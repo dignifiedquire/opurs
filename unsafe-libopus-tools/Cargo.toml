@@ -16,6 +16,10 @@ rayon = { version = "1.7.0" }
 itertools = { version = "0.11.0" }
 indicatif = { version = "0.17.6", features = ["rayon"] }
 
+[features]
+default = []
+ent-dump = ["unsafe-libopus/ent-dump"]
+
 [[bin]]
 name = "opus_compare"
 
