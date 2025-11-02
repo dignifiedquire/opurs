@@ -6,7 +6,17 @@
 #![allow(deprecated)]
 
 pub mod test_opus_common_h {
-    pub static mut iseed: u32 = 0;
+    use std::sync::atomic::AtomicU32;
+    static iseed: AtomicU32 = AtomicU32::new(0);
+
+    pub fn get_iseed() -> u32 {
+        iseed.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_iseed(val: u32) {
+        iseed.store(val, std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub unsafe fn _test_failed(mut file: *const i8, mut line: i32) -> ! {
         eprintln!();
         eprintln!(" ***************************************************");
@@ -15,7 +25,7 @@ pub mod test_opus_common_h {
         eprintln!("Please report this failure and include");
         eprintln!(
             "'make check SEED={} fails {} at line {} for {}'",
-            iseed,
+            get_iseed(),
             std::ffi::CStr::from_ptr(file as _).to_str().unwrap(),
             line,
             opus_get_version_string()
@@ -26,11 +36,11 @@ pub mod test_opus_common_h {
 
     use unsafe_libopus::opus_get_version_string;
 }
-pub use self::test_opus_common_h::{_test_failed, iseed};
+pub use self::test_opus_common_h::{_test_failed, get_iseed, set_iseed};
 use unsafe_libopus::externs::memset;
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_destroy, opus_get_version_string, OpusDecoder,
+    OpusDecoder, opus_decode, opus_decoder_create, opus_decoder_destroy, opus_get_version_string,
 };
 
 pub unsafe fn test_overflow() -> i32 {
@@ -63,7 +73,7 @@ pub unsafe fn test_overflow() -> i32 {
 }
 unsafe fn main_0() -> i32 {
     let mut _tests: i32 = 0;
-    iseed = 0;
+    set_iseed(0);
     let oversion = opus_get_version_string();
     eprintln!("Testing {} padding.", oversion);
     _tests += test_overflow();

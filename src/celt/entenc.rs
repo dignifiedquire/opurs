@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
+use crate::celt::entcode::{EC_UINT_BITS, EC_WINDOW_SIZE, celt_udiv, ec_ctx, ec_window};
 
 pub type ec_enc<'a> = ec_ctx<'a>;
 
@@ -73,7 +73,7 @@ fn ec_enc_normalize(this: &mut ec_enc) {
     }
 }
 
-pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc {
+pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc<'_> {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_init()");
     ec_enc {

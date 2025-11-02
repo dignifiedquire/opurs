@@ -1,4 +1,4 @@
-use nalgebra::{Dim, Matrix, ViewStorage, ViewStorageMut, U1};
+use nalgebra::{Dim, Matrix, U1, ViewStorage, ViewStorageMut};
 
 // provide type-aliases for row-major views and functions for their construction
 
@@ -14,7 +14,11 @@ pub type MatrixViewR<'a, T, R, C, RStride = C, CStride = U1> =
 pub type MatrixViewRMut<'a, T, R, C, RStride = C, CStride = U1> =
     Matrix<T, R, C, ViewStorageMut<'a, T, R, C, RStride, CStride>>;
 
-pub fn make_viewr_mut_generic<T, R, C>(slice: &mut [T], rows: R, cols: C) -> MatrixViewRMut<T, R, C>
+pub fn make_viewr_mut_generic<T, R, C>(
+    slice: &mut [T],
+    rows: R,
+    cols: C,
+) -> MatrixViewRMut<'_, T, R, C>
 where
     R: Dim,
     C: Dim,
@@ -25,7 +29,7 @@ where
     })
 }
 
-pub fn make_viewr_generic<T, R, C>(slice: &[T], rows: R, cols: C) -> MatrixViewR<T, R, C>
+pub fn make_viewr_generic<T, R, C>(slice: &[T], rows: R, cols: C) -> MatrixViewR<'_, T, R, C>
 where
     R: Dim,
     C: Dim,

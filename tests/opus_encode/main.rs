@@ -63,7 +63,16 @@ pub mod test_opus_common_h {
         Rw = 18000_u32.wrapping_mul(Rw & 65535).wrapping_add(Rw >> 16);
         (Rz << 16).wrapping_add(Rw)
     }
-    pub static mut iseed: u32 = 0;
+    static iseed: AtomicU32 = AtomicU32::new(0);
+
+    pub fn get_iseed() -> u32 {
+        iseed.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_iseed(val: u32) {
+        iseed.store(val, std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub unsafe fn _test_failed(mut file: *const i8, mut line: i32) -> ! {
         eprintln!();
         eprintln!(" ***************************************************");
@@ -72,7 +81,7 @@ pub mod test_opus_common_h {
         eprintln!("Please report this failure and include");
         eprintln!(
             "'make check SEED={} fails {} at line {} for {}'",
-            iseed,
+            get_iseed(),
             std::ffi::CStr::from_ptr(file as _).to_str().unwrap(),
             line,
             opus_get_version_string()
@@ -81,18 +90,22 @@ pub mod test_opus_common_h {
         panic!("test failed");
     }
 
+    use std::sync::atomic::AtomicU32;
+
     use unsafe_libopus::externs::memset;
     use unsafe_libopus::externs::{free, malloc};
     use unsafe_libopus::opus_get_version_string;
 }
-pub use self::test_opus_common_h::{debruijn2, Rw, Rz, _test_failed, fast_rand, iseed};
+use crate::test_opus_common_h::set_iseed;
+
+pub use self::test_opus_common_h::{_test_failed, Rw, Rz, debruijn2, fast_rand, get_iseed};
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::externs::{memcpy, memset};
 use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
-    opus_decoder_get_size, opus_encode, opus_encoder_create, opus_encoder_ctl,
-    opus_encoder_destroy, opus_encoder_get_size, opus_get_version_string, opus_packet_pad,
-    opus_packet_parse, opus_packet_unpad, OpusDecoder, OpusEncoder,
+    OpusDecoder, OpusEncoder, opus_decode, opus_decoder_create, opus_decoder_ctl,
+    opus_decoder_destroy, opus_decoder_get_size, opus_encode, opus_encoder_create,
+    opus_encoder_ctl, opus_encoder_destroy, opus_encoder_get_size, opus_get_version_string,
+    opus_packet_pad, opus_packet_parse, opus_packet_unpad,
 };
 
 mod opus_encode_regressions;
@@ -401,7 +414,8 @@ pub unsafe fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32)
                 _test_failed(b"tests/test_opus_encode.c\0" as *const u8 as *const i8, 252);
             }
             if test_encode(enc, num_channels, frame_size, dec) != 0 {
-                eprintln!("fuzz_encoder_settings: {} kHz, {} ch, application: {}, {} bps, force ch: {}, vbr: {}, vbr constraint: {}, complexity: {}, max bw: {}, signal: {}, inband fec: {}, pkt loss: {}%, lsb depth: {}, pred disabled: {}, dtx: {}, ({}/2) ms", 
+                eprintln!(
+                    "fuzz_encoder_settings: {} kHz, {} ch, application: {}, {} bps, force ch: {}, vbr: {}, vbr constraint: {}, complexity: {}, max bw: {}, signal: {}, inband fec: {}, pkt loss: {}%, lsb depth: {}, pred disabled: {}, dtx: {}, ({}/2) ms",
                     sampling_rate / 1000,
                     num_channels,
                     application,
@@ -926,7 +940,7 @@ unsafe fn main_0() -> i32 {
     let mut args = DUMMY_ARGS.into_iter().map(|v| v.to_string()); // std::env::args();
     let argv0 = args.next().unwrap();
 
-    iseed = match args
+    let seed = match args
         .next()
         .map(|v| v.parse().expect("Failed to parse seed from command line"))
     {
@@ -953,8 +967,9 @@ unsafe fn main_0() -> i32 {
             }
         },
     };
+    set_iseed(seed);
 
-    Rz = iseed;
+    Rz = seed;
     Rw = Rz;
 
     let mut num_encoders_to_fuzz: i32 = 5;
@@ -986,7 +1001,7 @@ unsafe fn main_0() -> i32 {
     eprintln!(
         "Testing {} encoder. Random seed: {} ({:4X})",
         oversion,
-        iseed,
+        get_iseed(),
         fast_rand() % 65535
     );
     regression_test();

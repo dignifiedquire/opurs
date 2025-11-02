@@ -1,6 +1,6 @@
 use crate::celt::bands::{
-    compute_band_energies, haar1, hysteresis_decision, normalise_bands, quant_all_bands,
-    spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
+    SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL, compute_band_energies, haar1,
+    hysteresis_decision, normalise_bands, quant_all_bands, spreading_decision,
 };
 
 pub mod arch_h {
@@ -23,26 +23,26 @@ pub mod stddef_h {
     pub const NULL: i32 = 0;
 }
 pub use self::arch_h::{
-    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON,
+    CELT_SIG_SCALE, EPSILON, celt_ener, celt_norm, celt_sig, opus_val16, opus_val32,
 };
 pub use self::stddef_h::NULL;
-use crate::celt::celt::{
-    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
-};
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
     CELT_SET_SILK_INFO_REQUEST, CELT_SET_START_BAND_REQUEST, COMBFILTER_MAXPERIOD,
     COMBFILTER_MINPERIOD, OPUS_SET_ENERGY_MASK_REQUEST, OPUS_SET_LFE_REQUEST,
 };
-use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
+use crate::celt::celt::{
+    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
+};
+use crate::celt::entcode::{BITRES, ec_get_error, ec_tell, ec_tell_frac};
 use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
     ec_enc_uint,
 };
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
-use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
+use crate::celt::modes::{OpusCustomMode, opus_custom_mode_create};
 use crate::celt::pitch::{celt_inner_prod_c, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
@@ -2117,11 +2117,7 @@ pub unsafe fn celt_encode_with_ec(
             max_allowed = if (if (if tell == 1 { 2 } else { 0 })
                 > vbr_rate + vbr_bound - (*st).vbr_reservoir >> 3 + 3
             {
-                if tell == 1 {
-                    2
-                } else {
-                    0
-                }
+                if tell == 1 { 2 } else { 0 }
             } else {
                 vbr_rate + vbr_bound - (*st).vbr_reservoir >> 3 + 3
             }) < nbAvailableBytes
@@ -2129,11 +2125,7 @@ pub unsafe fn celt_encode_with_ec(
                 if (if tell == 1 { 2 } else { 0 })
                     > vbr_rate + vbr_bound - (*st).vbr_reservoir >> 3 + 3
                 {
-                    if tell == 1 {
-                        2
-                    } else {
-                        0
-                    }
+                    if tell == 1 { 2 } else { 0 }
                 } else {
                     vbr_rate + vbr_bound - (*st).vbr_reservoir >> 3 + 3
                 }
@@ -2439,11 +2431,7 @@ pub unsafe fn celt_encode_with_ec(
         diff = diff * 6 as f32 / (C * (mask_end - 1) * (mask_end + 1) * mask_end) as f32;
         diff = 0.5f32 * diff;
         diff = if (if diff < 0.031f32 { diff } else { 0.031f32 }) > -0.031f32 {
-            if diff < 0.031f32 {
-                diff
-            } else {
-                0.031f32
-            }
+            if diff < 0.031f32 { diff } else { 0.031f32 }
         } else {
             -0.031f32
         };
@@ -2843,7 +2831,7 @@ pub unsafe fn celt_encode_with_ec(
         i += 1;
     }
     if C == 2 {
-        static mut intensity_thresholds: [opus_val16; 21] = [
+        static intensity_thresholds: [opus_val16; 21] = [
             1 as opus_val16,
             2 as opus_val16,
             3 as opus_val16,
@@ -2866,7 +2854,7 @@ pub unsafe fn celt_encode_with_ec(
             106 as opus_val16,
             134 as opus_val16,
         ];
-        static mut intensity_histeresis: [opus_val16; 21] = [
+        static intensity_histeresis: [opus_val16; 21] = [
             1 as opus_val16,
             1 as opus_val16,
             1 as opus_val16,

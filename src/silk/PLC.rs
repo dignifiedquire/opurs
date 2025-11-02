@@ -1,4 +1,5 @@
-const BWE_COEF: f64 = 0.99;
+// const BWE_COEF: f64 = 0.99;
+
 /// 0.7 in Q14
 const V_PITCH_GAIN_START_MIN_Q14: i32 = 11469;
 /// 0.95 in Q14
@@ -14,6 +15,12 @@ pub mod typedef_h {
 }
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX, silk_int32_MIN};
 use crate::externs::{memcpy, memset};
+use crate::silk::Inlines::{silk_INVERSE32_varQ, silk_SQRT_APPROX};
+use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
+use crate::silk::SigProc_FIX::{
+    SILK_FIX_CONST, silk_RAND, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int,
+};
 use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED,
@@ -21,12 +28,6 @@ use crate::silk::define::{
 use crate::silk::macros::{silk_CLZ32, silk_SMULBB};
 use crate::silk::structs::{silk_PLC_struct, silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
-use crate::silk::Inlines::{silk_INVERSE32_varQ, silk_SQRT_APPROX};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
-use crate::silk::SigProc_FIX::{
-    silk_RAND, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int, SILK_FIX_CONST,
-};
 
 pub const NB_ATT: i32 = 2;
 static HARM_ATT_Q15: [i16; 2] = [32440, 31130];
@@ -272,7 +273,7 @@ unsafe fn silk_PLC_conceal(
             PLC_RAND_ATTENUATE_UV_Q15[silk_min_int(NB_ATT - 1, psDec.lossCnt) as usize] as i32;
     }
     silk_bwexpander(
-        &mut (*psPLC).prevLPC_Q12[..psDec.LPC_order],
+        &mut (&mut (*psPLC).prevLPC_Q12)[..psDec.LPC_order],
         (0.99f64 * ((1) << 16) as f64 + 0.5f64) as i32,
     );
     memcpy(
@@ -295,7 +296,7 @@ unsafe fn silk_PLC_conceal(
             let mut invGain_Q30: i32 = 0;
             let mut down_scale_Q30: i32 = 0;
             invGain_Q30 =
-                silk_LPC_inverse_pred_gain_c(&mut (*psPLC).prevLPC_Q12[..psDec.LPC_order]);
+                silk_LPC_inverse_pred_gain_c(&mut (&mut (*psPLC).prevLPC_Q12)[..psDec.LPC_order]);
             down_scale_Q30 = silk_min_32((1) << 30 >> 3, invGain_Q30);
             down_scale_Q30 = silk_max_32((1) << 30 >> 8, down_scale_Q30);
             down_scale_Q30 = ((down_scale_Q30 as u32) << 3) as i32;

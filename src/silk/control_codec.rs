@@ -5,14 +5,15 @@ pub mod errors_h {
 
 use self::errors_h::{SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR};
 use crate::externs::memset;
+use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 use crate::silk::control_audio_bandwidth::silk_control_audio_bandwidth;
 use crate::silk::define::{
     LA_SHAPE_MS, MAX_DEL_DEC_STATES, MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER,
     SUB_FRAME_LENGTH_MS, TYPE_NO_VOICE_ACTIVITY,
 };
 use crate::silk::enc_API::silk_EncControlStruct;
-use crate::silk::float::structs_FLP::{silk_encoder_state_FLP, silk_shape_state_FLP};
 use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_short2float_array};
+use crate::silk::float::structs_FLP::{silk_encoder_state_FLP, silk_shape_state_FLP};
 use crate::silk::pitch_est_tables::{
     SILK_PE_MAX_COMPLEX, SILK_PE_MID_COMPLEX, SILK_PE_MIN_COMPLEX,
 };
@@ -26,7 +27,6 @@ use crate::silk::tables_pitch_lag::{
     silk_pitch_contour_iCDF,
 };
 use crate::silk::tuning_parameters::WARPING_MULTIPLIER;
-use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 pub unsafe fn silk_control_encoder(
     psEnc: *mut silk_encoder_state_FLP,
@@ -88,7 +88,7 @@ unsafe fn silk_setup_resamplers(psEnc: *mut silk_encoder_state_FLP, fs_kHz: i32)
             let mut x_bufFIX: Vec<i16> = ::std::vec::from_elem(0, vla);
             silk_float2short_array(
                 &mut x_bufFIX[..old_buf_samples as usize],
-                &(*psEnc).x_buf[..old_buf_samples as usize],
+                &(&(*psEnc).x_buf)[..old_buf_samples as usize],
             );
 
             /* Initialize resampler for temporary resampling of x_buf data to API_fs_Hz */
@@ -117,7 +117,7 @@ unsafe fn silk_setup_resamplers(psEnc: *mut silk_encoder_state_FLP, fs_kHz: i32)
                 &x_buf_API_fs_Hz[..api_buf_samples as usize],
             );
             silk_short2float_array(
-                &mut (*psEnc).x_buf[..new_buf_samples as usize],
+                &mut (&mut (*psEnc).x_buf)[..new_buf_samples as usize],
                 &x_bufFIX[..new_buf_samples as usize],
             );
         }

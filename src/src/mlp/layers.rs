@@ -1,6 +1,6 @@
 use crate::src::mlp::tansig::{sigmoid_approx, tansig_approx};
 use ndarray::{
-    aview1, aview_mut1, azip, ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _,
+    ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _, aview_mut1, aview1, azip,
 };
 
 pub const WEIGHTS_SCALE: f32 = 1.0f32 / 128f32;
@@ -35,7 +35,7 @@ impl DenseLayer {
     }
 
     // TODO: it would be nice to have to do this only once (converting slices to arrays requires some bound checks)
-    pub fn as_arrays(&self) -> (ArrayView1<i8>, ArrayView2<i8>) {
+    pub fn as_arrays(&self) -> (ArrayView1<'_, i8>, ArrayView2<'_, i8>) {
         let n = self.nb_neurons();
         let m = self.nb_inputs();
         let col_stride = n;
@@ -95,9 +95,9 @@ impl GRULayer {
     fn as_arrays(
         &self,
     ) -> (
-        [ArrayView1<i8>; 3],
-        [ArrayView2<i8>; 3],
-        [ArrayView2<i8>; 3],
+        [ArrayView1<'_, i8>; 3],
+        [ArrayView2<'_, i8>; 3],
+        [ArrayView2<'_, i8>; 3],
     ) {
         let m = self.nb_inputs();
         let n = self.nb_neurons();

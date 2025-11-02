@@ -63,7 +63,15 @@ pub mod test_opus_common_h {
         Rw = 18000_u32.wrapping_mul(Rw & 65535).wrapping_add(Rw >> 16);
         (Rz << 16).wrapping_add(Rw)
     }
-    pub static mut iseed: u32 = 0;
+    static iseed: AtomicU32 = AtomicU32::new(0);
+
+    pub fn get_iseed() -> u32 {
+        iseed.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_iseed(val: u32) {
+        iseed.store(val, std::sync::atomic::Ordering::Relaxed)
+    }
     pub unsafe fn _test_failed(mut file: *const i8, mut line: i32) -> ! {
         eprintln!();
         eprintln!(" ***************************************************");
@@ -72,7 +80,7 @@ pub mod test_opus_common_h {
         eprintln!("Please report this failure and include");
         eprintln!(
             "'make check SEED={} fails {} at line {} for {}'",
-            iseed,
+            get_iseed(),
             std::ffi::CStr::from_ptr(file as _).to_str().unwrap(),
             line,
             opus_get_version_string()
@@ -81,18 +89,22 @@ pub mod test_opus_common_h {
         panic!("test failed");
     }
 
+    use std::sync::atomic::AtomicU32;
+
     use unsafe_libopus::externs::memset;
     use unsafe_libopus::externs::{free, malloc};
     use unsafe_libopus::opus_get_version_string;
 }
-pub use self::test_opus_common_h::{debruijn2, Rw, Rz, _test_failed, fast_rand, iseed};
+use crate::test_opus_common_h::set_iseed;
+
+pub use self::test_opus_common_h::{_test_failed, Rw, Rz, debruijn2, fast_rand, get_iseed};
 use unsafe_libopus::externs::{memcpy, memset};
 
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
+    OpusDecoder, opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
     opus_decoder_get_nb_samples, opus_decoder_get_size, opus_get_version_string,
-    opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder,
+    opus_packet_get_nb_channels, opus_pcm_soft_clip,
 };
 
 pub unsafe fn test_decoder_code0(no_fuzz: bool) -> i32 {
@@ -801,7 +813,7 @@ unsafe fn main_0() -> i32 {
     let mut args = DUMMY_ARGS.into_iter().map(|v| v.to_string()); // std::env::args();
     let _argv0 = args.next().unwrap();
 
-    iseed = match args
+    let seed = match args
         .next()
         .map(|v| v.parse().expect("Failed to parse seed from command line"))
     {
@@ -829,7 +841,8 @@ unsafe fn main_0() -> i32 {
         },
     };
 
-    Rz = iseed;
+    set_iseed(seed);
+    Rz = seed;
     Rw = Rz;
 
     let oversion = opus_get_version_string();
@@ -837,7 +850,7 @@ unsafe fn main_0() -> i32 {
     eprintln!(
         "Testing {} decoder. Random seed: {} ({:4X})",
         oversion,
-        iseed,
+        get_iseed(),
         (fast_rand() % 65535)
     );
     test_decoder_code0(std::env::var("TEST_OPUS_NOFUZZ").is_ok());

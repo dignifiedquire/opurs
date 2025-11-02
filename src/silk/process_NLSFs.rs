@@ -1,9 +1,9 @@
 use crate::externs::memcpy;
-use crate::silk::interpolate::silk_interpolate;
-use crate::silk::structs::silk_encoder_state;
 use crate::silk::NLSF_VQ_weights_laroia::silk_NLSF_VQ_weights_laroia;
 use crate::silk::NLSF_encode::silk_NLSF_encode;
 use crate::silk::NLSF2A::silk_NLSF2A;
+use crate::silk::interpolate::silk_interpolate;
+use crate::silk::structs::silk_encoder_state;
 
 pub unsafe fn silk_process_NLSFs(
     psEncC: &mut silk_encoder_state,
@@ -67,7 +67,7 @@ pub unsafe fn silk_process_NLSFs(
         psEncC.indices.signalType as i32,
     );
     silk_NLSF2A(
-        &mut (*PredCoef_Q12.offset(1))[..psEncC.predictLPCOrder as usize],
+        &mut (&mut (*PredCoef_Q12.offset(1)))[..psEncC.predictLPCOrder as usize],
         std::slice::from_raw_parts(pNLSF_Q15, psEncC.predictLPCOrder as usize),
     );
     if doInterpolate != 0 {
@@ -78,7 +78,7 @@ pub unsafe fn silk_process_NLSFs(
             psEncC.indices.NLSFInterpCoef_Q2 as i32,
         );
         silk_NLSF2A(
-            &mut (*PredCoef_Q12)[..psEncC.predictLPCOrder as usize],
+            &mut (&mut (*PredCoef_Q12))[..psEncC.predictLPCOrder as usize],
             &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
         );
     } else {

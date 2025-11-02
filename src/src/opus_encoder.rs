@@ -18,9 +18,9 @@ pub mod cpu_support_h {
         return 0;
     }
 }
-use self::arch_h::{opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL};
+use self::arch_h::{CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL, opus_val16, opus_val32};
 pub use self::cpu_support_h::opus_select_arch;
-pub use self::stddef_h::{size_t, NULL};
+pub use self::stddef_h::{NULL, size_t};
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
@@ -28,7 +28,7 @@ use crate::celt::celt::{
     OPUS_SET_LFE_REQUEST,
 };
 use crate::celt::celt_encoder::{
-    celt_encode_with_ec, celt_encoder_get_size, celt_encoder_init, OpusCustomEncoder, SILKInfo,
+    OpusCustomEncoder, SILKInfo, celt_encode_with_ec, celt_encoder_get_size, celt_encoder_init,
 };
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::ec_enc;
@@ -48,20 +48,20 @@ use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
 use crate::src::analysis::{
-    downmix_func, run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo,
-    TonalityAnalysisState,
+    AnalysisInfo, TonalityAnalysisState, downmix_func, run_analysis, tonality_analysis_init,
+    tonality_analysis_reset,
 };
 use crate::src::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
     OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND,
     OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND, OPUS_BANDWIDTH_SUPERWIDEBAND,
-    OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_FRAMESIZE_100_MS,
-    OPUS_FRAMESIZE_10_MS, OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_20_MS, OPUS_FRAMESIZE_2_5_MS,
-    OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_5_MS, OPUS_FRAMESIZE_60_MS, OPUS_FRAMESIZE_80_MS,
+    OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_FRAMESIZE_2_5_MS,
+    OPUS_FRAMESIZE_5_MS, OPUS_FRAMESIZE_10_MS, OPUS_FRAMESIZE_20_MS, OPUS_FRAMESIZE_40_MS,
+    OPUS_FRAMESIZE_60_MS, OPUS_FRAMESIZE_80_MS, OPUS_FRAMESIZE_100_MS, OPUS_FRAMESIZE_120_MS,
     OPUS_FRAMESIZE_ARG, OPUS_GET_APPLICATION_REQUEST, OPUS_GET_BANDWIDTH_REQUEST,
     OPUS_GET_BITRATE_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_EXPERT_FRAME_DURATION_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST,
-    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_IN_DTX_REQUEST,
+    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_IN_DTX_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_LOOKAHEAD_REQUEST, OPUS_GET_LSB_DEPTH_REQUEST, OPUS_GET_MAX_BANDWIDTH_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
     OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_GET_SIGNAL_REQUEST,
@@ -75,13 +75,13 @@ use crate::src::opus_defines::{
     OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
 };
 use crate::src::opus_private::{
-    align, MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY, OPUS_GET_VOICE_RATIO_REQUEST,
-    OPUS_SET_FORCE_MODE_REQUEST, OPUS_SET_VOICE_RATIO_REQUEST,
+    MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY, OPUS_GET_VOICE_RATIO_REQUEST,
+    OPUS_SET_FORCE_MODE_REQUEST, OPUS_SET_VOICE_RATIO_REQUEST, align,
 };
 use crate::varargs::VarArgs;
 use crate::{
-    opus_custom_encoder_ctl, opus_packet_pad, opus_repacketizer_cat, opus_repacketizer_init,
-    opus_repacketizer_out_range_impl, OpusRepacketizer,
+    OpusRepacketizer, opus_custom_encoder_ctl, opus_packet_pad, opus_repacketizer_cat,
+    opus_repacketizer_init, opus_repacketizer_out_range_impl,
 };
 
 #[derive(Copy, Clone)]
@@ -143,13 +143,11 @@ pub struct StereoWidthState {
     pub max_follower: opus_val16,
 }
 pub const PSEUDO_SNR_THRESHOLD: f32 = 316.23f32;
-static mut mono_voice_bandwidth_thresholds: [i32; 8] =
+static mono_voice_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
+static mono_music_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
+static stereo_voice_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-static mut mono_music_bandwidth_thresholds: [i32; 8] =
-    [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
-static mut stereo_voice_bandwidth_thresholds: [i32; 8] =
-    [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-static mut stereo_music_bandwidth_thresholds: [i32; 8] =
+static stereo_music_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
 static mut stereo_voice_threshold: i32 = 19000;
 static mut stereo_music_threshold: i32 = 17000;
