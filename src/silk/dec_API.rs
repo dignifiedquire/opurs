@@ -1,7 +1,7 @@
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_DecControlStruct {
-    pub nChannelsAPI: i32,
+    pub nChannelsAPI: usize,
     pub nChannelsInternal: i32,
     pub API_sampleRate: i32,
     pub internalSampleRate: i32,
@@ -151,7 +151,7 @@ pub unsafe fn silk_Decode(
             ::core::mem::size_of::<ResamplerState>() as u64,
         );
     }
-    psDec.nChannelsAPI = decControl.nChannelsAPI;
+    psDec.nChannelsAPI = decControl.nChannelsAPI as i32;
     psDec.nChannelsInternal = decControl.nChannelsInternal;
     if decControl.API_sampleRate > MAX_API_FS_KHZ * 1000 || decControl.API_sampleRate < 8000 {
         ret = SILK_DEC_INVALID_SAMPLING_FREQUENCY;
@@ -285,7 +285,8 @@ pub unsafe fn silk_Decode(
         channel_state[1].first_frame_after_reset = 1;
     }
     delay_stack_alloc = (decControl.internalSampleRate * decControl.nChannelsInternal
-        < decControl.API_sampleRate * decControl.nChannelsAPI) as i32;
+        < decControl.API_sampleRate * decControl.nChannelsAPI as i32)
+        as i32;
     let vla = (if delay_stack_alloc != 0 {
         1
     } else {
@@ -418,8 +419,8 @@ pub unsafe fn silk_Decode(
     }
     n = 0;
     while n
-        < (if decControl.nChannelsAPI < decControl.nChannelsInternal {
-            decControl.nChannelsAPI
+        < (if (decControl.nChannelsAPI as i32) < decControl.nChannelsInternal {
+            decControl.nChannelsAPI as i32
         } else {
             decControl.nChannelsInternal
         })

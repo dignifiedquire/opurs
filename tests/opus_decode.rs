@@ -742,8 +742,8 @@ pub unsafe fn test_decoder_code0(no_fuzz: bool) -> i32 {
     0
 }
 pub unsafe fn test_soft_clip() {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut i = 0;
+    let mut j = 0;
     let mut x: [f32; 1024] = [0.; 1024];
     let mut s: [f32; 8] = [
         0 as f32, 0 as f32, 0 as f32, 0 as f32, 0 as f32, 0 as f32, 0 as f32, 0 as f32,
@@ -756,12 +756,7 @@ pub unsafe fn test_soft_clip() {
             x[j as usize] = (j & 255) as f32 * (1 as f32 / 32.0f32) - 4.0f32;
             j += 1;
         }
-        opus_pcm_soft_clip(
-            &mut *x.as_mut_ptr().offset(i as isize),
-            1024 - i,
-            1,
-            s.as_mut_ptr(),
-        );
+        opus_pcm_soft_clip(&mut x[i as usize..], 1024 - i, 1, &mut s);
         j = i;
         while j < 1024 {
             if x[j as usize] > 1.0f32 {
@@ -781,7 +776,7 @@ pub unsafe fn test_soft_clip() {
             x[j as usize] = (j & 255) as f32 * (1 as f32 / 32.0f32) - 4.0f32;
             j += 1;
         }
-        opus_pcm_soft_clip(x.as_mut_ptr(), 1024 / i, i, s.as_mut_ptr());
+        opus_pcm_soft_clip(&mut x, 1024 / i, i, &mut s);
         j = 0;
         while j < 1024 / i * i {
             if x[j as usize] > 1.0f32 {
@@ -794,12 +789,14 @@ pub unsafe fn test_soft_clip() {
         }
         i += 1;
     }
-    opus_pcm_soft_clip(x.as_mut_ptr(), 0, 1, s.as_mut_ptr());
-    opus_pcm_soft_clip(x.as_mut_ptr(), 1, 0, s.as_mut_ptr());
-    opus_pcm_soft_clip(x.as_mut_ptr(), 1, 1, std::ptr::null_mut::<f32>());
-    opus_pcm_soft_clip(x.as_mut_ptr(), 1, -1, s.as_mut_ptr());
-    opus_pcm_soft_clip(x.as_mut_ptr(), -1, 1, s.as_mut_ptr());
-    opus_pcm_soft_clip(std::ptr::null_mut::<f32>(), 1, 1, s.as_mut_ptr());
+    opus_pcm_soft_clip(&mut x, 0, 1, &mut s);
+    opus_pcm_soft_clip(&mut x, 1, 0, &mut s);
+
+    // tested the api returning early, not needed anymore
+    // opus_pcm_soft_clip(&mut x, 1, -1, &mut s);
+    // opus_pcm_soft_clip(&mut x, -1, 1, &mut s);
+    // opus_pcm_soft_clip(x.as_mut_ptr(), 1, 1, std::ptr::null_mut::<f32>());
+    // opus_pcm_soft_clip(std::ptr::null_mut::<f32>(), 1, 1, s.as_mut_ptr());
     println!("OK.");
 }
 

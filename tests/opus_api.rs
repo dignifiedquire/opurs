@@ -381,7 +381,7 @@ pub unsafe fn test_dec_api() -> i32 {
     }
     cfgs += 1;
     println!("    opus_decode() ................................ OK.");
-    if opus_decode_float(&mut *dec, packet.as_mut_ptr(), 3, fbuf.as_mut_ptr(), 960, 0) != 960 {
+    if opus_decode_float(&mut *dec, packet.as_mut_ptr(), 3, &mut fbuf, 960, 0) != 960 {
         _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 320);
     }
     cfgs += 1;

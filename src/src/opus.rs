@@ -4,119 +4,91 @@ pub mod stddef_h {
 pub use self::stddef_h::NULL;
 use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
-pub unsafe fn opus_pcm_soft_clip(mut _x: *mut f32, N: i32, C: i32, declip_mem: *mut f32) {
-    let mut c: i32 = 0;
-    let mut i: i32 = 0;
-    let mut x: *mut f32 = 0 as *mut f32;
-    if C < 1 || N < 1 || _x.is_null() || declip_mem.is_null() {
+pub fn opus_pcm_soft_clip(_x: &mut [f32], N: usize, C: usize, declip_mem: &mut [f32]) {
+    if C < 1 || N < 1 {
         return;
     }
-    i = 0;
-    while i < N * C {
-        *_x.offset(i as isize) = if -2.0f32
-            > (if 2.0f32 < *_x.offset(i as isize) {
-                2.0f32
-            } else {
-                *_x.offset(i as isize)
-            }) {
+
+    for i in 0..N * C {
+        _x[i] = if -2.0f32 > (if 2.0f32 < _x[i] { 2.0f32 } else { _x[i] }) {
             -2.0f32
-        } else if 2.0f32 < *_x.offset(i as isize) {
+        } else if 2.0f32 < _x[i] {
             2.0f32
         } else {
-            *_x.offset(i as isize)
-        };
-        i += 1;
+            _x[i]
+        }
     }
-    c = 0;
-    while c < C {
-        let mut a: f32 = 0.;
-        let mut x0: f32 = 0.;
-        let mut curr: i32 = 0;
-        x = _x.offset(c as isize);
-        a = *declip_mem.offset(c as isize);
-        i = 0;
-        while i < N {
-            if *x.offset((i * C) as isize) * a >= 0 as f32 {
+    for c in 0..C {
+        let x = &mut _x[c..];
+        let mut a = declip_mem[c];
+
+        for i in 0..N {
+            if x[i * C] * a >= 0. {
                 break;
             }
-            *x.offset((i * C) as isize) = *x.offset((i * C) as isize)
-                + a * *x.offset((i * C) as isize) * *x.offset((i * C) as isize);
-            i += 1;
+            x[i * C] = x[i * C] + a * x[i * C] * x[i * C];
         }
-        curr = 0;
-        x0 = *x.offset(0 as isize);
+
+        let mut curr = 0;
+        let x0 = x[0];
         loop {
-            let mut start: i32 = 0;
-            let mut end: i32 = 0;
-            let mut maxval: f32 = 0.;
-            let mut special: i32 = 0;
-            let mut peak_pos: i32 = 0;
-            i = curr;
+            let mut start = 0;
+            let mut end = 0;
+            let mut maxval = 0.;
+            let mut special = 0;
+            let mut peak_pos = 0;
+
+            let mut i = curr;
             while i < N {
-                if *x.offset((i * C) as isize) > 1 as f32 || *x.offset((i * C) as isize) < -1 as f32
-                {
+                if x[i * C] > 1. || x[i * C] < -1. {
                     break;
                 }
                 i += 1;
             }
             if i == N {
-                a = 0 as f32;
+                a = 0.;
                 break;
             } else {
                 peak_pos = i;
                 end = i;
                 start = end;
-                maxval = (*x.offset((i * C) as isize)).abs();
-                while start > 0
-                    && *x.offset((i * C) as isize) * *x.offset(((start - 1) * C) as isize)
-                        >= 0 as f32
-                {
+                maxval = x[i * C].abs();
+                while start > 0 && x[i * C] * x[(start - 1) * C] >= 0. {
                     start -= 1;
                 }
-                while end < N
-                    && *x.offset((i * C) as isize) * *x.offset((end * C) as isize) >= 0 as f32
-                {
-                    if (*x.offset((end * C) as isize)).abs() > maxval {
-                        maxval = (*x.offset((end * C) as isize)).abs();
+                while end < N && x[i * C] * x[end * C] >= 0. {
+                    if x[end * C].abs() > maxval {
+                        maxval = x[end * C].abs();
                         peak_pos = end;
                     }
                     end += 1;
                 }
-                special = (start == 0
-                    && *x.offset((i * C) as isize) * *x.offset(0 as isize) >= 0 as f32)
-                    as i32;
-                a = (maxval - 1 as f32) / (maxval * maxval);
+                special = (start == 0 && x[i * C] * x[0] >= 0.) as i32;
+                a = (maxval - 1.) / (maxval * maxval);
                 a += a * 2.4e-7f32;
-                if *x.offset((i * C) as isize) > 0 as f32 {
+                if x[i * C] > 0. {
                     a = -a;
                 }
-                i = start;
-                while i < end {
-                    *x.offset((i * C) as isize) = *x.offset((i * C) as isize)
-                        + a * *x.offset((i * C) as isize) * *x.offset((i * C) as isize);
-                    i += 1;
+                for i in start..end {
+                    x[i * C] = x[i * C] + a * x[i * C] * x[i * C];
                 }
+
                 if special != 0 && peak_pos >= 2 {
-                    let mut delta: f32 = 0.;
-                    let mut offset: f32 = x0 - *x.offset(0 as isize);
+                    let mut delta = 0.;
+                    let mut offset = x0 - x[0];
                     delta = offset / peak_pos as f32;
-                    i = curr;
-                    while i < peak_pos {
+
+                    for i in curr..peak_pos {
                         offset -= delta;
-                        *x.offset((i * C) as isize) += offset;
-                        *x.offset((i * C) as isize) = if -1.0f32
-                            > (if 1.0f32 < *x.offset((i * C) as isize) {
-                                1.0f32
-                            } else {
-                                *x.offset((i * C) as isize)
-                            }) {
+                        x[i * C] += offset;
+                        x[i * C] = if -1.0f32 > (if 1.0f32 < x[i * C] { 1.0f32 } else { x[i * C] })
+                        {
                             -1.0f32
-                        } else if 1.0f32 < *x.offset((i * C) as isize) {
+                        } else if 1.0f32 < x[i * C] {
                             1.0f32
                         } else {
-                            *x.offset((i * C) as isize)
+                            x[i * C]
                         };
-                        i += 1;
                     }
                 }
                 curr = end;
@@ -125,10 +97,10 @@ pub unsafe fn opus_pcm_soft_clip(mut _x: *mut f32, N: i32, C: i32, declip_mem: *
                 }
             }
         }
-        *declip_mem.offset(c as isize) = a;
-        c += 1;
+        declip_mem[c] = a;
     }
 }
+
 pub unsafe fn encode_size(size: i32, data: *mut u8) -> i32 {
     if size < 252 {
         *data.offset(0 as isize) = size as u8;
