@@ -40,7 +40,7 @@ pub use self::test_opus_common_h::{_test_failed, get_iseed, set_iseed};
 use unsafe_libopus::externs::memset;
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::{
-    OpusDecoder, opus_decode, opus_decoder_create, opus_decoder_destroy, opus_get_version_string,
+    opus_decode, opus_decoder_create, opus_decoder_destroy, opus_get_version_string, OpusDecoder,
 };
 
 pub unsafe fn test_overflow() -> i32 {

@@ -3,14 +3,14 @@ use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_PREDICTION_POWER_GAIN,
     MAX_PREDICTION_POWER_GAIN_AFTER_RESET, TYPE_VOICED,
 };
-use crate::silk::float::LTP_analysis_filter_FLP::silk_LTP_analysis_filter_FLP;
-use crate::silk::float::LTP_scale_ctrl_FLP::silk_LTP_scale_ctrl_FLP;
 use crate::silk::float::find_LPC_FLP::silk_find_LPC_FLP;
 use crate::silk::float::find_LTP_FLP::silk_find_LTP_FLP;
 use crate::silk::float::residual_energy_FLP::silk_residual_energy_FLP;
 use crate::silk::float::scale_copy_vector_FLP::silk_scale_copy_vector_FLP;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::float::wrappers_FLP::{silk_process_NLSFs_FLP, silk_quant_LTP_gains_FLP};
+use crate::silk::float::LTP_analysis_filter_FLP::silk_LTP_analysis_filter_FLP;
+use crate::silk::float::LTP_scale_ctrl_FLP::silk_LTP_scale_ctrl_FLP;
 use crate::silk::mathops::silk_exp2;
 use crate::util::nalgebra::make_viewr_mut_generic;
 use nalgebra::{Const, Dyn, VectorView};

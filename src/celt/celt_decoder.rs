@@ -636,12 +636,7 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     *X.as_mut_ptr().offset((boffs + j) as isize) = (seed as i32 >> 20) as celt_norm;
                     j += 1;
                 }
-                renormalise_vector(
-                    X.as_mut_ptr().offset(boffs as isize),
-                    blen,
-                    Q15ONE,
-                    st.arch,
-                );
+                renormalise_vector(X.as_mut_ptr().offset(boffs as isize), blen, Q15ONE, st.arch);
                 i += 1;
             }
             c += 1;

@@ -36,7 +36,6 @@ use self::errors_h::SILK_NO_ERROR;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
 use crate::externs::{memcpy, memset};
-use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
 use crate::silk::check_control_input::check_control_input;
 use crate::silk::control_SNR::silk_control_SNR;
 use crate::silk::control_codec::silk_control_encoder;
@@ -49,8 +48,8 @@ use crate::silk::encode_pulses::silk_encode_pulses;
 use crate::silk::float::encode_frame_FLP::{silk_encode_do_VAD_FLP, silk_encode_frame_FLP};
 use crate::silk::float::structs_FLP::{silk_encoder, silk_encoder_state_FLP, silk_shape_state_FLP};
 use crate::silk::init_encoder::silk_init_encoder;
-use crate::silk::resampler::ResamplerState;
 use crate::silk::resampler::silk_resampler;
+use crate::silk::resampler::ResamplerState;
 use crate::silk::stereo_LR_to_MS::silk_stereo_LR_to_MS;
 use crate::silk::stereo_encode_pred::{silk_stereo_encode_mid_only, silk_stereo_encode_pred};
 use crate::silk::structs::{silk_LP_state, silk_nsq_state};
@@ -58,6 +57,7 @@ use crate::silk::tables_other::{silk_LBRR_flags_iCDF_ptr, silk_Quantization_Offs
 use crate::silk::tuning_parameters::{
     BITRESERVOIR_DECAY_TIME_MS, MAX_BANDWIDTH_SWITCH_DELAY_MS, SPEECH_ACTIVITY_DTX_THRES,
 };
+use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
 
 pub unsafe fn silk_Get_Encoder_Size(encSizeBytes: *mut i32) -> i32 {
     let ret: i32 = SILK_NO_ERROR;

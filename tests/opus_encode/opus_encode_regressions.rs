@@ -1,5 +1,5 @@
 use unsafe_libopus::{
-    OpusEncoder, opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
+    opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy, OpusEncoder,
 };
 
 unsafe fn ec_enc_shrink_assert() -> i32 {

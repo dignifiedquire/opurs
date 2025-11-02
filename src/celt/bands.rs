@@ -15,11 +15,11 @@ pub mod stddef_h {
     pub const NULL: i32 = 0;
 }
 pub use self::arch_h::{
-    EPSILON, NORM_SCALING, Q15ONE, celt_ener, celt_norm, celt_sig, opus_val16, opus_val32,
+    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, EPSILON, NORM_SCALING, Q15ONE,
 };
 pub use self::stack_alloc_h::ALLOC_NONE;
 pub use self::stddef_h::NULL;
-use crate::celt::entcode::{BITRES, celt_sudiv, celt_udiv, ec_ctx, ec_ctx_saved, ec_tell_frac};
+use crate::celt::entcode::{celt_sudiv, celt_udiv, ec_ctx, ec_ctx_saved, ec_tell_frac, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_uint, ec_dec_update, ec_decode};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint, ec_encode};
 use crate::celt::mathops::{celt_exp2, celt_rsqrt, celt_rsqrt_norm, celt_sqrt, isqrt32};
@@ -27,7 +27,7 @@ use crate::celt::modes::OpusCustomMode;
 use crate::celt::pitch::{celt_inner_prod_c, dual_inner_prod_c};
 use crate::celt::quant_bands::eMeans;
 use crate::celt::rate::{
-    QTHETA_OFFSET, QTHETA_OFFSET_TWOPHASE, bits2pulses, get_pulses, pulses2bits,
+    bits2pulses, get_pulses, pulses2bits, QTHETA_OFFSET, QTHETA_OFFSET_TWOPHASE,
 };
 use crate::celt::vq::{alg_quant, alg_unquant, renormalise_vector, stereo_itheta};
 use crate::externs::{memcpy, memset};

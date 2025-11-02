@@ -1,10 +1,10 @@
 use crate::celt::mathops::celt_sqrt;
 use crate::externs::memcpy;
 use crate::silk::define::{CODE_CONDITIONALLY, TYPE_VOICED};
-use crate::silk::float::SigProc_FLP::silk_sigmoid;
 use crate::silk::float::structs_FLP::{
     silk_encoder_control_FLP, silk_encoder_state_FLP, silk_shape_state_FLP,
 };
+use crate::silk::float::SigProc_FLP::silk_sigmoid;
 use crate::silk::gain_quant::silk_gains_quant;
 use crate::silk::mathops::silk_exp2;
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;

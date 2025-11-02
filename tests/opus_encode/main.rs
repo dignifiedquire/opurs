@@ -98,14 +98,14 @@ pub mod test_opus_common_h {
 }
 use crate::test_opus_common_h::set_iseed;
 
-pub use self::test_opus_common_h::{_test_failed, Rw, Rz, debruijn2, fast_rand, get_iseed};
+pub use self::test_opus_common_h::{Rw, Rz, _test_failed, debruijn2, fast_rand, get_iseed};
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::externs::{memcpy, memset};
 use unsafe_libopus::{
-    OpusDecoder, OpusEncoder, opus_decode, opus_decoder_create, opus_decoder_ctl,
-    opus_decoder_destroy, opus_decoder_get_size, opus_encode, opus_encoder_create,
-    opus_encoder_ctl, opus_encoder_destroy, opus_encoder_get_size, opus_get_version_string,
-    opus_packet_pad, opus_packet_parse, opus_packet_unpad,
+    opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
+    opus_decoder_get_size, opus_encode, opus_encoder_create, opus_encoder_ctl,
+    opus_encoder_destroy, opus_encoder_get_size, opus_get_version_string, opus_packet_pad,
+    opus_packet_parse, opus_packet_unpad, OpusDecoder, OpusEncoder,
 };
 
 mod opus_encode_regressions;

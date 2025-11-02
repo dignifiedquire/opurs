@@ -96,20 +96,20 @@ pub mod NSQ_h {
     }
 }
 
+pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 pub use self::NSQ_h::{
     silk_NSQ_noise_shape_feedback_loop_c, silk_noise_shape_quantizer_short_prediction_c,
 };
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::externs::{memcpy, memmove};
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::SigProc_FIX::silk_RAND;
 use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
-use crate::silk::structs::{SideInfoIndices, silk_encoder_state, silk_nsq_state};
+use crate::silk::structs::{silk_encoder_state, silk_nsq_state, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
+use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::SigProc_FIX::silk_RAND;
 
 pub unsafe fn silk_NSQ_c(
     psEncC: &silk_encoder_state,

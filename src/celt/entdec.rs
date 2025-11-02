@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use crate::celt::entcode::{EC_UINT_BITS, EC_WINDOW_SIZE, celt_udiv, ec_ctx, ec_window};
+use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 use crate::silk::macros::EC_CLZ0;
 
 pub type ec_dec<'a> = ec_ctx<'a>;

@@ -1,6 +1,6 @@
 use crate::src::mlp::tansig::{sigmoid_approx, tansig_approx};
 use ndarray::{
-    ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _, aview_mut1, aview1, azip,
+    aview1, aview_mut1, azip, ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _,
 };
 
 pub const WEIGHTS_SCALE: f32 = 1.0f32 / 128f32;

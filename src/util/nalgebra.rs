@@ -1,4 +1,4 @@
-use nalgebra::{Dim, Matrix, U1, ViewStorage, ViewStorageMut};
+use nalgebra::{Dim, Matrix, ViewStorage, ViewStorageMut, U1};
 
 // provide type-aliases for row-major views and functions for their construction
 

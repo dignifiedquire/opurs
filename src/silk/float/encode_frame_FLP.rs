@@ -1,26 +1,26 @@
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::ec_enc;
 use crate::externs::{memcpy, memmove};
-use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
-use crate::silk::SigProc_FIX::silk_min_int;
-use crate::silk::VAD::silk_VAD_GetSA_Q8_c;
 use crate::silk::define::{
-    CODE_CONDITIONALLY, LA_SHAPE_MS, MAX_CONSECUTIVE_DTX, N_LEVELS_QGAIN,
-    NB_SPEECH_FRAMES_BEFORE_DTX, TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, VAD_NO_ACTIVITY,
+    CODE_CONDITIONALLY, LA_SHAPE_MS, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX,
+    N_LEVELS_QGAIN, TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, VAD_NO_ACTIVITY,
 };
 use crate::silk::encode_indices::silk_encode_indices;
 use crate::silk::encode_pulses::silk_encode_pulses;
-use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::float::find_pitch_lags_FLP::silk_find_pitch_lags_FLP;
 use crate::silk::float::find_pred_coefs_FLP::silk_find_pred_coefs_FLP;
 use crate::silk::float::noise_shape_analysis_FLP::silk_noise_shape_analysis_FLP;
 use crate::silk::float::process_gains_FLP::silk_process_gains_FLP;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::float::wrappers_FLP::silk_NSQ_wrapper_FLP;
+use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_ID, silk_gains_dequant, silk_gains_quant};
 use crate::silk::log2lin::silk_log2lin;
-use crate::silk::structs::{SideInfoIndices, silk_nsq_state};
+use crate::silk::structs::{silk_nsq_state, SideInfoIndices};
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
+use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
+use crate::silk::SigProc_FIX::silk_min_int;
+use crate::silk::VAD::silk_VAD_GetSA_Q8_c;
 
 pub unsafe fn silk_encode_do_VAD_FLP(psEnc: *mut silk_encoder_state_FLP, activity: i32) {
     let activity_threshold: i32 =
