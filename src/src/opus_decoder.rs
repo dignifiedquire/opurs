@@ -727,8 +727,7 @@ pub unsafe fn opus_decode_native(
     }
     packet_mode = opus_packet_get_mode(data);
     packet_bandwidth = opus_packet_get_bandwidth(data);
-    packet_frame_size =
-        opus_packet_get_samples_per_frame(std::slice::from_raw_parts(data, len as usize), st.Fs);
+    packet_frame_size = opus_packet_get_samples_per_frame(*data.offset(0), st.Fs);
     packet_stream_channels = opus_packet_get_nb_channels(data);
     count = opus_packet_parse_impl(
         data,
@@ -1060,7 +1059,7 @@ pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
     if count < 0 {
         return count;
     }
-    samples = count * opus_packet_get_samples_per_frame(packet, Fs);
+    samples = count * opus_packet_get_samples_per_frame(packet[0], Fs);
     if samples * 25 > Fs * 3 {
         return OPUS_INVALID_PACKET;
     } else {

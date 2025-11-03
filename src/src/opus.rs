@@ -126,23 +126,24 @@ unsafe fn parse_size(data: *const u8, len: i32, size: *mut i16) -> i32 {
         return 2;
     };
 }
-pub fn opus_packet_get_samples_per_frame(data: &[u8], Fs: i32) -> i32 {
+
+pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
     let mut audiosize: i32 = 0;
-    if data[0] & 0x80 != 0 {
-        audiosize = data[0] as i32 >> 3 & 0x3;
-        audiosize = (Fs << audiosize) / 400;
-    } else if data[0] as i32 & 0x60 == 0x60 {
-        audiosize = if data[0] as i32 & 0x8 != 0 {
-            Fs / 50
+    if data & 0x80 != 0 {
+        audiosize = data as i32 >> 3 & 0x3;
+        audiosize = (fs << audiosize) / 400;
+    } else if data as i32 & 0x60 == 0x60 {
+        audiosize = if data as i32 & 0x8 != 0 {
+            fs / 50
         } else {
-            Fs / 100
+            fs / 100
         };
     } else {
-        audiosize = data[0] as i32 >> 3 & 0x3;
+        audiosize = data as i32 >> 3 & 0x3;
         if audiosize == 3 {
-            audiosize = Fs * 60 / 1000;
+            audiosize = fs * 60 / 1000;
         } else {
-            audiosize = (Fs << audiosize) / 100;
+            audiosize = (fs << audiosize) / 100;
         }
     }
     return audiosize;
@@ -173,8 +174,7 @@ pub unsafe fn opus_packet_parse_impl(
     if len == 0 {
         return OPUS_INVALID_PACKET;
     }
-    framesize =
-        opus_packet_get_samples_per_frame(std::slice::from_raw_parts(data, len as usize), 48000);
+    framesize = opus_packet_get_samples_per_frame(*data.offset(0), 48000);
     cbr = 0;
     let fresh0 = data;
     data = data.offset(1);

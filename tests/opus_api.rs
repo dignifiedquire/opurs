@@ -5,27 +5,9 @@
 #![allow(unused_mut)]
 #![allow(deprecated)]
 
-pub mod test_opus_common_h {
-    pub unsafe fn _test_failed(mut file: *const i8, mut line: i32) -> ! {
-        eprintln!();
-        eprintln!(" ***************************************************");
-        eprintln!(" ***         A fatal error was detected.         ***");
-        eprintln!(" ***************************************************");
-        eprintln!("Please report this failure and include");
-        eprintln!(
-            "'make check fails {} at line {} for {}'",
-            std::ffi::CStr::from_ptr(file as _).to_str().unwrap(),
-            line,
-            opus_get_version_string()
-        );
-        eprintln!("and any relevant details about your system.");
-        panic!("test failed");
-    }
-
-    use unsafe_libopus::opus_get_version_string;
+fn fail(file: &str, line: usize) {
+    panic!("test failed, original: {file} at line {line}");
 }
-
-pub use self::test_opus_common_h::_test_failed;
 
 use unsafe_libopus::externs::{free, malloc};
 use unsafe_libopus::externs::{memcmp, memcpy, memset};
@@ -33,39 +15,36 @@ use unsafe_libopus::{
     opus_decode, opus_decode_float, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
     opus_decoder_get_nb_samples, opus_decoder_get_size, opus_decoder_init, opus_encode,
     opus_encode_float, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
-    opus_encoder_get_size, opus_encoder_init, opus_get_version_string, opus_packet_get_bandwidth,
-    opus_packet_get_nb_frames, opus_packet_get_nb_samples, opus_packet_get_samples_per_frame,
-    opus_packet_pad, opus_packet_parse, opus_packet_unpad, opus_repacketizer_cat,
-    opus_repacketizer_create, opus_repacketizer_destroy, opus_repacketizer_get_nb_frames,
-    opus_repacketizer_get_size, opus_repacketizer_init, opus_repacketizer_out,
-    opus_repacketizer_out_range, opus_strerror, OpusDecoder, OpusEncoder, OpusRepacketizer,
+    opus_encoder_get_size, opus_encoder_init, opus_packet_get_bandwidth, opus_packet_get_nb_frames,
+    opus_packet_get_nb_samples, opus_packet_get_samples_per_frame, opus_packet_pad,
+    opus_packet_parse, opus_packet_unpad, opus_repacketizer_cat, opus_repacketizer_create,
+    opus_repacketizer_destroy, opus_repacketizer_get_nb_frames, opus_repacketizer_get_size,
+    opus_repacketizer_init, opus_repacketizer_out, opus_repacketizer_out_range, OpusDecoder,
+    OpusEncoder, OpusRepacketizer, OPUS_BAD_ARG, OPUS_INVALID_PACKET,
 };
 
-pub static mut null_int_ptr: *mut i32 =
-    0 as *const core::ffi::c_void as *mut core::ffi::c_void as *mut i32;
-pub static mut null_uint_ptr: *mut u32 =
-    0 as *const core::ffi::c_void as *mut core::ffi::c_void as *mut u32;
-static mut opus_rates: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
-pub unsafe fn test_dec_api() -> i32 {
+static opus_rates: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
+
+#[test]
+fn test_dec_api() {
+    unsafe { test_dec_api_inner() };
+}
+
+unsafe fn test_dec_api_inner() {
     let mut dec_final_range: u32 = 0;
-    let mut dec: *mut OpusDecoder = std::ptr::null_mut::<OpusDecoder>();
-    let mut dec2: *mut OpusDecoder = std::ptr::null_mut::<OpusDecoder>();
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut cfgs: i32 = 0;
     let mut packet: [u8; 1276] = [0; 1276];
     let mut fbuf: [f32; 1920] = [0.; 1920];
     let mut sbuf: [i16; 1920] = [0; 1920];
-    let mut c: i32 = 0;
     let mut err: i32 = 0;
-    cfgs = 0;
+    let mut cfgs = 0;
+
+    // First test invalid configurations which should fail
     println!("\n  Decoder basic API tests");
     println!("  ---------------------------------------------------");
-    c = 0;
-    while c < 4 {
-        i = opus_decoder_get_size(c);
+    for c in 0..4 {
+        let i = opus_decoder_get_size(c);
         if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 16) || c != 1 && c != 2 && i != 0 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 106);
+            fail("tests/test_opus_api.c", 106);
         }
         println!(
             "    opus_decoder_get_size({})={} ...............{} OK.",
@@ -74,156 +53,151 @@ pub unsafe fn test_dec_api() -> i32 {
             if i > 0 { "" } else { "...." }
         );
         cfgs += 1;
-        c += 1;
     }
-    c = 0;
-    while c < 4 {
-        i = -(7);
-        while i <= 96000 {
-            let mut fs: i32 = 0;
+
+    // Test with unsupported sample rates
+    for c in 0..4 {
+        for i in -7..=96000 {
             if !((i == 8000 || i == 12000 || i == 16000 || i == 24000 || i == 48000)
                 && (c == 1 || c == 2))
             {
-                match i {
-                    -5 => {
-                        fs = -(8000);
-                    }
-                    -6 => {
-                        fs = 2147483647;
-                    }
-                    -7 => {
-                        fs = -(2147483647) - 1;
-                    }
-                    _ => {
-                        fs = i;
-                    }
-                }
-                err = 0;
-                dec = opus_decoder_create(fs, c, &mut err);
-                if err != -1 || !dec.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 128);
+                let fs = match i {
+                    -5 => -8000,
+                    -6 => 2147483647,
+                    -7 => -2147483647 - 1,
+                    _ => i,
+                };
+                let mut err = 0;
+                let mut dec = opus_decoder_create(fs, c, &mut err);
+                if err != OPUS_BAD_ARG || !dec.is_null() {
+                    fail("tests/test_opus_api.c", 128);
                 }
                 cfgs += 1;
                 dec = opus_decoder_create(fs, c, std::ptr::null_mut::<i32>());
                 if !dec.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 131);
+                    fail("tests/test_opus_api.c", 131);
                 }
                 cfgs += 1;
                 dec = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
                 if dec.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 134);
+                    fail("tests/test_opus_api.c", 134);
                 }
                 err = opus_decoder_init(dec, fs, c);
-                if err != -1 {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 136);
+                if err != OPUS_BAD_ARG {
+                    fail("tests/test_opus_api.c", 136);
                 }
                 cfgs += 1;
                 free(dec as *mut core::ffi::c_void);
             }
-            i += 1;
         }
-        c += 1;
     }
-    dec = opus_decoder_create(48000, 2, &mut err);
+
+    let mut dec = opus_decoder_create(48000, 2, &mut err);
     if err != 0 || dec.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 144);
+        fail("tests/test_opus_api.c", 144);
     }
     cfgs += 1;
     println!("    opus_decoder_create() ........................ OK.");
     println!("    opus_decoder_init() .......................... OK.");
     err = opus_decoder_ctl!(&mut *dec, 4031, &mut dec_final_range);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 155);
+        fail("tests/test_opus_api.c", 155);
     }
     println!("    OPUS_GET_FINAL_RANGE ......................... OK.");
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, -(5));
     if err != -(5) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 161);
+        fail("tests/test_opus_api.c", 161);
     }
     println!("    OPUS_UNIMPLEMENTED ........................... OK.");
     cfgs += 1;
+
+    let mut i = 0;
     err = opus_decoder_ctl!(&mut *dec, 4009, &mut i);
     if err != 0 || i != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 169);
+        fail("tests/test_opus_api.c", 169);
     }
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4029, &mut i);
     if err != 0 || i != 48000 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 177);
+        fail("tests/test_opus_api.c", 177);
     }
     println!("    OPUS_GET_SAMPLE_RATE ......................... OK.");
     cfgs += 1;
+
+    // GET_PITCH has different execution paths depending on the previously decoded frame.
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
     if err != 0 || i > 0 || i < -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 187);
+        fail("tests/test_opus_api.c", 187);
     }
     cfgs += 1;
-    packet[0 as usize] = ((63) << 2) as u8;
-    packet[2 as usize] = 0;
-    packet[1 as usize] = packet[2 as usize];
+    packet[0] = ((63) << 2) as u8;
+    packet[2] = 0;
+    packet[1] = packet[2];
     if opus_decode(&mut *dec, packet.as_mut_ptr(), 3, sbuf.as_mut_ptr(), 960, 0) != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 191);
+        fail("tests/test_opus_api.c", 191);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
     if err != 0 || i > 0 || i < -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 195);
+        fail("tests/test_opus_api.c", 195);
     }
     cfgs += 1;
-    packet[0 as usize] = 1;
+    packet[0] = 1;
     if opus_decode(&mut *dec, packet.as_mut_ptr(), 1, sbuf.as_mut_ptr(), 960, 0) != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 198);
+        fail("tests/test_opus_api.c", 198);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
     if err != 0 || i > 0 || i < -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 202);
+        fail("tests/test_opus_api.c", 202);
     }
     cfgs += 1;
     println!("    OPUS_GET_PITCH ............................... OK.");
     err = opus_decoder_ctl!(&mut *dec, 4039, &mut i);
     if err != 0 || i != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 210);
+        fail("tests/test_opus_api.c", 210);
     }
     cfgs += 1;
     println!("    OPUS_GET_LAST_PACKET_DURATION ................ OK.");
     err = opus_decoder_ctl!(&mut *dec, 4045, &mut i);
     if err != 0 || i != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 217);
+        fail("tests/test_opus_api.c", 217);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, -(32769));
-    if err != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 223);
+    if err != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 223);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, 32768);
-    if err != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 226);
+    if err != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 226);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, -(15));
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 229);
+        fail("tests/test_opus_api.c", 229);
     }
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4045, &mut i);
     if err != 0 || i != -(15) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 234);
+        fail("tests/test_opus_api.c", 234);
     }
     cfgs += 1;
     println!("    OPUS_SET_GAIN ................................ OK.");
     println!("    OPUS_GET_GAIN ................................ OK.");
-    dec2 = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
+
+    // Reset the decoder
+    let mut dec2 = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
     memcpy(
         dec2 as *mut core::ffi::c_void,
         dec as *const core::ffi::c_void,
         opus_decoder_get_size(2) as u64,
     );
     if opus_decoder_ctl!(&mut *dec, 4028) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 242);
+        fail("tests/test_opus_api.c", 242);
     }
     if memcmp(
         dec2 as *const core::ffi::c_void,
@@ -231,116 +205,109 @@ pub unsafe fn test_dec_api() -> i32 {
         opus_decoder_get_size(2) as u64,
     ) == 0
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 243);
+        fail("tests/test_opus_api.c", 243);
     }
     free(dec2 as *mut core::ffi::c_void);
     println!("    OPUS_RESET_STATE ............................. OK.");
     cfgs += 1;
-    packet[0 as usize] = 0;
+    packet[0] = 0;
     if opus_decoder_get_nb_samples(&mut *dec, &packet[..1]) != 480 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 250);
+        fail("tests/test_opus_api.c", 250);
     }
     if opus_packet_get_nb_samples(&packet[..1], 48000) != 480 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 251);
+        fail("tests/test_opus_api.c", 251);
     }
     if opus_packet_get_nb_samples(&packet[..1], 96000) != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 252);
+        fail("tests/test_opus_api.c", 252);
     }
     if opus_packet_get_nb_samples(&packet[..1], 32000) != 320 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 253);
+        fail("tests/test_opus_api.c", 253);
     }
     if opus_packet_get_nb_samples(&packet[..1], 8000) != 80 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 254);
+        fail("tests/test_opus_api.c", 254);
     }
-    packet[0 as usize] = 3;
-    if opus_packet_get_nb_samples(&packet[..1], 24000) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 256);
+    packet[0] = 3;
+    if opus_packet_get_nb_samples(&packet[..1], 24000) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 256);
     }
-    packet[0 as usize] = ((63) << 2 | 3) as u8;
+    packet[0] = ((63) << 2 | 3) as u8;
     packet[1 as usize] = 63;
-    if opus_packet_get_nb_samples(&[], 24000) != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 259);
+    if opus_packet_get_nb_samples(&[], 24000) != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 259);
     }
-    if opus_packet_get_nb_samples(&packet[..2], 48000) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 260);
+    if opus_packet_get_nb_samples(&packet[..2], 48000) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 260);
     }
-    if opus_decoder_get_nb_samples(&mut *dec, &packet[..2]) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 261);
+    if opus_decoder_get_nb_samples(&mut *dec, &packet[..2]) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 261);
     }
     println!("    opus_{{packet,decoder}}_get_nb_samples() ....... OK.");
     cfgs += 9;
-    if -1 != opus_packet_get_nb_frames(&[]) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 265);
+    if OPUS_BAD_ARG != opus_packet_get_nb_frames(&[]) {
+        fail("tests/test_opus_api.c", 265);
     }
-    i = 0;
-    while i < 256 {
-        let mut l1res: [i32; 4] = [1, 2, 2, -(4)];
-        packet[0 as usize] = i as u8;
-        if l1res[(packet[0 as usize] as i32 & 3) as usize]
-            != opus_packet_get_nb_frames(&packet[..1])
-        {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 269);
+
+    for i in 0..256 {
+        let mut l1res: [i32; 4] = [1, 2, 2, OPUS_INVALID_PACKET];
+        packet[0] = i as u8;
+        if l1res[(packet[0] as i32 & 3) as usize] != opus_packet_get_nb_frames(&packet[..1]) {
+            fail("tests/test_opus_api.c", 269);
         }
         cfgs += 1;
-        j = 0;
-        while j < 256 {
+        for j in 0..256 {
             packet[1 as usize] = j as u8;
-            if (if packet[0 as usize] as i32 & 3 != 3 {
-                l1res[(packet[0 as usize] as i32 & 3) as usize]
+            if (if packet[0] as i32 & 3 != 3 {
+                l1res[(packet[0] as i32 & 3) as usize]
             } else {
                 packet[1 as usize] as i32 & 63
             }) != opus_packet_get_nb_frames(&packet[..2])
             {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 273);
+                fail("tests/test_opus_api.c", 273);
             }
             cfgs += 1;
-            j += 1;
         }
-        i += 1;
     }
     println!("    opus_packet_get_nb_frames() .................. OK.");
-    i = 0;
-    while i < 256 {
+
+    for i in 0..256 {
         let mut bw: i32 = 0;
-        packet[0 as usize] = i as u8;
-        bw = packet[0 as usize] as i32 >> 4;
+        packet[0] = i as u8;
+        bw = packet[0] as i32 >> 4;
         bw = 1101 + (((((bw & 7) * 9) & (63 - (bw & 8))) + 2 + 12 * (bw & 8 != 0) as i32) >> 4);
         if bw != opus_packet_get_bandwidth(packet.as_mut_ptr()) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 284);
+            fail("tests/test_opus_api.c", 284);
         }
         cfgs += 1;
-        i += 1;
     }
     println!("    opus_packet_get_bandwidth() .................. OK.");
-    i = 0;
-    while i < 256 {
+
+    for i in 0..256 {
         let mut fp3s: i32 = 0;
         let mut rate: i32 = 0;
-        packet[0 as usize] = i as u8;
-        fp3s = packet[0 as usize] as i32 >> 3;
+        packet[0] = i as u8;
+        fp3s = packet[0] as i32 >> 3;
         fp3s = (((((3 - (fp3s & 3)) * 13) & 119) + 9) >> 2)
             * ((fp3s > 13) as i32 * (3 - (fp3s & 3 == 3) as i32) + 1)
             * 25;
         rate = 0;
         while rate < 5 {
             if opus_rates[rate as usize] * 3 / fp3s
-                != opus_packet_get_samples_per_frame(&packet, opus_rates[rate as usize])
+                != opus_packet_get_samples_per_frame(packet[0], opus_rates[rate as usize])
             {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 295);
+                fail("tests/test_opus_api.c", 295);
             }
             cfgs += 1;
             rate += 1;
         }
-        i += 1;
     }
     println!("    opus_packet_get_samples_per_frame() .......... OK.");
-    packet[0 as usize] = (((63) << 2) + 3) as u8;
+
+    packet[0] = (((63) << 2) + 3) as u8;
     packet[1 as usize] = 49;
-    j = 2;
-    while j < 51 {
+    for j in 2..51 {
         packet[j as usize] = 0;
-        j += 1;
     }
+
     if opus_decode(
         &mut *dec,
         packet.as_mut_ptr(),
@@ -348,12 +315,12 @@ pub unsafe fn test_dec_api() -> i32 {
         sbuf.as_mut_ptr(),
         960,
         0,
-    ) != -(4)
+    ) != OPUS_INVALID_PACKET
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 305);
+        fail("tests/test_opus_api.c", 305);
     }
     cfgs += 1;
-    packet[0 as usize] = ((63) << 2) as u8;
+    packet[0] = ((63) << 2) as u8;
     packet[2 as usize] = 0;
     packet[1 as usize] = packet[2 as usize];
     if opus_decode(
@@ -363,26 +330,26 @@ pub unsafe fn test_dec_api() -> i32 {
         sbuf.as_mut_ptr(),
         960,
         0,
-    ) != -1
+    ) != OPUS_BAD_ARG
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 309);
+        fail("tests/test_opus_api.c", 309);
     }
     cfgs += 1;
     if opus_decode(&mut *dec, packet.as_mut_ptr(), 3, sbuf.as_mut_ptr(), 60, 0) != -(2) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 311);
+        fail("tests/test_opus_api.c", 311);
     }
     cfgs += 1;
     if opus_decode(&mut *dec, packet.as_mut_ptr(), 3, sbuf.as_mut_ptr(), 480, 0) != -(2) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 313);
+        fail("tests/test_opus_api.c", 313);
     }
     cfgs += 1;
     if opus_decode(&mut *dec, packet.as_mut_ptr(), 3, sbuf.as_mut_ptr(), 960, 0) != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 315);
+        fail("tests/test_opus_api.c", 315);
     }
     cfgs += 1;
     println!("    opus_decode() ................................ OK.");
     if opus_decode_float(&mut *dec, packet.as_mut_ptr(), 3, &mut fbuf, 960, 0) != 960 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 320);
+        fail("tests/test_opus_api.c", 320);
     }
     cfgs += 1;
     println!("    opus_decode_float() .......................... OK.");
@@ -390,9 +357,14 @@ pub unsafe fn test_dec_api() -> i32 {
     cfgs += 1;
     println!("                   All decoder interface tests passed");
     println!("                   ({:6} API invocations)", cfgs);
-    cfgs
 }
-pub unsafe fn test_parse() -> i32 {
+
+#[test]
+fn test_parse() {
+    unsafe { test_parse_inner() };
+}
+
+unsafe fn test_parse_inner() {
     let mut i: i32 = 0;
     let mut j: i32 = 0;
     let mut jj: i32 = 0;
@@ -412,7 +384,7 @@ pub unsafe fn test_parse() -> i32 {
         0,
         (::core::mem::size_of::<i8>() as u64).wrapping_mul(1276),
     );
-    packet[0 as usize] = ((63) << 2) as u8;
+    packet[0] = ((63) << 2) as u8;
     if opus_packet_parse(
         packet.as_mut_ptr(),
         1,
@@ -420,17 +392,17 @@ pub unsafe fn test_parse() -> i32 {
         frames.as_mut_ptr(),
         std::ptr::null_mut::<i16>(),
         &mut payload_offset,
-    ) != -1
+    ) != OPUS_BAD_ARG
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 720);
+        fail("tests/test_opus_api.c", 720);
     }
     cfgs = 1;
     cfgs_total = cfgs;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = (i << 2) as u8;
+        packet[0] = (i << 2) as u8;
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -443,13 +415,13 @@ pub unsafe fn test_parse() -> i32 {
         );
         cfgs += 1;
         if ret != 1 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 729);
+            fail("tests/test_opus_api.c", 729);
         }
-        if size[0 as usize] as i32 != 3 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 730);
+        if size[0] as i32 != 3 {
+            fail("tests/test_opus_api.c", 730);
         }
-        if frames[0 as usize] != packet.as_mut_ptr().offset(1 as isize) as *const u8 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 731);
+        if frames[0] != packet.as_mut_ptr().offset(1 as isize) as *const u8 {
+            fail("tests/test_opus_api.c", 731);
         }
         i += 1;
     }
@@ -461,11 +433,11 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 1) as u8;
+        packet[0] = ((i << 2) + 1) as u8;
         jj = 0;
         while jj <= 1275 * 2 + 3 {
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -479,26 +451,22 @@ pub unsafe fn test_parse() -> i32 {
             cfgs += 1;
             if jj & 1 == 1 && jj <= 2551 {
                 if ret != 2 {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 749);
+                    fail("tests/test_opus_api.c", 749);
                 }
-                if size[0 as usize] as i32 != size[1 as usize] as i32
-                    || size[0 as usize] as i32 != (jj - 1) >> 1
-                {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 750);
+                if size[0] as i32 != size[1 as usize] as i32 || size[0] as i32 != (jj - 1) >> 1 {
+                    fail("tests/test_opus_api.c", 750);
                 }
-                if frames[0 as usize] != packet.as_mut_ptr().offset(1 as isize) as *const u8 {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 751);
+                if frames[0] != packet.as_mut_ptr().offset(1 as isize) as *const u8 {
+                    fail("tests/test_opus_api.c", 751);
                 }
-                if frames[1 as usize]
-                    != (frames[0 as usize]).offset(size[0 as usize] as i32 as isize)
-                {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 752);
+                if frames[1 as usize] != (frames[0]).offset(size[0] as i32 as isize) {
+                    fail("tests/test_opus_api.c", 752);
                 }
                 if toc as i32 >> 2 != i {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 753);
+                    fail("tests/test_opus_api.c", 753);
                 }
-            } else if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 754);
+            } else if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 754);
             }
             jj += 1;
         }
@@ -509,9 +477,9 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 2) as u8;
+        packet[0] = ((i << 2) + 2) as u8;
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -523,12 +491,12 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 767);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 767);
         }
         packet[1 as usize] = 252;
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -540,8 +508,8 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 772);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 772);
         }
         j = 0;
         while j < 1275 {
@@ -552,7 +520,7 @@ pub unsafe fn test_parse() -> i32 {
                 packet[2 as usize] = ((j - 252) >> 2) as u8;
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -564,11 +532,11 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 781);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 781);
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -580,11 +548,11 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 786);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 786);
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -597,19 +565,19 @@ pub unsafe fn test_parse() -> i32 {
             );
             cfgs += 1;
             if ret != 2 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 791);
+                fail("tests/test_opus_api.c", 791);
             }
-            if size[0 as usize] as i32 != j || size[1 as usize] as i32 != 0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 792);
+            if size[0] as i32 != j || size[1 as usize] as i32 != 0 {
+                fail("tests/test_opus_api.c", 792);
             }
-            if frames[1 as usize] != (frames[0 as usize]).offset(size[0 as usize] as i32 as isize) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 793);
+            if frames[1 as usize] != (frames[0]).offset(size[0] as i32 as isize) {
+                fail("tests/test_opus_api.c", 793);
             }
             if toc as i32 >> 2 != i {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 794);
+                fail("tests/test_opus_api.c", 794);
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -622,18 +590,18 @@ pub unsafe fn test_parse() -> i32 {
             );
             cfgs += 1;
             if ret != 2 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 799);
+                fail("tests/test_opus_api.c", 799);
             }
-            if size[0 as usize] as i32 != j
+            if size[0] as i32 != j
                 || size[1 as usize] as i32 != (j << 1) + 3 - j - (if j < 252 { 1 } else { 2 })
             {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 800);
+                fail("tests/test_opus_api.c", 800);
             }
-            if frames[1 as usize] != (frames[0 as usize]).offset(size[0 as usize] as i32 as isize) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 801);
+            if frames[1 as usize] != (frames[0]).offset(size[0] as i32 as isize) {
+                fail("tests/test_opus_api.c", 801);
             }
             if toc as i32 >> 2 != i {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 802);
+                fail("tests/test_opus_api.c", 802);
             }
             j += 1;
         }
@@ -647,9 +615,9 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 3) as u8;
+        packet[0] = ((i << 2) + 3) as u8;
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -661,8 +629,8 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 815);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 815);
         }
         i += 1;
     }
@@ -674,12 +642,12 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 3) as u8;
+        packet[0] = ((i << 2) + 3) as u8;
         jj = 49;
         while jj <= 64 {
             packet[1 as usize] = (0 + (jj & 63)) as u8;
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -691,12 +659,12 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 830);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 830);
             }
             packet[1 as usize] = (128 + (jj & 63)) as u8;
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -708,12 +676,12 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 835);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 835);
             }
             packet[1 as usize] = (64 + (jj & 63)) as u8;
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -725,12 +693,12 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 840);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 840);
             }
             packet[1 as usize] = (128 + 64 + (jj & 63)) as u8;
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -742,8 +710,8 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 845);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 845);
             }
             jj += 1;
         }
@@ -757,12 +725,12 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 3) as u8;
+        packet[0] = ((i << 2) + 3) as u8;
         packet[1 as usize] = 1;
         j = 0;
         while j < 1276 {
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -775,18 +743,18 @@ pub unsafe fn test_parse() -> i32 {
             );
             cfgs += 1;
             if ret != 1 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 861);
+                fail("tests/test_opus_api.c", 861);
             }
-            if size[0 as usize] as i32 != j {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 862);
+            if size[0] as i32 != j {
+                fail("tests/test_opus_api.c", 862);
             }
             if toc as i32 >> 2 != i {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 863);
+                fail("tests/test_opus_api.c", 863);
             }
             j += 1;
         }
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -798,8 +766,8 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 868);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 868);
         }
         i += 1;
     }
@@ -812,15 +780,15 @@ pub unsafe fn test_parse() -> i32 {
     i = 0;
     while i < 64 {
         let mut frame_samp: i32 = 0;
-        packet[0 as usize] = ((i << 2) + 3) as u8;
-        frame_samp = opus_packet_get_samples_per_frame(&packet, 48000);
+        packet[0] = ((i << 2) + 3) as u8;
+        frame_samp = opus_packet_get_samples_per_frame(packet[0], 48000);
         j = 2;
         while j < 49 {
             packet[1 as usize] = j as u8;
             sz = 2;
             while sz < (j + 2) * 1275 {
                 toc = u8::MAX;
-                frames[0 as usize] = std::ptr::null_mut::<u8>();
+                frames[0] = std::ptr::null_mut::<u8>();
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
@@ -834,7 +802,7 @@ pub unsafe fn test_parse() -> i32 {
                 cfgs += 1;
                 if frame_samp * j <= 5760 && (sz - 2) % j == 0 && (sz - 2) / j < 1276 {
                     if ret != j {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 890);
+                        fail("tests/test_opus_api.c", 890);
                     }
                     jj = 1;
                     while jj < ret {
@@ -842,15 +810,15 @@ pub unsafe fn test_parse() -> i32 {
                             != (frames[(jj - 1) as usize])
                                 .offset(size[(jj - 1) as usize] as i32 as isize)
                         {
-                            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 891);
+                            fail("tests/test_opus_api.c", 891);
                         }
                         jj += 1;
                     }
                     if toc as i32 >> 2 != i {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 892);
+                        fail("tests/test_opus_api.c", 892);
                     }
-                } else if ret != -(4) {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 893);
+                } else if ret != OPUS_INVALID_PACKET {
+                    fail("tests/test_opus_api.c", 893);
                 }
                 sz += 1;
             }
@@ -858,7 +826,7 @@ pub unsafe fn test_parse() -> i32 {
         }
         packet[1 as usize] = (5760 / frame_samp) as u8;
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -871,12 +839,12 @@ pub unsafe fn test_parse() -> i32 {
         );
         cfgs += 1;
         if ret != packet[1 as usize] as i32 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 901);
+            fail("tests/test_opus_api.c", 901);
         }
         jj = 0;
         while jj < ret {
             if size[jj as usize] as i32 != 1275 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 902);
+                fail("tests/test_opus_api.c", 902);
             }
             jj += 1;
         }
@@ -888,13 +856,13 @@ pub unsafe fn test_parse() -> i32 {
     i = 0;
     while i < 64 {
         let mut frame_samp_0: i32 = 0;
-        packet[0 as usize] = ((i << 2) + 3) as u8;
+        packet[0] = ((i << 2) + 3) as u8;
         packet[1 as usize] = (128 + 1) as u8;
-        frame_samp_0 = opus_packet_get_samples_per_frame(&packet, 48000);
+        frame_samp_0 = opus_packet_get_samples_per_frame(packet[0], 48000);
         jj = 0;
         while jj < 1276 {
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -907,18 +875,18 @@ pub unsafe fn test_parse() -> i32 {
             );
             cfgs += 1;
             if ret != 1 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 919);
+                fail("tests/test_opus_api.c", 919);
             }
-            if size[0 as usize] as i32 != jj {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 920);
+            if size[0] as i32 != jj {
+                fail("tests/test_opus_api.c", 920);
             }
             if toc as i32 >> 2 != i {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 921);
+                fail("tests/test_opus_api.c", 921);
             }
             jj += 1;
         }
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -930,14 +898,14 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 926);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 926);
         }
         j = 2;
         while j < 49 {
             packet[1 as usize] = (128 + j) as u8;
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -949,8 +917,8 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 934);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 934);
             }
             packet[2 as usize] = 252;
             packet[3 as usize] = 0;
@@ -960,7 +928,7 @@ pub unsafe fn test_parse() -> i32 {
                 jj += 1;
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -972,8 +940,8 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 941);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 941);
             }
             jj = 2;
             while jj < 2 + j {
@@ -981,7 +949,7 @@ pub unsafe fn test_parse() -> i32 {
                 jj += 1;
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -993,8 +961,8 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 947);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 947);
             }
             packet[2 as usize] = 252;
             packet[3 as usize] = 0;
@@ -1004,7 +972,7 @@ pub unsafe fn test_parse() -> i32 {
                 jj += 1;
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -1016,8 +984,8 @@ pub unsafe fn test_parse() -> i32 {
                 &mut payload_offset,
             );
             cfgs += 1;
-            if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 955);
+            if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 955);
             }
             jj = 2;
             while jj < 2 + j {
@@ -1025,7 +993,7 @@ pub unsafe fn test_parse() -> i32 {
                 jj += 1;
             }
             toc = u8::MAX;
-            frames[0 as usize] = std::ptr::null_mut::<u8>();
+            frames[0] = std::ptr::null_mut::<u8>();
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
@@ -1039,20 +1007,20 @@ pub unsafe fn test_parse() -> i32 {
             cfgs += 1;
             if frame_samp_0 * j <= 5760 {
                 if ret != j {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 962);
+                    fail("tests/test_opus_api.c", 962);
                 }
                 jj = 0;
                 while jj < j {
                     if size[jj as usize] as i32 != 0 {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 963);
+                        fail("tests/test_opus_api.c", 963);
                     }
                     jj += 1;
                 }
                 if toc as i32 >> 2 != i {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 964);
+                    fail("tests/test_opus_api.c", 964);
                 }
-            } else if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 965);
+            } else if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 965);
             }
             sz = 0;
             while sz < 8 {
@@ -1072,7 +1040,7 @@ pub unsafe fn test_parse() -> i32 {
                     jj += 1;
                 }
                 toc = u8::MAX;
-                frames[0 as usize] = std::ptr::null_mut::<u8>();
+                frames[0] = std::ptr::null_mut::<u8>();
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
@@ -1089,25 +1057,25 @@ pub unsafe fn test_parse() -> i32 {
                     && tsz[sz as usize] + i - 2 - pos - as_0 * (j - 1) < 1276
                 {
                     if ret != j {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 981);
+                        fail("tests/test_opus_api.c", 981);
                     }
                     jj = 0;
                     while jj < j - 1 {
                         if size[jj as usize] as i32 != as_0 {
-                            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 982);
+                            fail("tests/test_opus_api.c", 982);
                         }
                         jj += 1;
                     }
                     if size[(j - 1) as usize] as i32
                         != tsz[sz as usize] + i - 2 - pos - as_0 * (j - 1)
                     {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 983);
+                        fail("tests/test_opus_api.c", 983);
                     }
                     if toc as i32 >> 2 != i {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 984);
+                        fail("tests/test_opus_api.c", 984);
                     }
-                } else if ret != -(4) {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 985);
+                } else if ret != OPUS_INVALID_PACKET {
+                    fail("tests/test_opus_api.c", 985);
                 }
                 sz += 1;
             }
@@ -1120,7 +1088,7 @@ pub unsafe fn test_parse() -> i32 {
     cfgs = 0;
     i = 0;
     while i < 64 {
-        packet[0 as usize] = ((i << 2) + 3) as u8;
+        packet[0] = ((i << 2) + 3) as u8;
         packet[1 as usize] = (128 + 1 + 64) as u8;
         jj = 2;
         while jj < 127 {
@@ -1128,7 +1096,7 @@ pub unsafe fn test_parse() -> i32 {
             jj += 1;
         }
         toc = u8::MAX;
-        frames[0 as usize] = std::ptr::null_mut::<u8>();
+        frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
@@ -1140,8 +1108,8 @@ pub unsafe fn test_parse() -> i32 {
             &mut payload_offset,
         );
         cfgs += 1;
-        if ret != -(4) {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1002);
+        if ret != OPUS_INVALID_PACKET {
+            fail("tests/test_opus_api.c", 1002);
         }
         sz = 0;
         while sz < 4 {
@@ -1158,7 +1126,7 @@ pub unsafe fn test_parse() -> i32 {
                 pos_0 += 1;
                 if sz == 0 && i == 63 {
                     toc = u8::MAX;
-                    frames[0 as usize] = std::ptr::null_mut::<u8>();
+                    frames[0] = std::ptr::null_mut::<u8>();
                     frames[1 as usize] = std::ptr::null_mut::<u8>();
                     payload_offset = -1;
                     ret = opus_packet_parse(
@@ -1170,12 +1138,12 @@ pub unsafe fn test_parse() -> i32 {
                         &mut payload_offset,
                     );
                     cfgs += 1;
-                    if ret != -(4) {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1019);
+                    if ret != OPUS_INVALID_PACKET {
+                        fail("tests/test_opus_api.c", 1019);
                     }
                 }
                 toc = u8::MAX;
-                frames[0 as usize] = std::ptr::null_mut::<u8>();
+                frames[0] = std::ptr::null_mut::<u8>();
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
@@ -1189,16 +1157,16 @@ pub unsafe fn test_parse() -> i32 {
                 cfgs += 1;
                 if tsz_0[sz as usize] + i < 1276 {
                     if ret != 1 {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1026);
+                        fail("tests/test_opus_api.c", 1026);
                     }
-                    if size[0 as usize] as i32 != tsz_0[sz as usize] + i {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1027);
+                    if size[0] as i32 != tsz_0[sz as usize] + i {
+                        fail("tests/test_opus_api.c", 1027);
                     }
                     if toc as i32 >> 2 != i {
-                        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1028);
+                        fail("tests/test_opus_api.c", 1028);
                     }
-                } else if ret != -(4) {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1029);
+                } else if ret != OPUS_INVALID_PACKET {
+                    fail("tests/test_opus_api.c", 1029);
                 }
                 jj += 11;
             }
@@ -1211,9 +1179,13 @@ pub unsafe fn test_parse() -> i32 {
     println!("    opus_packet_parse ............................ OK.");
     println!("                      All packet parsing tests passed");
     println!("                   ({} API invocations)", cfgs_total);
-    cfgs_total
 }
-pub unsafe fn test_enc_api() -> i32 {
+
+#[test]
+fn test_enc_api() {
+    unsafe { test_enc_api_inner() };
+}
+unsafe fn test_enc_api_inner() {
     let mut enc_final_range: u32 = 0;
     let mut enc: *mut OpusEncoder = std::ptr::null_mut::<OpusEncoder>();
     let mut i: i32 = 0;
@@ -1231,7 +1203,7 @@ pub unsafe fn test_enc_api() -> i32 {
     while c < 4 {
         i = opus_encoder_get_size(c);
         if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 17) || c != 1 && c != 2 && i != 0 {
-            _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1084);
+            fail("tests/test_opus_api.c", 1084);
         }
         println!(
             "    opus_encoder_get_size({})={} ...............{} OK.",
@@ -1266,23 +1238,23 @@ pub unsafe fn test_enc_api() -> i32 {
                 }
                 err = 0;
                 enc = opus_encoder_create(fs, c, 2048, &mut err);
-                if err != -1 || !enc.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1106);
+                if err != OPUS_BAD_ARG || !enc.is_null() {
+                    fail("tests/test_opus_api.c", 1106);
                 }
                 cfgs += 1;
                 enc = opus_encoder_create(fs, c, 2048, std::ptr::null_mut::<i32>());
                 if !enc.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1109);
+                    fail("tests/test_opus_api.c", 1109);
                 }
                 cfgs += 1;
                 opus_encoder_destroy(enc);
                 enc = malloc(opus_encoder_get_size(2) as u64) as *mut OpusEncoder;
                 if enc.is_null() {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1113);
+                    fail("tests/test_opus_api.c", 1113);
                 }
                 err = opus_encoder_init(enc, fs, c, 2048);
-                if err != -1 {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1115);
+                if err != OPUS_BAD_ARG {
+                    fail("tests/test_opus_api.c", 1115);
                 }
                 cfgs += 1;
                 free(enc as *mut core::ffi::c_void);
@@ -1293,45 +1265,45 @@ pub unsafe fn test_enc_api() -> i32 {
     }
     enc = opus_encoder_create(48000, 2, -(1000), std::ptr::null_mut::<i32>());
     if !enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1122);
+        fail("tests/test_opus_api.c", 1122);
     }
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, -(1000), &mut err);
-    if err != -1 || !enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1127);
+    if err != OPUS_BAD_ARG || !enc.is_null() {
+        fail("tests/test_opus_api.c", 1127);
     }
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2048, std::ptr::null_mut::<i32>());
     if enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1132);
+        fail("tests/test_opus_api.c", 1132);
     }
     opus_encoder_destroy(enc);
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2051, &mut err);
     if err != 0 || enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1138);
+        fail("tests/test_opus_api.c", 1138);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1141);
+        fail("tests/test_opus_api.c", 1141);
     }
     cfgs += 1;
     opus_encoder_destroy(enc);
     enc = opus_encoder_create(48000, 2, 2049, &mut err);
     if err != 0 || enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1147);
+        fail("tests/test_opus_api.c", 1147);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1150);
+        fail("tests/test_opus_api.c", 1150);
     }
     opus_encoder_destroy(enc);
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2048, &mut err);
     if err != 0 || enc.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1156);
+        fail("tests/test_opus_api.c", 1156);
     }
     cfgs += 1;
     println!("    opus_encoder_create() ........................ OK.");
@@ -1339,572 +1311,572 @@ pub unsafe fn test_enc_api() -> i32 {
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1165);
+        fail("tests/test_opus_api.c", 1165);
     }
     cfgs += 1;
     println!("    OPUS_GET_LOOKAHEAD ........................... OK.");
     err = opus_encoder_ctl!(enc, 4029, &mut i);
     if err != 0 || i != 48000 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1173);
+        fail("tests/test_opus_api.c", 1173);
     }
     cfgs += 1;
     println!("    OPUS_GET_SAMPLE_RATE ......................... OK.");
     if opus_encoder_ctl!(enc, -(5)) != -(5) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1180);
+        fail("tests/test_opus_api.c", 1180);
     }
     println!("    OPUS_UNIMPLEMENTED ........................... OK.");
     cfgs += 1;
     i = -1;
     if opus_encoder_ctl!(enc, 4000, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     i = -(1000);
     if opus_encoder_ctl!(enc, 4000, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     i = 2049;
     j = i;
     if opus_encoder_ctl!(enc, 4000, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4001, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     i = 2051;
     j = i;
     if opus_encoder_ctl!(enc, 4000, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     println!("    OPUS_SET_APPLICATION ......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4001, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1190);
+        fail("tests/test_opus_api.c", 1190);
     }
     println!("    OPUS_GET_APPLICATION ......................... OK.");
     cfgs += 6;
     if opus_encoder_ctl!(enc, 4002, 1073741832) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1195);
+        fail("tests/test_opus_api.c", 1195);
     }
     cfgs += 1;
     if opus_encoder_ctl!(enc, 4003, &mut i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1198);
+        fail("tests/test_opus_api.c", 1198);
     }
     if i > 700000 || i < 256000 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1199);
+        fail("tests/test_opus_api.c", 1199);
     }
     cfgs += 1;
     i = -(12345);
     if opus_encoder_ctl!(enc, 4002, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     i = 0;
     if opus_encoder_ctl!(enc, 4002, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     i = 500;
     j = i;
     if opus_encoder_ctl!(enc, 4002, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4003, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     i = 256000;
     j = i;
     if opus_encoder_ctl!(enc, 4002, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     println!("    OPUS_SET_BITRATE ............................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4003, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1204);
+        fail("tests/test_opus_api.c", 1204);
     }
     println!("    OPUS_GET_BITRATE ............................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4022, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     i = 3;
     if opus_encoder_ctl!(enc, 4022, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4022, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4023, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     i = -(1000);
     j = i;
     if opus_encoder_ctl!(enc, 4022, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     println!("    OPUS_SET_FORCE_CHANNELS ...................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4023, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1212);
+        fail("tests/test_opus_api.c", 1212);
     }
     println!("    OPUS_GET_FORCE_CHANNELS ...................... OK.");
     cfgs += 6;
     i = -(2);
     if opus_encoder_ctl!(enc, 4008, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1215);
+        fail("tests/test_opus_api.c", 1215);
     }
     cfgs += 1;
     i = 1105 + 1;
     if opus_encoder_ctl!(enc, 4008, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1218);
+        fail("tests/test_opus_api.c", 1218);
     }
     cfgs += 1;
     i = 1101;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1221);
+        fail("tests/test_opus_api.c", 1221);
     }
     cfgs += 1;
     i = 1105;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1224);
+        fail("tests/test_opus_api.c", 1224);
     }
     cfgs += 1;
     i = 1103;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1227);
+        fail("tests/test_opus_api.c", 1227);
     }
     cfgs += 1;
     i = 1102;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1230);
+        fail("tests/test_opus_api.c", 1230);
     }
     cfgs += 1;
     println!("    OPUS_SET_BANDWIDTH ........................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4009, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 && i != -(1000) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1240);
+        fail("tests/test_opus_api.c", 1240);
     }
     cfgs += 1;
     if opus_encoder_ctl!(enc, 4008, -(1000)) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1242);
+        fail("tests/test_opus_api.c", 1242);
     }
     cfgs += 1;
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     i = -(2);
     if opus_encoder_ctl!(enc, 4004, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1250);
+        fail("tests/test_opus_api.c", 1250);
     }
     cfgs += 1;
     i = 1105 + 1;
     if opus_encoder_ctl!(enc, 4004, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1253);
+        fail("tests/test_opus_api.c", 1253);
     }
     cfgs += 1;
     i = 1101;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1256);
+        fail("tests/test_opus_api.c", 1256);
     }
     cfgs += 1;
     i = 1105;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1259);
+        fail("tests/test_opus_api.c", 1259);
     }
     cfgs += 1;
     i = 1103;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1262);
+        fail("tests/test_opus_api.c", 1262);
     }
     cfgs += 1;
     i = 1102;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1265);
+        fail("tests/test_opus_api.c", 1265);
     }
     cfgs += 1;
     println!("    OPUS_SET_MAX_BANDWIDTH ....................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4005, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1275);
+        fail("tests/test_opus_api.c", 1275);
     }
     cfgs += 1;
     println!("    OPUS_GET_MAX_BANDWIDTH ....................... OK.");
     i = -1;
     if opus_encoder_ctl!(enc, 4016, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4016, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4016, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4017, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4016, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     println!("    OPUS_SET_DTX ................................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4017, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1288);
+        fail("tests/test_opus_api.c", 1288);
     }
     println!("    OPUS_GET_DTX ................................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4010, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     i = 11;
     if opus_encoder_ctl!(enc, 4010, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4010, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4011, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     i = 10;
     j = i;
     if opus_encoder_ctl!(enc, 4010, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     println!("    OPUS_SET_COMPLEXITY .......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4011, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1296);
+        fail("tests/test_opus_api.c", 1296);
     }
     println!("    OPUS_GET_COMPLEXITY .......................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4012, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4012, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4012, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4013, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4012, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     println!("    OPUS_SET_INBAND_FEC .......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4013, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1304);
+        fail("tests/test_opus_api.c", 1304);
     }
     println!("    OPUS_GET_INBAND_FEC .......................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4014, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     i = 101;
     if opus_encoder_ctl!(enc, 4014, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     i = 100;
     j = i;
     if opus_encoder_ctl!(enc, 4014, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4015, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4014, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     println!("    OPUS_SET_PACKET_LOSS_PERC .................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4015, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1312);
+        fail("tests/test_opus_api.c", 1312);
     }
     println!("    OPUS_GET_PACKET_LOSS_PERC .................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4006, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4006, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4006, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4007, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4006, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     println!("    OPUS_SET_VBR ................................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4007, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1320);
+        fail("tests/test_opus_api.c", 1320);
     }
     println!("    OPUS_GET_VBR ................................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4020, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4020, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4020, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4021, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4020, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     println!("    OPUS_SET_VBR_CONSTRAINT ...................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4021, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1336);
+        fail("tests/test_opus_api.c", 1336);
     }
     println!("    OPUS_GET_VBR_CONSTRAINT ...................... OK.");
     cfgs += 6;
     i = -(12345);
     if opus_encoder_ctl!(enc, 4024, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     i = 0x7fffffff;
     if opus_encoder_ctl!(enc, 4024, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     i = 3002;
     j = i;
     if opus_encoder_ctl!(enc, 4024, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4025, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     i = -(1000);
     j = i;
     if opus_encoder_ctl!(enc, 4024, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     println!("    OPUS_SET_SIGNAL .............................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4025, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1344);
+        fail("tests/test_opus_api.c", 1344);
     }
     println!("    OPUS_GET_SIGNAL .............................. OK.");
     cfgs += 6;
     i = 7;
     if opus_encoder_ctl!(enc, 4036, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     i = 25;
     if opus_encoder_ctl!(enc, 4036, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     i = 16;
     j = i;
     if opus_encoder_ctl!(enc, 4036, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4037, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     i = 24;
     j = i;
     if opus_encoder_ctl!(enc, 4036, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     println!("    OPUS_SET_LSB_DEPTH ........................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4037, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1351);
+        fail("tests/test_opus_api.c", 1351);
     }
     println!("    OPUS_GET_LSB_DEPTH ........................... OK.");
     cfgs += 6;
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if i != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1354);
+        fail("tests/test_opus_api.c", 1354);
     }
     cfgs += 1;
     i = -1;
     if opus_encoder_ctl!(enc, 4042, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4042, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4042, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4042, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     println!("    OPUS_SET_PREDICTION_DISABLED ................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1361);
+        fail("tests/test_opus_api.c", 1361);
     }
     println!("    OPUS_GET_PREDICTION_DISABLED ................. OK.");
     cfgs += 6;
     err = opus_encoder_ctl!(enc, 4040, 5001);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1367);
+        fail("tests/test_opus_api.c", 1367);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5002);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1370);
+        fail("tests/test_opus_api.c", 1370);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5003);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1373);
+        fail("tests/test_opus_api.c", 1373);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5004);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1376);
+        fail("tests/test_opus_api.c", 1376);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5005);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1379);
+        fail("tests/test_opus_api.c", 1379);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5006);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1382);
+        fail("tests/test_opus_api.c", 1382);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5007);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1385);
+        fail("tests/test_opus_api.c", 1385);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5008);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1388);
+        fail("tests/test_opus_api.c", 1388);
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5009);
     if err != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1391);
+        fail("tests/test_opus_api.c", 1391);
     }
     cfgs += 1;
     i = 0;
     if opus_encoder_ctl!(enc, 4040, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     i = -1;
     if opus_encoder_ctl!(enc, 4040, i) == 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     i = 5006;
     j = i;
     if opus_encoder_ctl!(enc, 4040, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4041, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     i = 5000;
     j = i;
     if opus_encoder_ctl!(enc, 4040, i) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     println!("    OPUS_SET_EXPERT_FRAME_DURATION ............... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4041, &mut i);
     if err != 0 || i != j {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1396);
+        fail("tests/test_opus_api.c", 1396);
     }
     println!("    OPUS_GET_EXPERT_FRAME_DURATION ............... OK.");
     cfgs += 6;
     if opus_encoder_ctl!(enc, 4031, &mut enc_final_range) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1403);
+        fail("tests/test_opus_api.c", 1403);
     }
     cfgs += 1;
     println!("    OPUS_GET_FINAL_RANGE ......................... OK.");
     if opus_encoder_ctl!(enc, 4028) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1408);
+        fail("tests/test_opus_api.c", 1408);
     }
     cfgs += 1;
     println!("    OPUS_RESET_STATE ............................. OK.");
@@ -1923,7 +1895,7 @@ pub unsafe fn test_enc_api() -> i32 {
         ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
     );
     if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1415);
+        fail("tests/test_opus_api.c", 1415);
     }
     cfgs += 1;
     println!("    opus_encode() ................................ OK.");
@@ -1942,7 +1914,7 @@ pub unsafe fn test_enc_api() -> i32 {
         ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
     );
     if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1423);
+        fail("tests/test_opus_api.c", 1423);
     }
     cfgs += 1;
     println!("    opus_encode_float() .......................... OK.");
@@ -1951,9 +1923,14 @@ pub unsafe fn test_enc_api() -> i32 {
     println!("                   All encoder interface tests passed");
 
     println!("                   ({} API invocations)", cfgs);
-    cfgs
 }
-pub unsafe fn test_repacketizer_api() -> i32 {
+
+#[test]
+fn test_repacketizer_api() {
+    unsafe { test_repacketizer_api_inner() };
+}
+
+unsafe fn test_repacketizer_api_inner() {
     let mut ret: i32 = 0;
     let mut cfgs: i32 = 0;
     let mut i: i32 = 0;
@@ -1967,7 +1944,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     println!("  ---------------------------------------------------");
     packet = malloc((1276 * 48 + 48 * 2 + 2) as u64) as *mut u8;
     if packet.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1455);
+        fail("tests/test_opus_api.c", 1455);
     }
     memset(
         packet as *mut core::ffi::c_void,
@@ -1976,83 +1953,83 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     );
     po = malloc((1276 * 48 + 48 * 2 + 2 + 256) as u64) as *mut u8;
     if po.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1458);
+        fail("tests/test_opus_api.c", 1458);
     }
     i = opus_repacketizer_get_size();
     if i <= 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1461);
+        fail("tests/test_opus_api.c", 1461);
     }
     cfgs += 1;
     println!("    opus_repacketizer_get_size()={} ............. OK.", i);
     rp = malloc(i as u64) as *mut OpusRepacketizer;
     rp = opus_repacketizer_init(rp);
     if rp.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1467);
+        fail("tests/test_opus_api.c", 1467);
     }
     cfgs += 1;
     free(rp as *mut core::ffi::c_void);
     println!("    opus_repacketizer_init ....................... OK.");
     rp = opus_repacketizer_create();
     if rp.is_null() {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1473);
+        fail("tests/test_opus_api.c", 1473);
     }
     cfgs += 1;
     println!("    opus_repacketizer_create ..................... OK.");
     if opus_repacketizer_get_nb_frames(rp) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1477);
+        fail("tests/test_opus_api.c", 1477);
     }
     cfgs += 1;
     println!("    opus_repacketizer_get_nb_frames .............. OK.");
-    if opus_repacketizer_cat(rp, packet, 0) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1483);
+    if opus_repacketizer_cat(rp, packet, 0) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1483);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 1;
-    if opus_repacketizer_cat(rp, packet, 2) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1486);
+    if opus_repacketizer_cat(rp, packet, 2) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1486);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 2;
-    if opus_repacketizer_cat(rp, packet, 1) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1489);
+    if opus_repacketizer_cat(rp, packet, 1) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1489);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 3;
-    if opus_repacketizer_cat(rp, packet, 1) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1492);
+    if opus_repacketizer_cat(rp, packet, 1) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1492);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 2;
     *packet.offset(1 as isize) = 255;
-    if opus_repacketizer_cat(rp, packet, 2) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1496);
+    if opus_repacketizer_cat(rp, packet, 2) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1496);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 2;
     *packet.offset(1 as isize) = 250;
-    if opus_repacketizer_cat(rp, packet, 251) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1500);
+    if opus_repacketizer_cat(rp, packet, 251) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1500);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 3;
     *packet.offset(1 as isize) = 0;
-    if opus_repacketizer_cat(rp, packet, 2) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1504);
+    if opus_repacketizer_cat(rp, packet, 2) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1504);
     }
     cfgs += 1;
     *packet.offset(1 as isize) = 49;
-    if opus_repacketizer_cat(rp, packet, 100) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1507);
+    if opus_repacketizer_cat(rp, packet, 100) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1507);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 0;
     if opus_repacketizer_cat(rp, packet, 3) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1510);
+        fail("tests/test_opus_api.c", 1510);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = ((1) << 2) as u8;
-    if opus_repacketizer_cat(rp, packet, 3) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1513);
+    if opus_repacketizer_cat(rp, packet, 3) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1513);
     }
     cfgs += 1;
     opus_repacketizer_init(rp);
@@ -2060,7 +2037,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     while j < 32 {
         let mut maxi: i32 = 0;
         *packet.offset(0 as isize) = (((j << 1) + (j & 1)) << 2) as u8;
-        maxi = 960 / opus_packet_get_samples_per_frame(std::slice::from_raw_parts(packet, 1), 8000);
+        maxi = 960 / opus_packet_get_samples_per_frame(*packet.offset(0), 8000);
         i = 1;
         while i <= maxi {
             let mut maxp: i32 = 0;
@@ -2070,11 +2047,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
                 *fresh0 = (*fresh0 as i32 + if i == 2 { 1 } else { 3 }) as u8;
             }
             *packet.offset(1 as isize) = (if i > 2 { i } else { 0 }) as u8;
-            maxp = 960
-                / (i * opus_packet_get_samples_per_frame(
-                    std::slice::from_raw_parts(packet, 1),
-                    8000,
-                ));
+            maxp = 960 / (i * opus_packet_get_samples_per_frame(*packet.offset(0), 8000));
             k = 0;
             while k <= 1275 + 75 {
                 let mut cnt: i32 = 0;
@@ -2088,13 +2061,10 @@ pub unsafe fn test_repacketizer_api() -> i32 {
                             if if cnt <= maxp && k <= 1275 * i {
                                 (ret != 0) as i32
                             } else {
-                                (ret != -(4)) as i32
+                                (ret != OPUS_INVALID_PACKET) as i32
                             } != 0
                             {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1542,
-                                );
+                                fail("tests/test_opus_api.c", 1542);
                             }
                             cfgs += 1;
                         }
@@ -2108,10 +2078,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
                             0
                         };
                         if opus_repacketizer_get_nb_frames(rp) != rcnt * i {
-                            _test_failed(
-                                b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                1546,
-                            );
+                            fail("tests/test_opus_api.c", 1546);
                         }
                         cfgs += 1;
                         ret = opus_repacketizer_out_range(
@@ -2125,97 +2092,58 @@ pub unsafe fn test_repacketizer_api() -> i32 {
                             let mut len: i32 = 0;
                             len = k * rcnt + (if rcnt * i > 2 { 2 } else { 1 });
                             if ret != len {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1553,
-                                );
+                                fail("tests/test_opus_api.c", 1553);
                             }
                             if rcnt * i < 2 && *po.offset(0 as isize) as i32 & 3 != 0 {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1554,
-                                );
+                                fail("tests/test_opus_api.c", 1554);
                             }
                             if rcnt * i == 2 && *po.offset(0 as isize) as i32 & 3 != 1 {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1555,
-                                );
+                                fail("tests/test_opus_api.c", 1555);
                             }
                             if rcnt * i > 2
                                 && (*po.offset(0 as isize) as i32 & 3 != 3
                                     || *po.offset(1 as isize) as i32 != rcnt * i)
                             {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1556,
-                                );
+                                fail("tests/test_opus_api.c", 1556);
                             }
                             cfgs += 1;
                             if opus_repacketizer_out(rp, po, len) != len {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1558,
-                                );
+                                fail("tests/test_opus_api.c", 1558);
                             }
                             cfgs += 1;
                             if opus_packet_unpad(po, len) != len {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1560,
-                                );
+                                fail("tests/test_opus_api.c", 1560);
                             }
                             cfgs += 1;
                             if opus_packet_pad(po, len, len + 1) != 0 {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1562,
-                                );
+                                fail("tests/test_opus_api.c", 1562);
                             }
                             cfgs += 1;
                             if opus_packet_pad(po, len + 1, len + 256) != 0 {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1564,
-                                );
+                                fail("tests/test_opus_api.c", 1564);
                             }
                             cfgs += 1;
                             if opus_packet_unpad(po, len + 256) != len {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1566,
-                                );
+                                fail("tests/test_opus_api.c", 1566);
                             }
                             cfgs += 1;
 
                             if opus_repacketizer_out(rp, po, len - 1) != -(2) {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1576,
-                                );
+                                fail("tests/test_opus_api.c", 1576);
                             }
                             cfgs += 1;
                             if len > 1 {
                                 if opus_repacketizer_out(rp, po, 1) != -(2) {
-                                    _test_failed(
-                                        b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                        1580,
-                                    );
+                                    fail("tests/test_opus_api.c", 1580);
                                 }
                                 cfgs += 1;
                             }
                             if opus_repacketizer_out(rp, po, 0) != -(2) {
-                                _test_failed(
-                                    b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                    1583,
-                                );
+                                fail("tests/test_opus_api.c", 1583);
                             }
                             cfgs += 1;
-                        } else if ret != -1 {
-                            _test_failed(
-                                b"tests/test_opus_api.c\0" as *const u8 as *const i8,
-                                1585,
-                            );
+                        } else if ret != OPUS_BAD_ARG {
+                            fail("tests/test_opus_api.c", 1585);
                         }
                         cnt += 1;
                     }
@@ -2230,13 +2158,13 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     opus_repacketizer_init(rp);
     *packet.offset(0 as isize) = 0;
     if opus_repacketizer_cat(rp, packet, 5) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1595);
+        fail("tests/test_opus_api.c", 1595);
     }
     cfgs += 1;
     let fresh1 = &mut (*packet.offset(0 as isize));
     *fresh1 = (*fresh1 as i32 + 1) as u8;
     if opus_repacketizer_cat(rp, packet, 9) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1598);
+        fail("tests/test_opus_api.c", 1598);
     }
     cfgs += 1;
     i = opus_repacketizer_out(rp, po, 1276 * 48 + 48 * 2 + 2);
@@ -2245,28 +2173,28 @@ pub unsafe fn test_repacketizer_api() -> i32 {
         || *po.offset(1 as isize) as i32 & 63 != 3
         || *po.offset(1 as isize) as i32 >> 7 != 0
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1601);
+        fail("tests/test_opus_api.c", 1601);
     }
     cfgs += 1;
     i = opus_repacketizer_out_range(rp, 0, 1, po, 1276 * 48 + 48 * 2 + 2);
     if i != 5 || *po.offset(0 as isize) as i32 & 3 != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1604);
+        fail("tests/test_opus_api.c", 1604);
     }
     cfgs += 1;
     i = opus_repacketizer_out_range(rp, 1, 2, po, 1276 * 48 + 48 * 2 + 2);
     if i != 5 || *po.offset(0 as isize) as i32 & 3 != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1607);
+        fail("tests/test_opus_api.c", 1607);
     }
     cfgs += 1;
     opus_repacketizer_init(rp);
     *packet.offset(0 as isize) = 1;
     if opus_repacketizer_cat(rp, packet, 9) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1613);
+        fail("tests/test_opus_api.c", 1613);
     }
     cfgs += 1;
     *packet.offset(0 as isize) = 0;
     if opus_repacketizer_cat(rp, packet, 3) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1616);
+        fail("tests/test_opus_api.c", 1616);
     }
     cfgs += 1;
     i = opus_repacketizer_out(rp, po, 1276 * 48 + 48 * 2 + 2);
@@ -2275,18 +2203,18 @@ pub unsafe fn test_repacketizer_api() -> i32 {
         || *po.offset(1 as isize) as i32 & 63 != 3
         || *po.offset(1 as isize) as i32 >> 7 != 1
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1619);
+        fail("tests/test_opus_api.c", 1619);
     }
     cfgs += 1;
     opus_repacketizer_init(rp);
     *packet.offset(0 as isize) = 2;
     *packet.offset(1 as isize) = 4;
     if opus_repacketizer_cat(rp, packet, 8) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1626);
+        fail("tests/test_opus_api.c", 1626);
     }
     cfgs += 1;
     if opus_repacketizer_cat(rp, packet, 8) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1628);
+        fail("tests/test_opus_api.c", 1628);
     }
     cfgs += 1;
     i = opus_repacketizer_out(rp, po, 1276 * 48 + 48 * 2 + 2);
@@ -2295,18 +2223,18 @@ pub unsafe fn test_repacketizer_api() -> i32 {
         || *po.offset(1 as isize) as i32 & 63 != 4
         || *po.offset(1 as isize) as i32 >> 7 != 1
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1631);
+        fail("tests/test_opus_api.c", 1631);
     }
     cfgs += 1;
     opus_repacketizer_init(rp);
     *packet.offset(0 as isize) = 2;
     *packet.offset(1 as isize) = 4;
     if opus_repacketizer_cat(rp, packet, 10) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1638);
+        fail("tests/test_opus_api.c", 1638);
     }
     cfgs += 1;
     if opus_repacketizer_cat(rp, packet, 10) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1640);
+        fail("tests/test_opus_api.c", 1640);
     }
     cfgs += 1;
     i = opus_repacketizer_out(rp, po, 1276 * 48 + 48 * 2 + 2);
@@ -2315,7 +2243,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
         || *po.offset(1 as isize) as i32 & 63 != 4
         || *po.offset(1 as isize) as i32 >> 7 != 0
     {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1643);
+        fail("tests/test_opus_api.c", 1643);
     }
     cfgs += 1;
     j = 0;
@@ -2324,8 +2252,7 @@ pub unsafe fn test_repacketizer_api() -> i32 {
         let mut sum: i32 = 0;
         let mut rcnt_0: i32 = 0;
         *packet.offset(0 as isize) = (((j << 1) + (j & 1)) << 2) as u8;
-        maxi_0 =
-            960 / opus_packet_get_samples_per_frame(std::slice::from_raw_parts(packet, 1), 8000);
+        maxi_0 = 960 / opus_packet_get_samples_per_frame(*packet.offset(0), 8000);
         sum = 0;
         rcnt_0 = 0;
         opus_repacketizer_init(rp);
@@ -2335,12 +2262,12 @@ pub unsafe fn test_repacketizer_api() -> i32 {
             ret = opus_repacketizer_cat(rp, packet, i);
             if rcnt_0 < maxi_0 {
                 if ret != 0 {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1662);
+                    fail("tests/test_opus_api.c", 1662);
                 }
                 rcnt_0 += 1;
                 sum += i - 1;
-            } else if ret != -(4) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1665);
+            } else if ret != OPUS_INVALID_PACKET {
+                fail("tests/test_opus_api.c", 1665);
             }
             cfgs += 1;
             len_0 = sum
@@ -2352,50 +2279,50 @@ pub unsafe fn test_repacketizer_api() -> i32 {
                     2 + rcnt_0 - 1
                 });
             if opus_repacketizer_out(rp, po, 1276 * 48 + 48 * 2 + 2) != len_0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1668);
+                fail("tests/test_opus_api.c", 1668);
             }
             if rcnt_0 > 2 && *po.offset(1 as isize) as i32 & 63 != rcnt_0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1669);
+                fail("tests/test_opus_api.c", 1669);
             }
             if rcnt_0 == 2 && *po.offset(0 as isize) as i32 & 3 != 2 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1670);
+                fail("tests/test_opus_api.c", 1670);
             }
             if rcnt_0 == 1 && *po.offset(0 as isize) as i32 & 3 != 0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1671);
+                fail("tests/test_opus_api.c", 1671);
             }
             cfgs += 1;
             if opus_repacketizer_out(rp, po, len_0) != len_0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1673);
+                fail("tests/test_opus_api.c", 1673);
             }
             cfgs += 1;
             if opus_packet_unpad(po, len_0) != len_0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1675);
+                fail("tests/test_opus_api.c", 1675);
             }
             cfgs += 1;
             if opus_packet_pad(po, len_0, len_0 + 1) != 0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1677);
+                fail("tests/test_opus_api.c", 1677);
             }
             cfgs += 1;
             if opus_packet_pad(po, len_0 + 1, len_0 + 256) != 0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1679);
+                fail("tests/test_opus_api.c", 1679);
             }
             cfgs += 1;
             if opus_packet_unpad(po, len_0 + 256) != len_0 {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1681);
+                fail("tests/test_opus_api.c", 1681);
             }
             cfgs += 1;
             if opus_repacketizer_out(rp, po, len_0 - 1) != -(2) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1691);
+                fail("tests/test_opus_api.c", 1691);
             }
             cfgs += 1;
             if len_0 > 1 {
                 if opus_repacketizer_out(rp, po, 1) != -(2) {
-                    _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1695);
+                    fail("tests/test_opus_api.c", 1695);
                 }
                 cfgs += 1;
             }
             if opus_repacketizer_out(rp, po, 0) != -(2) {
-                _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1698);
+                fail("tests/test_opus_api.c", 1698);
             }
             cfgs += 1;
             i += 1;
@@ -2405,30 +2332,30 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     *po.offset(0 as isize) = 'O' as i32 as u8;
     *po.offset(1 as isize) = 'p' as i32 as u8;
     if opus_packet_pad(po, 4, 4) != 0 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1705);
+        fail("tests/test_opus_api.c", 1705);
     }
     cfgs += 1;
-    if opus_packet_pad(po, 4, 5) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1709);
+    if opus_packet_pad(po, 4, 5) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1709);
     }
     cfgs += 1;
-    if opus_packet_pad(po, 0, 5) != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1713);
+    if opus_packet_pad(po, 0, 5) != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 1713);
     }
     cfgs += 1;
-    if opus_packet_unpad(po, 0) != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1717);
+    if opus_packet_unpad(po, 0) != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 1717);
     }
     cfgs += 1;
-    if opus_packet_unpad(po, 4) != -(4) {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1721);
+    if opus_packet_unpad(po, 4) != OPUS_INVALID_PACKET {
+        fail("tests/test_opus_api.c", 1721);
     }
     cfgs += 1;
     *po.offset(0 as isize) = 0;
     *po.offset(1 as isize) = 0;
     *po.offset(2 as isize) = 0;
-    if opus_packet_pad(po, 5, 4) != -1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1728);
+    if opus_packet_pad(po, 5, 4) != OPUS_BAD_ARG {
+        fail("tests/test_opus_api.c", 1728);
     }
     cfgs += 1;
     println!("    opus_repacketizer_cat ........................ OK.");
@@ -2442,43 +2369,4 @@ pub unsafe fn test_repacketizer_api() -> i32 {
     free(po as *mut core::ffi::c_void);
     println!("                        All repacketizer tests passed");
     println!("                   ({:7} API invocations)", cfgs);
-    cfgs
-}
-pub unsafe fn test_malloc_fail() -> i32 {
-    println!("\n  malloc() failure tests");
-    println!("  ---------------------------------------------------");
-    println!("    opus_decoder_create() ................... SKIPPED.");
-    println!("    opus_encoder_create() ................... SKIPPED.");
-    println!("    opus_repacketizer_create() .............. SKIPPED.");
-    println!("    opus_multistream_decoder_create() ....... SKIPPED.");
-    println!("    opus_multistream_encoder_create() ....... SKIPPED.");
-    println!("(Test only supported with GLIBC and without valgrind)");
-    0
-}
-
-unsafe fn main_0() -> i32 {
-    let mut total: i32 = 0;
-    let oversion = opus_get_version_string();
-    eprintln!("Testing the {} API deterministically", oversion);
-    opus_strerror(-(32768));
-    opus_strerror(32767);
-    if opus_strerror(0).len() < 1 {
-        _test_failed(b"tests/test_opus_api.c\0" as *const u8 as *const i8, 1891);
-    }
-    total = 4;
-    total += test_dec_api();
-    total += test_parse();
-    total += test_enc_api();
-    total += test_repacketizer_api();
-    total += test_malloc_fail();
-    eprintln!(
-        "\nAll API tests passed.\nThe libopus API was invoked {} times.",
-        total
-    );
-    0
-}
-
-#[test]
-fn test_opus_encode() {
-    assert_eq!(unsafe { main_0() }, 0, "Test returned a non-zero exit code");
 }
