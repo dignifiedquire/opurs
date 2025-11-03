@@ -26,36 +26,17 @@ use unsafe_libopus::{
 static opus_rates: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
 
 #[test]
-fn test_dec_api() {
-    unsafe { test_dec_api_inner() };
-}
-
-unsafe fn test_dec_api_inner() {
-    let mut dec_final_range: u32 = 0;
-    let mut packet: [u8; 1276] = [0; 1276];
-    let mut fbuf: [f32; 1920] = [0.; 1920];
-    let mut sbuf: [i16; 1920] = [0; 1920];
-    let mut err: i32 = 0;
-    let mut cfgs = 0;
-
-    // First test invalid configurations which should fail
-    println!("\n  Decoder basic API tests");
-    println!("  ---------------------------------------------------");
+fn test_opus_decoder_get_size() {
     for c in 0..4 {
         let i = opus_decoder_get_size(c);
         if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 16) || c != 1 && c != 2 && i != 0 {
             fail("tests/test_opus_api.c", 106);
         }
-        println!(
-            "    opus_decoder_get_size({})={} ...............{} OK.",
-            c,
-            i,
-            if i > 0 { "" } else { "...." }
-        );
-        cfgs += 1;
     }
+}
 
-    // Test with unsupported sample rates
+#[test]
+fn test_opus_decoder_create_init() {
     for c in 0..4 {
         for i in -7..=96000 {
             if !((i == 8000 || i == 12000 || i == 16000 || i == 24000 || i == 48000)
@@ -68,37 +49,47 @@ unsafe fn test_dec_api_inner() {
                     _ => i,
                 };
                 let mut err = 0;
-                let mut dec = opus_decoder_create(fs, c, &mut err);
+                let mut dec = unsafe { opus_decoder_create(fs, c, &mut err) };
                 if err != OPUS_BAD_ARG || !dec.is_null() {
                     fail("tests/test_opus_api.c", 128);
                 }
-                cfgs += 1;
-                dec = opus_decoder_create(fs, c, std::ptr::null_mut::<i32>());
+                dec = unsafe { opus_decoder_create(fs, c, std::ptr::null_mut::<i32>()) };
                 if !dec.is_null() {
                     fail("tests/test_opus_api.c", 131);
                 }
-                cfgs += 1;
-                dec = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
+                dec = unsafe { malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder };
                 if dec.is_null() {
                     fail("tests/test_opus_api.c", 134);
                 }
-                err = opus_decoder_init(dec, fs, c);
+                let err = unsafe { opus_decoder_init(dec, fs, c) };
                 if err != OPUS_BAD_ARG {
                     fail("tests/test_opus_api.c", 136);
                 }
-                cfgs += 1;
-                free(dec as *mut core::ffi::c_void);
+                unsafe {
+                    free(dec as *mut core::ffi::c_void);
+                }
             }
         }
     }
+}
 
-    let mut dec = opus_decoder_create(48000, 2, &mut err);
+#[test]
+fn test_dec_api() {
+    unsafe { test_dec_api_inner() };
+}
+
+unsafe fn test_dec_api_inner() {
+    let mut dec_final_range: u32 = 0;
+    let mut packet: [u8; 1276] = [0; 1276];
+    let mut fbuf: [f32; 1920] = [0.; 1920];
+    let mut sbuf: [i16; 1920] = [0; 1920];
+    let mut err: i32 = 0;
+    let mut cfgs = 0;
+
+    let mut dec = unsafe { opus_decoder_create(48000, 2, &mut err) };
     if err != 0 || dec.is_null() {
         fail("tests/test_opus_api.c", 144);
     }
-    cfgs += 1;
-    println!("    opus_decoder_create() ........................ OK.");
-    println!("    opus_decoder_init() .......................... OK.");
     err = opus_decoder_ctl!(&mut *dec, 4031, &mut dec_final_range);
     if err != 0 {
         fail("tests/test_opus_api.c", 155);
