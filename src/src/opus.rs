@@ -4,100 +4,112 @@ pub mod stddef_h {
 pub use self::stddef_h::NULL;
 use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
-pub fn opus_pcm_soft_clip(_x: &mut [f32], N: usize, C: usize, declip_mem: &mut [f32]) {
-    if C < 1 || N < 1 {
+/// Applies soft-clipping to bring a float signal within the [-1,1] range. If
+/// the signal is already in that range, nothing is done. If there are values
+/// outside of [-1,1], then the signal is clipped as smoothly as possible to
+/// both fit in the range and avoid creating excessive distortion in the
+/// process.
+/// - `pcm`: Input PCM and modified PCM
+/// - `frame_size`: Number of samples per channel to process
+/// - `channels`: Number of channels
+/// - `softclip_mem`: State memory for the soft clipping process (one float per channel, initialized to zero)
+pub fn opus_pcm_soft_clip(
+    pcm: &mut [f32],
+    frame_size: usize,
+    channels: usize,
+    softclip_mem: &mut [f32],
+) {
+    if channels < 1 || frame_size < 1 {
         return;
     }
 
-    for i in 0..N * C {
-        _x[i] = if -2.0f32 > (if 2.0f32 < _x[i] { 2.0f32 } else { _x[i] }) {
-            -2.0f32
-        } else if 2.0f32 < _x[i] {
-            2.0f32
-        } else {
-            _x[i]
-        }
+    // First thing: saturate everything to +/- 2 which is the highest level our
+    // non-linearity can handle. At the point where the signal reaches +/-2,
+    // the derivative will be zero anyway, so this doesn't introduce any
+    // discontinuity in the derivative.
+    for i in 0..frame_size * channels {
+        pcm[i] = (-2.0f32).max((2.0f32).min(pcm[i]));
     }
-    for c in 0..C {
-        let x = &mut _x[c..];
-        let mut a = declip_mem[c];
 
-        for i in 0..N {
-            if x[i * C] * a >= 0. {
+    for c in 0..channels {
+        let x = &mut pcm[c..];
+        let mut a = softclip_mem[c];
+
+        // Continue applying the non-linearity from the previous frame to avoid
+        // any discontinuity.
+        for i in 0..frame_size {
+            if x[i * channels] * a >= 0. {
                 break;
             }
-            x[i * C] = x[i * C] + a * x[i * C] * x[i * C];
+            x[i * channels] = x[i * channels] + a * x[i * channels] * x[i * channels];
         }
 
         let mut curr = 0;
         let x0 = x[0];
         loop {
-            let mut start = 0;
-            let mut end = 0;
-            let mut maxval = 0.;
-            let mut special = 0;
-            let mut peak_pos = 0;
-
             let mut i = curr;
-            while i < N {
-                if x[i * C] > 1. || x[i * C] < -1. {
+            while i < frame_size {
+                if x[i * channels] > 1. || x[i * channels] < -1. {
                     break;
                 }
                 i += 1;
             }
-            if i == N {
+            if i == frame_size {
                 a = 0.;
                 break;
-            } else {
-                peak_pos = i;
-                end = i;
-                start = end;
-                maxval = x[i * C].abs();
-                while start > 0 && x[i * C] * x[(start - 1) * C] >= 0. {
-                    start -= 1;
-                }
-                while end < N && x[i * C] * x[end * C] >= 0. {
-                    if x[end * C].abs() > maxval {
-                        maxval = x[end * C].abs();
-                        peak_pos = end;
-                    }
-                    end += 1;
-                }
-                special = (start == 0 && x[i * C] * x[0] >= 0.) as i32;
-                a = (maxval - 1.) / (maxval * maxval);
-                a += a * 2.4e-7f32;
-                if x[i * C] > 0. {
-                    a = -a;
-                }
-                for i in start..end {
-                    x[i * C] = x[i * C] + a * x[i * C] * x[i * C];
-                }
+            }
+            let mut peak_pos = i;
+            let mut end = i;
+            let mut start = end;
+            let mut maxval = x[i * channels].abs();
 
-                if special != 0 && peak_pos >= 2 {
-                    let mut delta = 0.;
-                    let mut offset = x0 - x[0];
-                    delta = offset / peak_pos as f32;
-
-                    for i in curr..peak_pos {
-                        offset -= delta;
-                        x[i * C] += offset;
-                        x[i * C] = if -1.0f32 > (if 1.0f32 < x[i * C] { 1.0f32 } else { x[i * C] })
-                        {
-                            -1.0f32
-                        } else if 1.0f32 < x[i * C] {
-                            1.0f32
-                        } else {
-                            x[i * C]
-                        };
-                    }
+            // Look for first zero crossing before clipping
+            while start > 0 && x[i * channels] * x[(start - 1) * channels] >= 0. {
+                start -= 1;
+            }
+            // Look for first zero crossing after clipping
+            while end < frame_size && x[i * channels] * x[end * channels] >= 0. {
+                if x[end * channels].abs() > maxval {
+                    maxval = x[end * channels].abs();
+                    peak_pos = end;
                 }
-                curr = end;
-                if curr == N {
-                    break;
+                end += 1;
+            }
+            // Detect the special case where we clip before the first zero crossing
+            let special = (start == 0 && x[i * channels] * x[0] >= 0.) as i32;
+            // Compute a such that maxval + a*maxval^2 = 1
+            a = (maxval - 1.) / (maxval * maxval);
+            // Slightly boost "a" by 2^-22. This is just enough to ensure -ffast-math
+            // does not cause output values larger than +/-1, but small enough not
+            // to matter even for 24-bit output.
+            a += a * 2.4e-7f32;
+            if x[i * channels] > 0. {
+                a = -a;
+            }
+            // Apply soft clipping
+            for i in start..end {
+                x[i * channels] = x[i * channels] + a * x[i * channels] * x[i * channels];
+            }
+
+            if special != 0 && peak_pos >= 2 {
+                // Add a linear ramp from the first sample to the signal peak.
+                // This avoids a discontinuity at the beginning of the frame.
+                let mut delta = 0.;
+                let mut offset = x0 - x[0];
+                delta = offset / peak_pos as f32;
+
+                for i in curr..peak_pos {
+                    offset -= delta;
+                    x[i * channels] += offset;
+                    x[i * channels] = (-1.0f32).max((1.0f32).min(x[i * channels]));
                 }
             }
+            curr = end;
+            if curr == frame_size {
+                break;
+            }
         }
-        declip_mem[c] = a;
+        softclip_mem[c] = a;
     }
 }
 
