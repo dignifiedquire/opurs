@@ -164,31 +164,34 @@ pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
 pub unsafe fn opus_packet_parse_impl(
     mut data: *const u8,
     mut len: i32,
-    self_delimited: i32,
-    out_toc: *mut u8,
-    frames: *mut *const u8,
-    size: *mut i16,
-    payload_offset: *mut i32,
-    packet_offset: *mut i32,
+    self_delimited: bool,
+    out_toc: Option<&mut u8>,
+    mut frames: Option<&mut [*const u8]>,
+    size: Option<&mut [i16]>,
+    payload_offset: Option<&mut i32>,
+    packet_offset: Option<&mut i32>,
 ) -> i32 {
     let mut i: i32 = 0;
     let mut bytes: i32 = 0;
     let mut count: i32 = 0;
-    let mut cbr: i32 = 0;
+    let mut cbr = false;
     let mut ch: u8 = 0;
     let mut toc: u8 = 0;
     let mut framesize: i32 = 0;
     let mut last_size: i32 = 0;
     let mut pad: i32 = 0;
     let data0: *const u8 = data;
-    if size.is_null() || len < 0 {
+
+    let Some(size) = size else {
+        return OPUS_BAD_ARG;
+    };
+    if len < 0 {
         return OPUS_BAD_ARG;
     }
     if len == 0 {
         return OPUS_INVALID_PACKET;
     }
     framesize = opus_packet_get_samples_per_frame(*data.offset(0), 48000);
-    cbr = 0;
     let fresh0 = data;
     data = data.offset(1);
     toc = *fresh0;
@@ -196,33 +199,39 @@ pub unsafe fn opus_packet_parse_impl(
     last_size = len;
     match toc as i32 & 0x3 {
         0 => {
+            // One frame
             count = 1;
         }
         1 => {
+            // Two CBR frames
             count = 2;
-            cbr = 1;
-            if self_delimited == 0 {
+            cbr = true;
+            if !self_delimited {
                 if len & 0x1 != 0 {
                     return OPUS_INVALID_PACKET;
                 }
                 last_size = len / 2;
-                *size.offset(0 as isize) = last_size as i16;
+                // If last_size doesn't fit in size[0], we'll catch it later
+                size[0] = last_size as i16;
             }
         }
         2 => {
+            // Two VBR frames
             count = 2;
-            bytes = parse_size(data, len, size);
+            bytes = parse_size(data, len, size.as_mut_ptr());
             len -= bytes;
-            if (*size.offset(0 as isize) as i32) < 0 || *size.offset(0 as isize) as i32 > len {
+            if (size[0] as i32) < 0 || size[0] as i32 > len {
                 return OPUS_INVALID_PACKET;
             }
             data = data.offset(bytes as isize);
-            last_size = len - *size.offset(0 as isize) as i32;
+            last_size = len - size[0] as i32;
         }
         _ => {
+            // Multiple CBR/VBR frames (from 0 to 120 ms)
             if len < 1 {
                 return OPUS_INVALID_PACKET;
             }
+            // Number of frames encoded in bits 0 to 5
             let fresh1 = data;
             data = data.offset(1);
             ch = *fresh1;
@@ -231,6 +240,7 @@ pub unsafe fn opus_packet_parse_impl(
                 return OPUS_INVALID_PACKET;
             }
             len -= 1;
+            // Padding flag is bit 6
             if ch as i32 & 0x40 != 0 {
                 let mut p: i32 = 0;
                 loop {
@@ -253,81 +263,84 @@ pub unsafe fn opus_packet_parse_impl(
             if len < 0 {
                 return OPUS_INVALID_PACKET;
             }
-            cbr = (ch as i32 & 0x80 == 0) as i32;
-            if cbr == 0 {
+            // VBR flag is bit 7
+            cbr = ch as i32 & 0x80 == 0;
+            if !cbr {
+                // VBR case
                 last_size = len;
                 i = 0;
                 while i < count - 1 {
-                    bytes = parse_size(data, len, size.offset(i as isize));
+                    bytes = parse_size(data, len, size[i as usize..].as_mut_ptr());
                     len -= bytes;
-                    if (*size.offset(i as isize) as i32) < 0
-                        || *size.offset(i as isize) as i32 > len
-                    {
+                    if (size[i as usize] as i32) < 0 || size[i as usize] as i32 > len {
                         return OPUS_INVALID_PACKET;
                     }
                     data = data.offset(bytes as isize);
-                    last_size -= bytes + *size.offset(i as isize) as i32;
+                    last_size -= bytes + size[i as usize] as i32;
                     i += 1;
                 }
                 if last_size < 0 {
                     return OPUS_INVALID_PACKET;
                 }
-            } else if self_delimited == 0 {
+            } else if !self_delimited {
+                // CBR case
                 last_size = len / count;
                 if last_size * count != len {
                     return OPUS_INVALID_PACKET;
                 }
                 i = 0;
                 while i < count - 1 {
-                    *size.offset(i as isize) = last_size as i16;
+                    size[i as usize] = last_size as i16;
                     i += 1;
                 }
             }
         }
     }
-    if self_delimited != 0 {
-        bytes = parse_size(data, len, size.offset(count as isize).offset(-(1 as isize)));
+    // Self-delimited framing has an extra size for the last frame.
+    if self_delimited {
+        bytes = parse_size(data, len, size[count as usize - 1..].as_mut_ptr());
         len -= bytes;
-        if (*size.offset((count - 1) as isize) as i32) < 0
-            || *size.offset((count - 1) as isize) as i32 > len
-        {
+        if (size[count as usize - 1] as i32) < 0 || size[(count - 1) as usize] as i32 > len {
             return OPUS_INVALID_PACKET;
         }
         data = data.offset(bytes as isize);
-        if cbr != 0 {
-            if *size.offset((count - 1) as isize) as i32 * count > len {
+        // For CBR packets, apply the size to all the frames.
+        if cbr {
+            if size[(count - 1) as usize] as i32 * count > len {
                 return OPUS_INVALID_PACKET;
             }
             i = 0;
             while i < count - 1 {
-                *size.offset(i as isize) = *size.offset((count - 1) as isize);
+                size[i as usize] = size[(count - 1) as usize];
                 i += 1;
             }
-        } else if bytes + *size.offset((count - 1) as isize) as i32 > last_size {
+        } else if bytes + size[(count - 1) as usize] as i32 > last_size {
             return OPUS_INVALID_PACKET;
         }
     } else {
+        // Because it's not encoded explicitly, it's possible the size of the
+        // last packet (or all the packets, for the CBR case) is larger than
+        // 1275. Reject them here.
         if last_size > 1275 {
             return OPUS_INVALID_PACKET;
         }
-        *size.offset((count - 1) as isize) = last_size as i16;
+        size[(count - 1) as usize] = last_size as i16;
     }
-    if !payload_offset.is_null() {
-        *payload_offset = data.offset_from(data0) as i64 as i32;
+    if let Some(payload_offset) = payload_offset {
+        *payload_offset = data.offset_from(data0) as i32;
     }
     i = 0;
     while i < count {
-        if !frames.is_null() {
-            let ref mut fresh3 = *frames.offset(i as isize);
-            *fresh3 = data;
+        if let Some(ref mut frames) = frames {
+            frames[i as usize] = data;
         }
-        data = data.offset(*size.offset(i as isize) as i32 as isize);
+        data = data.offset(size[i as usize] as isize);
         i += 1;
     }
-    if !packet_offset.is_null() {
-        *packet_offset = pad + data.offset_from(data0) as i64 as i32;
+    if let Some(packet_offset) = packet_offset {
+        *packet_offset = pad + data.offset_from(data0) as i32;
     }
-    if !out_toc.is_null() {
+    if let Some(out_toc) = out_toc {
         *out_toc = toc;
     }
 
@@ -359,16 +372,11 @@ pub unsafe fn opus_packet_parse(
     opus_packet_parse_impl(
         data.as_mut_ptr(),
         len,
-        0,
-        out_toc.map(|s| s as _).unwrap_or_else(std::ptr::null_mut),
-        frames
-            .map(|s| s.as_mut_slice().as_mut_ptr())
-            .unwrap_or_else(std::ptr::null_mut),
-        size.map(|s| s.as_mut_ptr())
-            .unwrap_or_else(std::ptr::null_mut),
-        payload_offset
-            .map(|s| s as _)
-            .unwrap_or_else(std::ptr::null_mut),
-        std::ptr::null_mut(),
+        false,
+        out_toc,
+        frames.map(|s| s.as_mut_slice()),
+        size.map(|s| s.as_mut_slice()),
+        payload_offset,
+        None,
     )
 }

@@ -42,45 +42,49 @@ unsafe fn opus_repacketizer_cat_impl(
     rp: *mut OpusRepacketizer,
     data: *const u8,
     len: i32,
-    self_delimited: i32,
+    self_delimited: bool,
 ) -> i32 {
+    let rpp = &mut *rp;
+
     let mut tmp_toc: u8 = 0;
     let mut curr_nb_frames: i32 = 0;
     let mut ret: i32 = 0;
     if len < 1 {
         return OPUS_INVALID_PACKET;
     }
-    if (*rp).nb_frames == 0 {
-        (*rp).toc = *data.offset(0 as isize);
-        (*rp).framesize = opus_packet_get_samples_per_frame(*data.offset(0), 8000);
-    } else if (*rp).toc as i32 & 0xfc != *data.offset(0 as isize) as i32 & 0xfc {
+    if rpp.nb_frames == 0 {
+        rpp.toc = *data.offset(0 as isize);
+        rpp.framesize = opus_packet_get_samples_per_frame(*data.offset(0), 8000);
+    } else if rpp.toc as i32 & 0xfc != *data.offset(0 as isize) as i32 & 0xfc {
         return OPUS_INVALID_PACKET;
     }
     curr_nb_frames = opus_packet_get_nb_frames(std::slice::from_raw_parts(data, len as usize));
     if curr_nb_frames < 1 {
         return OPUS_INVALID_PACKET;
     }
-    if (curr_nb_frames + (*rp).nb_frames) * (*rp).framesize > 960 {
+    if (curr_nb_frames + rpp.nb_frames) * rpp.framesize > 960 {
         return OPUS_INVALID_PACKET;
     }
+
     ret = opus_packet_parse_impl(
         data,
         len,
         self_delimited,
-        &mut tmp_toc,
-        &mut *((*rp).frames).as_mut_ptr().offset((*rp).nb_frames as isize),
-        &mut *((*rp).len).as_mut_ptr().offset((*rp).nb_frames as isize),
-        NULL as *mut i32,
-        NULL as *mut i32,
+        Some(&mut tmp_toc),
+        Some(&mut rpp.frames[rpp.nb_frames as usize..]),
+        Some(&mut rpp.len[rpp.nb_frames as usize..]),
+        None,
+        None,
     );
     if ret < 1 {
         return ret;
     }
-    (*rp).nb_frames += curr_nb_frames;
-    return OPUS_OK;
+    rpp.nb_frames += curr_nb_frames;
+    OPUS_OK
 }
+
 pub unsafe fn opus_repacketizer_cat(rp: *mut OpusRepacketizer, data: *const u8, len: i32) -> i32 {
-    return opus_repacketizer_cat_impl(rp, data, len, 0);
+    return opus_repacketizer_cat_impl(rp, data, len, false);
 }
 pub unsafe fn opus_repacketizer_get_nb_frames(rp: *mut OpusRepacketizer) -> i32 {
     return (*rp).nb_frames;

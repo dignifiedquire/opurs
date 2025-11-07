@@ -675,8 +675,8 @@ pub unsafe fn opus_decode_native(
     pcm: &mut [opus_val16],
     frame_size: i32,
     decode_fec: i32,
-    self_delimited: i32,
-    packet_offset: *mut i32,
+    self_delimited: bool,
+    packet_offset: Option<&mut i32>,
     soft_clip: i32,
 ) -> i32 {
     let mut i: i32 = 0;
@@ -733,10 +733,10 @@ pub unsafe fn opus_decode_native(
         data,
         len,
         self_delimited,
-        &mut toc,
-        NULL as *mut *const u8,
-        size.as_mut_ptr(),
-        &mut offset,
+        Some(&mut toc),
+        None,
+        Some(&mut size),
+        Some(&mut offset),
         packet_offset,
     );
     if count < 0 {
@@ -757,8 +757,8 @@ pub unsafe fn opus_decode_native(
                 pcm,
                 frame_size,
                 0,
-                0,
-                NULL as *mut i32,
+                false,
+                None,
                 soft_clip,
             );
         }
@@ -771,8 +771,8 @@ pub unsafe fn opus_decode_native(
                 pcm,
                 frame_size - packet_frame_size,
                 0,
-                0,
-                NULL as *mut i32,
+                false,
+                None,
                 soft_clip,
             );
             if ret_0 < 0 {
@@ -870,15 +870,7 @@ pub unsafe fn opus_decode(
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
     ret = opus_decode_native(
-        st,
-        data,
-        len,
-        &mut out,
-        frame_size,
-        decode_fec,
-        0,
-        NULL as *mut i32,
-        1,
+        st, data, len, &mut out, frame_size, decode_fec, false, None, 1,
     );
     if ret > 0 {
         i = 0;
@@ -900,17 +892,7 @@ pub unsafe fn opus_decode_float(
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    return opus_decode_native(
-        st,
-        data,
-        len,
-        pcm,
-        frame_size,
-        decode_fec,
-        0,
-        NULL as *mut i32,
-        0,
-    );
+    return opus_decode_native(st, data, len, pcm, frame_size, decode_fec, false, None, 0);
 }
 pub unsafe fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) -> i32 {
     let celt_dec = &mut st.celt_dec;
