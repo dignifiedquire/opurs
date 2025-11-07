@@ -139,27 +139,32 @@ unsafe fn parse_size(data: *const u8, len: i32, size: *mut i16) -> i32 {
     };
 }
 
+/// Gets the number of samples per frame from an Opus packet.
+///
+/// - `data`: The first byte of an opus packet.
+/// - `fs`: Sampling rate in Hz.
+///   This must be a multiple of 400, or inaccurate results will be returned.
+/// Returns the number of samples per frame.
 pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
-    let mut audiosize: i32 = 0;
     if data & 0x80 != 0 {
-        audiosize = data as i32 >> 3 & 0x3;
-        audiosize = (fs << audiosize) / 400;
+        let audiosize = data as i32 >> 3 & 0x3;
+        (fs << audiosize) / 400
     } else if data as i32 & 0x60 == 0x60 {
-        audiosize = if data as i32 & 0x8 != 0 {
+        if data as i32 & 0x8 != 0 {
             fs / 50
         } else {
             fs / 100
-        };
+        }
     } else {
-        audiosize = data as i32 >> 3 & 0x3;
+        let audiosize = data as i32 >> 3 & 0x3;
         if audiosize == 3 {
-            audiosize = fs * 60 / 1000;
+            fs * 60 / 1000
         } else {
-            audiosize = (fs << audiosize) / 100;
+            (fs << audiosize) / 100
         }
     }
-    return audiosize;
 }
+
 pub unsafe fn opus_packet_parse_impl(
     mut data: *const u8,
     mut len: i32,
