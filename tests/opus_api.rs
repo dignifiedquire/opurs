@@ -1,8 +1,4 @@
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
 #![allow(unused_assignments)]
-#![allow(unused_mut)]
 #![allow(deprecated)]
 
 use std::ptr;
@@ -88,7 +84,7 @@ unsafe fn test_dec_api_inner() {
     let mut err: i32 = 0;
     let mut cfgs = 0;
 
-    let mut dec = unsafe { opus_decoder_create(48000, 2, &mut err) };
+    let dec = unsafe { opus_decoder_create(48000, 2, &mut err) };
     if err != 0 || dec.is_null() {
         fail("tests/test_opus_api.c", 144);
     }
@@ -183,7 +179,7 @@ unsafe fn test_dec_api_inner() {
     println!("    OPUS_GET_GAIN ................................ OK.");
 
     // Reset the decoder
-    let mut dec2 = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
+    let dec2 = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
     memcpy(
         dec2 as *mut core::ffi::c_void,
         dec as *const core::ffi::c_void,
@@ -241,7 +237,7 @@ unsafe fn test_dec_api_inner() {
     }
 
     for i in 0..256 {
-        let mut l1res: [i32; 4] = [1, 2, 2, OPUS_INVALID_PACKET];
+        let l1res: [i32; 4] = [1, 2, 2, OPUS_INVALID_PACKET];
         packet[0] = i as u8;
         if l1res[(packet[0] as i32 & 3) as usize] != opus_packet_get_nb_frames(&packet[..1]) {
             fail("tests/test_opus_api.c", 269);
@@ -862,7 +858,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
         packet[1] = (128 + 1) as u8;
-        let mut frame_samp_0 = opus_packet_get_samples_per_frame(packet[0], 48000);
+        let frame_samp_0 = opus_packet_get_samples_per_frame(packet[0], 48000);
 
         for jj in 0..1276 {
             frames[0] = ptr::null_mut::<u8>();
@@ -1006,7 +1002,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
             for sz in 0..8 {
                 let tsz: [i32; 8] = [50, 201, 403, 700, 1472, 5110, 20400, 61298];
                 let mut pos: i32 = 0;
-                let mut as_0: i32 = (tsz[sz as usize] + i - j - 2) / j;
+                let as_0: i32 = (tsz[sz as usize] + i - j - 2) / j;
                 for _jj in 0..j - 1 {
                     if as_0 < 252 {
                         packet[(2 + pos) as usize] = as_0 as u8;
