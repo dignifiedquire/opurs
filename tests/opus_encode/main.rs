@@ -812,12 +812,12 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
             _test_failed(b"tests/test_opus_encode.c\0" as *const u8 as *const i8, 580);
         }
         if opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             len_1,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         ) <= 0
         {
             _test_failed(b"tests/test_opus_encode.c\0" as *const u8 as *const i8, 585);

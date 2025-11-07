@@ -1,7 +1,3 @@
-pub mod stddef_h {
-    pub const NULL: i32 = 0;
-}
-pub use self::stddef_h::NULL;
 use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
 /// Applies soft-clipping to bring a float signal within the [-1,1] range. If
@@ -334,24 +330,45 @@ pub unsafe fn opus_packet_parse_impl(
     if !out_toc.is_null() {
         *out_toc = toc;
     }
-    return count;
+
+    count
 }
+
+/// Parse an opus packet into one or more frames.
+/// Opus_decode will perform this operation internally so most applications do
+/// not need to use this function.
+/// This function does not copy the frames, the returned pointers are pointers into
+/// the input packet.
+///
+/// - `data`: Opus packet to be parsed
+/// - `len`: size of data
+/// - `out_toc`: TOC pointer
+/// - `frames`: encapsulated frames
+/// - `size`: sizes of the encapsulated frames
+/// - `payload_offset`: returns the position of the payload within the packet (in bytes)
+///
+/// Returns number of frames
 pub unsafe fn opus_packet_parse(
-    data: *const u8,
+    data: &mut [u8],
     len: i32,
-    out_toc: *mut u8,
-    frames: *mut *const u8,
-    size: *mut i16,
-    payload_offset: *mut i32,
+    out_toc: Option<&mut u8>,
+    frames: Option<&mut [*const u8; 48]>,
+    size: Option<&mut [i16; 48]>,
+    payload_offset: Option<&mut i32>,
 ) -> i32 {
-    return opus_packet_parse_impl(
-        data,
+    opus_packet_parse_impl(
+        data.as_mut_ptr(),
         len,
         0,
-        out_toc,
-        frames,
-        size,
-        payload_offset,
-        NULL as *mut i32,
-    );
+        out_toc.map(|s| s as _).unwrap_or_else(std::ptr::null_mut),
+        frames
+            .map(|s| s.as_mut_slice().as_mut_ptr())
+            .unwrap_or_else(std::ptr::null_mut),
+        size.map(|s| s.as_mut_ptr())
+            .unwrap_or_else(std::ptr::null_mut),
+        payload_offset
+            .map(|s| s as _)
+            .unwrap_or_else(std::ptr::null_mut),
+        std::ptr::null_mut(),
+    )
 }

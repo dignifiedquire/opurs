@@ -377,12 +377,12 @@ unsafe fn test_parse_inner() {
     );
     packet[0] = ((63) << 2) as u8;
     if opus_packet_parse(
-        packet.as_mut_ptr(),
+        &mut packet,
         1,
-        &mut toc,
-        frames.as_mut_ptr(),
-        std::ptr::null_mut::<i16>(),
-        &mut payload_offset,
+        Some(&mut toc),
+        Some(&mut frames),
+        None,
+        Some(&mut payload_offset),
     ) != OPUS_BAD_ARG
     {
         fail("tests/test_opus_api.c", 720);
@@ -397,12 +397,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             4,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != 1 {
@@ -432,12 +432,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 jj,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if jj & 1 == 1 && jj <= 2551 {
@@ -474,12 +474,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             1,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -491,12 +491,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             2,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -515,12 +515,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 j + (if j < 252 { 2 } else { 3 }) - 1,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -531,12 +531,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 j + (if j < 252 { 2 } else { 3 }) + 1276,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -547,12 +547,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 j + (if j < 252 { 2 } else { 3 }),
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != 2 {
@@ -572,12 +572,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 (j << 1) + 4,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != 2 {
@@ -612,12 +612,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             1,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -642,12 +642,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 1275,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -659,12 +659,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 1275,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -676,12 +676,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 1275,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -693,12 +693,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 1275,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -725,12 +725,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 j + 2,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != 1 {
@@ -749,12 +749,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             1276 + 2,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -783,12 +783,12 @@ unsafe fn test_parse_inner() {
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     sz,
-                    &mut toc,
-                    frames.as_mut_ptr(),
-                    size.as_mut_ptr(),
-                    &mut payload_offset,
+                    Some(&mut toc),
+                    Some(&mut frames),
+                    Some(&mut size),
+                    Some(&mut payload_offset),
                 );
                 cfgs += 1;
                 if frame_samp * j <= 5760 && (sz - 2) % j == 0 && (sz - 2) / j < 1276 {
@@ -820,13 +820,14 @@ unsafe fn test_parse_inner() {
         frames[0] = std::ptr::null_mut::<u8>();
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
+        let p1 = packet[1];
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
-            1275 * packet[1 as usize] as i32 + 2,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            &mut packet,
+            1275 * p1 as i32 + 2,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != packet[1 as usize] as i32 {
@@ -857,12 +858,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + jj,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != 1 {
@@ -881,12 +882,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             2 + 1276,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -900,12 +901,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + j - 2,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -923,12 +924,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + j,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -944,12 +945,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + j - 2,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -967,12 +968,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + j + 252 - 1,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if ret != OPUS_INVALID_PACKET {
@@ -988,12 +989,12 @@ unsafe fn test_parse_inner() {
             frames[1 as usize] = std::ptr::null_mut::<u8>();
             payload_offset = -1;
             ret = opus_packet_parse(
-                packet.as_mut_ptr(),
+                &mut packet,
                 2 + j - 1,
-                &mut toc,
-                frames.as_mut_ptr(),
-                size.as_mut_ptr(),
-                &mut payload_offset,
+                Some(&mut toc),
+                Some(&mut frames),
+                Some(&mut size),
+                Some(&mut payload_offset),
             );
             cfgs += 1;
             if frame_samp_0 * j <= 5760 {
@@ -1035,12 +1036,12 @@ unsafe fn test_parse_inner() {
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     tsz[sz as usize] + i,
-                    &mut toc,
-                    frames.as_mut_ptr(),
-                    size.as_mut_ptr(),
-                    &mut payload_offset,
+                    Some(&mut toc),
+                    Some(&mut frames),
+                    Some(&mut size),
+                    Some(&mut payload_offset),
                 );
                 cfgs += 1;
                 if frame_samp_0 * j <= 5760
@@ -1091,12 +1092,12 @@ unsafe fn test_parse_inner() {
         frames[1 as usize] = std::ptr::null_mut::<u8>();
         payload_offset = -1;
         ret = opus_packet_parse(
-            packet.as_mut_ptr(),
+            &mut packet,
             127,
-            &mut toc,
-            frames.as_mut_ptr(),
-            size.as_mut_ptr(),
-            &mut payload_offset,
+            Some(&mut toc),
+            Some(&mut frames),
+            Some(&mut size),
+            Some(&mut payload_offset),
         );
         cfgs += 1;
         if ret != OPUS_INVALID_PACKET {
@@ -1121,12 +1122,12 @@ unsafe fn test_parse_inner() {
                     frames[1 as usize] = std::ptr::null_mut::<u8>();
                     payload_offset = -1;
                     ret = opus_packet_parse(
-                        packet.as_mut_ptr(),
+                        &mut packet,
                         2 + jj + pos_0 - 1,
-                        &mut toc,
-                        frames.as_mut_ptr(),
-                        size.as_mut_ptr(),
-                        &mut payload_offset,
+                        Some(&mut toc),
+                        Some(&mut frames),
+                        Some(&mut size),
+                        Some(&mut payload_offset),
                     );
                     cfgs += 1;
                     if ret != OPUS_INVALID_PACKET {
@@ -1138,12 +1139,12 @@ unsafe fn test_parse_inner() {
                 frames[1 as usize] = std::ptr::null_mut::<u8>();
                 payload_offset = -1;
                 ret = opus_packet_parse(
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     2 + jj + tsz_0[sz as usize] + i + pos_0,
-                    &mut toc,
-                    frames.as_mut_ptr(),
-                    size.as_mut_ptr(),
-                    &mut payload_offset,
+                    Some(&mut toc),
+                    Some(&mut frames),
+                    Some(&mut size),
+                    Some(&mut payload_offset),
                 );
                 cfgs += 1;
                 if tsz_0[sz as usize] + i < 1276 {
