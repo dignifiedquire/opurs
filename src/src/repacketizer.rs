@@ -72,7 +72,7 @@ unsafe fn opus_repacketizer_cat_impl(
         self_delimited,
         Some(&mut tmp_toc),
         Some(&mut rpp.frames[rpp.nb_frames as usize..]),
-        Some(&mut rpp.len[rpp.nb_frames as usize..]),
+        &mut rpp.len[rpp.nb_frames as usize..],
         None,
         None,
     );

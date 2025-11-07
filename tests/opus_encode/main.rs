@@ -816,7 +816,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
             len_1,
             Some(&mut toc),
             Some(&mut frames),
-            Some(&mut size),
+            &mut size,
             Some(&mut payload_offset),
         ) <= 0
         {

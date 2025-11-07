@@ -735,7 +735,7 @@ pub unsafe fn opus_decode_native(
         self_delimited,
         Some(&mut toc),
         None,
-        Some(&mut size),
+        &mut size,
         Some(&mut offset),
         packet_offset,
     );
