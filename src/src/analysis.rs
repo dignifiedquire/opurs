@@ -1087,7 +1087,7 @@ unsafe fn tonality_analysis(
         E += binE;
         i += 1;
     }
-    E = E;
+    // E = E;
     band_log2[0 as usize] = 0.5f32 * std::f32::consts::LOG2_E * celt_log(E + 1e-10f32);
     b = 0;
     while b < NB_TBANDS {
@@ -1099,11 +1099,11 @@ unsafe fn tonality_analysis(
         let mut stationarity: f32 = 0.;
         i = tbands[b as usize];
         while i < tbands[(b + 1) as usize] {
-            let mut binE_0: f32 = out[i as usize].re * out[i as usize].re
+            let binE_0: f32 = out[i as usize].re * out[i as usize].re
                 + out[(N - i) as usize].re * out[(N - i) as usize].re
                 + out[i as usize].im * out[i as usize].im
                 + out[(N - i) as usize].im * out[(N - i) as usize].im;
-            binE_0 = binE_0;
+            // binE_0 = binE_0;
             E_0 += binE_0;
             tE += binE_0
                 * (if 0 as f32 > tonality[i as usize] {
@@ -1301,7 +1301,7 @@ unsafe fn tonality_analysis(
             E_1 += binE_1;
             i += 1;
         }
-        E_1 = E_1;
+        // E_1 = E_1;
         maxE = if maxE > E_1 { maxE } else { E_1 };
         if band_start < 64 {
             below_max_pitch += E_1;
