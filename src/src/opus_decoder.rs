@@ -670,7 +670,7 @@ unsafe fn opus_decode_frame(
 }
 pub unsafe fn opus_decode_native(
     st: &mut OpusDecoder,
-    mut data: *const u8,
+    data: &[u8],
     len: i32,
     pcm: &mut [opus_val16],
     frame_size: i32,
@@ -693,10 +693,10 @@ pub unsafe fn opus_decode_native(
     if decode_fec < 0 || decode_fec > 1 {
         return OPUS_BAD_ARG;
     }
-    if (decode_fec != 0 || len == 0 || data.is_null()) && frame_size % (st.Fs / 400) != 0 {
+    if (decode_fec != 0 || len == 0 || data.len() == 0) && frame_size % (st.Fs / 400) != 0 {
         return OPUS_BAD_ARG;
     }
-    if len == 0 || data.is_null() {
+    if len == 0 || data.len() == 0 {
         let mut pcm_count: i32 = 0;
         loop {
             let mut ret: i32 = 0;
@@ -725,10 +725,10 @@ pub unsafe fn opus_decode_native(
             return OPUS_BAD_ARG;
         }
     }
-    packet_mode = opus_packet_get_mode(data);
-    packet_bandwidth = opus_packet_get_bandwidth(data);
-    packet_frame_size = opus_packet_get_samples_per_frame(*data.offset(0), st.Fs);
-    packet_stream_channels = opus_packet_get_nb_channels(data);
+    packet_mode = opus_packet_get_mode(data.as_ptr());
+    packet_bandwidth = opus_packet_get_bandwidth(data.as_ptr());
+    packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.Fs);
+    packet_stream_channels = opus_packet_get_nb_channels(data.as_ptr());
     count = opus_packet_parse_impl(
         data,
         len,
@@ -742,7 +742,7 @@ pub unsafe fn opus_decode_native(
     if count < 0 {
         return count;
     }
-    data = data.offset(offset as isize);
+    let mut data = &data[offset as usize..];
     if decode_fec != 0 {
         let mut duration_copy: i32 = 0;
         let mut ret_0: i32 = 0;
@@ -750,23 +750,13 @@ pub unsafe fn opus_decode_native(
             || packet_mode == MODE_CELT_ONLY
             || st.mode == MODE_CELT_ONLY
         {
-            return opus_decode_native(
-                st,
-                NULL as *const u8,
-                0,
-                pcm,
-                frame_size,
-                0,
-                false,
-                None,
-                soft_clip,
-            );
+            return opus_decode_native(st, &[][..], 0, pcm, frame_size, 0, false, None, soft_clip);
         }
         duration_copy = st.last_packet_duration;
         if frame_size - packet_frame_size != 0 {
             ret_0 = opus_decode_native(
                 st,
-                NULL as *const u8,
+                &[][..],
                 0,
                 pcm,
                 frame_size - packet_frame_size,
@@ -787,7 +777,7 @@ pub unsafe fn opus_decode_native(
         st.stream_channels = packet_stream_channels;
         ret_0 = opus_decode_frame(
             st,
-            data,
+            data.as_ptr(),
             size[0 as usize] as i32,
             pcm[(st.channels * (frame_size - packet_frame_size)) as usize..].as_mut_ptr(),
             packet_frame_size,
@@ -814,7 +804,7 @@ pub unsafe fn opus_decode_native(
         let mut ret_1: i32 = 0;
         ret_1 = opus_decode_frame(
             st,
-            data,
+            data.as_ptr(),
             size[i as usize] as i32,
             pcm[(nb_samples * st.channels as usize)..].as_mut_ptr(),
             frame_size - nb_samples as i32,
@@ -824,7 +814,7 @@ pub unsafe fn opus_decode_native(
             return ret_1;
         }
         assert!(ret_1 == packet_frame_size);
-        data = data.offset(size[i as usize] as i32 as isize);
+        data = &data[size[i as usize] as usize..];
         nb_samples += ret_1 as usize;
         i += 1;
     }
@@ -841,7 +831,7 @@ pub unsafe fn opus_decode_native(
 
 pub unsafe fn opus_decode(
     st: &mut OpusDecoder,
-    data: *const u8,
+    data: &[u8],
     len: i32,
     pcm: *mut i16,
     mut frame_size: i32,
@@ -853,9 +843,8 @@ pub unsafe fn opus_decode(
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    if !data.is_null() && len > 0 && decode_fec == 0 {
-        nb_samples =
-            opus_decoder_get_nb_samples(st, std::slice::from_raw_parts(data, len as usize));
+    if data.len() > 0 && len > 0 && decode_fec == 0 {
+        nb_samples = opus_decoder_get_nb_samples(st, data);
         if nb_samples > 0 {
             frame_size = if frame_size < nb_samples {
                 frame_size
@@ -883,7 +872,7 @@ pub unsafe fn opus_decode(
 }
 pub unsafe fn opus_decode_float(
     st: &mut OpusDecoder,
-    data: *const u8,
+    data: &[u8],
     len: i32,
     pcm: &mut [opus_val16],
     frame_size: i32,

@@ -240,7 +240,7 @@ pub unsafe fn test_encode(
             ret = -1;
             break;
         } else {
-            out_samples = opus_decode(&mut *dec, packet.as_mut_ptr(), len, outbuf, 5760, 0);
+            out_samples = opus_decode(&mut *dec, &mut packet, len, outbuf, 5760, 0);
             if out_samples != frame_size {
                 eprintln!("opus_decode() returned {}", out_samples);
                 ret = -1;
@@ -694,7 +694,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 }
                 out_samples = opus_decode(
                     &mut *dec,
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     len,
                     &mut *outbuf.offset((i << 1) as isize),
                     5760,
@@ -711,7 +711,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 }
                 out_samples = opus_decode(
                     &mut *dec_err[0 as usize],
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     len,
                     out2buf,
                     frame_size,
@@ -722,7 +722,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 }
                 out_samples = opus_decode(
                     &mut *dec_err[1 as usize],
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     if fast_rand() & 3 == 0 { 0 } else { len },
                     out2buf,
                     5760,
@@ -798,7 +798,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         opus_encoder_ctl!(enc, 4031, &mut enc_final_range);
         out_samples_1 = opus_decode(
             &mut *dec,
-            packet.as_mut_ptr(),
+            &mut packet,
             len_1,
             &mut *outbuf.offset((offset << 1) as isize),
             5760,
@@ -838,11 +838,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         }
         out_samples_1 = opus_decode(
             &mut *dec_err[0 as usize],
-            if len_1 > 0 {
-                packet.as_mut_ptr()
-            } else {
-                std::ptr::null_mut::<u8>()
-            },
+            &packet[..len_1 as _],
             len_1,
             out2buf,
             5760,
@@ -858,11 +854,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         dec2 = (fast_rand()).wrapping_rem(9).wrapping_add(1) as i32;
         out_samples_1 = opus_decode(
             &mut *dec_err[dec2 as usize],
-            if len_1 > 0 {
-                packet.as_mut_ptr()
-            } else {
-                std::ptr::null_mut::<u8>()
-            },
+            &packet[..len_1 as _],
             len_1,
             out2buf,
             5760,

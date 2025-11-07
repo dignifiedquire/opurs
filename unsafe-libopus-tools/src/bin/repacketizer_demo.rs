@@ -100,7 +100,7 @@ unsafe fn main_0() -> i32 {
                 } else {
                     err = opus_repacketizer_cat(
                         rp,
-                        (packets[i as usize]).as_mut_ptr(),
+                        &(packets[i as usize])[..len[i as usize] as usize],
                         len[i as usize],
                     );
                     if err != 0 {

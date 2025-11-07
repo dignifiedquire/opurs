@@ -1074,7 +1074,7 @@ unsafe fn encode_multiframe_packet(
         }
         ret = opus_repacketizer_cat(
             rp.as_mut_ptr(),
-            tmp_data.as_mut_ptr().offset((i * bytes_per_frame) as isize),
+            &tmp_data[(i * bytes_per_frame) as usize..],
             tmp_len,
         );
         if ret < 0 {

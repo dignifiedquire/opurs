@@ -40,7 +40,7 @@ pub unsafe fn opus_repacketizer_destroy(rp: *mut OpusRepacketizer) {
 }
 unsafe fn opus_repacketizer_cat_impl(
     rp: *mut OpusRepacketizer,
-    data: *const u8,
+    data: &[u8],
     len: i32,
     self_delimited: bool,
 ) -> i32 {
@@ -53,12 +53,12 @@ unsafe fn opus_repacketizer_cat_impl(
         return OPUS_INVALID_PACKET;
     }
     if rpp.nb_frames == 0 {
-        rpp.toc = *data.offset(0 as isize);
-        rpp.framesize = opus_packet_get_samples_per_frame(*data.offset(0), 8000);
-    } else if rpp.toc as i32 & 0xfc != *data.offset(0 as isize) as i32 & 0xfc {
+        rpp.toc = data[0];
+        rpp.framesize = opus_packet_get_samples_per_frame(data[0], 8000);
+    } else if rpp.toc as i32 & 0xfc != data[0] as i32 & 0xfc {
         return OPUS_INVALID_PACKET;
     }
-    curr_nb_frames = opus_packet_get_nb_frames(std::slice::from_raw_parts(data, len as usize));
+    curr_nb_frames = opus_packet_get_nb_frames(data);
     if curr_nb_frames < 1 {
         return OPUS_INVALID_PACKET;
     }
@@ -83,7 +83,7 @@ unsafe fn opus_repacketizer_cat_impl(
     OPUS_OK
 }
 
-pub unsafe fn opus_repacketizer_cat(rp: *mut OpusRepacketizer, data: *const u8, len: i32) -> i32 {
+pub unsafe fn opus_repacketizer_cat(rp: *mut OpusRepacketizer, data: &[u8], len: i32) -> i32 {
     return opus_repacketizer_cat_impl(rp, data, len, false);
 }
 pub unsafe fn opus_repacketizer_get_nb_frames(rp: *mut OpusRepacketizer) -> i32 {
@@ -294,7 +294,10 @@ pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
     );
     ret = opus_repacketizer_cat(
         &mut rp,
-        data.offset(new_len as isize).offset(-(len as isize)),
+        std::slice::from_raw_parts(
+            data.offset(new_len as isize).offset(-(len as isize)),
+            len as _,
+        ),
         len,
     );
     if ret != OPUS_OK {
@@ -307,6 +310,7 @@ pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
         return ret;
     };
 }
+
 pub unsafe fn opus_packet_unpad(data: *mut u8, len: i32) -> i32 {
     let mut rp: OpusRepacketizer = OpusRepacketizer {
         toc: 0,
@@ -320,7 +324,7 @@ pub unsafe fn opus_packet_unpad(data: *mut u8, len: i32) -> i32 {
         return OPUS_BAD_ARG;
     }
     opus_repacketizer_init(&mut rp);
-    ret = opus_repacketizer_cat(&mut rp, data, len);
+    ret = opus_repacketizer_cat(&mut rp, std::slice::from_raw_parts(data, len as _), len);
     if ret < 0 {
         return ret;
     }

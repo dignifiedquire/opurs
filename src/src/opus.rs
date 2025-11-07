@@ -162,7 +162,7 @@ pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
 }
 
 pub unsafe fn opus_packet_parse_impl(
-    mut data: *const u8,
+    data: &[u8],
     mut len: i32,
     self_delimited: bool,
     out_toc: Option<&mut u8>,
@@ -180,6 +180,7 @@ pub unsafe fn opus_packet_parse_impl(
     let mut framesize: i32 = 0;
     let mut last_size: i32 = 0;
     let mut pad: i32 = 0;
+    let mut data = data.as_ptr();
     let data0: *const u8 = data;
 
     let Some(size) = size else {
@@ -362,7 +363,7 @@ pub unsafe fn opus_packet_parse_impl(
 ///
 /// Returns number of frames
 pub unsafe fn opus_packet_parse(
-    data: &mut [u8],
+    data: &[u8],
     len: i32,
     out_toc: Option<&mut u8>,
     frames: Option<&mut [*const u8; 48]>,
@@ -370,7 +371,7 @@ pub unsafe fn opus_packet_parse(
     payload_offset: Option<&mut i32>,
 ) -> i32 {
     opus_packet_parse_impl(
-        data.as_mut_ptr(),
+        data,
         len,
         false,
         out_toc,
