@@ -1062,13 +1062,14 @@ unsafe fn encode_multiframe_packet(
         if tmp_len < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        ret = rp[0].opus_repacketizer_cat(&tmp_data[(i * bytes_per_frame) as usize..], tmp_len);
+        let start = (i * bytes_per_frame) as usize;
+        ret = rp[0].cat(&tmp_data[start..start + tmp_len as usize]);
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;
         }
         i += 1;
     }
-    ret = rp[0].opus_repacketizer_out_range_impl(
+    ret = rp[0].out_range_impl(
         0,
         nb_frames,
         data,

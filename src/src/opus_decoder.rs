@@ -1024,6 +1024,7 @@ pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
         return (packet[1] & 0x3f) as i32;
     };
 }
+
 pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
     let mut samples: i32 = 0;
     let count: i32 = opus_packet_get_nb_frames(packet);

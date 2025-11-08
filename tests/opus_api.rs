@@ -1926,60 +1926,60 @@ unsafe fn test_repacketizer_api_inner() {
     println!("\n  Repacketizer tests");
     println!("  ---------------------------------------------------");
 
-    if rp.opus_repacketizer_get_nb_frames() != 0 {
+    if rp.get_nb_frames() != 0 {
         fail("tests/test_opus_api.c", 1477);
     }
     cfgs += 1;
     println!("    opus_repacketizer_get_nb_frames .............. OK.");
-    if rp.opus_repacketizer_cat(&packet[..0], 0) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..0]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1483);
     }
     cfgs += 1;
     packet[0] = 1;
-    if rp.opus_repacketizer_cat(&packet[..2], 2) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1486);
     }
     cfgs += 1;
     packet[0] = 2;
-    if rp.opus_repacketizer_cat(&packet[..1], 1) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..1]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1489);
     }
     cfgs += 1;
     packet[0] = 3;
-    if rp.opus_repacketizer_cat(&packet[..1], 1) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..1]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1492);
     }
     cfgs += 1;
     packet[0] = 2;
     packet[1] = 255;
-    if rp.opus_repacketizer_cat(&packet[..2], 2) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1496);
     }
     cfgs += 1;
     packet[0] = 2;
     packet[1] = 250;
-    if rp.opus_repacketizer_cat(&packet[..251], 251) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..251]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1500);
     }
     cfgs += 1;
     packet[0] = 3;
     packet[1] = 0;
-    if rp.opus_repacketizer_cat(&packet[..2], 2) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1504);
     }
     cfgs += 1;
     packet[1] = 49;
-    if rp.opus_repacketizer_cat(&packet[..100], 100) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..100]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1507);
     }
     cfgs += 1;
     packet[0] = 0;
-    if rp.opus_repacketizer_cat(&packet[..3], 3) != 0 {
+    if rp.cat(&packet[..3]) != 0 {
         fail("tests/test_opus_api.c", 1510);
     }
     cfgs += 1;
     packet[0] = ((1) << 2) as u8;
-    if rp.opus_repacketizer_cat(&packet[..3], 3) != OPUS_INVALID_PACKET {
+    if rp.cat(&packet[..3]) != OPUS_INVALID_PACKET {
         fail("tests/test_opus_api.c", 1513);
     }
     cfgs += 1;
@@ -2007,7 +2007,7 @@ unsafe fn test_repacketizer_api_inner() {
                     while cnt < maxp + 2 {
                         if cnt > 0 {
                             let len = k + (if i > 2 { 2 } else { 1 });
-                            ret = rp.opus_repacketizer_cat(&packet[..len as usize], len);
+                            ret = rp.cat(&packet[..len as usize]);
                             if if cnt <= maxp && k <= 1275 * i {
                                 (ret != 0) as i32
                             } else {
@@ -2027,16 +2027,11 @@ unsafe fn test_repacketizer_api_inner() {
                         } else {
                             0
                         };
-                        if rp.opus_repacketizer_get_nb_frames() != rcnt * i {
+                        if rp.get_nb_frames() != rcnt * i {
                             fail("tests/test_opus_api.c", 1546);
                         }
                         cfgs += 1;
-                        ret = rp.opus_repacketizer_out_range(
-                            0,
-                            rcnt * i,
-                            po.as_mut_ptr(),
-                            1276 * 48 + 48 * 2 + 2,
-                        );
+                        ret = rp.out_range(0, rcnt * i, po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
                         if rcnt > 0 {
                             let mut len: i32 = 0;
                             len = k * rcnt + (if rcnt * i > 2 { 2 } else { 1 });
@@ -2053,7 +2048,7 @@ unsafe fn test_repacketizer_api_inner() {
                                 fail("tests/test_opus_api.c", 1556);
                             }
                             cfgs += 1;
-                            if rp.opus_repacketizer_out(po.as_mut_ptr(), len) != len {
+                            if rp.out(po.as_mut_ptr(), len) != len {
                                 fail("tests/test_opus_api.c", 1558);
                             }
                             cfgs += 1;
@@ -2074,22 +2069,17 @@ unsafe fn test_repacketizer_api_inner() {
                             }
                             cfgs += 1;
 
-                            if rp.opus_repacketizer_out(po.as_mut_ptr(), len - 1)
-                                != OPUS_BUFFER_TOO_SMALL
-                            {
+                            if rp.out(po.as_mut_ptr(), len - 1) != OPUS_BUFFER_TOO_SMALL {
                                 fail("tests/test_opus_api.c", 1576);
                             }
                             cfgs += 1;
                             if len > 1 {
-                                if rp.opus_repacketizer_out(po.as_mut_ptr(), 1)
-                                    != OPUS_BUFFER_TOO_SMALL
-                                {
+                                if rp.out(po.as_mut_ptr(), 1) != OPUS_BUFFER_TOO_SMALL {
                                     fail("tests/test_opus_api.c", 1580);
                                 }
                                 cfgs += 1;
                             }
-                            if rp.opus_repacketizer_out(po.as_mut_ptr(), 0) != OPUS_BUFFER_TOO_SMALL
-                            {
+                            if rp.out(po.as_mut_ptr(), 0) != OPUS_BUFFER_TOO_SMALL {
                                 fail("tests/test_opus_api.c", 1583);
                             }
                             cfgs += 1;
@@ -2105,43 +2095,43 @@ unsafe fn test_repacketizer_api_inner() {
     }
     rp.init();
     packet[0] = 0;
-    if rp.opus_repacketizer_cat(&packet[..5], 5) != 0 {
+    if rp.cat(&packet[..5]) != 0 {
         fail("tests/test_opus_api.c", 1595);
     }
     cfgs += 1;
     let fresh1 = &mut (packet[0]);
     *fresh1 = (*fresh1 as i32 + 1) as u8;
-    if rp.opus_repacketizer_cat(&packet[..9], 9) != 0 {
+    if rp.cat(&packet[..9]) != 0 {
         fail("tests/test_opus_api.c", 1598);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 4 + 8 + 2 || po[0] as i32 & 3 != 3 || po[1] as i32 & 63 != 3 || po[1] as i32 >> 7 != 0 {
         fail("tests/test_opus_api.c", 1601);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out_range(0, 1, po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out_range(0, 1, po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 5 || po[0] as i32 & 3 != 0 {
         fail("tests/test_opus_api.c", 1604);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out_range(1, 2, po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out_range(1, 2, po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 5 || po[0] as i32 & 3 != 0 {
         fail("tests/test_opus_api.c", 1607);
     }
     cfgs += 1;
     rp.init();
     packet[0] = 1;
-    if rp.opus_repacketizer_cat(&packet[..9], 9) != 0 {
+    if rp.cat(&packet[..9]) != 0 {
         fail("tests/test_opus_api.c", 1613);
     }
     cfgs += 1;
     packet[0] = 0;
-    if rp.opus_repacketizer_cat(&packet[..3], 3) != 0 {
+    if rp.cat(&packet[..3]) != 0 {
         fail("tests/test_opus_api.c", 1616);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 2 + 8 + 2 + 2
         || po[0] as i32 & 3 != 3
         || po[1] as i32 & 63 != 3
@@ -2153,15 +2143,15 @@ unsafe fn test_repacketizer_api_inner() {
     rp.init();
     packet[0] = 2;
     packet[1] = 4;
-    if rp.opus_repacketizer_cat(&packet[..8], 8) != 0 {
+    if rp.cat(&packet[..8]) != 0 {
         fail("tests/test_opus_api.c", 1626);
     }
     cfgs += 1;
-    if rp.opus_repacketizer_cat(&packet[..8], 8) != 0 {
+    if rp.cat(&packet[..8]) != 0 {
         fail("tests/test_opus_api.c", 1628);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 2 + 1 + 1 + 1 + 4 + 2 + 4 + 2 || po[0] & 3 != 3 || po[1] & 63 != 4 || po[1] >> 7 != 1 {
         fail("tests/test_opus_api.c", 1631);
     }
@@ -2169,15 +2159,15 @@ unsafe fn test_repacketizer_api_inner() {
     rp.init();
     packet[0] = 2;
     packet[1] = 4;
-    if rp.opus_repacketizer_cat(&packet[..10], 10) != 0 {
+    if rp.cat(&packet[..10]) != 0 {
         fail("tests/test_opus_api.c", 1638);
     }
     cfgs += 1;
-    if rp.opus_repacketizer_cat(&packet[..10], 10) != 0 {
+    if rp.cat(&packet[..10]) != 0 {
         fail("tests/test_opus_api.c", 1640);
     }
     cfgs += 1;
-    i = rp.opus_repacketizer_out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
+    i = rp.out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2);
     if i != 2 + 4 + 4 + 4 + 4 || po[0] & 3 != 3 || po[1] & 63 != 4 || po[1] >> 7 != 0 {
         fail("tests/test_opus_api.c", 1643);
     }
@@ -2194,7 +2184,7 @@ unsafe fn test_repacketizer_api_inner() {
         rp.init();
         for i in 1..=maxi_0 + 1 {
             let mut len_0: i32 = 0;
-            ret = rp.opus_repacketizer_cat(&packet[..i as usize], i);
+            ret = rp.cat(&packet[..i as usize]);
             if rcnt_0 < maxi_0 {
                 if ret != 0 {
                     fail("tests/test_opus_api.c", 1662);
@@ -2213,7 +2203,7 @@ unsafe fn test_repacketizer_api_inner() {
                 } else {
                     2 + rcnt_0 - 1
                 });
-            if rp.opus_repacketizer_out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2) != len_0 {
+            if rp.out(po.as_mut_ptr(), 1276 * 48 + 48 * 2 + 2) != len_0 {
                 fail("tests/test_opus_api.c", 1668);
             }
             if rcnt_0 > 2 && po[1] as i32 & 63 != rcnt_0 {
@@ -2226,7 +2216,7 @@ unsafe fn test_repacketizer_api_inner() {
                 fail("tests/test_opus_api.c", 1671);
             }
             cfgs += 1;
-            if rp.opus_repacketizer_out(po.as_mut_ptr(), len_0) != len_0 {
+            if rp.out(po.as_mut_ptr(), len_0) != len_0 {
                 fail("tests/test_opus_api.c", 1673);
             }
             cfgs += 1;
@@ -2246,17 +2236,17 @@ unsafe fn test_repacketizer_api_inner() {
                 fail("tests/test_opus_api.c", 1681);
             }
             cfgs += 1;
-            if rp.opus_repacketizer_out(po.as_mut_ptr(), len_0 - 1) != OPUS_BUFFER_TOO_SMALL {
+            if rp.out(po.as_mut_ptr(), len_0 - 1) != OPUS_BUFFER_TOO_SMALL {
                 fail("tests/test_opus_api.c", 1691);
             }
             cfgs += 1;
             if len_0 > 1 {
-                if rp.opus_repacketizer_out(po.as_mut_ptr(), 1) != OPUS_BUFFER_TOO_SMALL {
+                if rp.out(po.as_mut_ptr(), 1) != OPUS_BUFFER_TOO_SMALL {
                     fail("tests/test_opus_api.c", 1695);
                 }
                 cfgs += 1;
             }
-            if rp.opus_repacketizer_out(po.as_mut_ptr(), 0) != OPUS_BUFFER_TOO_SMALL {
+            if rp.out(po.as_mut_ptr(), 0) != OPUS_BUFFER_TOO_SMALL {
                 fail("tests/test_opus_api.c", 1698);
             }
             cfgs += 1;

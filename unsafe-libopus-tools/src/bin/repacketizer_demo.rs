@@ -93,10 +93,7 @@ unsafe fn main_0() -> i32 {
                     eof = true;
                     break;
                 } else {
-                    err = rp.opus_repacketizer_cat(
-                        &(packets[i as usize])[..len[i as usize] as usize],
-                        len[i as usize],
-                    );
+                    err = rp.cat(&(packets[i as usize])[..len[i as usize] as usize]);
                     if err != 0 {
                         eprintln!("opus_repacketizer_cat() failed: {}", opus_strerror(err));
                         break;
@@ -111,7 +108,7 @@ unsafe fn main_0() -> i32 {
             break;
         }
         if !split {
-            err = rp.opus_repacketizer_out(output_packet.as_mut_ptr(), 32000);
+            err = rp.out(output_packet.as_mut_ptr(), 32000);
             if err > 0 {
                 let mut int_field: [u8; 4] = err.to_be_bytes();
                 fout.write_all(&int_field).unwrap();
@@ -124,10 +121,10 @@ unsafe fn main_0() -> i32 {
                 eprintln!("opus_repacketizer_out() failed: {}", opus_strerror(err));
             }
         } else {
-            let mut nb_frames = rp.opus_repacketizer_get_nb_frames();
+            let mut nb_frames = rp.get_nb_frames();
             let mut i = 0;
             while i < nb_frames {
-                err = rp.opus_repacketizer_out_range(i, i + 1, output_packet.as_mut_ptr(), 32000);
+                err = rp.out_range(i, i + 1, output_packet.as_mut_ptr(), 32000);
                 if err > 0 {
                     let mut int_field_0: [u8; 4] = err.to_be_bytes();
                     fout.write_all(&int_field_0).unwrap();
