@@ -79,10 +79,7 @@ use crate::src::opus_private::{
     OPUS_SET_FORCE_MODE_REQUEST, OPUS_SET_VOICE_RATIO_REQUEST,
 };
 use crate::varargs::VarArgs;
-use crate::{
-    opus_custom_encoder_ctl, opus_packet_pad, opus_repacketizer_cat, opus_repacketizer_init,
-    opus_repacketizer_out_range_impl, OpusRepacketizer,
-};
+use crate::{opus_custom_encoder_ctl, opus_packet_pad, OpusRepacketizer};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -1027,14 +1024,7 @@ unsafe fn encode_multiframe_packet(
     };
     let vla = (nb_frames * bytes_per_frame) as usize;
     let mut tmp_data: Vec<u8> = ::std::vec::from_elem(0, vla);
-    let mut rp: [OpusRepacketizer; 1] = [OpusRepacketizer {
-        toc: 0,
-        nb_frames: 0,
-        frames: [0 as *const u8; 48],
-        len: [0; 48],
-        framesize: 0,
-    }; 1];
-    opus_repacketizer_init(rp.as_mut_ptr());
+    let mut rp = [OpusRepacketizer::default()];
     bak_mode = (*st).user_forced_mode;
     bak_bandwidth = (*st).user_bandwidth;
     bak_channels = (*st).force_channels;
@@ -1072,18 +1062,13 @@ unsafe fn encode_multiframe_packet(
         if tmp_len < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        ret = opus_repacketizer_cat(
-            rp.as_mut_ptr(),
-            &tmp_data[(i * bytes_per_frame) as usize..],
-            tmp_len,
-        );
+        ret = rp[0].opus_repacketizer_cat(&tmp_data[(i * bytes_per_frame) as usize..], tmp_len);
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;
         }
         i += 1;
     }
-    ret = opus_repacketizer_out_range_impl(
-        rp.as_mut_ptr(),
+    ret = rp[0].opus_repacketizer_out_range_impl(
         0,
         nb_frames,
         data,

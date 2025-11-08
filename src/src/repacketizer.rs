@@ -1,4 +1,9 @@
-use crate::externs::{free, malloc};
+use crate::externs::memmove;
+
+use crate::src::opus::{encode_size, opus_packet_parse_impl};
+use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK};
+use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusRepacketizer {
@@ -9,265 +14,251 @@ pub struct OpusRepacketizer {
     pub(crate) framesize: i32,
 }
 
-pub mod stddef_h {
-    pub type size_t = u64;
-    pub const NULL: i32 = 0;
-}
-pub use self::stddef_h::{size_t, NULL};
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK};
-
-use crate::externs::memmove;
-use crate::src::opus::{encode_size, opus_packet_parse_impl};
-use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
-
-pub unsafe fn opus_repacketizer_get_size() -> i32 {
-    return ::core::mem::size_of::<OpusRepacketizer>() as u64 as i32;
-}
-pub unsafe fn opus_repacketizer_init(rp: *mut OpusRepacketizer) -> *mut OpusRepacketizer {
-    (*rp).nb_frames = 0;
-    return rp;
-}
-pub unsafe fn opus_repacketizer_create() -> *mut OpusRepacketizer {
-    let mut rp: *mut OpusRepacketizer = 0 as *mut OpusRepacketizer;
-    rp = malloc(opus_repacketizer_get_size() as size_t) as *mut OpusRepacketizer;
-    if rp.is_null() {
-        return NULL as *mut OpusRepacketizer;
-    }
-    return opus_repacketizer_init(rp);
-}
-pub unsafe fn opus_repacketizer_destroy(rp: *mut OpusRepacketizer) {
-    free(rp as *mut core::ffi::c_void);
-}
-unsafe fn opus_repacketizer_cat_impl(
-    rp: *mut OpusRepacketizer,
-    data: &[u8],
-    len: i32,
-    self_delimited: bool,
-) -> i32 {
-    let rpp = &mut *rp;
-
-    let mut tmp_toc: u8 = 0;
-    let mut curr_nb_frames: i32 = 0;
-    let mut ret: i32 = 0;
-    if len < 1 {
-        return OPUS_INVALID_PACKET;
-    }
-    if rpp.nb_frames == 0 {
-        rpp.toc = data[0];
-        rpp.framesize = opus_packet_get_samples_per_frame(data[0], 8000);
-    } else if rpp.toc as i32 & 0xfc != data[0] as i32 & 0xfc {
-        return OPUS_INVALID_PACKET;
-    }
-    curr_nb_frames = opus_packet_get_nb_frames(data);
-    if curr_nb_frames < 1 {
-        return OPUS_INVALID_PACKET;
-    }
-    if (curr_nb_frames + rpp.nb_frames) * rpp.framesize > 960 {
-        return OPUS_INVALID_PACKET;
-    }
-
-    ret = opus_packet_parse_impl(
-        data,
-        len,
-        self_delimited,
-        Some(&mut tmp_toc),
-        Some(&mut rpp.frames[rpp.nb_frames as usize..]),
-        &mut rpp.len[rpp.nb_frames as usize..],
-        None,
-        None,
-    );
-    if ret < 1 {
-        return ret;
-    }
-    rpp.nb_frames += curr_nb_frames;
-    OPUS_OK
-}
-
-pub unsafe fn opus_repacketizer_cat(rp: *mut OpusRepacketizer, data: &[u8], len: i32) -> i32 {
-    return opus_repacketizer_cat_impl(rp, data, len, false);
-}
-pub unsafe fn opus_repacketizer_get_nb_frames(rp: *mut OpusRepacketizer) -> i32 {
-    return (*rp).nb_frames;
-}
-pub unsafe fn opus_repacketizer_out_range_impl(
-    rp: *mut OpusRepacketizer,
-    begin: i32,
-    end: i32,
-    data: *mut u8,
-    maxlen: i32,
-    self_delimited: i32,
-    pad: i32,
-) -> i32 {
-    let mut i: i32 = 0;
-    let mut count: i32 = 0;
-    let mut tot_size: i32 = 0;
-    let mut len: *mut i16 = 0 as *mut i16;
-    let mut frames: *mut *const u8 = 0 as *mut *const u8;
-    let mut ptr: *mut u8 = 0 as *mut u8;
-    if begin < 0 || begin >= end || end > (*rp).nb_frames {
-        return OPUS_BAD_ARG;
-    }
-    count = end - begin;
-    len = ((*rp).len).as_mut_ptr().offset(begin as isize);
-    frames = ((*rp).frames).as_mut_ptr().offset(begin as isize);
-    if self_delimited != 0 {
-        tot_size = 1 + (*len.offset((count - 1) as isize) as i32 >= 252) as i32;
-    } else {
-        tot_size = 0;
-    }
-    ptr = data;
-    if count == 1 {
-        tot_size += *len.offset(0 as isize) as i32 + 1;
-        if tot_size > maxlen {
-            return OPUS_BUFFER_TOO_SMALL;
-        }
-        let fresh0 = ptr;
-        ptr = ptr.offset(1);
-        *fresh0 = ((*rp).toc as i32 & 0xfc) as u8;
-    } else if count == 2 {
-        if *len.offset(1 as isize) as i32 == *len.offset(0 as isize) as i32 {
-            tot_size += 2 * *len.offset(0 as isize) as i32 + 1;
-            if tot_size > maxlen {
-                return OPUS_BUFFER_TOO_SMALL;
-            }
-            let fresh1 = ptr;
-            ptr = ptr.offset(1);
-            *fresh1 = ((*rp).toc as i32 & 0xfc | 0x1) as u8;
-        } else {
-            tot_size += *len.offset(0 as isize) as i32
-                + *len.offset(1 as isize) as i32
-                + 2
-                + (*len.offset(0 as isize) as i32 >= 252) as i32;
-            if tot_size > maxlen {
-                return OPUS_BUFFER_TOO_SMALL;
-            }
-            let fresh2 = ptr;
-            ptr = ptr.offset(1);
-            *fresh2 = ((*rp).toc as i32 & 0xfc | 0x2) as u8;
-            ptr = ptr.offset(encode_size(*len.offset(0 as isize) as i32, ptr) as isize);
+impl Default for OpusRepacketizer {
+    fn default() -> Self {
+        Self {
+            toc: 0,
+            nb_frames: 0,
+            frames: [std::ptr::null(); 48],
+            len: [0; 48],
+            framesize: 0,
         }
     }
-    if count > 2 || pad != 0 && tot_size < maxlen {
-        let mut vbr: i32 = 0;
-        let mut pad_amount: i32 = 0;
-        ptr = data;
+}
+
+impl OpusRepacketizer {
+    pub fn init(&mut self) {
+        self.nb_frames = 0;
+    }
+
+    unsafe fn opus_repacketizer_cat_impl(
+        &mut self,
+        data: &[u8],
+        len: i32,
+        self_delimited: bool,
+    ) -> i32 {
+        let mut tmp_toc: u8 = 0;
+        let mut curr_nb_frames: i32 = 0;
+        let mut ret: i32 = 0;
+        if len < 1 {
+            return OPUS_INVALID_PACKET;
+        }
+        if self.nb_frames == 0 {
+            self.toc = data[0];
+            self.framesize = opus_packet_get_samples_per_frame(data[0], 8000);
+        } else if self.toc as i32 & 0xfc != data[0] as i32 & 0xfc {
+            return OPUS_INVALID_PACKET;
+        }
+        curr_nb_frames = opus_packet_get_nb_frames(data);
+        if curr_nb_frames < 1 {
+            return OPUS_INVALID_PACKET;
+        }
+        if (curr_nb_frames + self.nb_frames) * self.framesize > 960 {
+            return OPUS_INVALID_PACKET;
+        }
+
+        ret = opus_packet_parse_impl(
+            data,
+            len,
+            self_delimited,
+            Some(&mut tmp_toc),
+            Some(&mut self.frames[self.nb_frames as usize..]),
+            &mut self.len[self.nb_frames as usize..],
+            None,
+            None,
+        );
+        if ret < 1 {
+            return ret;
+        }
+        self.nb_frames += curr_nb_frames;
+        OPUS_OK
+    }
+
+    pub unsafe fn opus_repacketizer_cat(&mut self, data: &[u8], len: i32) -> i32 {
+        self.opus_repacketizer_cat_impl(data, len, false)
+    }
+
+    pub fn opus_repacketizer_get_nb_frames(&self) -> i32 {
+        self.nb_frames
+    }
+
+    pub unsafe fn opus_repacketizer_out_range_impl(
+        &mut self,
+        begin: i32,
+        end: i32,
+        data: *mut u8,
+        maxlen: i32,
+        self_delimited: i32,
+        pad: i32,
+    ) -> i32 {
+        let mut i: i32 = 0;
+        let mut count: i32 = 0;
+        let mut tot_size: i32 = 0;
+        let mut len: *mut i16 = 0 as *mut i16;
+        let mut frames: *mut *const u8 = 0 as *mut *const u8;
+        let mut ptr: *mut u8 = 0 as *mut u8;
+        if begin < 0 || begin >= end || end > self.nb_frames {
+            return OPUS_BAD_ARG;
+        }
+        count = end - begin;
+        len = (self.len).as_mut_ptr().offset(begin as isize);
+        frames = (self.frames).as_mut_ptr().offset(begin as isize);
         if self_delimited != 0 {
             tot_size = 1 + (*len.offset((count - 1) as isize) as i32 >= 252) as i32;
         } else {
             tot_size = 0;
         }
-        vbr = 0;
-        i = 1;
-        while i < count {
-            if *len.offset(i as isize) as i32 != *len.offset(0 as isize) as i32 {
-                vbr = 1;
-                break;
-            } else {
-                i += 1;
-            }
-        }
-        if vbr != 0 {
-            tot_size += 2;
-            i = 0;
-            while i < count - 1 {
-                tot_size += 1
-                    + (*len.offset(i as isize) as i32 >= 252) as i32
-                    + *len.offset(i as isize) as i32;
-                i += 1;
-            }
-            tot_size += *len.offset((count - 1) as isize) as i32;
+        ptr = data;
+        if count == 1 {
+            tot_size += *len.offset(0 as isize) as i32 + 1;
             if tot_size > maxlen {
                 return OPUS_BUFFER_TOO_SMALL;
             }
-            let fresh3 = ptr;
+            let fresh0 = ptr;
             ptr = ptr.offset(1);
-            *fresh3 = ((*rp).toc as i32 & 0xfc | 0x3) as u8;
-            let fresh4 = ptr;
-            ptr = ptr.offset(1);
-            *fresh4 = (count | 0x80) as u8;
-        } else {
-            tot_size += count * *len.offset(0 as isize) as i32 + 2;
-            if tot_size > maxlen {
-                return OPUS_BUFFER_TOO_SMALL;
-            }
-            let fresh5 = ptr;
-            ptr = ptr.offset(1);
-            *fresh5 = ((*rp).toc as i32 & 0xfc | 0x3) as u8;
-            let fresh6 = ptr;
-            ptr = ptr.offset(1);
-            *fresh6 = count as u8;
-        }
-        pad_amount = if pad != 0 { maxlen - tot_size } else { 0 };
-        if pad_amount != 0 {
-            let mut nb_255s: i32 = 0;
-            let ref mut fresh7 = *data.offset(1 as isize);
-            *fresh7 = (*fresh7 as i32 | 0x40) as u8;
-            nb_255s = (pad_amount - 1) / 255;
-            i = 0;
-            while i < nb_255s {
-                let fresh8 = ptr;
+            *fresh0 = (self.toc as i32 & 0xfc) as u8;
+        } else if count == 2 {
+            if *len.offset(1 as isize) as i32 == *len.offset(0 as isize) as i32 {
+                tot_size += 2 * *len.offset(0 as isize) as i32 + 1;
+                if tot_size > maxlen {
+                    return OPUS_BUFFER_TOO_SMALL;
+                }
+                let fresh1 = ptr;
                 ptr = ptr.offset(1);
-                *fresh8 = 255;
-                i += 1;
+                *fresh1 = (self.toc as i32 & 0xfc | 0x1) as u8;
+            } else {
+                tot_size += *len.offset(0 as isize) as i32
+                    + *len.offset(1 as isize) as i32
+                    + 2
+                    + (*len.offset(0 as isize) as i32 >= 252) as i32;
+                if tot_size > maxlen {
+                    return OPUS_BUFFER_TOO_SMALL;
+                }
+                let fresh2 = ptr;
+                ptr = ptr.offset(1);
+                *fresh2 = (self.toc as i32 & 0xfc | 0x2) as u8;
+                ptr = ptr.offset(encode_size(*len.offset(0 as isize) as i32, ptr) as isize);
             }
-            let fresh9 = ptr;
-            ptr = ptr.offset(1);
-            *fresh9 = (pad_amount - 255 * nb_255s - 1) as u8;
-            tot_size += pad_amount;
         }
-        if vbr != 0 {
-            i = 0;
-            while i < count - 1 {
-                ptr = ptr.offset(encode_size(*len.offset(i as isize) as i32, ptr) as isize);
-                i += 1;
+        if count > 2 || pad != 0 && tot_size < maxlen {
+            let mut vbr: i32 = 0;
+            let mut pad_amount: i32 = 0;
+            ptr = data;
+            if self_delimited != 0 {
+                tot_size = 1 + (*len.offset((count - 1) as isize) as i32 >= 252) as i32;
+            } else {
+                tot_size = 0;
+            }
+            vbr = 0;
+            i = 1;
+            while i < count {
+                if *len.offset(i as isize) as i32 != *len.offset(0 as isize) as i32 {
+                    vbr = 1;
+                    break;
+                } else {
+                    i += 1;
+                }
+            }
+            if vbr != 0 {
+                tot_size += 2;
+                i = 0;
+                while i < count - 1 {
+                    tot_size += 1
+                        + (*len.offset(i as isize) as i32 >= 252) as i32
+                        + *len.offset(i as isize) as i32;
+                    i += 1;
+                }
+                tot_size += *len.offset((count - 1) as isize) as i32;
+                if tot_size > maxlen {
+                    return OPUS_BUFFER_TOO_SMALL;
+                }
+                let fresh3 = ptr;
+                ptr = ptr.offset(1);
+                *fresh3 = (self.toc as i32 & 0xfc | 0x3) as u8;
+                let fresh4 = ptr;
+                ptr = ptr.offset(1);
+                *fresh4 = (count | 0x80) as u8;
+            } else {
+                tot_size += count * *len.offset(0 as isize) as i32 + 2;
+                if tot_size > maxlen {
+                    return OPUS_BUFFER_TOO_SMALL;
+                }
+                let fresh5 = ptr;
+                ptr = ptr.offset(1);
+                *fresh5 = (self.toc as i32 & 0xfc | 0x3) as u8;
+                let fresh6 = ptr;
+                ptr = ptr.offset(1);
+                *fresh6 = count as u8;
+            }
+            pad_amount = if pad != 0 { maxlen - tot_size } else { 0 };
+            if pad_amount != 0 {
+                let mut nb_255s: i32 = 0;
+                let ref mut fresh7 = *data.offset(1 as isize);
+                *fresh7 = (*fresh7 as i32 | 0x40) as u8;
+                nb_255s = (pad_amount - 1) / 255;
+                i = 0;
+                while i < nb_255s {
+                    let fresh8 = ptr;
+                    ptr = ptr.offset(1);
+                    *fresh8 = 255;
+                    i += 1;
+                }
+                let fresh9 = ptr;
+                ptr = ptr.offset(1);
+                *fresh9 = (pad_amount - 255 * nb_255s - 1) as u8;
+                tot_size += pad_amount;
+            }
+            if vbr != 0 {
+                i = 0;
+                while i < count - 1 {
+                    ptr = ptr.offset(encode_size(*len.offset(i as isize) as i32, ptr) as isize);
+                    i += 1;
+                }
             }
         }
-    }
-    if self_delimited != 0 {
-        let sdlen: i32 = encode_size(*len.offset((count - 1) as isize) as i32, ptr);
-        ptr = ptr.offset(sdlen as isize);
-    }
-    i = 0;
-    while i < count {
-        memmove(
-            ptr as *mut core::ffi::c_void,
-            *frames.offset(i as isize) as *const core::ffi::c_void,
-            (*len.offset(i as isize) as u64)
-                .wrapping_mul(::core::mem::size_of::<u8>() as u64)
-                .wrapping_add((0 * ptr.offset_from(*frames.offset(i as isize)) as i64) as u64),
-        );
-        ptr = ptr.offset(*len.offset(i as isize) as i32 as isize);
-        i += 1;
-    }
-    if pad != 0 {
-        while ptr < data.offset(maxlen as isize) {
-            let fresh10 = ptr;
-            ptr = ptr.offset(1);
-            *fresh10 = 0;
+        if self_delimited != 0 {
+            let sdlen: i32 = encode_size(*len.offset((count - 1) as isize) as i32, ptr);
+            ptr = ptr.offset(sdlen as isize);
         }
+        i = 0;
+        while i < count {
+            memmove(
+                ptr as *mut core::ffi::c_void,
+                *frames.offset(i as isize) as *const core::ffi::c_void,
+                (*len.offset(i as isize) as u64)
+                    .wrapping_mul(::core::mem::size_of::<u8>() as u64)
+                    .wrapping_add((0 * ptr.offset_from(*frames.offset(i as isize)) as i64) as u64),
+            );
+            ptr = ptr.offset(*len.offset(i as isize) as i32 as isize);
+            i += 1;
+        }
+        if pad != 0 {
+            while ptr < data.offset(maxlen as isize) {
+                let fresh10 = ptr;
+                ptr = ptr.offset(1);
+                *fresh10 = 0;
+            }
+        }
+        return tot_size;
     }
-    return tot_size;
+
+    pub unsafe fn opus_repacketizer_out_range(
+        &mut self,
+        begin: i32,
+        end: i32,
+        data: *mut u8,
+        maxlen: i32,
+    ) -> i32 {
+        self.opus_repacketizer_out_range_impl(begin, end, data, maxlen, 0, 0)
+    }
+
+    pub unsafe fn opus_repacketizer_out(&mut self, data: *mut u8, maxlen: i32) -> i32 {
+        self.opus_repacketizer_out_range_impl(0, self.nb_frames, data, maxlen, 0, 0)
+    }
 }
-pub unsafe fn opus_repacketizer_out_range(
-    rp: *mut OpusRepacketizer,
-    begin: i32,
-    end: i32,
-    data: *mut u8,
-    maxlen: i32,
-) -> i32 {
-    return opus_repacketizer_out_range_impl(rp, begin, end, data, maxlen, 0, 0);
-}
-pub unsafe fn opus_repacketizer_out(rp: *mut OpusRepacketizer, data: *mut u8, maxlen: i32) -> i32 {
-    return opus_repacketizer_out_range_impl(rp, 0, (*rp).nb_frames, data, maxlen, 0, 0);
-}
+
 pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
-    let mut rp: OpusRepacketizer = OpusRepacketizer {
-        toc: 0,
-        nb_frames: 0,
-        frames: [0 as *const u8; 48],
-        len: [0; 48],
-        framesize: 0,
-    };
+    let mut rp = OpusRepacketizer::default();
     let mut ret: i32 = 0;
     if len < 1 {
         return OPUS_BAD_ARG;
@@ -279,7 +270,7 @@ pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
             return OPUS_BAD_ARG;
         }
     }
-    opus_repacketizer_init(&mut rp);
+
     memmove(
         data.offset(new_len as isize).offset(-(len as isize)) as *mut core::ffi::c_void,
         data as *const core::ffi::c_void,
@@ -292,8 +283,7 @@ pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
                     .offset_from(data) as i64) as u64,
             ),
     );
-    ret = opus_repacketizer_cat(
-        &mut rp,
+    ret = rp.opus_repacketizer_cat(
         std::slice::from_raw_parts(
             data.offset(new_len as isize).offset(-(len as isize)),
             len as _,
@@ -303,32 +293,24 @@ pub unsafe fn opus_packet_pad(data: *mut u8, len: i32, new_len: i32) -> i32 {
     if ret != OPUS_OK {
         return ret;
     }
-    ret = opus_repacketizer_out_range_impl(&mut rp, 0, rp.nb_frames, data, new_len, 0, 1);
+    ret = rp.opus_repacketizer_out_range_impl(0, rp.nb_frames, data, new_len, 0, 1);
     if ret > 0 {
-        return OPUS_OK;
+        OPUS_OK
     } else {
-        return ret;
-    };
+        ret
+    }
 }
 
 pub unsafe fn opus_packet_unpad(data: *mut u8, len: i32) -> i32 {
-    let mut rp: OpusRepacketizer = OpusRepacketizer {
-        toc: 0,
-        nb_frames: 0,
-        frames: [0 as *const u8; 48],
-        len: [0; 48],
-        framesize: 0,
-    };
-    let mut ret: i32 = 0;
     if len < 1 {
         return OPUS_BAD_ARG;
     }
-    opus_repacketizer_init(&mut rp);
-    ret = opus_repacketizer_cat(&mut rp, std::slice::from_raw_parts(data, len as _), len);
+    let mut rp = OpusRepacketizer::default();
+    let mut ret = rp.opus_repacketizer_cat(std::slice::from_raw_parts(data, len as _), len);
     if ret < 0 {
         return ret;
     }
-    ret = opus_repacketizer_out_range_impl(&mut rp, 0, rp.nb_frames, data, len, 0, 0);
+    ret = rp.opus_repacketizer_out_range_impl(0, rp.nb_frames, data, len, 0, 0);
     assert!(ret > 0 && ret <= len);
     return ret;
 }

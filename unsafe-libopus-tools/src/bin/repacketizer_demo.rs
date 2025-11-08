@@ -7,11 +7,7 @@
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 
-use unsafe_libopus::{
-    opus_repacketizer_cat, opus_repacketizer_create, opus_repacketizer_get_nb_frames,
-    opus_repacketizer_init, opus_repacketizer_out, opus_repacketizer_out_range, opus_strerror,
-    OpusRepacketizer,
-};
+use unsafe_libopus::{opus_strerror, OpusRepacketizer};
 fn usage(argv0: &str) {
     eprintln!("usage: {} [options] input_file output_file", argv0);
 }
@@ -70,13 +66,12 @@ unsafe fn main_0() -> i32 {
     let mut fout =
         File::create(args.next().expect("output file argument")).expect("opening output file");
 
-    // TODO: cleanup on exit
-    let mut rp: *mut OpusRepacketizer = opus_repacketizer_create();
+    let mut rp = OpusRepacketizer::default();
     let mut eof = false;
     while !eof {
         let mut err: i32 = 0;
         let mut nb_packets: usize = merge;
-        opus_repacketizer_init(rp);
+        rp.init();
         let mut i = 0 as usize;
         while i < nb_packets {
             let mut ch: [u8; 4] = [0; 4];
@@ -98,8 +93,7 @@ unsafe fn main_0() -> i32 {
                     eof = true;
                     break;
                 } else {
-                    err = opus_repacketizer_cat(
-                        rp,
+                    err = rp.opus_repacketizer_cat(
                         &(packets[i as usize])[..len[i as usize] as usize],
                         len[i as usize],
                     );
@@ -117,7 +111,7 @@ unsafe fn main_0() -> i32 {
             break;
         }
         if !split {
-            err = opus_repacketizer_out(rp, output_packet.as_mut_ptr(), 32000);
+            err = rp.opus_repacketizer_out(output_packet.as_mut_ptr(), 32000);
             if err > 0 {
                 let mut int_field: [u8; 4] = err.to_be_bytes();
                 fout.write_all(&int_field).unwrap();
@@ -130,10 +124,10 @@ unsafe fn main_0() -> i32 {
                 eprintln!("opus_repacketizer_out() failed: {}", opus_strerror(err));
             }
         } else {
-            let mut nb_frames: i32 = opus_repacketizer_get_nb_frames(rp);
+            let mut nb_frames = rp.opus_repacketizer_get_nb_frames();
             let mut i = 0;
             while i < nb_frames {
-                err = opus_repacketizer_out_range(rp, i, i + 1, output_packet.as_mut_ptr(), 32000);
+                err = rp.opus_repacketizer_out_range(i, i + 1, output_packet.as_mut_ptr(), 32000);
                 if err > 0 {
                     let mut int_field_0: [u8; 4] = err.to_be_bytes();
                     fout.write_all(&int_field_0).unwrap();

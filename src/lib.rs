@@ -198,12 +198,7 @@ pub use crate::src::opus::{
     opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip,
 };
 // opus_repacketizer
-pub use crate::src::repacketizer::{
-    opus_packet_pad, opus_packet_unpad, opus_repacketizer_cat, opus_repacketizer_create,
-    opus_repacketizer_destroy, opus_repacketizer_get_nb_frames, opus_repacketizer_get_size,
-    opus_repacketizer_init, opus_repacketizer_out, opus_repacketizer_out_range,
-    opus_repacketizer_out_range_impl, OpusRepacketizer,
-};
+pub use crate::src::repacketizer::{opus_packet_pad, opus_packet_unpad, OpusRepacketizer};
 
 // =====
 // opus_defines.h
