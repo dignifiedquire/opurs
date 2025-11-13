@@ -179,7 +179,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
             unsafe {
                 B::opus_encode(
                     &mut enc,
-                    frame.as_ptr(),
+                    frame,
                     // it's not the length of the frame slice!
                     frame_size as i32,
                     buffer.as_mut_ptr(),

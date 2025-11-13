@@ -251,18 +251,18 @@ unsafe fn ec_enc_shrink_assert() -> i32 {
     opus_encoder_ctl!(enc, 4010, 10);
     opus_encoder_ctl!(enc, 4014, 6);
     opus_encoder_ctl!(enc, 4002, 6000);
-    data_len = opus_encode(enc, pcm1.as_ptr(), 960, data.as_mut_ptr(), 2000);
+    data_len = opus_encode(enc, &pcm1, 960, data.as_mut_ptr(), 2000);
     assert!(data_len > 0);
     opus_encoder_ctl!(enc, 4024, 3001);
     opus_encoder_ctl!(enc, 4042, 1);
     opus_encoder_ctl!(enc, 4008, 1104);
     opus_encoder_ctl!(enc, 4012, 1);
     opus_encoder_ctl!(enc, 4002, 15600);
-    data_len = opus_encode(enc, pcm2.as_ptr(), 2880, data.as_mut_ptr(), 122);
+    data_len = opus_encode(enc, &pcm2, 2880, data.as_mut_ptr(), 122);
     assert!(data_len > 0);
     opus_encoder_ctl!(enc, 4024, 3002);
     opus_encoder_ctl!(enc, 4002, 27000);
-    data_len = opus_encode(enc, pcm3.as_ptr(), 2880, data.as_mut_ptr(), 122);
+    data_len = opus_encode(enc, &pcm3, 2880, data.as_mut_ptr(), 122);
     assert!(data_len > 0);
     opus_encoder_destroy(enc);
     0
@@ -312,7 +312,7 @@ unsafe fn ec_enc_shrink_assert2() -> i32 {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
-    data_len = opus_encode(enc, pcm.as_ptr(), 960, data.as_mut_ptr(), 2000);
+    data_len = opus_encode(enc, &pcm, 960, data.as_mut_ptr(), 2000);
     assert!(data_len > 0);
     opus_encoder_ctl!(enc, 4024, 3002);
     let pcm_0: [i16; 480] = [
@@ -334,7 +334,7 @@ unsafe fn ec_enc_shrink_assert2() -> i32 {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
-    data_len = opus_encode(enc, pcm_0.as_ptr(), 480, data.as_mut_ptr(), 19);
+    data_len = opus_encode(enc, &pcm_0, 480, data.as_mut_ptr(), 19);
     assert!(data_len > 0);
     opus_encoder_destroy(enc);
     0
@@ -391,13 +391,13 @@ unsafe fn silk_gain_assert() -> i32 {
     opus_encoder_ctl!(enc, 4010, 3);
     opus_encoder_ctl!(enc, 4004, 1101);
     opus_encoder_ctl!(enc, 4002, 6000);
-    data_len = opus_encode(enc, pcm1.as_ptr(), 160, data.as_mut_ptr(), 1000);
+    data_len = opus_encode(enc, &pcm1, 160, data.as_mut_ptr(), 1000);
     assert!(data_len > 0);
     opus_encoder_ctl!(enc, 4006, 0);
     opus_encoder_ctl!(enc, 4010, 0);
     opus_encoder_ctl!(enc, 4004, 1102);
     opus_encoder_ctl!(enc, 4002, 2867);
-    data_len = opus_encode(enc, pcm2.as_ptr(), 960, data.as_mut_ptr(), 1000);
+    data_len = opus_encode(enc, &pcm2, 960, data.as_mut_ptr(), 1000);
     assert!(data_len > 0);
     opus_encoder_destroy(enc);
     0

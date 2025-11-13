@@ -6,7 +6,6 @@ use crate::celt::float_cast::float2int;
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
 use crate::celt::mathops::{celt_log, celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
-use crate::externs::memmove;
 use crate::src::mlp::analysis_mlp::run_analysis_mlp;
 use crate::src::opus_encoder::is_digital_silence;
 
@@ -426,8 +425,7 @@ pub struct AnalysisInfo {
 
 pub const LEAK_BANDS: i32 = 19;
 
-pub type downmix_func =
-    Option<unsafe fn(*const core::ffi::c_void, *mut f32, i32, i32, i32, i32, i32) -> ()>;
+pub type DownmixFn<T> = Option<fn(&[T], &mut [f32], i32, i32, i32, i32, i32) -> ()>;
 
 #[derive(Copy, Clone)]
 pub struct TonalityAnalysisState {
@@ -519,9 +517,9 @@ fn silk_resampler_down2_hp(
     hp_ener
 }
 
-fn downmix_and_resample(
-    downmix: downmix_func,
-    mut _x: *const core::ffi::c_void,
+fn downmix_and_resample<T>(
+    downmix: DownmixFn<T>,
+    _x: &[T],
     y: &mut [f32],
     S: &mut [f32],
     mut subframe: usize,
@@ -546,17 +544,8 @@ fn downmix_and_resample(
     }
     let mut tmp: Vec<f32> = vec![0.; subframe];
 
-    unsafe {
-        downmix.expect("non-null function pointer")(
-            _x,
-            tmp.as_mut_ptr(),
-            subframe as _,
-            offset,
-            c1,
-            c2,
-            C,
-        );
-    }
+    downmix.expect("non-null function pointer")(_x, &mut tmp, subframe as _, offset, c1, c2, C);
+
     scale = 1.0 / 32_768.;
 
     if c2 == -2 {
@@ -859,17 +848,17 @@ impl TonalityAnalysisState {
         info
     }
 
-    fn analysis(
+    fn analysis<T>(
         &mut self,
         celt_mode: &OpusCustomMode,
-        x: *const core::ffi::c_void,
+        x: &[T],
         mut len: i32,
         mut offset: i32,
         c1: i32,
         c2: i32,
         C: i32,
         lsb_depth: i32,
-        downmix: downmix_func,
+        downmix: DownmixFn<T>,
     ) {
         let mut i: i32 = 0;
         let mut b: i32 = 0;
@@ -983,25 +972,9 @@ impl TonalityAnalysisState {
             in_0[(N - i - 1) as usize].im = w * self.inmem[(N + N2 - i - 1) as usize];
             i += 1;
         }
-        unsafe {
-            memmove(
-                (self.inmem).as_mut_ptr() as *mut core::ffi::c_void,
-                (self.inmem)
-                    .as_mut_ptr()
-                    .offset(720 as isize)
-                    .offset(-(240 as isize)) as *const core::ffi::c_void,
-                240_u64
-                    .wrapping_mul(::core::mem::size_of::<f32>() as u64)
-                    .wrapping_add(
-                        (0 * (self.inmem).as_mut_ptr().offset_from(
-                            (self.inmem)
-                                .as_mut_ptr()
-                                .offset(720 as isize)
-                                .offset(-(240 as isize)),
-                        ) as i64) as u64,
-                    ),
-            );
-        }
+        // OPUS_MOVE(tonal->inmem, tonal->inmem+ANALYSIS_BUF_SIZE-240, 240);
+        let start = ANALYSIS_BUF_SIZE as usize - 240;
+        self.inmem.copy_within(start..start + 240, 0);
         remaining = len - (ANALYSIS_BUF_SIZE - self.mem_fill);
         self.hp_ener_accum = downmix_and_resample(
             downmix,
@@ -1575,10 +1548,10 @@ impl TonalityAnalysisState {
         );
     }
 
-    pub unsafe fn run_analysis(
+    pub fn run_analysis<T>(
         &mut self,
         celt_mode: &OpusCustomMode,
-        analysis_pcm: *const core::ffi::c_void,
+        analysis_pcm: Option<&[T]>,
         mut analysis_frame_size: i32,
         frame_size: i32,
         c1: i32,
@@ -1586,12 +1559,12 @@ impl TonalityAnalysisState {
         C: i32,
         Fs: i32,
         lsb_depth: i32,
-        downmix: downmix_func,
+        downmix: DownmixFn<T>,
     ) -> AnalysisInfo {
         let mut offset: i32 = 0;
         let mut pcm_len: i32 = 0;
         analysis_frame_size -= analysis_frame_size & 1;
-        if !analysis_pcm.is_null() {
+        if let Some(analysis_pcm) = analysis_pcm {
             analysis_frame_size = if ((100 - 5) * Fs / 50) < analysis_frame_size {
                 (100 - 5) * Fs / 50
             } else {

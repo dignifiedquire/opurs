@@ -1843,7 +1843,7 @@ unsafe fn test_enc_api_inner() {
     );
     i = opus_encode(
         enc,
-        sbuf.as_mut_ptr(),
+        &sbuf,
         960,
         packet.as_mut_ptr(),
         ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,

@@ -48,7 +48,7 @@ use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
-use crate::src::analysis::{downmix_func, AnalysisInfo, TonalityAnalysisState};
+use crate::src::analysis::{AnalysisInfo, DownmixFn, TonalityAnalysisState};
 use crate::src::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
     OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND,
@@ -565,79 +565,53 @@ unsafe fn user_bitrate_to_bitrate(
         return (*st).user_bitrate_bps;
     };
 }
-pub unsafe fn downmix_float(
-    mut _x: *const core::ffi::c_void,
-    y: *mut opus_val32,
+pub fn downmix_float(
+    x: &[f32],
+    y: &mut [opus_val32],
     subframe: i32,
     offset: i32,
     c1: i32,
     c2: i32,
     C: i32,
 ) {
-    let mut x: *const f32 = 0 as *const f32;
-    let mut j: i32 = 0;
-    x = _x as *const f32;
-    j = 0;
-    while j < subframe {
-        *y.offset(j as isize) = *x.offset(((j + offset) * C + c1) as isize) * CELT_SIG_SCALE;
-        j += 1;
+    for j in 0..subframe {
+        y[j as usize] = x[((j + offset) * C + c1) as usize] * CELT_SIG_SCALE;
     }
+
     if c2 > -1 {
-        j = 0;
-        while j < subframe {
-            let ref mut fresh0 = *y.offset(j as isize);
-            *fresh0 += *x.offset(((j + offset) * C + c2) as isize) * CELT_SIG_SCALE;
-            j += 1;
+        for j in 0..subframe {
+            y[j as usize] += x[((j + offset) * C + c2) as usize] * CELT_SIG_SCALE;
         }
-    } else if c2 == -(2) {
-        let mut c: i32 = 0;
-        c = 1;
-        while c < C {
-            j = 0;
-            while j < subframe {
-                let ref mut fresh1 = *y.offset(j as isize);
-                *fresh1 += *x.offset(((j + offset) * C + c) as isize) * CELT_SIG_SCALE;
-                j += 1;
+    } else if c2 == -2 {
+        for c in 1..C {
+            for j in 0..subframe {
+                y[j as usize] += x[((j + offset) * C + c) as usize] * CELT_SIG_SCALE;
             }
-            c += 1;
         }
     }
 }
-pub unsafe fn downmix_int(
-    mut _x: *const core::ffi::c_void,
-    y: *mut opus_val32,
+
+pub fn downmix_int(
+    x: &[i16],
+    y: &mut [opus_val32],
     subframe: i32,
     offset: i32,
     c1: i32,
     c2: i32,
     C: i32,
 ) {
-    let mut x: *const i16 = 0 as *const i16;
-    let mut j: i32 = 0;
-    x = _x as *const i16;
-    j = 0;
-    while j < subframe {
-        *y.offset(j as isize) = *x.offset(((j + offset) * C + c1) as isize) as opus_val32;
-        j += 1;
+    for j in 0..subframe {
+        y[j as usize] = x[((j + offset) * C + c1) as usize] as opus_val32;
     }
     if c2 > -1 {
-        j = 0;
-        while j < subframe {
-            let ref mut fresh2 = *y.offset(j as isize);
-            *fresh2 += *x.offset(((j + offset) * C + c2) as isize) as i32 as f32;
-            j += 1;
+        for j in 0..subframe {
+            y[j as usize] += x[((j + offset) * C + c2) as usize] as i32 as f32;
         }
     } else if c2 == -(2) {
-        let mut c: i32 = 0;
-        c = 1;
-        while c < C {
-            j = 0;
-            while j < subframe {
-                let ref mut fresh3 = *y.offset(j as isize);
-                *fresh3 += *x.offset(((j + offset) * C + c) as isize) as i32 as f32;
-                j += 1;
+        for c in 1..C {
+            for j in 0..subframe {
+                y[j as usize] += x[((j + offset) * C + c) as usize] as i32 as f32;
             }
-            c += 1;
         }
     }
 }
@@ -1039,14 +1013,14 @@ unsafe fn encode_multiframe_packet(
         if to_celt != 0 && i == nb_frames - 1 {
             (*st).user_forced_mode = MODE_CELT_ONLY;
         }
-        let tmp_len = opus_encode_native(
+        let tmp_len = opus_encode_native::<f32>(
             st,
             &pcm[(i * ((*st).channels * frame_size)) as usize..],
             frame_size,
             tmp_data[start..].as_mut_ptr(),
             bytes_per_frame,
             lsb_depth,
-            std::ptr::null(),
+            None,
             0,
             0,
             0,
@@ -1127,19 +1101,20 @@ unsafe fn compute_redundancy_bytes(
     }
     return redundancy_bytes;
 }
-pub unsafe fn opus_encode_native(
+
+pub unsafe fn opus_encode_native<T>(
     st: *mut OpusEncoder,
     pcm: &[f32],
     frame_size: i32,
     mut data: *mut u8,
     out_data_bytes: i32,
     mut lsb_depth: i32,
-    analysis_pcm: *const core::ffi::c_void,
+    analysis_pcm: Option<&[T]>,
     analysis_size: i32,
     c1: i32,
     c2: i32,
     analysis_channels: i32,
-    downmix: downmix_func,
+    downmix: DownmixFn<T>,
     float_api: i32,
 ) -> i32 {
     let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
@@ -2454,9 +2429,10 @@ pub unsafe fn opus_encode_native(
     }
     return ret;
 }
+
 pub unsafe fn opus_encode(
     st: *mut OpusEncoder,
-    pcm: *const i16,
+    pcm: &[i16],
     analysis_frame_size: i32,
     data: *mut u8,
     max_data_bytes: i32,
@@ -2473,7 +2449,7 @@ pub unsafe fn opus_encode(
     i = 0;
     while i < frame_size * (*st).channels {
         *in_0.as_mut_ptr().offset(i as isize) =
-            1.0f32 / 32768 as f32 * *pcm.offset(i as isize) as i32 as f32;
+            1.0f32 / 32768 as f32 * pcm[i as usize] as i32 as f32;
         i += 1;
     }
     ret = opus_encode_native(
@@ -2483,23 +2459,12 @@ pub unsafe fn opus_encode(
         data,
         max_data_bytes,
         16,
-        pcm as *const core::ffi::c_void,
+        Some(pcm),
         analysis_frame_size,
         0,
         -(2),
         (*st).channels,
-        Some(
-            downmix_int
-                as unsafe fn(
-                    *const core::ffi::c_void,
-                    *mut opus_val32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                ) -> (),
-        ),
+        Some(downmix_int as fn(&[i16], &mut [opus_val32], i32, i32, i32, i32, i32) -> ()),
         0,
     );
     return ret;
@@ -2520,23 +2485,12 @@ pub unsafe fn opus_encode_float(
         data,
         out_data_bytes,
         24,
-        pcm.as_ptr() as *const core::ffi::c_void,
+        Some(pcm),
         analysis_frame_size,
         0,
         -(2),
         (*st).channels,
-        Some(
-            downmix_float
-                as unsafe fn(
-                    *const core::ffi::c_void,
-                    *mut opus_val32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                ) -> (),
-        ),
+        Some(downmix_float as fn(&[f32], &mut [opus_val32], i32, i32, i32, i32, i32) -> ()),
         1,
     );
 }

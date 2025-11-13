@@ -16,7 +16,7 @@ pub(crate) trait OpusBackendTrait {
     unsafe fn opus_encoder_ctl_impl(st: &mut Self::Encoder, request: i32, args: VarArgs) -> i32;
     unsafe fn opus_encode(
         st: &mut Self::Encoder,
-        pcm: *const i16,
+        pcm: &[i16],
         analysis_frame_size: i32,
         data: *mut u8,
         max_data_bytes: i32,
@@ -73,7 +73,7 @@ mod unsafe_libopus {
 
         unsafe fn opus_encode(
             &mut st: &mut *mut OpusEncoder,
-            pcm: *const i16,
+            pcm: &[i16],
             analysis_frame_size: i32,
             data: *mut u8,
             max_data_bytes: i32,
@@ -161,12 +161,12 @@ mod libopus {
 
         unsafe fn opus_encode(
             &mut st: &mut *mut OpusEncoder,
-            pcm: *const i16,
+            pcm: &[i16],
             analysis_frame_size: i32,
             data: *mut u8,
             max_data_bytes: i32,
         ) -> i32 {
-            opus_encode(st, pcm, analysis_frame_size, data, max_data_bytes)
+            opus_encode(st, pcm.as_ptr(), analysis_frame_size, data, max_data_bytes)
         }
 
         unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {

@@ -188,9 +188,8 @@ pub unsafe fn test_encode(
     let mut len: i32;
     let mut out_samples: i32;
     let mut ret: i32 = 0;
-    let inbuf = malloc((::core::mem::size_of::<i16>() as u64).wrapping_mul((48000 * 30 / 3) as u64))
-        as *mut i16;
-    generate_music(inbuf, 48000 * 30 / 3 / 2);
+    let mut inbuf = vec![0; 48000 * 30 / 3];
+    generate_music(inbuf.as_mut_ptr(), 48000 * 30 / 3 / 2);
     let outbuf = malloc(
         (::core::mem::size_of::<i16>() as u64)
             .wrapping_mul(5760)
@@ -199,7 +198,7 @@ pub unsafe fn test_encode(
     loop {
         len = opus_encode(
             enc,
-            &mut *inbuf.offset((samp_count * channels) as isize),
+            &inbuf[(samp_count * channels) as usize..],
             frame_size,
             packet.as_mut_ptr(),
             1500,
@@ -222,7 +221,6 @@ pub unsafe fn test_encode(
             }
         }
     }
-    free(inbuf as *mut core::ffi::c_void);
     free(outbuf as *mut core::ffi::c_void);
     ret
 }
@@ -420,7 +418,6 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
     let mut enc: *mut OpusEncoder;
     let dec: *mut OpusDecoder;
     let mut dec_err: [*mut OpusDecoder; 10] = [std::ptr::null_mut::<OpusDecoder>(); 10];
-    let inbuf: *mut i16;
     let outbuf: *mut i16;
     let out2buf: *mut i16;
     let mut bitrate_bps: i32;
@@ -477,11 +474,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
     );
     opus_encoder_destroy(enc);
     enc = enccpy;
-    inbuf = malloc(
-        (::core::mem::size_of::<i16>() as u64)
-            .wrapping_mul((48000 * 30) as u64)
-            .wrapping_mul(2),
-    ) as *mut i16;
+    let mut inbuf = vec![0; (48000 * 30) * 2];
     outbuf = malloc(
         (::core::mem::size_of::<i16>() as u64)
             .wrapping_mul((48000 * 30) as u64)
@@ -492,17 +485,17 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
             .wrapping_mul(5760)
             .wrapping_mul(3),
     ) as *mut i16;
-    if inbuf.is_null() || outbuf.is_null() || out2buf.is_null() {
+    if outbuf.is_null() || out2buf.is_null() {
         fail("tests/test_opus_encode.c", 378);
     }
-    generate_music(inbuf, 48000 * 30);
+    generate_music(inbuf.as_mut_ptr(), 48000 * 30);
     if opus_encoder_ctl!(enc, 4008, -(1000)) != 0 {
         fail("tests/test_opus_encode.c", 387);
     }
     if opus_encoder_ctl!(enc, 11002, -(2)) != -1 {
         fail("tests/test_opus_encode.c", 388);
     }
-    if opus_encode(enc, inbuf, 500, packet.as_mut_ptr(), 1500) != -1 {
+    if opus_encode(enc, &inbuf, 500, packet.as_mut_ptr(), 1500) != -1 {
         fail("tests/test_opus_encode.c", 389);
     }
     rc = 0;
@@ -628,7 +621,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 }
                 len = opus_encode(
                     enc,
-                    &mut *inbuf.offset((i << 1) as isize),
+                    &inbuf[(i << 1) as usize..],
                     frame_size,
                     packet.as_mut_ptr(),
                     1500,
@@ -752,7 +745,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         opus_encoder_ctl!(enc, 4002, bitrate_bps);
         len_1 = opus_encode(
             enc,
-            &mut *inbuf.offset((offset << 1) as isize),
+            &inbuf[(offset << 1) as usize..],
             frame_size_1,
             packet.as_mut_ptr(),
             1500,
@@ -871,7 +864,6 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         opus_decoder_destroy(dec_err[i as usize]);
         i += 1;
     }
-    free(inbuf as *mut core::ffi::c_void);
     free(outbuf as *mut core::ffi::c_void);
     free(out2buf as *mut core::ffi::c_void);
     0
