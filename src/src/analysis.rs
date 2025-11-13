@@ -6,6 +6,7 @@ use crate::celt::float_cast::float2int;
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
 use crate::celt::mathops::{celt_log, celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
+use crate::opus_private::opus_select_arch;
 use crate::src::mlp::analysis_mlp::run_analysis_mlp;
 use crate::src::opus_encoder::is_digital_silence;
 
@@ -581,7 +582,7 @@ fn downmix_and_resample<T>(
 impl TonalityAnalysisState {
     pub fn new(fs: i32) -> Self {
         Self {
-            arch: 0, // TODO
+            arch: opus_select_arch(),
             Fs: fs,
             application: 0,
             angle: [0.; 240],

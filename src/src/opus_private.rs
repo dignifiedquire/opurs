@@ -15,3 +15,9 @@ pub fn align(i: i32) -> i32 {
         .wrapping_div(alignment)
         .wrapping_mul(alignment) as i32;
 }
+
+#[inline]
+pub fn opus_select_arch() -> i32 {
+    // TODO: actually implement
+    0
+}

@@ -1,27 +1,12 @@
 use crate::externs::{free, malloc};
+use crate::opus_private::opus_select_arch;
 use crate::src::repacketizer::FrameSource;
 
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-    pub const CELT_SIG_SCALE: f32 = 32768.0f32;
-    pub const Q15ONE: f32 = 1.0f32;
-    pub const EPSILON: f32 = 1e-15f32;
-    pub const VERY_SMALL: f32 = 1e-30f32;
-}
-pub mod stddef_h {
-    pub type size_t = u64;
-    pub const NULL: i32 = 0;
-}
-pub mod cpu_support_h {
-    #[inline]
-    pub unsafe fn opus_select_arch() -> i32 {
-        return 0;
-    }
-}
-use self::arch_h::{opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL};
-pub use self::cpu_support_h::opus_select_arch;
-pub use self::stddef_h::{size_t, NULL};
+pub const CELT_SIG_SCALE: f32 = 32768.0f32;
+pub const Q15ONE: f32 = 1.0f32;
+pub const EPSILON: f32 = 1e-15f32;
+pub const VERY_SMALL: f32 = 1e-30f32;
+
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
@@ -109,8 +94,8 @@ pub struct OpusEncoder {
     pub(crate) stream_channels: i32,
     pub(crate) hybrid_stereo_width_Q14: i16,
     pub(crate) variable_HP_smth2_Q15: i32,
-    pub(crate) prev_HB_gain: opus_val16,
-    pub(crate) hp_mem: [opus_val32; 4],
+    pub(crate) prev_HB_gain: f32,
+    pub(crate) hp_mem: [f32; 4],
     pub(crate) mode: i32,
     pub(crate) prev_mode: i32,
     pub(crate) prev_channels: i32,
@@ -119,23 +104,23 @@ pub struct OpusEncoder {
     pub(crate) auto_bandwidth: i32,
     pub(crate) silk_bw_switch: i32,
     pub(crate) first: i32,
-    pub(crate) energy_masking: *mut opus_val16,
+    pub(crate) energy_masking: *mut f32,
     pub(crate) width_mem: StereoWidthState,
-    pub(crate) delay_buffer: [opus_val16; 960],
+    pub(crate) delay_buffer: [f32; 960],
     pub(crate) detected_bandwidth: i32,
     pub(crate) nb_no_activity_frames: i32,
-    pub(crate) peak_signal_energy: opus_val32,
+    pub(crate) peak_signal_energy: f32,
     pub(crate) nonfinal_frame: i32,
     pub(crate) rangeFinal: u32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct StereoWidthState {
-    pub XX: opus_val32,
-    pub XY: opus_val32,
-    pub YY: opus_val32,
-    pub smoothed_width: opus_val16,
-    pub max_follower: opus_val16,
+    pub XX: f32,
+    pub XY: f32,
+    pub YY: f32,
+    pub smoothed_width: f32,
+    pub max_follower: f32,
 }
 pub const PSEUDO_SNR_THRESHOLD: f32 = 316.23f32;
 static mono_voice_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
@@ -285,19 +270,19 @@ unsafe fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) 
     return toc;
 }
 unsafe fn silk_biquad_float(
-    in_0: *const opus_val16,
+    in_0: *const f32,
     B_Q28: *const i32,
     A_Q28: *const i32,
-    S: *mut opus_val32,
-    out: *mut opus_val16,
+    S: *mut f32,
+    out: *mut f32,
     len: i32,
     stride: i32,
 ) {
     let mut k: i32 = 0;
-    let mut vout: opus_val32 = 0.;
-    let mut inval: opus_val32 = 0.;
-    let mut A: [opus_val32; 2] = [0.; 2];
-    let mut B: [opus_val32; 3] = [0.; 3];
+    let mut vout: f32 = 0.;
+    let mut inval: f32 = 0.;
+    let mut A: [f32; 2] = [0.; 2];
+    let mut B: [f32; 3] = [0.; 3];
     A[0 as usize] = *A_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
     A[1 as usize] = *A_Q28.offset(1 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
     B[0 as usize] = *B_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
@@ -315,10 +300,10 @@ unsafe fn silk_biquad_float(
     }
 }
 unsafe fn hp_cutoff(
-    in_0: *const opus_val16,
+    in_0: *const f32,
     cutoff_Hz: i32,
-    out: *mut opus_val16,
-    hp_mem: *mut opus_val32,
+    out: *mut f32,
+    hp_mem: *mut f32,
     len: i32,
     channels: i32,
     Fs: i32,
@@ -365,10 +350,10 @@ unsafe fn hp_cutoff(
     }
 }
 unsafe fn dc_reject(
-    in_0: *const opus_val16,
+    in_0: *const f32,
     cutoff_Hz: i32,
-    out: *mut opus_val16,
-    hp_mem: *mut opus_val32,
+    out: *mut f32,
+    hp_mem: *mut f32,
     len: i32,
     channels: i32,
     Fs: i32,
@@ -385,10 +370,10 @@ unsafe fn dc_reject(
         m2 = *hp_mem.offset(2 as isize);
         i = 0;
         while i < len {
-            let mut x0: opus_val32 = 0.;
-            let mut x1: opus_val32 = 0.;
-            let mut out0: opus_val32 = 0.;
-            let mut out1: opus_val32 = 0.;
+            let mut x0: f32 = 0.;
+            let mut x1: f32 = 0.;
+            let mut out0: f32 = 0.;
+            let mut out1: f32 = 0.;
             x0 = *in_0.offset((2 * i + 0) as isize);
             x1 = *in_0.offset((2 * i + 1) as isize);
             out0 = x0 - m0;
@@ -406,8 +391,8 @@ unsafe fn dc_reject(
         m0_0 = *hp_mem.offset(0 as isize);
         i = 0;
         while i < len {
-            let mut x: opus_val32 = 0.;
-            let mut y: opus_val32 = 0.;
+            let mut x: f32 = 0.;
+            let mut y: f32 = 0.;
             x = *in_0.offset(i as isize);
             y = x - m0_0;
             m0_0 = coef * x + VERY_SMALL + coef2 * m0_0;
@@ -418,14 +403,14 @@ unsafe fn dc_reject(
     };
 }
 unsafe fn stereo_fade(
-    in_0: *const opus_val16,
-    out: *mut opus_val16,
-    mut g1: opus_val16,
-    mut g2: opus_val16,
+    in_0: *const f32,
+    out: *mut f32,
+    mut g1: f32,
+    mut g2: f32,
     overlap48: i32,
     frame_size: i32,
     channels: i32,
-    window: *const opus_val16,
+    window: *const f32,
     Fs: i32,
 ) {
     let mut i: i32 = 0;
@@ -437,9 +422,9 @@ unsafe fn stereo_fade(
     g2 = Q15ONE - g2;
     i = 0;
     while i < overlap {
-        let mut diff: opus_val32 = 0.;
-        let mut g: opus_val16 = 0.;
-        let mut w: opus_val16 = 0.;
+        let mut diff: f32 = 0.;
+        let mut g: f32 = 0.;
+        let mut w: f32 = 0.;
         w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
         g = w * g2 + (1.0f32 - w) * g1;
         diff = 0.5f32
@@ -450,7 +435,7 @@ unsafe fn stereo_fade(
         i += 1;
     }
     while i < frame_size {
-        let mut diff_0: opus_val32 = 0.;
+        let mut diff_0: f32 = 0.;
         diff_0 = 0.5f32
             * (*in_0.offset((i * channels) as isize) - *in_0.offset((i * channels + 1) as isize));
         diff_0 = g2 * diff_0;
@@ -461,14 +446,14 @@ unsafe fn stereo_fade(
     }
 }
 unsafe fn gain_fade(
-    in_0: *const opus_val16,
-    out: *mut opus_val16,
-    g1: opus_val16,
-    g2: opus_val16,
+    in_0: *const f32,
+    out: *mut f32,
+    g1: f32,
+    g2: f32,
     overlap48: i32,
     frame_size: i32,
     channels: i32,
-    window: *const opus_val16,
+    window: *const f32,
     Fs: i32,
 ) {
     let mut i: i32 = 0;
@@ -480,8 +465,8 @@ unsafe fn gain_fade(
     if channels == 1 {
         i = 0;
         while i < overlap {
-            let mut g: opus_val16 = 0.;
-            let mut w: opus_val16 = 0.;
+            let mut g: f32 = 0.;
+            let mut w: f32 = 0.;
             w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
             g = w * g2 + (1.0f32 - w) * g1;
             *out.offset(i as isize) = g * *in_0.offset(i as isize);
@@ -490,8 +475,8 @@ unsafe fn gain_fade(
     } else {
         i = 0;
         while i < overlap {
-            let mut g_0: opus_val16 = 0.;
-            let mut w_0: opus_val16 = 0.;
+            let mut g_0: f32 = 0.;
+            let mut w_0: f32 = 0.;
             w_0 = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
             g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
             *out.offset((i * 2) as isize) = g_0 * *in_0.offset((i * 2) as isize);
@@ -530,14 +515,14 @@ pub unsafe fn opus_encoder_create(
         if !error.is_null() {
             *error = OPUS_BAD_ARG;
         }
-        return NULL as *mut OpusEncoder;
+        return std::ptr::null_mut();
     }
-    st = malloc(opus_encoder_get_size(channels) as size_t) as *mut OpusEncoder;
+    st = malloc(opus_encoder_get_size(channels) as u64) as *mut OpusEncoder;
     if st.is_null() {
         if !error.is_null() {
             *error = OPUS_ALLOC_FAIL;
         }
-        return NULL as *mut OpusEncoder;
+        return std::ptr::null_mut();
     }
     ret = opus_encoder_init(st, Fs, channels, application);
     if !error.is_null() {
@@ -545,7 +530,7 @@ pub unsafe fn opus_encoder_create(
     }
     if ret != OPUS_OK {
         free(st as *mut core::ffi::c_void);
-        st = NULL as *mut OpusEncoder;
+        st = std::ptr::null_mut();
     }
     return st;
 }
@@ -567,7 +552,7 @@ unsafe fn user_bitrate_to_bitrate(
 }
 pub fn downmix_float(
     x: &[f32],
-    y: &mut [opus_val32],
+    y: &mut [f32],
     subframe: i32,
     offset: i32,
     c1: i32,
@@ -591,17 +576,9 @@ pub fn downmix_float(
     }
 }
 
-pub fn downmix_int(
-    x: &[i16],
-    y: &mut [opus_val32],
-    subframe: i32,
-    offset: i32,
-    c1: i32,
-    c2: i32,
-    C: i32,
-) {
+pub fn downmix_int(x: &[i16], y: &mut [f32], subframe: i32, offset: i32, c1: i32, c2: i32, C: i32) {
     for j in 0..subframe {
-        y[j as usize] = x[((j + offset) * C + c1) as usize] as opus_val32;
+        y[j as usize] = x[((j + offset) * C + c1) as usize] as f32;
     }
     if c2 > -1 {
         for j in 0..subframe {
@@ -651,34 +628,34 @@ pub unsafe fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32
     return new_size;
 }
 pub unsafe fn compute_stereo_width(
-    pcm: *const opus_val16,
+    pcm: *const f32,
     frame_size: i32,
     Fs: i32,
     mem: *mut StereoWidthState,
-) -> opus_val16 {
-    let mut xx: opus_val32 = 0.;
-    let mut xy: opus_val32 = 0.;
-    let mut yy: opus_val32 = 0.;
-    let mut sqrt_xx: opus_val16 = 0.;
-    let mut sqrt_yy: opus_val16 = 0.;
-    let mut qrrt_xx: opus_val16 = 0.;
-    let mut qrrt_yy: opus_val16 = 0.;
+) -> f32 {
+    let mut xx: f32 = 0.;
+    let mut xy: f32 = 0.;
+    let mut yy: f32 = 0.;
+    let mut sqrt_xx: f32 = 0.;
+    let mut sqrt_yy: f32 = 0.;
+    let mut qrrt_xx: f32 = 0.;
+    let mut qrrt_yy: f32 = 0.;
     let mut frame_rate: i32 = 0;
     let mut i: i32 = 0;
-    let mut short_alpha: opus_val16 = 0.;
+    let mut short_alpha: f32 = 0.;
     frame_rate = Fs / frame_size;
     short_alpha =
-        Q15ONE - 25 as opus_val32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
-    yy = 0 as opus_val32;
+        Q15ONE - 25 as f32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
+    yy = 0 as f32;
     xy = yy;
     xx = xy;
     i = 0;
     while i < frame_size - 3 {
-        let mut pxx: opus_val32 = 0 as opus_val32;
-        let mut pxy: opus_val32 = 0 as opus_val32;
-        let mut pyy: opus_val32 = 0 as opus_val32;
-        let mut x: opus_val16 = 0.;
-        let mut y: opus_val16 = 0.;
+        let mut pxx: f32 = 0 as f32;
+        let mut pxy: f32 = 0 as f32;
+        let mut pyy: f32 = 0 as f32;
+        let mut x: f32 = 0.;
+        let mut y: f32 = 0.;
         x = *pcm.offset((2 * i) as isize);
         y = *pcm.offset((2 * i + 1) as isize);
         pxx = x * x;
@@ -705,7 +682,7 @@ pub unsafe fn compute_stereo_width(
         i += 4;
     }
     if !(xx < 1e9f32) || xx != xx || !(yy < 1e9f32) || yy != yy {
-        yy = 0 as opus_val32;
+        yy = 0 as f32;
         xx = yy;
         xy = xx;
     }
@@ -733,9 +710,9 @@ pub unsafe fn compute_stereo_width(
         (*mem).YY
     }) > 8e-4f32
     {
-        let mut corr: opus_val16 = 0.;
-        let mut ldiff: opus_val16 = 0.;
-        let mut width: opus_val16 = 0.;
+        let mut corr: f32 = 0.;
+        let mut ldiff: f32 = 0.;
+        let mut width: f32 = 0.;
         sqrt_xx = celt_sqrt((*mem).XX);
         sqrt_yy = celt_sqrt((*mem).YY);
         qrrt_xx = celt_sqrt(sqrt_xx);
@@ -756,10 +733,10 @@ pub unsafe fn compute_stereo_width(
                 (*mem).smoothed_width
             };
     }
-    return if 1.0f32 < 20 as opus_val32 * (*mem).max_follower {
+    return if 1.0f32 < 20 as f32 * (*mem).max_follower {
         1.0f32
     } else {
-        20 as opus_val32 * (*mem).max_follower
+        20 as f32 * (*mem).max_follower
     };
 }
 unsafe fn decide_fec(
@@ -903,28 +880,23 @@ unsafe fn compute_equiv_rate(
 
 pub fn is_digital_silence(pcm: &[f32], frame_size: i32, channels: i32, lsb_depth: i32) -> i32 {
     let sample_max = celt_maxabs16(pcm, (frame_size * channels) as usize);
-    (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32
+    (sample_max <= 1 as f32 / ((1) << lsb_depth) as f32) as i32
 }
-unsafe fn compute_frame_energy(
-    pcm: &[f32],
-    frame_size: i32,
-    channels: i32,
-    _arch: i32,
-) -> opus_val32 {
+unsafe fn compute_frame_energy(pcm: &[f32], frame_size: i32, channels: i32, _arch: i32) -> f32 {
     let len: i32 = frame_size * channels;
     celt_inner_prod_c(pcm, pcm, len) / len as f32
 }
 unsafe fn decide_dtx_mode(
     activity_probability: f32,
     nb_no_activity_frames: *mut i32,
-    peak_signal_energy: opus_val32,
-    pcm: &[opus_val16],
+    peak_signal_energy: f32,
+    pcm: &[f32],
     frame_size: i32,
     channels: i32,
     mut is_silence: i32,
     arch: i32,
 ) -> i32 {
-    let mut noise_energy: opus_val32 = 0.;
+    let mut noise_energy: f32 = 0.;
     if is_silence == 0 {
         if activity_probability < DTX_ACTIVITY_THRESHOLD {
             noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
@@ -1153,10 +1125,10 @@ pub unsafe fn opus_encode_native<T>(
     let mut frame_rate: i32 = 0;
     let mut max_rate: i32 = 0;
     let mut curr_bandwidth: i32 = 0;
-    let mut HB_gain: opus_val16 = 0.;
+    let mut HB_gain: f32 = 0.;
     let mut max_data_bytes: i32 = 0;
     let mut total_buffer: i32 = 0;
-    let mut stereo_width: opus_val16 = 0.;
+    let mut stereo_width: f32 = 0.;
     let mut celt_mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
     let mut analysis_info = AnalysisInfo::default();
     let mut analysis_read_pos_bak: i32 = -1;
@@ -1250,7 +1222,7 @@ pub unsafe fn opus_encode_native<T>(
         stereo_width =
             compute_stereo_width(pcm.as_ptr(), frame_size, (*st).Fs, &mut (*st).width_mem);
     } else {
-        stereo_width = 0 as opus_val16;
+        stereo_width = 0 as f32;
     }
     total_buffer = delay_compensation;
     (*st).bitrate_bps = user_bitrate_to_bitrate(st, frame_size, max_data_bytes);
@@ -1688,15 +1660,15 @@ pub unsafe fn opus_encode_native<T>(
         (max_data_bytes - 1) as usize,
     ));
     let vla = ((total_buffer + frame_size) * (*st).channels) as usize;
-    let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
+    let mut pcm_buf: Vec<f32> = ::std::vec::from_elem(0., vla);
     memcpy(
         pcm_buf.as_mut_ptr() as *mut core::ffi::c_void,
         &mut *((*st).delay_buffer)
             .as_mut_ptr()
             .offset((((*st).encoder_buffer - total_buffer) * (*st).channels) as isize)
-            as *mut opus_val16 as *const core::ffi::c_void,
+            as *mut f32 as *const core::ffi::c_void,
         ((total_buffer * (*st).channels) as u64)
-            .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
+            .wrapping_mul(::core::mem::size_of::<f32>() as u64)
             .wrapping_add(
                 (0 * pcm_buf.as_mut_ptr().offset_from(
                     &mut *((*st).delay_buffer)
@@ -1744,7 +1716,7 @@ pub unsafe fn opus_encode_native<T>(
         );
     }
     if float_api != 0 {
-        let mut sum: opus_val32 = 0.;
+        let mut sum: f32 = 0.;
         sum = celt_inner_prod_c(
             &pcm_buf[(total_buffer * (*st).channels) as usize..],
             &pcm_buf[(total_buffer * (*st).channels) as usize..],
@@ -1754,13 +1726,13 @@ pub unsafe fn opus_encode_native<T>(
             memset(
                 &mut *pcm_buf
                     .as_mut_ptr()
-                    .offset((total_buffer * (*st).channels) as isize)
-                    as *mut opus_val16 as *mut core::ffi::c_void,
+                    .offset((total_buffer * (*st).channels) as isize) as *mut f32
+                    as *mut core::ffi::c_void,
                 0,
                 ((frame_size * (*st).channels) as u64)
-                    .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64),
+                    .wrapping_mul(::core::mem::size_of::<f32>() as u64),
             );
-            (*st).hp_mem[3 as usize] = 0 as opus_val32;
+            (*st).hp_mem[3 as usize] = 0 as f32;
             (*st).hp_mem[2 as usize] = (*st).hp_mem[3 as usize];
             (*st).hp_mem[1 as usize] = (*st).hp_mem[2 as usize];
             (*st).hp_mem[0 as usize] = (*st).hp_mem[1 as usize];
@@ -1795,8 +1767,8 @@ pub unsafe fn opus_encode_native<T>(
             (*st).silk_mode.bitRate = total_bitRate;
         }
         if !((*st).energy_masking).is_null() && (*st).use_vbr != 0 && (*st).lfe == 0 {
-            let mut mask_sum: opus_val32 = 0 as opus_val32;
-            let mut masking_depth: opus_val16 = 0.;
+            let mut mask_sum: f32 = 0 as f32;
+            let mut masking_depth: f32 = 0.;
             let mut rate_offset: i32 = 0;
             let mut c: i32 = 0;
             let mut end: i32 = 17;
@@ -1812,7 +1784,7 @@ pub unsafe fn opus_encode_native<T>(
             while c < (*st).channels {
                 i = 0;
                 while i < end {
-                    let mut mask: opus_val16 = 0.;
+                    let mut mask: f32 = 0.;
                     mask = if (if *((*st).energy_masking).offset((21 * c + i) as isize) < 0.5f32 {
                         *((*st).energy_masking).offset((21 * c + i) as isize)
                     } else {
@@ -1837,7 +1809,7 @@ pub unsafe fn opus_encode_native<T>(
             }
             masking_depth = mask_sum / end as f32 * (*st).channels as f32;
             masking_depth += 0.2f32;
-            rate_offset = (srate as opus_val32 * masking_depth) as i32;
+            rate_offset = (srate as f32 * masking_depth) as i32;
             rate_offset = if rate_offset > -(2) * (*st).silk_mode.bitRate / 3 {
                 rate_offset
             } else {
@@ -1932,7 +1904,7 @@ pub unsafe fn opus_encode_native<T>(
                 ((*st).delay_buffer)
                     .as_mut_ptr()
                     .offset(prefill_offset as isize),
-                0 as opus_val16,
+                0 as f32,
                 Q15ONE,
                 (*celt_mode).overlap as i32,
                 (*st).Fs / 400,
@@ -1943,7 +1915,7 @@ pub unsafe fn opus_encode_native<T>(
             memset(
                 ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
                 0,
-                (prefill_offset as u64).wrapping_mul(::core::mem::size_of::<opus_val16>() as u64),
+                (prefill_offset as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
             );
             i = 0;
             while i < (*st).encoder_buffer * (*st).channels {
@@ -2040,10 +2012,10 @@ pub unsafe fn opus_encode_native<T>(
     opus_custom_encoder_ctl!(celt_enc, CELT_SET_CHANNELS_REQUEST, (*st).stream_channels);
     opus_custom_encoder_ctl!(celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
     if (*st).mode != MODE_SILK_ONLY {
-        let mut celt_pred: opus_val32 = 2 as opus_val32;
+        let mut celt_pred: f32 = 2 as f32;
         opus_custom_encoder_ctl!(celt_enc, OPUS_SET_VBR_REQUEST, 0);
         if (*st).silk_mode.reducedDependency != 0 {
-            celt_pred = 0 as opus_val32;
+            celt_pred = 0 as f32;
         }
         opus_custom_encoder_ctl!(celt_enc, CELT_SET_PREDICTION_REQUEST, celt_pred as i32);
         if (*st).mode == MODE_HYBRID {
@@ -2066,15 +2038,15 @@ pub unsafe fn opus_encode_native<T>(
         }
     }
     let vla_1 = ((*st).channels * (*st).Fs / 400) as usize;
-    let mut tmp_prefill: Vec<opus_val16> = ::std::vec::from_elem(0., vla_1);
+    let mut tmp_prefill: Vec<f32> = ::std::vec::from_elem(0., vla_1);
     if (*st).mode != MODE_SILK_ONLY && (*st).mode != (*st).prev_mode && (*st).prev_mode > 0 {
         memcpy(
             tmp_prefill.as_mut_ptr() as *mut core::ffi::c_void,
             &mut *((*st).delay_buffer).as_mut_ptr().offset(
                 (((*st).encoder_buffer - total_buffer - (*st).Fs / 400) * (*st).channels) as isize,
-            ) as *mut opus_val16 as *const core::ffi::c_void,
+            ) as *mut f32 as *const core::ffi::c_void,
             (((*st).channels * (*st).Fs / 400) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
+                .wrapping_mul(::core::mem::size_of::<f32>() as u64)
                 .wrapping_add(
                     (0 * tmp_prefill.as_mut_ptr().offset_from(
                         &mut *((*st).delay_buffer).as_mut_ptr().offset(
@@ -2090,10 +2062,10 @@ pub unsafe fn opus_encode_native<T>(
             ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
             &mut *((*st).delay_buffer)
                 .as_mut_ptr()
-                .offset(((*st).channels * frame_size) as isize) as *mut opus_val16
+                .offset(((*st).channels * frame_size) as isize) as *mut f32
                 as *const core::ffi::c_void,
             (((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
+                .wrapping_mul(::core::mem::size_of::<f32>() as u64)
                 .wrapping_add(
                     (0 * ((*st).delay_buffer).as_mut_ptr().offset_from(
                         &mut *((*st).delay_buffer)
@@ -2105,16 +2077,15 @@ pub unsafe fn opus_encode_native<T>(
         memcpy(
             &mut *((*st).delay_buffer).as_mut_ptr().offset(
                 ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as isize,
-            ) as *mut opus_val16 as *mut core::ffi::c_void,
-            &mut *pcm_buf.as_mut_ptr().offset(0 as isize) as *mut opus_val16
-                as *const core::ffi::c_void,
+            ) as *mut f32 as *mut core::ffi::c_void,
+            &mut *pcm_buf.as_mut_ptr().offset(0 as isize) as *mut f32 as *const core::ffi::c_void,
             (((frame_size + total_buffer) * (*st).channels) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
+                .wrapping_mul(::core::mem::size_of::<f32>() as u64)
                 .wrapping_add(
                     (0 * (&mut *((*st).delay_buffer).as_mut_ptr().offset(
                         ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer))
                             as isize,
-                    ) as *mut opus_val16)
+                    ) as *mut f32)
                         .offset_from(&mut *pcm_buf.as_mut_ptr().offset(0 as isize))
                         as i64) as u64,
                 ),
@@ -2124,9 +2095,9 @@ pub unsafe fn opus_encode_native<T>(
             ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
             &mut *pcm_buf.as_mut_ptr().offset(
                 ((frame_size + total_buffer - (*st).encoder_buffer) * (*st).channels) as isize,
-            ) as *mut opus_val16 as *const core::ffi::c_void,
+            ) as *mut f32 as *const core::ffi::c_void,
             (((*st).encoder_buffer * (*st).channels) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
+                .wrapping_mul(::core::mem::size_of::<f32>() as u64)
                 .wrapping_add(
                     (0 * ((*st).delay_buffer).as_mut_ptr().offset_from(
                         &mut *pcm_buf.as_mut_ptr().offset(
@@ -2165,10 +2136,10 @@ pub unsafe fn opus_encode_native<T>(
         if ((*st).hybrid_stereo_width_Q14 as i32) < (1) << 14
             || (*st).silk_mode.stereoWidth_Q14 < (1) << 14
         {
-            let mut g1: opus_val16 = 0.;
-            let mut g2: opus_val16 = 0.;
-            g1 = (*st).hybrid_stereo_width_Q14 as opus_val16;
-            g2 = (*st).silk_mode.stereoWidth_Q14 as opus_val16;
+            let mut g1: f32 = 0.;
+            let mut g2: f32 = 0.;
+            g1 = (*st).hybrid_stereo_width_Q14 as f32;
+            g2 = (*st).silk_mode.stereoWidth_Q14 as f32;
             g1 *= 1.0f32 / 16384 as f32;
             g2 *= 1.0f32 / 16384 as f32;
             stereo_fade(
@@ -2302,7 +2273,7 @@ pub unsafe fn opus_encode_native<T>(
                 celt_enc,
                 &pcm_buf,
                 frame_size,
-                NULL as *mut u8,
+                std::ptr::null_mut(),
                 nb_compr_bytes,
                 Some(&mut enc),
             );
@@ -2464,7 +2435,7 @@ pub unsafe fn opus_encode(
         0,
         -(2),
         (*st).channels,
-        Some(downmix_int as fn(&[i16], &mut [opus_val32], i32, i32, i32, i32, i32) -> ()),
+        Some(downmix_int as fn(&[i16], &mut [f32], i32, i32, i32, i32, i32) -> ()),
         0,
     );
     return ret;
@@ -2490,7 +2461,7 @@ pub unsafe fn opus_encode_float(
         0,
         -(2),
         (*st).channels,
-        Some(downmix_float as fn(&[f32], &mut [opus_val32], i32, i32, i32, i32, i32) -> ()),
+        Some(downmix_float as fn(&[f32], &mut [f32], i32, i32, i32, i32, i32) -> ()),
         1,
     );
 }
@@ -2889,7 +2860,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             current_block = 16167632229894708628;
         }
         OPUS_SET_ENERGY_MASK_REQUEST => {
-            let value_38: *mut opus_val16 = ap.arg::<*mut opus_val16>();
+            let value_38: *mut f32 = ap.arg::<*mut f32>();
             (*st).energy_masking = value_38;
             ret = opus_custom_encoder_ctl!(
                 celt_enc,
