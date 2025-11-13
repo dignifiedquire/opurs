@@ -1,7 +1,8 @@
-use crate::src::mlp::tansig::{sigmoid_approx, tansig_approx};
 use ndarray::{
     aview1, aview_mut1, azip, ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _,
 };
+
+use crate::src::mlp::tansig::{sigmoid_approx, tansig_approx};
 
 pub const WEIGHTS_SCALE: f32 = 1.0f32 / 128f32;
 
