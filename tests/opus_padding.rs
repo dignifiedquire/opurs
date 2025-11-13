@@ -63,7 +63,6 @@ pub unsafe fn test_overflow() -> i32 {
     result = opus_decode(
         &mut *decoder,
         std::slice::from_raw_parts(in_0, 16909318),
-        16909318,
         out,
         5760,
         0,

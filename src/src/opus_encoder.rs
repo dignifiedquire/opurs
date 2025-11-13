@@ -1,4 +1,5 @@
 use crate::externs::{free, malloc};
+use crate::src::repacketizer::FrameSource;
 
 pub mod arch_h {
     pub type opus_val16 = f32;
@@ -991,18 +992,18 @@ unsafe fn encode_multiframe_packet(
     lsb_depth: i32,
     float_api: i32,
 ) -> i32 {
-    let mut i: i32 = 0;
     let mut ret: i32 = 0;
     let mut bak_mode: i32 = 0;
     let mut bak_bandwidth: i32 = 0;
     let mut bak_channels: i32 = 0;
     let mut bak_to_mono: i32 = 0;
-    let mut max_header_bytes: i32 = 0;
-    let mut bytes_per_frame: i32 = 0;
     let mut cbr_bytes: i32 = 0;
     let mut repacketize_len: i32 = 0;
-    let mut tmp_len: i32 = 0;
-    max_header_bytes = if nb_frames == 2 {
+
+    // Worst cases:
+    // 2 frames: Code 2 with different compressed sizes
+    // >2 frames: Code 3 VBR
+    let max_header_bytes = if nb_frames == 2 {
         3
     } else {
         2 + (nb_frames - 1) * 2
@@ -1017,14 +1018,14 @@ unsafe fn encode_multiframe_packet(
             out_data_bytes
         };
     }
-    bytes_per_frame = if (1276) < 1 + (repacketize_len - max_header_bytes) / nb_frames {
+    let bytes_per_frame = if (1276) < 1 + (repacketize_len - max_header_bytes) / nb_frames {
         1276
     } else {
         1 + (repacketize_len - max_header_bytes) / nb_frames
     };
     let vla = (nb_frames * bytes_per_frame) as usize;
-    let mut tmp_data: Vec<u8> = ::std::vec::from_elem(0, vla);
-    let mut rp = [OpusRepacketizer::default()];
+    let mut tmp_data: Vec<u8> = vec![0u8; vla];
+    let mut rp = OpusRepacketizer::default();
     bak_mode = (*st).user_forced_mode;
     bak_bandwidth = (*st).user_bandwidth;
     bak_channels = (*st).force_channels;
@@ -1037,21 +1038,25 @@ unsafe fn encode_multiframe_packet(
     } else {
         (*st).prev_channels = (*st).stream_channels;
     }
-    i = 0;
-    while i < nb_frames {
+    let mut offsets = Vec::new();
+    for i in 0..nb_frames {
         (*st).silk_mode.toMono = 0;
         (*st).nonfinal_frame = (i < nb_frames - 1) as i32;
+
+        let start = (i * bytes_per_frame) as usize;
+
+        // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
         if to_celt != 0 && i == nb_frames - 1 {
             (*st).user_forced_mode = MODE_CELT_ONLY;
         }
-        tmp_len = opus_encode_native(
+        let tmp_len = opus_encode_native(
             st,
             pcm.offset((i * ((*st).channels * frame_size)) as isize),
             frame_size,
-            tmp_data.as_mut_ptr().offset((i * bytes_per_frame) as isize),
+            tmp_data[start..].as_mut_ptr(),
             bytes_per_frame,
             lsb_depth,
-            NULL as *const core::ffi::c_void,
+            std::ptr::null(),
             0,
             0,
             0,
@@ -1062,30 +1067,43 @@ unsafe fn encode_multiframe_packet(
         if tmp_len < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        let start = (i * bytes_per_frame) as usize;
-        ret = rp[0].cat(&tmp_data[start..start + tmp_len as usize]);
+
+        ret = rp.cat(&tmp_data[start..start + tmp_len as usize]);
+        offsets.push((start, start + tmp_len as usize));
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        i += 1;
     }
-    ret = rp[0].out_range_impl(
+
+    // this relies on `rp.cat` keeping refernces into `tmp_data` and copying the frames from there,
+    // instead of from `data` which does not happen anymore, as `rp.frames` no stores offsets, insted of pointers
+
+    let offsets = offsets
+        .into_iter()
+        .map(|(start, end)| &tmp_data[start..end])
+        .collect();
+    let data = std::slice::from_raw_parts_mut(data, repacketize_len as _);
+    ret = rp.out_range_impl(
         0,
         nb_frames,
         data,
-        repacketize_len,
-        0,
-        ((*st).use_vbr == 0) as i32,
+        false,
+        (*st).use_vbr == 0,
+        FrameSource::Slice { data: offsets },
     );
     if ret < 0 {
         return OPUS_INTERNAL_ERROR;
     }
+
+    // Discard configs that were forced locally for the purpose of repacketization
     (*st).user_forced_mode = bak_mode;
     (*st).user_bandwidth = bak_bandwidth;
     (*st).force_channels = bak_channels;
     (*st).silk_mode.toMono = bak_to_mono;
-    return ret;
+
+    ret
 }
+
 unsafe fn compute_redundancy_bytes(
     max_data_bytes: i32,
     bitrate_bps: i32,
@@ -1351,6 +1369,7 @@ pub unsafe fn opus_encode_native(
             *data.offset(1 as isize) = num_multiframes as u8;
         }
         if (*st).use_vbr == 0 {
+            let data = std::slice::from_raw_parts_mut(data, max_data_bytes as _);
             ret = opus_packet_pad(data, ret, max_data_bytes);
             if ret == OPUS_OK {
                 ret = max_data_bytes;
@@ -2459,6 +2478,7 @@ pub unsafe fn opus_encode_native(
     }
     ret += 1 + redundancy_bytes;
     if (*st).use_vbr == 0 {
+        let data = std::slice::from_raw_parts_mut(data, max_data_bytes as _);
         if opus_packet_pad(data, ret, max_data_bytes) != OPUS_OK {
             return OPUS_INTERNAL_ERROR;
         }

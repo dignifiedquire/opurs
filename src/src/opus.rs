@@ -109,25 +109,25 @@ pub fn opus_pcm_soft_clip(
     }
 }
 
-pub unsafe fn encode_size(size: i32, data: *mut u8) -> i32 {
+pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
     if size < 252 {
-        *data.offset(0 as isize) = size as u8;
-        return 1;
+        data[0] = size as u8;
+        1
     } else {
-        *data.offset(0 as isize) = (252 + (size & 0x3)) as u8;
-        *data.offset(1 as isize) = (size - *data.offset(0 as isize) as i32 >> 2) as u8;
-        return 2;
-    };
+        data[0] = (252 + (size & 0x3)) as u8;
+        data[1] = (size - data[0] as i32 >> 2) as u8;
+        2
+    }
 }
 
-fn parse_size(data: &[u8], len: i32, size: &mut i16) -> i32 {
-    if len < 1 {
+fn parse_size(data: &[u8], size: &mut i16) -> i32 {
+    if data.len() < 1 {
         *size = -1;
         -1
     } else if data[0] < 252 {
         *size = data[0] as _;
         1
-    } else if len < 2 {
+    } else if data.len() < 2 {
         *size = -1;
         -1
     } else {
@@ -166,14 +166,14 @@ pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
 /// <https://www.rfc-editor.org/rfc/rfc6716#section-3>
 pub fn opus_packet_parse_impl(
     data: &[u8],
-    len: i32,
     self_delimited: bool,
     out_toc: Option<&mut u8>,
-    mut frames: Option<&mut [*const u8]>,
+    mut frames: Option<&mut [usize]>,
     size: &mut [i16],
     payload_offset: Option<&mut i32>,
     packet_offset: Option<&mut i32>,
 ) -> i32 {
+    let len = data.len() as i32;
     if len < 0 {
         return OPUS_BAD_ARG;
     }
@@ -199,6 +199,7 @@ pub fn opus_packet_parse_impl(
     // the table of content byte
     let toc = data[0];
 
+    let og_data = data;
     let mut data = &data[1..];
     let mut len = len - 1;
     let mut offset = 1;
@@ -225,7 +226,7 @@ pub fn opus_packet_parse_impl(
         2 => {
             // Two VBR frames
             count = 2;
-            let bytes = parse_size(data, len, &mut size[0]);
+            let bytes = parse_size(data, &mut size[0]);
             len -= bytes;
             if size[0] < 0 || size[0] as i32 > len {
                 return OPUS_INVALID_PACKET;
@@ -281,7 +282,7 @@ pub fn opus_packet_parse_impl(
                 // VBR case
                 last_size = len;
                 for i in 0..count - 1 {
-                    let bytes = parse_size(data, len, &mut size[i as usize]);
+                    let bytes = parse_size(data, &mut size[i as usize]);
                     len -= bytes;
                     if (size[i as usize] as i32) < 0 || size[i as usize] as i32 > len {
                         return OPUS_INVALID_PACKET;
@@ -308,7 +309,7 @@ pub fn opus_packet_parse_impl(
 
     // Self-delimited framing has an extra size for the last frame.
     if self_delimited {
-        let bytes = parse_size(data, len, &mut size[count as usize - 1]);
+        let bytes = parse_size(data, &mut size[count as usize - 1]);
         len -= bytes;
         if size[count as usize - 1] < 0 || size[(count - 1) as usize] as i32 > len {
             return OPUS_INVALID_PACKET;
@@ -340,17 +341,23 @@ pub fn opus_packet_parse_impl(
         *payload_offset = offset as i32;
     }
 
-    // Store the pointers to the individual frames in the `frames`
+    // Store the pointers to the individual frames in `self.frames`
     for i in 0..count as usize {
         if let Some(ref mut frames) = frames {
-            frames[i] = data.as_ptr();
+            let calc_offset: usize = unsafe {
+                let dp = og_data.as_ptr();
+                let fp = data.as_ptr();
+                fp.offset_from(dp) as _
+            };
+            debug_assert_eq!(calc_offset, offset);
+            frames[i] = offset;
         }
-        let start = size[i] as usize;
-        if start > data.len() {
+        let size = size[i] as usize;
+        if size > data.len() {
             return OPUS_INVALID_PACKET;
         }
-        data = &data[start..];
-        offset += start;
+        data = &data[size..];
+        offset += size;
     }
 
     if let Some(packet_offset) = packet_offset {
@@ -379,15 +386,13 @@ pub fn opus_packet_parse_impl(
 /// Returns number of frames
 pub fn opus_packet_parse(
     data: &[u8],
-    len: i32,
     out_toc: Option<&mut u8>,
-    frames: Option<&mut [*const u8; 48]>,
+    frames: Option<&mut [usize; 48]>,
     size: &mut [i16; 48],
     payload_offset: Option<&mut i32>,
 ) -> i32 {
     opus_packet_parse_impl(
         data,
-        len,
         false,
         out_toc,
         frames.map(|s| s.as_mut_slice()),
