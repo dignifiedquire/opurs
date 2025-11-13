@@ -199,7 +199,6 @@ pub fn opus_packet_parse_impl(
     // the table of content byte
     let toc = data[0];
 
-    let og_data = data;
     let mut data = &data[1..];
     let mut len = len - 1;
     let mut offset = 1;
@@ -344,12 +343,6 @@ pub fn opus_packet_parse_impl(
     // Store the pointers to the individual frames in `self.frames`
     for i in 0..count as usize {
         if let Some(ref mut frames) = frames {
-            let calc_offset: usize = unsafe {
-                let dp = og_data.as_ptr();
-                let fp = data.as_ptr();
-                fp.offset_from(dp) as _
-            };
-            debug_assert_eq!(calc_offset, offset);
             frames[i] = offset;
         }
         let size = size[i] as usize;

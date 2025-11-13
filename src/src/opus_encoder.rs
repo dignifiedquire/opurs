@@ -48,10 +48,7 @@ use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
-use crate::src::analysis::{
-    downmix_func, run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo,
-    TonalityAnalysisState,
-};
+use crate::src::analysis::{downmix_func, AnalysisInfo, TonalityAnalysisState};
 use crate::src::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
     OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND,
@@ -256,7 +253,7 @@ pub unsafe fn opus_encoder_init(
     (*st).first = 1;
     (*st).mode = MODE_HYBRID;
     (*st).bandwidth = OPUS_BANDWIDTH_FULLBAND;
-    tonality_analysis_init(&mut (*st).analysis, (*st).Fs);
+    (*st).analysis.init((*st).Fs);
     (*st).analysis.application = (*st).application;
     return OPUS_OK;
 }
@@ -1240,8 +1237,7 @@ pub unsafe fn opus_encode_native(
         is_silence = is_digital_silence(pcm, frame_size, (*st).channels, lsb_depth);
         analysis_read_pos_bak = (*st).analysis.read_pos;
         analysis_read_subframe_bak = (*st).analysis.read_subframe;
-        run_analysis(
-            &mut (*st).analysis,
+        (*st).analysis.run_analysis(
             celt_mode,
             analysis_pcm,
             analysis_size,
@@ -1264,7 +1260,7 @@ pub unsafe fn opus_encode_native(
             };
         }
     } else if (*st).analysis.initialized != 0 {
-        tonality_analysis_reset(&mut (*st).analysis);
+        (*st).analysis.reset();
     }
     if is_silence == 0 {
         (*st).voice_ratio = -1;
@@ -2930,7 +2926,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             let mut start: *mut i8 = 0 as *mut i8;
             silk_enc =
                 (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
-            tonality_analysis_reset(&mut (*st).analysis);
+            (*st).analysis.reset();
             start = &mut (*st).stream_channels as *mut i32 as *mut i8;
             memset(
                 start as *mut core::ffi::c_void,
