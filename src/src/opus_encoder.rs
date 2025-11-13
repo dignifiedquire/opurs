@@ -253,7 +253,7 @@ pub unsafe fn opus_encoder_init(
     (*st).first = 1;
     (*st).mode = MODE_HYBRID;
     (*st).bandwidth = OPUS_BANDWIDTH_FULLBAND;
-    (*st).analysis.init((*st).Fs);
+    (*st).analysis = TonalityAnalysisState::new((*st).Fs);
     (*st).analysis.application = (*st).application;
     return OPUS_OK;
 }
@@ -926,32 +926,25 @@ unsafe fn compute_equiv_rate(
     }
     return equiv;
 }
-pub unsafe fn is_digital_silence(
-    pcm: *const opus_val16,
-    frame_size: i32,
-    channels: i32,
-    lsb_depth: i32,
-) -> i32 {
-    let mut silence: i32 = 0;
-    let mut sample_max: opus_val32 = 0 as opus_val32;
-    sample_max = celt_maxabs16(pcm, frame_size * channels);
-    silence = (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32;
-    return silence;
+
+pub fn is_digital_silence(pcm: &[f32], frame_size: i32, channels: i32, lsb_depth: i32) -> i32 {
+    let sample_max = celt_maxabs16(pcm, (frame_size * channels) as usize);
+    (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32
 }
 unsafe fn compute_frame_energy(
-    pcm: *const opus_val16,
+    pcm: &[f32],
     frame_size: i32,
     channels: i32,
     _arch: i32,
 ) -> opus_val32 {
     let len: i32 = frame_size * channels;
-    return celt_inner_prod_c(pcm, pcm, len) / len as f32;
+    celt_inner_prod_c(pcm, pcm, len) / len as f32
 }
 unsafe fn decide_dtx_mode(
     activity_probability: f32,
     nb_no_activity_frames: *mut i32,
     peak_signal_energy: opus_val32,
-    pcm: *const opus_val16,
+    pcm: &[opus_val16],
     frame_size: i32,
     channels: i32,
     mut is_silence: i32,
@@ -980,7 +973,7 @@ unsafe fn decide_dtx_mode(
 }
 unsafe fn encode_multiframe_packet(
     st: *mut OpusEncoder,
-    pcm: *const opus_val16,
+    pcm: &[f32],
     nb_frames: i32,
     frame_size: i32,
     data: *mut u8,
@@ -1048,7 +1041,7 @@ unsafe fn encode_multiframe_packet(
         }
         let tmp_len = opus_encode_native(
             st,
-            pcm.offset((i * ((*st).channels * frame_size)) as isize),
+            &pcm[(i * ((*st).channels * frame_size)) as usize..],
             frame_size,
             tmp_data[start..].as_mut_ptr(),
             bytes_per_frame,
@@ -1136,7 +1129,7 @@ unsafe fn compute_redundancy_bytes(
 }
 pub unsafe fn opus_encode_native(
     st: *mut OpusEncoder,
-    pcm: *const opus_val16,
+    pcm: &[f32],
     frame_size: i32,
     mut data: *mut u8,
     out_data_bytes: i32,
@@ -1190,20 +1183,7 @@ pub unsafe fn opus_encode_native(
     let mut total_buffer: i32 = 0;
     let mut stereo_width: opus_val16 = 0.;
     let mut celt_mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
-    let mut analysis_info: AnalysisInfo = AnalysisInfo {
-        valid: 0,
-        tonality: 0.,
-        tonality_slope: 0.,
-        noisiness: 0.,
-        activity: 0.,
-        music_prob: 0.,
-        music_prob_min: 0.,
-        music_prob_max: 0.,
-        bandwidth: 0,
-        activity_probability: 0.,
-        max_pitch_ratio: 0.,
-        leak_boost: [0; 19],
-    };
+    let mut analysis_info = AnalysisInfo::default();
     let mut analysis_read_pos_bak: i32 = -1;
     let mut analysis_read_subframe_bak: i32 = -1;
     let mut is_silence: i32 = 0;
@@ -1237,8 +1217,8 @@ pub unsafe fn opus_encode_native(
         is_silence = is_digital_silence(pcm, frame_size, (*st).channels, lsb_depth);
         analysis_read_pos_bak = (*st).analysis.read_pos;
         analysis_read_subframe_bak = (*st).analysis.read_subframe;
-        (*st).analysis.run_analysis(
-            celt_mode,
+        analysis_info = (*st).analysis.run_analysis(
+            &*celt_mode,
             analysis_pcm,
             analysis_size,
             frame_size,
@@ -1248,7 +1228,6 @@ pub unsafe fn opus_encode_native(
             (*st).Fs,
             lsb_depth,
             downmix,
-            &mut analysis_info,
         );
         if is_silence == 0 && analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
             (*st).peak_signal_energy = if 0.999f32 * (*st).peak_signal_energy
@@ -1260,7 +1239,7 @@ pub unsafe fn opus_encode_native(
             };
         }
     } else if (*st).analysis.initialized != 0 {
-        (*st).analysis.reset();
+        (*st).analysis = TonalityAnalysisState::new((*st).analysis.Fs);
     }
     if is_silence == 0 {
         (*st).voice_ratio = -1;
@@ -1293,7 +1272,8 @@ pub unsafe fn opus_encode_native(
         }
     }
     if (*st).channels == 2 && (*st).force_channels != 1 {
-        stereo_width = compute_stereo_width(pcm, frame_size, (*st).Fs, &mut (*st).width_mem);
+        stereo_width =
+            compute_stereo_width(pcm.as_ptr(), frame_size, (*st).Fs, &mut (*st).width_mem);
     } else {
         stereo_width = 0 as opus_val16;
     }
@@ -1764,7 +1744,7 @@ pub unsafe fn opus_encode_native(
     cutoff_Hz = silk_log2lin((*st).variable_HP_smth2_Q15 >> 8);
     if (*st).application == OPUS_APPLICATION_VOIP {
         hp_cutoff(
-            pcm,
+            pcm.as_ptr(),
             cutoff_Hz,
             &mut *pcm_buf
                 .as_mut_ptr()
@@ -1777,7 +1757,7 @@ pub unsafe fn opus_encode_native(
         );
     } else {
         dc_reject(
-            pcm,
+            pcm.as_ptr(),
             3,
             &mut *pcm_buf
                 .as_mut_ptr()
@@ -1791,12 +1771,8 @@ pub unsafe fn opus_encode_native(
     if float_api != 0 {
         let mut sum: opus_val32 = 0.;
         sum = celt_inner_prod_c(
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
+            &pcm_buf[(total_buffer * (*st).channels) as usize..],
+            &pcm_buf[(total_buffer * (*st).channels) as usize..],
             frame_size * (*st).channels,
         );
         if !(sum < 1e9f32) || sum != sum {
@@ -2307,7 +2283,7 @@ pub unsafe fn opus_encode_native(
         opus_custom_encoder_ctl!(celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
         err = celt_encode_with_ec(
             celt_enc,
-            pcm_buf.as_mut_ptr(),
+            &pcm_buf,
             (*st).Fs / 200,
             data.offset(nb_compr_bytes as isize),
             redundancy_bytes,
@@ -2326,7 +2302,7 @@ pub unsafe fn opus_encode_native(
             opus_custom_encoder_ctl!(celt_enc, OPUS_RESET_STATE);
             celt_encode_with_ec(
                 celt_enc,
-                tmp_prefill.as_mut_ptr(),
+                &tmp_prefill,
                 (*st).Fs / 400,
                 dummy_0.as_mut_ptr(),
                 2,
@@ -2349,7 +2325,7 @@ pub unsafe fn opus_encode_native(
             opus_custom_encoder_ctl!(celt_enc, OPUS_SET_VBR_REQUEST, (*st).use_vbr);
             ret = celt_encode_with_ec(
                 celt_enc,
-                pcm_buf.as_mut_ptr(),
+                &pcm_buf,
                 frame_size,
                 NULL as *mut u8,
                 nb_compr_bytes,
@@ -2397,9 +2373,7 @@ pub unsafe fn opus_encode_native(
         }
         celt_encode_with_ec(
             celt_enc,
-            pcm_buf
-                .as_mut_ptr()
-                .offset(((*st).channels * (frame_size - N2 - N4)) as isize),
+            &pcm_buf[((*st).channels * (frame_size - N2 - N4)) as usize..],
             N4,
             dummy_1.as_mut_ptr(),
             2,
@@ -2407,9 +2381,7 @@ pub unsafe fn opus_encode_native(
         );
         err_0 = celt_encode_with_ec(
             celt_enc,
-            pcm_buf
-                .as_mut_ptr()
-                .offset(((*st).channels * (frame_size - N2)) as isize),
+            &pcm_buf[((*st).channels * (frame_size - N2)) as usize..],
             N2,
             data.offset(nb_compr_bytes as isize),
             redundancy_bytes,
@@ -2506,7 +2478,7 @@ pub unsafe fn opus_encode(
     }
     ret = opus_encode_native(
         st,
-        in_0.as_mut_ptr(),
+        &in_0,
         frame_size,
         data,
         max_data_bytes,
@@ -2534,7 +2506,7 @@ pub unsafe fn opus_encode(
 }
 pub unsafe fn opus_encode_float(
     st: *mut OpusEncoder,
-    pcm: *const f32,
+    pcm: &[f32],
     analysis_frame_size: i32,
     data: *mut u8,
     out_data_bytes: i32,
@@ -2548,7 +2520,7 @@ pub unsafe fn opus_encode_float(
         data,
         out_data_bytes,
         24,
-        pcm as *const core::ffi::c_void,
+        pcm.as_ptr() as *const core::ffi::c_void,
         analysis_frame_size,
         0,
         -(2),
@@ -2926,7 +2898,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             let mut start: *mut i8 = 0 as *mut i8;
             silk_enc =
                 (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
-            (*st).analysis.reset();
+            (*st).analysis = TonalityAnalysisState::new((*st).Fs);
             start = &mut (*st).stream_channels as *mut i32 as *mut i8;
             memset(
                 start as *mut core::ffi::c_void,

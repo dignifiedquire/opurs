@@ -132,7 +132,7 @@ pub unsafe fn bitexact_log2tan(mut isin: i32, mut icos: i32) -> i32 {
 }
 pub unsafe fn compute_band_energies(
     m: *const OpusCustomMode,
-    X: *const celt_sig,
+    X: &[celt_sig],
     bandE: *mut celt_ener,
     end: i32,
     C: i32,
@@ -142,7 +142,7 @@ pub unsafe fn compute_band_energies(
     let mut i: i32 = 0;
     let mut c: i32 = 0;
     let mut N: i32 = 0;
-    let eBands: *const i16 = (*m).eBands.as_ptr();
+    let eBands = (*m).eBands;
     N = (*m).shortMdctSize << LM;
     c = 0;
     loop {
@@ -151,10 +151,9 @@ pub unsafe fn compute_band_energies(
             let mut sum: opus_val32 = 0.;
             sum = 1e-27f32
                 + celt_inner_prod_c(
-                    &*X.offset((c * N + ((*eBands.offset(i as isize) as i32) << LM)) as isize),
-                    &*X.offset((c * N + ((*eBands.offset(i as isize) as i32) << LM)) as isize),
-                    (*eBands.offset((i + 1) as isize) as i32 - *eBands.offset(i as isize) as i32)
-                        << LM,
+                    &X[(c * N + ((eBands[i as usize] as i32) << LM)) as usize..],
+                    &X[(c * N + ((eBands[i as usize] as i32) << LM)) as usize..],
+                    (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) << LM,
                 );
             *bandE.offset((i + c * (*m).nbEBands as i32) as isize) = celt_sqrt(sum);
             i += 1;
@@ -1570,7 +1569,7 @@ pub unsafe fn quant_all_bands(
 ) {
     let mut i: i32 = 0;
     let mut remaining_bits: i32 = 0;
-    let eBands: *const i16 = (*m).eBands.as_ptr();
+    let eBands = (*m).eBands;
     let mut norm: *mut celt_norm = 0 as *mut celt_norm;
     let mut norm2: *mut celt_norm = 0 as *mut celt_norm;
     let mut resynth_alloc: i32 = 0;
@@ -1603,18 +1602,16 @@ pub unsafe fn quant_all_bands(
     };
     M = (1) << LM;
     B = if shortBlocks != 0 { M } else { 1 };
-    norm_offset = M * *eBands.offset(start as isize) as i32;
-    let vla =
-        (C * (M * *eBands.offset(((*m).nbEBands - 1) as isize) as i32 - norm_offset)) as usize;
+    norm_offset = M * eBands[start as usize] as i32;
+    let vla = (C * (M * eBands[((*m).nbEBands - 1) as usize] as i32 - norm_offset)) as usize;
     let mut _norm: Vec<celt_norm> = ::std::vec::from_elem(0., vla);
     norm = _norm.as_mut_ptr();
     norm2 = norm
-        .offset((M * *eBands.offset(((*m).nbEBands - 1) as isize) as i32) as isize)
+        .offset((M * eBands[((*m).nbEBands - 1) as usize] as i32) as isize)
         .offset(-(norm_offset as isize));
     if encode != 0 && resynth != 0 {
         resynth_alloc = M
-            * (*eBands.offset((*m).nbEBands as isize) as i32
-                - *eBands.offset(((*m).nbEBands - 1) as isize) as i32);
+            * (eBands[(*m).nbEBands as usize] as i32 - eBands[((*m).nbEBands - 1) as usize] as i32);
     } else {
         resynth_alloc = ALLOC_NONE;
     }
@@ -1623,8 +1620,7 @@ pub unsafe fn quant_all_bands(
     if encode != 0 && resynth != 0 {
         lowband_scratch = _lowband_scratch.as_mut_ptr();
     } else {
-        lowband_scratch =
-            X_.offset((M * *eBands.offset(((*m).nbEBands - 1) as isize) as i32) as isize);
+        lowband_scratch = X_.offset((M * eBands[((*m).nbEBands - 1) as usize] as i32) as isize);
     }
     let vla_1 = resynth_alloc as usize;
     let mut X_save: Vec<celt_norm> = ::std::vec::from_elem(0., vla_1);
@@ -1656,21 +1652,19 @@ pub unsafe fn quant_all_bands(
         let mut N: i32 = 0;
         let mut curr_balance: i32 = 0;
         let mut effective_lowband: i32 = -1;
-        let mut X: *mut celt_norm = 0 as *mut celt_norm;
-        let mut Y: *mut celt_norm = 0 as *mut celt_norm;
         let mut tf_change: i32 = 0;
         let mut x_cm: u32 = 0;
         let mut y_cm: u32 = 0;
         let mut last: i32 = 0;
         ctx.i = i;
         last = (i == end - 1) as i32;
-        X = X_.offset((M * *eBands.offset(i as isize) as i32) as isize);
-        if !Y_.is_null() {
-            Y = Y_.offset((M * *eBands.offset(i as isize) as i32) as isize);
+        let mut X = X_.offset((M * eBands[i as usize] as i32) as isize);
+        let mut Y = if !Y_.is_null() {
+            Y_.offset((M * eBands[i as usize] as i32) as isize)
         } else {
-            Y = NULL as *mut celt_norm;
-        }
-        N = M * *eBands.offset((i + 1) as isize) as i32 - M * *eBands.offset(i as isize) as i32;
+            std::ptr::null_mut()
+        };
+        N = M * eBands[(i + 1) as usize] as i32 - M * eBands[i as usize] as i32;
         assert!(N > 0);
         tell = ec_tell_frac(&mut *ec) as i32;
         if i != start {
@@ -1720,8 +1714,7 @@ pub unsafe fn quant_all_bands(
             b = 0;
         }
         if resynth != 0
-            && (M * *eBands.offset(i as isize) as i32 - N
-                >= M * *eBands.offset(start as isize) as i32
+            && (M * eBands[i as usize] as i32 - N >= M * eBands[start as usize] as i32
                 || i == start + 1)
             && (update_lowband != 0 || lowband_offset == 0)
         {
@@ -1746,18 +1739,16 @@ pub unsafe fn quant_all_bands(
             let mut fold_start: i32 = 0;
             let mut fold_end: i32 = 0;
             let mut fold_i: i32 = 0;
-            effective_lowband =
-                if 0 > M * *eBands.offset(lowband_offset as isize) as i32 - norm_offset - N {
-                    0
-                } else {
-                    M * *eBands.offset(lowband_offset as isize) as i32 - norm_offset - N
-                };
+            effective_lowband = if 0 > M * eBands[lowband_offset as usize] as i32 - norm_offset - N
+            {
+                0
+            } else {
+                M * eBands[lowband_offset as usize] as i32 - norm_offset - N
+            };
             fold_start = lowband_offset;
             loop {
                 fold_start -= 1;
-                if !(M * *eBands.offset(fold_start as isize) as i32
-                    > effective_lowband + norm_offset)
-                {
+                if !(M * eBands[fold_start as usize] as i32 > effective_lowband + norm_offset) {
                     break;
                 }
             }
@@ -1765,8 +1756,7 @@ pub unsafe fn quant_all_bands(
             loop {
                 fold_end += 1;
                 if !(fold_end < i
-                    && (M * *eBands.offset(fold_end as isize) as i32)
-                        < effective_lowband + norm_offset + N)
+                    && (M * eBands[fold_end as usize] as i32) < effective_lowband + norm_offset + N)
                 {
                     break;
                 }
@@ -1791,7 +1781,7 @@ pub unsafe fn quant_all_bands(
             dual_stereo = 0;
             if resynth != 0 {
                 j = 0;
-                while j < M * *eBands.offset(i as isize) as i32 - norm_offset {
+                while j < M * eBands[i as usize] as i32 - norm_offset {
                     *norm.offset(j as isize) =
                         0.5f32 * (*norm.offset(j as isize) + *norm2.offset(j as isize));
                     j += 1;
@@ -1814,7 +1804,7 @@ pub unsafe fn quant_all_bands(
                 if last != 0 {
                     NULL as *mut celt_norm
                 } else {
-                    norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                    norm.offset((M * eBands[i as usize] as i32) as isize)
                         .offset(-(norm_offset as isize))
                 },
                 Q15ONE,
@@ -1837,7 +1827,7 @@ pub unsafe fn quant_all_bands(
                     NULL as *mut celt_norm
                 } else {
                     norm2
-                        .offset((M * *eBands.offset(i as isize) as i32) as isize)
+                        .offset((M * eBands[i as usize] as i32) as isize)
                         .offset(-(norm_offset as isize))
                 },
                 Q15ONE,
@@ -1932,14 +1922,16 @@ pub unsafe fn quant_all_bands(
                         if last != 0 {
                             NULL as *mut celt_norm
                         } else {
-                            norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                            norm.offset((M * eBands[i as usize] as i32) as isize)
                                 .offset(-(norm_offset as isize))
                         },
                         lowband_scratch,
                         cm as i32,
                     );
-                    dist0 = w[0 as usize] * celt_inner_prod_c(X_save.as_mut_ptr(), X, N)
-                        + w[1 as usize] * celt_inner_prod_c(Y_save.as_mut_ptr(), Y, N);
+                    dist0 = w[0 as usize]
+                        * celt_inner_prod_c(&X_save, std::slice::from_raw_parts(X, N as _), N)
+                        + w[1 as usize]
+                            * celt_inner_prod_c(&Y_save, std::slice::from_raw_parts(Y, N as _), N);
                     cm2 = x_cm;
                     ec_save2 = (*ec).save();
                     ctx_save2 = ctx;
@@ -1960,17 +1952,15 @@ pub unsafe fn quant_all_bands(
                     if last == 0 {
                         memcpy(
                             norm_save2.as_mut_ptr() as *mut core::ffi::c_void,
-                            norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                            norm.offset((M * eBands[i as usize] as i32) as isize)
                                 .offset(-(norm_offset as isize))
                                 as *const core::ffi::c_void,
                             (N as u64)
                                 .wrapping_mul(::core::mem::size_of::<celt_norm>() as u64)
                                 .wrapping_add(
                                     (0 * norm_save2.as_mut_ptr().offset_from(
-                                        norm.offset(
-                                            (M * *eBands.offset(i as isize) as i32) as isize,
-                                        )
-                                        .offset(-(norm_offset as isize)),
+                                        norm.offset((M * eBands[i as usize] as i32) as isize)
+                                            .offset(-(norm_offset as isize)),
                                     ) as i64) as u64,
                                 ),
                         );
@@ -2024,14 +2014,16 @@ pub unsafe fn quant_all_bands(
                         if last != 0 {
                             NULL as *mut celt_norm
                         } else {
-                            norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                            norm.offset((M * eBands[i as usize] as i32) as isize)
                                 .offset(-(norm_offset as isize))
                         },
                         lowband_scratch,
                         cm as i32,
                     );
-                    dist1 = w[0 as usize] * celt_inner_prod_c(X_save.as_mut_ptr(), X, N)
-                        + w[1 as usize] * celt_inner_prod_c(Y_save.as_mut_ptr(), Y, N);
+                    dist1 = w[0 as usize]
+                        * celt_inner_prod_c(&X_save, std::slice::from_raw_parts(X, N as _), N)
+                        + w[1 as usize]
+                            * celt_inner_prod_c(&Y_save, std::slice::from_raw_parts(Y, N as _), N);
                     if dist0 >= dist1 {
                         x_cm = cm2;
                         (*ec).restore(ec_save2);
@@ -2056,7 +2048,7 @@ pub unsafe fn quant_all_bands(
                         );
                         if last == 0 {
                             memcpy(
-                                norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                                norm.offset((M * eBands[i as usize] as i32) as isize)
                                     .offset(-(norm_offset as isize))
                                     as *mut core::ffi::c_void,
                                 norm_save2.as_mut_ptr() as *const core::ffi::c_void,
@@ -2064,9 +2056,7 @@ pub unsafe fn quant_all_bands(
                                     .wrapping_mul(::core::mem::size_of::<celt_norm>() as u64)
                                     .wrapping_add(
                                         (0 * norm
-                                            .offset(
-                                                (M * *eBands.offset(i as isize) as i32) as isize,
-                                            )
+                                            .offset((M * eBands[i as usize] as i32) as isize)
                                             .offset(-(norm_offset as isize))
                                             .offset_from(norm_save2.as_mut_ptr())
                                             as i64) as u64,
@@ -2102,7 +2092,7 @@ pub unsafe fn quant_all_bands(
                         if last != 0 {
                             NULL as *mut celt_norm
                         } else {
-                            norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                            norm.offset((M * eBands[i as usize] as i32) as isize)
                                 .offset(-(norm_offset as isize))
                         },
                         lowband_scratch,
@@ -2125,7 +2115,7 @@ pub unsafe fn quant_all_bands(
                     if last != 0 {
                         NULL as *mut celt_norm
                     } else {
-                        norm.offset((M * *eBands.offset(i as isize) as i32) as isize)
+                        norm.offset((M * eBands[i as usize] as i32) as isize)
                             .offset(-(norm_offset as isize))
                     },
                     Q15ONE,

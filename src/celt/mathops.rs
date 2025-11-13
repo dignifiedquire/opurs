@@ -31,47 +31,39 @@ pub unsafe fn isqrt32(mut _val: u32) -> u32 {
 }
 
 #[inline]
-pub unsafe fn fast_atan2f(y: f32, x: f32) -> f32 {
+pub fn fast_atan2f(y: f32, x: f32) -> f32 {
     let mut x2: f32 = 0.;
     let mut y2: f32 = 0.;
     x2 = x * x;
     y2 = y * y;
     if x2 + y2 < 1e-18f32 {
-        return 0 as f32;
+        return 0.;
     }
     if x2 < y2 {
         let den: f32 = (y2 + cB * x2) * (y2 + cC * x2);
-        return -x * y * (y2 + cA * x2) / den + (if y < 0 as f32 { -cE } else { cE });
+        -x * y * (y2 + cA * x2) / den + (if y < 0 as f32 { -cE } else { cE })
     } else {
         let den_0: f32 = (x2 + cB * y2) * (x2 + cC * y2);
-        return x * y * (x2 + cA * y2) / den_0 + (if y < 0 as f32 { -cE } else { cE })
-            - (if x * y < 0 as f32 { -cE } else { cE });
-    };
+        x * y * (x2 + cA * y2) / den_0 + (if y < 0 as f32 { -cE } else { cE })
+            - (if x * y < 0 as f32 { -cE } else { cE })
+    }
 }
 
-pub type opus_val16 = f32;
 pub type opus_val32 = f32;
 
 #[inline]
-pub unsafe fn celt_maxabs16(x: *const opus_val16, len: i32) -> opus_val32 {
-    let mut i: i32 = 0;
-    let mut maxval: opus_val16 = 0 as opus_val16;
-    let mut minval: opus_val16 = 0 as opus_val16;
-    i = 0;
-    while i < len {
-        maxval = if maxval > *x.offset(i as isize) {
-            maxval
-        } else {
-            *x.offset(i as isize)
-        };
-        minval = if minval < *x.offset(i as isize) {
-            minval
-        } else {
-            *x.offset(i as isize)
-        };
-        i += 1;
+pub fn celt_maxabs16(x: &[f32], len: usize) -> opus_val32 {
+    let mut maxval = 0.;
+    let mut minval = 0.;
+    for i in 0..len {
+        maxval = if maxval > x[i] { maxval } else { x[i] };
+        minval = if minval < x[i] { minval } else { x[i] };
     }
-    return if maxval > -minval { maxval } else { -minval };
+    if maxval > -minval {
+        maxval
+    } else {
+        -minval
+    }
 }
 
 // the functions below are analogous to the macros defined in mathops.h header.

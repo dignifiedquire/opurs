@@ -509,7 +509,7 @@ unsafe fn compute_mdcts(
     }
 }
 pub unsafe fn celt_preemphasis(
-    pcmp: *const opus_val16,
+    pcmp: &[f32],
     inp: *mut celt_sig,
     N: i32,
     CC: i32,
@@ -528,7 +528,7 @@ pub unsafe fn celt_preemphasis(
         i = 0;
         while i < N {
             let mut x: opus_val16 = 0.;
-            x = *pcmp.offset((CC * i) as isize) * CELT_SIG_SCALE;
+            x = pcmp[(CC * i) as usize] * CELT_SIG_SCALE;
             *inp.offset(i as isize) = x - m;
             m = coef0 * x;
             i += 1;
@@ -546,7 +546,7 @@ pub unsafe fn celt_preemphasis(
     }
     i = 0;
     while i < Nu {
-        *inp.offset((i * upsample) as isize) = *pcmp.offset((CC * i) as isize) * CELT_SIG_SCALE;
+        *inp.offset((i * upsample) as isize) = pcmp[(CC * i) as usize] * CELT_SIG_SCALE;
         i += 1;
     }
     if clip != 0 {
@@ -877,7 +877,7 @@ unsafe fn tf_encode(
 }
 unsafe fn alloc_trim_analysis(
     m: *const OpusCustomMode,
-    X: *const celt_norm,
+    X: &[celt_norm],
     bandLogE: *const opus_val16,
     end: i32,
     LM: i32,
@@ -910,15 +910,12 @@ unsafe fn alloc_trim_analysis(
         i = 0;
         while i < 8 {
             let mut partial: opus_val32 = 0.;
-            partial = celt_inner_prod_c(
-                &*X.offset(((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as isize),
-                &*X.offset(
-                    (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as isize,
-                ),
-                (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                    - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                    << LM,
-            );
+            let a = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
+            let b = (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
+            let n = (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
+                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
+                << LM;
+            partial = celt_inner_prod_c(&X[a..], &X[b..], n);
             sum = sum + partial;
             i += 1;
         }
@@ -932,15 +929,12 @@ unsafe fn alloc_trim_analysis(
         i = 8;
         while i < intensity {
             let mut partial_0: opus_val32 = 0.;
-            partial_0 = celt_inner_prod_c(
-                &*X.offset(((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as isize),
-                &*X.offset(
-                    (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as isize,
-                ),
-                (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                    - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                    << LM,
-            );
+            let a = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
+            let b = (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
+            let n = (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
+                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
+                << LM;
+            partial_0 = celt_inner_prod_c(&X[a..], &X[b..], n);
             minXC = if minXC < (partial_0).abs() {
                 minXC
             } else {
@@ -1934,7 +1928,7 @@ unsafe fn compute_vbr(
 }
 pub unsafe fn celt_encode_with_ec(
     st: *mut OpusCustomEncoder,
-    pcm: *const opus_val16,
+    pcm: &[f32],
     mut frame_size: i32,
     compressed: *mut u8,
     mut nbCompressedBytes: i32,
@@ -2021,7 +2015,7 @@ pub unsafe fn celt_encode_with_ec(
     end = (*st).end;
     hybrid = (start != 0) as i32;
     tf_estimate = 0 as opus_val16;
-    if nbCompressedBytes < 2 || pcm.is_null() {
+    if nbCompressedBytes < 2 {
         return OPUS_BAD_ARG;
     }
     frame_size *= (*st).upsample;
@@ -2154,14 +2148,15 @@ pub unsafe fn celt_encode_with_ec(
     }
     let vla = (CC * (N + overlap)) as usize;
     let mut in_0: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
-    sample_max = if (*st).overlap_max > celt_maxabs16(pcm, C * (N - overlap) / (*st).upsample) {
-        (*st).overlap_max
-    } else {
-        celt_maxabs16(pcm, C * (N - overlap) / (*st).upsample)
-    };
+    sample_max =
+        if (*st).overlap_max > celt_maxabs16(pcm, (C * (N - overlap) / (*st).upsample) as usize) {
+            (*st).overlap_max
+        } else {
+            celt_maxabs16(pcm, (C * (N - overlap) / (*st).upsample) as usize)
+        };
     (*st).overlap_max = celt_maxabs16(
-        pcm.offset((C * (N - overlap) / (*st).upsample) as isize),
-        C * overlap / (*st).upsample,
+        &pcm[(C * (N - overlap) / (*st).upsample) as usize..],
+        (C * overlap / (*st).upsample) as usize,
     );
     sample_max = if sample_max > (*st).overlap_max {
         sample_max
@@ -2194,7 +2189,7 @@ pub unsafe fn celt_encode_with_ec(
         let mut need_clip: i32 = 0;
         need_clip = ((*st).clip != 0 && sample_max > 65536.0f32) as i32;
         celt_preemphasis(
-            pcm.offset(c as isize),
+            &pcm[c as usize..],
             in_0.as_mut_ptr()
                 .offset((c * (N + overlap)) as isize)
                 .offset(overlap as isize),
@@ -2303,15 +2298,7 @@ pub unsafe fn celt_encode_with_ec(
             LM,
             (*st).upsample,
         );
-        compute_band_energies(
-            mode,
-            freq.as_mut_ptr(),
-            bandE.as_mut_ptr(),
-            effEnd,
-            C,
-            LM,
-            (*st).arch,
-        );
+        compute_band_energies(mode, &freq, bandE.as_mut_ptr(), effEnd, C, LM, (*st).arch);
         amp2Log2(
             mode,
             effEnd,
@@ -2346,15 +2333,7 @@ pub unsafe fn celt_encode_with_ec(
     if CC == 2 && C == 1 {
         tf_chan = 0;
     }
-    compute_band_energies(
-        mode,
-        freq.as_mut_ptr(),
-        bandE.as_mut_ptr(),
-        effEnd,
-        C,
-        LM,
-        (*st).arch,
-    );
+    compute_band_energies(mode, &freq, bandE.as_mut_ptr(), effEnd, C, LM, (*st).arch);
     if (*st).lfe != 0 {
         i = 2;
         while i < end {
@@ -2579,15 +2558,7 @@ pub unsafe fn celt_encode_with_ec(
                 LM,
                 (*st).upsample,
             );
-            compute_band_energies(
-                mode,
-                freq.as_mut_ptr(),
-                bandE.as_mut_ptr(),
-                effEnd,
-                C,
-                LM,
-                (*st).arch,
-            );
+            compute_band_energies(mode, &freq, bandE.as_mut_ptr(), effEnd, C, LM, (*st).arch);
             amp2Log2(
                 mode,
                 effEnd,
@@ -2920,7 +2891,7 @@ pub unsafe fn celt_encode_with_ec(
         } else {
             alloc_trim = alloc_trim_analysis(
                 mode,
-                X.as_mut_ptr(),
+                &X,
                 bandLogE.as_mut_ptr(),
                 end,
                 LM,

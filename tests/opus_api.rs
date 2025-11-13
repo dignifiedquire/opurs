@@ -1862,7 +1862,7 @@ unsafe fn test_enc_api_inner() {
     );
     i = opus_encode_float(
         enc,
-        fbuf.as_mut_ptr(),
+        &fbuf,
         960,
         packet.as_mut_ptr(),
         ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,

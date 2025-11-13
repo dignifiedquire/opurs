@@ -6,7 +6,7 @@ use crate::celt::float_cast::float2int;
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
 use crate::celt::mathops::{celt_log, celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
-use crate::externs::{memcpy, memmove};
+use crate::externs::memmove;
 use crate::src::mlp::analysis_mlp::run_analysis_mlp;
 use crate::src::opus_encoder::is_digital_silence;
 
@@ -408,8 +408,7 @@ const TBANDS: [i32; 19] = [
     4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160, 192, 240,
 ];
 
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[derive(Copy, Clone, Default)]
 pub struct AnalysisInfo {
     pub valid: i32,
     pub tonality: f32,
@@ -425,30 +424,14 @@ pub struct AnalysisInfo {
     pub leak_boost: [u8; 19],
 }
 
-impl AnalysisInfo {
-    fn clear(&mut self) {
-        self.valid = 0;
-        self.tonality = 0.;
-        self.noisiness = 0.;
-        self.activity = 0.;
-        self.music_prob = 0.;
-        self.music_prob_min = 0.;
-        self.music_prob_max = 0.;
-        self.bandwidth = 0;
-        self.activity_probability = 0.;
-        self.max_pitch_ratio = 0.;
-        self.leak_boost.fill(0);
-    }
-}
-
 pub const LEAK_BANDS: i32 = 19;
 
 pub type downmix_func =
     Option<unsafe fn(*const core::ffi::c_void, *mut f32, i32, i32, i32, i32, i32) -> ()>;
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct TonalityAnalysisState {
+    #[allow(dead_code)]
     pub arch: i32,
     pub application: i32,
     pub Fs: i32,
@@ -484,169 +467,169 @@ pub struct TonalityAnalysisState {
     pub info: [AnalysisInfo; 100],
 }
 
-unsafe fn silk_resampler_down2_hp(
-    S: *mut f32,
+/// Inputs
+/// - state:  State vector [ 2 ]
+/// - out:    Output signal [ floor(len/2) ]
+/// - input:  Input signal [ len ]
+/// - in_len: Number of input samples
+fn silk_resampler_down2_hp(
+    state: &mut [f32],
     out: &mut [f32],
-    in_0: *const f32,
-    inLen: i32,
+    input: &[f32],
+    in_len: usize,
 ) -> f32 {
-    let mut k: i32 = 0;
-    let len2: i32 = inLen / 2;
-    let mut in32: f32 = 0.;
-    let mut out32: f32 = 0.;
-    let mut out32_hp: f32 = 0.;
-    let mut Y: f32 = 0.;
-    let mut X: f32 = 0.;
+    let len2 = in_len / 2;
+
     let mut hp_ener: f32 = 0.;
-    k = 0;
-    while k < len2 {
-        in32 = *in_0.offset((2 * k) as isize);
-        Y = in32 - *S.offset(0 as isize);
-        X = 0.6074371f32 * Y;
-        out32 = *S.offset(0 as isize) + X;
-        *S.offset(0 as isize) = in32 + X;
-        out32_hp = out32;
-        in32 = *in_0.offset((2 * k + 1) as isize);
-        Y = in32 - *S.offset(1 as isize);
-        X = 0.15063f32 * Y;
-        out32 = out32 + *S.offset(1 as isize);
-        out32 = out32 + X;
-        *S.offset(1 as isize) = in32 + X;
-        Y = -in32 - *S.offset(2 as isize);
-        X = 0.15063f32 * Y;
-        out32_hp = out32_hp + *S.offset(2 as isize);
+
+    // Internal variables and state are in Q10 format
+    for k in 0..len2 {
+        // Convert to Q10
+        let in32 = input[2 * k];
+
+        // All-pass section for even input sample
+        let mut Y = in32 - state[0];
+        let mut X = 0.6074371 * Y;
+        let mut out32 = state[0] + X;
+        state[0] = in32 + X;
+        let mut out32_hp = out32;
+
+        // Convert to Q10
+        let in32 = input[2 * k + 1];
+
+        // All-pass section for odd input sample, and add to output of previous section
+        Y = in32 - state[1];
+        X = 0.15063 * Y;
+        out32 += state[1];
+        out32 += X;
+        state[1] = in32 + X;
+
+        Y = -in32 - state[2];
+        X = 0.15063 * Y;
+        out32_hp += state[2];
         out32_hp = out32_hp + X;
-        *S.offset(2 as isize) = -in32 + X;
+        state[2] = -in32 + X;
+
         hp_ener += out32_hp * out32_hp;
+
+        // Add, convert back to int16 and store to output
         out[k as usize] = 0.5f32 * out32;
-        k += 1;
     }
-    return hp_ener;
+
+    hp_ener
 }
 
-unsafe fn downmix_and_resample(
+fn downmix_and_resample(
     downmix: downmix_func,
     mut _x: *const core::ffi::c_void,
     y: &mut [f32],
-    S: *mut f32,
-    mut subframe: i32,
+    S: &mut [f32],
+    mut subframe: usize,
     mut offset: i32,
     c1: i32,
     c2: i32,
     C: i32,
-    Fs: i32,
+    fs: i32,
 ) -> f32 {
-    let mut scale: f32 = 0.;
-    let mut j: i32 = 0;
-    let mut ret: f32 = 0 as f32;
     if subframe == 0 {
-        return 0 as f32;
+        return 0.;
     }
-    if Fs == 48000 {
+
+    let mut scale: f32 = 0.;
+    let mut ret: f32 = 0.;
+    if fs == 48_000 {
         subframe *= 2;
         offset *= 2;
-    } else if Fs == 16000 {
+    } else if fs == 16_000 {
         subframe = subframe * 2 / 3;
         offset = offset * 2 / 3;
     }
-    let vla = subframe as usize;
-    let mut tmp: Vec<f32> = vec![0.; vla];
-    downmix.expect("non-null function pointer")(_x, tmp.as_mut_ptr(), subframe, offset, c1, c2, C);
-    scale = 1.0f32 / 32768 as f32;
-    if c2 == -(2) {
+    let mut tmp: Vec<f32> = vec![0.; subframe];
+
+    unsafe {
+        downmix.expect("non-null function pointer")(
+            _x,
+            tmp.as_mut_ptr(),
+            subframe as _,
+            offset,
+            c1,
+            c2,
+            C,
+        );
+    }
+    scale = 1.0 / 32_768.;
+
+    if c2 == -2 {
         scale /= C as f32;
     } else if c2 > -1 {
         scale /= 2 as f32;
     }
-    j = 0;
-    while j < subframe {
-        let ref mut fresh0 = *tmp.as_mut_ptr().offset(j as isize);
-        *fresh0 *= scale;
-        j += 1;
+    for j in 0..subframe {
+        tmp[j] *= scale;
     }
-    if Fs == 48000 {
-        ret = silk_resampler_down2_hp(S, y, tmp.as_mut_ptr(), subframe);
-    } else if Fs == 24000 {
+    if fs == 48_000 {
+        ret = silk_resampler_down2_hp(S, y, &tmp, subframe);
+    } else if fs == 24_000 {
         // OPUS_COPY(y, tmp, subframe)
-        y[..subframe as usize].copy_from_slice(&tmp[..subframe as usize]);
-    } else if Fs == 16000 {
-        let vla_0 = (3 * subframe) as usize;
-        let mut tmp3x: Vec<f32> = ::std::vec::from_elem(0., vla_0);
-        j = 0;
-        while j < subframe {
-            *tmp3x.as_mut_ptr().offset((3 * j) as isize) = *tmp.as_mut_ptr().offset(j as isize);
-            *tmp3x.as_mut_ptr().offset((3 * j + 1) as isize) = *tmp.as_mut_ptr().offset(j as isize);
-            *tmp3x.as_mut_ptr().offset((3 * j + 2) as isize) = *tmp.as_mut_ptr().offset(j as isize);
-            j += 1;
+        y[..subframe].copy_from_slice(&tmp[..subframe]);
+    } else if fs == 16_000 {
+        let mut tmp3x: Vec<f32> = vec![0.; 3 * subframe];
+
+        // Don't do this at home! This resampler is horrible and it's only (barely)
+        // usable for the purpose of the analysis because we don't care about all
+        // the aliasing between 8 kHz and 12 kHz. */
+        for j in 0..subframe {
+            tmp3x[3 * j] = tmp[j];
+            tmp3x[3 * j + 1] = tmp[j];
+            tmp3x[3 * j + 2] = tmp[j];
         }
-        silk_resampler_down2_hp(S, y, tmp3x.as_mut_ptr(), 3 * subframe);
+        silk_resampler_down2_hp(S, y, &tmp3x, 3 * subframe);
     }
-    return ret;
+
+    ret
 }
 
 impl TonalityAnalysisState {
-    pub unsafe fn init(&mut self, Fs: i32) {
-        self.arch = 0;
-        self.Fs = Fs;
-        self.reset();
-    }
-
-    pub unsafe fn reset(&mut self) {
-        self.angle.fill(0.);
-        self.d_angle.fill(0.);
-        self.d2_angle.fill(0.);
-        self.inmem.fill(0.);
-        self.mem_fill = 0;
-        self.prev_band_tonality.fill(0.);
-        self.prev_tonality = 0.;
-        self.prev_bandwidth = 0;
-        for e in &mut self.E {
-            e.fill(0.);
-        }
-        for e in &mut self.logE {
-            e.fill(0.);
-        }
-        self.lowE.fill(0.);
-        self.highE.fill(0.);
-        self.meanE.fill(0.);
-        self.mem.fill(0.);
-        self.cmean.fill(0.);
-        self.std.fill(0.);
-        self.Etracker = 0.;
-        self.lowECount = 0.;
-        self.E_count = 0;
-        self.count = 0;
-        self.analysis_offset = 0;
-        self.write_pos = 0;
-        self.read_pos = 0;
-        self.read_subframe = 0;
-        self.hp_ener_accum = 0.;
-        self.initialized = 0;
-        self.rnn_state.fill(0.);
-        self.downmix_state.fill(0.);
-        for i in &mut self.info {
-            i.clear();
+    pub fn new(fs: i32) -> Self {
+        Self {
+            arch: 0, // TODO
+            Fs: fs,
+            application: 0,
+            angle: [0.; 240],
+            d_angle: [0.; 240],
+            d2_angle: [0.; 240],
+            inmem: [0.; 720],
+            mem_fill: 0,
+            prev_band_tonality: [0.; 18],
+            prev_tonality: 0.,
+            prev_bandwidth: 0,
+            E: [[0.; 18]; 8],
+            logE: [[0.; 18]; 8],
+            lowE: [0.; 18],
+            highE: [0.; 18],
+            meanE: [0.; 19],
+            mem: [0.; 32],
+            cmean: [0.; 8],
+            std: [0.; 9],
+            Etracker: 0.,
+            lowECount: 0.,
+            E_count: 0,
+            count: 0,
+            analysis_offset: 0,
+            write_pos: 0,
+            read_pos: 0,
+            read_subframe: 0,
+            hp_ener_accum: 0.,
+            initialized: 0,
+            rnn_state: [0.; 24],
+            downmix_state: [0.; 3],
+            info: [AnalysisInfo::default(); 100],
         }
     }
 
-    pub unsafe fn get_info(&mut self, info_out: *mut AnalysisInfo, len: i32) {
-        let mut pos: i32 = 0;
-        let mut curr_lookahead: i32 = 0;
-        let mut tonality_max: f32 = 0.;
-        let mut tonality_avg: f32 = 0.;
-        let mut tonality_count: i32 = 0;
-        let mut i: i32 = 0;
-        let mut pos0: i32 = 0;
-        let mut prob_avg: f32 = 0.;
-        let mut prob_count: f32 = 0.;
-        let mut prob_min: f32 = 0.;
-        let mut prob_max: f32 = 0.;
-        let mut vad_prob: f32 = 0.;
-        let mut mpos: i32 = 0;
-        let mut vpos: i32 = 0;
-        let mut bandwidth_span: i32 = 0;
-        pos = self.read_pos;
-        curr_lookahead = self.write_pos - self.read_pos;
+    pub fn get_info(&mut self, len: i32) -> AnalysisInfo {
+        let mut pos = self.read_pos;
+        let mut curr_lookahead = self.write_pos - self.read_pos;
         if curr_lookahead < 0 {
             curr_lookahead += DETECT_SIZE;
         }
@@ -658,6 +641,7 @@ impl TonalityAnalysisState {
         if self.read_pos >= DETECT_SIZE {
             self.read_pos -= DETECT_SIZE;
         }
+        // On long frames, look at the second analysis window rather than the first.
         if len > self.Fs / 50 && pos != self.write_pos {
             pos += 1;
             if pos == DETECT_SIZE {
@@ -670,27 +654,20 @@ impl TonalityAnalysisState {
         if pos < 0 {
             pos = DETECT_SIZE - 1;
         }
-        pos0 = pos;
-        memcpy(
-            info_out as *mut core::ffi::c_void,
-            &mut *(self.info).as_mut_ptr().offset(pos as isize) as *mut AnalysisInfo
-                as *const core::ffi::c_void,
-            1_u64
-                .wrapping_mul(::core::mem::size_of::<AnalysisInfo>() as u64)
-                .wrapping_add(
-                    (0 * info_out.offset_from(&mut *(self.info).as_mut_ptr().offset(pos as isize))
-                        as i64) as u64,
-                ),
-        );
-        if (*info_out).valid == 0 {
-            return;
+        let pos0 = pos;
+
+        let mut info = self.info[pos as usize].clone();
+        if info.valid == 0 {
+            return info;
         }
-        tonality_avg = (*info_out).tonality;
-        tonality_max = tonality_avg;
-        tonality_count = 1;
-        bandwidth_span = 6;
-        i = 0;
-        while i < 3 {
+        let mut tonality_avg = info.tonality;
+        let mut tonality_max = tonality_avg;
+        let mut tonality_count = 1;
+
+        // Look at the neighbouring frames and pick largest bandwidth found (to be safe).
+        let mut bandwidth_span = 6;
+        // If possible, look ahead for a tone to compensate for the delay in the tone detector.
+        for _i in 0..3 {
             pos += 1;
             if pos == DETECT_SIZE {
                 pos = 0;
@@ -705,17 +682,17 @@ impl TonalityAnalysisState {
             };
             tonality_avg += self.info[pos as usize].tonality;
             tonality_count += 1;
-            (*info_out).bandwidth = if (*info_out).bandwidth > self.info[pos as usize].bandwidth {
-                (*info_out).bandwidth
+            info.bandwidth = if info.bandwidth > self.info[pos as usize].bandwidth {
+                info.bandwidth
             } else {
                 self.info[pos as usize].bandwidth
             };
             bandwidth_span -= 1;
-            i += 1;
         }
         pos = pos0;
-        i = 0;
-        while i < bandwidth_span {
+
+        // Look back in time to see if any has a wider bandwidth than the current frame.
+        for _i in 0..bandwidth_span {
             pos -= 1;
             if pos < 0 {
                 pos = DETECT_SIZE - 1;
@@ -723,20 +700,21 @@ impl TonalityAnalysisState {
             if pos == self.write_pos {
                 break;
             }
-            (*info_out).bandwidth = if (*info_out).bandwidth > self.info[pos as usize].bandwidth {
-                (*info_out).bandwidth
+            info.bandwidth = if info.bandwidth > self.info[pos as usize].bandwidth {
+                info.bandwidth
             } else {
                 self.info[pos as usize].bandwidth
             };
-            i += 1;
         }
-        (*info_out).tonality = if tonality_avg / tonality_count as f32 > tonality_max - 0.2f32 {
+        // If we have enough look-ahead, compensate for the ~5-frame delay in the music prob and
+        // ~1 frame delay in the VAD prob.
+        info.tonality = if tonality_avg / tonality_count as f32 > tonality_max - 0.2 {
             tonality_avg / tonality_count as f32
         } else {
-            tonality_max - 0.2f32
+            tonality_max - 0.2
         };
-        vpos = pos0;
-        mpos = vpos;
+        let mut vpos = pos0;
+        let mut mpos = vpos;
         if curr_lookahead > 15 {
             mpos += 5;
             if mpos >= DETECT_SIZE {
@@ -747,12 +725,44 @@ impl TonalityAnalysisState {
                 vpos -= DETECT_SIZE;
             }
         }
-        prob_min = 1.0f32;
-        prob_max = 0.0f32;
-        vad_prob = self.info[vpos as usize].activity_probability;
-        prob_count = if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob };
-        prob_avg = (if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob })
-            * self.info[mpos as usize].music_prob;
+
+        // The following calculations attempt to minimize a "badness function"
+        // for the transition. When switching from speech to music, the badness
+        // of switching at frame k is
+        // b_k = S*v_k + \sum_{i=0}^{k-1} v_i*(p_i - T)
+        // where
+        // v_i is the activity probability (VAD) at frame i,
+        // p_i is the music probability at frame i
+        // T is the probability threshold for switching
+        // S is the penalty for switching during active audio rather than silence
+        // the current frame has index i=0
+        //
+        // Rather than apply badness to directly decide when to switch, what we compute
+        // instead is the threshold for which the optimal switching point is now. When
+        // considering whether to switch now (frame 0) or at frame k, we have:
+        // S*v_0 = S*v_k + \sum_{i=0}^{k-1} v_i*(p_i - T)
+        // which gives us:
+        // T = ( \sum_{i=0}^{k-1} v_i*p_i + S*(v_k-v_0) ) / ( \sum_{i=0}^{k-1} v_i )
+        // We take the min threshold across all positive values of k (up to the maximum
+        // amount of lookahead we have) to give us the threshold for which the current
+        // frame is the optimal switch point.
+        //
+        // The last step is that we need to consider whether we want to switch at all.
+        // For that we use the average of the music probability over the entire window.
+        // If the threshold is higher than that average we're not going to
+        // switch, so we compute a min with the average as well. The result of all these
+        // min operations is music_prob_min, which gives the threshold for switching to music
+        // if we're currently encoding for speech.
+        //
+        // We do the exact opposite to compute music_prob_max which is used for switching
+        // from music to speech.
+
+        let mut prob_min = 1.0;
+        let mut prob_max = 0.0;
+        let vad_prob = self.info[vpos as usize].activity_probability;
+        let mut prob_count = if 0.1 > vad_prob { 0.1 } else { vad_prob };
+        let mut prob_avg =
+            (if 0.1 > vad_prob { 0.1 } else { vad_prob }) * self.info[mpos as usize].music_prob;
         loop {
             let mut pos_vad: f32 = 0.;
             mpos += 1;
@@ -784,7 +794,7 @@ impl TonalityAnalysisState {
             prob_avg += (if 0.1f32 > pos_vad { 0.1f32 } else { pos_vad })
                 * self.info[mpos as usize].music_prob;
         }
-        (*info_out).music_prob = prob_avg / prob_count;
+        info.music_prob = prob_avg / prob_count;
         prob_min = if prob_avg / prob_count < prob_min {
             prob_avg / prob_count
         } else {
@@ -797,13 +807,15 @@ impl TonalityAnalysisState {
         };
         prob_min = if prob_min > 0.0f32 { prob_min } else { 0.0f32 };
         prob_max = if prob_max < 1.0f32 { prob_max } else { 1.0f32 };
+
+        // If we don't have enough look-ahead, do our best to make a decent decision.
         if curr_lookahead < 10 {
-            let mut pmin: f32 = 0.;
-            let mut pmax: f32 = 0.;
-            pmin = prob_min;
-            pmax = prob_max;
+            let mut pmin = prob_min;
+            let mut pmax = prob_max;
             pos = pos0;
-            i = 0;
+
+            // Look for min/max in the past.
+            let mut i = 0;
             while i
                 < (if (self.count - 1) < 15 {
                     self.count - 1
@@ -827,26 +839,29 @@ impl TonalityAnalysisState {
                 };
                 i += 1;
             }
-            pmin = if 0.0f32 > pmin - 0.1f32 * vad_prob {
-                0.0f32
+            // Bias against switching on active audio.
+            pmin = if 0.0 > pmin - 0.1 * vad_prob {
+                0.0
             } else {
-                pmin - 0.1f32 * vad_prob
+                pmin - 0.1 * vad_prob
             };
-            pmax = if 1.0f32 < pmax + 0.1f32 * vad_prob {
-                1.0f32
+            pmax = if 1.0 < pmax + 0.1 * vad_prob {
+                1.0
             } else {
-                pmax + 0.1f32 * vad_prob
+                pmax + 0.1 * vad_prob
             };
             prob_min += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmin - prob_min);
             prob_max += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmax - prob_max);
         }
-        (*info_out).music_prob_min = prob_min;
-        (*info_out).music_prob_max = prob_max;
+        info.music_prob_min = prob_min;
+        info.music_prob_max = prob_max;
+
+        info
     }
 
-    unsafe fn analysis(
+    fn analysis(
         &mut self,
-        celt_mode: *const OpusCustomMode,
+        celt_mode: &OpusCustomMode,
         x: *const core::ffi::c_void,
         mut len: i32,
         mut offset: i32,
@@ -860,9 +875,9 @@ impl TonalityAnalysisState {
         let mut b: i32 = 0;
         let N: i32 = 480;
         let N2: i32 = 240;
-        let A: *mut f32 = (self.angle).as_mut_ptr();
-        let dA: *mut f32 = (self.d_angle).as_mut_ptr();
-        let d2A: *mut f32 = (self.d2_angle).as_mut_ptr();
+        let A = &mut self.angle;
+        let dA = &mut self.d_angle;
+        let d2A = &mut self.d2_angle;
         let mut band_tonality: [f32; 18] = [0.; 18];
         let mut logE: [f32; 18] = [0.; 18];
         let mut BFCC: [f32; 8] = [0.; 8];
@@ -884,7 +899,6 @@ impl TonalityAnalysisState {
         let mut maxE: f32 = 0 as f32;
         let mut noise_floor: f32 = 0.;
         let mut remaining: i32 = 0;
-        let mut info: *mut AnalysisInfo = 0 as *mut AnalysisInfo;
         let mut hp_ener: f32 = 0.;
         let mut tonality2: [f32; 240] = [0.; 240];
         let mut midE: [f32; 8] = [0.; 8];
@@ -895,6 +909,7 @@ impl TonalityAnalysisState {
         let mut below_max_pitch: f32 = 0.;
         let mut above_max_pitch: f32 = 0.;
         let mut is_silence: i32 = 0;
+
         if self.initialized == 0 {
             self.mem_fill = 240;
             self.initialized = 1;
@@ -932,11 +947,11 @@ impl TonalityAnalysisState {
             downmix,
             x,
             &mut self.inmem[self.mem_fill as usize..],
-            (self.downmix_state).as_mut_ptr(),
+            &mut self.downmix_state,
             if len < 720 - self.mem_fill {
-                len
+                len as usize
             } else {
-                720 - self.mem_fill
+                720 - self.mem_fill as usize
             },
             offset,
             c1,
@@ -949,13 +964,12 @@ impl TonalityAnalysisState {
             return;
         }
         hp_ener = self.hp_ener_accum;
-        let fresh1 = self.write_pos;
+        let info_pos = self.write_pos as usize;
         self.write_pos = self.write_pos + 1;
-        info = &mut *(self.info).as_mut_ptr().offset(fresh1 as isize) as *mut AnalysisInfo;
         if self.write_pos >= DETECT_SIZE {
             self.write_pos -= DETECT_SIZE;
         }
-        is_silence = is_digital_silence((self.inmem).as_mut_ptr(), 720, 1, lsb_depth);
+        is_silence = is_digital_silence(&self.inmem, 720, 1, lsb_depth);
         let mut in_0: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
         let mut out: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
         let mut tonality: [f32; 240] = [0.; 240];
@@ -969,30 +983,32 @@ impl TonalityAnalysisState {
             in_0[(N - i - 1) as usize].im = w * self.inmem[(N + N2 - i - 1) as usize];
             i += 1;
         }
-        memmove(
-            (self.inmem).as_mut_ptr() as *mut core::ffi::c_void,
-            (self.inmem)
-                .as_mut_ptr()
-                .offset(720 as isize)
-                .offset(-(240 as isize)) as *const core::ffi::c_void,
-            240_u64
-                .wrapping_mul(::core::mem::size_of::<f32>() as u64)
-                .wrapping_add(
-                    (0 * (self.inmem).as_mut_ptr().offset_from(
-                        (self.inmem)
-                            .as_mut_ptr()
-                            .offset(720 as isize)
-                            .offset(-(240 as isize)),
-                    ) as i64) as u64,
-                ),
-        );
+        unsafe {
+            memmove(
+                (self.inmem).as_mut_ptr() as *mut core::ffi::c_void,
+                (self.inmem)
+                    .as_mut_ptr()
+                    .offset(720 as isize)
+                    .offset(-(240 as isize)) as *const core::ffi::c_void,
+                240_u64
+                    .wrapping_mul(::core::mem::size_of::<f32>() as u64)
+                    .wrapping_add(
+                        (0 * (self.inmem).as_mut_ptr().offset_from(
+                            (self.inmem)
+                                .as_mut_ptr()
+                                .offset(720 as isize)
+                                .offset(-(240 as isize)),
+                        ) as i64) as u64,
+                    ),
+            );
+        }
         remaining = len - (ANALYSIS_BUF_SIZE - self.mem_fill);
         self.hp_ener_accum = downmix_and_resample(
             downmix,
             x,
             &mut self.inmem[240..],
-            (self.downmix_state).as_mut_ptr(),
-            remaining,
+            &mut self.downmix_state,
+            remaining as usize,
             offset + ANALYSIS_BUF_SIZE - self.mem_fill,
             c1,
             c2,
@@ -1005,23 +1021,15 @@ impl TonalityAnalysisState {
             if prev_pos < 0 {
                 prev_pos += DETECT_SIZE;
             }
-            memcpy(
-                info as *mut core::ffi::c_void,
-                &mut *(self.info).as_mut_ptr().offset(prev_pos as isize) as *mut AnalysisInfo
-                    as *const core::ffi::c_void,
-                1_u64
-                    .wrapping_mul(::core::mem::size_of::<AnalysisInfo>() as u64)
-                    .wrapping_add(
-                        (0 * info
-                            .offset_from(&mut *(self.info).as_mut_ptr().offset(prev_pos as isize))
-                            as i64) as u64,
-                    ),
-            );
+            self.info[info_pos] = self.info[prev_pos as usize].clone();
+
             return;
         }
         opus_fft_c(kfft, &in_0, &mut out);
+
+        let info = &mut self.info[info_pos];
         if out[0].re != out[0].re {
-            (*info).valid = 0;
+            info.valid = 0;
             return;
         }
         i = 1;
@@ -1044,8 +1052,8 @@ impl TonalityAnalysisState {
             X2r = out[i as usize].im + out[(N - i) as usize].im;
             X2i = out[(N - i) as usize].re - out[i as usize].re;
             angle = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X1i, X1r);
-            d_angle = angle - *A.offset(i as isize);
-            d2_angle = d_angle - *dA.offset(i as isize);
+            d_angle = angle - A[i as usize];
+            d2_angle = d_angle - dA[i as usize];
             angle2 = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X2i, X2r);
             d_angle2 = angle2 - angle;
             d2_angle2 = d_angle2 - d_angle;
@@ -1057,12 +1065,12 @@ impl TonalityAnalysisState {
             noisiness[i as usize] += (mod2).abs();
             mod2 *= mod2;
             mod2 *= mod2;
-            avg_mod = 0.25f32 * (*d2A.offset(i as isize) + mod1 + 2 as f32 * mod2);
+            avg_mod = 0.25f32 * (d2A[i as usize] + mod1 + 2 as f32 * mod2);
             tonality[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * avg_mod) - 0.015f32;
             tonality2[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * mod2) - 0.015f32;
-            *A.offset(i as isize) = angle2;
-            *dA.offset(i as isize) = d_angle2;
-            *d2A.offset(i as isize) = mod2;
+            A[i as usize] = angle2;
+            dA[i as usize] = d_angle2;
+            d2A[i as usize] = mod2;
             i += 1;
         }
         i = 2;
@@ -1569,7 +1577,7 @@ impl TonalityAnalysisState {
 
     pub unsafe fn run_analysis(
         &mut self,
-        celt_mode: *const OpusCustomMode,
+        celt_mode: &OpusCustomMode,
         analysis_pcm: *const core::ffi::c_void,
         mut analysis_frame_size: i32,
         frame_size: i32,
@@ -1579,8 +1587,7 @@ impl TonalityAnalysisState {
         Fs: i32,
         lsb_depth: i32,
         downmix: downmix_func,
-        analysis_info: *mut AnalysisInfo,
-    ) {
+    ) -> AnalysisInfo {
         let mut offset: i32 = 0;
         let mut pcm_len: i32 = 0;
         analysis_frame_size -= analysis_frame_size & 1;
@@ -1614,6 +1621,6 @@ impl TonalityAnalysisState {
             self.analysis_offset = analysis_frame_size;
             self.analysis_offset -= frame_size;
         }
-        self.get_info(analysis_info, frame_size);
+        self.get_info(frame_size)
     }
 }

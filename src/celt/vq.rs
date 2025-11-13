@@ -322,7 +322,12 @@ pub unsafe fn renormalise_vector(X: *mut celt_norm, N: i32, gain: opus_val16, _a
     let mut g: opus_val16 = 0.;
     let mut t: opus_val32 = 0.;
     let mut xptr: *mut celt_norm = 0 as *mut celt_norm;
-    E = EPSILON + celt_inner_prod_c(X, X, N);
+    E = EPSILON
+        + celt_inner_prod_c(
+            std::slice::from_raw_parts(X, N as _),
+            std::slice::from_raw_parts(X, N as _),
+            N,
+        );
     t = E;
     g = celt_rsqrt_norm(t) * gain;
     xptr = X;
@@ -360,8 +365,16 @@ pub unsafe fn stereo_itheta(
             i += 1;
         }
     } else {
-        Emid += celt_inner_prod_c(X, X, N);
-        Eside += celt_inner_prod_c(Y, Y, N);
+        Emid += celt_inner_prod_c(
+            std::slice::from_raw_parts(X, N as _),
+            std::slice::from_raw_parts(X, N as _),
+            N,
+        );
+        Eside += celt_inner_prod_c(
+            std::slice::from_raw_parts(Y, N as _),
+            std::slice::from_raw_parts(Y, N as _),
+            N,
+        );
     }
     mid = celt_sqrt(Emid);
     side = celt_sqrt(Eside);

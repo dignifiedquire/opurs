@@ -144,15 +144,12 @@ pub unsafe fn xcorr_kernel_c(
     }
 }
 #[inline]
-pub unsafe fn celt_inner_prod_c(x: *const opus_val16, y: *const opus_val16, N: i32) -> opus_val32 {
-    let mut i: i32 = 0;
-    let mut xy: opus_val32 = 0 as opus_val32;
-    i = 0;
-    while i < N {
-        xy = xy + *x.offset(i as isize) * *y.offset(i as isize);
-        i += 1;
+pub fn celt_inner_prod_c(x: &[f32], y: &[f32], N: i32) -> opus_val32 {
+    let mut xy = 0.;
+    for i in 0..N {
+        xy = xy + x[i as usize] * y[i as usize];
     }
-    return xy;
+    xy
 }
 
 unsafe fn find_best_pitch(
@@ -343,7 +340,11 @@ pub unsafe fn celt_pitch_xcorr_c(
     }
     while i < max_pitch {
         let mut sum_0: opus_val32 = 0.;
-        sum_0 = celt_inner_prod_c(_x, _y.offset(i as isize), len);
+        sum_0 = celt_inner_prod_c(
+            std::slice::from_raw_parts(_x, len as _),
+            std::slice::from_raw_parts(_y.offset(i as isize), len as _),
+            len,
+        );
         *xcorr.offset(i as isize) = sum_0;
         i += 1;
     }
@@ -402,7 +403,12 @@ pub unsafe fn pitch_search(
         if !((i - 2 * best_pitch[0 as usize]).abs() > 2
             && (i - 2 * best_pitch[1 as usize]).abs() > 2)
         {
-            sum = celt_inner_prod_c(x_lp, y.offset(i as isize), len >> 1);
+            let l = len >> 1;
+            sum = celt_inner_prod_c(
+                std::slice::from_raw_parts(x_lp, l as _),
+                std::slice::from_raw_parts(y.offset(i as isize), l as _),
+                l,
+            );
             *xcorr.as_mut_ptr().offset(i as isize) = if -1 as f32 > sum { -1 as f32 } else { sum };
         }
         i += 1;
@@ -577,7 +583,11 @@ pub unsafe fn remove_doubling(
     }
     k = 0;
     while k < 3 {
-        xcorr[k as usize] = celt_inner_prod_c(x, x.offset(-((T + k - 1) as isize)), N);
+        xcorr[k as usize] = celt_inner_prod_c(
+            std::slice::from_raw_parts(x, N as _),
+            std::slice::from_raw_parts(x.offset(-((T + k - 1) as isize)), N as _),
+            N,
+        );
         k += 1;
     }
     if xcorr[2 as usize] - xcorr[0 as usize] > 0.7f32 * (xcorr[1 as usize] - xcorr[0 as usize]) {
