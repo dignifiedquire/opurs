@@ -26,16 +26,19 @@ mod celt {
     pub mod pitch;
     pub mod quant_bands;
     pub mod rate;
-    // pub mod tests {
-    //     pub mod test_unit_cwrs32;
-    //     pub mod test_unit_dft;
-    //     pub mod test_unit_entropy;
-    //     pub mod test_unit_laplace;
-    //     pub mod test_unit_mathops;
-    //     pub mod test_unit_mdct;
-    //     pub mod test_unit_rotation;
-    //     pub mod test_unit_types;
-    // } // mod tests
+
+    #[cfg(test)]
+    mod tests {
+        pub mod test_unit_cwrs32;
+        //     pub mod test_unit_dft;
+        //     pub mod test_unit_entropy;
+        //     pub mod test_unit_laplace;
+        //     pub mod test_unit_mathops;
+        //     pub mod test_unit_mdct;
+        //     pub mod test_unit_rotation;
+        //     pub mod test_unit_types;
+    }
+
     pub mod vq;
     // stuff for structs that do not have a clear home, named after the header files
     pub mod float_cast;

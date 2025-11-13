@@ -124,7 +124,7 @@ This allows us to derive O(N) encoding and O(N*log(K)) decoding routines for
   year=1986
 }*/
 
-static PVQ_U_DATA2: [&[u32]; 15] = [
+pub(crate) const PVQ_U_DATA2: [&[u32]; 15] = [
     /*N=0, K=0...176:*/
     &[
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -278,7 +278,7 @@ static PVQ_U_DATA2: [&[u32]; 15] = [
 ];
 
 #[inline]
-fn pvq_u(n: u32, k: u32) -> u32 {
+pub(crate) fn pvq_u(n: u32, k: u32) -> u32 {
     // N = MIN(n, k)
     // K = MAX(n, k)
     let (n, k) = if n < k { (n, k) } else { (k, n) };
@@ -287,7 +287,7 @@ fn pvq_u(n: u32, k: u32) -> u32 {
 }
 
 #[inline]
-fn pvq_v(n: u32, k: u32) -> u32 {
+pub(crate) fn pvq_v(n: u32, k: u32) -> u32 {
     pvq_u(n, k) + pvq_u(n, k + 1)
 }
 
@@ -327,7 +327,7 @@ mod test {
     }
 }
 
-unsafe fn icwrs(mut _n: i32, mut _y: *const i32) -> u32 {
+pub(crate) unsafe fn icwrs(mut _n: i32, mut _y: *const i32) -> u32 {
     let mut i: u32 = 0;
     let mut j: u32 = 0;
     let mut k: u32 = 0;
@@ -355,7 +355,7 @@ pub unsafe fn encode_pulses(mut _y: *const i32, mut _n: i32, mut _k: i32, mut _e
     ec_enc_uint(&mut *_enc, icwrs(_n, _y), pvq_v(_n as u32, _k as u32));
 }
 
-unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus_val32 {
+pub(crate) unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus_val32 {
     let mut p: u32 = 0;
     let mut s: i32 = 0;
     let mut k0: i32 = 0;
@@ -363,6 +363,7 @@ unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus
     let mut yy: opus_val32 = 0 as opus_val32;
     assert!(_k > 0);
     assert!(_n > 1);
+
     while _n > 2 {
         let mut q: u32 = 0;
         if _k >= _n {
@@ -442,6 +443,7 @@ unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus
     yy = yy + val as opus_val32 * val as opus_val32;
     return yy;
 }
+
 pub unsafe fn decode_pulses(
     mut _y: *mut i32,
     mut _n: i32,

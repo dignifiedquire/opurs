@@ -1,13 +1,15 @@
 pub const FINE_OFFSET: i32 = 21;
 pub const MAX_FINE_BITS: i32 = 8;
+
 #[inline]
-pub unsafe fn get_pulses(i: i32) -> i32 {
-    return if i < 8 {
+pub fn get_pulses(i: i32) -> i32 {
+    if i < 8 {
         i
     } else {
         8 + (i & 7) << (i >> 3) - 1
-    };
+    }
 }
+
 #[inline]
 pub unsafe fn bits2pulses(m: *const OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) -> i32 {
     let mut i: i32 = 0;
@@ -45,7 +47,9 @@ pub unsafe fn bits2pulses(m: *const OpusCustomMode, band: i32, mut LM: i32, mut 
         return hi;
     };
 }
+
 pub const LOG_MAX_PSEUDO: i32 = 6;
+
 #[inline]
 pub unsafe fn pulses2bits(m: *const OpusCustomMode, band: i32, mut LM: i32, pulses: i32) -> i32 {
     let mut cache: *const u8 = 0 as *const u8;
