@@ -4,19 +4,24 @@ use num_traits::Zero;
 pub type kiss_fft_cpx = num_complex::Complex32;
 pub type kiss_twiddle_cpx = num_complex::Complex32;
 
+// E.g. an fft of length 128 has 4 factors
+// as far as kissfft is concerned  4*4*4*2
+const MAX_FACTORS: usize = 8;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct kiss_fft_state<'a> {
     pub nfft: usize,
     pub scale: f32,
     pub shift: i32,
-    pub factors: [(i32, i32); 8],
+    pub factors: [i32; 2 * MAX_FACTORS],
     pub bitrev: &'a [i16],
     pub twiddles: &'a [kiss_twiddle_cpx; 480],
 }
 
 fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
     let tw: f32 = std::f32::consts::FRAC_1_SQRT_2;
-    /* We know that m==4 here because the radix-2 is just after a radix-4 */
+    // We know that m==4 here because the radix-2 is just after a radix-4
+
     assert_eq!(m, 4);
     assert_eq!(Fout.len(), N as usize * 8);
     for chunk in Fout.chunks_exact_mut(8) {
@@ -45,6 +50,7 @@ fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
         Fout[3] += t;
     }
 }
+
 fn kf_bfly4(
     Fout: &mut [kiss_fft_cpx],
     fstride: usize,
@@ -54,7 +60,7 @@ fn kf_bfly4(
     mm: i32,
 ) {
     if m == 1 {
-        /* Degenerate case where all the twiddles are 1. */
+        // Degenerate case where all the twiddles are 1.
         assert_eq!(Fout.len(), N as usize * 4);
         for chunk in Fout.chunks_exact_mut(4) {
             let scratch0 = chunk[0] - chunk[2];
@@ -80,7 +86,8 @@ fn kf_bfly4(
             let mut tw1 = st.twiddles.as_slice();
             let mut tw2 = tw1;
             let mut tw3 = tw2;
-            /* m is guaranteed to be a multiple of 4. */
+
+            // m is guaranteed to be a multiple of 4.
             for _ in 0..m {
                 scratch[0] = chunk[m] * tw1[0];
                 scratch[1] = chunk[m2] * tw2[0];
@@ -105,6 +112,7 @@ fn kf_bfly4(
         }
     };
 }
+
 fn kf_bfly3(
     Fout: &mut [kiss_fft_cpx],
     fstride: usize,
@@ -211,14 +219,16 @@ fn kf_bfly5(
 
 pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
     assert_eq!(st.nfft, fout.len());
+    // st->shift can be -1
     let shift = st.shift.max(0);
 
-    let mut fstride: [i32; 8] = [0; 8];
+    let mut fstride = [0; 8];
     fstride[0] = 1;
 
-    let mut L = 0_usize;
+    let mut L = 0;
     loop {
-        let (p, m) = st.factors[L];
+        let p = st.factors[2 * L];
+        let m = st.factors[2 * L + 1];
         fstride[L + 1] = fstride[L] * p;
         L += 1;
         if m == 1 {
@@ -226,10 +236,10 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
         }
     }
 
-    let mut m = st.factors[L - 1].1;
+    let mut m = st.factors[2 * L - 1];
     for i in (0..L).rev() {
-        let m2 = if i > 0 { st.factors[i - 1].1 } else { 1 };
-        match st.factors[i].0 {
+        let m2 = if i > 0 { st.factors[2 * i - 1] } else { 1 };
+        match st.factors[2 * i] {
             2 => kf_bfly2(fout, m, fstride[i]),
             4 => kf_bfly4(fout, (fstride[i] << shift) as usize, st, m, fstride[i], m2),
             3 => kf_bfly3(fout, (fstride[i] << shift) as usize, st, m, fstride[i], m2),
@@ -241,12 +251,33 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
 }
 
 pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
-    let mut scale: f32 = 0.;
-    scale = st.scale;
     assert_eq!(fin.len(), st.nfft);
     assert_eq!(fout.len(), st.nfft);
-    for (&x, &i) in fin.iter().zip(st.bitrev) {
-        fout[i as usize] = scale * x;
+
+    let scale = st.scale;
+
+    // Bit-reverse the input
+    for i in 0..st.nfft {
+        let x = fin[i];
+        fout[st.bitrev[i] as usize] = scale * x;
     }
     opus_fft_impl(st, fout);
+}
+
+#[cfg(test)]
+pub fn opus_ifft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
+    assert_eq!(fin.len(), st.nfft);
+    assert_eq!(fout.len(), st.nfft);
+
+    // Bit-reverse the input
+    for i in 0..st.nfft {
+        fout[st.bitrev[i] as usize] = fin[i];
+    }
+    for el in fout.iter_mut() {
+        el.im = -el.im;
+    }
+    opus_fft_impl(st, fout);
+    for el in fout.iter_mut() {
+        el.im = -el.im;
+    }
 }

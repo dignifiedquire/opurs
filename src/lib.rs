@@ -30,7 +30,7 @@ mod celt {
     #[cfg(test)]
     mod tests {
         pub mod test_unit_cwrs32;
-        //     pub mod test_unit_dft;
+        pub mod test_unit_dft;
         //     pub mod test_unit_entropy;
         //     pub mod test_unit_laplace;
         //     pub mod test_unit_mathops;
