@@ -2,7 +2,6 @@ use crate::externs::{free, malloc};
 
 pub mod arch_h {
     pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
 }
 pub mod stddef_h {
     pub type size_t = u64;

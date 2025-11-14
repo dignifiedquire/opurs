@@ -254,9 +254,6 @@ impl OpusRepacketizer {
         }
         if count > 2 || pad && tot_size < maxlen {
             // Code 3
-            let mut vbr: i32 = 0;
-            let mut pad_amount: i32 = 0;
-
             // Restart the process for the padding case
             ptr = 0;
             if self_delimited {
@@ -264,7 +261,7 @@ impl OpusRepacketizer {
             } else {
                 tot_size = 0;
             }
-            vbr = 0;
+            let mut vbr = 0;
             for i in 1..count {
                 if len[i as usize] != len[0] {
                     vbr = 1;
@@ -294,7 +291,7 @@ impl OpusRepacketizer {
                 data[ptr] = count as u8;
                 ptr += 1;
             }
-            pad_amount = if pad { maxlen - tot_size } else { 0 };
+            let pad_amount = if pad { maxlen - tot_size } else { 0 };
             if pad_amount != 0 {
                 data[1] |= 0x40;
                 let nb_255s = (pad_amount - 1) / 255;
