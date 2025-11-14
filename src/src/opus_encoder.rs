@@ -137,17 +137,15 @@ static mut fec_thresholds: [i32; 10] = [
 ];
 pub unsafe fn opus_encoder_get_size(channels: i32) -> i32 {
     let mut silkEncSizeBytes: i32 = 0;
-    let mut celtEncSizeBytes: i32 = 0;
-    let mut ret: i32 = 0;
     if channels < 1 || channels > 2 {
         return 0;
     }
-    ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
+    let ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
     if ret != 0 {
         return 0;
     }
-    silkEncSizeBytes = align(silkEncSizeBytes);
-    celtEncSizeBytes = celt_encoder_get_size(channels);
+    let silkEncSizeBytes = align(silkEncSizeBytes);
+    let celtEncSizeBytes = celt_encoder_get_size(channels);
     return align(::core::mem::size_of::<OpusEncoder>() as u64 as i32)
         + silkEncSizeBytes
         + celtEncSizeBytes;
@@ -158,10 +156,6 @@ pub unsafe fn opus_encoder_init(
     channels: i32,
     application: i32,
 ) -> i32 {
-    let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
-    let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
-    let mut err: i32 = 0;
-    let mut ret: i32 = 0;
     let mut silkEncSizeBytes: i32 = 0;
     if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
         || channels != 1 && channels != 2
@@ -176,20 +170,20 @@ pub unsafe fn opus_encoder_init(
         0,
         (opus_encoder_get_size(channels) as u64).wrapping_mul(::core::mem::size_of::<i8>() as u64),
     );
-    ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
+    let ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
     if ret != 0 {
         return OPUS_BAD_ARG;
     }
     silkEncSizeBytes = align(silkEncSizeBytes);
     (*st).silk_enc_offset = align(::core::mem::size_of::<OpusEncoder>() as u64 as i32);
     (*st).celt_enc_offset = (*st).silk_enc_offset + silkEncSizeBytes;
-    silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
-    celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
+    let silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
+    let celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
     (*st).channels = channels;
     (*st).stream_channels = (*st).channels;
     (*st).Fs = Fs;
     (*st).arch = opus_select_arch();
-    ret = silk_InitEncoder(silk_enc, (*st).arch, &mut (*st).silk_mode);
+    let ret = silk_InitEncoder(silk_enc, (*st).arch, &mut (*st).silk_mode);
     if ret != 0 {
         return OPUS_INTERNAL_ERROR;
     }
@@ -207,7 +201,7 @@ pub unsafe fn opus_encoder_init(
     (*st).silk_mode.useDTX = 0;
     (*st).silk_mode.useCBR = 0;
     (*st).silk_mode.reducedDependency = 0;
-    err = celt_encoder_init(celt_enc, Fs, channels, (*st).arch);
+    let err = celt_encoder_init(celt_enc, Fs, channels, (*st).arch);
     if err != OPUS_OK {
         return OPUS_INTERNAL_ERROR;
     }
@@ -243,9 +237,8 @@ pub unsafe fn opus_encoder_init(
     return OPUS_OK;
 }
 unsafe fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
-    let mut period: i32 = 0;
-    let mut toc: u8 = 0;
-    period = 0;
+    let mut toc;
+    let mut period = 0;
     while framerate < 400 {
         framerate <<= 1;
         period += 1;
@@ -278,9 +271,6 @@ unsafe fn silk_biquad_float(
     len: i32,
     stride: i32,
 ) {
-    let mut k: i32 = 0;
-    let mut vout: f32 = 0.;
-    let mut inval: f32 = 0.;
     let mut A: [f32; 2] = [0.; 2];
     let mut B: [f32; 3] = [0.; 3];
     A[0 as usize] = *A_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
@@ -288,15 +278,16 @@ unsafe fn silk_biquad_float(
     B[0 as usize] = *B_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
     B[1 as usize] = *B_Q28.offset(1 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
     B[2 as usize] = *B_Q28.offset(2 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
-    k = 0;
-    while k < len {
+
+    let mut vout;
+    let mut inval;
+    for k in 0..len {
         inval = *in_0.offset((k * stride) as isize);
         vout = *S.offset(0 as isize) + B[0 as usize] * inval;
         *S.offset(0 as isize) =
             *S.offset(1 as isize) - vout * A[0 as usize] + B[1 as usize] * inval;
         *S.offset(1 as isize) = -vout * A[1 as usize] + B[2 as usize] * inval + VERY_SMALL;
         *out.offset((k * stride) as isize) = vout;
-        k += 1;
     }
 }
 unsafe fn hp_cutoff(
@@ -311,18 +302,16 @@ unsafe fn hp_cutoff(
 ) {
     let mut B_Q28: [i32; 3] = [0; 3];
     let mut A_Q28: [i32; 2] = [0; 2];
-    let mut Fc_Q19: i32 = 0;
-    let mut r_Q28: i32 = 0;
-    let mut r_Q22: i32 = 0;
-    Fc_Q19 = (1.5f64 * 3.14159f64 / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16 as i32
+    let Fc_Q19 = (1.5f64 * 3.14159f64 / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16
+        as i32
         * cutoff_Hz as i16 as i32
         / (Fs / 1000);
-    r_Q28 = (1.0f64 * ((1) << 28) as f64 + 0.5f64) as i32
+    let r_Q28 = (1.0f64 * ((1) << 28) as f64 + 0.5f64) as i32
         - (0.92f64 * ((1) << 9) as f64 + 0.5f64) as i32 * Fc_Q19;
     B_Q28[0 as usize] = r_Q28;
     B_Q28[1 as usize] = ((-r_Q28 as u32) << 1) as i32;
     B_Q28[2 as usize] = r_Q28;
-    r_Q22 = r_Q28 >> 6;
+    let r_Q22 = r_Q28 >> 6;
     A_Q28[0 as usize] = (r_Q22 as i64
         * ((Fc_Q19 as i64 * Fc_Q19 as i64 >> 16) as i32
             - (2.0f64 * ((1) << 22) as f64 + 0.5f64) as i32) as i64
@@ -358,46 +347,30 @@ unsafe fn dc_reject(
     channels: i32,
     Fs: i32,
 ) {
-    let mut i: i32 = 0;
-    let mut coef: f32 = 0.;
-    let mut coef2: f32 = 0.;
-    coef = 6.3f32 * cutoff_Hz as f32 / Fs as f32;
-    coef2 = 1 as f32 - coef;
+    let coef = 6.3f32 * cutoff_Hz as f32 / Fs as f32;
+    let coef2 = 1 as f32 - coef;
     if channels == 2 {
-        let mut m0: f32 = 0.;
-        let mut m2: f32 = 0.;
-        m0 = *hp_mem.offset(0 as isize);
-        m2 = *hp_mem.offset(2 as isize);
-        i = 0;
-        while i < len {
-            let mut x0: f32 = 0.;
-            let mut x1: f32 = 0.;
-            let mut out0: f32 = 0.;
-            let mut out1: f32 = 0.;
-            x0 = *in_0.offset((2 * i + 0) as isize);
-            x1 = *in_0.offset((2 * i + 1) as isize);
-            out0 = x0 - m0;
-            out1 = x1 - m2;
+        let mut m0 = *hp_mem.offset(0 as isize);
+        let mut m2 = *hp_mem.offset(2 as isize);
+        for i in 0..len {
+            let x0 = *in_0.offset((2 * i + 0) as isize);
+            let x1 = *in_0.offset((2 * i + 1) as isize);
+            let out0 = x0 - m0;
+            let out1 = x1 - m2;
             m0 = coef * x0 + VERY_SMALL + coef2 * m0;
             m2 = coef * x1 + VERY_SMALL + coef2 * m2;
             *out.offset((2 * i + 0) as isize) = out0;
             *out.offset((2 * i + 1) as isize) = out1;
-            i += 1;
         }
         *hp_mem.offset(0 as isize) = m0;
         *hp_mem.offset(2 as isize) = m2;
     } else {
-        let mut m0_0: f32 = 0.;
-        m0_0 = *hp_mem.offset(0 as isize);
-        i = 0;
-        while i < len {
-            let mut x: f32 = 0.;
-            let mut y: f32 = 0.;
-            x = *in_0.offset(i as isize);
-            y = x - m0_0;
+        let mut m0_0 = *hp_mem.offset(0 as isize);
+        for i in 0..len {
+            let x = *in_0.offset(i as isize);
+            let y = x - m0_0;
             m0_0 = coef * x + VERY_SMALL + coef2 * m0_0;
             *out.offset(i as isize) = y;
-            i += 1;
         }
         *hp_mem.offset(0 as isize) = m0_0;
     };
@@ -413,21 +386,15 @@ unsafe fn stereo_fade(
     window: *const f32,
     Fs: i32,
 ) {
-    let mut i: i32 = 0;
-    let mut overlap: i32 = 0;
-    let mut inc: i32 = 0;
-    inc = 48000 / Fs;
-    overlap = overlap48 / inc;
+    let inc = 48000 / Fs;
+    let overlap = overlap48 / inc;
     g1 = Q15ONE - g1;
     g2 = Q15ONE - g2;
-    i = 0;
+    let mut i = 0;
     while i < overlap {
-        let mut diff: f32 = 0.;
-        let mut g: f32 = 0.;
-        let mut w: f32 = 0.;
-        w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
-        g = w * g2 + (1.0f32 - w) * g1;
-        diff = 0.5f32
+        let w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+        let g = w * g2 + (1.0f32 - w) * g1;
+        let mut diff = 0.5f32
             * (*in_0.offset((i * channels) as isize) - *in_0.offset((i * channels + 1) as isize));
         diff = g * diff;
         *out.offset((i * channels) as isize) = *out.offset((i * channels) as isize) - diff;
@@ -435,8 +402,7 @@ unsafe fn stereo_fade(
         i += 1;
     }
     while i < frame_size {
-        let mut diff_0: f32 = 0.;
-        diff_0 = 0.5f32
+        let mut diff_0 = 0.5f32
             * (*in_0.offset((i * channels) as isize) - *in_0.offset((i * channels + 1) as isize));
         diff_0 = g2 * diff_0;
         *out.offset((i * channels) as isize) = *out.offset((i * channels) as isize) - diff_0;
@@ -445,6 +411,7 @@ unsafe fn stereo_fade(
         i += 1;
     }
 }
+
 unsafe fn gain_fade(
     in_0: *const f32,
     out: *mut f32,
@@ -456,41 +423,27 @@ unsafe fn gain_fade(
     window: *const f32,
     Fs: i32,
 ) {
-    let mut i: i32 = 0;
-    let mut inc: i32 = 0;
-    let mut overlap: i32 = 0;
-    let mut c: i32 = 0;
-    inc = 48000 / Fs;
-    overlap = overlap48 / inc;
+    let inc = 48000 / Fs;
+    let overlap = overlap48 / inc;
     if channels == 1 {
-        i = 0;
-        while i < overlap {
-            let mut g: f32 = 0.;
-            let mut w: f32 = 0.;
-            w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
-            g = w * g2 + (1.0f32 - w) * g1;
+        for i in 0..overlap {
+            let w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+            let g = w * g2 + (1.0f32 - w) * g1;
             *out.offset(i as isize) = g * *in_0.offset(i as isize);
-            i += 1;
         }
     } else {
-        i = 0;
-        while i < overlap {
-            let mut g_0: f32 = 0.;
-            let mut w_0: f32 = 0.;
-            w_0 = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
-            g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
+        for i in 0..overlap {
+            let w_0 = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+            let g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
             *out.offset((i * 2) as isize) = g_0 * *in_0.offset((i * 2) as isize);
             *out.offset((i * 2 + 1) as isize) = g_0 * *in_0.offset((i * 2 + 1) as isize);
-            i += 1;
         }
     }
-    c = 0;
+    let mut c = 0;
     loop {
-        i = overlap;
-        while i < frame_size {
+        for i in overlap..frame_size {
             *out.offset((i * channels + c) as isize) =
                 g2 * *in_0.offset((i * channels + c) as isize);
-            i += 1;
         }
         c += 1;
         if !(c < channels) {
@@ -504,8 +457,6 @@ pub unsafe fn opus_encoder_create(
     application: i32,
     error: *mut i32,
 ) -> *mut OpusEncoder {
-    let mut ret: i32 = 0;
-    let mut st: *mut OpusEncoder = 0 as *mut OpusEncoder;
     if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
         || channels != 1 && channels != 2
         || application != OPUS_APPLICATION_VOIP
@@ -517,14 +468,14 @@ pub unsafe fn opus_encoder_create(
         }
         return std::ptr::null_mut();
     }
-    st = malloc(opus_encoder_get_size(channels) as u64) as *mut OpusEncoder;
+    let mut st = malloc(opus_encoder_get_size(channels) as u64) as *mut OpusEncoder;
     if st.is_null() {
         if !error.is_null() {
             *error = OPUS_ALLOC_FAIL;
         }
         return std::ptr::null_mut();
     }
-    ret = opus_encoder_init(st, Fs, channels, application);
+    let ret = opus_encoder_init(st, Fs, channels, application);
     if !error.is_null() {
         *error = ret;
     }
@@ -534,6 +485,7 @@ pub unsafe fn opus_encoder_create(
     }
     return st;
 }
+
 unsafe fn user_bitrate_to_bitrate(
     st: *mut OpusEncoder,
     mut frame_size: i32,
@@ -593,7 +545,7 @@ pub fn downmix_int(x: &[i16], y: &mut [f32], subframe: i32, offset: i32, c1: i32
     }
 }
 pub unsafe fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
-    let mut new_size: i32 = 0;
+    let mut new_size;
     if frame_size < Fs / 400 {
         return -1;
     }
@@ -633,24 +585,13 @@ pub unsafe fn compute_stereo_width(
     Fs: i32,
     mem: *mut StereoWidthState,
 ) -> f32 {
-    let mut xx: f32 = 0.;
-    let mut xy: f32 = 0.;
-    let mut yy: f32 = 0.;
-    let mut sqrt_xx: f32 = 0.;
-    let mut sqrt_yy: f32 = 0.;
-    let mut qrrt_xx: f32 = 0.;
-    let mut qrrt_yy: f32 = 0.;
-    let mut frame_rate: i32 = 0;
-    let mut i: i32 = 0;
-    let mut short_alpha: f32 = 0.;
-    frame_rate = Fs / frame_size;
-    short_alpha =
+    let frame_rate = Fs / frame_size;
+    let short_alpha =
         Q15ONE - 25 as f32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
-    yy = 0 as f32;
-    xy = yy;
-    xx = xy;
-    i = 0;
-    while i < frame_size - 3 {
+    let mut yy = 0 as f32;
+    let mut xy = yy;
+    let mut xx = xy;
+    for i in (0..frame_size - 3).step_by(4) {
         let mut pxx: f32 = 0 as f32;
         let mut pxy: f32 = 0 as f32;
         let mut pyy: f32 = 0 as f32;
@@ -679,7 +620,6 @@ pub unsafe fn compute_stereo_width(
         xx += pxx;
         xy += pxy;
         yy += pyy;
-        i += 4;
     }
     if !(xx < 1e9f32) || xx != xx || !(yy < 1e9f32) || yy != yy {
         yy = 0 as f32;
@@ -710,21 +650,18 @@ pub unsafe fn compute_stereo_width(
         (*mem).YY
     }) > 8e-4f32
     {
-        let mut corr: f32 = 0.;
-        let mut ldiff: f32 = 0.;
-        let mut width: f32 = 0.;
-        sqrt_xx = celt_sqrt((*mem).XX);
-        sqrt_yy = celt_sqrt((*mem).YY);
-        qrrt_xx = celt_sqrt(sqrt_xx);
-        qrrt_yy = celt_sqrt(sqrt_yy);
+        let sqrt_xx = celt_sqrt((*mem).XX);
+        let sqrt_yy = celt_sqrt((*mem).YY);
+        let qrrt_xx = celt_sqrt(sqrt_xx);
+        let qrrt_yy = celt_sqrt(sqrt_yy);
         (*mem).XY = if (*mem).XY < sqrt_xx * sqrt_yy {
             (*mem).XY
         } else {
             sqrt_xx * sqrt_yy
         };
-        corr = (*mem).XY / (1e-15f32 + sqrt_xx * sqrt_yy);
-        ldiff = 1.0f32 * (qrrt_xx - qrrt_yy).abs() / (EPSILON + qrrt_xx + qrrt_yy);
-        width = celt_sqrt(1.0f32 - corr * corr) * ldiff;
+        let corr = (*mem).XY / (1e-15f32 + sqrt_xx * sqrt_yy);
+        let ldiff = 1.0f32 * (qrrt_xx - qrrt_yy).abs() / (EPSILON + qrrt_xx + qrrt_yy);
+        let width = celt_sqrt(1.0f32 - corr * corr) * ldiff;
         (*mem).smoothed_width += (width - (*mem).smoothed_width) / frame_rate as f32;
         (*mem).max_follower =
             if (*mem).max_follower - 0.02f32 / frame_rate as f32 > (*mem).smoothed_width {
@@ -733,11 +670,11 @@ pub unsafe fn compute_stereo_width(
                 (*mem).smoothed_width
             };
     }
-    return if 1.0f32 < 20 as f32 * (*mem).max_follower {
-        1.0f32
+    if 1.0 < 20. * (*mem).max_follower {
+        1.0
     } else {
-        20 as f32 * (*mem).max_follower
-    };
+        20. * (*mem).max_follower
+    }
 }
 unsafe fn decide_fec(
     useInBandFEC: i32,
@@ -747,17 +684,15 @@ unsafe fn decide_fec(
     bandwidth: *mut i32,
     rate: i32,
 ) -> i32 {
-    let mut orig_bandwidth: i32 = 0;
     if useInBandFEC == 0 || PacketLoss_perc == 0 || mode == MODE_CELT_ONLY {
         return 0;
     }
-    orig_bandwidth = *bandwidth;
+    let orig_bandwidth = *bandwidth;
     loop {
-        let mut hysteresis: i32 = 0;
-        let mut LBRR_rate_thres_bps: i32 = 0;
-        LBRR_rate_thres_bps =
+        let mut LBRR_rate_thres_bps =
             fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND)) as usize];
-        hysteresis = fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize];
+        let hysteresis =
+            fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize];
         if last_fec == 1 {
             LBRR_rate_thres_bps -= hysteresis;
         }
@@ -785,8 +720,9 @@ unsafe fn decide_fec(
         }
     }
     *bandwidth = orig_bandwidth;
-    return 0;
+    0
 }
+
 unsafe fn compute_silk_rate_for_hybrid(
     mut rate: i32,
     bandwidth: i32,
@@ -795,11 +731,7 @@ unsafe fn compute_silk_rate_for_hybrid(
     fec: i32,
     channels: i32,
 ) -> i32 {
-    let mut entry: i32 = 0;
-    let mut i: i32 = 0;
-    let mut N: i32 = 0;
-    let mut silk_rate: i32 = 0;
-    static mut rate_table: [[i32; 5]; 7] = [
+    const rate_table: [[i32; 5]; 7] = [
         [0, 0, 0, 0, 0],
         [12000, 10000, 10000, 11000, 11000],
         [16000, 13500, 13500, 15000, 15000],
@@ -809,28 +741,26 @@ unsafe fn compute_silk_rate_for_hybrid(
         [64000, 38000, 38000, 50000, 50000],
     ];
     rate /= channels;
-    entry = 1 + frame20ms + 2 * fec;
-    N = (::core::mem::size_of::<[[i32; 5]; 7]>() as u64)
+    let entry = 1 + frame20ms + 2 * fec;
+    let N = (::core::mem::size_of::<[[i32; 5]; 7]>() as u64)
         .wrapping_div(::core::mem::size_of::<[i32; 5]>() as u64) as i32;
-    i = 1;
+
+    let mut i = 1;
     while i < N {
         if rate_table[i as usize][0 as usize] > rate {
             break;
         }
         i += 1;
     }
+    let mut silk_rate;
     if i == N {
         silk_rate = rate_table[(i - 1) as usize][entry as usize];
         silk_rate += (rate - rate_table[(i - 1) as usize][0 as usize]) / 2;
     } else {
-        let mut lo: i32 = 0;
-        let mut hi: i32 = 0;
-        let mut x0: i32 = 0;
-        let mut x1: i32 = 0;
-        lo = rate_table[(i - 1) as usize][entry as usize];
-        hi = rate_table[i as usize][entry as usize];
-        x0 = rate_table[(i - 1) as usize][0 as usize];
-        x1 = rate_table[i as usize][0 as usize];
+        let lo = rate_table[(i - 1) as usize][entry as usize];
+        let hi = rate_table[i as usize][entry as usize];
+        let x0 = rate_table[(i - 1) as usize][0 as usize];
+        let x1 = rate_table[i as usize][0 as usize];
         silk_rate = (lo * (x1 - rate) + hi * (rate - x0)) / (x1 - x0);
     }
     if vbr == 0 {
@@ -845,6 +775,7 @@ unsafe fn compute_silk_rate_for_hybrid(
     }
     return silk_rate;
 }
+
 unsafe fn compute_equiv_rate(
     bitrate: i32,
     channels: i32,
@@ -854,8 +785,7 @@ unsafe fn compute_equiv_rate(
     complexity: i32,
     loss: i32,
 ) -> i32 {
-    let mut equiv: i32 = 0;
-    equiv = bitrate;
+    let mut equiv = bitrate;
     if frame_rate > 50 {
         equiv -= (40 * channels + 20) * (frame_rate - 50);
     }
@@ -875,7 +805,7 @@ unsafe fn compute_equiv_rate(
     } else {
         equiv -= equiv * loss / (12 * loss + 20);
     }
-    return equiv;
+    equiv
 }
 
 pub fn is_digital_silence(pcm: &[f32], frame_size: i32, channels: i32, lsb_depth: i32) -> i32 {
@@ -896,10 +826,9 @@ unsafe fn decide_dtx_mode(
     mut is_silence: i32,
     arch: i32,
 ) -> i32 {
-    let mut noise_energy: f32 = 0.;
     if is_silence == 0 {
         if activity_probability < DTX_ACTIVITY_THRESHOLD {
-            noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
+            let noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
             is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
         }
     }
@@ -915,8 +844,9 @@ unsafe fn decide_dtx_mode(
     } else {
         *nb_no_activity_frames = 0;
     }
-    return 0;
+    0
 }
+
 unsafe fn encode_multiframe_packet(
     st: *mut OpusEncoder,
     pcm: &[f32],
@@ -928,13 +858,8 @@ unsafe fn encode_multiframe_packet(
     lsb_depth: i32,
     float_api: i32,
 ) -> i32 {
-    let mut ret: i32 = 0;
-    let mut bak_mode: i32 = 0;
-    let mut bak_bandwidth: i32 = 0;
-    let mut bak_channels: i32 = 0;
-    let mut bak_to_mono: i32 = 0;
-    let mut cbr_bytes: i32 = 0;
-    let mut repacketize_len: i32 = 0;
+    let cbr_bytes;
+    let repacketize_len;
 
     // Worst cases:
     // 2 frames: Code 2 with different compressed sizes
@@ -962,13 +887,13 @@ unsafe fn encode_multiframe_packet(
     let vla = (nb_frames * bytes_per_frame) as usize;
     let mut tmp_data: Vec<u8> = vec![0u8; vla];
     let mut rp = OpusRepacketizer::default();
-    bak_mode = (*st).user_forced_mode;
-    bak_bandwidth = (*st).user_bandwidth;
-    bak_channels = (*st).force_channels;
+    let bak_mode = (*st).user_forced_mode;
+    let bak_bandwidth = (*st).user_bandwidth;
+    let bak_channels = (*st).force_channels;
     (*st).user_forced_mode = (*st).mode;
     (*st).user_bandwidth = (*st).bandwidth;
     (*st).force_channels = (*st).stream_channels;
-    bak_to_mono = (*st).silk_mode.toMono;
+    let bak_to_mono = (*st).silk_mode.toMono;
     if bak_to_mono != 0 {
         (*st).force_channels = 1;
     } else {
@@ -1004,7 +929,7 @@ unsafe fn encode_multiframe_packet(
             return OPUS_INTERNAL_ERROR;
         }
 
-        ret = rp.cat(&tmp_data[start..start + tmp_len as usize]);
+        let ret = rp.cat(&tmp_data[start..start + tmp_len as usize]);
         offsets.push((start, start + tmp_len as usize));
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;
@@ -1019,7 +944,7 @@ unsafe fn encode_multiframe_packet(
         .map(|(start, end)| &tmp_data[start..end])
         .collect();
     let data = std::slice::from_raw_parts_mut(data, repacketize_len as _);
-    ret = rp.out_range_impl(
+    let ret = rp.out_range_impl(
         0,
         nb_frames,
         data,
@@ -1046,18 +971,13 @@ unsafe fn compute_redundancy_bytes(
     frame_rate: i32,
     channels: i32,
 ) -> i32 {
-    let mut redundancy_bytes_cap: i32 = 0;
-    let mut redundancy_bytes: i32 = 0;
-    let mut redundancy_rate: i32 = 0;
-    let mut base_bits: i32 = 0;
-    let mut available_bits: i32 = 0;
-    base_bits = 40 * channels + 20;
-    redundancy_rate = bitrate_bps + base_bits * (200 - frame_rate);
-    redundancy_rate = 3 * redundancy_rate / 2;
-    redundancy_bytes = redundancy_rate / 1600;
-    available_bits = max_data_bytes * 8 - 2 * base_bits;
-    redundancy_bytes_cap = (available_bits * 240 / (240 + 48000 / frame_rate) + base_bits) / 8;
-    redundancy_bytes = if redundancy_bytes < redundancy_bytes_cap {
+    let base_bits = 40 * channels + 20;
+    let redundancy_rate = bitrate_bps + base_bits * (200 - frame_rate);
+    let redundancy_rate = 3 * redundancy_rate / 2;
+    let redundancy_bytes = redundancy_rate / 1600;
+    let available_bits = max_data_bytes * 8 - 2 * base_bits;
+    let redundancy_bytes_cap = (available_bits * 240 / (240 + 48000 / frame_rate) + base_bits) / 8;
+    let mut redundancy_bytes = if redundancy_bytes < redundancy_bytes_cap {
         redundancy_bytes
     } else {
         redundancy_bytes_cap
@@ -1071,7 +991,7 @@ unsafe fn compute_redundancy_bytes(
     } else {
         redundancy_bytes = 0;
     }
-    return redundancy_bytes;
+    redundancy_bytes
 }
 
 pub unsafe fn opus_encode_native<T>(
@@ -1089,9 +1009,6 @@ pub unsafe fn opus_encode_native<T>(
     downmix: DownmixFn<T>,
     float_api: i32,
 ) -> i32 {
-    let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
-    let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
-    let mut i: i32 = 0;
     let mut ret: i32 = 0;
     let mut nBytes: i32 = 0;
     let mut enc: ec_enc = ec_enc {
@@ -1146,8 +1063,8 @@ pub unsafe fn opus_encode_native<T>(
     if max_data_bytes == 1 && (*st).Fs == frame_size * 10 {
         return OPUS_BUFFER_TOO_SMALL;
     }
-    silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
-    celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
+    let silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
+    let celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
     if (*st).application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
         delay_compensation = 0;
     } else {
@@ -1479,15 +1396,13 @@ pub unsafe fn opus_encode_native<T>(
             voice_bandwidth_thresholds = mono_voice_bandwidth_thresholds.as_ptr();
             music_bandwidth_thresholds = mono_music_bandwidth_thresholds.as_ptr();
         }
-        i = 0;
-        while i < 8 {
+        for i in 0..8 {
             bandwidth_thresholds[i as usize] = *music_bandwidth_thresholds.offset(i as isize)
                 + (voice_est
                     * voice_est
                     * (*voice_bandwidth_thresholds.offset(i as isize)
                         - *music_bandwidth_thresholds.offset(i as isize))
                     >> 14);
-            i += 1;
         }
         loop {
             let mut threshold_0: i32 = 0;
@@ -1782,8 +1697,7 @@ pub unsafe fn opus_encode_native<T>(
             }
             c = 0;
             while c < (*st).channels {
-                i = 0;
-                while i < end {
+                for i in 0..end {
                     let mut mask: f32 = 0.;
                     mask = if (if *((*st).energy_masking).offset((21 * c + i) as isize) < 0.5f32 {
                         *((*st).energy_masking).offset((21 * c + i) as isize)
@@ -1803,7 +1717,6 @@ pub unsafe fn opus_encode_native<T>(
                         mask = 0.5f32 * mask;
                     }
                     mask_sum += mask;
-                    i += 1;
                 }
                 c += 1;
             }
@@ -1917,11 +1830,9 @@ pub unsafe fn opus_encode_native<T>(
                 0,
                 (prefill_offset as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
             );
-            i = 0;
-            while i < (*st).encoder_buffer * (*st).channels {
+            for i in 0..(*st).encoder_buffer * (*st).channels {
                 *pcm_silk.as_mut_ptr().offset(i as isize) =
                     FLOAT2INT16((*st).delay_buffer[i as usize]);
-                i += 1;
             }
             silk_Encode(
                 silk_enc,
@@ -1935,14 +1846,12 @@ pub unsafe fn opus_encode_native<T>(
             );
             (*st).silk_mode.opusCanSwitch = 0;
         }
-        i = 0;
-        while i < frame_size * (*st).channels {
+        for i in 0..frame_size * (*st).channels {
             *pcm_silk.as_mut_ptr().offset(i as isize) = FLOAT2INT16(
                 *pcm_buf
                     .as_mut_ptr()
                     .offset((total_buffer * (*st).channels + i) as isize),
             );
-            i += 1;
         }
         ret = silk_Encode(
             silk_enc,

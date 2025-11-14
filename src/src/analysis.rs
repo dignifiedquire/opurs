@@ -534,7 +534,6 @@ fn downmix_and_resample<T>(
         return 0.;
     }
 
-    let mut scale: f32 = 0.;
     let mut ret: f32 = 0.;
     if fs == 48_000 {
         subframe *= 2;
@@ -547,7 +546,7 @@ fn downmix_and_resample<T>(
 
     downmix.expect("non-null function pointer")(_x, &mut tmp, subframe as _, offset, c1, c2, C);
 
-    scale = 1.0 / 32_768.;
+    let mut scale = 1.0 / 32_768.;
 
     if c2 == -2 {
         scale /= C as f32;
@@ -754,7 +753,6 @@ impl TonalityAnalysisState {
         let mut prob_avg =
             (if 0.1 > vad_prob { 0.1 } else { vad_prob }) * self.info[mpos as usize].music_prob;
         loop {
-            let mut pos_vad: f32 = 0.;
             mpos += 1;
             if mpos == DETECT_SIZE {
                 mpos = 0;
@@ -769,7 +767,7 @@ impl TonalityAnalysisState {
             if vpos == self.write_pos {
                 break;
             }
-            pos_vad = self.info[vpos as usize].activity_probability;
+            let pos_vad = self.info[vpos as usize].activity_probability;
             prob_min = if (prob_avg - 10 as f32 * (vad_prob - pos_vad)) / prob_count < prob_min {
                 (prob_avg - 10 as f32 * (vad_prob - pos_vad)) / prob_count
             } else {
@@ -861,8 +859,6 @@ impl TonalityAnalysisState {
         lsb_depth: i32,
         downmix: DownmixFn<T>,
     ) {
-        let mut i: i32 = 0;
-        let mut b: i32 = 0;
         let N: i32 = 480;
         let N2: i32 = 240;
         let A = &mut self.angle;
@@ -872,51 +868,33 @@ impl TonalityAnalysisState {
         let mut logE: [f32; 18] = [0.; 18];
         let mut BFCC: [f32; 8] = [0.; 8];
         let mut features: [f32; 25] = [0.; 25];
-        let mut frame_tonality: f32 = 0.;
-        let mut max_frame_tonality: f32 = 0.;
-        let mut frame_noisiness: f32 = 0.;
         let pi4: f32 = (PI * PI * PI * PI) as f32;
         let mut slope: f32 = 0 as f32;
-        let mut frame_stationarity: f32 = 0.;
-        let mut relativeE: f32 = 0.;
-        let mut alpha: f32 = 0.;
-        let mut alphaE: f32 = 0.;
-        let mut alphaE2: f32 = 0.;
-        let mut frame_loudness: f32 = 0.;
-        let mut bandwidth_mask: f32 = 0.;
         let mut is_masked: [i32; 19] = [0; 19];
-        let mut bandwidth: i32 = 0;
-        let mut maxE: f32 = 0 as f32;
-        let mut noise_floor: f32 = 0.;
-        let mut remaining: i32 = 0;
-        let mut hp_ener: f32 = 0.;
         let mut tonality2: [f32; 240] = [0.; 240];
         let mut midE: [f32; 8] = [0.; 8];
         let mut spec_variability: f32 = 0 as f32;
         let mut band_log2: [f32; 19] = [0.; 19];
         let mut leakage_from: [f32; 19] = [0.; 19];
         let mut leakage_to: [f32; 19] = [0.; 19];
-        let mut below_max_pitch: f32 = 0.;
-        let mut above_max_pitch: f32 = 0.;
-        let mut is_silence: i32 = 0;
 
         if self.initialized == 0 {
             self.mem_fill = 240;
             self.initialized = 1;
         }
-        alpha = 1.0f32
+        let alpha = 1.0f32
             / (if (10) < 1 + self.count {
                 10
             } else {
                 1 + self.count
             }) as f32;
-        alphaE = 1.0f32
+        let alphaE = 1.0f32
             / (if (25) < 1 + self.count {
                 25
             } else {
                 1 + self.count
             }) as f32;
-        alphaE2 = 1.0f32
+        let mut alphaE2 = 1.0f32
             / (if (100) < 1 + self.count {
                 100
             } else {
@@ -953,30 +931,28 @@ impl TonalityAnalysisState {
             self.mem_fill += len;
             return;
         }
-        hp_ener = self.hp_ener_accum;
+        let hp_ener = self.hp_ener_accum;
         let info_pos = self.write_pos as usize;
         self.write_pos = self.write_pos + 1;
         if self.write_pos >= DETECT_SIZE {
             self.write_pos -= DETECT_SIZE;
         }
-        is_silence = is_digital_silence(&self.inmem, 720, 1, lsb_depth);
+        let is_silence = is_digital_silence(&self.inmem, 720, 1, lsb_depth);
         let mut in_0: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
         let mut out: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
         let mut tonality: [f32; 240] = [0.; 240];
         let mut noisiness: [f32; 240] = [0.; 240];
-        i = 0;
-        while i < N2 {
+        for i in 0..N2 {
             let w: f32 = ANALYSIS_WINDOW[i as usize];
             in_0[i as usize].re = w * self.inmem[i as usize];
             in_0[i as usize].im = w * self.inmem[(N2 + i) as usize];
             in_0[(N - i - 1) as usize].re = w * self.inmem[(N - i - 1) as usize];
             in_0[(N - i - 1) as usize].im = w * self.inmem[(N + N2 - i - 1) as usize];
-            i += 1;
         }
         // OPUS_MOVE(tonal->inmem, tonal->inmem+ANALYSIS_BUF_SIZE-240, 240);
         let start = ANALYSIS_BUF_SIZE as usize - 240;
         self.inmem.copy_within(start..start + 240, 0);
-        remaining = len - (ANALYSIS_BUF_SIZE - self.mem_fill);
+        let remaining = len - (ANALYSIS_BUF_SIZE - self.mem_fill);
         self.hp_ener_accum = downmix_and_resample(
             downmix,
             x,
@@ -1006,49 +982,33 @@ impl TonalityAnalysisState {
             info.valid = 0;
             return;
         }
-        i = 1;
-        while i < N2 {
-            let mut X1r: f32 = 0.;
-            let mut X2r: f32 = 0.;
-            let mut X1i: f32 = 0.;
-            let mut X2i: f32 = 0.;
-            let mut angle: f32 = 0.;
-            let mut d_angle: f32 = 0.;
-            let mut d2_angle: f32 = 0.;
-            let mut angle2: f32 = 0.;
-            let mut d_angle2: f32 = 0.;
-            let mut d2_angle2: f32 = 0.;
-            let mut mod1: f32 = 0.;
-            let mut mod2: f32 = 0.;
-            let mut avg_mod: f32 = 0.;
-            X1r = out[i as usize].re + out[(N - i) as usize].re;
-            X1i = out[i as usize].im - out[(N - i) as usize].im;
-            X2r = out[i as usize].im + out[(N - i) as usize].im;
-            X2i = out[(N - i) as usize].re - out[i as usize].re;
-            angle = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X1i, X1r);
-            d_angle = angle - A[i as usize];
-            d2_angle = d_angle - dA[i as usize];
-            angle2 = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X2i, X2r);
-            d_angle2 = angle2 - angle;
-            d2_angle2 = d_angle2 - d_angle;
-            mod1 = d2_angle - float2int(d2_angle) as f32;
+        for i in 1..N2 {
+            let X1r = out[i as usize].re + out[(N - i) as usize].re;
+            let X1i = out[i as usize].im - out[(N - i) as usize].im;
+            let X2r = out[i as usize].im + out[(N - i) as usize].im;
+            let X2i = out[(N - i) as usize].re - out[i as usize].re;
+            let angle = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X1i, X1r);
+            let d_angle = angle - A[i as usize];
+            let d2_angle = d_angle - dA[i as usize];
+            let angle2 = (0.5f32 as f64 / PI) as f32 * fast_atan2f(X2i, X2r);
+            let d_angle2 = angle2 - angle;
+            let d2_angle2 = d_angle2 - d_angle;
+            let mut mod1 = d2_angle - float2int(d2_angle) as f32;
             noisiness[i as usize] = (mod1).abs();
             mod1 *= mod1;
             mod1 *= mod1;
-            mod2 = d2_angle2 - float2int(d2_angle2) as f32;
+            let mut mod2 = d2_angle2 - float2int(d2_angle2) as f32;
             noisiness[i as usize] += (mod2).abs();
             mod2 *= mod2;
             mod2 *= mod2;
-            avg_mod = 0.25f32 * (d2A[i as usize] + mod1 + 2 as f32 * mod2);
+            let avg_mod = 0.25f32 * (d2A[i as usize] + mod1 + 2 as f32 * mod2);
             tonality[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * avg_mod) - 0.015f32;
             tonality2[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * mod2) - 0.015f32;
             A[i as usize] = angle2;
             dA[i as usize] = d_angle2;
             d2A[i as usize] = mod2;
-            i += 1;
         }
-        i = 2;
-        while i < N2 - 1 {
+        for i in 2..N2 - 1 {
             let tt: f32 = if tonality2[i as usize]
                 < (if tonality2[(i - 1) as usize] > tonality2[(i + 1) as usize] {
                     tonality2[(i - 1) as usize]
@@ -1067,50 +1027,38 @@ impl TonalityAnalysisState {
                 } else {
                     tt - 0.1f32
                 });
-            i += 1;
         }
-        frame_tonality = 0 as f32;
-        max_frame_tonality = 0 as f32;
+        let mut frame_tonality = 0 as f32;
+        let mut max_frame_tonality = 0 as f32;
         (*info).activity = 0 as f32;
-        frame_noisiness = 0 as f32;
-        frame_stationarity = 0 as f32;
+        let mut frame_noisiness = 0 as f32;
+        let mut frame_stationarity = 0 as f32;
         if self.count == 0 {
-            b = 0;
-            while b < NB_TBANDS {
+            for b in 0..NB_TBANDS {
                 self.lowE[b as usize] = 1e10f64 as f32;
                 self.highE[b as usize] = -1e10f64 as f32;
-                b += 1;
             }
         }
-        relativeE = 0 as f32;
-        frame_loudness = 0 as f32;
-        let mut E: f32 = 0 as f32;
-        let mut X1r_0: f32 = 0.;
-        let mut X2r_0: f32 = 0.;
-        X1r_0 = 2 as f32 * out[0 as usize].re;
-        X2r_0 = 2 as f32 * out[0 as usize].im;
-        E = X1r_0 * X1r_0 + X2r_0 * X2r_0;
-        i = 1;
-        while i < 4 {
+
+        let X1r_0 = 2. * out[0 as usize].re;
+        let X2r_0 = 2. * out[0 as usize].im;
+        let mut relativeE = 0.;
+        let mut frame_loudness = 0.;
+        let mut E = X1r_0 * X1r_0 + X2r_0 * X2r_0;
+        for i in 1..4 {
             let binE: f32 = out[i as usize].re * out[i as usize].re
                 + out[(N - i) as usize].re * out[(N - i) as usize].re
                 + out[i as usize].im * out[i as usize].im
                 + out[(N - i) as usize].im * out[(N - i) as usize].im;
             E += binE;
-            i += 1;
         }
         // E = E;
         band_log2[0 as usize] = 0.5f32 * std::f32::consts::LOG2_E * celt_log(E + 1e-10f32);
-        b = 0;
-        while b < NB_TBANDS {
+        for b in 0..NB_TBANDS {
             let mut E_0: f32 = 0 as f32;
             let mut tE: f32 = 0 as f32;
             let mut nE: f32 = 0 as f32;
-            let mut L1: f32 = 0.;
-            let mut L2: f32 = 0.;
-            let mut stationarity: f32 = 0.;
-            i = TBANDS[b as usize];
-            while i < TBANDS[(b + 1) as usize] {
+            for i in TBANDS[b as usize]..TBANDS[(b + 1) as usize] {
                 let binE_0: f32 = out[i as usize].re * out[i as usize].re
                     + out[(N - i) as usize].re * out[(N - i) as usize].re
                     + out[i as usize].im * out[i as usize].im
@@ -1124,7 +1072,6 @@ impl TonalityAnalysisState {
                         tonality[i as usize]
                     });
                 nE += binE_0 * 2.0f32 * (0.5f32 - noisiness[i as usize]);
-                i += 1;
             }
             if !(E_0 < 1e9f32) || E_0 != E_0 {
                 (*info).valid = 0;
@@ -1169,18 +1116,16 @@ impl TonalityAnalysisState {
             }
             relativeE += (logE[b as usize] - self.lowE[b as usize])
                 / (1e-5f32 + (self.highE[b as usize] - self.lowE[b as usize]));
-            L2 = 0 as f32;
-            L1 = L2;
-            i = 0;
-            while i < NB_FRAMES {
+            let mut L2 = 0.;
+            let mut L1 = L2;
+            for i in 0..NB_FRAMES {
                 L1 += celt_sqrt(self.E[i as usize][b as usize]);
                 L2 += self.E[i as usize][b as usize];
-                i += 1;
             }
             // NB:
             //  because `1e-15` is specified without a suffix in the upstream,
             //   this addition is performed as f64 and `celt_sqrt` can't be used
-            stationarity =
+            let mut stationarity =
                 0.99f32.min(L1 / (1e-15 + ((NB_FRAMES as f32 * L2) as f64)).sqrt() as f32);
             stationarity *= stationarity;
             stationarity *= stationarity;
@@ -1203,12 +1148,10 @@ impl TonalityAnalysisState {
                 };
             slope += band_tonality[b as usize] * (b - 8) as f32;
             self.prev_band_tonality[b as usize] = band_tonality[b as usize];
-            b += 1;
         }
         leakage_from[0 as usize] = band_log2[0 as usize];
         leakage_to[0 as usize] = band_log2[0 as usize] - LEAKAGE_OFFSET;
-        b = 1;
-        while b < NB_TBANDS + 1 {
+        for b in 1..NB_TBANDS + 1 {
             let leak_slope: f32 =
                 LEAKAGE_SLOPE * (TBANDS[b as usize] - TBANDS[(b - 1) as usize]) as f32 / 4 as f32;
             leakage_from[b as usize] =
@@ -1223,10 +1166,8 @@ impl TonalityAnalysisState {
                 } else {
                     band_log2[b as usize] - 2.5f32
                 };
-            b += 1;
         }
-        b = NB_TBANDS - 2;
-        while b >= 0 {
+        for b in (0..=NB_TBANDS - 2).rev() {
             let leak_slope_0: f32 =
                 LEAKAGE_SLOPE * (TBANDS[(b + 1) as usize] - TBANDS[b as usize]) as f32 / 4 as f32;
             leakage_from[b as usize] =
@@ -1241,11 +1182,9 @@ impl TonalityAnalysisState {
                 } else {
                     leakage_to[b as usize]
                 };
-            b -= 1;
         }
         assert!(18 + 1 <= 19);
-        b = 0;
-        while b < NB_TBANDS + 1 {
+        for b in 0..NB_TBANDS + 1 {
             let boost: f32 =
                 (if 0 as f32 > leakage_to[b as usize] - band_log2[b as usize] {
                     0 as f32
@@ -1261,60 +1200,43 @@ impl TonalityAnalysisState {
             } else {
                 (0.5 + (64.0 * boost)).floor() as i32
             }) as u8;
-            b += 1;
         }
-        while b < LEAK_BANDS {
+        for b in (NB_TBANDS + 1)..LEAK_BANDS {
             (*info).leak_boost[b as usize] = 0;
-            b += 1;
         }
-        i = 0;
-        while i < NB_FRAMES {
-            let mut j: i32 = 0;
+        for i in 0..NB_FRAMES {
             let mut mindist: f32 = 1e15f32;
-            j = 0;
-            while j < NB_FRAMES {
-                let mut k: i32 = 0;
+            for j in 0..NB_FRAMES {
                 let mut dist: f32 = 0 as f32;
-                k = 0;
-                while k < NB_TBANDS {
-                    let mut tmp: f32 = 0.;
-                    tmp = self.logE[i as usize][k as usize] - self.logE[j as usize][k as usize];
+                for k in 0..NB_TBANDS {
+                    let tmp = self.logE[i as usize][k as usize] - self.logE[j as usize][k as usize];
                     dist += tmp * tmp;
-                    k += 1;
                 }
                 if j != i {
                     mindist = if mindist < dist { mindist } else { dist };
                 }
-                j += 1;
             }
             spec_variability += mindist;
-            i += 1;
         }
         spec_variability = celt_sqrt(spec_variability / NB_FRAMES as f32 / NB_TBANDS as f32);
-        bandwidth_mask = 0 as f32;
-        bandwidth = 0;
-        maxE = 0 as f32;
-        noise_floor =
+        let mut bandwidth_mask = 0.;
+        let mut bandwidth = 0;
+        let mut maxE = 0 as f32;
+        let mut noise_floor =
             5.7e-4f32 / ((1) << (if 0 > lsb_depth - 8 { 0 } else { lsb_depth - 8 })) as f32;
         noise_floor *= noise_floor;
-        below_max_pitch = 0 as f32;
-        above_max_pitch = 0 as f32;
-        b = 0;
-        while b < NB_TBANDS {
-            let mut E_1: f32 = 0 as f32;
-            let mut Em: f32 = 0.;
-            let mut band_start: i32 = 0;
-            let mut band_end: i32 = 0;
-            band_start = TBANDS[b as usize];
-            band_end = TBANDS[(b + 1) as usize];
-            i = band_start;
-            while i < band_end {
+        let mut below_max_pitch = 0.;
+        let mut above_max_pitch = 0.;
+        for b in 0..NB_TBANDS {
+            let mut E_1: f32 = 0.;
+            let band_start = TBANDS[b as usize];
+            let band_end = TBANDS[(b + 1) as usize];
+            for i in band_start..band_end {
                 let binE_1: f32 = out[i as usize].re * out[i as usize].re
                     + out[(N - i) as usize].re * out[(N - i) as usize].re
                     + out[i as usize].im * out[i as usize].im
                     + out[(N - i) as usize].im * out[(N - i) as usize].im;
                 E_1 += binE_1;
-                i += 1;
             }
             // E_1 = E_1;
             maxE = if maxE > E_1 { maxE } else { E_1 };
@@ -1328,7 +1250,7 @@ impl TonalityAnalysisState {
             } else {
                 E_1
             };
-            Em = if E_1 > self.meanE[b as usize] {
+            let Em = if E_1 > self.meanE[b as usize] {
                 E_1
             } else {
                 self.meanE[b as usize]
@@ -1350,16 +1272,14 @@ impl TonalityAnalysisState {
             } else {
                 E_1
             };
-            b += 1;
         }
+        let b = NB_TBANDS;
         if self.Fs == 48000 {
-            let mut noise_ratio: f32 = 0.;
-            let mut Em_0: f32 = 0.;
             let E_2: f32 = hp_ener * (1.0f32 / (60 * 60) as f32);
-            noise_ratio = if self.prev_bandwidth == 20 {
-                10.0f32
+            let noise_ratio = if self.prev_bandwidth == 20 {
+                10.0
             } else {
-                30.0f32
+                30.0
             };
             above_max_pitch += E_2;
             self.meanE[b as usize] = if (1 as f32 - alphaE2) * self.meanE[b as usize] > E_2 {
@@ -1367,7 +1287,7 @@ impl TonalityAnalysisState {
             } else {
                 E_2
             };
-            Em_0 = if E_2 > self.meanE[b as usize] {
+            let Em_0 = if E_2 > self.meanE[b as usize] {
                 E_2
             } else {
                 self.meanE[b as usize]
@@ -1410,29 +1330,21 @@ impl TonalityAnalysisState {
         if frame_loudness < self.Etracker - 30 as f32 {
             self.lowECount += alphaE;
         }
-        i = 0;
-        while i < 8 {
+        for i in 0..8 {
             let mut sum: f32 = 0 as f32;
-            b = 0;
-            while b < 16 {
+            for b in 0..16 {
                 sum += DCT_TABLE[(i * 16 + b) as usize] * logE[b as usize];
-                b += 1;
             }
             BFCC[i as usize] = sum;
-            i += 1;
         }
-        i = 0;
-        while i < 8 {
+        for i in 0..8 {
             let mut sum_0: f32 = 0 as f32;
-            b = 0;
-            while b < 16 {
+            for b in 0..16 {
                 sum_0 += DCT_TABLE[(i * 16 + b) as usize]
                     * 0.5f32
                     * (self.highE[b as usize] + self.lowE[b as usize]);
-                b += 1;
             }
             midE[i as usize] = sum_0;
-            i += 1;
         }
         frame_stationarity /= NB_TBANDS as f32;
         relativeE /= NB_TBANDS as f32;
@@ -1457,61 +1369,45 @@ impl TonalityAnalysisState {
             10000
         };
         (*info).tonality = frame_tonality;
-        i = 0;
-        while i < 4 {
+        for i in 0..4 {
             features[i as usize] = -0.12299f32 * (BFCC[i as usize] + self.mem[(i + 24) as usize])
                 + 0.49195f32 * (self.mem[i as usize] + self.mem[(i + 16) as usize])
                 + 0.69693f32 * self.mem[(i + 8) as usize]
                 - 1.4349f32 * self.cmean[i as usize];
-            i += 1;
         }
-        i = 0;
-        while i < 4 {
+        for i in 0..4 {
             self.cmean[i as usize] =
                 (1 as f32 - alpha) * self.cmean[i as usize] + alpha * BFCC[i as usize];
-            i += 1;
         }
-        i = 0;
-        while i < 4 {
+        for i in 0..4 {
             features[(4 + i) as usize] = 0.63246f32
                 * (BFCC[i as usize] - self.mem[(i + 24) as usize])
                 + 0.31623f32 * (self.mem[i as usize] - self.mem[(i + 16) as usize]);
-            i += 1;
         }
-        i = 0;
-        while i < 3 {
+        for i in 0..3 {
             features[(8 + i) as usize] = 0.53452f32
                 * (BFCC[i as usize] + self.mem[(i + 24) as usize])
                 - 0.26726f32 * (self.mem[i as usize] + self.mem[(i + 16) as usize])
                 - 0.53452f32 * self.mem[(i + 8) as usize];
-            i += 1;
         }
         if self.count > 5 {
-            i = 0;
-            while i < 9 {
+            for i in 0..9 {
                 self.std[i as usize] = (1 as f32 - alpha) * self.std[i as usize]
                     + alpha * features[i as usize] * features[i as usize];
-                i += 1;
             }
         }
-        i = 0;
-        while i < 4 {
+        for i in 0..4 {
             features[i as usize] = BFCC[i as usize] - midE[i as usize];
-            i += 1;
         }
-        i = 0;
-        while i < 8 {
+        for i in 0..8 {
             self.mem[(i + 24) as usize] = self.mem[(i + 16) as usize];
             self.mem[(i + 16) as usize] = self.mem[(i + 8) as usize];
             self.mem[(i + 8) as usize] = self.mem[i as usize];
             self.mem[i as usize] = BFCC[i as usize];
-            i += 1;
         }
-        i = 0;
-        while i < 9 {
+        for i in 0..9 {
             features[(11 + i) as usize] =
                 celt_sqrt(self.std[i as usize]) - STD_FEATURE_BIAS[i as usize];
-            i += 1;
         }
         features[18] = spec_variability - 0.78f32;
         features[20] = (*info).tonality - 0.154723f32;
@@ -1562,8 +1458,6 @@ impl TonalityAnalysisState {
         lsb_depth: i32,
         downmix: DownmixFn<T>,
     ) -> AnalysisInfo {
-        let mut offset: i32 = 0;
-        let mut pcm_len: i32 = 0;
         analysis_frame_size -= analysis_frame_size & 1;
         if let Some(analysis_pcm) = analysis_pcm {
             analysis_frame_size = if ((100 - 5) * Fs / 50) < analysis_frame_size {
@@ -1571,8 +1465,8 @@ impl TonalityAnalysisState {
             } else {
                 analysis_frame_size
             };
-            pcm_len = analysis_frame_size - self.analysis_offset;
-            offset = self.analysis_offset;
+            let mut pcm_len = analysis_frame_size - self.analysis_offset;
+            let mut offset = self.analysis_offset;
             while pcm_len > 0 {
                 self.analysis(
                     celt_mode,
