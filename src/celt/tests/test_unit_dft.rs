@@ -67,8 +67,8 @@ fn test1d(nfft: usize, isinverse: bool) {
     let mut out = vec![kiss_fft_cpx::default(); nfft];
 
     for k in 0..nfft {
-        in_0[k].re = (rand() % 32767 - 16384) as f32;
-        in_0[k].im = (rand() % 32767 - 16384) as f32;
+        in_0[k].re = ((rand() % 32767).wrapping_sub(16384)) as f32;
+        in_0[k].im = ((rand() % 32767).wrapping_sub(16384)) as f32;
     }
     for k in 0..nfft {
         in_0[k].re *= 32768.;
