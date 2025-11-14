@@ -40,11 +40,14 @@ fn check(input: &[kiss_fft_cpx], out: &[kiss_fft_cpx], nfft: usize, isinverse: b
     }
 }
 
-fn rand() -> i32 {
+pub(super) fn rand() -> u32 {
+    // TODO: add seed
     let mut t = [0u8; 4];
     getrandom::getrandom(&mut t).unwrap();
-    i32::from_be_bytes(t)
+    u32::from_be_bytes(t)
 }
+
+pub(super) const RAND_MAX: u32 = u32::MAX;
 
 fn test1d(nfft: usize, isinverse: bool) {
     let mode = opus_custom_mode_create(48000, 960, None).unwrap();
