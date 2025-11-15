@@ -1,17 +1,11 @@
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-    pub type celt_sig = f32;
-    pub const Q15ONE: f32 = 1.0f32;
-}
-pub mod stddef_h {
-    pub const NULL: i32 = 0;
-}
-pub use self::arch_h::{celt_sig, opus_val16, opus_val32, Q15ONE};
-pub use self::stddef_h::NULL;
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
+
+pub type opus_val16 = f32;
+pub type opus_val32 = f32;
+pub type celt_sig = f32;
+pub const Q15ONE: f32 = 1.0f32;
 
 #[inline]
 pub unsafe fn dual_inner_prod_c(
@@ -244,75 +238,64 @@ unsafe fn celt_fir5(x: *mut opus_val16, num: *const opus_val16, N: i32) {
     }
 }
 pub unsafe fn pitch_downsample(
-    x: *mut *mut celt_sig,
+    x: &mut [&mut [celt_sig]],
     x_lp: *mut opus_val16,
     len: i32,
     C: i32,
     arch: i32,
 ) {
-    let mut i: i32 = 0;
     let mut ac: [opus_val32; 5] = [0.; 5];
     let mut tmp: opus_val16 = Q15ONE;
     let mut lpc: [opus_val16; 4] = [0.; 4];
     let mut lpc2: [opus_val16; 5] = [0.; 5];
     let c1: opus_val16 = 0.8f32;
-    i = 1;
-    while i < len >> 1 {
-        *x_lp.offset(i as isize) = 0.5f32
-            * (0.5f32
-                * (*(*x.offset(0 as isize)).offset((2 * i - 1) as isize)
-                    + *(*x.offset(0 as isize)).offset((2 * i + 1) as isize))
-                + *(*x.offset(0 as isize)).offset((2 * i) as isize));
-        i += 1;
+
+    for i in 1..len >> 1 {
+        *x_lp.offset(i as isize) = 0.5
+            * (0.5 * (x[0][(2 * i - 1) as usize] + x[0][(2 * i + 1) as usize])
+                + x[0][(2 * i) as usize]);
     }
-    *x_lp.offset(0 as isize) = 0.5f32
-        * (0.5f32 * *(*x.offset(0 as isize)).offset(1 as isize)
-            + *(*x.offset(0 as isize)).offset(0 as isize));
+
+    *x_lp.offset(0) = 0.5 * ((0.5 * x[0][1]) + x[0][0]);
+
     if C == 2 {
-        i = 1;
-        while i < len >> 1 {
-            let ref mut fresh19 = *x_lp.offset(i as isize);
-            *fresh19 += 0.5f32
-                * (0.5f32
-                    * (*(*x.offset(1 as isize)).offset((2 * i - 1) as isize)
-                        + *(*x.offset(1 as isize)).offset((2 * i + 1) as isize))
-                    + *(*x.offset(1 as isize)).offset((2 * i) as isize));
-            i += 1;
+        for i in 1..len >> 1 {
+            *x_lp.offset(i as isize) += 0.5
+                * (0.5 * (x[1][(2 * i - 1) as usize] + x[1][(2 * i + 1) as usize])
+                    + x[1][(2 * i) as usize]);
         }
-        let ref mut fresh20 = *x_lp.offset(0 as isize);
-        *fresh20 += 0.5f32
-            * (0.5f32 * *(*x.offset(1 as isize)).offset(1 as isize)
-                + *(*x.offset(1 as isize)).offset(0 as isize));
+        *x_lp.offset(0) += 0.5 * (0.5 * x[1][1] + x[1][0]);
     }
+
     _celt_autocorr(
         x_lp,
         ac.as_mut_ptr(),
-        NULL as *const opus_val16,
+        std::ptr::null(),
         0,
         4,
         len >> 1,
         arch,
     );
-    ac[0 as usize] *= 1.0001f32;
-    i = 1;
-    while i <= 4 {
-        ac[i as usize] -= ac[i as usize] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
-        i += 1;
+    ac[0] *= 1.0001f32;
+    for i in 0..=4 {
+        ac[i as usize] -= ac[i as usize] * (0.008 * i as f32) * (0.008 * i as f32);
     }
     _celt_lpc(lpc.as_mut_ptr(), ac.as_mut_ptr(), 4);
-    i = 0;
-    while i < 4 {
+    for i in 0..4 {
         tmp = 0.9f32 * tmp;
         lpc[i as usize] = lpc[i as usize] * tmp;
-        i += 1;
     }
-    lpc2[0 as usize] = lpc[0 as usize] + 0.8f32;
-    lpc2[1 as usize] = lpc[1 as usize] + c1 * lpc[0 as usize];
-    lpc2[2 as usize] = lpc[2 as usize] + c1 * lpc[1 as usize];
-    lpc2[3 as usize] = lpc[3 as usize] + c1 * lpc[2 as usize];
-    lpc2[4 as usize] = c1 * lpc[3 as usize];
+
+    // Add a zero
+    lpc2[0] = lpc[0] + 0.8;
+    lpc2[1] = lpc[1] + c1 * lpc[0];
+    lpc2[2] = lpc[2] + c1 * lpc[1];
+    lpc2[3] = lpc[3] + c1 * lpc[2];
+    lpc2[4] = c1 * lpc[3];
+
     celt_fir5(x_lp, lpc2.as_mut_ptr(), len >> 1);
 }
+
 pub unsafe fn celt_pitch_xcorr_c(
     mut _x: *const opus_val16,
     mut _y: *const opus_val16,

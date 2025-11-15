@@ -11,7 +11,7 @@ pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use super::rom::{silk_resampler_frac_FIR_12, RESAMPLER_ORDER_FIR_12};
 use super::up2_hq::{silk_resampler_private_up2_HQ, ResamplerUp2HqState};
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct ResamplerIirFirState {
     up2_HQ: ResamplerUp2HqState,
     fir_state: [i16; RESAMPLER_ORDER_FIR_12],

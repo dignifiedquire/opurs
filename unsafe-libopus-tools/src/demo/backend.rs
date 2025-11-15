@@ -18,7 +18,7 @@ pub(crate) trait OpusBackendTrait {
         st: &mut Self::Encoder,
         pcm: &[i16],
         analysis_frame_size: i32,
-        data: *mut u8,
+        data: &mut [u8],
         max_data_bytes: i32,
     ) -> i32;
     unsafe fn opus_encoder_destroy(st: Self::Encoder);
@@ -38,33 +38,26 @@ pub(crate) trait OpusBackendTrait {
 
 mod unsafe_libopus {
     use unsafe_libopus::{
-        opus_decode, opus_decoder_ctl_impl, opus_encode, opus_encoder_create,
-        opus_encoder_ctl_impl, opus_encoder_destroy, varargs::VarArgs, OpusDecoder, OpusEncoder,
+        opus_decode, opus_decoder_ctl_impl, opus_encode, opus_encoder_ctl_impl, varargs::VarArgs,
+        OpusDecoder, OpusEncoder,
     };
 
     pub struct RustLibopusBackend;
 
     impl super::OpusBackendTrait for RustLibopusBackend {
-        type Encoder = *mut OpusEncoder;
+        type Encoder = Box<OpusEncoder>;
         type Decoder = Box<OpusDecoder>;
 
         unsafe fn opus_encoder_create(
             Fs: i32,
             channels: i32,
             application: i32,
-        ) -> Result<*mut OpusEncoder, i32> {
-            let mut error = 0;
-
-            let res = opus_encoder_create(Fs, channels, application, &mut error);
-            if res.is_null() {
-                Err(error)
-            } else {
-                Ok(res)
-            }
+        ) -> Result<Box<OpusEncoder>, i32> {
+            OpusEncoder::new(Fs, channels, application).map(Box::new)
         }
 
         unsafe fn opus_encoder_ctl_impl(
-            &mut st: &mut *mut OpusEncoder,
+            st: &mut Box<OpusEncoder>,
             request: i32,
             args: VarArgs,
         ) -> i32 {
@@ -72,17 +65,17 @@ mod unsafe_libopus {
         }
 
         unsafe fn opus_encode(
-            &mut st: &mut *mut OpusEncoder,
+            st: &mut Box<OpusEncoder>,
             pcm: &[i16],
             analysis_frame_size: i32,
-            data: *mut u8,
+            data: &mut [u8],
             max_data_bytes: i32,
         ) -> i32 {
             opus_encode(st, pcm, analysis_frame_size, data, max_data_bytes)
         }
 
-        unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {
-            opus_encoder_destroy(st)
+        unsafe fn opus_encoder_destroy(st: Box<OpusEncoder>) {
+            drop(st);
         }
 
         unsafe fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
@@ -163,10 +156,16 @@ mod libopus {
             &mut st: &mut *mut OpusEncoder,
             pcm: &[i16],
             analysis_frame_size: i32,
-            data: *mut u8,
+            data: &mut [u8],
             max_data_bytes: i32,
         ) -> i32 {
-            opus_encode(st, pcm.as_ptr(), analysis_frame_size, data, max_data_bytes)
+            opus_encode(
+                st,
+                pcm.as_ptr(),
+                analysis_frame_size,
+                data.as_mut_ptr(),
+                max_data_bytes,
+            )
         }
 
         unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {

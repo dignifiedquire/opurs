@@ -181,8 +181,7 @@ mod src {
 
 // opus_encoder
 pub use crate::src::opus_encoder::{
-    opus_encode, opus_encode_float, opus_encoder_create, opus_encoder_ctl_impl,
-    opus_encoder_destroy, opus_encoder_get_size, opus_encoder_init, OpusEncoder,
+    opus_encode, opus_encode_float, opus_encoder_ctl_impl, OpusEncoder,
 };
 // opus_decoder
 #[allow(deprecated)]

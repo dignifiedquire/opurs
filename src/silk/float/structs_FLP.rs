@@ -1,9 +1,10 @@
+use crate::silk::define::ENCODER_NUM_CHANNELS;
 use crate::silk::structs::{silk_encoder_state, stereo_enc_state};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_encoder {
-    pub state_Fxx: [silk_encoder_state_FLP; 2],
+    pub state_Fxx: [silk_encoder_state_FLP; ENCODER_NUM_CHANNELS as usize],
     pub sStereo: stereo_enc_state,
     pub nBitsUsedLBRR: i32,
     pub nBitsExceeded: i32,
@@ -14,7 +15,7 @@ pub struct silk_encoder {
     pub allowBandwidthSwitch: i32,
     pub prev_decode_only_middle: i32,
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_encoder_state_FLP {
     pub sCmn: silk_encoder_state,
@@ -22,7 +23,7 @@ pub struct silk_encoder_state_FLP {
     pub x_buf: [f32; 720],
     pub LTPCorr: f32,
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct silk_shape_state_FLP {
     pub LastGainIndex: i8,

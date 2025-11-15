@@ -408,7 +408,7 @@ const TBANDS: [i32; 19] = [
     4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160, 192, 240,
 ];
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct AnalysisInfo {
     pub valid: i32,
     pub tonality: f32,
@@ -428,7 +428,7 @@ pub const LEAK_BANDS: i32 = 19;
 
 pub type DownmixFn<T> = Option<fn(&[T], &mut [f32], i32, i32, i32, i32, i32) -> ()>;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TonalityAnalysisState {
     #[allow(dead_code)]
     pub arch: i32,

@@ -1,7 +1,7 @@
 use crate::silk::define::{LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR};
 use crate::silk::resampler::ResamplerState;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_NLSF_CB_struct {
     pub nVectors: i16,
@@ -17,7 +17,7 @@ pub struct silk_NLSF_CB_struct {
     pub ec_Rates_Q5: &'static [u8; 72],
     pub deltaMin_Q15: &'static [i16],
 }
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct SideInfoIndices {
     pub GainsIndices: [i8; 4],
@@ -127,7 +127,7 @@ pub struct silk_decoder_control {
     pub LTP_scale_Q14: i32,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_nsq_state {
     pub xq: [i16; 640],
@@ -143,7 +143,26 @@ pub struct silk_nsq_state {
     pub prev_gain_Q16: i32,
     pub rewhite_flag: i32,
 }
-#[derive(Copy, Clone)]
+impl Default for silk_nsq_state {
+    fn default() -> Self {
+        Self {
+            xq: [0; 640],
+            sLTP_shp_Q14: [0; 640],
+            sLPC_Q14: [0; 96],
+            sAR2_Q14: [0; 24],
+            sLF_AR_shp_Q14: 0,
+            sDiff_shp_Q14: 0,
+            lagPrev: 0,
+            sLTP_buf_idx: 0,
+            sLTP_shp_buf_idx: 0,
+            rand_seed: 0,
+            prev_gain_Q16: 0,
+            rewhite_flag: 0,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_VAD_state {
     pub AnaState: [i32; 2],
@@ -157,7 +176,7 @@ pub struct silk_VAD_state {
     pub NoiseLevelBias: [i32; 4],
     pub counter: i32,
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct silk_LP_state {
     pub In_LP_State: [i32; 2],
@@ -165,7 +184,7 @@ pub struct silk_LP_state {
     pub mode: i32,
     pub saved_fs_kHz: i32,
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct silk_encoder_state {
     pub In_HP_State: [i32; 2],
@@ -247,7 +266,7 @@ pub struct silk_encoder_state {
     pub pulses_LBRR: [[i8; 320]; 3],
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default, Debug)]
 #[repr(C)]
 pub struct stereo_enc_state {
     pub pred_prev_Q13: [i16; 2],

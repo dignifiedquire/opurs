@@ -7,7 +7,7 @@ pub mod typedef_h {
 
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct ResamplerUp2HqState {
     iir_state: [i32; 6],
 }

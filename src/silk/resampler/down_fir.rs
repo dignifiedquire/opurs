@@ -7,14 +7,14 @@ use super::ar2::silk_resampler_private_AR2;
 use super::rom::{RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2};
 use crate::silk::resampler::{ResamplerParams, SILK_RESAMPLER_MAX_FIR_ORDER};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ResamplerDownFirParams {
     pub fir_order: usize,
     pub fir_fracs: i32,
     pub coefs: &'static [i16],
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ResamplerDownFirState {
     ar2_state: [i32; 2],
     fir_state: [i32; SILK_RESAMPLER_MAX_FIR_ORDER],

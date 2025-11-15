@@ -76,7 +76,7 @@ fn rate_id(r: i32) -> usize {
 
 const SILK_RESAMPLER_MAX_FIR_ORDER: usize = 36;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ResamplerState {
     params: ResamplerParams,
     mode: ResamplerMode,
@@ -93,7 +93,7 @@ impl Default for ResamplerState {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 struct ResamplerParams {
     pub batch_size: usize,
     pub inv_ratio_q16: i32,
@@ -103,7 +103,7 @@ struct ResamplerParams {
 }
 
 /// Includes the resampler mode, as well as the necessary params and state
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 enum ResamplerMode {
     #[default]
     Copy,

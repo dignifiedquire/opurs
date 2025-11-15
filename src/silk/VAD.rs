@@ -3,7 +3,6 @@ pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }
 pub use self::typedef_h::{silk_int32_MAX, silk_uint8_MAX};
-use crate::externs::memset;
 use crate::silk::ana_filt_bank_1::silk_ana_filt_bank_1;
 use crate::silk::define::{
     VAD_INTERNAL_SUBFRAMES, VAD_NEGATIVE_OFFSET_Q5, VAD_NOISE_LEVEL_SMOOTH_COEF_Q16, VAD_N_BANDS,
@@ -14,34 +13,37 @@ use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
 use crate::silk::Inlines::silk_SQRT_APPROX;
 use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 
-pub unsafe fn silk_VAD_Init(psSilk_VAD: *mut silk_VAD_state) -> i32 {
-    let mut b: i32 = 0;
-    let ret: i32 = 0;
-    memset(
-        psSilk_VAD as *mut core::ffi::c_void,
-        0,
-        ::core::mem::size_of::<silk_VAD_state>() as u64,
-    );
-    b = 0;
-    while b < VAD_N_BANDS {
-        (*psSilk_VAD).NoiseLevelBias[b as usize] = silk_max_32(50 / (b + 1), 1);
-        b += 1;
+impl Default for silk_VAD_state {
+    fn default() -> Self {
+        let mut NoiseLevelBias = [0; VAD_N_BANDS as usize];
+        let mut NL = [0; VAD_N_BANDS as usize];
+        let mut inv_NL = [0; VAD_N_BANDS as usize];
+        let mut NrgRatioSmth_Q8 = [0; VAD_N_BANDS as usize];
+
+        for b in 0..VAD_N_BANDS {
+            NoiseLevelBias[b as usize] = silk_max_32(50 / (b + 1), 1);
+            NL[b as usize] = 100 * NoiseLevelBias[b as usize];
+            inv_NL[b as usize] = 0x7fffffff / NL[b as usize];
+            NrgRatioSmth_Q8[b as usize] = 100 * 256;
+        }
+
+        Self {
+            AnaState: Default::default(),
+            AnaState1: Default::default(),
+            AnaState2: Default::default(),
+            XnrgSubfr: Default::default(),
+            NrgRatioSmth_Q8,
+            HPstate: 0, // i16,
+            NL,
+            inv_NL,
+            NoiseLevelBias,
+            counter: 15,
+        }
     }
-    b = 0;
-    while b < VAD_N_BANDS {
-        (*psSilk_VAD).NL[b as usize] = 100 * (*psSilk_VAD).NoiseLevelBias[b as usize];
-        (*psSilk_VAD).inv_NL[b as usize] = 0x7fffffff / (*psSilk_VAD).NL[b as usize];
-        b += 1;
-    }
-    (*psSilk_VAD).counter = 15;
-    b = 0;
-    while b < VAD_N_BANDS {
-        (*psSilk_VAD).NrgRatioSmth_Q8[b as usize] = 100 * 256;
-        b += 1;
-    }
-    return ret;
 }
-static mut tiltWeights: [i32; 4] = [30000, 6000, -(12000), -(12000)];
+
+const tiltWeights: [i32; 4] = [30000, 6000, -(12000), -(12000)];
+
 pub unsafe fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: *const i16) -> i32 {
     let mut SA_Q15: i32 = 0;
     let mut pSNR_dB_Q7: i32 = 0;
@@ -163,10 +165,7 @@ pub unsafe fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: *const i
         (*psSilk_VAD).XnrgSubfr[b as usize] = sumSquared;
         b += 1;
     }
-    silk_VAD_GetNoiseLevels(
-        &mut *Xnrg.as_mut_ptr().offset(0 as isize) as *mut i32 as *const i32,
-        psSilk_VAD,
-    );
+    silk_VAD_GetNoiseLevels(&Xnrg[0], psSilk_VAD);
     sumSquared = 0;
     input_tilt = 0;
     b = 0;

@@ -82,12 +82,11 @@ pub mod test_opus_common_h {
 use crate::test_opus_common_h::set_iseed;
 
 pub use self::test_opus_common_h::{debruijn2, fail, fast_rand, get_iseed, Rw, Rz};
+use unsafe_libopus::externs::memcpy;
 use unsafe_libopus::externs::{free, malloc};
-use unsafe_libopus::externs::{memcpy, memset};
 use unsafe_libopus::{
     opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
-    opus_decoder_get_size, opus_encode, opus_encoder_create, opus_encoder_ctl,
-    opus_encoder_destroy, opus_encoder_get_size, opus_get_version_string, opus_packet_pad,
+    opus_decoder_get_size, opus_encode, opus_encoder_ctl, opus_get_version_string, opus_packet_pad,
     opus_packet_parse, opus_packet_unpad, OpusDecoder, OpusEncoder,
 };
 
@@ -178,7 +177,7 @@ pub unsafe fn get_frame_size_enum(frame_size: i32, sampling_rate: i32) -> i32 {
 }
 
 pub unsafe fn test_encode(
-    enc: *mut OpusEncoder,
+    enc: &mut OpusEncoder,
     channels: i32,
     frame_size: i32,
     dec: *mut OpusDecoder,
@@ -200,7 +199,7 @@ pub unsafe fn test_encode(
             enc,
             &inbuf[(samp_count * channels) as usize..],
             frame_size,
-            packet.as_mut_ptr(),
+            &mut packet,
             1500,
         );
         if len < 0 || len > 1500 {
@@ -225,7 +224,6 @@ pub unsafe fn test_encode(
     ret
 }
 pub unsafe fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32) {
-    let mut enc: *mut OpusEncoder;
     let mut dec: *mut OpusDecoder;
     let mut err: i32 = 0;
     let sampling_rates: [i32; 5] = [8000, 12000, 16000, 24000, 48000];
@@ -274,10 +272,10 @@ pub unsafe fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32)
         if err != 0 || dec.is_null() {
             fail("tests/test_opus_encode.c", 217);
         }
-        enc = opus_encoder_create(sampling_rate, num_channels, application, &mut err);
-        if err != 0 || enc.is_null() {
-            fail("tests/test_opus_encode.c", 220);
-        }
+
+        println!("creating encoder {sampling_rate}, {num_channels}, {application}");
+        let mut enc = OpusEncoder::new(sampling_rate, num_channels, application).unwrap();
+
         let mut j = 0;
         while j < num_setting_changes {
             let bitrate: i32 = bitrates[(fast_rand() as u64)
@@ -339,46 +337,46 @@ pub unsafe fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32)
             } else {
                 num_channels
             };
-            if opus_encoder_ctl!(enc, 4002, bitrate) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4002, bitrate) != 0 {
                 fail("tests/test_opus_encode.c", 240);
             }
-            if opus_encoder_ctl!(enc, 4022, force_channel) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4022, force_channel) != 0 {
                 fail("tests/test_opus_encode.c", 241);
             }
-            if opus_encoder_ctl!(enc, 4006, vbr) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4006, vbr) != 0 {
                 fail("tests/test_opus_encode.c", 242);
             }
-            if opus_encoder_ctl!(enc, 4020, vbr_constraint) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4020, vbr_constraint) != 0 {
                 fail("tests/test_opus_encode.c", 243);
             }
-            if opus_encoder_ctl!(enc, 4010, complexity) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4010, complexity) != 0 {
                 fail("tests/test_opus_encode.c", 244);
             }
-            if opus_encoder_ctl!(enc, 4004, max_bw) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4004, max_bw) != 0 {
                 fail("tests/test_opus_encode.c", 245);
             }
-            if opus_encoder_ctl!(enc, 4024, sig) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4024, sig) != 0 {
                 fail("tests/test_opus_encode.c", 246);
             }
-            if opus_encoder_ctl!(enc, 4012, inband_fec) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4012, inband_fec) != 0 {
                 fail("tests/test_opus_encode.c", 247);
             }
-            if opus_encoder_ctl!(enc, 4014, pkt_loss) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4014, pkt_loss) != 0 {
                 fail("tests/test_opus_encode.c", 248);
             }
-            if opus_encoder_ctl!(enc, 4036, lsb_depth) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4036, lsb_depth) != 0 {
                 fail("tests/test_opus_encode.c", 249);
             }
-            if opus_encoder_ctl!(enc, 4042, pred_disabled) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4042, pred_disabled) != 0 {
                 fail("tests/test_opus_encode.c", 250);
             }
-            if opus_encoder_ctl!(enc, 4016, dtx) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4016, dtx) != 0 {
                 fail("tests/test_opus_encode.c", 251);
             }
-            if opus_encoder_ctl!(enc, 4040, frame_size_enum) != 0 {
+            if opus_encoder_ctl!(&mut enc, 4040, frame_size_enum) != 0 {
                 fail("tests/test_opus_encode.c", 252);
             }
-            if test_encode(enc, num_channels, frame_size, dec) != 0 {
+            if test_encode(&mut enc, num_channels, frame_size, dec) != 0 {
                 eprintln!(
                     "fuzz_encoder_settings: {} kHz, {} ch, application: {}, {} bps, force ch: {}, vbr: {}, vbr constraint: {}, complexity: {}, max bw: {}, signal: {}, inband fec: {}, pkt loss: {}%, lsb depth: {}, pred disabled: {}, dtx: {}, ({}/2) ms",
                     sampling_rate / 1000,
@@ -402,7 +400,6 @@ pub unsafe fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32)
             }
             j += 1;
         }
-        opus_encoder_destroy(enc);
         opus_decoder_destroy(dec);
         i += 1;
     }
@@ -415,7 +412,6 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
     let mut j: i32 = 0;
     let mut rc: i32;
     let mut err: i32 = 0;
-    let mut enc: *mut OpusEncoder;
     let dec: *mut OpusDecoder;
     let mut dec_err: [*mut OpusDecoder; 10] = [std::ptr::null_mut::<OpusDecoder>(); 10];
     let outbuf: *mut i16;
@@ -428,10 +424,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
     let mut fsize: i32;
     let mut count: i32;
     println!("  Encode+Decode tests.");
-    enc = opus_encoder_create(48000, 2, 2048, &mut err);
-    if err != 0 || enc.is_null() {
-        fail("tests/test_opus_encode.c", 302);
-    }
+    let mut enc = OpusEncoder::new(48000, 2, 2048).unwrap();
     if i != j {
         fail("tests/test_opus_encode.c", 339);
     }
@@ -461,19 +454,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         }
         i += 1;
     }
-    let enccpy = malloc(opus_encoder_get_size(2) as u64) as *mut OpusEncoder;
-    memcpy(
-        enccpy as *mut core::ffi::c_void,
-        enc as *const core::ffi::c_void,
-        opus_encoder_get_size(2) as u64,
-    );
-    memset(
-        enc as *mut core::ffi::c_void,
-        255,
-        opus_encoder_get_size(2) as u64,
-    );
-    opus_encoder_destroy(enc);
-    enc = enccpy;
+
     let mut inbuf = vec![0; (48000 * 30) * 2];
     outbuf = malloc(
         (::core::mem::size_of::<i16>() as u64)
@@ -489,27 +470,27 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         fail("tests/test_opus_encode.c", 378);
     }
     generate_music(inbuf.as_mut_ptr(), 48000 * 30);
-    if opus_encoder_ctl!(enc, 4008, -(1000)) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, -(1000)) != 0 {
         fail("tests/test_opus_encode.c", 387);
     }
-    if opus_encoder_ctl!(enc, 11002, -(2)) != -1 {
+    if opus_encoder_ctl!(&mut enc, 11002, -(2)) != -1 {
         fail("tests/test_opus_encode.c", 388);
     }
-    if opus_encode(enc, &inbuf, 500, packet.as_mut_ptr(), 1500) != -1 {
+    if opus_encode(&mut enc, &inbuf, 500, &mut packet, 1500) != -1 {
         fail("tests/test_opus_encode.c", 389);
     }
     rc = 0;
     while rc < 3 {
-        if opus_encoder_ctl!(enc, 4006, (rc < 2) as i32,) != 0 {
+        if opus_encoder_ctl!(&mut enc, 4006, (rc < 2) as i32,) != 0 {
             fail("tests/test_opus_encode.c", 393);
         }
-        if opus_encoder_ctl!(enc, 4020, (rc == 1) as i32,) != 0 {
+        if opus_encoder_ctl!(&mut enc, 4020, (rc == 1) as i32,) != 0 {
             fail("tests/test_opus_encode.c", 394);
         }
-        if opus_encoder_ctl!(enc, 4020, (rc == 1) as i32,) != 0 {
+        if opus_encoder_ctl!(&mut enc, 4020, (rc == 1) as i32,) != 0 {
             fail("tests/test_opus_encode.c", 395);
         }
-        if opus_encoder_ctl!(enc, 4012, (rc == 0) as i32,) != 0 {
+        if opus_encoder_ctl!(&mut enc, 4012, (rc == 0) as i32,) != 0 {
             fail("tests/test_opus_encode.c", 396);
         }
         for j in 0..13 {
@@ -546,7 +527,7 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 let frame_size = frame[j as usize];
 
                 if fast_rand() & 255 == 0 {
-                    if opus_encoder_ctl!(enc, 4028) != 0 {
+                    if opus_encoder_ctl!(&mut enc, 4028) != 0 {
                         fail("tests/test_opus_encode.c", 410);
                     }
                     if opus_decoder_ctl!(&mut *dec, 4028) != 0 {
@@ -565,41 +546,44 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 }
                 if (fast_rand()).wrapping_rem(10) == 0 {
                     let complex: i32 = (fast_rand()).wrapping_rem(11) as i32;
-                    if opus_encoder_ctl!(enc, 4010, complex) != 0 {
+                    if opus_encoder_ctl!(&mut enc, 4010, complex) != 0 {
                         fail("tests/test_opus_encode.c", 423);
                     }
                 }
                 if (fast_rand()).wrapping_rem(50) == 0 {
                     opus_decoder_ctl!(&mut *dec, 4028);
                 }
-                if opus_encoder_ctl!(enc, 4012, (rc == 0) as i32,) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4012, (rc == 0) as i32,) != 0 {
                     fail("tests/test_opus_encode.c", 426);
                 }
-                if opus_encoder_ctl!(enc, 11002, 1000 + modes[j as usize],) != 0 {
+                if opus_encoder_ctl!(&mut enc, 11002, 1000 + modes[j as usize],) != 0 {
                     fail("tests/test_opus_encode.c", 427);
                 }
                 fast_rand();
-                if opus_encoder_ctl!(enc, 4016, (fast_rand() & 1) as i32,) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4016, (fast_rand() & 1) as i32,) != 0 {
                     fail("tests/test_opus_encode.c", 428);
                 }
-                if opus_encoder_ctl!(enc, 4002, rate) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4002, rate) != 0 {
                     fail("tests/test_opus_encode.c", 429);
                 }
                 if rates[j as usize] >= 64000 {
                 } else {
                 };
-                if opus_encoder_ctl!(enc, 4022, if rates[j as usize] >= 64000 { 2 } else { 1 },)
-                    != 0
+                if opus_encoder_ctl!(
+                    &mut enc,
+                    4022,
+                    if rates[j as usize] >= 64000 { 2 } else { 1 },
+                ) != 0
                 {
                     fail("tests/test_opus_encode.c", 430);
                 }
-                if opus_encoder_ctl!(enc, 4010, (count >> 2) % 11,) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4010, (count >> 2) % 11,) != 0 {
                     fail("tests/test_opus_encode.c", 431);
                 }
                 fast_rand();
                 fast_rand();
                 if opus_encoder_ctl!(
-                    enc,
+                    &mut enc,
                     4014,
                     (fast_rand() & 15 & (fast_rand()).wrapping_rem(15)) as i32,
                 ) != 0
@@ -616,20 +600,20 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
                 if modes[j as usize] == 2 && bw == 1102 {
                     bw += 3;
                 }
-                if opus_encoder_ctl!(enc, 4008, bw) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4008, bw) != 0 {
                     fail("tests/test_opus_encode.c", 437);
                 }
                 len = opus_encode(
-                    enc,
+                    &mut enc,
                     &inbuf[(i << 1) as usize..],
                     frame_size,
-                    packet.as_mut_ptr(),
+                    &mut packet,
                     1500,
                 );
                 if len < 0 || len > 1500 {
                     fail("tests/test_opus_encode.c", 439);
                 }
-                if opus_encoder_ctl!(enc, 4031, &mut enc_final_range) != 0 {
+                if opus_encoder_ctl!(&mut enc, 4031, &mut enc_final_range) != 0 {
                     fail("tests/test_opus_encode.c", 440);
                 }
 
@@ -712,16 +696,16 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         }
         rc += 1;
     }
-    if opus_encoder_ctl!(enc, 11002, -(1000)) != 0 {
+    if opus_encoder_ctl!(&mut enc, 11002, -(1000)) != 0 {
         fail("tests/test_opus_encode.c", 472);
     }
-    if opus_encoder_ctl!(enc, 4022, -(1000)) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4022, -(1000)) != 0 {
         fail("tests/test_opus_encode.c", 473);
     }
-    if opus_encoder_ctl!(enc, 4012, 0) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4012, 0) != 0 {
         fail("tests/test_opus_encode.c", 474);
     }
-    if opus_encoder_ctl!(enc, 4016, 0) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4016, 0) != 0 {
         fail("tests/test_opus_encode.c", 475);
     }
     bitrate_bps = 512000;
@@ -742,19 +726,19 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         let mut out_samples_1: i32;
         let frame_size_1: i32 = fsizes[db62[fsize as usize] as usize];
         let offset: i32 = i % (48000 * 30 - 5760);
-        opus_encoder_ctl!(enc, 4002, bitrate_bps);
+        opus_encoder_ctl!(&mut enc, 4002, bitrate_bps);
         len_1 = opus_encode(
-            enc,
+            &mut enc,
             &inbuf[(offset << 1) as usize..],
             frame_size_1,
-            packet.as_mut_ptr(),
+            &mut packet,
             1500,
         );
         if len_1 < 0 || len_1 > 1500 {
             fail("tests/test_opus_encode.c", 569);
         }
         count += 1;
-        opus_encoder_ctl!(enc, 4031, &mut enc_final_range);
+        opus_encoder_ctl!(&mut enc, 4031, &mut enc_final_range);
         out_samples_1 = opus_decode(
             &mut *dec,
             &packet[..len_1 as _],
@@ -851,10 +835,9 @@ pub unsafe fn run_test1(no_fuzz: bool) -> i32 {
         "    All framesize pairs switching encode, {} frames OK.",
         count
     );
-    if opus_encoder_ctl!(enc, 4028) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4028) != 0 {
         fail("tests/test_opus_encode.c", 616);
     }
-    opus_encoder_destroy(enc);
     if opus_decoder_ctl!(&mut *dec, 4028) != 0 {
         fail("tests/test_opus_encode.c", 620);
     }

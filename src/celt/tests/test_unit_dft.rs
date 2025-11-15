@@ -50,7 +50,7 @@ pub(super) fn rand() -> u32 {
 pub(super) const RAND_MAX: u32 = u32::MAX;
 
 fn test1d(nfft: usize, isinverse: bool) {
-    let mode = opus_custom_mode_create(48000, 960, None).unwrap();
+    let mode = opus_custom_mode_create(48000, 960).unwrap();
     let id = if nfft == 480 {
         0
     } else if nfft == 240 {

@@ -12,8 +12,7 @@ use unsafe_libopus::externs::{memcmp, memcpy, memset};
 use unsafe_libopus::{
     opus_decode, opus_decode_float, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
     opus_decoder_get_nb_samples, opus_decoder_get_size, opus_decoder_init, opus_encode,
-    opus_encode_float, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
-    opus_encoder_get_size, opus_encoder_init, opus_packet_get_bandwidth, opus_packet_get_nb_frames,
+    opus_encode_float, opus_encoder_ctl, opus_packet_get_bandwidth, opus_packet_get_nb_frames,
     opus_packet_get_nb_samples, opus_packet_get_samples_per_frame, opus_packet_pad,
     opus_packet_parse, opus_packet_unpad, OpusDecoder, OpusEncoder, OpusRepacketizer, OPUS_BAD_ARG,
     OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
@@ -1141,33 +1140,16 @@ fn test_enc_api() {
 }
 unsafe fn test_enc_api_inner() {
     let mut enc_final_range: u32 = 0;
-    let mut enc: *mut OpusEncoder = ptr::null_mut::<OpusEncoder>();
     let mut i: i32 = 0;
     let mut j: i32 = 0;
     let mut packet = vec![0; 1276];
     let mut fbuf = vec![0.; 1920];
     let mut sbuf = vec![0; 1920];
     let mut c: i32 = 0;
-    let mut err: i32 = 0;
     let mut cfgs: i32 = 0;
     cfgs = 0;
     println!("\n  Encoder basic API tests");
     println!("  ---------------------------------------------------");
-    c = 0;
-    while c < 4 {
-        i = opus_encoder_get_size(c);
-        if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 17) || c != 1 && c != 2 && i != 0 {
-            fail("tests/test_opus_api.c", 1084);
-        }
-        println!(
-            "    opus_encoder_get_size({})={} ...............{} OK.",
-            c,
-            i,
-            if i > 0 { "" } else { "...." }
-        );
-        cfgs += 1;
-        c += 1;
-    }
     c = 0;
     while c < 4 {
         i = -(7);
@@ -1190,132 +1172,93 @@ unsafe fn test_enc_api_inner() {
                         fs = i;
                     }
                 }
-                err = 0;
-                enc = opus_encoder_create(fs, c, 2048, &mut err);
-                if err != OPUS_BAD_ARG || !enc.is_null() {
+                let err = OpusEncoder::new(fs, c, 2048).unwrap_err();
+                if err != OPUS_BAD_ARG {
                     fail("tests/test_opus_api.c", 1106);
                 }
                 cfgs += 1;
-                enc = opus_encoder_create(fs, c, 2048, ptr::null_mut::<i32>());
-                if !enc.is_null() {
-                    fail("tests/test_opus_api.c", 1109);
-                }
-                cfgs += 1;
-                opus_encoder_destroy(enc);
-                enc = malloc(opus_encoder_get_size(2) as u64) as *mut OpusEncoder;
-                if enc.is_null() {
-                    fail("tests/test_opus_api.c", 1113);
-                }
-                err = opus_encoder_init(enc, fs, c, 2048);
-                if err != OPUS_BAD_ARG {
-                    fail("tests/test_opus_api.c", 1115);
-                }
-                cfgs += 1;
-                free(enc as *mut core::ffi::c_void);
             }
             i += 1;
         }
         c += 1;
     }
-    enc = opus_encoder_create(48000, 2, -(1000), ptr::null_mut::<i32>());
-    if !enc.is_null() {
-        fail("tests/test_opus_api.c", 1122);
-    }
-    cfgs += 1;
-    enc = opus_encoder_create(48000, 2, -(1000), &mut err);
-    if err != OPUS_BAD_ARG || !enc.is_null() {
+    let err = OpusEncoder::new(48000, 2, -(1000)).unwrap_err();
+    if err != OPUS_BAD_ARG {
         fail("tests/test_opus_api.c", 1127);
     }
     cfgs += 1;
-    enc = opus_encoder_create(48000, 2, 2048, ptr::null_mut::<i32>());
-    if enc.is_null() {
-        fail("tests/test_opus_api.c", 1132);
-    }
-    opus_encoder_destroy(enc);
+    let mut enc = OpusEncoder::new(48000, 2, 2051).unwrap();
     cfgs += 1;
-    enc = opus_encoder_create(48000, 2, 2051, &mut err);
-    if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1138);
-    }
-    cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4027, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
         fail("tests/test_opus_api.c", 1141);
     }
     cfgs += 1;
-    opus_encoder_destroy(enc);
-    enc = opus_encoder_create(48000, 2, 2049, &mut err);
-    if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1147);
-    }
+
+    let mut enc = OpusEncoder::new(48000, 2, 2049).unwrap();
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4027, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
         fail("tests/test_opus_api.c", 1150);
     }
-    opus_encoder_destroy(enc);
     cfgs += 1;
-    enc = opus_encoder_create(48000, 2, 2048, &mut err);
-    if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1156);
-    }
-    cfgs += 1;
+    let mut enc = OpusEncoder::new(48000, 2, 2048).unwrap();
     println!("    opus_encoder_create() ........................ OK.");
     println!("    opus_encoder_init() .......................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4027, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
         fail("tests/test_opus_api.c", 1165);
     }
     cfgs += 1;
     println!("    OPUS_GET_LOOKAHEAD ........................... OK.");
-    err = opus_encoder_ctl!(enc, 4029, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4029, &mut i);
     if err != 0 || i != 48000 {
         fail("tests/test_opus_api.c", 1173);
     }
     cfgs += 1;
     println!("    OPUS_GET_SAMPLE_RATE ......................... OK.");
-    if opus_encoder_ctl!(enc, -(5)) != -(5) {
+    if opus_encoder_ctl!(&mut enc, -(5)) != -(5) {
         fail("tests/test_opus_api.c", 1180);
     }
     println!("    OPUS_UNIMPLEMENTED ........................... OK.");
     cfgs += 1;
     i = -1;
-    if opus_encoder_ctl!(enc, 4000, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4000, i) == 0 {
         fail("tests/test_opus_api.c", 1190);
     }
     i = -(1000);
-    if opus_encoder_ctl!(enc, 4000, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4000, i) == 0 {
         fail("tests/test_opus_api.c", 1190);
     }
     i = 2049;
     j = i;
-    if opus_encoder_ctl!(enc, 4000, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4000, i) != 0 {
         fail("tests/test_opus_api.c", 1190);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4001, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4001, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1190);
     }
     i = 2051;
     j = i;
-    if opus_encoder_ctl!(enc, 4000, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4000, i) != 0 {
         fail("tests/test_opus_api.c", 1190);
     }
     println!("    OPUS_SET_APPLICATION ......................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4001, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4001, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1190);
     }
     println!("    OPUS_GET_APPLICATION ......................... OK.");
     cfgs += 6;
-    if opus_encoder_ctl!(enc, 4002, 1073741832) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4002, 1073741832) != 0 {
         fail("tests/test_opus_api.c", 1195);
     }
     cfgs += 1;
-    if opus_encoder_ctl!(enc, 4003, &mut i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4003, &mut i) != 0 {
         fail("tests/test_opus_api.c", 1198);
     }
     if i > 700000 || i < 256000 {
@@ -1323,513 +1266,513 @@ unsafe fn test_enc_api_inner() {
     }
     cfgs += 1;
     i = -(12345);
-    if opus_encoder_ctl!(enc, 4002, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4002, i) == 0 {
         fail("tests/test_opus_api.c", 1204);
     }
     i = 0;
-    if opus_encoder_ctl!(enc, 4002, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4002, i) == 0 {
         fail("tests/test_opus_api.c", 1204);
     }
     i = 500;
     j = i;
-    if opus_encoder_ctl!(enc, 4002, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4002, i) != 0 {
         fail("tests/test_opus_api.c", 1204);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4003, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4003, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1204);
     }
     i = 256000;
     j = i;
-    if opus_encoder_ctl!(enc, 4002, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4002, i) != 0 {
         fail("tests/test_opus_api.c", 1204);
     }
     println!("    OPUS_SET_BITRATE ............................. OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4003, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4003, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1204);
     }
     println!("    OPUS_GET_BITRATE ............................. OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4022, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4022, i) == 0 {
         fail("tests/test_opus_api.c", 1212);
     }
     i = 3;
-    if opus_encoder_ctl!(enc, 4022, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4022, i) == 0 {
         fail("tests/test_opus_api.c", 1212);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4022, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4022, i) != 0 {
         fail("tests/test_opus_api.c", 1212);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4023, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4023, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1212);
     }
     i = -(1000);
     j = i;
-    if opus_encoder_ctl!(enc, 4022, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4022, i) != 0 {
         fail("tests/test_opus_api.c", 1212);
     }
     println!("    OPUS_SET_FORCE_CHANNELS ...................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4023, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4023, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1212);
     }
     println!("    OPUS_GET_FORCE_CHANNELS ...................... OK.");
     cfgs += 6;
     i = OPUS_BUFFER_TOO_SMALL;
-    if opus_encoder_ctl!(enc, 4008, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) == 0 {
         fail("tests/test_opus_api.c", 1215);
     }
     cfgs += 1;
     i = 1105 + 1;
-    if opus_encoder_ctl!(enc, 4008, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) == 0 {
         fail("tests/test_opus_api.c", 1218);
     }
     cfgs += 1;
     i = 1101;
-    if opus_encoder_ctl!(enc, 4008, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) != 0 {
         fail("tests/test_opus_api.c", 1221);
     }
     cfgs += 1;
     i = 1105;
-    if opus_encoder_ctl!(enc, 4008, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) != 0 {
         fail("tests/test_opus_api.c", 1224);
     }
     cfgs += 1;
     i = 1103;
-    if opus_encoder_ctl!(enc, 4008, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) != 0 {
         fail("tests/test_opus_api.c", 1227);
     }
     cfgs += 1;
     i = 1102;
-    if opus_encoder_ctl!(enc, 4008, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, i) != 0 {
         fail("tests/test_opus_api.c", 1230);
     }
     cfgs += 1;
     println!("    OPUS_SET_BANDWIDTH ........................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4009, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4009, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 && i != -(1000) {
         fail("tests/test_opus_api.c", 1240);
     }
     cfgs += 1;
-    if opus_encoder_ctl!(enc, 4008, -(1000)) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4008, -(1000)) != 0 {
         fail("tests/test_opus_api.c", 1242);
     }
     cfgs += 1;
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     i = OPUS_BUFFER_TOO_SMALL;
-    if opus_encoder_ctl!(enc, 4004, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) == 0 {
         fail("tests/test_opus_api.c", 1250);
     }
     cfgs += 1;
     i = 1105 + 1;
-    if opus_encoder_ctl!(enc, 4004, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) == 0 {
         fail("tests/test_opus_api.c", 1253);
     }
     cfgs += 1;
     i = 1101;
-    if opus_encoder_ctl!(enc, 4004, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) != 0 {
         fail("tests/test_opus_api.c", 1256);
     }
     cfgs += 1;
     i = 1105;
-    if opus_encoder_ctl!(enc, 4004, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) != 0 {
         fail("tests/test_opus_api.c", 1259);
     }
     cfgs += 1;
     i = 1103;
-    if opus_encoder_ctl!(enc, 4004, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) != 0 {
         fail("tests/test_opus_api.c", 1262);
     }
     cfgs += 1;
     i = 1102;
-    if opus_encoder_ctl!(enc, 4004, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4004, i) != 0 {
         fail("tests/test_opus_api.c", 1265);
     }
     cfgs += 1;
     println!("    OPUS_SET_MAX_BANDWIDTH ....................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4005, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4005, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 {
         fail("tests/test_opus_api.c", 1275);
     }
     cfgs += 1;
     println!("    OPUS_GET_MAX_BANDWIDTH ....................... OK.");
     i = -1;
-    if opus_encoder_ctl!(enc, 4016, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4016, i) == 0 {
         fail("tests/test_opus_api.c", 1288);
     }
     i = 2;
-    if opus_encoder_ctl!(enc, 4016, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4016, i) == 0 {
         fail("tests/test_opus_api.c", 1288);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4016, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4016, i) != 0 {
         fail("tests/test_opus_api.c", 1288);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4017, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4017, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1288);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4016, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4016, i) != 0 {
         fail("tests/test_opus_api.c", 1288);
     }
     println!("    OPUS_SET_DTX ................................. OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4017, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4017, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1288);
     }
     println!("    OPUS_GET_DTX ................................. OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4010, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4010, i) == 0 {
         fail("tests/test_opus_api.c", 1296);
     }
     i = 11;
-    if opus_encoder_ctl!(enc, 4010, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4010, i) == 0 {
         fail("tests/test_opus_api.c", 1296);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4010, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4010, i) != 0 {
         fail("tests/test_opus_api.c", 1296);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4011, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4011, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1296);
     }
     i = 10;
     j = i;
-    if opus_encoder_ctl!(enc, 4010, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4010, i) != 0 {
         fail("tests/test_opus_api.c", 1296);
     }
     println!("    OPUS_SET_COMPLEXITY .......................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4011, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4011, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1296);
     }
     println!("    OPUS_GET_COMPLEXITY .......................... OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4012, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4012, i) == 0 {
         fail("tests/test_opus_api.c", 1304);
     }
     i = 2;
-    if opus_encoder_ctl!(enc, 4012, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4012, i) == 0 {
         fail("tests/test_opus_api.c", 1304);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4012, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4012, i) != 0 {
         fail("tests/test_opus_api.c", 1304);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4013, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4013, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1304);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4012, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4012, i) != 0 {
         fail("tests/test_opus_api.c", 1304);
     }
     println!("    OPUS_SET_INBAND_FEC .......................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4013, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4013, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1304);
     }
     println!("    OPUS_GET_INBAND_FEC .......................... OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4014, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4014, i) == 0 {
         fail("tests/test_opus_api.c", 1312);
     }
     i = 101;
-    if opus_encoder_ctl!(enc, 4014, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4014, i) == 0 {
         fail("tests/test_opus_api.c", 1312);
     }
     i = 100;
     j = i;
-    if opus_encoder_ctl!(enc, 4014, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4014, i) != 0 {
         fail("tests/test_opus_api.c", 1312);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4015, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4015, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1312);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4014, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4014, i) != 0 {
         fail("tests/test_opus_api.c", 1312);
     }
     println!("    OPUS_SET_PACKET_LOSS_PERC .................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4015, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4015, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1312);
     }
     println!("    OPUS_GET_PACKET_LOSS_PERC .................... OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4006, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4006, i) == 0 {
         fail("tests/test_opus_api.c", 1320);
     }
     i = 2;
-    if opus_encoder_ctl!(enc, 4006, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4006, i) == 0 {
         fail("tests/test_opus_api.c", 1320);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4006, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4006, i) != 0 {
         fail("tests/test_opus_api.c", 1320);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4007, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4007, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1320);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4006, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4006, i) != 0 {
         fail("tests/test_opus_api.c", 1320);
     }
     println!("    OPUS_SET_VBR ................................. OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4007, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4007, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1320);
     }
     println!("    OPUS_GET_VBR ................................. OK.");
     cfgs += 6;
     i = -1;
-    if opus_encoder_ctl!(enc, 4020, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4020, i) == 0 {
         fail("tests/test_opus_api.c", 1336);
     }
     i = 2;
-    if opus_encoder_ctl!(enc, 4020, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4020, i) == 0 {
         fail("tests/test_opus_api.c", 1336);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4020, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4020, i) != 0 {
         fail("tests/test_opus_api.c", 1336);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4021, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4021, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1336);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4020, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4020, i) != 0 {
         fail("tests/test_opus_api.c", 1336);
     }
     println!("    OPUS_SET_VBR_CONSTRAINT ...................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4021, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4021, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1336);
     }
     println!("    OPUS_GET_VBR_CONSTRAINT ...................... OK.");
     cfgs += 6;
     i = -(12345);
-    if opus_encoder_ctl!(enc, 4024, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4024, i) == 0 {
         fail("tests/test_opus_api.c", 1344);
     }
     i = 0x7fffffff;
-    if opus_encoder_ctl!(enc, 4024, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4024, i) == 0 {
         fail("tests/test_opus_api.c", 1344);
     }
     i = 3002;
     j = i;
-    if opus_encoder_ctl!(enc, 4024, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4024, i) != 0 {
         fail("tests/test_opus_api.c", 1344);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4025, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4025, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1344);
     }
     i = -(1000);
     j = i;
-    if opus_encoder_ctl!(enc, 4024, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4024, i) != 0 {
         fail("tests/test_opus_api.c", 1344);
     }
     println!("    OPUS_SET_SIGNAL .............................. OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4025, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4025, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1344);
     }
     println!("    OPUS_GET_SIGNAL .............................. OK.");
     cfgs += 6;
     i = 7;
-    if opus_encoder_ctl!(enc, 4036, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4036, i) == 0 {
         fail("tests/test_opus_api.c", 1351);
     }
     i = 25;
-    if opus_encoder_ctl!(enc, 4036, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4036, i) == 0 {
         fail("tests/test_opus_api.c", 1351);
     }
     i = 16;
     j = i;
-    if opus_encoder_ctl!(enc, 4036, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4036, i) != 0 {
         fail("tests/test_opus_api.c", 1351);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4037, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4037, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1351);
     }
     i = 24;
     j = i;
-    if opus_encoder_ctl!(enc, 4036, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4036, i) != 0 {
         fail("tests/test_opus_api.c", 1351);
     }
     println!("    OPUS_SET_LSB_DEPTH ........................... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4037, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4037, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1351);
     }
     println!("    OPUS_GET_LSB_DEPTH ........................... OK.");
     cfgs += 6;
-    err = opus_encoder_ctl!(enc, 4043, &mut i);
-    if i != 0 {
+    let err = opus_encoder_ctl!(&mut enc, 4043, &mut i);
+    if err != 0 || i != 0 {
         fail("tests/test_opus_api.c", 1354);
     }
     cfgs += 1;
     i = -1;
-    if opus_encoder_ctl!(enc, 4042, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4042, i) == 0 {
         fail("tests/test_opus_api.c", 1361);
     }
     i = 2;
-    if opus_encoder_ctl!(enc, 4042, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4042, i) == 0 {
         fail("tests/test_opus_api.c", 1361);
     }
     i = 1;
     j = i;
-    if opus_encoder_ctl!(enc, 4042, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4042, i) != 0 {
         fail("tests/test_opus_api.c", 1361);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4043, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4043, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1361);
     }
     i = 0;
     j = i;
-    if opus_encoder_ctl!(enc, 4042, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4042, i) != 0 {
         fail("tests/test_opus_api.c", 1361);
     }
     println!("    OPUS_SET_PREDICTION_DISABLED ................. OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4043, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4043, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1361);
     }
     println!("    OPUS_GET_PREDICTION_DISABLED ................. OK.");
     cfgs += 6;
-    err = opus_encoder_ctl!(enc, 4040, 5001);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5001);
     if err != 0 {
         fail("tests/test_opus_api.c", 1367);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5002);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5002);
     if err != 0 {
         fail("tests/test_opus_api.c", 1370);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5003);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5003);
     if err != 0 {
         fail("tests/test_opus_api.c", 1373);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5004);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5004);
     if err != 0 {
         fail("tests/test_opus_api.c", 1376);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5005);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5005);
     if err != 0 {
         fail("tests/test_opus_api.c", 1379);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5006);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5006);
     if err != 0 {
         fail("tests/test_opus_api.c", 1382);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5007);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5007);
     if err != 0 {
         fail("tests/test_opus_api.c", 1385);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5008);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5008);
     if err != 0 {
         fail("tests/test_opus_api.c", 1388);
     }
     cfgs += 1;
-    err = opus_encoder_ctl!(enc, 4040, 5009);
+    let err = opus_encoder_ctl!(&mut enc, 4040, 5009);
     if err != 0 {
         fail("tests/test_opus_api.c", 1391);
     }
     cfgs += 1;
     i = 0;
-    if opus_encoder_ctl!(enc, 4040, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4040, i) == 0 {
         fail("tests/test_opus_api.c", 1396);
     }
     i = -1;
-    if opus_encoder_ctl!(enc, 4040, i) == 0 {
+    if opus_encoder_ctl!(&mut enc, 4040, i) == 0 {
         fail("tests/test_opus_api.c", 1396);
     }
     i = 5006;
     j = i;
-    if opus_encoder_ctl!(enc, 4040, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4040, i) != 0 {
         fail("tests/test_opus_api.c", 1396);
     }
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4041, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4041, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1396);
     }
     i = 5000;
     j = i;
-    if opus_encoder_ctl!(enc, 4040, i) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4040, i) != 0 {
         fail("tests/test_opus_api.c", 1396);
     }
     println!("    OPUS_SET_EXPERT_FRAME_DURATION ............... OK.");
     i = -(12345);
-    err = opus_encoder_ctl!(enc, 4041, &mut i);
+    let err = opus_encoder_ctl!(&mut enc, 4041, &mut i);
     if err != 0 || i != j {
         fail("tests/test_opus_api.c", 1396);
     }
     println!("    OPUS_GET_EXPERT_FRAME_DURATION ............... OK.");
     cfgs += 6;
-    if opus_encoder_ctl!(enc, 4031, &mut enc_final_range) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4031, &mut enc_final_range) != 0 {
         fail("tests/test_opus_api.c", 1403);
     }
     cfgs += 1;
     println!("    OPUS_GET_FINAL_RANGE ......................... OK.");
-    if opus_encoder_ctl!(enc, 4028) != 0 {
+    if opus_encoder_ctl!(&mut enc, 4028) != 0 {
         fail("tests/test_opus_api.c", 1408);
     }
     cfgs += 1;
@@ -1842,10 +1785,10 @@ unsafe fn test_enc_api_inner() {
             .wrapping_mul(960),
     );
     i = opus_encode(
-        enc,
+        &mut enc,
         &sbuf,
         960,
-        packet.as_mut_ptr(),
+        &mut packet,
         ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
     );
     if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
@@ -1860,20 +1803,12 @@ unsafe fn test_enc_api_inner() {
             .wrapping_mul(2)
             .wrapping_mul(960),
     );
-    i = opus_encode_float(
-        enc,
-        &fbuf,
-        960,
-        packet.as_mut_ptr(),
-        ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
-    );
-    if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
+    i = opus_encode_float(&mut enc, &fbuf, 960, &mut packet, 1276);
+    if i < 1 || i > 1276 {
         fail("tests/test_opus_api.c", 1423);
     }
     cfgs += 1;
     println!("    opus_encode_float() .......................... OK.");
-    opus_encoder_destroy(enc);
-    cfgs += 1;
     println!("                   All encoder interface tests passed");
 
     println!("                   ({} API invocations)", cfgs);

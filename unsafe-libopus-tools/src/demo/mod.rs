@@ -175,6 +175,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         #[cfg(feature = "ent-dump")]
         eprintln!("START encoding packet @ 0x{:x}", fpos);
 
+        let len = buffer.len() as i32;
         let res = handle_opus_error(
             unsafe {
                 B::opus_encode(
@@ -182,8 +183,8 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
                     frame,
                     // it's not the length of the frame slice!
                     frame_size as i32,
-                    buffer.as_mut_ptr(),
-                    buffer.len() as i32,
+                    &mut buffer,
+                    len,
                 )
             },
             "opus_encode",
