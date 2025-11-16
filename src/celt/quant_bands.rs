@@ -352,6 +352,14 @@ pub unsafe fn quant_coarse_energy(
         nstart_bytes = enc_start_state.offs;
         nintra_bytes = enc_intra_state.offs;
         intra_buf = (enc.buf.as_mut_ptr()).offset(nstart_bytes as isize);
+        #[cfg(feature = "ent-dump")]
+        eprintln!(
+            "intra_buf: 0x{}",
+            hex::encode(std::slice::from_raw_parts(
+                intra_buf,
+                nintra_bytes.wrapping_sub(nstart_bytes) as _
+            ))
+        );
         save_bytes = nintra_bytes.wrapping_sub(nstart_bytes);
         if save_bytes == 0 {
             save_bytes = ALLOC_NONE as u32;
