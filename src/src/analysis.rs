@@ -579,11 +579,11 @@ fn downmix_and_resample<T>(
 }
 
 impl TonalityAnalysisState {
-    pub fn new(fs: i32) -> Self {
+    pub fn new(application: i32, fs: i32) -> Self {
         Self {
             arch: opus_select_arch(),
             Fs: fs,
-            application: 0,
+            application,
             angle: [0.; 240],
             d_angle: [0.; 240],
             d2_angle: [0.; 240],

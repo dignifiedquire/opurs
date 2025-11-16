@@ -1558,7 +1558,7 @@ unsafe fn run_prefilter(
     }
 
     if enabled != 0 {
-        let mut pitch_buf: Vec<opus_val16> = vec![0.; ((COMBFILTER_MAXPERIOD + N) >> 1) as usize];
+        let mut pitch_buf: Vec<opus_val16> = vec![0.; (COMBFILTER_MAXPERIOD + N >> 1) as usize];
 
         pitch_downsample(
             &mut pre,
