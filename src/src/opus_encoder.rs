@@ -1524,6 +1524,10 @@ pub unsafe fn opus_encode_native<T>(
             (*st).bitrate_bps * frame_size / ((*st).Fs * 8)
         }) - 1;
     data = data.offset(1 as isize);
+    eprintln!(
+        "ec_enc_init data-len {}, {max_data_bytes}",
+        max_data_bytes - 1
+    );
     let mut enc = ec_enc_init(std::slice::from_raw_parts_mut(
         data,
         (max_data_bytes - 1) as usize,

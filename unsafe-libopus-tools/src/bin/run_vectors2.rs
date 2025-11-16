@@ -300,7 +300,7 @@ fn main() {
     // debugging
     let test_kinds = [TestKind::RustEncode { bitrate: 20_000 }];
 
-    let tests = iproduct!(test_vectors.iter(), test_kinds).collect::<Vec<_>>();
+    let tests = iproduct!(test_vectors.iter().take(1), test_kinds).collect::<Vec<_>>();
 
     println!("Running {} tests in parallel", tests.len());
 
