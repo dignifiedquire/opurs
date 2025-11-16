@@ -40,6 +40,8 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
 }
 
 fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_carry_out(0x{:x})", c);
     if c as u32 != EC_SYM_MAX {
         let mut carry: i32 = 0;
         carry = c >> EC_SYM_BITS;
@@ -65,6 +67,8 @@ fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
 
 #[inline]
 fn ec_enc_normalize(this: &mut ec_enc) {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_normalize()");
     while this.rng <= EC_CODE_BOT {
         ec_enc_carry_out(this, (this.val >> EC_CODE_SHIFT) as i32);
         this.val = this.val << EC_SYM_BITS & EC_CODE_TOP.wrapping_sub(1);
@@ -241,6 +245,9 @@ pub fn ec_enc_shrink(this: &mut ec_enc, new_size: u32) {
 }
 
 pub fn ec_enc_done(this: &mut ec_enc) {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_done(): start");
+
     let mut window: ec_window = 0;
     let mut used: i32 = 0;
     let mut msk: u32 = 0;
@@ -296,7 +303,7 @@ pub fn ec_enc_done(this: &mut ec_enc) {
 
     #[cfg(feature = "ent-dump")]
     eprintln!(
-        "ec_enc_done(): {}",
+        "ec_enc_done(): finish: {}",
         hex::encode(&this.buf[..this.storage as usize])
     );
 }
