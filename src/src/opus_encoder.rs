@@ -1481,6 +1481,7 @@ pub fn opus_encode_native<T>(
         }) - 1;
 
     let (data0, data) = og_data.split_at_mut(1);
+    eprintln!("ec_enc_init data-len {}, {max_data_bytes}", data.len());
     let mut enc = ec_enc_init(&mut data[..max_data_bytes as usize - 1]);
 
     let mut pcm_buf = vec![0.; ((total_buffer + frame_size) * st.channels) as usize];

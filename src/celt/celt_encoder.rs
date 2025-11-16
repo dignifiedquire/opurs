@@ -2045,13 +2045,18 @@ pub unsafe fn celt_encode_with_ec(
         };
     }
     let enc = if let Some(enc) = enc {
+        eprintln!("reusing ec_enc");
         enc
     } else {
         assert!(!compressed.is_null());
-        _enc = ec_enc_init(std::slice::from_raw_parts_mut(
-            compressed,
-            nbCompressedBytes as usize,
-        ));
+        let compressed_slice =
+            std::slice::from_raw_parts_mut(compressed, nbCompressedBytes as usize);
+        eprintln!(
+            "init ec_enc {}: {}",
+            nbCompressedBytes,
+            hex::encode(&compressed_slice)
+        );
+        _enc = ec_enc_init(compressed_slice);
         &mut _enc
     };
     if vbr_rate > 0 {
