@@ -2839,7 +2839,7 @@ pub unsafe fn celt_encode_with_ec(
         };
     }
     alloc_trim = 5;
-    eprintln!("tell + <= total_bits");
+    eprintln!("tell + <= total_bits {:?}", enc);
     if tell + ((6) << BITRES) <= total_bits - total_boost {
         if start > 0 || st.lfe != 0 {
             st.stereo_saving = 0 as opus_val16;
@@ -3021,7 +3021,7 @@ pub unsafe fn celt_encode_with_ec(
     if st.lfe != 0 {
         signalBandwidth = 1;
     }
-    eprintln!("clt_compute_allocation");
+    eprintln!("clt_compute_allocation {:?}", enc);
     codedBands = clt_compute_allocation(
         mode,
         start,
@@ -3059,7 +3059,7 @@ pub unsafe fn celt_encode_with_ec(
     } else {
         st.lastCodedBands = codedBands;
     }
-    eprintln!("quant_fine_energy");
+    eprintln!("quant_fine_energy {:?}", enc);
     quant_fine_energy(
         mode,
         start,
@@ -3072,6 +3072,7 @@ pub unsafe fn celt_encode_with_ec(
     );
     let vla_15 = (C * nbEBands) as usize;
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
+    eprintln!("quant_all_bands {:?}", enc);
     quant_all_bands(
         1,
         mode,
