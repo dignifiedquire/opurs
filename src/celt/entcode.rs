@@ -18,6 +18,7 @@ pub struct ec_ctx<'a> {
     pub end_offs: u32,
     pub end_window: ec_window,
     pub nend_bits: i32,
+    /// This is the offset from which ec_tell() will subtract partial bits.
     pub nbits_total: i32,
     pub offs: u32,
     pub rng: u32,

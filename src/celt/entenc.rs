@@ -39,10 +39,23 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
     0
 }
 
+/// Outputs a symbol, with a carry bit.
+///  If there is a potential to propagate a carry over several symbols, they are
+///   buffered until it can be determined whether or not an actual carry will
+///   occur.
+///  If the counter for the buffered symbols overflows, then the stream becomes
+///   undecodable.
+///  This gives a theoretical limit of a few billion symbols in a single packet on
+///   32-bit systems.
+///  The alternative is to truncate the range in order to force a carry, but
+///   requires similar carry tracking in the decoder, needlessly slowing it down.
 fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
     if c as u32 != EC_SYM_MAX {
+        // No further carry propagation possible, flush buffer.
         let mut carry: i32 = 0;
         carry = c >> EC_SYM_BITS;
+        // Don't output a byte on the first write.
+        // This compare should be taken care of by branch-prediction thereafter.
         if this.rem >= 0 {
             this.error |= ec_write_byte(this, (this.rem + carry) as u32);
         }
@@ -60,13 +73,15 @@ fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
         this.rem = (c as u32 & EC_SYM_MAX) as i32;
     } else {
         this.ext += 1;
-    };
+    }
 }
 
 #[inline]
 fn ec_enc_normalize(this: &mut ec_enc) {
+    // If the range is too small, output some bits and rescale it.
     while this.rng <= EC_CODE_BOT {
         ec_enc_carry_out(this, (this.val >> EC_CODE_SHIFT) as i32);
+        // Move the next-to-high-order symbol into the high-order position.
         this.val = this.val << EC_SYM_BITS & EC_CODE_TOP.wrapping_sub(1);
         this.rng <<= EC_SYM_BITS;
         this.nbits_total += EC_SYM_BITS;
@@ -127,6 +142,7 @@ pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u
     ec_enc_normalize(this);
 }
 
+// The probability of having a "one" is 1/(1<<_logp).
 pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bit_logp({}, {})", _val, _logp);
@@ -170,6 +186,7 @@ pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     let mut ft: u32 = 0;
     let mut fl: u32 = 0;
     let mut ftb: i32 = 0;
+    // In order to optimize EC_ILOG(), it is undefined for the value 0.
     assert!(_ft > 1);
     _ft = _ft.wrapping_sub(1);
     ftb = EC_CLZ0 - _ft.leading_zeros() as i32;
@@ -218,10 +235,13 @@ pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u
     shift = (EC_SYM_BITS as u32).wrapping_sub(_nbits) as i32;
     mask = ((((1) << _nbits) - 1) << shift) as u32;
     if this.offs > 0 {
+        // The first byte has been finalized.
         this.buf[0] = (this.buf[0] as u32 & !mask | _val << shift) as u8;
     } else if this.rem >= 0 {
+        // The first byte is still awaiting carry propagation.
         this.rem = (this.rem as u32 & !mask | _val << shift) as i32;
     } else if this.rng <= EC_CODE_TOP >> _nbits {
+        // The renormalization loop has never been run.
         this.val = this.val & !(mask << EC_CODE_SHIFT) | _val << (EC_CODE_SHIFT + shift);
     } else {
         this.error = -1;
@@ -246,8 +266,8 @@ pub fn ec_enc_done(this: &mut ec_enc) {
     let mut msk: u32 = 0;
     let mut end: u32 = 0;
     let mut l: i32 = 0;
-    /*We output the minimum number of bits that ensures that the symbols encoded
-    thus far will be decoded correctly regardless of the bits that follow.*/
+    // We output the minimum number of bits that ensures that the symbols encoded
+    // thus far will be decoded correctly regardless of the bits that follow.
     l = EC_CODE_BITS - (EC_CLZ0 - (this.rng).leading_zeros() as i32);
     msk = EC_CODE_TOP.wrapping_sub(1) >> l;
     end = (this.val).wrapping_add(msk) & !msk;
@@ -261,11 +281,11 @@ pub fn ec_enc_done(this: &mut ec_enc) {
         end = end << EC_SYM_BITS & EC_CODE_TOP.wrapping_sub(1);
         l -= EC_SYM_BITS;
     }
-    /*If we have a buffered byte flush it into the output buffer.*/
+    // If we have a buffered byte flush it into the output buffer.
     if this.rem >= 0 || this.ext > 0 {
         ec_enc_carry_out(this, 0);
     }
-    /*If we have buffered extra bits, flush them as well.*/
+    // If we have buffered extra bits, flush them as well.
     window = this.end_window;
     used = this.nend_bits;
     while used >= EC_SYM_BITS {
@@ -273,16 +293,16 @@ pub fn ec_enc_done(this: &mut ec_enc) {
         window >>= EC_SYM_BITS;
         used -= EC_SYM_BITS;
     }
-    /*Clear any excess space and add any remaining extra bits to the last byte.*/
+    // Clear any excess space and add any remaining extra bits to the last byte.
     if this.error == 0 {
         this.buf[this.offs as usize..(this.storage - this.end_offs) as usize].fill(0);
         if used > 0 {
-            /*If there's no range coder data at all, give up.*/
+            // If there's no range coder data at all, give up.
             if this.end_offs >= this.storage {
                 this.error = -1;
             } else {
-                /*If we've busted, don't add too many extra bits to the last byte; it
-                would corrupt the range coder data, and that's more important.*/
+                // If we've busted, don't add too many extra bits to the last byte; it
+                // would corrupt the range coder data, and that's more important.
                 l = -l;
                 if (this.offs).wrapping_add(this.end_offs) >= this.storage && l < used {
                     window &= (((1) << l) - 1) as u32;
