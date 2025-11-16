@@ -1971,6 +1971,13 @@ pub unsafe fn quant_all_bands(
                     nend_bytes = ec.storage as i32;
                     bytes_buf = ec.buf.as_ptr().offset(nstart_bytes as isize);
                     save_bytes = nend_bytes - nstart_bytes;
+                    #[cfg(feature = "ent-dump")]
+                    eprintln!(
+                        "bytes_buf: 0x{} ({}, {})",
+                        hex::encode(std::slice::from_raw_parts(bytes_buf, save_bytes as _,)),
+                        nstart_bytes,
+                        save_bytes
+                    );
                     memcpy(
                         bytes_save.as_mut_ptr() as *mut core::ffi::c_void,
                         bytes_buf as *const core::ffi::c_void,
