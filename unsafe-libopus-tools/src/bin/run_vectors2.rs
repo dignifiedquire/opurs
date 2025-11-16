@@ -207,6 +207,7 @@ fn run_test(
 
             let (upstream_encoded, pre_skip) =
                 opus_demo_encode(OpusBackend::Upstream, &true_decoded, encode_args);
+
             let (rust_encoded, rust_pre_skip) =
                 opus_demo_encode(OpusBackend::Rust, &true_decoded, encode_args);
             assert_eq!(rust_pre_skip, pre_skip);
@@ -269,7 +270,7 @@ fn main() {
         std::fs::create_dir(dump_dir).expect("Creating dump directory");
     }
     // TODO: test more configurations for the encoder/decoder
-    let test_kinds = iproduct!(
+    let decode_tests = iproduct!(
         [
             SampleRate::R48000,
             SampleRate::R24000,
@@ -283,8 +284,8 @@ fn main() {
     .map(|(&sample_rate, &channels)| TestKind::RustDecode {
         sample_rate,
         channels,
-    })
-    .chain([
+    });
+    let encode_tests = [
         TestKind::RustEncode { bitrate: 10_000 },
         TestKind::RustEncode { bitrate: 20_000 },
         TestKind::RustEncode { bitrate: 30_000 },
@@ -294,7 +295,10 @@ fn main() {
         TestKind::RustEncode { bitrate: 120_000 },
         TestKind::RustEncode { bitrate: 180_000 },
         TestKind::RustEncode { bitrate: 240_000 },
-    ]);
+    ];
+    // let test_kinds = decode_tests.chain(encode_tests);
+    // debugging
+    let test_kinds = [TestKind::RustEncode { bitrate: 20_000 }];
 
     let tests = iproduct!(test_vectors.iter(), test_kinds).collect::<Vec<_>>();
 
@@ -302,42 +306,35 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let results = tests
-        .into_par_iter()
-        .progress()
-        // .into_iter()
-        .map(|(test_vector, test_kind)| {
-            (
-                test_vector.name.as_str(),
-                test_kind,
-                run_test(test_vector, test_kind, args.dump_dir.as_deref()),
-            )
-        })
-        .collect::<Vec<_>>();
+    // let results = tests
+    //     .into_par_iter()
+    //     .progress()
+    //     // .into_iter()
+    //     .map(|(test_vector, test_kind)| {
+    //         (
+    //             test_vector.name.as_str(),
+    //             test_kind,
+    //             run_test(test_vector, test_kind, args.dump_dir.as_deref()),
+    //         )
+    //     })
+    //     .collect::<Vec<_>>();
+
+    let mut results = Vec::new();
+    for (test_vector, test_kind) in tests {
+        let res = run_test(test_vector, test_kind, args.dump_dir.as_deref());
+
+        print_result(test_vector.name.as_str(), test_kind, res);
+        if !res.is_success() {
+            std::process::exit(1);
+        }
+        results.push((test_vector.name.as_str(), test_kind, res));
+    }
 
     let elapsed = start_time.elapsed();
     println!("Ran {} tests in {:?}", results.len(), elapsed);
 
     for &(vector, kind, result) in &results {
-        let kind = match kind {
-            TestKind::RustDecode {
-                channels,
-                sample_rate,
-            } => {
-                let channels = match channels {
-                    Channels::Mono => "M",
-                    Channels::Stereo => "S",
-                };
-                let sample_rate = format!("{:02}k", usize::from(sample_rate) / 1000);
-
-                format!("DEC {} {}    ", channels, sample_rate)
-            }
-            TestKind::RustEncode { bitrate } => {
-                format!("ENC @ {:03}kbps", bitrate / 1000)
-            }
-        };
-
-        println!("{}: {} -> {}", vector, kind, result);
+        print_result(vector, kind, result);
     }
 
     let passed = results.iter().filter(|(_, _, r)| r.is_success()).count();
@@ -347,4 +344,26 @@ fn main() {
     if passed != results.len() {
         std::process::exit(1);
     }
+}
+
+fn print_result(vector: &str, kind: TestKind, result: TestResult) {
+    let kind = match kind {
+        TestKind::RustDecode {
+            channels,
+            sample_rate,
+        } => {
+            let channels = match channels {
+                Channels::Mono => "M",
+                Channels::Stereo => "S",
+            };
+            let sample_rate = format!("{:02}k", usize::from(sample_rate) / 1000);
+
+            format!("DEC {} {}    ", channels, sample_rate)
+        }
+        TestKind::RustEncode { bitrate } => {
+            format!("ENC @ {:03}kbps", bitrate / 1000)
+        }
+    };
+
+    println!("{}: {} -> {}", vector, kind, result);
 }
