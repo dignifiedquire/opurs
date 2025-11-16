@@ -1,6 +1,6 @@
 use crate::celt::bands::{
-    compute_band_energies, haar1, hysteresis_decision, normalise_bands, quant_all_bands,
-    spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
+    SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL, compute_band_energies, haar1,
+    hysteresis_decision, normalise_bands, quant_all_bands, spreading_decision,
 };
 
 pub mod arch_h {
@@ -23,26 +23,26 @@ pub mod stddef_h {
     pub const NULL: i32 = 0;
 }
 pub use self::arch_h::{
-    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON,
+    CELT_SIG_SCALE, EPSILON, celt_ener, celt_norm, celt_sig, opus_val16, opus_val32,
 };
 pub use self::stddef_h::NULL;
-use crate::celt::celt::{
-    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
-};
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
     CELT_SET_SILK_INFO_REQUEST, CELT_SET_START_BAND_REQUEST, COMBFILTER_MAXPERIOD,
     COMBFILTER_MINPERIOD, OPUS_SET_ENERGY_MASK_REQUEST, OPUS_SET_LFE_REQUEST,
 };
-use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
+use crate::celt::celt::{
+    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
+};
+use crate::celt::entcode::{BITRES, ec_get_error, ec_tell, ec_tell_frac};
 use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
     ec_enc_uint,
 };
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
-use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
+use crate::celt::modes::{OpusCustomMode, opus_custom_mode_create};
 use crate::celt::pitch::{celt_inner_prod_c, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
@@ -2061,11 +2061,7 @@ pub unsafe fn celt_encode_with_ec(
             max_allowed = if (if (if tell == 1 { 2 } else { 0 })
                 > vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
             {
-                if tell == 1 {
-                    2
-                } else {
-                    0
-                }
+                if tell == 1 { 2 } else { 0 }
             } else {
                 vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
             }) < nbAvailableBytes
@@ -2073,11 +2069,7 @@ pub unsafe fn celt_encode_with_ec(
                 if (if tell == 1 { 2 } else { 0 })
                     > vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
                 {
-                    if tell == 1 {
-                        2
-                    } else {
-                        0
-                    }
+                    if tell == 1 { 2 } else { 0 }
                 } else {
                     vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
                 }
@@ -2176,7 +2168,10 @@ pub unsafe fn celt_encode_with_ec(
         nbAvailableBytes,
     );
     #[cfg(feature = "ent-dump")]
-    eprintln!("prefilter: pitch_index={pitch_index}, gain1={gain1:1.6}, qg={qg}");
+    eprintln!(
+        "prefilter: pitch_index={pitch_index}, gain1={gain1:1.6}, qg={qg} enc={:?}",
+        enc
+    );
     if (gain1 > 0.4f32 || st.prefilter_gain > 0.4f32)
         && (st.analysis.valid == 0 || st.analysis.tonality as f64 > 0.3f64)
         && (pitch_index as f64 > 1.26f64 * st.prefilter_period as f64
@@ -2206,6 +2201,7 @@ pub unsafe fn celt_encode_with_ec(
     isTransient = 0;
     shortBlocks = 0;
     if st.complexity >= 1 && st.lfe == 0 {
+        eprintln!("transient_analysis complexity {:?}", enc);
         let allow_weak_transients: i32 =
             (hybrid != 0 && effectiveBytes < 15 && st.silk_info.signalType != 2) as i32;
         isTransient = transient_analysis(
@@ -2301,6 +2297,7 @@ pub unsafe fn celt_encode_with_ec(
             i += 1;
         }
     }
+    eprintln!("amp2Log2 {:?}", enc);
     amp2Log2(
         mode,
         effEnd,
@@ -2366,11 +2363,7 @@ pub unsafe fn celt_encode_with_ec(
         diff = diff * 6 as f32 / (C * (mask_end - 1) * (mask_end + 1) * mask_end) as f32;
         diff = 0.5f32 * diff;
         diff = if (if diff < 0.031f32 { diff } else { 0.031f32 }) > -0.031f32 {
-            if diff < 0.031f32 {
-                diff
-            } else {
-                0.031f32
-            }
+            if diff < 0.031f32 { diff } else { 0.031f32 }
         } else {
             -0.031f32
         };
@@ -2433,6 +2426,8 @@ pub unsafe fn celt_encode_with_ec(
         surround_trim = 64 as f32 * diff;
         surround_masking = mask_avg;
     }
+
+    eprintln!("lfe == 0 {} {:?}", st.lfe == 0, enc);
     if st.lfe == 0 {
         let mut follow: opus_val16 = -10.0f32;
         let mut frame_avg: opus_val32 = 0 as opus_val32;
@@ -2486,6 +2481,7 @@ pub unsafe fn celt_encode_with_ec(
                 ),
         );
     }
+    eprintln!("LM > 0 {}, {:?}", LM > 0, enc);
     if LM > 0
         && ec_tell(enc) + 3 <= total_bits
         && isTransient == 0
@@ -2554,6 +2550,7 @@ pub unsafe fn celt_encode_with_ec(
     let mut importance: Vec<i32> = ::std::vec::from_elem(0, vla_7);
     let vla_8 = nbEBands as usize;
     let mut spread_weight: Vec<i32> = ::std::vec::from_elem(0, vla_8);
+    eprintln!("dynalloc {:?}", enc);
     maxDepth = dynalloc_analysis(
         bandLogE.as_mut_ptr(),
         bandLogE2.as_mut_ptr(),
@@ -2577,6 +2574,7 @@ pub unsafe fn celt_encode_with_ec(
         importance.as_mut_ptr(),
         spread_weight.as_mut_ptr(),
     );
+    eprintln!("tf_analysis {:?}", enc);
     let vla_9 = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla_9);
     if enable_tf_analysis != 0 {
@@ -2647,6 +2645,7 @@ pub unsafe fn celt_encode_with_ec(
             break;
         }
     }
+    eprintln!("quant_coarse_engery {:?}", enc);
     quant_coarse_energy(
         mode,
         start,
@@ -2666,6 +2665,7 @@ pub unsafe fn celt_encode_with_ec(
         st.loss_rate,
         st.lfe,
     );
+    eprintln!("tf_encode {:?}", enc);
     tf_encode(
         start,
         end,
@@ -2675,6 +2675,7 @@ pub unsafe fn celt_encode_with_ec(
         tf_select,
         enc,
     );
+    eprintln!("ec_tell + 4 {:?}", enc);
     if ec_tell(enc) + 4 <= total_bits {
         if st.lfe != 0 {
             st.tapset_decision = 0;
@@ -2717,6 +2718,7 @@ pub unsafe fn celt_encode_with_ec(
             effectiveBytes / 3
         };
     }
+    eprintln!("init_caps {:?}", enc);
     let vla_11 = nbEBands as usize;
     let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_11);
     init_caps(mode, cap.as_mut_ptr(), LM, C);
@@ -2839,6 +2841,7 @@ pub unsafe fn celt_encode_with_ec(
         };
     }
     alloc_trim = 5;
+    // first diff
     eprintln!("tell + <= total_bits {:?}", enc);
     if tell + ((6) << BITRES) <= total_bits - total_boost {
         if start > 0 || st.lfe != 0 {
