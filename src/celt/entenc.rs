@@ -82,6 +82,8 @@ fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
 fn ec_enc_normalize(this: &mut ec_enc) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_normalize()");
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_normalize(): im: val:{}, rng:{}", this.val, this.rng);
     // If the range is too small, output some bits and rescale it.
     while this.rng <= EC_CODE_BOT {
         ec_enc_carry_out(this, (this.val >> EC_CODE_SHIFT) as i32);
@@ -130,6 +132,11 @@ pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
 pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode_bin({}, {}, {})", _fl, _fh, _bits);
+    #[cfg(feature = "ent-dump")]
+    eprintln!(
+        "ec_enc_encode_bin(): im: val:{}, rng:{}",
+        this.val, this.rng
+    );
     let mut r: u32 = 0;
     r = this.rng >> _bits;
     if _fl > 0 {
@@ -150,6 +157,8 @@ pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u
 pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bit_logp({}, {})", _val, _logp);
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_bit_logp(): im: val:{}, rng:{}", this.val, this.rng);
     let mut r: u32 = 0;
     let mut s: u32 = 0;
     let mut l: u32 = 0;
@@ -168,6 +177,8 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     // we do a sub-slice here because the C code doesn't have an idea about the icdf length (it doesn't need to)
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_icdf({}, {:?}, {})", s, &icdf[..=(s as usize)], ftb);
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_enc_icdf(): im: val:{}, rng:{}", this.val, this.rng);
     let mut r: u32 = 0;
     r = this.rng >> ftb;
     if s > 0 {
