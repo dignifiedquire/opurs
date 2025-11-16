@@ -2004,16 +2004,21 @@ pub fn opus_encode_native<T>(
     }
 
     // 5 ms redundant frame for CELT->SILK
-    if redundancy != 0 && celt_to_silk != 0 {
+    let mut enc = if redundancy != 0 && celt_to_silk != 0 {
         opus_custom_encoder_ctl!(&mut st.celt_enc, CELT_SET_START_BAND_REQUEST, 0);
         opus_custom_encoder_ctl!(&mut st.celt_enc, OPUS_SET_VBR_REQUEST, 0);
         opus_custom_encoder_ctl!(&mut st.celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
+
+        // save and restore the enc, to allow access to `data`
+        let saved_enc = enc.save();
+        drop(enc);
+
         let err = unsafe {
             celt_encode_with_ec(
                 &mut st.celt_enc,
                 &pcm_buf,
                 st.Fs / 200,
-                enc.buf[nb_compr_bytes as usize..].as_mut_ptr(),
+                data[nb_compr_bytes as usize..].as_mut_ptr(),
                 redundancy_bytes,
                 None,
             )
@@ -2027,7 +2032,12 @@ pub fn opus_encode_native<T>(
             &mut redundant_rng
         );
         opus_custom_encoder_ctl!(&mut st.celt_enc, OPUS_RESET_STATE);
-    }
+        let mut enc = ec_enc_init(&mut data[..max_data_bytes as usize - 1]);
+        enc.restore(saved_enc);
+        enc
+    } else {
+        enc
+    };
 
     opus_custom_encoder_ctl!(&mut st.celt_enc, CELT_SET_START_BAND_REQUEST, start_band);
 
