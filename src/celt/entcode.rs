@@ -12,6 +12,7 @@ pub const EC_CODE_EXTRA: i32 = (EC_CODE_BITS - 2) % EC_SYM_BITS + 1;
 
 pub type ec_window = u32;
 
+#[derive(Debug)]
 pub struct ec_ctx<'a> {
     pub buf: &'a mut [u8],
     pub storage: u32,
