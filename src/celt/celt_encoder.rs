@@ -64,6 +64,7 @@ use crate::varargs::VarArgs;
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct OpusCustomEncoder {
+    /// Mode used by the encoder
     pub mode: &'static OpusCustomMode,
     pub channels: i32,
     pub stream_channels: i32,
@@ -77,6 +78,7 @@ pub struct OpusCustomEncoder {
     pub bitrate: i32,
     pub vbr: i32,
     pub signalling: i32,
+    /// If zero, VBR can do whatever it likes with the rate
     pub constrained_vbr: i32,
     pub loss_rate: i32,
     pub lsb_depth: i32,
@@ -132,18 +134,22 @@ impl OpusCustomEncoder {
             mode,
             channels,
             stream_channels: channels,
+
             upsample: 1,
             start: 0,
             end: mode.effEBands,
             signalling: 1,
-            arch: arch,
+            arch,
+
             constrained_vbr: 1,
             clip: 1,
+
             bitrate: OPUS_BITRATE_MAX,
             vbr: 0,
             force_intra: 0,
             complexity: 5,
             lsb_depth: 24,
+
             disable_pf: 0,
             loss_rate: 0,
             lfe: 0,
@@ -202,116 +208,119 @@ unsafe fn transient_analysis(
     allow_weak_transients: i32,
     weak_transient: *mut i32,
 ) -> i32 {
-    let mut i: i32 = 0;
     let mut mem0: opus_val32 = 0.;
     let mut mem1: opus_val32 = 0.;
     let mut is_transient: i32 = 0;
     let mut mask_metric: i32 = 0;
-    let mut c: i32 = 0;
     let mut tf_max: opus_val16 = 0.;
-    let mut len2: i32 = 0;
-    let mut forward_decay: opus_val16 = 0.0625f32;
 
-    static mut inv_table: [u8; 128] = [
+    // Forward masking: 6.7 dB/ms.
+    let mut forward_decay = 0.0625;
+
+    // Table of 6*64/x, trained on real data to minimize the average error
+    const inv_table: [u8; 128] = [
         255, 255, 156, 110, 86, 70, 59, 51, 45, 40, 37, 33, 31, 28, 26, 25, 23, 22, 21, 20, 19, 18,
         17, 16, 16, 15, 15, 14, 13, 13, 12, 12, 12, 12, 11, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9,
         8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5,
         5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
         4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2,
     ];
-    let vla = len as usize;
-    let mut tmp: Vec<opus_val16> = vec![0.; vla];
+    let mut tmp = vec![0.; len as usize];
     *weak_transient = 0;
+    // For lower bitrates, let's be more conservative and have a forward masking
+    //  decay of 3.3 dB/ms. This avoids having to code transients at very low
+    //  bitrate (mostly for hybrid), which can result in unstable energy and/or
+    //  partial collapse.
     if allow_weak_transients != 0 {
-        forward_decay = 0.03125f32;
+        forward_decay = 0.03125;
     }
-    len2 = len / 2;
-    c = 0;
-    while c < C {
+    let len2 = len / 2;
+    for c in 0..C {
         let mut mean: opus_val32 = 0.;
         let mut unmask: i32 = 0;
         let mut norm: opus_val32 = 0.;
         let mut maxE: opus_val16 = 0.;
+
         mem0 = 0.;
         mem1 = 0.;
-        i = 0;
-        while i < len {
+
+        // High-pass filter: (1 - 2*z^-1 + z^-2) / (1 - z^-1 + .5*z^-2)
+        for i in 0..len {
             let x = *in_0.offset((i + c * len) as isize);
             let y = mem0 + x;
             mem0 = mem1 + y - 2. * x;
             mem1 = x - 0.5 * y;
             tmp[i as usize] = y;
-            i += 1;
         }
+        // First few samples are bad because we don't propagate the memory
         tmp[..12].fill(0.);
+
         mean = 0.;
         mem0 = 0.;
-        i = 0;
-        while i < len2 {
+        // Grouping by two to reduce complexity
+        // Forward pass to compute the post-echo threshold
+        for i in 0..len2 {
             let x2: opus_val16 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
                 + tmp[(2 * i + 1) as usize] * tmp[(2 * i + 1) as usize];
             mean += x2;
             tmp[i as usize] = mem0 + forward_decay * (x2 - mem0);
             mem0 = tmp[i as usize];
-            i += 1;
         }
-        mem0 = 0 as opus_val32;
-        maxE = 0 as opus_val16;
-        i = len2 - 1;
-        while i >= 0 {
+
+        mem0 = 0.;
+        maxE = 0.;
+        // Backward pass to compute the pre-echo threshold
+        for i in (0..len2).rev() {
             tmp[i as usize] = mem0 + 0.125f32 * (tmp[i as usize] - mem0);
             mem0 = tmp[i as usize];
-            maxE = if maxE > mem0 { maxE } else { mem0 };
-            i -= 1;
+            maxE = maxE.max(mem0);
         }
+        /* Compute the ratio of the "frame energy" over the harmonic mean of the energy.
+        This essentially corresponds to a bitrate-normalized temporal noise-to-mask
+        ratio */
+
+        /* As a compromise with the old transient detector, frame energy is the
+        geometric mean of the energy and half the max */
         mean = celt_sqrt((mean * maxE) * 0.5f32 * len2 as f32);
         norm = len2 as f32 / (1e-15f32 + mean);
         unmask = 0;
+
+        /* We should never see NaNs here. If we find any, then something really bad happened and we better abort
+        before it does any damage later on. If these asserts are disabled (no hardening), then the table
+        lookup a few lines below (id = ...) is likely to crash dur to an out-of-bounds read. DO NOT FIX
+        that crash on NaN since it could result in a worse issue later on. */
         assert!(
             !tmp[0].is_nan(),
             "{c}: {tmp:?} - {norm}\n{:?}",
             std::slice::from_raw_parts(in_0, len as _)
         );
         assert!(!norm.is_nan());
-        i = 12;
-        while i < len2 - 5 {
-            let mut id: i32 = 0;
-            id = (if 0.0
-                > (if 127.0
-                    < (64.0 * norm * (*tmp.as_mut_ptr().offset(i as isize) + 1e-15f32)).floor()
-                {
-                    127.0
-                } else {
-                    (64.0 * norm * (*tmp.as_mut_ptr().offset(i as isize) + 1e-15f32)).floor()
-                }) {
-                0.0
-            } else if 127.0
-                < (64.0 * norm * (*tmp.as_mut_ptr().offset(i as isize) + 1e-15f32)).floor()
-            {
-                127.0
-            } else {
-                (64.0 * norm * (*tmp.as_mut_ptr().offset(i as isize) + 1e-15f32)).floor()
-            }) as i32;
+        for i in (12..len2 - 5).step_by(4) {
+            // Do not round to nearest;
+            let id = (0.0f32)
+                .max((127.0f32).min(
+                    (64.0 * norm * (*tmp.as_mut_ptr().offset(i as isize) + 1e-15f32)).floor(),
+                ));
             unmask += inv_table[id as usize] as i32;
-            i += 4;
         }
+
+        // Normalize, compensate for the 1/4th of the sample and the factor of 6 in the inverse table
         unmask = 64 * unmask * 4 / (6 * (len2 - 17));
         if unmask > mask_metric {
             *tf_chan = c;
             mask_metric = unmask;
         }
-        c += 1;
     }
+
     is_transient = (mask_metric > 200) as i32;
+    // For low bitrates, define "weak transients" that need to be
+    // handled differently to avoid partial collapse.
     if allow_weak_transients != 0 && is_transient != 0 && mask_metric < 600 {
         is_transient = 0;
         *weak_transient = 1;
     }
-    tf_max = if 0 as f32 > celt_sqrt((27 * mask_metric) as f32) - 42 as f32 {
-        0 as f32
-    } else {
-        celt_sqrt((27 * mask_metric) as f32) - 42 as f32
-    };
+    // Arbitrary metric for VBR boost
+    tf_max = (0.0f32).max(celt_sqrt((27 * mask_metric) as f32) - 42.);
     *tf_estimate = (if 0 as f64
         > (0.0069f64 as opus_val32
             * (if (163 as f32) < tf_max {
@@ -333,8 +342,10 @@ unsafe fn transient_analysis(
     })
     // here, a 64-bit sqrt __should__ be used
     .sqrt() as f32;
-    return is_transient;
+
+    is_transient
 }
+
 unsafe fn patch_transient_decision(
     newE: *mut opus_val16,
     oldE: *mut opus_val16,
@@ -3196,115 +3207,92 @@ pub fn opus_custom_encoder_ctl_impl(
     request: i32,
     args: VarArgs,
 ) -> i32 {
-    let current_block: u64;
     let mut ap = args;
     match request {
         OPUS_SET_COMPLEXITY_REQUEST => {
             let value: i32 = ap.arg::<i32>();
             if value < 0 || value > 10 {
-                current_block = 2472048668343472511;
-            } else {
-                st.complexity = value;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.complexity = value;
         }
         CELT_SET_START_BAND_REQUEST => {
             let value_0: i32 = ap.arg::<i32>();
             if value_0 < 0 || value_0 >= st.mode.nbEBands as i32 {
-                current_block = 2472048668343472511;
-            } else {
-                st.start = value_0;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.start = value_0;
         }
         CELT_SET_END_BAND_REQUEST => {
             let value_1: i32 = ap.arg::<i32>();
             if value_1 < 1 || value_1 > st.mode.nbEBands as i32 {
-                current_block = 2472048668343472511;
-            } else {
-                st.end = value_1;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.end = value_1;
         }
         CELT_SET_PREDICTION_REQUEST => {
             let value_2: i32 = ap.arg::<i32>();
             if value_2 < 0 || value_2 > 2 {
-                current_block = 2472048668343472511;
-            } else {
-                st.disable_pf = (value_2 <= 1) as i32;
-                st.force_intra = (value_2 == 0) as i32;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.disable_pf = (value_2 <= 1) as i32;
+            st.force_intra = (value_2 == 0) as i32;
         }
         OPUS_SET_PACKET_LOSS_PERC_REQUEST => {
             let value_3: i32 = ap.arg::<i32>();
             if value_3 < 0 || value_3 > 100 {
-                current_block = 2472048668343472511;
-            } else {
-                st.loss_rate = value_3;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.loss_rate = value_3;
         }
         OPUS_SET_VBR_CONSTRAINT_REQUEST => {
             let value_4: i32 = ap.arg::<i32>();
             st.constrained_vbr = value_4;
-            current_block = 10007731352114176167;
         }
         OPUS_SET_VBR_REQUEST => {
             let value_5: i32 = ap.arg::<i32>();
             st.vbr = value_5;
-            current_block = 10007731352114176167;
         }
         OPUS_SET_BITRATE_REQUEST => {
             let mut value_6: i32 = ap.arg::<i32>();
             if value_6 <= 500 && value_6 != OPUS_BITRATE_MAX {
-                current_block = 2472048668343472511;
-            } else {
-                value_6 = if value_6 < 260000 * st.channels {
-                    value_6
-                } else {
-                    260000 * st.channels
-                };
-                st.bitrate = value_6;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            value_6 = if value_6 < 260000 * st.channels {
+                value_6
+            } else {
+                260000 * st.channels
+            };
+            st.bitrate = value_6;
         }
         CELT_SET_CHANNELS_REQUEST => {
             let value_7: i32 = ap.arg::<i32>();
             if value_7 < 1 || value_7 > 2 {
-                current_block = 2472048668343472511;
-            } else {
-                st.stream_channels = value_7;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.stream_channels = value_7;
         }
         OPUS_SET_LSB_DEPTH_REQUEST => {
             let value_8: i32 = ap.arg::<i32>();
             if value_8 < 8 || value_8 > 24 {
-                current_block = 2472048668343472511;
-            } else {
-                st.lsb_depth = value_8;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.lsb_depth = value_8;
         }
         OPUS_GET_LSB_DEPTH_REQUEST => {
             let value_9: &mut i32 = ap.arg::<&mut i32>();
             *value_9 = st.lsb_depth;
-            current_block = 10007731352114176167;
         }
         OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST => {
             let value_10: i32 = ap.arg::<i32>();
             if value_10 < 0 || value_10 > 1 {
-                current_block = 2472048668343472511;
-            } else {
-                st.disable_inv = value_10;
-                current_block = 10007731352114176167;
+                return OPUS_BAD_ARG;
             }
+            st.disable_inv = value_10;
         }
         OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
             let value_11: &mut i32 = ap.arg::<&mut i32>();
             *value_11 = st.disable_inv;
-            current_block = 10007731352114176167;
         }
         OPUS_RESET_STATE => {
             // clearing out fields
@@ -3315,14 +3303,18 @@ pub fn opus_custom_encoder_ctl_impl(
             st.lastCodedBands = 0;
             st.hf_average = 0;
             st.tapset_decision = 0;
+
             st.prefilter_period = 0;
             st.prefilter_gain = 0.;
             st.prefilter_tapset = 0;
+
             st.consec_transient = 0;
             st.analysis = AnalysisInfo::default();
             st.silk_info = SILKInfo::default();
+
             st.preemph_memE.fill(0.);
             st.preemph_memD.fill(0.);
+
             st.vbr_reservoir = 0;
             st.vbr_drift = 0;
             st.vbr_offset = 0;
@@ -3332,12 +3324,12 @@ pub fn opus_custom_encoder_ctl_impl(
             st.intensity = 0;
             st.energy_mask = std::ptr::null_mut();
             st.spec_avg = 0.;
-            st.in_mem.fill(0.);
 
-            for i in 0..(st.channels as usize * st.mode.nbEBands) {
-                st.oldLogE[i] = -28.;
-                st.oldLogE2[i] = -28.;
-            }
+            st.in_mem.fill(0.);
+            st.prefilter_mem.fill(0.);
+            st.oldLogE.fill(-28.);
+            st.oldLogE2.fill(-28.);
+            st.energyError.fill(0.);
 
             st.vbr_offset = 0;
             st.delayedIntra = 1 as opus_val32;
@@ -3345,53 +3337,38 @@ pub fn opus_custom_encoder_ctl_impl(
             st.tonal_average = 256;
             st.hf_average = 0;
             st.tapset_decision = 0;
-
-            current_block = 10007731352114176167;
         }
         CELT_SET_SIGNALLING_REQUEST => {
             let value_12: i32 = ap.arg::<i32>();
             st.signalling = value_12;
-
-            current_block = 10007731352114176167;
         }
         CELT_SET_ANALYSIS_REQUEST => {
             let info = ap.arg::<&mut AnalysisInfo>();
             *info = st.analysis.clone();
-
-            current_block = 10007731352114176167;
         }
         CELT_SET_SILK_INFO_REQUEST => {
             let info_0 = ap.arg::<&mut SILKInfo>();
             *info_0 = st.silk_info.clone();
-
-            current_block = 10007731352114176167;
         }
         CELT_GET_MODE_REQUEST => {
             let value_13 = ap.arg::<&mut *const OpusCustomMode>();
             *value_13 = st.mode;
-            current_block = 10007731352114176167;
         }
         OPUS_GET_FINAL_RANGE_REQUEST => {
             let value_14 = ap.arg::<&mut u32>();
             *value_14 = st.rng;
-            current_block = 10007731352114176167;
         }
         OPUS_SET_LFE_REQUEST => {
             let value_15: i32 = ap.arg::<i32>();
             st.lfe = value_15;
-            current_block = 10007731352114176167;
         }
         OPUS_SET_ENERGY_MASK_REQUEST => {
             let value_16: *mut opus_val16 = ap.arg::<*mut opus_val16>();
             st.energy_mask = value_16;
-            current_block = 10007731352114176167;
         }
         _ => return OPUS_UNIMPLEMENTED,
     }
-    match current_block {
-        10007731352114176167 => return OPUS_OK,
-        _ => return OPUS_BAD_ARG,
-    };
+    OPUS_OK
 }
 
 #[macro_export]
