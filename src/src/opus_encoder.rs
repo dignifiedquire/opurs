@@ -2088,6 +2088,11 @@ pub fn opus_encode_native<T>(
                 // OPUS_MOVE(data+ret, data+nb_compr_bytes, redundancy_bytes);
                 let start = nb_compr_bytes as usize;
                 let end = start + redundancy_bytes as usize;
+                #[cfg(feature = "ent-dump")]
+                eprintln!(
+                    "data+nb_compr_bytes: 0x{}",
+                    hex::encode(&enc.buf[start..end])
+                );
                 eprintln!("data+nb_compr_bytes: 0x{:x}", enc.buf[start]);
                 enc.buf.copy_within(start..end, ret as usize);
                 nb_compr_bytes = nb_compr_bytes + redundancy_bytes;
