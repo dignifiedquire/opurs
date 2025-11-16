@@ -10,7 +10,7 @@ use crate::celt::entcode::{
 };
 
 fn ec_read_byte(this: &mut ec_dec) -> i32 {
-    if this.offs < this.storage {
+    let value = if this.offs < this.storage {
         let res = this.buf[this.offs as usize] as i32;
 
         this.offs += 1;
@@ -18,7 +18,10 @@ fn ec_read_byte(this: &mut ec_dec) -> i32 {
         res
     } else {
         0
-    }
+    };
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_read_byte(0x{:x} @ 0x{:x})", value, this.offs - 1);
+    value
 }
 
 fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
@@ -32,6 +35,11 @@ fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
 }
 
 fn ec_dec_normalize(this: &mut ec_dec) {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_normalize()");
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_normalize(): im: val:{}, rng:{}", this.val, this.rng);
+
     while this.rng <= EC_CODE_BOT {
         let mut sym: i32 = 0;
         this.nbits_total += EC_SYM_BITS;
@@ -45,6 +53,8 @@ fn ec_dec_normalize(this: &mut ec_dec) {
 }
 
 pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_init()");
     let mut this = ec_dec {
         storage: buf.len() as u32,
         buf,
@@ -72,6 +82,8 @@ pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
 }
 
 pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_decode({})", _ft);
     let mut s: u32 = 0;
     this.ext = celt_udiv(this.rng, _ft);
     s = (this.val).wrapping_div(this.ext);
@@ -82,6 +94,13 @@ pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
 }
 
 pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_decode_bin({})", _bits);
+    #[cfg(feature = "ent-dump")]
+    eprintln!(
+        "ec_enc_decode_bin(): im: val:{}, rng:{}",
+        this.val, this.rng
+    );
     let mut s: u32 = 0;
     this.ext = this.rng >> _bits;
     s = (this.val).wrapping_div(this.ext);
@@ -93,6 +112,10 @@ pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
 }
 
 pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_update({}, {}, {})", _fl, _fh, _ft);
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_update(): im: val:{}, rng:{}", _this.val, _this.rng);
     let mut s: u32 = 0;
     s = (_this.ext).wrapping_mul(_ft.wrapping_sub(_fh));
     _this.val = _this.val.wrapping_sub(s);
@@ -105,6 +128,13 @@ pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft
 }
 
 pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_bit_logp({})", _logp);
+    #[cfg(feature = "ent-dump")]
+    eprintln!(
+        "ec_dec_bit_logp(): im: val:{}, rng:{}",
+        _this.val, _this.rng
+    );
     let mut r: u32 = 0;
     let mut d: u32 = 0;
     let mut s: u32 = 0;
@@ -123,6 +153,10 @@ pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
 }
 
 pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_icdf({:?}, {})", icdf, _ftb);
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_icdf(): im: val:{}, rng:{}", _this.val, _this.rng);
     let mut r: u32 = 0;
     let mut d: u32 = 0;
     let mut s: u32 = 0;
@@ -148,6 +182,8 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
 }
 
 pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_uint({})", _ft);
     let mut ft: u32 = 0;
     let mut s: u32 = 0;
     let mut ftb: i32 = 0;
@@ -175,6 +211,8 @@ pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
 }
 
 pub fn ec_dec_bits(mut _this: &mut ec_dec, mut _bits: u32) -> u32 {
+    #[cfg(feature = "ent-dump")]
+    eprintln!("ec_dec_bits({})", _bits);
     let mut window: ec_window = 0;
     let mut available: i32 = 0;
     let mut ret: u32 = 0;
