@@ -2140,9 +2140,13 @@ pub unsafe fn opus_encode_native<T>(
                 && (*st).mode == MODE_HYBRID
                 && (*st).use_vbr != 0
             {
+                #[cfg(feature = "ent-dump")]
                 eprintln!(
-                    "data+nb_compr_bytes: 0x{:x}",
-                    *data.offset(nb_compr_bytes as isize)
+                    "data+nb_compr_bytes: 0x{}",
+                    hex::encode(std::slice::from_raw_parts(
+                        data.offset(nb_compr_bytes as isize),
+                        redundancy_bytes as _
+                    ))
                 );
 
                 memmove(
