@@ -2839,6 +2839,7 @@ pub unsafe fn celt_encode_with_ec(
         };
     }
     alloc_trim = 5;
+    eprintln!("tell + <= total_bits");
     if tell + ((6) << BITRES) <= total_bits - total_boost {
         if start > 0 || st.lfe != 0 {
             st.stereo_saving = 0 as opus_val16;
@@ -2889,6 +2890,7 @@ pub unsafe fn celt_encode_with_ec(
             base_target += st.vbr_offset >> lm_diff;
         }
         if hybrid == 0 {
+            eprintln!("compute_vbr");
             target = compute_vbr(
                 mode,
                 &mut st.analysis,
@@ -3019,6 +3021,7 @@ pub unsafe fn celt_encode_with_ec(
     if st.lfe != 0 {
         signalBandwidth = 1;
     }
+    eprintln!("clt_compute_allocation");
     codedBands = clt_compute_allocation(
         mode,
         start,
@@ -3056,6 +3059,7 @@ pub unsafe fn celt_encode_with_ec(
     } else {
         st.lastCodedBands = codedBands;
     }
+    eprintln!("quant_fine_energy");
     quant_fine_energy(
         mode,
         start,
@@ -3101,6 +3105,7 @@ pub unsafe fn celt_encode_with_ec(
         anti_collapse_on = (st.consec_transient < 2) as i32;
         ec_enc_bits(enc, anti_collapse_on as u32, 1);
     }
+    eprintln!("quant_energy_finalise: {:?}", enc);
     quant_energy_finalise(
         mode,
         start,
@@ -3115,6 +3120,7 @@ pub unsafe fn celt_encode_with_ec(
     );
     st.energyError.fill(0.);
 
+    eprintln!("energy error: {:?}", enc);
     c = 0;
     loop {
         i = start;
@@ -3192,7 +3198,9 @@ pub unsafe fn celt_encode_with_ec(
     } else {
         st.consec_transient = 0;
     }
+    eprintln!("update rng st:{}-enc:{}", st.rng, enc.rng);
     st.rng = enc.rng;
+    // -- end
     ec_enc_done(enc);
     if ec_get_error(enc) != 0 {
         return OPUS_INTERNAL_ERROR;
