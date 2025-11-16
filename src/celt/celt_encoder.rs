@@ -1932,26 +1932,19 @@ pub unsafe fn celt_encode_with_ec(
     mut frame_size: i32,
     compressed: *mut u8,
     mut nbCompressedBytes: i32,
-    mut enc: Option<&mut ec_enc>,
+    enc: Option<&mut ec_enc>,
 ) -> i32 {
+    let c = if compressed.is_null() {
+        "NULL".to_string()
+    } else {
+        format!("0x{:x}", *compressed)
+    };
+    eprintln!("celt_encode_with_ec: compressed {c}");
     let mut i: i32 = 0;
     let mut c: i32 = 0;
     let mut N: i32 = 0;
     let mut bits: i32 = 0;
-    let mut _enc: ec_enc = ec_enc {
-        buf: &mut [],
-        storage: 0,
-        end_offs: 0,
-        end_window: 0,
-        nend_bits: 0,
-        nbits_total: 0,
-        offs: 0,
-        rng: 0,
-        val: 0,
-        ext: 0,
-        rem: 0,
-        error: 0,
-    };
+    let mut _enc: ec_enc;
     let mut prefilter_mem: *mut celt_sig = 0 as *mut celt_sig;
     let mut oldBandE: *mut opus_val16 = 0 as *mut opus_val16;
     let mut oldLogE: *mut opus_val16 = 0 as *mut opus_val16;
@@ -2038,7 +2031,7 @@ pub unsafe fn celt_encode_with_ec(
     oldLogE = oldBandE.offset((CC * nbEBands) as isize);
     oldLogE2 = oldLogE.offset((CC * nbEBands) as isize);
     energyError = oldLogE2.offset((CC * nbEBands) as isize);
-    if let Some(enc) = enc.as_mut() {
+    if let Some(enc) = enc.as_ref() {
         tell0_frac = ec_tell_frac(enc) as i32;
         tell = ec_tell(enc);
         nbFilledBytes = tell + 4 >> 3;
@@ -2100,6 +2093,7 @@ pub unsafe fn celt_encode_with_ec(
         assert!(!compressed.is_null());
         let compressed_slice =
             std::slice::from_raw_parts_mut(compressed, nbCompressedBytes as usize);
+        #[cfg(feature = "ent-dump")]
         eprintln!(
             "init ec_enc {}: {}",
             nbCompressedBytes,

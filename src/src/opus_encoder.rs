@@ -2140,6 +2140,11 @@ pub unsafe fn opus_encode_native<T>(
                 && (*st).mode == MODE_HYBRID
                 && (*st).use_vbr != 0
             {
+                eprintln!(
+                    "data+nb_compr_bytes: 0x{:x}",
+                    *data.offset(nb_compr_bytes as isize)
+                );
+
                 memmove(
                     data.offset(ret as isize) as *mut core::ffi::c_void,
                     data.offset(nb_compr_bytes as isize) as *const core::ffi::c_void,
