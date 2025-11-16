@@ -283,6 +283,11 @@ pub fn ec_enc_done(this: &mut ec_enc) {
         msk >>= 1;
         end = (this.val).wrapping_add(msk) & !msk;
     }
+    #[cfg(feature = "ent-dump")]
+    eprintln!(
+        "ec_enc_done(): im: l:{l}, msk:{msk}, val:{}, rng:{}",
+        this.val, this.rng
+    );
     while l > 0 {
         ec_enc_carry_out(this, (end >> EC_CODE_SHIFT) as i32);
         end = end << EC_SYM_BITS & EC_CODE_TOP.wrapping_sub(1);
