@@ -1189,6 +1189,7 @@ unsafe fn quant_band(
     lowband_scratch: *mut celt_norm,
     mut fill: i32,
 ) -> u32 {
+    #[cfg(feature = "ent-dump")]
     eprintln!("quant band {:?}", (*(*ctx).ec));
     let N0: i32 = N;
     let mut N_B: i32 = N;
@@ -1568,6 +1569,7 @@ pub unsafe fn quant_all_bands(
     arch: i32,
     disable_inv: i32,
 ) {
+    #[cfg(feature = "ent-dump")]
     eprintln!("quant all bands");
     let mut i: i32 = 0;
     let mut remaining_bits: i32 = 0;

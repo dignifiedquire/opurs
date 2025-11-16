@@ -1,6 +1,6 @@
 use crate::celt::bands::{
-    SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL, compute_band_energies, haar1,
-    hysteresis_decision, normalise_bands, quant_all_bands, spreading_decision,
+    compute_band_energies, haar1, hysteresis_decision, normalise_bands, quant_all_bands,
+    spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
 };
 
 pub mod arch_h {
@@ -23,26 +23,26 @@ pub mod stddef_h {
     pub const NULL: i32 = 0;
 }
 pub use self::arch_h::{
-    CELT_SIG_SCALE, EPSILON, celt_ener, celt_norm, celt_sig, opus_val16, opus_val32,
+    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON,
 };
 pub use self::stddef_h::NULL;
+use crate::celt::celt::{
+    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
+};
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
     CELT_SET_SILK_INFO_REQUEST, CELT_SET_START_BAND_REQUEST, COMBFILTER_MAXPERIOD,
     COMBFILTER_MINPERIOD, OPUS_SET_ENERGY_MASK_REQUEST, OPUS_SET_LFE_REQUEST,
 };
-use crate::celt::celt::{
-    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
-};
-use crate::celt::entcode::{BITRES, ec_get_error, ec_tell, ec_tell_frac};
+use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
     ec_enc_uint,
 };
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
-use crate::celt::modes::{OpusCustomMode, opus_custom_mode_create};
+use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 use crate::celt::pitch::{celt_inner_prod_c, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
@@ -1897,12 +1897,15 @@ pub unsafe fn celt_encode_with_ec(
     mut nbCompressedBytes: i32,
     enc: Option<&mut ec_enc>,
 ) -> i32 {
-    let c = if compressed.is_null() {
-        "NULL".to_string()
-    } else {
-        format!("0x{:x}", *compressed)
-    };
-    eprintln!("celt_encode_with_ec: compressed {c}");
+    #[cfg(feature = "ent-dump")]
+    {
+        let c = if compressed.is_null() {
+            "NULL".to_string()
+        } else {
+            format!("0x{:x}", *compressed)
+        };
+        eprintln!("celt_encode_with_ec: compressed {c}");
+    }
     let mut i: i32 = 0;
     let mut c: i32 = 0;
     let mut N: i32 = 0;
@@ -2060,7 +2063,11 @@ pub unsafe fn celt_encode_with_ec(
             max_allowed = if (if (if tell == 1 { 2 } else { 0 })
                 > vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
             {
-                if tell == 1 { 2 } else { 0 }
+                if tell == 1 {
+                    2
+                } else {
+                    0
+                }
             } else {
                 vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
             }) < nbAvailableBytes
@@ -2068,7 +2075,11 @@ pub unsafe fn celt_encode_with_ec(
                 if (if tell == 1 { 2 } else { 0 })
                     > vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
                 {
-                    if tell == 1 { 2 } else { 0 }
+                    if tell == 1 {
+                        2
+                    } else {
+                        0
+                    }
                 } else {
                     vbr_rate + vbr_bound - st.vbr_reservoir >> 3 + 3
                 }
@@ -2200,6 +2211,7 @@ pub unsafe fn celt_encode_with_ec(
     isTransient = 0;
     shortBlocks = 0;
     if st.complexity >= 1 && st.lfe == 0 {
+        #[cfg(feature = "ent-dump")]
         eprintln!("transient_analysis complexity {:?}", enc);
         let allow_weak_transients: i32 =
             (hybrid != 0 && effectiveBytes < 15 && st.silk_info.signalType != 2) as i32;
@@ -2296,6 +2308,7 @@ pub unsafe fn celt_encode_with_ec(
             i += 1;
         }
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("amp2Log2 {:?}", enc);
     amp2Log2(
         mode,
@@ -2362,7 +2375,11 @@ pub unsafe fn celt_encode_with_ec(
         diff = diff * 6 as f32 / (C * (mask_end - 1) * (mask_end + 1) * mask_end) as f32;
         diff = 0.5f32 * diff;
         diff = if (if diff < 0.031f32 { diff } else { 0.031f32 }) > -0.031f32 {
-            if diff < 0.031f32 { diff } else { 0.031f32 }
+            if diff < 0.031f32 {
+                diff
+            } else {
+                0.031f32
+            }
         } else {
             -0.031f32
         };
@@ -2426,6 +2443,7 @@ pub unsafe fn celt_encode_with_ec(
         surround_masking = mask_avg;
     }
 
+    #[cfg(feature = "ent-dump")]
     eprintln!("lfe == 0 {} {:?}", st.lfe == 0, enc);
     if st.lfe == 0 {
         let mut follow: opus_val16 = -10.0f32;
@@ -2480,6 +2498,7 @@ pub unsafe fn celt_encode_with_ec(
                 ),
         );
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("LM > 0 {}, {:?}", LM > 0, enc);
     if LM > 0
         && ec_tell(enc) + 3 <= total_bits
@@ -2549,6 +2568,7 @@ pub unsafe fn celt_encode_with_ec(
     let mut importance: Vec<i32> = ::std::vec::from_elem(0, vla_7);
     let vla_8 = nbEBands as usize;
     let mut spread_weight: Vec<i32> = ::std::vec::from_elem(0, vla_8);
+    #[cfg(feature = "ent-dump")]
     eprintln!("dynalloc {:?}", enc);
     maxDepth = dynalloc_analysis(
         bandLogE.as_mut_ptr(),
@@ -2573,6 +2593,7 @@ pub unsafe fn celt_encode_with_ec(
         importance.as_mut_ptr(),
         spread_weight.as_mut_ptr(),
     );
+    #[cfg(feature = "ent-dump")]
     eprintln!("tf_analysis {:?}", enc);
     let vla_9 = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla_9);
@@ -2644,6 +2665,7 @@ pub unsafe fn celt_encode_with_ec(
             break;
         }
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!(
         "quant_coarse_engery {:?}\nbandLogE:{:?}\noldBandE:{:?}",
         enc, bandLogE, st.oldBandE
@@ -2667,6 +2689,7 @@ pub unsafe fn celt_encode_with_ec(
         st.loss_rate,
         st.lfe,
     );
+    #[cfg(feature = "ent-dump")]
     eprintln!("tf_encode {:?}", enc);
     tf_encode(
         start,
@@ -2677,6 +2700,7 @@ pub unsafe fn celt_encode_with_ec(
         tf_select,
         enc,
     );
+    #[cfg(feature = "ent-dump")]
     eprintln!("ec_tell + 4 {:?}", enc);
     if ec_tell(enc) + 4 <= total_bits {
         if st.lfe != 0 {
@@ -2720,6 +2744,7 @@ pub unsafe fn celt_encode_with_ec(
             effectiveBytes / 3
         };
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("init_caps {:?}", enc);
     let vla_11 = nbEBands as usize;
     let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_11);
@@ -2844,6 +2869,7 @@ pub unsafe fn celt_encode_with_ec(
     }
     alloc_trim = 5;
     // first diff
+    #[cfg(feature = "ent-dump")]
     eprintln!("tell + <= total_bits {:?}", enc);
     if tell + ((6) << BITRES) <= total_bits - total_boost {
         if start > 0 || st.lfe != 0 {
@@ -2895,6 +2921,7 @@ pub unsafe fn celt_encode_with_ec(
             base_target += st.vbr_offset >> lm_diff;
         }
         if hybrid == 0 {
+            #[cfg(feature = "ent-dump")]
             eprintln!("compute_vbr");
             target = compute_vbr(
                 mode,
@@ -3026,6 +3053,7 @@ pub unsafe fn celt_encode_with_ec(
     if st.lfe != 0 {
         signalBandwidth = 1;
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("clt_compute_allocation {:?}", enc);
     codedBands = clt_compute_allocation(
         mode,
@@ -3064,6 +3092,7 @@ pub unsafe fn celt_encode_with_ec(
     } else {
         st.lastCodedBands = codedBands;
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("quant_fine_energy {:?}", enc);
     quant_fine_energy(
         mode,
@@ -3077,6 +3106,7 @@ pub unsafe fn celt_encode_with_ec(
     );
     let vla_15 = (C * nbEBands) as usize;
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
+    #[cfg(feature = "ent-dump")]
     eprintln!("quant_all_bands {:?}", enc);
     quant_all_bands(
         1,
@@ -3111,6 +3141,7 @@ pub unsafe fn celt_encode_with_ec(
         anti_collapse_on = (st.consec_transient < 2) as i32;
         ec_enc_bits(enc, anti_collapse_on as u32, 1);
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("quant_energy_finalise: {:?}", enc);
     quant_energy_finalise(
         mode,
@@ -3126,6 +3157,7 @@ pub unsafe fn celt_encode_with_ec(
     );
     st.energyError.fill(0.);
 
+    #[cfg(feature = "ent-dump")]
     eprintln!("energy error: {:?}", enc);
     c = 0;
     loop {
@@ -3204,6 +3236,7 @@ pub unsafe fn celt_encode_with_ec(
     } else {
         st.consec_transient = 0;
     }
+    #[cfg(feature = "ent-dump")]
     eprintln!("update rng st:{}-enc:{}", st.rng, enc.rng);
     st.rng = enc.rng;
     // -- end
@@ -3340,6 +3373,7 @@ pub fn opus_custom_encoder_ctl_impl(
 
             st.in_mem.fill(0.);
             st.prefilter_mem.fill(0.);
+            st.oldBandE.fill(0.);
             st.oldLogE.fill(-28.);
             st.oldLogE2.fill(-28.);
             st.energyError.fill(0.);
