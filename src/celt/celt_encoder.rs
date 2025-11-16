@@ -1944,7 +1944,6 @@ pub unsafe fn celt_encode_with_ec(
     let mut tot_boost: i32 = 0;
     let mut sample_max: opus_val32 = 0.;
     let mut maxDepth: opus_val16 = 0.;
-    let mut mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
     let mut nbEBands: i32 = 0;
     let mut overlap: i32 = 0;
     let mut eBands: *const i16 = 0 as *const i16;
@@ -1958,10 +1957,10 @@ pub unsafe fn celt_encode_with_ec(
     let mut hybrid: i32 = 0;
     let mut weak_transient: i32 = 0;
     let mut enable_tf_analysis: i32 = 0;
-    mode = st.mode;
-    nbEBands = (*mode).nbEBands as i32;
-    overlap = (*mode).overlap as i32;
-    eBands = (*mode).eBands.as_ptr();
+    let mode = st.mode;
+    nbEBands = mode.nbEBands as i32;
+    overlap = mode.overlap as i32;
+    eBands = mode.eBands.as_ptr();
     start = st.start;
     end = st.end;
     hybrid = (start != 0) as i32;
@@ -1971,17 +1970,17 @@ pub unsafe fn celt_encode_with_ec(
     }
     frame_size *= st.upsample;
     LM = 0;
-    while LM <= (*mode).maxLM {
-        if (*mode).shortMdctSize << LM == frame_size {
+    while LM <= mode.maxLM {
+        if mode.shortMdctSize << LM == frame_size {
             break;
         }
         LM += 1;
     }
-    if LM > (*mode).maxLM {
+    if LM > mode.maxLM {
         return OPUS_BAD_ARG;
     }
     M = (1) << LM;
-    N = M * (*mode).shortMdctSize;
+    N = M * mode.shortMdctSize;
     if let Some(enc) = enc.as_ref() {
         tell0_frac = ec_tell_frac(enc) as i32;
         tell = ec_tell(enc);
@@ -1999,7 +1998,7 @@ pub unsafe fn celt_encode_with_ec(
     };
     nbAvailableBytes = nbCompressedBytes - nbFilledBytes;
     if st.vbr != 0 && st.bitrate != OPUS_BITRATE_MAX {
-        let den: i32 = (*mode).Fs >> BITRES;
+        let den: i32 = mode.Fs >> BITRES;
         vbr_rate = (st.bitrate * frame_size + (den >> 1)) / den;
         effectiveBytes = vbr_rate >> 3 + BITRES;
     } else {
@@ -2012,19 +2011,19 @@ pub unsafe fn celt_encode_with_ec(
         if st.bitrate != OPUS_BITRATE_MAX {
             nbCompressedBytes = if 2
                 > (if nbCompressedBytes
-                    < (tmp + 4 * (*mode).Fs) / (8 * (*mode).Fs) - (st.signalling != 0) as i32
+                    < (tmp + 4 * mode.Fs) / (8 * mode.Fs) - (st.signalling != 0) as i32
                 {
                     nbCompressedBytes
                 } else {
-                    (tmp + 4 * (*mode).Fs) / (8 * (*mode).Fs) - (st.signalling != 0) as i32
+                    (tmp + 4 * mode.Fs) / (8 * mode.Fs) - (st.signalling != 0) as i32
                 }) {
                 2
             } else if nbCompressedBytes
-                < (tmp + 4 * (*mode).Fs) / (8 * (*mode).Fs) - (st.signalling != 0) as i32
+                < (tmp + 4 * mode.Fs) / (8 * mode.Fs) - (st.signalling != 0) as i32
             {
                 nbCompressedBytes
             } else {
-                (tmp + 4 * (*mode).Fs) / (8 * (*mode).Fs) - (st.signalling != 0) as i32
+                (tmp + 4 * mode.Fs) / (8 * mode.Fs) - (st.signalling != 0) as i32
             };
         }
         effectiveBytes = nbCompressedBytes - nbFilledBytes;
@@ -2085,8 +2084,8 @@ pub unsafe fn celt_encode_with_ec(
     }
     total_bits = nbCompressedBytes * 8;
     effEnd = end;
-    if effEnd > (*mode).effEBands {
-        effEnd = (*mode).effEBands;
+    if effEnd > mode.effEBands {
+        effEnd = mode.effEBands;
     }
     let vla = (CC * (N + overlap)) as usize;
     let mut in_0: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
@@ -2138,7 +2137,7 @@ pub unsafe fn celt_encode_with_ec(
             N,
             CC,
             st.upsample,
-            ((*mode).preemph).as_ptr(),
+            (mode.preemph).as_ptr(),
             (st.preemph_memE).as_mut_ptr().offset(c as isize),
             need_clip,
         );
@@ -2560,7 +2559,7 @@ pub unsafe fn celt_encode_with_ec(
         C,
         offsets.as_mut_ptr(),
         st.lsb_depth,
-        (*mode).logN.as_ptr(),
+        mode.logN.as_ptr(),
         isTransient,
         st.vbr,
         st.constrained_vbr,
@@ -2645,7 +2644,10 @@ pub unsafe fn celt_encode_with_ec(
             break;
         }
     }
-    eprintln!("quant_coarse_engery {:?}", enc);
+    eprintln!(
+        "quant_coarse_engery {:?}\nbandLogE:{:?}\noldBandE:{:?}",
+        enc, bandLogE, st.oldBandE
+    );
     quant_coarse_energy(
         mode,
         start,
@@ -2874,7 +2876,7 @@ pub unsafe fn celt_encode_with_ec(
         let mut target: i32 = 0;
         let mut base_target: i32 = 0;
         let mut min_allowed: i32 = 0;
-        let lm_diff: i32 = (*mode).maxLM - LM;
+        let lm_diff: i32 = mode.maxLM - LM;
         nbCompressedBytes = if nbCompressedBytes < 1275 >> 3 - LM {
             nbCompressedBytes
         } else {
