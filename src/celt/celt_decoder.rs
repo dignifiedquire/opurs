@@ -1220,35 +1220,60 @@ pub unsafe fn celt_decode_with_ec(
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_5);
     let vla_6 = (C * N) as usize;
     let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_6);
-    quant_all_bands(
-        0,
-        &*mode,
-        start,
-        end,
-        X.as_mut_ptr(),
-        if C == 2 {
-            X.as_mut_ptr().offset(N as isize)
-        } else {
-            std::ptr::null_mut()
-        },
-        &mut collapse_masks,
-        &[],
-        &mut pulses,
-        shortBlocks,
-        spread_decision,
-        dual_stereo,
-        intensity,
-        &mut tf_res,
-        len * ((8) << BITRES) - anti_collapse_rsv,
-        balance,
-        dec,
-        LM,
-        codedBands,
-        &mut st.rng,
-        0,
-        st.arch,
-        st.disable_inv,
-    );
+    if C == 2 {
+        let (x_part, y_part) = X.split_at_mut(N as usize);
+        quant_all_bands(
+            0,
+            &*mode,
+            start,
+            end,
+            x_part,
+            Some(y_part),
+            &mut collapse_masks,
+            &[],
+            &mut pulses,
+            shortBlocks,
+            spread_decision,
+            dual_stereo,
+            intensity,
+            &mut tf_res,
+            len * ((8) << BITRES) - anti_collapse_rsv,
+            balance,
+            dec,
+            LM,
+            codedBands,
+            &mut st.rng,
+            0,
+            st.arch,
+            st.disable_inv,
+        );
+    } else {
+        quant_all_bands(
+            0,
+            &*mode,
+            start,
+            end,
+            &mut X,
+            None,
+            &mut collapse_masks,
+            &[],
+            &mut pulses,
+            shortBlocks,
+            spread_decision,
+            dual_stereo,
+            intensity,
+            &mut tf_res,
+            len * ((8) << BITRES) - anti_collapse_rsv,
+            balance,
+            dec,
+            LM,
+            codedBands,
+            &mut st.rng,
+            0,
+            st.arch,
+            st.disable_inv,
+        );
+    }
     if anti_collapse_rsv > 0 {
         anti_collapse_on = ec_dec_bits(dec, 1) as i32;
     }

@@ -3095,35 +3095,60 @@ pub unsafe fn celt_encode_with_ec(
     );
     let vla_15 = (C * nbEBands) as usize;
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
-    quant_all_bands(
-        1,
-        &*mode,
-        start,
-        end,
-        X.as_mut_ptr(),
-        if C == 2 {
-            X.as_mut_ptr().offset(N as isize)
-        } else {
-            std::ptr::null_mut()
-        },
-        &mut collapse_masks,
-        &bandE,
-        &mut pulses,
-        shortBlocks,
-        (*st).spread_decision,
-        dual_stereo,
-        (*st).intensity,
-        &mut tf_res,
-        nbCompressedBytes * ((8) << BITRES) - anti_collapse_rsv,
-        balance,
-        enc,
-        LM,
-        codedBands,
-        &mut (*st).rng,
-        (*st).complexity,
-        (*st).arch,
-        (*st).disable_inv,
-    );
+    if C == 2 {
+        let (x_part, y_part) = X.split_at_mut(N as usize);
+        quant_all_bands(
+            1,
+            &*mode,
+            start,
+            end,
+            x_part,
+            Some(y_part),
+            &mut collapse_masks,
+            &bandE,
+            &mut pulses,
+            shortBlocks,
+            (*st).spread_decision,
+            dual_stereo,
+            (*st).intensity,
+            &mut tf_res,
+            nbCompressedBytes * ((8) << BITRES) - anti_collapse_rsv,
+            balance,
+            enc,
+            LM,
+            codedBands,
+            &mut (*st).rng,
+            (*st).complexity,
+            (*st).arch,
+            (*st).disable_inv,
+        );
+    } else {
+        quant_all_bands(
+            1,
+            &*mode,
+            start,
+            end,
+            &mut X,
+            None,
+            &mut collapse_masks,
+            &bandE,
+            &mut pulses,
+            shortBlocks,
+            (*st).spread_decision,
+            dual_stereo,
+            (*st).intensity,
+            &mut tf_res,
+            nbCompressedBytes * ((8) << BITRES) - anti_collapse_rsv,
+            balance,
+            enc,
+            LM,
+            codedBands,
+            &mut (*st).rng,
+            (*st).complexity,
+            (*st).arch,
+            (*st).disable_inv,
+        );
+    }
     if anti_collapse_rsv > 0 {
         anti_collapse_on = ((*st).consec_transient < 2) as i32;
         ec_enc_bits(enc, anti_collapse_on as u32, 1);

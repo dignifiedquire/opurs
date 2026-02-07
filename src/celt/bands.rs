@@ -881,17 +881,13 @@ fn quant_band_n1(
 }
 
 /// Upstream C: celt/bands.c:quant_partition
-///
-/// Uses raw pointer for X to allow recursive splitting. All pointer
-/// arithmetic is bounds-checked via the N parameter which tracks the
-/// valid length.
-unsafe fn quant_partition(
+fn quant_partition(
     ctx: &mut band_ctx,
-    X: *mut f32,
+    X: &mut [f32],
     mut N: i32,
     mut b: i32,
     mut B: i32,
-    lowband: *mut f32,
+    lowband: Option<&[f32]>,
     mut LM: i32,
     gain: f32,
     mut fill: i32,
@@ -914,28 +910,30 @@ unsafe fn quant_partition(
             itheta: 0,
             qalloc: 0,
         };
-        let mut next_lowband2: *mut f32 = std::ptr::null_mut();
         N >>= 1;
-        let Y = X.offset(N as isize);
+        let n = N as usize;
         LM -= 1;
         if B == 1 {
             fill = fill & 1 | fill << 1;
         }
         B = B + 1 >> 1;
-        compute_theta(
-            ctx,
-            &mut sctx,
-            std::slice::from_raw_parts_mut(X, N as usize),
-            std::slice::from_raw_parts_mut(Y, N as usize),
-            N,
-            &mut b,
-            B,
-            B0,
-            LM,
-            0,
-            &mut fill,
-            ec,
-        );
+        {
+            let (x_lo, x_hi) = X.split_at_mut(n);
+            compute_theta(
+                ctx,
+                &mut sctx,
+                x_lo,
+                &mut x_hi[..n],
+                N,
+                &mut b,
+                B,
+                B0,
+                LM,
+                0,
+                &mut fill,
+                ec,
+            );
+        }
         let imid = sctx.imid;
         let iside = sctx.iside;
         let mut delta = sctx.delta;
@@ -968,46 +966,50 @@ unsafe fn quant_partition(
         };
         let mut sbits = b - mbits;
         ctx.remaining_bits -= qalloc;
-        if !lowband.is_null() {
-            next_lowband2 = lowband.offset(N as isize);
-        }
+        let next_lowband2 = lowband.map(|lb| &lb[n..]);
         let mut rebalance = ctx.remaining_bits;
         if mbits >= sbits {
-            cm = quant_partition(ctx, X, N, mbits, B, lowband, LM, gain * mid, fill, ec);
-            rebalance = mbits - (rebalance - ctx.remaining_bits);
-            if rebalance > (3) << BITRES && itheta != 0 {
-                sbits += rebalance - ((3) << BITRES);
+            {
+                let (x_lo, x_hi) = X.split_at_mut(n);
+                cm = quant_partition(ctx, x_lo, N, mbits, B, lowband, LM, gain * mid, fill, ec);
+                rebalance = mbits - (rebalance - ctx.remaining_bits);
+                if rebalance > (3) << BITRES && itheta != 0 {
+                    sbits += rebalance - ((3) << BITRES);
+                }
+                cm |= quant_partition(
+                    ctx,
+                    &mut x_hi[..n],
+                    N,
+                    sbits,
+                    B,
+                    next_lowband2,
+                    LM,
+                    gain * side,
+                    fill >> B,
+                    ec,
+                ) << (B0 >> 1);
             }
-            cm |= quant_partition(
-                ctx,
-                Y,
-                N,
-                sbits,
-                B,
-                next_lowband2,
-                LM,
-                gain * side,
-                fill >> B,
-                ec,
-            ) << (B0 >> 1);
         } else {
-            cm = quant_partition(
-                ctx,
-                Y,
-                N,
-                sbits,
-                B,
-                next_lowband2,
-                LM,
-                gain * side,
-                fill >> B,
-                ec,
-            ) << (B0 >> 1);
-            rebalance = sbits - (rebalance - ctx.remaining_bits);
-            if rebalance > (3) << BITRES && itheta != 16384 {
-                mbits += rebalance - ((3) << BITRES);
+            {
+                let (x_lo, x_hi) = X.split_at_mut(n);
+                cm = quant_partition(
+                    ctx,
+                    &mut x_hi[..n],
+                    N,
+                    sbits,
+                    B,
+                    next_lowband2,
+                    LM,
+                    gain * side,
+                    fill >> B,
+                    ec,
+                ) << (B0 >> 1);
+                rebalance = sbits - (rebalance - ctx.remaining_bits);
+                if rebalance > (3) << BITRES && itheta != 16384 {
+                    mbits += rebalance - ((3) << BITRES);
+                }
+                cm |= quant_partition(ctx, x_lo, N, mbits, B, lowband, LM, gain * mid, fill, ec);
             }
-            cm |= quant_partition(ctx, X, N, mbits, B, lowband, LM, gain * mid, fill, ec);
         }
     } else {
         let q = {
@@ -1026,7 +1028,7 @@ unsafe fn quant_partition(
             let K = get_pulses(q);
             if encode != 0 {
                 cm = alg_quant(
-                    std::slice::from_raw_parts_mut(X, N as usize),
+                    &mut X[..N as usize],
                     N,
                     K,
                     spread,
@@ -1037,15 +1039,7 @@ unsafe fn quant_partition(
                     ctx.arch,
                 );
             } else {
-                cm = alg_unquant(
-                    std::slice::from_raw_parts_mut(X, N as usize),
-                    N,
-                    K,
-                    spread,
-                    B,
-                    ec,
-                    gain,
-                );
+                cm = alg_unquant(&mut X[..N as usize], N, K, spread, B, ec, gain);
             }
         } else {
             cm = 0;
@@ -1053,33 +1047,29 @@ unsafe fn quant_partition(
                 let cm_mask = (((1_u64) << B) as u32).wrapping_sub(1);
                 fill = (fill as u32 & cm_mask) as i32;
                 if fill == 0 {
-                    std::slice::from_raw_parts_mut(X, N as usize).fill(0.0);
+                    X[..N as usize].fill(0.0);
                 } else {
-                    if lowband.is_null() {
+                    if lowband.is_none() {
                         let mut j = 0;
                         while j < N {
                             ctx.seed = celt_lcg_rand(ctx.seed);
-                            *X.offset(j as isize) = (ctx.seed as i32 >> 20) as f32;
+                            X[j as usize] = (ctx.seed as i32 >> 20) as f32;
                             j += 1;
                         }
                         cm = cm_mask;
                     } else {
+                        let lb = lowband.unwrap();
                         let mut j = 0;
                         while j < N {
                             let mut tmp = 1.0f32 / 256.0f32;
                             ctx.seed = celt_lcg_rand(ctx.seed);
                             tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
-                            *X.offset(j as isize) = *lowband.offset(j as isize) + tmp;
+                            X[j as usize] = lb[j as usize] + tmp;
                             j += 1;
                         }
                         cm = fill as u32;
                     }
-                    renormalise_vector(
-                        std::slice::from_raw_parts_mut(X, N as usize),
-                        N,
-                        gain,
-                        ctx.arch,
-                    );
+                    renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
                 }
             }
         }
@@ -1088,17 +1078,17 @@ unsafe fn quant_partition(
 }
 
 /// Upstream C: celt/bands.c:quant_band
-unsafe fn quant_band(
+fn quant_band(
     ctx: &mut band_ctx,
-    X: *mut f32,
+    X: &mut [f32],
     N: i32,
     b: i32,
     mut B: i32,
-    mut lowband: *mut f32,
+    lowband: Option<&mut [f32]>,
     LM: i32,
-    lowband_out: *mut f32,
+    lowband_out: Option<&mut [f32]>,
     gain: f32,
-    lowband_scratch: *mut f32,
+    lowband_scratch: Option<&mut [f32]>,
     mut fill: i32,
     ec: &mut ec_ctx,
 ) -> u32 {
@@ -1115,49 +1105,35 @@ unsafe fn quant_band(
     N_B = celt_udiv(N_B as u32, B as u32) as i32;
     if N == 1 {
         let y_opt: Option<&mut [f32]> = None;
-        let lbo_opt = if lowband_out.is_null() {
-            None
-        } else {
-            Some(std::slice::from_raw_parts_mut(lowband_out, 1))
-        };
-        return quant_band_n1(
-            ctx,
-            std::slice::from_raw_parts_mut(X, 1),
-            y_opt,
-            b,
-            lbo_opt,
-            ec,
-        );
+        return quant_band_n1(ctx, &mut X[..1], y_opt, b, lowband_out, ec);
     }
     if tf_change > 0 {
         recombine = tf_change;
     }
-    if !lowband_scratch.is_null()
-        && !lowband.is_null()
-        && (recombine != 0 || N_B & 1 == 0 && tf_change < 0 || B0 > 1)
-    {
-        std::slice::from_raw_parts_mut(lowband_scratch, N as usize)
-            .copy_from_slice(std::slice::from_raw_parts(lowband, N as usize));
-        lowband = lowband_scratch;
-    }
+    // If we need to transform lowband, copy it into scratch first.
+    // After this, `lb_work` is the working lowband buffer (either scratch with
+    // copied data, or original lowband, or None).
+    let need_scratch = lowband.is_some()
+        && lowband_scratch.is_some()
+        && (recombine != 0 || N_B & 1 == 0 && tf_change < 0 || B0 > 1);
+    let mut lb_work: Option<&mut [f32]> = if need_scratch {
+        let scratch = lowband_scratch.unwrap();
+        let lb = lowband.unwrap();
+        scratch[..N as usize].copy_from_slice(&lb[..N as usize]);
+        Some(scratch)
+    } else {
+        lowband
+    };
 
     const BIT_INTERLEAVE_TABLE: [u8; 16] = [0, 1, 1, 1, 2, 3, 3, 3, 2, 3, 3, 3, 2, 3, 3, 3];
 
     let mut k = 0;
     while k < recombine {
         if encode != 0 {
-            haar1(
-                std::slice::from_raw_parts_mut(X, N as usize),
-                N >> k,
-                (1) << k,
-            );
+            haar1(&mut X[..N as usize], N >> k, (1) << k);
         }
-        if !lowband.is_null() {
-            haar1(
-                std::slice::from_raw_parts_mut(lowband, N as usize),
-                N >> k,
-                (1) << k,
-            );
+        if let Some(ref mut lb) = lb_work {
+            haar1(&mut lb[..N as usize], N >> k, (1) << k);
         }
         fill = BIT_INTERLEAVE_TABLE[(fill & 0xf) as usize] as i32
             | (BIT_INTERLEAVE_TABLE[(fill >> 4) as usize] as i32) << 2;
@@ -1167,10 +1143,10 @@ unsafe fn quant_band(
     N_B <<= recombine;
     while N_B & 1 == 0 && tf_change < 0 {
         if encode != 0 {
-            haar1(std::slice::from_raw_parts_mut(X, N as usize), N_B, B);
+            haar1(&mut X[..N as usize], N_B, B);
         }
-        if !lowband.is_null() {
-            haar1(std::slice::from_raw_parts_mut(lowband, N as usize), N_B, B);
+        if let Some(ref mut lb) = lb_work {
+            haar1(&mut lb[..N as usize], N_B, B);
         }
         fill |= fill << B;
         B <<= 1;
@@ -1183,26 +1159,28 @@ unsafe fn quant_band(
     if B0 > 1 {
         if encode != 0 {
             deinterleave_hadamard(
-                std::slice::from_raw_parts_mut(X, N as usize),
+                &mut X[..N as usize],
                 N_B >> recombine,
                 B0 << recombine,
                 longBlocks,
             );
         }
-        if !lowband.is_null() {
+        if let Some(ref mut lb) = lb_work {
             deinterleave_hadamard(
-                std::slice::from_raw_parts_mut(lowband, N as usize),
+                &mut lb[..N as usize],
                 N_B >> recombine,
                 B0 << recombine,
                 longBlocks,
             );
         }
     }
-    cm = quant_partition(ctx, X, N, b, B, lowband, LM, gain, fill, ec);
+    // Pass lowband as read-only to quant_partition
+    let lb_ref: Option<&[f32]> = lb_work.as_deref();
+    cm = quant_partition(ctx, X, N, b, B, lb_ref, LM, gain, fill, ec);
     if ctx.resynth != 0 {
         if B0 > 1 {
             interleave_hadamard(
-                std::slice::from_raw_parts_mut(X, N as usize),
+                &mut X[..N as usize],
                 N_B >> recombine,
                 B0 << recombine,
                 longBlocks,
@@ -1215,7 +1193,7 @@ unsafe fn quant_band(
             B >>= 1;
             N_B <<= 1;
             cm |= cm >> B;
-            haar1(std::slice::from_raw_parts_mut(X, N as usize), N_B, B);
+            haar1(&mut X[..N as usize], N_B, B);
             k += 1;
         }
 
@@ -1227,20 +1205,14 @@ unsafe fn quant_band(
         k = 0;
         while k < recombine {
             cm = BIT_DEINTERLEAVE_TABLE[cm as usize] as u32;
-            haar1(
-                std::slice::from_raw_parts_mut(X, N as usize),
-                N0 >> k,
-                (1) << k,
-            );
+            haar1(&mut X[..N as usize], N0 >> k, (1) << k);
             k += 1;
         }
         B <<= recombine;
-        if !lowband_out.is_null() {
-            let mut j: i32 = 0;
+        if let Some(lbo) = lowband_out {
             let n = celt_sqrt(N0 as f32);
-            while j < N0 {
-                *lowband_out.offset(j as isize) = n * *X.offset(j as isize);
-                j += 1;
+            for j in 0..N0 as usize {
+                lbo[j] = n * X[j];
             }
         }
         cm &= (((1) << B) - 1) as u32;
@@ -1249,17 +1221,17 @@ unsafe fn quant_band(
 }
 
 /// Upstream C: celt/bands.c:quant_band_stereo
-unsafe fn quant_band_stereo(
+fn quant_band_stereo(
     ctx: &mut band_ctx,
-    X: *mut f32,
-    Y: *mut f32,
+    X: &mut [f32],
+    Y: &mut [f32],
     N: i32,
     mut b: i32,
     B: i32,
-    lowband: *mut f32,
+    lowband: Option<&mut [f32]>,
     LM: i32,
-    lowband_out: *mut f32,
-    lowband_scratch: *mut f32,
+    lowband_out: Option<&mut [f32]>,
+    lowband_scratch: Option<&mut [f32]>,
     mut fill: i32,
     ec: &mut ec_ctx,
 ) -> u32 {
@@ -1285,20 +1257,13 @@ unsafe fn quant_band_stereo(
     let orig_fill = fill;
     let encode = ctx.encode;
     if N == 1 {
-        let x_slice = std::slice::from_raw_parts_mut(X, 1);
-        let y_slice = Some(std::slice::from_raw_parts_mut(Y, 1));
-        let lbo = if lowband_out.is_null() {
-            None
-        } else {
-            Some(std::slice::from_raw_parts_mut(lowband_out, 1))
-        };
-        return quant_band_n1(ctx, x_slice, y_slice, b, lbo, ec);
+        return quant_band_n1(ctx, &mut X[..1], Some(&mut Y[..1]), b, lowband_out, ec);
     }
     compute_theta(
         ctx,
         &mut sctx,
-        std::slice::from_raw_parts_mut(X, N as usize),
-        std::slice::from_raw_parts_mut(Y, N as usize),
+        &mut X[..N as usize],
+        &mut Y[..N as usize],
         N,
         &mut b,
         B,
@@ -1326,46 +1291,70 @@ unsafe fn quant_band_stereo(
         mbits -= sbits;
         let c = (itheta > 8192) as i32;
         ctx.remaining_bits -= qalloc + sbits;
-        let x2 = if c != 0 { Y } else { X };
-        let y2 = if c != 0 { X } else { Y };
+        // When c != 0, x2=Y,y2=X; otherwise x2=X,y2=Y.
+        // We work with (X,Y) directly and swap logic as needed.
         if sbits != 0 {
             if encode != 0 {
-                sign =
-                    (*x2.offset(0) * *y2.offset(1) - *x2.offset(1) * *y2.offset(0) < 0.0f32) as i32;
+                sign = if c != 0 {
+                    (Y[0] * X[1] - Y[1] * X[0] < 0.0f32) as i32
+                } else {
+                    (X[0] * Y[1] - X[1] * Y[0] < 0.0f32) as i32
+                };
                 ec_enc_bits(ec, sign as u32, 1);
             } else {
                 sign = ec_dec_bits(ec, 1) as i32;
             }
         }
         sign = 1 - 2 * sign;
-        cm = quant_band(
-            ctx,
-            x2,
-            N,
-            mbits,
-            B,
-            lowband,
-            LM,
-            lowband_out,
-            Q15ONE,
-            lowband_scratch,
-            orig_fill,
-            ec,
-        );
-        *y2.offset(0) = -sign as f32 * *x2.offset(1);
-        *y2.offset(1) = sign as f32 * *x2.offset(0);
+        // quant_band on x2 (the "primary" channel for this theta)
+        if c != 0 {
+            cm = quant_band(
+                ctx,
+                Y,
+                N,
+                mbits,
+                B,
+                lowband,
+                LM,
+                lowband_out,
+                Q15ONE,
+                lowband_scratch,
+                orig_fill,
+                ec,
+            );
+            // y2=X: X[0] = -sign * Y[1], X[1] = sign * Y[0]
+            X[0] = -sign as f32 * Y[1];
+            X[1] = sign as f32 * Y[0];
+        } else {
+            cm = quant_band(
+                ctx,
+                X,
+                N,
+                mbits,
+                B,
+                lowband,
+                LM,
+                lowband_out,
+                Q15ONE,
+                lowband_scratch,
+                orig_fill,
+                ec,
+            );
+            // y2=Y: Y[0] = -sign * X[1], Y[1] = sign * X[0]
+            Y[0] = -sign as f32 * X[1];
+            Y[1] = sign as f32 * X[0];
+        }
         if ctx.resynth != 0 {
-            let mut tmp: f32;
-            *X.offset(0) = mid * *X.offset(0);
-            *X.offset(1) = mid * *X.offset(1);
-            *Y.offset(0) = side * *Y.offset(0);
-            *Y.offset(1) = side * *Y.offset(1);
-            tmp = *X.offset(0);
-            *X.offset(0) = tmp - *Y.offset(0);
-            *Y.offset(0) = tmp + *Y.offset(0);
-            tmp = *X.offset(1);
-            *X.offset(1) = tmp - *Y.offset(1);
-            *Y.offset(1) = tmp + *Y.offset(1);
+            X[0] = mid * X[0];
+            X[1] = mid * X[1];
+            Y[0] = side * Y[0];
+            Y[1] = side * Y[1];
+            let tmp0 = X[0];
+            X[0] = tmp0 - Y[0];
+            Y[0] = tmp0 + Y[0];
+            let tmp1 = X[1];
+            X[1] = tmp1 - Y[1];
+            Y[1] = tmp1 + Y[1];
         }
     } else {
         mbits = if 0
@@ -1408,11 +1397,11 @@ unsafe fn quant_band_stereo(
                 N,
                 sbits,
                 B,
-                std::ptr::null_mut(),
+                None,
                 LM,
-                std::ptr::null_mut(),
+                None,
                 side,
-                std::ptr::null_mut(),
+                None,
                 fill >> B,
                 ec,
             );
@@ -1423,11 +1412,11 @@ unsafe fn quant_band_stereo(
                 N,
                 sbits,
                 B,
-                std::ptr::null_mut(),
+                None,
                 LM,
-                std::ptr::null_mut(),
+                None,
                 side,
-                std::ptr::null_mut(),
+                None,
                 fill >> B,
                 ec,
             );
@@ -1453,19 +1442,11 @@ unsafe fn quant_band_stereo(
     }
     if ctx.resynth != 0 {
         if N != 2 {
-            stereo_merge(
-                std::slice::from_raw_parts_mut(X, N as usize),
-                std::slice::from_raw_parts_mut(Y, N as usize),
-                mid,
-                N,
-                ctx.arch,
-            );
+            stereo_merge(&mut X[..N as usize], &mut Y[..N as usize], mid, N, ctx.arch);
         }
         if inv != 0 {
-            let mut j = 0;
-            while j < N {
-                *Y.offset(j as isize) = -*Y.offset(j as isize);
-                j += 1;
+            for j in 0..N as usize {
+                Y[j] = -Y[j];
             }
         }
     }
@@ -1492,17 +1473,13 @@ fn special_hybrid_folding(
 }
 
 /// Upstream C: celt/bands.c:quant_all_bands
-///
-/// # Safety
-/// X_ and Y_ must point to valid buffers of sufficient size.
-/// Y_ may be null (mono mode) or may alias into X_ (stereo mode).
-pub unsafe fn quant_all_bands(
+pub fn quant_all_bands(
     encode: i32,
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    X_: *mut f32,
-    Y_: *mut f32,
+    X_: &mut [f32],
+    Y_: Option<&mut [f32]>,
     collapse_masks: &mut [u8],
     bandE: &[f32],
     pulses: &mut [i32],
@@ -1528,17 +1505,15 @@ pub unsafe fn quant_all_bands(
     let M: i32 = (1) << LM;
     let mut lowband_offset: i32 = 0;
     let mut update_lowband: i32 = 1;
-    let C: i32 = if !Y_.is_null() { 2 } else { 1 };
+    let C: i32 = if Y_.is_some() { 2 } else { 1 };
     let norm_offset: i32 = M * eBands[start as usize] as i32;
     let theta_rdo: i32 =
-        (encode != 0 && !Y_.is_null() && dual_stereo == 0 && complexity >= 8) as i32;
+        (encode != 0 && Y_.is_some() && dual_stereo == 0 && complexity >= 8) as i32;
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
 
     B = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[(m.nbEBands - 1) as usize] as i32 - norm_offset) as usize;
     let mut _norm = vec![0.0f32; C as usize * norm_size];
-    // norm = _norm[0..norm_size], norm2 = _norm[norm_size..2*norm_size]
-    // Access via index: norm_idx(band_start) = (M * eBands[i] - norm_offset) as usize
 
     if encode != 0 && resynth != 0 {
         resynth_alloc =
@@ -1546,7 +1521,6 @@ pub unsafe fn quant_all_bands(
     } else {
         resynth_alloc = 0;
     }
-    // Always allocate lowband_scratch separately to avoid aliasing issues
     let mut _lowband_scratch = vec![
         0.0f32;
         if resynth_alloc > 0 {
@@ -1561,14 +1535,22 @@ pub unsafe fn quant_all_bands(
     let mut _Y_save2 = vec![0.0f32; resynth_alloc as usize];
     let mut _norm_save2 = vec![0.0f32; resynth_alloc as usize];
 
-    // Determine lowband_scratch pointer
-    let lowband_scratch_ptr: *mut f32;
-    if encode != 0 && resynth != 0 {
-        lowband_scratch_ptr = _lowband_scratch.as_mut_ptr();
-    } else {
-        // In decode-only mode, use X_[last_band..] as scratch
-        lowband_scratch_ptr = X_.offset((M * eBands[(m.nbEBands - 1) as usize] as i32) as isize);
-    }
+    // In decode-only mode, lowband_scratch comes from the end of X_
+    let decode_scratch_off = (M * eBands[(m.nbEBands - 1) as usize] as i32) as usize;
+    let use_alloc_scratch = encode != 0 && resynth != 0;
+
+    let has_y = Y_.is_some();
+    // We need raw pointers for X_ and Y_ to allow sub-slicing in the loop
+    // while also passing &mut _norm etc. This is safe because the band regions
+    // of X_/Y_ don't overlap with _norm/_lowband_scratch.
+    let x_ptr = X_.as_mut_ptr();
+    let _x_len = X_.len();
+    let y_ptr = Y_
+        .as_ref()
+        .map_or(std::ptr::null_mut(), |y| y.as_ptr() as *mut f32);
+    let _y_len = Y_.as_ref().map_or(0, |y| y.len());
+    // Forget the borrows - we'll reconstruct slices per-band
+    std::mem::drop(Y_);
 
     let mut ctx = band_ctx {
         encode,
@@ -1597,14 +1579,10 @@ pub unsafe fn quant_all_bands(
         let mut y_cm: u32;
         ctx.i = i;
         let last = (i == end - 1) as i32;
-        let X: *mut f32 = X_.offset((M * eBands[i as usize] as i32) as isize);
-        let Y: *mut f32 = if !Y_.is_null() {
-            Y_.offset((M * eBands[i as usize] as i32) as isize)
-        } else {
-            std::ptr::null_mut()
-        };
+        let band_start = (M * eBands[i as usize] as i32) as usize;
         N = M * eBands[(i + 1) as usize] as i32 - M * eBands[i as usize] as i32;
         assert!(N > 0);
+        let n = N as usize;
         let tell = ec_tell_frac(ec) as i32;
         if i != start {
             balance -= tell;
@@ -1665,23 +1643,11 @@ pub unsafe fn quant_all_bands(
         }
         tf_change = tf_res[i as usize];
         ctx.tf_change = tf_change;
-        // For bands beyond effEBands, use norm buffer as X/Y
-        let (X, Y, mut lowband_scratch_cur) = if i >= m.effEBands {
-            (
-                _norm.as_mut_ptr(),
-                if !Y_.is_null() {
-                    _norm.as_mut_ptr()
-                } else {
-                    std::ptr::null_mut()
-                },
-                std::ptr::null_mut(),
-            )
-        } else {
-            (X, Y, lowband_scratch_ptr)
-        };
-        if last != 0 && theta_rdo == 0 {
-            lowband_scratch_cur = std::ptr::null_mut();
-        }
+
+        // For bands beyond effEBands, use norm buffer as dummy X/Y
+        let use_norm_xy = i >= m.effEBands;
+        let have_scratch = !use_norm_xy && !(last != 0 && theta_rdo == 0);
+
         if lowband_offset != 0 && (spread != SPREAD_AGGRESSIVE || B > 1 || tf_change < 0) {
             let mut fold_start: i32;
             let mut fold_end: i32;
@@ -1733,32 +1699,62 @@ pub unsafe fn quant_all_bands(
                 }
             }
         }
+
+        // Helper: get lowband slice from _norm (read-only)
+        let norm_band_out_off = (M * eBands[i as usize] as i32 - norm_offset) as usize;
+
+        // Get scratch buffer for this band
+        let scratch: Option<&mut [f32]> = if have_scratch {
+            if use_alloc_scratch {
+                Some(&mut _lowband_scratch)
+            } else {
+                // SAFETY: decode_scratch_off..decode_scratch_off+n is within X_ bounds
+                // and does not overlap with the current band [band_start..band_start+n]
+                // because decode_scratch_off = M*eBands[nbEBands-1] >= band_start+n
+                // for all bands i < effEBands.
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        x_ptr.add(decode_scratch_off),
+                        n,
+                    ))
+                }
+            }
+        } else {
+            None
+        };
+
         if dual_stereo != 0 {
-            let norm_ptr = _norm.as_mut_ptr();
-            let norm2_ptr = norm_ptr.offset(norm_size as isize);
-            let lowband_x = if effective_lowband != -1 {
-                norm_ptr.offset(effective_lowband as isize)
+            let (norm1, norm2) = _norm.split_at_mut(norm_size);
+            // SAFETY: lowband_x reads from [effective_lowband..] and lowband_out_x writes
+            // to [norm_band_out_off..]. These don't overlap because effective_lowband + N
+            // <= norm_band_out_off (lowband is always from a previous, lower-frequency band).
+            let norm1_ptr = norm1.as_mut_ptr();
+            let norm1_len = norm1.len();
+            let lowband_x: Option<&mut [f32]> = if effective_lowband != -1 {
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm1_ptr.add(effective_lowband as usize),
+                        norm1_len - effective_lowband as usize,
+                    ))
+                }
             } else {
-                std::ptr::null_mut()
+                None
             };
-            let lowband_y = if effective_lowband != -1 {
-                norm2_ptr.offset(effective_lowband as isize)
+            let lowband_out_x: Option<&mut [f32]> = if last != 0 {
+                None
             } else {
-                std::ptr::null_mut()
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm1_ptr.add(norm_band_out_off),
+                        norm1_len - norm_band_out_off,
+                    ))
+                }
             };
-            let lowband_out_x = if last != 0 {
-                std::ptr::null_mut()
-            } else {
-                norm_ptr.offset((M * eBands[i as usize] as i32 - norm_offset) as isize)
-            };
-            let lowband_out_y = if last != 0 {
-                std::ptr::null_mut()
-            } else {
-                norm2_ptr.offset((M * eBands[i as usize] as i32 - norm_offset) as isize)
-            };
+            // SAFETY: x_ptr+band_start..+n is a valid sub-region of X_
+            let x_band = unsafe { std::slice::from_raw_parts_mut(x_ptr.add(band_start), n) };
             x_cm = quant_band(
                 &mut ctx,
-                X,
+                x_band,
                 N,
                 b / 2,
                 B,
@@ -1766,13 +1762,51 @@ pub unsafe fn quant_all_bands(
                 LM,
                 lowband_out_x,
                 Q15ONE,
-                lowband_scratch_cur,
+                scratch,
                 x_cm as i32,
                 ec,
             );
+            let norm2_ptr = norm2.as_mut_ptr();
+            let norm2_len = norm2.len();
+            let lowband_y: Option<&mut [f32]> = if effective_lowband != -1 {
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm2_ptr.add(effective_lowband as usize),
+                        norm2_len - effective_lowband as usize,
+                    ))
+                }
+            } else {
+                None
+            };
+            let lowband_out_y: Option<&mut [f32]> = if last != 0 {
+                None
+            } else {
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm2_ptr.add(norm_band_out_off),
+                        norm2_len - norm_band_out_off,
+                    ))
+                }
+            };
+            let scratch2: Option<&mut [f32]> = if have_scratch {
+                if use_alloc_scratch {
+                    Some(&mut _lowband_scratch)
+                } else {
+                    unsafe {
+                        Some(std::slice::from_raw_parts_mut(
+                            x_ptr.add(decode_scratch_off),
+                            n,
+                        ))
+                    }
+                }
+            } else {
+                None
+            };
+            // SAFETY: y_ptr+band_start..+n is valid
+            let y_band = unsafe { std::slice::from_raw_parts_mut(y_ptr.add(band_start), n) };
             y_cm = quant_band(
                 &mut ctx,
-                Y,
+                y_band,
                 N,
                 b / 2,
                 B,
@@ -1780,24 +1814,61 @@ pub unsafe fn quant_all_bands(
                 LM,
                 lowband_out_y,
                 Q15ONE,
-                lowband_scratch_cur,
+                scratch2,
                 y_cm as i32,
                 ec,
             );
         } else {
+            // SAFETY: lowband reads from [effective_lowband..] and lowband_out writes
+            // to [norm_band_out_off..]. These don't overlap because effective_lowband + N
+            // <= norm_band_out_off (lowband is always from a previous, lower-frequency band).
             let norm_ptr = _norm.as_mut_ptr();
-            let lowband_ptr = if effective_lowband != -1 {
-                norm_ptr.offset(effective_lowband as isize)
+            let norm_len = _norm.len();
+            let lowband_ref: Option<&mut [f32]> = if effective_lowband != -1 {
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm_ptr.add(effective_lowband as usize),
+                        norm_len - effective_lowband as usize,
+                    ))
+                }
             } else {
-                std::ptr::null_mut()
+                None
             };
-            let lowband_out_ptr = if last != 0 {
-                std::ptr::null_mut()
+            let lowband_out_ref: Option<&mut [f32]> = if last != 0 {
+                None
             } else {
-                norm_ptr.offset((M * eBands[i as usize] as i32 - norm_offset) as isize)
+                unsafe {
+                    Some(std::slice::from_raw_parts_mut(
+                        norm_ptr.add(norm_band_out_off),
+                        norm_len - norm_band_out_off,
+                    ))
+                }
             };
-            if !Y.is_null() {
-                if theta_rdo != 0 && i < intensity {
+            if has_y {
+                // SAFETY: non-overlapping sub-regions of the original X_ and Y_ buffers
+                let x_band = unsafe { std::slice::from_raw_parts_mut(x_ptr.add(band_start), n) };
+                let y_band = unsafe { std::slice::from_raw_parts_mut(y_ptr.add(band_start), n) };
+                if use_norm_xy {
+                    // Beyond effEBands: use norm as dummy X/Y, no scratch
+                    let (dummy_x, dummy_rest) = _norm.split_at_mut(n);
+                    let dummy_y = &mut dummy_rest[..n];
+                    // No lowband/scratch for out-of-range bands
+                    x_cm = quant_band_stereo(
+                        &mut ctx,
+                        dummy_x,
+                        dummy_y,
+                        N,
+                        b,
+                        B,
+                        None,
+                        LM,
+                        None,
+                        None,
+                        (x_cm | y_cm) as i32,
+                        ec,
+                    );
+                    y_cm = x_cm;
+                } else if theta_rdo != 0 && i < intensity {
                     let ec_save;
                     let ec_save2;
                     let ctx_save: band_ctx;
@@ -1815,52 +1886,35 @@ pub unsafe fn quant_all_bands(
                     cm = x_cm | y_cm;
                     ec_save = ec.save();
                     ctx_save = ctx;
-                    // Save X, Y
-                    _X_save[..N as usize]
-                        .copy_from_slice(std::slice::from_raw_parts(X, N as usize));
-                    _Y_save[..N as usize]
-                        .copy_from_slice(std::slice::from_raw_parts(Y, N as usize));
+                    _X_save[..n].copy_from_slice(&x_band[..n]);
+                    _Y_save[..n].copy_from_slice(&y_band[..n]);
                     // Try theta_round = -1
                     ctx.theta_round = -1;
                     x_cm = quant_band_stereo(
                         &mut ctx,
-                        X,
-                        Y,
+                        x_band,
+                        y_band,
                         N,
                         b,
                         B,
-                        lowband_ptr,
+                        lowband_ref,
                         LM,
-                        lowband_out_ptr,
-                        lowband_scratch_cur,
+                        lowband_out_ref,
+                        scratch,
                         cm as i32,
                         ec,
                     );
-                    dist0 =
-                        w[0] * celt_inner_prod(
-                            &_X_save[..N as usize],
-                            std::slice::from_raw_parts(X, N as usize),
-                            N as usize,
-                        ) + w[1]
-                            * celt_inner_prod(
-                                &_Y_save[..N as usize],
-                                std::slice::from_raw_parts(Y, N as usize),
-                                N as usize,
-                            );
+                    dist0 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n)
+                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n);
                     cm2 = x_cm;
                     ec_save2 = ec.save();
                     ctx_save2 = ctx;
-                    // Save X, Y, norm after round -1
-                    _X_save2[..N as usize]
-                        .copy_from_slice(std::slice::from_raw_parts(X, N as usize));
-                    _Y_save2[..N as usize]
-                        .copy_from_slice(std::slice::from_raw_parts(Y, N as usize));
+                    _X_save2[..n].copy_from_slice(&x_band[..n]);
+                    _Y_save2[..n].copy_from_slice(&y_band[..n]);
                     if last == 0 {
-                        let norm_out_off = (M * eBands[i as usize] as i32 - norm_offset) as usize;
-                        _norm_save2[..N as usize]
-                            .copy_from_slice(&_norm[norm_out_off..norm_out_off + N as usize]);
+                        _norm_save2[..n]
+                            .copy_from_slice(&_norm[norm_band_out_off..norm_band_out_off + n]);
                     }
-                    // Save ec bytes
                     let nstart_bytes = ec_save.offs as usize;
                     let nend_bytes = ec.storage as usize;
                     let save_bytes = nend_bytes - nstart_bytes;
@@ -1869,54 +1923,74 @@ pub unsafe fn quant_all_bands(
                     // Restore state for round +1
                     ec.restore(ec_save);
                     ctx = ctx_save;
-                    std::slice::from_raw_parts_mut(X, N as usize)
-                        .copy_from_slice(&_X_save[..N as usize]);
-                    std::slice::from_raw_parts_mut(Y, N as usize)
-                        .copy_from_slice(&_Y_save[..N as usize]);
+                    x_band[..n].copy_from_slice(&_X_save[..n]);
+                    y_band[..n].copy_from_slice(&_Y_save[..n]);
                     if i == start + 1 {
                         let (norm_part, norm2_part) = _norm.split_at_mut(norm_size);
                         special_hybrid_folding(m, norm_part, norm2_part, start, M, dual_stereo);
                     }
-                    // Try theta_round = +1
+                    // Re-obtain lowband/scratch for second try
+                    // SAFETY: same non-overlapping guarantee as above
+                    let lowband_ref2: Option<&mut [f32]> = if effective_lowband != -1 {
+                        unsafe {
+                            Some(std::slice::from_raw_parts_mut(
+                                norm_ptr.add(effective_lowband as usize),
+                                norm_len - effective_lowband as usize,
+                            ))
+                        }
+                    } else {
+                        None
+                    };
+                    let lowband_out_ref2: Option<&mut [f32]> = if last != 0 {
+                        None
+                    } else {
+                        unsafe {
+                            Some(std::slice::from_raw_parts_mut(
+                                norm_ptr.add(norm_band_out_off),
+                                norm_len - norm_band_out_off,
+                            ))
+                        }
+                    };
+                    let scratch2: Option<&mut [f32]> = if have_scratch {
+                        if use_alloc_scratch {
+                            Some(&mut _lowband_scratch)
+                        } else {
+                            unsafe {
+                                Some(std::slice::from_raw_parts_mut(
+                                    x_ptr.add(decode_scratch_off),
+                                    n,
+                                ))
+                            }
+                        }
+                    } else {
+                        None
+                    };
                     ctx.theta_round = 1;
                     x_cm = quant_band_stereo(
                         &mut ctx,
-                        X,
-                        Y,
+                        x_band,
+                        y_band,
                         N,
                         b,
                         B,
-                        lowband_ptr,
+                        lowband_ref2,
                         LM,
-                        lowband_out_ptr,
-                        lowband_scratch_cur,
+                        lowband_out_ref2,
+                        scratch2,
                         cm as i32,
                         ec,
                     );
-                    dist1 =
-                        w[0] * celt_inner_prod(
-                            &_X_save[..N as usize],
-                            std::slice::from_raw_parts(X, N as usize),
-                            N as usize,
-                        ) + w[1]
-                            * celt_inner_prod(
-                                &_Y_save[..N as usize],
-                                std::slice::from_raw_parts(Y, N as usize),
-                                N as usize,
-                            );
+                    dist1 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n)
+                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n);
                     if dist0 >= dist1 {
                         x_cm = cm2;
                         ec.restore(ec_save2);
                         ctx = ctx_save2;
-                        std::slice::from_raw_parts_mut(X, N as usize)
-                            .copy_from_slice(&_X_save2[..N as usize]);
-                        std::slice::from_raw_parts_mut(Y, N as usize)
-                            .copy_from_slice(&_Y_save2[..N as usize]);
+                        x_band[..n].copy_from_slice(&_X_save2[..n]);
+                        y_band[..n].copy_from_slice(&_Y_save2[..n]);
                         if last == 0 {
-                            let norm_out_off =
-                                (M * eBands[i as usize] as i32 - norm_offset) as usize;
-                            _norm[norm_out_off..norm_out_off + N as usize]
-                                .copy_from_slice(&_norm_save2[..N as usize]);
+                            _norm[norm_band_out_off..norm_band_out_off + n]
+                                .copy_from_slice(&_norm_save2[..n]);
                         }
                         ec.buf[nstart_bytes..nend_bytes].copy_from_slice(&bytes_save);
                     }
@@ -1924,36 +1998,58 @@ pub unsafe fn quant_all_bands(
                     ctx.theta_round = 0;
                     x_cm = quant_band_stereo(
                         &mut ctx,
-                        X,
-                        Y,
+                        x_band,
+                        y_band,
                         N,
                         b,
                         B,
-                        lowband_ptr,
+                        lowband_ref,
                         LM,
-                        lowband_out_ptr,
-                        lowband_scratch_cur,
+                        lowband_out_ref,
+                        scratch,
                         (x_cm | y_cm) as i32,
                         ec,
                     );
                 }
+                y_cm = x_cm;
             } else {
-                x_cm = quant_band(
-                    &mut ctx,
-                    X,
-                    N,
-                    b,
-                    B,
-                    lowband_ptr,
-                    LM,
-                    lowband_out_ptr,
-                    Q15ONE,
-                    lowband_scratch_cur,
-                    (x_cm | y_cm) as i32,
-                    ec,
-                );
+                // Mono mode
+                if use_norm_xy {
+                    let dummy = &mut _norm[..n];
+                    x_cm = quant_band(
+                        &mut ctx,
+                        dummy,
+                        N,
+                        b,
+                        B,
+                        None,
+                        LM,
+                        None,
+                        Q15ONE,
+                        None,
+                        (x_cm | y_cm) as i32,
+                        ec,
+                    );
+                } else {
+                    let x_band =
+                        unsafe { std::slice::from_raw_parts_mut(x_ptr.add(band_start), n) };
+                    x_cm = quant_band(
+                        &mut ctx,
+                        x_band,
+                        N,
+                        b,
+                        B,
+                        lowband_ref,
+                        LM,
+                        lowband_out_ref,
+                        Q15ONE,
+                        scratch,
+                        (x_cm | y_cm) as i32,
+                        ec,
+                    );
+                }
+                y_cm = x_cm;
             }
-            y_cm = x_cm;
         }
         collapse_masks[(i * C + 0) as usize] = x_cm as u8;
         collapse_masks[(i * C + C - 1) as usize] = y_cm as u8;

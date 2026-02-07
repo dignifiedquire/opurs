@@ -82,18 +82,19 @@ Key: `qb` = quant_bands.rs
 
 ### Stage 2.4 — Integration Hub
 
-- [ ] `bands.rs`
+- [x] `bands.rs`
   - Upstream C: `celt/bands.h`, `celt/bands.c`
-  - Functions (24 unsafe): `compute_band_energies`, `normalise_bands`, `denormalise_bands`, `anti_collapse`, `spreading_decision`, `haar1`, `quant_all_bands`, etc.
-  - Risk: **Very High** — 2146 lines, calls vq, quant_bands, entenc, entdec, mathops, pitch
-  - Strategy: Refactor in sub-commits, function by function
-  - All callees must be safe first (Stages 2.1–2.3)
-- [ ] `celt.rs`
+  - Functions (24 unsafe → 0): all converted to safe slice APIs
+  - `quant_partition`, `quant_band`, `quant_band_stereo`, `quant_all_bands` — last 4 unsafe fns removed
+  - `quant_all_bands` public API: `X_: &mut [f32]`, `Y_: Option<&mut [f32]>`
+  - Internal raw pointers for X_/Y_/norm sub-slicing (borrow checker workaround for non-overlapping regions)
+- [x] `celt.rs`
   - Upstream C: `celt/celt.h`, `celt/celt.c`
-  - Functions: `opus_strerror`, `opus_get_version_string`, utility functions
-  - Risk: Low — mostly string/utility functions
-- [ ] **Commit**: `refactor: make celt::bands safe` (may be multiple commits)
-- [ ] **Commit**: `refactor: make celt::celt safe`
+  - Functions (3 unsafe → 0): `init_caps`, `comb_filter`, `comb_filter_const_c` all safe
+  - `comb_filter` split into separate-buffer and in-place variants
+  - `static mut gains` → `const GAINS`
+- [x] **Commit**: `refactor: make celt::celt safe (Stage 2.4)`
+- [x] **Commit**: `refactor: make celt bands.rs safe (Stage 2.4)`
 
 ### Stage 2.5 — Encoder/Decoder
 
