@@ -513,9 +513,11 @@ unsafe fn opus_decode_frame(
         assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
         celt_decode_with_ec(
             celt_dec,
-            data.offset(len as isize),
-            redundancy_bytes,
-            redundant_audio.as_mut_ptr(),
+            Some(std::slice::from_raw_parts(
+                data.offset(len as isize),
+                redundancy_bytes as usize,
+            )),
+            &mut redundant_audio,
             F5,
             None,
             0,
@@ -531,18 +533,17 @@ unsafe fn opus_decode_frame(
         celt_ret = celt_decode_with_ec(
             celt_dec,
             if decode_fec != 0 {
-                NULL as *const u8
+                None
             } else {
-                data
+                Some(std::slice::from_raw_parts(data, len as usize))
             },
-            len,
-            pcm,
+            std::slice::from_raw_parts_mut(pcm, (celt_frame_size * st.channels) as usize),
             celt_frame_size,
             Some(&mut dec),
             celt_accum,
         );
     } else {
-        let mut silence: [u8; 2] = [0xff, 0xff];
+        let silence: [u8; 2] = [0xff, 0xff];
         if celt_accum == 0 {
             i = 0;
             while i < frame_size * st.channels {
@@ -556,9 +557,8 @@ unsafe fn opus_decode_frame(
             assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
             celt_decode_with_ec(
                 celt_dec,
-                silence.as_mut_ptr(),
-                2,
-                pcm,
+                Some(&silence[..2]),
+                std::slice::from_raw_parts_mut(pcm, (F2_5 * st.channels) as usize),
                 F2_5,
                 None,
                 celt_accum,
@@ -581,9 +581,11 @@ unsafe fn opus_decode_frame(
         assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
         celt_decode_with_ec(
             celt_dec,
-            data.offset(len as isize),
-            redundancy_bytes,
-            redundant_audio.as_mut_ptr(),
+            Some(std::slice::from_raw_parts(
+                data.offset(len as isize),
+                redundancy_bytes as usize,
+            )),
+            &mut redundant_audio,
             F5,
             None,
             0,

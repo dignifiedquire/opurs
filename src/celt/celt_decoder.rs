@@ -23,7 +23,7 @@ use crate::celt::quant_bands::{
 };
 use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
-use crate::externs::{memcpy, memmove};
+
 use crate::opus_custom_decoder_ctl;
 use crate::src::opus_defines::{
     OPUS_BAD_ARG, OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST,
@@ -35,7 +35,6 @@ use crate::varargs::VarArgs;
 pub use self::arch_h::{
     celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
 };
-pub use self::stddef_h::NULL;
 
 pub mod arch_h {
     pub type opus_val16 = f32;
@@ -163,9 +162,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         backgroundLogE: [0.0; 2 * 21],
     };
 
-    unsafe {
-        opus_custom_decoder_ctl!(&mut st, OPUS_RESET_STATE);
-    }
+    opus_custom_decoder_ctl!(&mut st, OPUS_RESET_STATE);
 
     st
 }
@@ -807,11 +804,11 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     }
     st.loss_count = loss_count + 1;
 }
-pub unsafe fn celt_decode_with_ec(
+/// Upstream C: celt/celt_decoder.c:celt_decode_with_ec
+pub fn celt_decode_with_ec(
     st: &mut OpusCustomDecoder,
-    data: *const u8,
-    len: i32,
-    pcm: *mut opus_val16,
+    data: Option<&[u8]>,
+    pcm: &mut [opus_val16],
     mut frame_size: i32,
     dec: Option<&mut ec_dec>,
     accum: i32,
@@ -821,22 +818,6 @@ pub unsafe fn celt_decode_with_ec(
     let mut N: i32 = 0;
     let mut spread_decision: i32 = 0;
     let mut bits: i32 = 0;
-    let mut _dec: ec_dec = ec_dec {
-        buf: &mut [],
-        storage: 0,
-        end_offs: 0,
-        end_window: 0,
-        nend_bits: 0,
-        nbits_total: 0,
-        offs: 0,
-        rng: 0,
-        val: 0,
-        ext: 0,
-        rem: 0,
-        error: 0,
-    };
-    let mut decode_mem: [*mut celt_sig; 2] = [0 as *mut celt_sig; 2];
-    let mut out_syn: [*mut celt_sig; 2] = [0 as *mut celt_sig; 2];
     let mut shortBlocks: i32 = 0;
     let mut isTransient: i32 = 0;
     let mut intra_ener: i32 = 0;
@@ -861,71 +842,54 @@ pub unsafe fn celt_decode_with_ec(
     let mut anti_collapse_on: i32 = 0;
     let mut silence: i32 = 0;
     let C: i32 = st.stream_channels as i32;
-    let mut mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
-    let mut nbEBands: i32 = 0;
-    let mut overlap: i32 = 0;
-    let mut eBands: *const i16 = 0 as *const i16;
+    let len: i32 = data.map_or(0, |d| d.len() as i32);
     validate_celt_decoder(&*st);
-    mode = st.mode;
-    nbEBands = (*mode).nbEBands as i32;
-    overlap = (*mode).overlap as i32;
-    eBands = (*mode).eBands.as_ptr();
+    let mode = st.mode;
+    let nbEBands = mode.nbEBands as i32;
+    let overlap = mode.overlap as i32;
+    let eBands = &mode.eBands;
     start = st.start;
     end = st.end;
     frame_size *= st.downsample;
-
-    let oldBandE = st.oldEBands.as_mut_ptr();
-    let oldLogE = st.oldLogE.as_mut_ptr();
-    let oldLogE2 = st.oldLogE2.as_mut_ptr();
-    let backgroundLogE = st.backgroundLogE.as_mut_ptr();
+    let chan_stride = DECODE_BUFFER_SIZE + overlap as usize;
 
     LM = 0;
-    while LM <= (*mode).maxLM {
-        if (*mode).shortMdctSize << LM == frame_size {
+    while LM <= mode.maxLM {
+        if mode.shortMdctSize << LM == frame_size {
             break;
         }
         LM += 1;
     }
-    if LM > (*mode).maxLM {
+    if LM > mode.maxLM {
         return OPUS_BAD_ARG;
     }
     M = (1) << LM;
-    if len < 0 || len > 1275 || pcm.is_null() {
+    if len < 0 || len > 1275 {
         return OPUS_BAD_ARG;
     }
-    N = M * (*mode).shortMdctSize;
-    c = 0;
-    loop {
-        decode_mem[c as usize] = (st.decode_mem)
-            .as_mut_ptr()
-            .offset((c * (DECODE_BUFFER_SIZE as i32 + overlap)) as isize);
-        out_syn[c as usize] = (decode_mem[c as usize])
-            .offset(DECODE_BUFFER_SIZE as isize)
-            .offset(-(N as isize));
-        c += 1;
-        if !(c < CC) {
-            break;
-        }
-    }
+    N = M * mode.shortMdctSize;
+    let n = N as usize;
+    let out_syn_off = DECODE_BUFFER_SIZE - n;
     effEnd = end;
-    if effEnd > (*mode).effEBands {
-        effEnd = (*mode).effEBands;
+    if effEnd > mode.effEBands {
+        effEnd = mode.effEBands;
     }
-    if data.is_null() || len <= 1 {
+    if data.is_none() || len <= 1 {
         celt_decode_lost(st, N, LM);
         {
-            let out_n = N as usize;
             let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
-                .map(|c| std::slice::from_raw_parts(out_syn[c], out_n))
+                .map(|c| {
+                    &st.decode_mem[c * chan_stride + out_syn_off..c * chan_stride + out_syn_off + n]
+                })
                 .collect();
             let pcm_len = (frame_size / st.downsample * CC) as usize;
             deemphasis(
                 &in_ch,
-                std::slice::from_raw_parts_mut(pcm, pcm_len),
+                &mut pcm[..pcm_len],
                 N,
                 CC,
                 st.downsample,
-                &(*mode).preemph,
+                &mode.preemph,
                 &mut st.preemph_memD,
                 accum,
             );
@@ -933,24 +897,28 @@ pub unsafe fn celt_decode_with_ec(
         return frame_size / st.downsample;
     }
     st.skip_plc = (st.loss_count != 0) as i32;
-    let dec = if let Some(dec) = dec {
-        dec
-    } else {
-        _dec = ec_dec_init(std::slice::from_raw_parts_mut(
-            data as *mut u8,
-            len as usize,
-        ));
-        &mut _dec
-    };
+    // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
+    // a const-to-mut cast. Max 1275 bytes per validation above.
+    let mut data_copy = data.unwrap().to_vec();
+    // ec_dec_init requires &mut [u8]. We create a separate mutable reference to
+    // data_copy with an erased lifetime to avoid the compiler unifying the local
+    // lifetime with the caller-provided dec's lifetime parameter.
+    // SAFETY: data_copy is live for the remainder of this function, and _dec is
+    // the only reference to it. The 'static lifetime is a lie that is safe because
+    // _dec never escapes this function.
+    let data_ref: &mut [u8] =
+        unsafe { std::slice::from_raw_parts_mut(data_copy.as_mut_ptr(), data_copy.len()) };
+    let mut _dec = ec_dec_init(data_ref);
+    let dec = if let Some(dec) = dec { dec } else { &mut _dec };
     if C == 1 {
         i = 0;
+        let nb = nbEBands as usize;
         while i < nbEBands {
-            *oldBandE.offset(i as isize) =
-                if *oldBandE.offset(i as isize) > *oldBandE.offset((nbEBands + i) as isize) {
-                    *oldBandE.offset(i as isize)
-                } else {
-                    *oldBandE.offset((nbEBands + i) as isize)
-                };
+            st.oldEBands[i as usize] = if st.oldEBands[i as usize] > st.oldEBands[nb + i as usize] {
+                st.oldEBands[i as usize]
+            } else {
+                st.oldEBands[nb + i as usize]
+            };
             i += 1;
         }
     }
@@ -1003,10 +971,10 @@ pub unsafe fn celt_decode_with_ec(
         0
     };
     unquant_coarse_energy(
-        &*mode,
+        mode,
         start,
         end,
-        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &mut st.oldEBands[..(C * nbEBands) as usize],
         intra_ener,
         dec,
         C,
@@ -1022,7 +990,7 @@ pub unsafe fn celt_decode_with_ec(
     }
     let vla_0 = nbEBands as usize;
     let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_0);
-    init_caps(&*mode, &mut cap, LM, C);
+    init_caps(mode, &mut cap, LM, C);
     let vla_1 = nbEBands as usize;
     let mut offsets: Vec<i32> = ::std::vec::from_elem(0, vla_1);
     dynalloc_logp = 6;
@@ -1034,8 +1002,7 @@ pub unsafe fn celt_decode_with_ec(
         let mut quanta: i32 = 0;
         let mut dynalloc_loop_logp: i32 = 0;
         let mut boost: i32 = 0;
-        width =
-            C * (*eBands.offset((i + 1) as isize) as i32 - *eBands.offset(i as isize) as i32) << LM;
+        width = C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) << LM;
         quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
@@ -1045,9 +1012,7 @@ pub unsafe fn celt_decode_with_ec(
         };
         dynalloc_loop_logp = dynalloc_logp;
         boost = 0;
-        while tell + (dynalloc_loop_logp << BITRES) < total_bits
-            && boost < *cap.as_mut_ptr().offset(i as isize)
-        {
+        while tell + (dynalloc_loop_logp << BITRES) < total_bits && boost < cap[i as usize] {
             let mut flag: i32 = 0;
             flag = ec_dec_bit_logp(dec, dynalloc_loop_logp as u32);
             tell = ec_tell_frac(dec) as i32;
@@ -1058,7 +1023,7 @@ pub unsafe fn celt_decode_with_ec(
             total_bits -= quanta;
             dynalloc_loop_logp = 1;
         }
-        *offsets.as_mut_ptr().offset(i as isize) = boost;
+        offsets[i as usize] = boost;
         if boost > 0 {
             dynalloc_logp = if 2 > dynalloc_logp - 1 {
                 2
@@ -1089,7 +1054,7 @@ pub unsafe fn celt_decode_with_ec(
     let vla_4 = nbEBands as usize;
     let mut fine_priority: Vec<i32> = ::std::vec::from_elem(0, vla_4);
     codedBands = clt_compute_allocation(
-        &*mode,
+        mode,
         start,
         end,
         &offsets,
@@ -1110,27 +1075,20 @@ pub unsafe fn celt_decode_with_ec(
         0,
     );
     unquant_fine_energy(
-        &*mode,
+        mode,
         start,
         end,
-        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &mut st.oldEBands[..(C * nbEBands) as usize],
         &fine_quant,
         dec,
         C,
     );
     c = 0;
     loop {
-        memmove(
-            decode_mem[c as usize] as *mut core::ffi::c_void,
-            (decode_mem[c as usize]).offset(N as isize) as *const core::ffi::c_void,
-            ((2048 - N + overlap / 2) as u64)
-                .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                .wrapping_add(
-                    (0 * (decode_mem[c as usize])
-                        .offset_from((decode_mem[c as usize]).offset(N as isize))
-                        as i64) as u64,
-                ),
-        );
+        let ch_off = c as usize * chan_stride;
+        let shift_len = (2048 - N + overlap / 2) as usize;
+        st.decode_mem
+            .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
         c += 1;
         if !(c < CC) {
             break;
@@ -1144,7 +1102,7 @@ pub unsafe fn celt_decode_with_ec(
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(
             0,
-            &*mode,
+            mode,
             start,
             end,
             x_part,
@@ -1170,7 +1128,7 @@ pub unsafe fn celt_decode_with_ec(
     } else {
         quant_all_bands(
             0,
-            &*mode,
+            mode,
             start,
             end,
             &mut X,
@@ -1198,10 +1156,10 @@ pub unsafe fn celt_decode_with_ec(
         anti_collapse_on = ec_dec_bits(dec, 1) as i32;
     }
     unquant_energy_finalise(
-        &*mode,
+        mode,
         start,
         end,
-        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &mut st.oldEBands[..(C * nbEBands) as usize],
         &fine_quant,
         &fine_priority,
         len * 8 - ec_tell(dec),
@@ -1210,7 +1168,7 @@ pub unsafe fn celt_decode_with_ec(
     );
     if anti_collapse_on != 0 {
         anti_collapse(
-            &*mode,
+            mode,
             &mut X,
             &mut collapse_masks,
             LM,
@@ -1218,9 +1176,9 @@ pub unsafe fn celt_decode_with_ec(
             N,
             start,
             end,
-            std::slice::from_raw_parts(oldBandE, (2 * nbEBands) as usize),
-            std::slice::from_raw_parts(oldLogE, (2 * nbEBands) as usize),
-            std::slice::from_raw_parts(oldLogE2, (2 * nbEBands) as usize),
+            &st.oldEBands[..(2 * nbEBands) as usize],
+            &st.oldLogE[..(2 * nbEBands) as usize],
+            &st.oldLogE2[..(2 * nbEBands) as usize],
             &pulses,
             st.rng,
             st.arch,
@@ -1229,18 +1187,23 @@ pub unsafe fn celt_decode_with_ec(
     if silence != 0 {
         i = 0;
         while i < C * nbEBands {
-            *oldBandE.offset(i as isize) = -28.0f32;
+            st.oldEBands[i as usize] = -28.0f32;
             i += 1;
         }
     }
     {
-        let out_syn_len = N as usize + overlap as usize;
+        let out_syn_len = n + overlap as usize;
+        let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
         celt_synthesis(
-            &*mode,
+            mode,
             &X,
-            std::slice::from_raw_parts_mut(out_syn[0], out_syn_len),
-            std::slice::from_raw_parts_mut(out_syn[1], if CC >= 2 { out_syn_len } else { 0 }),
-            std::slice::from_raw_parts(oldBandE, (2 * nbEBands) as usize),
+            &mut ch0[out_syn_off..out_syn_off + out_syn_len],
+            if CC >= 2 {
+                &mut ch1_region[out_syn_off..out_syn_off + out_syn_len]
+            } else {
+                &mut []
+            },
+            &st.oldEBands[..(2 * nbEBands) as usize],
             start,
             effEnd,
             C,
@@ -1265,35 +1228,34 @@ pub unsafe fn celt_decode_with_ec(
             15
         };
         {
-            let dm_len = DECODE_BUFFER_SIZE + overlap as usize;
-            let dm_slice = std::slice::from_raw_parts_mut(decode_mem[c as usize], dm_len);
-            let out_syn_off = (DECODE_BUFFER_SIZE as i32 - N) as usize;
+            let ch_off = c as usize * chan_stride;
+            let dm_slice = &mut st.decode_mem[ch_off..ch_off + chan_stride];
             comb_filter_inplace(
                 dm_slice,
                 out_syn_off,
                 st.postfilter_period_old,
                 st.postfilter_period,
-                (*mode).shortMdctSize,
+                mode.shortMdctSize,
                 st.postfilter_gain_old,
                 st.postfilter_gain,
                 st.postfilter_tapset_old,
                 st.postfilter_tapset,
-                &(&(*mode).window)[..overlap as usize],
+                &mode.window[..overlap as usize],
                 overlap,
                 st.arch,
             );
             if LM != 0 {
                 comb_filter_inplace(
                     dm_slice,
-                    out_syn_off + (*mode).shortMdctSize as usize,
+                    out_syn_off + mode.shortMdctSize as usize,
                     st.postfilter_period,
                     postfilter_pitch,
-                    N - (*mode).shortMdctSize,
+                    N - mode.shortMdctSize,
                     st.postfilter_gain,
                     postfilter_gain,
                     st.postfilter_tapset,
                     postfilter_tapset,
-                    &(&(*mode).window)[..overlap as usize],
+                    &mode.window[..overlap as usize],
                     overlap,
                     st.arch,
                 );
@@ -1315,34 +1277,15 @@ pub unsafe fn celt_decode_with_ec(
         st.postfilter_gain_old = st.postfilter_gain;
         st.postfilter_tapset_old = st.postfilter_tapset;
     }
+    let nb = nbEBands as usize;
     if C == 1 {
-        memcpy(
-            &mut *oldBandE.offset(nbEBands as isize) as *mut opus_val16 as *mut core::ffi::c_void,
-            oldBandE as *const core::ffi::c_void,
-            (nbEBands as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add(
-                    (0 * (&mut *oldBandE.offset(nbEBands as isize) as *mut opus_val16)
-                        .offset_from(oldBandE) as i64) as u64,
-                ),
-        );
+        st.oldEBands.copy_within(0..nb, nb);
     }
     if isTransient == 0 {
         let mut max_background_increase: opus_val16 = 0.;
-        memcpy(
-            oldLogE2 as *mut core::ffi::c_void,
-            oldLogE as *const core::ffi::c_void,
-            ((2 * nbEBands) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add((0 * oldLogE2.offset_from(oldLogE) as i64) as u64),
-        );
-        memcpy(
-            oldLogE as *mut core::ffi::c_void,
-            oldBandE as *const core::ffi::c_void,
-            ((2 * nbEBands) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add((0 * oldLogE.offset_from(oldBandE) as i64) as u64),
-        );
+        let nb2 = (2 * nbEBands) as usize;
+        st.oldLogE2[..nb2].copy_from_slice(&st.oldLogE[..nb2]);
+        st.oldLogE[..nb2].copy_from_slice(&st.oldEBands[..nb2]);
         if st.loss_count < 10 {
             max_background_increase = M as f32 * 0.001f32;
         } else {
@@ -1350,25 +1293,24 @@ pub unsafe fn celt_decode_with_ec(
         }
         i = 0;
         while i < 2 * nbEBands {
-            *backgroundLogE.offset(i as isize) = if *backgroundLogE.offset(i as isize)
+            st.backgroundLogE[i as usize] = if st.backgroundLogE[i as usize]
                 + max_background_increase
-                < *oldBandE.offset(i as isize)
+                < st.oldEBands[i as usize]
             {
-                *backgroundLogE.offset(i as isize) + max_background_increase
+                st.backgroundLogE[i as usize] + max_background_increase
             } else {
-                *oldBandE.offset(i as isize)
+                st.oldEBands[i as usize]
             };
             i += 1;
         }
     } else {
         i = 0;
         while i < 2 * nbEBands {
-            *oldLogE.offset(i as isize) =
-                if *oldLogE.offset(i as isize) < *oldBandE.offset(i as isize) {
-                    *oldLogE.offset(i as isize)
-                } else {
-                    *oldBandE.offset(i as isize)
-                };
+            st.oldLogE[i as usize] = if st.oldLogE[i as usize] < st.oldEBands[i as usize] {
+                st.oldLogE[i as usize]
+            } else {
+                st.oldEBands[i as usize]
+            };
             i += 1;
         }
     }
@@ -1376,18 +1318,16 @@ pub unsafe fn celt_decode_with_ec(
     loop {
         i = 0;
         while i < start {
-            *oldBandE.offset((c * nbEBands + i) as isize) = 0 as opus_val16;
-            let ref mut fresh0 = *oldLogE2.offset((c * nbEBands + i) as isize);
-            *fresh0 = -28.0f32;
-            *oldLogE.offset((c * nbEBands + i) as isize) = *fresh0;
+            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
+            st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
+            st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
             i += 1;
         }
         i = end;
         while i < nbEBands {
-            *oldBandE.offset((c * nbEBands + i) as isize) = 0 as opus_val16;
-            let ref mut fresh1 = *oldLogE2.offset((c * nbEBands + i) as isize);
-            *fresh1 = -28.0f32;
-            *oldLogE.offset((c * nbEBands + i) as isize) = *fresh1;
+            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
+            st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
+            st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
             i += 1;
         }
         c += 1;
@@ -1397,18 +1337,19 @@ pub unsafe fn celt_decode_with_ec(
     }
     st.rng = dec.rng;
     {
-        let out_n = N as usize;
         let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
-            .map(|c| std::slice::from_raw_parts(out_syn[c], out_n))
+            .map(|c| {
+                &st.decode_mem[c * chan_stride + out_syn_off..c * chan_stride + out_syn_off + n]
+            })
             .collect();
         let pcm_len = (frame_size / st.downsample * CC) as usize;
         deemphasis(
             &in_ch,
-            std::slice::from_raw_parts_mut(pcm, pcm_len),
+            &mut pcm[..pcm_len],
             N,
             CC,
             st.downsample,
-            &(*mode).preemph,
+            &mode.preemph,
             &mut st.preemph_memD,
             accum,
         );
@@ -1422,7 +1363,8 @@ pub unsafe fn celt_decode_with_ec(
     }
     return frame_size / st.downsample;
 }
-pub unsafe fn opus_custom_decoder_ctl_impl(
+/// Upstream C: celt/celt_decoder.c:opus_custom_decoder_ctl
+pub fn opus_custom_decoder_ctl_impl(
     st: &mut OpusCustomDecoder,
     request: i32,
     args: VarArgs,

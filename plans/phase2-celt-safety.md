@@ -98,19 +98,22 @@ Key: `qb` = quant_bands.rs
 
 ### Stage 2.5 — Encoder/Decoder
 
-- [ ] `celt_decoder.rs`
+- [x] `celt_decoder.rs`
   - Upstream C: `celt/celt_decoder.c`
-  - Functions (8 unsafe): `celt_decode_with_ec`, `opus_custom_decoder_ctl_impl`, etc.
-  - Risk: High — 1551 lines, manages decoder state, calls bands/mdct/entdec
-  - Strategy: Convert state struct first, then decode pipeline
-  - VarArgs in CTL → will be cleaned up in Phase 4 but prepare safe internals here
+  - Functions (8 unsafe fn → 0): all converted to safe APIs
+  - `celt_decode_with_ec`: `data: *const u8 + len` → `Option<&[u8]>`, `pcm: *mut` → `&mut [opus_val16]`
+  - `opus_custom_decoder_ctl_impl`: removed `unsafe` (body was already safe)
+  - `celt_synthesis`: raw double-pointer channels → separate `&mut [celt_sig]` params
+  - `celt_decode_lost`: raw pointer struct access → direct field indexing, memmove → copy_within
+  - `deemphasis`, `tf_decode`, `celt_plc_pitch_search`: pointer params → slices
+  - 2 minimal unsafe blocks remain (non-overlapping slice creation, lifetime erasure for ec_dec)
 - [ ] `celt_encoder.rs`
   - Upstream C: `celt/celt_encoder.c`
   - Functions (20 unsafe): `celt_encode_with_ec`, `opus_custom_encoder_ctl_impl`, etc.
   - Risk: **Very High** — 3523 lines, largest file, calls everything
   - Strategy: Convert state struct, then encoding pipeline in stages
   - Sub-commits for logical groups of functions
-- [ ] **Commit**: `refactor: make celt::celt_decoder safe`
+- [x] **Commit**: `refactor: make celt::celt_decoder safe (Stage 2.5)` (3 commits)
 - [ ] **Commit(s)**: `refactor: make celt::celt_encoder safe` (likely 3-5 commits)
 
 ---
