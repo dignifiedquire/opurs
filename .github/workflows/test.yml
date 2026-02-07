@@ -1,4 +1,4 @@
-on: [ push, pull_request ]
+on: [push, pull_request]
 
 name: Run opus tests
 
@@ -14,24 +14,21 @@ jobs:
           - macos-13 # x86
           - macos-14 # arm64
           - windows-latest
-        profile: [ release, dev ]
+        profile: [release, dev]
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
 
       - name: Execute tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all --profile=${{ matrix.profile }} -- --nocapture
+        run: cargo nextest run --all --cargo-profile=${{ matrix.profile }}
+
   test-vectors:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -44,14 +41,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup clang
         # macOS has clang already
@@ -61,10 +54,7 @@ jobs:
           compiler: llvm
 
       - name: Build (release)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: cargo build --release
 
       - name: Download test vectors from IETF site
         run: |
@@ -73,10 +63,7 @@ jobs:
           # the vectors are now extracted to opus_newvectors
 
       - name: Run test vectors
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release -p unsafe-libopus-tools --bin run_vectors2 -- opus_newvectors
+        run: cargo run --release -p unsafe-libopus-tools --bin run_vectors2 -- opus_newvectors
 
 # TODO: upload a dump? 800M feels a bit too much for gha though..
 #      - name: Upload logs
