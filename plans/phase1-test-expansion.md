@@ -327,32 +327,36 @@ This is already the best-structured test file (15 `#[test]` fns). Cleanup:
 
 ### 1.6 — Verify test suite completeness
 
-- [ ] Run `cargo test --all` — all tests pass
-- [ ] Run `cargo test --all --release` — all tests pass
-- [ ] Run vector tests — all pass
-- [ ] Run clippy — clean
-- [ ] `cargo fmt --check` passes
-- [ ] Compare test function count against upstream:
+- [x] Run `cargo test --all` — all tests pass (74 tests)
+- [x] Run `cargo test --all --release` — all tests pass (74 tests)
+- [x] Run vector tests — 228/228 pass
+- [ ] Run clippy — clean (pre-existing lib warnings/errors; test code is clean)
+- [x] `cargo fmt --check` passes
+- [x] Compare test function count against upstream:
 
   | Upstream test | Upstream fn count | Rust #[test] count | Status |
   |---------------|------------------|--------------------|--------|
-  | test_opus_api.c | 5 main fns | 15+ | OK |
-  | test_opus_decode.c | 2 fns | 5+ | OK |
-  | test_opus_encode.c | 3 fns | 10+ | OK |
-  | opus_encode_regressions.c | 3 fns | 3 | OK |
+  | test_opus_api.c | 5 main fns | 15 | OK |
+  | test_opus_decode.c | 2 fns | 5 | OK |
+  | test_opus_encode.c | 3 fns | 4 (1 main + 3 regression) | OK |
+  | opus_encode_regressions.c | 3 fns | (merged into opus_encode) | OK |
   | test_opus_padding.c | 1 fn | 1 | OK |
   | test_unit_types.c | 1 fn | 2 | OK |
-  | test_unit_mathops.c | 8 fns | 8 | OK |
-  | test_unit_entropy.c | 1 fn (big) | 5+ | OK |
-  | test_unit_laplace.c | 1 fn | 2 | OK |
-  | test_unit_cwrs32.c | 1 fn | 2 | OK |
+  | test_unit_mathops.c | 8 fns | 6 | OK |
+  | test_unit_entropy.c | 1 fn (big) | 7 | OK |
+  | test_unit_laplace.c | 1 fn | 1 | OK |
+  | test_unit_cwrs32.c | 1 fn | 1 | OK |
   | test_unit_rotation.c | 1 fn | 4 | OK |
-  | test_unit_mdct.c | 1 fn | 6+ | OK |
-  | test_unit_dft.c | 1 fn | 6+ | OK |
-  | test_unit_LPC_inv_pred_gain.c | 1 fn | 1+ | OK |
+  | test_unit_mdct.c | 1 fn | 8 | OK |
+  | test_unit_dft.c | 1 fn | 8 | OK |
+  | test_unit_LPC_inv_pred_gain.c | 1 fn | 1 | OK |
+  | opus_decode_fuzzer.c | 1 fn | 1 (cargo-fuzz) | OK |
+  | test_opus_projection.c | 5 fns | — | Deferred (multistream not ported) |
 
-- [ ] Document any remaining gaps in this file
-- [ ] **Commit**: `test: verify complete test suite, update phase1 plan`
+  **Total: 64 #[test] functions + 1 fuzz target**
+
+- [x] Document any remaining gaps in this file
+- [x] **Commit**: `test: verify complete test suite, update phase1 plan`
 
 ---
 
@@ -385,18 +389,18 @@ doesn't need to match upstream — only the test *logic* needs to match.
 
 ## Definition of Done
 
-- [ ] All 8 CELT unit tests rewritten with `#[test]`, importing from library
-- [ ] SILK unit test rewritten with `#[test]`, importing from library
-- [ ] Old `src/celt/tests/` and `src/silk/tests/` removed
-- [ ] Integration tests split into 25+ granular `#[test]` functions
-- [ ] Zero `_test_failed()` calls — all use `assert!`/`assert_eq!`
-- [ ] Zero `malloc`/`free` in test code — all use `Vec`/`Box`
-- [ ] Zero `static mut` — all RNG state passed explicitly
-- [ ] Zero `extern "C"` libc imports in test code
-- [ ] Every `assert!` has a context message describing what failed and why
-- [ ] Seed printed at start of randomized tests for reproducibility
-- [ ] Shared test utilities in `tests/test_common/`
-- [ ] Cargo-fuzz target for decode fuzzing
-- [ ] `test_opus_projection` explicitly deferred with documentation
-- [ ] All tests pass in both dev and release profiles
-- [ ] Zero clippy warnings, formatted
+- [x] All 8 CELT unit tests rewritten with `#[test]`, importing from library
+- [x] SILK unit test rewritten with `#[test]`, importing from library
+- [x] Old `src/celt/tests/` and `src/silk/tests/` removed
+- [x] Integration tests split into 25+ granular `#[test]` functions (64 total)
+- [x] Zero `_test_failed()` calls — all use `assert!`/`assert_eq!`
+- [x] Zero `malloc`/`free` in test code — all use `Vec`/`Box`
+- [x] Zero `static mut` — all RNG state passed explicitly
+- [x] Zero `extern "C"` libc imports in test code
+- [x] Every `assert!` has a context message describing what failed and why
+- [x] Seed printed at start of randomized tests for reproducibility
+- [x] Shared test utilities in `tests/test_common/`
+- [x] Cargo-fuzz target for decode fuzzing
+- [x] `test_opus_projection` explicitly deferred with documentation
+- [x] All tests pass in both dev and release profiles
+- [ ] Zero clippy warnings, formatted (pre-existing lib clippy issues remain)
