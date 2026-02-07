@@ -169,93 +169,88 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
 
     st
 }
-unsafe fn deemphasis_stereo_simple(
-    in_0: *mut *mut celt_sig,
-    pcm: *mut opus_val16,
+/// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
+fn deemphasis_stereo_simple(
+    ch0: &[celt_sig],
+    ch1: &[celt_sig],
+    pcm: &mut [opus_val16],
     N: i32,
     coef0: opus_val16,
-    mem: *mut celt_sig,
+    mem: &mut [celt_sig; 2],
 ) {
-    let mut x0: *mut celt_sig = 0 as *mut celt_sig;
-    let mut x1: *mut celt_sig = 0 as *mut celt_sig;
-    let mut m0: celt_sig = 0.;
-    let mut m1: celt_sig = 0.;
-    let mut j: i32 = 0;
-    x0 = *in_0.offset(0 as isize);
-    x1 = *in_0.offset(1 as isize);
-    m0 = *mem.offset(0 as isize);
-    m1 = *mem.offset(1 as isize);
-    j = 0;
+    let mut m0: celt_sig = mem[0];
+    let mut m1: celt_sig = mem[1];
+    let mut j = 0;
     while j < N {
-        let mut tmp0: celt_sig = 0.;
-        let mut tmp1: celt_sig = 0.;
-        tmp0 = *x0.offset(j as isize) + VERY_SMALL + m0;
-        tmp1 = *x1.offset(j as isize) + VERY_SMALL + m1;
+        let ju = j as usize;
+        let tmp0: celt_sig = ch0[ju] + VERY_SMALL + m0;
+        let tmp1: celt_sig = ch1[ju] + VERY_SMALL + m1;
         m0 = coef0 * tmp0;
         m1 = coef0 * tmp1;
-        *pcm.offset((2 * j) as isize) = tmp0 * (1 as f32 / CELT_SIG_SCALE);
-        *pcm.offset((2 * j + 1) as isize) = tmp1 * (1 as f32 / CELT_SIG_SCALE);
+        pcm[2 * ju] = tmp0 * (1 as f32 / CELT_SIG_SCALE);
+        pcm[2 * ju + 1] = tmp1 * (1 as f32 / CELT_SIG_SCALE);
         j += 1;
     }
-    *mem.offset(0 as isize) = m0;
-    *mem.offset(1 as isize) = m1;
+    mem[0] = m0;
+    mem[1] = m1;
 }
-unsafe fn deemphasis(
-    in_0: *mut *mut celt_sig,
-    pcm: *mut opus_val16,
+/// Upstream C: celt/celt_decoder.c:deemphasis
+fn deemphasis(
+    in_channels: &[&[celt_sig]],
+    pcm: &mut [opus_val16],
     N: i32,
     C: i32,
     downsample: i32,
-    coef: *const opus_val16,
-    mem: *mut celt_sig,
+    coef: &[opus_val16],
+    mem: &mut [celt_sig],
     accum: i32,
 ) {
-    let mut c: i32 = 0;
-    let mut Nd: i32 = 0;
     let mut apply_downsampling: i32 = 0;
-    let mut coef0: opus_val16 = 0.;
     if downsample == 1 && C == 2 && accum == 0 {
-        deemphasis_stereo_simple(in_0, pcm, N, *coef.offset(0 as isize), mem);
+        deemphasis_stereo_simple(
+            in_channels[0],
+            in_channels[1],
+            pcm,
+            N,
+            coef[0],
+            mem.try_into().unwrap(),
+        );
         return;
     }
     assert!(accum == 0);
     let vla = N as usize;
     let mut scratch: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
-    coef0 = *coef.offset(0 as isize);
-    Nd = N / downsample;
-    c = 0;
+    let coef0: opus_val16 = coef[0];
+    let Nd: i32 = N / downsample;
+    let mut c = 0;
     loop {
-        let mut j: i32 = 0;
-        let mut x: *mut celt_sig = 0 as *mut celt_sig;
-        let mut y: *mut opus_val16 = 0 as *mut opus_val16;
-        let mut m: celt_sig = *mem.offset(c as isize);
-        x = *in_0.offset(c as isize);
-        y = pcm.offset(c as isize);
+        let mut j: i32;
+        let mut m: celt_sig = mem[c as usize];
+        let x = in_channels[c as usize];
         if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = *x.offset(j as isize) + VERY_SMALL + m;
+                let tmp: celt_sig = x[j as usize] + VERY_SMALL + m;
                 m = coef0 * tmp;
-                *scratch.as_mut_ptr().offset(j as isize) = tmp;
+                scratch[j as usize] = tmp;
                 j += 1;
             }
             apply_downsampling = 1;
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = *x.offset(j as isize) + VERY_SMALL + m;
+                let tmp_0: celt_sig = x[j as usize] + VERY_SMALL + m;
                 m = coef0 * tmp_0;
-                *y.offset((j * C) as isize) = tmp_0 * (1 as f32 / CELT_SIG_SCALE);
+                pcm[(c + j * C) as usize] = tmp_0 * (1 as f32 / CELT_SIG_SCALE);
                 j += 1;
             }
         }
-        *mem.offset(c as isize) = m;
+        mem[c as usize] = m;
         if apply_downsampling != 0 {
             j = 0;
             while j < Nd {
-                *y.offset((j * C) as isize) =
-                    *scratch.as_mut_ptr().offset((j * downsample) as isize)
-                        * (1 as f32 / CELT_SIG_SCALE);
+                pcm[(c + j * C) as usize] =
+                    scratch[(j * downsample) as usize] * (1 as f32 / CELT_SIG_SCALE);
                 j += 1;
             }
         }
@@ -470,37 +465,35 @@ unsafe fn celt_synthesis(
         }
     }
 }
-unsafe fn tf_decode(
+/// Upstream C: celt/celt_decoder.c:tf_decode
+fn tf_decode(
     start: i32,
     end: i32,
     isTransient: i32,
-    tf_res: *mut i32,
+    tf_res: &mut [i32],
     LM: i32,
     dec: &mut ec_dec,
 ) {
-    let mut i: i32 = 0;
-    let mut curr: i32 = 0;
-    let mut tf_select: i32 = 0;
-    let mut tf_select_rsv: i32 = 0;
-    let mut tf_changed: i32 = 0;
-    let mut logp: i32 = 0;
-    let mut budget: u32 = 0;
-    let mut tell: u32 = 0;
-    budget = dec.storage.wrapping_mul(8);
-    tell = ec_tell(dec) as u32;
+    let mut curr: i32;
+    let mut tf_select: i32;
+    let mut tf_changed: i32;
+    let mut logp: i32;
+    let mut budget: u32 = dec.storage.wrapping_mul(8);
+    let mut tell: u32 = ec_tell(dec) as u32;
     logp = if isTransient != 0 { 2 } else { 4 };
-    tf_select_rsv = (LM > 0 && tell.wrapping_add(logp as u32).wrapping_add(1) <= budget) as i32;
+    let tf_select_rsv: i32 =
+        (LM > 0 && tell.wrapping_add(logp as u32).wrapping_add(1) <= budget) as i32;
     budget = budget.wrapping_sub(tf_select_rsv as u32);
     curr = 0;
     tf_changed = curr;
-    i = start;
+    let mut i = start;
     while i < end {
         if tell.wrapping_add(logp as u32) <= budget {
             curr ^= ec_dec_bit_logp(dec, logp as u32);
             tell = ec_tell(dec) as u32;
             tf_changed |= curr;
         }
-        *tf_res.offset(i as isize) = curr;
+        tf_res[i as usize] = curr;
         logp = if isTransient != 0 { 4 } else { 5 };
         i += 1;
     }
@@ -513,21 +506,20 @@ unsafe fn tf_decode(
     }
     i = start;
     while i < end {
-        *tf_res.offset(i as isize) = tf_select_table[LM as usize]
-            [(4 * isTransient + 2 * tf_select + *tf_res.offset(i as isize)) as usize]
+        tf_res[i as usize] = tf_select_table[LM as usize]
+            [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
             as i32;
         i += 1;
     }
 }
-unsafe fn celt_plc_pitch_search(decode_mem: *mut *mut celt_sig, C: i32, _arch: i32) -> i32 {
+/// Upstream C: celt/celt_decoder.c:celt_plc_pitch_search
+fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: i32) -> i32 {
     let mut lp_pitch_buf: [opus_val16; 1024] = [0.; 1024];
     let ds_len = DECODE_BUFFER_SIZE;
-    let ch0 = std::slice::from_raw_parts(*decode_mem.offset(0), ds_len);
-    if C == 2 {
-        let ch1 = std::slice::from_raw_parts(*decode_mem.offset(1), ds_len);
-        pitch::pitch_downsample(&[ch0, ch1], &mut lp_pitch_buf, ds_len);
+    if let Some(ch1) = ch1 {
+        pitch::pitch_downsample(&[&ch0[..ds_len], &ch1[..ds_len]], &mut lp_pitch_buf, ds_len);
     } else {
-        pitch::pitch_downsample(&[ch0], &mut lp_pitch_buf, ds_len);
+        pitch::pitch_downsample(&[&ch0[..ds_len]], &mut lp_pitch_buf, ds_len);
     }
     let mut pitch_index = pitch::pitch_search(
         &lp_pitch_buf[(PLC_PITCH_LAG_MAX >> 1) as usize..],
@@ -536,7 +528,7 @@ unsafe fn celt_plc_pitch_search(decode_mem: *mut *mut celt_sig, C: i32, _arch: i
         PLC_PITCH_LAG_MAX - PLC_PITCH_LAG_MIN,
     );
     pitch_index = PLC_PITCH_LAG_MAX - pitch_index;
-    return pitch_index;
+    pitch_index
 }
 unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     let mut c: i32 = 0;
@@ -686,7 +678,18 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
         let mut fade: opus_val16 = Q15ONE;
         let mut pitch_index: i32 = 0;
         if loss_count == 0 {
-            pitch_index = celt_plc_pitch_search(decode_mem.as_mut_ptr(), C, st.arch);
+            pitch_index = celt_plc_pitch_search(
+                std::slice::from_raw_parts(decode_mem[0], DECODE_BUFFER_SIZE),
+                if C == 2 {
+                    Some(std::slice::from_raw_parts(
+                        decode_mem[1],
+                        DECODE_BUFFER_SIZE,
+                    ))
+                } else {
+                    None
+                },
+                st.arch,
+            );
             st.last_pitch_index = pitch_index;
         } else {
             pitch_index = st.last_pitch_index;
@@ -1000,16 +1003,23 @@ pub unsafe fn celt_decode_with_ec(
     }
     if data.is_null() || len <= 1 {
         celt_decode_lost(st, N, LM);
-        deemphasis(
-            out_syn.as_mut_ptr(),
-            pcm,
-            N,
-            CC,
-            st.downsample,
-            ((*mode).preemph).as_ptr(),
-            (st.preemph_memD).as_mut_ptr(),
-            accum,
-        );
+        {
+            let out_n = N as usize;
+            let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
+                .map(|c| std::slice::from_raw_parts(out_syn[c], out_n))
+                .collect();
+            let pcm_len = (frame_size / st.downsample * CC) as usize;
+            deemphasis(
+                &in_ch,
+                std::slice::from_raw_parts_mut(pcm, pcm_len),
+                N,
+                CC,
+                st.downsample,
+                &(*mode).preemph,
+                &mut st.preemph_memD,
+                accum,
+            );
+        }
         return frame_size / st.downsample;
     }
     st.skip_plc = (st.loss_count != 0) as i32;
@@ -1094,7 +1104,7 @@ pub unsafe fn celt_decode_with_ec(
     );
     let vla = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla);
-    tf_decode(start, end, isTransient, tf_res.as_mut_ptr(), LM, dec);
+    tf_decode(start, end, isTransient, &mut tf_res, LM, dec);
     tell = ec_tell(dec);
     spread_decision = SPREAD_NORMAL;
     if tell + 4 <= total_bits {
@@ -1472,16 +1482,23 @@ pub unsafe fn celt_decode_with_ec(
         }
     }
     st.rng = dec.rng;
-    deemphasis(
-        out_syn.as_mut_ptr(),
-        pcm,
-        N,
-        CC,
-        st.downsample,
-        ((*mode).preemph).as_ptr(),
-        (st.preemph_memD).as_mut_ptr(),
-        accum,
-    );
+    {
+        let out_n = N as usize;
+        let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
+            .map(|c| std::slice::from_raw_parts(out_syn[c], out_n))
+            .collect();
+        let pcm_len = (frame_size / st.downsample * CC) as usize;
+        deemphasis(
+            &in_ch,
+            std::slice::from_raw_parts_mut(pcm, pcm_len),
+            N,
+            CC,
+            st.downsample,
+            &(*mode).preemph,
+            &mut st.preemph_memD,
+            accum,
+        );
+    }
     st.loss_count = 0;
     if ec_tell(dec) > 8 * len {
         return OPUS_INTERNAL_ERROR;
