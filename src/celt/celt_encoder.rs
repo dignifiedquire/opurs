@@ -2313,18 +2313,10 @@ pub unsafe fn celt_encode_with_ec(
             LM,
             (*st).arch,
         );
-        amp2Log2(
-            mode,
-            effEnd,
-            end,
-            bandE.as_mut_ptr(),
-            bandLogE2.as_mut_ptr(),
-            C,
-        );
+        amp2Log2(&*mode, effEnd, end, &bandE, &mut bandLogE2, C);
         i = 0;
         while i < C * nbEBands {
-            let ref mut fresh2 = *bandLogE2.as_mut_ptr().offset(i as isize);
-            *fresh2 += 0.5f32 * LM as f32;
+            bandLogE2[i as usize] += 0.5f32 * LM as f32;
             i += 1;
         }
     }
@@ -2375,14 +2367,7 @@ pub unsafe fn celt_encode_with_ec(
             i += 1;
         }
     }
-    amp2Log2(
-        mode,
-        effEnd,
-        end,
-        bandE.as_mut_ptr(),
-        bandLogE.as_mut_ptr(),
-        C,
-    );
+    amp2Log2(&*mode, effEnd, end, &bandE, &mut bandLogE, C);
     let vla_4 = (C * nbEBands) as usize;
     let mut surround_dynalloc: Vec<opus_val16> = ::std::vec::from_elem(0., vla_4);
     memset(
@@ -2589,18 +2574,10 @@ pub unsafe fn celt_encode_with_ec(
                 LM,
                 (*st).arch,
             );
-            amp2Log2(
-                mode,
-                effEnd,
-                end,
-                bandE.as_mut_ptr(),
-                bandLogE.as_mut_ptr(),
-                C,
-            );
+            amp2Log2(&*mode, effEnd, end, &bandE, &mut bandLogE, C);
             i = 0;
             while i < C * nbEBands {
-                let ref mut fresh3 = *bandLogE2.as_mut_ptr().offset(i as isize);
-                *fresh3 += 0.5f32 * LM as f32;
+                bandLogE2[i as usize] += 0.5f32 * LM as f32;
                 i += 1;
             }
             tf_estimate = 0.2f32;
@@ -2723,14 +2700,14 @@ pub unsafe fn celt_encode_with_ec(
         }
     }
     quant_coarse_energy(
-        mode,
+        &*mode,
         start,
         end,
         effEnd,
-        bandLogE.as_mut_ptr(),
-        oldBandE,
+        &bandLogE,
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
         total_bits as u32,
-        error.as_mut_ptr(),
+        &mut error,
         enc,
         C,
         LM,
@@ -3096,19 +3073,19 @@ pub unsafe fn celt_encode_with_ec(
         signalBandwidth = 1;
     }
     codedBands = clt_compute_allocation(
-        mode,
+        &*mode,
         start,
         end,
-        offsets.as_mut_ptr(),
-        cap.as_mut_ptr(),
+        &offsets,
+        &cap,
         alloc_trim,
         &mut (*st).intensity,
         &mut dual_stereo,
         bits,
         &mut balance,
-        pulses.as_mut_ptr(),
-        fine_quant.as_mut_ptr(),
-        fine_priority.as_mut_ptr(),
+        &mut pulses,
+        &mut fine_quant,
+        &mut fine_priority,
         C,
         LM,
         enc,
@@ -3133,12 +3110,12 @@ pub unsafe fn celt_encode_with_ec(
         (*st).lastCodedBands = codedBands;
     }
     quant_fine_energy(
-        mode,
+        &*mode,
         start,
         end,
-        oldBandE,
-        error.as_mut_ptr(),
-        fine_quant.as_mut_ptr(),
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &mut error,
+        &fine_quant,
         enc,
         C,
     );
@@ -3178,13 +3155,13 @@ pub unsafe fn celt_encode_with_ec(
         ec_enc_bits(enc, anti_collapse_on as u32, 1);
     }
     quant_energy_finalise(
-        mode,
+        &*mode,
         start,
         end,
-        oldBandE,
-        error.as_mut_ptr(),
-        fine_quant.as_mut_ptr(),
-        fine_priority.as_mut_ptr(),
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &mut error,
+        &fine_quant,
+        &fine_priority,
         nbCompressedBytes * 8 - ec_tell(enc),
         enc,
         C,

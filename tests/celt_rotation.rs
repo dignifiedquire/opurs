@@ -26,9 +26,7 @@ fn check_rotation(n: usize, k: i32, rng: &mut TestRng) {
     }
 
     // Forward rotation
-    unsafe {
-        exp_rotation(x1.as_mut_ptr(), n as i32, 1, 1, k, SPREAD_NORMAL);
-    }
+    exp_rotation(&mut x1, n as i32, 1, 1, k, SPREAD_NORMAL);
 
     let mut err = 0.0f64;
     let mut ener = 0.0f64;
@@ -39,9 +37,7 @@ fn check_rotation(n: usize, k: i32, rng: &mut TestRng) {
     let snr0 = 20.0 * (ener / err).log10();
 
     // Inverse rotation (should recover original)
-    unsafe {
-        exp_rotation(x1.as_mut_ptr(), n as i32, -1, 1, k, SPREAD_NORMAL);
-    }
+    exp_rotation(&mut x1, n as i32, -1, 1, k, SPREAD_NORMAL);
 
     err = 0.0;
     ener = 0.0;

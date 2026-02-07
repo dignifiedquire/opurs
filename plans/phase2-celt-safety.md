@@ -69,19 +69,16 @@ Key: `qb` = quant_bands.rs
 - [x] `mdct.rs` — already safe (0 unsafe fn, 2 isolated unsafe blocks in ndutil), added upstream comments
 - [x] `pitch.rs` — converted all 10 functions to safe slice APIs, removed `arch_h` module, `static mut second_check` → `const SECOND_CHECK`
   - Also removed remaining unsafe blocks from `celt_lpc.rs` (Stage 2.1 holdover)
-- [ ] `rate.rs`
+- [x] `rate.rs` — converted all 5 functions to safe slice APIs, `static mut LOG2_FRAC_TABLE` → `const`
   - Upstream C: `celt/rate.h`, `celt/rate.c`
-  - Functions: `clt_compute_allocation`, `bits2pulses`, `pulses2bits`
-  - Risk: Medium — array indexing into mode tables
-- [ ] `quant_bands.rs`
+  - Functions: `clt_compute_allocation`, `bits2pulses`, `pulses2bits`, `interp_bits2pulses`, `get_pulses`
+- [x] `quant_bands.rs` — converted all 9 functions to safe slice APIs, 4 `static mut` → `const`, removed `arch_h`/`stack_alloc_h` modules, replaced all `memcpy` with `copy_from_slice`
   - Upstream C: `celt/quant_bands.h`, `celt/quant_bands.c`
-  - Functions: `quant_coarse_energy`, `quant_fine_energy`, `quant_energy_finalise`, `unquant_*`
-  - Risk: Medium — uses entenc/entdec + mode tables
-- [ ] `vq.rs`
+  - Functions: `quant_coarse_energy`, `quant_fine_energy`, `quant_energy_finalise`, `unquant_*`, `amp2Log2`, `loss_distortion`
+- [x] `vq.rs` — converted all 9 functions to safe slice APIs, removed `arch_h` module
   - Upstream C: `celt/vq.h`, `celt/vq.c`
   - Functions: `exp_rotation`, `op_pvq_search_c`, `alg_quant`, `alg_unquant`, `renormalise_vector`, `stereo_itheta`
-  - Risk: High — core vector quantization with pointer manipulation
-- [ ] **Commit per file**: `refactor: make celt::<module> safe`
+- [x] **Commit**: `refactor: make celt rate/vq/quant_bands safe (Stage 2.3b)`
 
 ### Stage 2.4 — Integration Hub
 

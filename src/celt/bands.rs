@@ -356,7 +356,12 @@ pub unsafe fn anti_collapse(
                 k += 1;
             }
             if renormalize != 0 {
-                renormalise_vector(X, N0 << LM, Q15ONE, arch);
+                renormalise_vector(
+                    std::slice::from_raw_parts_mut(X, (N0 << LM) as usize),
+                    N0 << LM,
+                    Q15ONE,
+                    arch,
+                );
             }
             c += 1;
             if !(c < C) {
@@ -752,7 +757,13 @@ unsafe fn compute_theta(
         qn = 1;
     }
     if encode != 0 {
-        itheta = stereo_itheta(X, Y, stereo, N, (*ctx).arch);
+        itheta = stereo_itheta(
+            std::slice::from_raw_parts(X, N as usize),
+            std::slice::from_raw_parts(Y, N as usize),
+            stereo,
+            N,
+            (*ctx).arch,
+        );
     }
     tell = ec_tell_frac(ec) as i32;
     if qn != 1 {
@@ -1122,20 +1133,20 @@ unsafe fn quant_partition(
             cm |= quant_partition(ctx, X, N, mbits, B, lowband, LM, gain * mid, fill);
         }
     } else {
-        q = bits2pulses(m, i, LM, b);
-        curr_bits = pulses2bits(m, i, LM, q);
+        q = bits2pulses(&*m, i, LM, b);
+        curr_bits = pulses2bits(&*m, i, LM, q);
         (*ctx).remaining_bits -= curr_bits;
         while (*ctx).remaining_bits < 0 && q > 0 {
             (*ctx).remaining_bits += curr_bits;
             q -= 1;
-            curr_bits = pulses2bits(m, i, LM, q);
+            curr_bits = pulses2bits(&*m, i, LM, q);
             (*ctx).remaining_bits -= curr_bits;
         }
         if q != 0 {
             let K: i32 = get_pulses(q);
             if encode != 0 {
                 cm = alg_quant(
-                    X,
+                    std::slice::from_raw_parts_mut(X, N as usize),
                     N,
                     K,
                     spread,
@@ -1146,7 +1157,15 @@ unsafe fn quant_partition(
                     (*ctx).arch,
                 );
             } else {
-                cm = alg_unquant(X, N, K, spread, B, ec, gain);
+                cm = alg_unquant(
+                    std::slice::from_raw_parts_mut(X, N as usize),
+                    N,
+                    K,
+                    spread,
+                    B,
+                    ec,
+                    gain,
+                );
             }
         } else {
             let mut j: i32 = 0;
@@ -1181,7 +1200,12 @@ unsafe fn quant_partition(
                         }
                         cm = fill as u32;
                     }
-                    renormalise_vector(X, N, gain, (*ctx).arch);
+                    renormalise_vector(
+                        std::slice::from_raw_parts_mut(X, N as usize),
+                        N,
+                        gain,
+                        (*ctx).arch,
+                    );
                 }
             }
         }

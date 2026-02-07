@@ -632,7 +632,12 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     *X.as_mut_ptr().offset((boffs + j) as isize) = (seed as i32 >> 20) as celt_norm;
                     j += 1;
                 }
-                renormalise_vector(X.as_mut_ptr().offset(boffs as isize), blen, Q15ONE, st.arch);
+                renormalise_vector(
+                    &mut X[boffs as usize..(boffs + blen) as usize],
+                    blen,
+                    Q15ONE,
+                    st.arch,
+                );
                 i += 1;
             }
             c += 1;
@@ -1070,7 +1075,16 @@ pub unsafe fn celt_decode_with_ec(
     } else {
         0
     };
-    unquant_coarse_energy(mode, start, end, oldBandE, intra_ener, dec, C, LM);
+    unquant_coarse_energy(
+        &*mode,
+        start,
+        end,
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        intra_ener,
+        dec,
+        C,
+        LM,
+    );
     let vla = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla);
     tf_decode(start, end, isTransient, tf_res.as_mut_ptr(), LM, dec);
@@ -1148,19 +1162,19 @@ pub unsafe fn celt_decode_with_ec(
     let vla_4 = nbEBands as usize;
     let mut fine_priority: Vec<i32> = ::std::vec::from_elem(0, vla_4);
     codedBands = clt_compute_allocation(
-        mode,
+        &*mode,
         start,
         end,
-        offsets.as_mut_ptr(),
-        cap.as_mut_ptr(),
+        &offsets,
+        &cap,
         alloc_trim,
         &mut intensity,
         &mut dual_stereo,
         bits,
         &mut balance,
-        pulses.as_mut_ptr(),
-        fine_quant.as_mut_ptr(),
-        fine_priority.as_mut_ptr(),
+        &mut pulses,
+        &mut fine_quant,
+        &mut fine_priority,
         C,
         LM,
         dec,
@@ -1168,7 +1182,15 @@ pub unsafe fn celt_decode_with_ec(
         0,
         0,
     );
-    unquant_fine_energy(mode, start, end, oldBandE, fine_quant.as_mut_ptr(), dec, C);
+    unquant_fine_energy(
+        &*mode,
+        start,
+        end,
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &fine_quant,
+        dec,
+        C,
+    );
     c = 0;
     loop {
         memmove(
@@ -1224,12 +1246,12 @@ pub unsafe fn celt_decode_with_ec(
         anti_collapse_on = ec_dec_bits(dec, 1) as i32;
     }
     unquant_energy_finalise(
-        mode,
+        &*mode,
         start,
         end,
-        oldBandE,
-        fine_quant.as_mut_ptr(),
-        fine_priority.as_mut_ptr(),
+        std::slice::from_raw_parts_mut(oldBandE, (C * nbEBands) as usize),
+        &fine_quant,
+        &fine_priority,
         len * 8 - ec_tell(dec),
         dec,
         C,
