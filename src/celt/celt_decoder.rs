@@ -32,7 +32,7 @@ use crate::src::opus_defines::{
 use crate::varargs::VarArgs;
 
 pub use self::arch_h::{
-    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
+    celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
 };
 pub use self::stddef_h::NULL;
 
@@ -41,7 +41,6 @@ pub mod arch_h {
     pub type opus_val32 = f32;
     pub type celt_sig = f32;
     pub type celt_norm = f32;
-    pub type celt_ener = f32;
     pub const Q15ONE: f32 = 1.0f32;
     pub const VERY_SMALL: f32 = 1e-30f32;
     pub const CELT_SIG_SCALE: f32 = 32768.0f32;
@@ -308,10 +307,10 @@ unsafe fn celt_synthesis(
     if CC == 2 && C == 1 {
         let mut freq2: *mut celt_sig = 0 as *mut celt_sig;
         denormalise_bands(
-            mode,
-            X,
-            freq.as_mut_ptr(),
-            oldBandE,
+            &*mode,
+            std::slice::from_raw_parts(X, (C * N) as usize),
+            &mut freq,
+            std::slice::from_raw_parts(oldBandE, (C * nbEBands) as usize),
             start,
             effEnd,
             M,
@@ -368,10 +367,10 @@ unsafe fn celt_synthesis(
         let mut freq2_0: *mut celt_sig = 0 as *mut celt_sig;
         freq2_0 = (*out_syn.offset(0 as isize)).offset((overlap / 2) as isize);
         denormalise_bands(
-            mode,
-            X,
-            freq.as_mut_ptr(),
-            oldBandE,
+            &*mode,
+            std::slice::from_raw_parts(X, (C * N) as usize),
+            &mut freq,
+            std::slice::from_raw_parts(oldBandE, (C * nbEBands) as usize),
             start,
             effEnd,
             M,
@@ -379,10 +378,10 @@ unsafe fn celt_synthesis(
             silence,
         );
         denormalise_bands(
-            mode,
-            X.offset(N as isize),
-            freq2_0,
-            oldBandE.offset(nbEBands as isize),
+            &*mode,
+            std::slice::from_raw_parts(X.offset(N as isize), N as usize),
+            std::slice::from_raw_parts_mut(freq2_0, N as usize),
+            std::slice::from_raw_parts(oldBandE.offset(nbEBands as isize), nbEBands as usize),
             start,
             effEnd,
             M,
@@ -418,10 +417,13 @@ unsafe fn celt_synthesis(
         c = 0;
         loop {
             denormalise_bands(
-                mode,
-                X.offset((c * N) as isize),
-                freq.as_mut_ptr(),
-                oldBandE.offset((c * nbEBands) as isize),
+                &*mode,
+                std::slice::from_raw_parts(X.offset((c * N) as isize), N as usize),
+                &mut freq,
+                std::slice::from_raw_parts(
+                    oldBandE.offset((c * nbEBands) as isize),
+                    nbEBands as usize,
+                ),
                 start,
                 effEnd,
                 M,
@@ -1215,23 +1217,23 @@ pub unsafe fn celt_decode_with_ec(
     let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_6);
     quant_all_bands(
         0,
-        mode,
+        &*mode,
         start,
         end,
         X.as_mut_ptr(),
         if C == 2 {
             X.as_mut_ptr().offset(N as isize)
         } else {
-            NULL as *mut celt_norm
+            std::ptr::null_mut()
         },
-        collapse_masks.as_mut_ptr(),
-        NULL as *const celt_ener,
-        pulses.as_mut_ptr(),
+        &mut collapse_masks,
+        &[],
+        &mut pulses,
         shortBlocks,
         spread_decision,
         dual_stereo,
         intensity,
-        tf_res.as_mut_ptr(),
+        &mut tf_res,
         len * ((8) << BITRES) - anti_collapse_rsv,
         balance,
         dec,
@@ -1258,18 +1260,18 @@ pub unsafe fn celt_decode_with_ec(
     );
     if anti_collapse_on != 0 {
         anti_collapse(
-            mode,
-            X.as_mut_ptr(),
-            collapse_masks.as_mut_ptr(),
+            &*mode,
+            &mut X,
+            &mut collapse_masks,
             LM,
             C,
             N,
             start,
             end,
-            oldBandE,
-            oldLogE,
-            oldLogE2,
-            pulses.as_mut_ptr(),
+            std::slice::from_raw_parts(oldBandE, (2 * nbEBands) as usize),
+            std::slice::from_raw_parts(oldLogE, (2 * nbEBands) as usize),
+            std::slice::from_raw_parts(oldLogE2, (2 * nbEBands) as usize),
+            &pulses,
             st.rng,
             st.arch,
         );

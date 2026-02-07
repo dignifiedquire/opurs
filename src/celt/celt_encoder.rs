@@ -675,7 +675,7 @@ unsafe fn tf_analysis(
                         (0 * tmp_1.as_mut_ptr().offset_from(tmp.as_mut_ptr()) as i64) as u64,
                     ),
             );
-            haar1(tmp_1.as_mut_ptr(), N >> LM, (1) << LM);
+            haar1(&mut tmp_1, N >> LM, (1) << LM);
             L1 = l1_metric(tmp_1.as_mut_ptr(), N, LM + 1, bias);
             if L1 < best_L1 {
                 best_L1 = L1;
@@ -690,7 +690,7 @@ unsafe fn tf_analysis(
             } else {
                 B = k + 1;
             }
-            haar1(tmp.as_mut_ptr(), N >> k, (1) << k);
+            haar1(&mut tmp, N >> k, (1) << k);
             L1 = l1_metric(tmp.as_mut_ptr(), N, B, bias);
             if L1 < best_L1 {
                 best_L1 = L1;
@@ -2304,15 +2304,7 @@ pub unsafe fn celt_encode_with_ec(
             LM,
             (*st).upsample,
         );
-        compute_band_energies(
-            mode,
-            freq.as_mut_ptr(),
-            bandE.as_mut_ptr(),
-            effEnd,
-            C,
-            LM,
-            (*st).arch,
-        );
+        compute_band_energies(&*mode, &freq, &mut bandE, effEnd, C, LM, (*st).arch);
         amp2Log2(&*mode, effEnd, end, &bandE, &mut bandLogE2, C);
         i = 0;
         while i < C * nbEBands {
@@ -2339,15 +2331,7 @@ pub unsafe fn celt_encode_with_ec(
     if CC == 2 && C == 1 {
         tf_chan = 0;
     }
-    compute_band_energies(
-        mode,
-        freq.as_mut_ptr(),
-        bandE.as_mut_ptr(),
-        effEnd,
-        C,
-        LM,
-        (*st).arch,
-    );
+    compute_band_energies(&*mode, &freq, &mut bandE, effEnd, C, LM, (*st).arch);
     if (*st).lfe != 0 {
         i = 2;
         while i < end {
@@ -2565,15 +2549,7 @@ pub unsafe fn celt_encode_with_ec(
                 LM,
                 (*st).upsample,
             );
-            compute_band_energies(
-                mode,
-                freq.as_mut_ptr(),
-                bandE.as_mut_ptr(),
-                effEnd,
-                C,
-                LM,
-                (*st).arch,
-            );
+            compute_band_energies(&*mode, &freq, &mut bandE, effEnd, C, LM, (*st).arch);
             amp2Log2(&*mode, effEnd, end, &bandE, &mut bandLogE, C);
             i = 0;
             while i < C * nbEBands {
@@ -2588,15 +2564,7 @@ pub unsafe fn celt_encode_with_ec(
     }
     let vla_5 = (C * N) as usize;
     let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_5);
-    normalise_bands(
-        mode,
-        freq.as_mut_ptr(),
-        X.as_mut_ptr(),
-        bandE.as_mut_ptr(),
-        effEnd,
-        C,
-        M,
-    );
+    normalise_bands(&*mode, &freq, &mut X, &bandE, effEnd, C, M);
     enable_tf_analysis =
         (effectiveBytes >= 15 * C && hybrid == 0 && (*st).complexity >= 2 && (*st).lfe == 0) as i32;
     let vla_6 = nbEBands as usize;
@@ -2747,8 +2715,8 @@ pub unsafe fn celt_encode_with_ec(
             }
         } else {
             (*st).spread_decision = spreading_decision(
-                mode,
-                X.as_mut_ptr(),
+                &*mode,
+                &X,
                 &mut (*st).tonal_average,
                 (*st).spread_decision,
                 &mut (*st).hf_average,
@@ -2757,7 +2725,7 @@ pub unsafe fn celt_encode_with_ec(
                 effEnd,
                 C,
                 M,
-                spread_weight.as_mut_ptr(),
+                &spread_weight,
             );
         }
         ec_enc_icdf(enc, (*st).spread_decision, &spread_icdf, 5);
@@ -2872,8 +2840,8 @@ pub unsafe fn celt_encode_with_ec(
         }
         (*st).intensity = hysteresis_decision(
             (equiv_rate / 1000) as opus_val16,
-            intensity_thresholds.as_ptr(),
-            intensity_histeresis.as_ptr(),
+            &intensity_thresholds,
+            &intensity_histeresis,
             21,
             (*st).intensity,
         );
@@ -3123,23 +3091,23 @@ pub unsafe fn celt_encode_with_ec(
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
     quant_all_bands(
         1,
-        mode,
+        &*mode,
         start,
         end,
         X.as_mut_ptr(),
         if C == 2 {
             X.as_mut_ptr().offset(N as isize)
         } else {
-            NULL as *mut celt_norm
+            std::ptr::null_mut()
         },
-        collapse_masks.as_mut_ptr(),
-        bandE.as_mut_ptr(),
-        pulses.as_mut_ptr(),
+        &mut collapse_masks,
+        &bandE,
+        &mut pulses,
         shortBlocks,
         (*st).spread_decision,
         dual_stereo,
         (*st).intensity,
-        tf_res.as_mut_ptr(),
+        &mut tf_res,
         nbCompressedBytes * ((8) << BITRES) - anti_collapse_rsv,
         balance,
         enc,

@@ -19,7 +19,7 @@ fn test_bitexact_cos() {
     let mut last: i32 = 32767;
 
     for i in 64..=16320 {
-        let q = unsafe { bitexact_cos(i as i16) } as i32;
+        let q = bitexact_cos(i as i16) as i32;
         chk ^= q * i;
         let d = last - q;
         if d > max_d {
@@ -34,18 +34,14 @@ fn test_bitexact_cos() {
     assert_eq!(chk, 89408644, "bitexact_cos checksum mismatch: got {chk}");
     assert_eq!(max_d, 5, "bitexact_cos max delta: got {max_d}");
     assert_eq!(min_d, 0, "bitexact_cos min delta: got {min_d}");
+    assert_eq!(bitexact_cos(64) as i32, 32767, "bitexact_cos(64) failed");
     assert_eq!(
-        unsafe { bitexact_cos(64) } as i32,
-        32767,
-        "bitexact_cos(64) failed"
-    );
-    assert_eq!(
-        unsafe { bitexact_cos(16320) } as i32,
+        bitexact_cos(16320) as i32,
         200,
         "bitexact_cos(16320) failed"
     );
     assert_eq!(
-        unsafe { bitexact_cos(8192) } as i32,
+        bitexact_cos(8192) as i32,
         23171,
         "bitexact_cos(8192) failed"
     );
@@ -64,14 +60,14 @@ fn test_bitexact_log2tan() {
     let mut fail = false;
 
     for i in 64..8193 {
-        let mid = unsafe { bitexact_cos(i as i16) } as i32;
-        let side = unsafe { bitexact_cos((16384 - i) as i16) } as i32;
-        let q = unsafe { bitexact_log2tan(mid, side) };
+        let mid = bitexact_cos(i as i16) as i32;
+        let side = bitexact_cos((16384 - i) as i16) as i32;
+        let q = bitexact_log2tan(mid, side);
         chk ^= q * i;
         let d = last - q;
 
         // Symmetry: log2tan(mid, side) == -log2tan(side, mid)
-        if q != -1 * unsafe { bitexact_log2tan(side, mid) } {
+        if q != -1 * bitexact_log2tan(side, mid) {
             fail = true;
         }
 
@@ -92,17 +88,17 @@ fn test_bitexact_log2tan() {
     assert_eq!(max_d, 61, "bitexact_log2tan max delta: got {max_d}");
     assert_eq!(min_d, -2, "bitexact_log2tan min delta: got {min_d}");
     assert_eq!(
-        unsafe { bitexact_log2tan(32767, 200) },
+        bitexact_log2tan(32767, 200),
         15059,
         "bitexact_log2tan(32767, 200) failed"
     );
     assert_eq!(
-        unsafe { bitexact_log2tan(30274, 12540) },
+        bitexact_log2tan(30274, 12540),
         2611,
         "bitexact_log2tan(30274, 12540) failed"
     );
     assert_eq!(
-        unsafe { bitexact_log2tan(23171, 23171) },
+        bitexact_log2tan(23171, 23171),
         0,
         "bitexact_log2tan(23171, 23171) failed"
     );
