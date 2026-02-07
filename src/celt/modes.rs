@@ -1,19 +1,19 @@
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OpusCustomMode {
     pub(crate) Fs: i32,
-    pub(crate) overlap: usize,
+    pub overlap: usize,
     pub(crate) nbEBands: usize,
     pub(crate) effEBands: i32,
     pub(crate) preemph: [f32; 4],
     pub(crate) eBands: &'static [i16],
     pub(crate) maxLM: i32,
     pub(crate) nbShortMdcts: i32,
-    pub(crate) shortMdctSize: i32,
+    pub shortMdctSize: i32,
     pub(crate) nbAllocVectors: i32,
     pub(crate) allocVectors: &'static [u8],
     pub(crate) logN: &'static [i16],
-    pub(crate) window: &'static [f32],
-    pub(crate) mdct: MdctLookup<'static>,
+    pub window: &'static [f32],
+    pub mdct: MdctLookup<'static>,
     pub(crate) cache: PulseCache,
 }
 #[derive(Copy, Clone, Debug, PartialEq)]

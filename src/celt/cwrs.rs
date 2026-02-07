@@ -287,7 +287,7 @@ fn pvq_u(n: u32, k: u32) -> u32 {
 }
 
 #[inline]
-fn pvq_v(n: u32, k: u32) -> u32 {
+pub fn pvq_v(n: u32, k: u32) -> u32 {
     pvq_u(n, k) + pvq_u(n, k + 1)
 }
 
@@ -327,7 +327,7 @@ mod test {
     }
 }
 
-unsafe fn icwrs(mut _n: i32, mut _y: *const i32) -> u32 {
+pub unsafe fn icwrs(mut _n: i32, mut _y: *const i32) -> u32 {
     let mut i: u32 = 0;
     let mut j: u32 = 0;
     let mut k: u32 = 0;
@@ -355,7 +355,7 @@ pub unsafe fn encode_pulses(mut _y: *const i32, mut _n: i32, mut _k: i32, mut _e
     ec_enc_uint(&mut *_enc, icwrs(_n, _y), pvq_v(_n as u32, _k as u32));
 }
 
-unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus_val32 {
+pub unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus_val32 {
     let mut p: u32 = 0;
     let mut s: i32 = 0;
     let mut k0: i32 = 0;

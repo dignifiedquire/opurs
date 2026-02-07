@@ -26,16 +26,6 @@ mod celt {
     pub mod pitch;
     pub mod quant_bands;
     pub mod rate;
-    // pub mod tests {
-    //     pub mod test_unit_cwrs32;
-    //     pub mod test_unit_dft;
-    //     pub mod test_unit_entropy;
-    //     pub mod test_unit_laplace;
-    //     pub mod test_unit_mathops;
-    //     pub mod test_unit_mdct;
-    //     pub mod test_unit_rotation;
-    //     pub mod test_unit_types;
-    // } // mod tests
     pub mod vq;
     // stuff for structs that do not have a clear home, named after the header files
     pub mod float_cast;
@@ -247,3 +237,55 @@ pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 
 // expose opus_private
 pub use crate::src::opus_private;
+
+// =====
+// Internal re-exports for unit tests
+// =====
+// These expose CELT/SILK internals that are needed by tests in tests/.
+// Prefer pub(crate) in the source modules; these re-exports make them
+// accessible to integration tests without making the celt/silk modules public.
+pub mod internals {
+    // -- CELT mathops --
+    pub use crate::celt::mathops::{celt_cos_norm, celt_exp2, celt_log2, celt_sqrt, isqrt32};
+
+    // -- CELT bands (bitexact trig, spread constants) --
+    pub use crate::celt::bands::{bitexact_cos, bitexact_log2tan, SPREAD_NORMAL};
+
+    // -- CELT entropy coder --
+    pub use crate::celt::entcode::{ec_ctx, ec_get_error, ec_tell, ec_tell_frac};
+    pub use crate::celt::entdec::{
+        ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint, ec_dec_update,
+        ec_decode, ec_decode_bin,
+    };
+    pub use crate::celt::entenc::{
+        ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init,
+        ec_enc_patch_initial_bits, ec_enc_shrink, ec_enc_uint, ec_encode, ec_encode_bin,
+    };
+
+    // -- CELT laplace --
+    pub use crate::celt::laplace::{
+        ec_laplace_decode, ec_laplace_encode, LAPLACE_MINP, LAPLACE_NMIN,
+    };
+
+    // -- CELT CWRS --
+    pub use crate::celt::cwrs::{cwrsi, decode_pulses, encode_pulses, icwrs, pvq_v};
+
+    // -- CELT rate --
+    pub use crate::celt::rate::get_pulses;
+
+    // -- CELT VQ (rotation) --
+    pub use crate::celt::vq::exp_rotation;
+
+    // -- CELT FFT --
+    pub use crate::celt::kiss_fft::{kiss_fft_state, opus_fft_c, opus_fft_impl};
+
+    // -- CELT MDCT --
+    pub use crate::celt::mdct::{mdct_backward, mdct_forward};
+
+    // -- CELT modes (for FFT/MDCT state access) --
+    pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
+
+    // -- SILK LPC --
+    pub use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
+    pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
+}
