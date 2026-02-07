@@ -743,15 +743,13 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 }
             }
             {
-                // x needs ord history samples before the data start
+                // C: celt_fir(exc+MAX_PERIOD-exc_length, lpc+c*LPC_ORDER, fir_tmp, exc_length, LPC_ORDER)
+                // exc = _exc + LPC_ORDER, so exc+1024-exc_length = _exc + LPC_ORDER + 1024 - exc_length
+                // celt_fir_c needs ord history samples before, starting at _exc[1024 - exc_length]
                 let fir_ord = LPC_ORDER;
                 let fir_n = exc_length as usize;
-                let x_start = (1024 - exc_length as usize) - fir_ord;
-                // exc is _exc[LPC_ORDER..], so exc-relative offsets map to _exc[LPC_ORDER + offset]
-                // x_start in exc-relative = 1024 - exc_length - 24
-                // In _exc-relative = LPC_ORDER + 1024 - exc_length - 24 = 1024 - exc_length
-                let fir_x =
-                    std::slice::from_raw_parts(exc.offset(x_start as isize), fir_ord + fir_n);
+                let fir_start = 1024 - fir_n; // index into _exc
+                let fir_x = &_exc[fir_start..fir_start + fir_ord + fir_n];
                 let fir_num = std::slice::from_raw_parts(
                     lpc.offset((c * LPC_ORDER as i32) as isize),
                     fir_ord,
