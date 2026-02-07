@@ -43,7 +43,7 @@ use crate::celt::entenc::{
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
 use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
-use crate::celt::pitch::{celt_inner_prod_c, pitch_downsample, pitch_search, remove_doubling};
+use crate::celt::pitch::{celt_inner_prod, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
 };
@@ -910,14 +910,16 @@ unsafe fn alloc_trim_analysis(
         i = 0;
         while i < 8 {
             let mut partial: opus_val32 = 0.;
-            partial = celt_inner_prod_c(
-                &*X.offset(((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as isize),
-                &*X.offset(
-                    (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as isize,
-                ),
-                (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                    - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                    << LM,
+            let band_off = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
+            let band_off2 =
+                (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
+            let band_len = ((*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
+                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
+                << LM) as usize;
+            partial = celt_inner_prod(
+                std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
+                std::slice::from_raw_parts(X.offset(band_off2 as isize), band_len),
+                band_len,
             );
             sum = sum + partial;
             i += 1;
@@ -932,14 +934,16 @@ unsafe fn alloc_trim_analysis(
         i = 8;
         while i < intensity {
             let mut partial_0: opus_val32 = 0.;
-            partial_0 = celt_inner_prod_c(
-                &*X.offset(((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as isize),
-                &*X.offset(
-                    (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as isize,
-                ),
-                (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                    - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                    << LM,
+            let band_off = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
+            let band_off2 =
+                (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
+            let band_len = ((*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
+                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
+                << LM) as usize;
+            partial_0 = celt_inner_prod(
+                std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
+                std::slice::from_raw_parts(X.offset(band_off2 as isize), band_len),
+                band_len,
             );
             minXC = if minXC < (partial_0).abs() {
                 minXC
@@ -1576,33 +1580,31 @@ unsafe fn run_prefilter(
     if enabled != 0 {
         let vla_0 = (1024 + N >> 1) as usize;
         let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
-        pitch_downsample(
-            pre.as_mut_ptr() as *mut *mut celt_sig,
-            pitch_buf.as_mut_ptr(),
-            COMBFILTER_MAXPERIOD + N,
-            CC,
-            (*st).arch,
-        );
-        pitch_search(
-            pitch_buf
-                .as_mut_ptr()
-                .offset((COMBFILTER_MAXPERIOD >> 1) as isize),
-            pitch_buf.as_mut_ptr(),
+        {
+            let ds_len = (COMBFILTER_MAXPERIOD + N) as usize;
+            let ch0 = std::slice::from_raw_parts(pre[0], ds_len);
+            if CC == 2 {
+                let ch1 = std::slice::from_raw_parts(pre[1], ds_len);
+                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), ds_len);
+            } else {
+                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), ds_len);
+            }
+        }
+        pitch_index = pitch_search(
+            &pitch_buf[(COMBFILTER_MAXPERIOD >> 1) as usize..],
+            pitch_buf.as_slice(),
             N,
             COMBFILTER_MAXPERIOD - 3 * COMBFILTER_MINPERIOD,
-            &mut pitch_index,
-            (*st).arch,
         );
         pitch_index = COMBFILTER_MAXPERIOD - pitch_index;
         gain1 = remove_doubling(
-            pitch_buf.as_mut_ptr(),
+            pitch_buf.as_slice(),
             COMBFILTER_MAXPERIOD,
             COMBFILTER_MINPERIOD,
             N,
             &mut pitch_index,
             (*st).prefilter_period,
             (*st).prefilter_gain,
-            (*st).arch,
         );
         if pitch_index > COMBFILTER_MAXPERIOD - 2 {
             pitch_index = COMBFILTER_MAXPERIOD - 2;

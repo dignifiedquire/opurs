@@ -1,3 +1,4 @@
+/// Upstream C: celt/modes.h:OpusCustomMode
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OpusCustomMode {
     pub(crate) Fs: i32,
@@ -16,6 +17,7 @@ pub struct OpusCustomMode {
     pub mdct: MdctLookup<'static>,
     pub(crate) cache: PulseCache,
 }
+/// Upstream C: celt/modes.h:PulseCache
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PulseCache {
     pub size: i32,
@@ -48,6 +50,7 @@ static band_allocation: [u8; 231] = [
     104,
 ];
 
+/// Upstream C: celt/modes.c:opus_custom_mode_create
 pub fn opus_custom_mode_create(
     Fs: i32,
     frame_size: i32,

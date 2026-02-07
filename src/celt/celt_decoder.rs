@@ -16,7 +16,7 @@ use crate::celt::entdec::{
 use crate::celt::mathops::celt_sqrt;
 use crate::celt::mdct::mdct_backward;
 use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode, MAX_PERIOD};
-use crate::celt::pitch::{pitch_downsample, pitch_search};
+use crate::celt::pitch;
 use crate::celt::quant_bands::{
     unquant_coarse_energy, unquant_energy_finalise, unquant_fine_energy,
 };
@@ -516,25 +516,21 @@ unsafe fn tf_decode(
         i += 1;
     }
 }
-unsafe fn celt_plc_pitch_search(decode_mem: *mut *mut celt_sig, C: i32, arch: i32) -> i32 {
-    let mut pitch_index: i32 = 0;
+unsafe fn celt_plc_pitch_search(decode_mem: *mut *mut celt_sig, C: i32, _arch: i32) -> i32 {
     let mut lp_pitch_buf: [opus_val16; 1024] = [0.; 1024];
-    pitch_downsample(
-        decode_mem as *mut *mut celt_sig,
-        lp_pitch_buf.as_mut_ptr(),
-        DECODE_BUFFER_SIZE as i32,
-        C,
-        arch,
-    );
-    pitch_search(
-        lp_pitch_buf
-            .as_mut_ptr()
-            .offset((PLC_PITCH_LAG_MAX >> 1) as isize),
-        lp_pitch_buf.as_mut_ptr(),
+    let ds_len = DECODE_BUFFER_SIZE;
+    let ch0 = std::slice::from_raw_parts(*decode_mem.offset(0), ds_len);
+    if C == 2 {
+        let ch1 = std::slice::from_raw_parts(*decode_mem.offset(1), ds_len);
+        pitch::pitch_downsample(&[ch0, ch1], &mut lp_pitch_buf, ds_len);
+    } else {
+        pitch::pitch_downsample(&[ch0], &mut lp_pitch_buf, ds_len);
+    }
+    let mut pitch_index = pitch::pitch_search(
+        &lp_pitch_buf[(PLC_PITCH_LAG_MAX >> 1) as usize..],
+        &lp_pitch_buf,
         DECODE_BUFFER_SIZE as i32 - PLC_PITCH_LAG_MAX,
         PLC_PITCH_LAG_MAX - PLC_PITCH_LAG_MIN,
-        &mut pitch_index,
-        arch,
     );
     pitch_index = PLC_PITCH_LAG_MAX - pitch_index;
     return pitch_index;

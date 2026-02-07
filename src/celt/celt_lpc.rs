@@ -1,4 +1,4 @@
-use crate::celt::pitch::{celt_pitch_xcorr_c, xcorr_kernel_c};
+use crate::celt::pitch::{celt_pitch_xcorr, xcorr_kernel};
 
 pub const LPC_ORDER: usize = 24;
 
@@ -64,16 +64,7 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
         sum[1] = x[ord + ix + 1];
         sum[2] = x[ord + ix + 2];
         sum[3] = x[ord + ix + 3];
-        // SAFETY: xcorr_kernel_c reads rnum[0..ord] and y_ptr[0..ord+3], writes sum[0..4].
-        // All within bounds of our slices.
-        unsafe {
-            xcorr_kernel_c(
-                rnum.as_ptr(),
-                x[ix..].as_ptr(),
-                sum.as_mut_ptr(),
-                ord as i32,
-            );
-        }
+        xcorr_kernel(&rnum, &x[ix..], &mut sum, ord);
         y[ix] = sum[0];
         y[ix + 1] = sum[1];
         y[ix + 2] = sum[2];
@@ -124,16 +115,7 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
         sum[1] = buf[ix + 1];
         sum[2] = buf[ix + 2];
         sum[3] = buf[ix + 3];
-        // SAFETY: xcorr_kernel_c reads rden[0..ord] and yy[ix..ix+ord+3], writes sum[0..4].
-        // All within bounds.
-        unsafe {
-            xcorr_kernel_c(
-                rden.as_ptr(),
-                yy[ix..].as_ptr(),
-                sum.as_mut_ptr(),
-                ord as i32,
-            );
-        }
+        xcorr_kernel(&rden, &yy[ix..], &mut sum, ord);
         yy[ix + ord] = -sum[0];
         buf[ix] = sum[0];
         sum[1] += yy[ix + ord] * den[0];
@@ -202,18 +184,7 @@ pub fn _celt_autocorr(
         xptr = x;
     }
 
-    // SAFETY: celt_pitch_xcorr_c takes raw pointers but only reads xptr[0..n]
-    // and writes ac[0..lag+1]. Both are within bounds of our slices.
-    unsafe {
-        celt_pitch_xcorr_c(
-            xptr.as_ptr(),
-            xptr.as_ptr(),
-            ac.as_mut_ptr(),
-            fast_n as i32,
-            (lag + 1) as i32,
-            0,
-        );
-    }
+    celt_pitch_xcorr(xptr, xptr, &mut ac[..lag + 1], fast_n);
 
     for k in 0..=lag {
         let mut d = 0.0f32;

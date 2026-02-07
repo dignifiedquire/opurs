@@ -64,26 +64,11 @@ Key: `qb` = quant_bands.rs
 
 ### Stage 2.3 — Mid-level DSP
 
-- [ ] `modes.rs` (including `modes/static_modes_float_h.rs`)
-  - Upstream C: `celt/modes.h`, `celt/modes.c`
-  - Functions: `opus_custom_mode_create`
-  - Scope: Mode tables and configuration structs
-  - Risk: Low — mostly static data, some allocation
-- [ ] `kiss_fft.rs`
-  - Upstream C: `celt/kiss_fft.h`, `celt/kiss_fft.c`
-  - Functions: FFT butterfly operations, `opus_fft_impl`, `opus_fft`, `opus_ifft`
-  - Risk: High — complex pointer arithmetic in butterfly loops
-  - Pattern: Convert twiddle factor access to slice indexing
-- [ ] `mdct.rs`
-  - Upstream C: `celt/mdct.h`, `celt/mdct.c`
-  - Functions: `clt_mdct_forward`, `clt_mdct_backward`
-  - Risk: Medium — uses kiss_fft, pointer strides
-  - Depends on: kiss_fft safe
-- [ ] `pitch.rs`
-  - Upstream C: `celt/pitch.h`, `celt/pitch.c`
-  - Functions: `pitch_downsample`, `pitch_search`, `remove_doubling`, `dual_inner_prod_c`, `xcorr_kernel_c`, `celt_inner_prod_c`
-  - Risk: High — inner product kernels with pointer arithmetic
-  - Pattern: Convert `*const f32` + stride → slice iteration
+- [x] `modes.rs` — already safe, added upstream comments
+- [x] `kiss_fft.rs` — already safe (`#![forbid(unsafe_code)]`), added upstream comments
+- [x] `mdct.rs` — already safe (0 unsafe fn, 2 isolated unsafe blocks in ndutil), added upstream comments
+- [x] `pitch.rs` — converted all 10 functions to safe slice APIs, removed `arch_h` module, `static mut second_check` → `const SECOND_CHECK`
+  - Also removed remaining unsafe blocks from `celt_lpc.rs` (Stage 2.1 holdover)
 - [ ] `rate.rs`
   - Upstream C: `celt/rate.h`, `celt/rate.c`
   - Functions: `clt_compute_allocation`, `bits2pulses`, `pulses2bits`

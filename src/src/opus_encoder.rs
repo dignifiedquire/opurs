@@ -37,7 +37,7 @@ use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_done, ec_enc_init, ec_enc_shri
 use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::modes::OpusCustomMode;
-use crate::celt::pitch::celt_inner_prod_c;
+use crate::celt::pitch::celt_inner_prod;
 use crate::externs::{memcpy, memmove, memset};
 use crate::silk::define::{
     DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX, VAD_NO_DECISION,
@@ -951,7 +951,8 @@ unsafe fn compute_frame_energy(
     _arch: i32,
 ) -> opus_val32 {
     let len: i32 = frame_size * channels;
-    return celt_inner_prod_c(pcm, pcm, len) / len as f32;
+    let s = std::slice::from_raw_parts(pcm, len as usize);
+    return celt_inner_prod(s, s, len as usize) / len as f32;
 }
 unsafe fn decide_dtx_mode(
     activity_probability: f32,
@@ -1797,15 +1798,11 @@ pub unsafe fn opus_encode_native(
     }
     if float_api != 0 {
         let mut sum: opus_val32 = 0.;
-        sum = celt_inner_prod_c(
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
-            frame_size * (*st).channels,
-        );
+        {
+            let off = (total_buffer * (*st).channels) as usize;
+            let n = (frame_size * (*st).channels) as usize;
+            sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n);
+        }
         if !(sum < 1e9f32) || sum != sum {
             memset(
                 &mut *pcm_buf

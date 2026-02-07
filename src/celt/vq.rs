@@ -12,7 +12,7 @@ use crate::celt::entcode::celt_udiv;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entenc::ec_enc;
 use crate::celt::mathops::{celt_cos_norm, celt_rsqrt_norm, celt_sqrt, fast_atan2f};
-use crate::celt::pitch::celt_inner_prod_c;
+use crate::celt::pitch::celt_inner_prod;
 
 unsafe fn exp_rotation1(X: *mut celt_norm, len: i32, stride: i32, c: opus_val16, s: opus_val16) {
     let mut i: i32 = 0;
@@ -322,7 +322,12 @@ pub unsafe fn renormalise_vector(X: *mut celt_norm, N: i32, gain: opus_val16, _a
     let mut g: opus_val16 = 0.;
     let mut t: opus_val32 = 0.;
     let mut xptr: *mut celt_norm = 0 as *mut celt_norm;
-    E = EPSILON + celt_inner_prod_c(X, X, N);
+    E = EPSILON
+        + celt_inner_prod(
+            std::slice::from_raw_parts(X, N as usize),
+            std::slice::from_raw_parts(X, N as usize),
+            N as usize,
+        );
     t = E;
     g = celt_rsqrt_norm(t) * gain;
     xptr = X;
@@ -360,8 +365,16 @@ pub unsafe fn stereo_itheta(
             i += 1;
         }
     } else {
-        Emid += celt_inner_prod_c(X, X, N);
-        Eside += celt_inner_prod_c(Y, Y, N);
+        Emid += celt_inner_prod(
+            std::slice::from_raw_parts(X, N as usize),
+            std::slice::from_raw_parts(X, N as usize),
+            N as usize,
+        );
+        Eside += celt_inner_prod(
+            std::slice::from_raw_parts(Y, N as usize),
+            std::slice::from_raw_parts(Y, N as usize),
+            N as usize,
+        );
     }
     mid = celt_sqrt(Emid);
     side = celt_sqrt(Eside);

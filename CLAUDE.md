@@ -161,6 +161,10 @@ GitHub Actions runs on Ubuntu, macOS (x86 + ARM), Windows:
 1. `cargo test --all` in both `dev` and `release` profiles
 2. Vector tests: downloads IETF test vectors, runs `run_vectors2` in release mode
 
+## Tool Preferences
+
+- Always use `rg` (ripgrep) instead of `grep` for searching
+
 ## Dependencies
 
 **Runtime**: num-traits, num-complex, bytemuck, arrayref, const-chunks, ndarray, nalgebra, itertools

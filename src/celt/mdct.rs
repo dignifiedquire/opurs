@@ -11,6 +11,7 @@ use num_complex::Complex;
 use num_traits::Zero as _;
 use std::ops::Neg as _;
 
+/// Upstream C: celt/mdct.h:mdct_lookup
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MdctLookup<'a> {
     pub n: usize,
@@ -70,6 +71,7 @@ mod ndutil {
     }
 }
 
+/// Upstream C: celt/mdct.c:clt_mdct_forward_c
 pub fn mdct_forward(
     l: &MdctLookup,
     input: &[f32],
@@ -202,6 +204,7 @@ pub fn mdct_forward(
     }
 }
 
+/// Upstream C: celt/mdct.c:clt_mdct_backward_c
 pub fn mdct_backward(
     l: &MdctLookup,
     input: &[f32],

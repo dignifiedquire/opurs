@@ -24,7 +24,7 @@ use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_uint, ec_dec_upda
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint, ec_encode};
 use crate::celt::mathops::{celt_exp2, celt_rsqrt, celt_rsqrt_norm, celt_sqrt, isqrt32};
 use crate::celt::modes::OpusCustomMode;
-use crate::celt::pitch::{celt_inner_prod_c, dual_inner_prod_c};
+use crate::celt::pitch::{celt_inner_prod, dual_inner_prod};
 use crate::celt::quant_bands::eMeans;
 use crate::celt::rate::{
     bits2pulses, get_pulses, pulses2bits, QTHETA_OFFSET, QTHETA_OFFSET_TWOPHASE,
@@ -149,12 +149,15 @@ pub unsafe fn compute_band_energies(
         i = 0;
         while i < end {
             let mut sum: opus_val32 = 0.;
+            let band_off = (c * N + ((*eBands.offset(i as isize) as i32) << LM)) as usize;
+            let band_len = ((*eBands.offset((i + 1) as isize) as i32
+                - *eBands.offset(i as isize) as i32)
+                << LM) as usize;
             sum = 1e-27f32
-                + celt_inner_prod_c(
-                    &*X.offset((c * N + ((*eBands.offset(i as isize) as i32) << LM)) as isize),
-                    &*X.offset((c * N + ((*eBands.offset(i as isize) as i32) << LM)) as isize),
-                    (*eBands.offset((i + 1) as isize) as i32 - *eBands.offset(i as isize) as i32)
-                        << LM,
+                + celt_inner_prod(
+                    std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
+                    std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
+                    band_len,
                 );
             *bandE.offset((i + c * (*m).nbEBands as i32) as isize) = celt_sqrt(sum);
             i += 1;
@@ -424,7 +427,15 @@ unsafe fn stereo_merge(X: *mut celt_norm, Y: *mut celt_norm, mid: opus_val16, N:
     let mut t: opus_val32 = 0.;
     let mut lgain: opus_val32 = 0.;
     let mut rgain: opus_val32 = 0.;
-    dual_inner_prod_c(Y, X, Y, N, &mut xp, &mut side);
+    let n = N as usize;
+    let (xp_val, side_val) = dual_inner_prod(
+        std::slice::from_raw_parts(Y, n),
+        std::slice::from_raw_parts(X, n),
+        std::slice::from_raw_parts(Y, n),
+        n,
+    );
+    xp = xp_val;
+    side = side_val;
     xp = mid * xp;
     mid2 = mid;
     El = mid2 * mid2 + side - 2 as f32 * xp;
@@ -1938,8 +1949,18 @@ pub unsafe fn quant_all_bands(
                         lowband_scratch,
                         cm as i32,
                     );
-                    dist0 = w[0 as usize] * celt_inner_prod_c(X_save.as_mut_ptr(), X, N)
-                        + w[1 as usize] * celt_inner_prod_c(Y_save.as_mut_ptr(), Y, N);
+                    dist0 = w[0 as usize]
+                        * celt_inner_prod(
+                            &X_save,
+                            std::slice::from_raw_parts(X, N as usize),
+                            N as usize,
+                        )
+                        + w[1 as usize]
+                            * celt_inner_prod(
+                                &Y_save,
+                                std::slice::from_raw_parts(Y, N as usize),
+                                N as usize,
+                            );
                     cm2 = x_cm;
                     ec_save2 = (*ec).save();
                     ctx_save2 = ctx;
@@ -2030,8 +2051,18 @@ pub unsafe fn quant_all_bands(
                         lowband_scratch,
                         cm as i32,
                     );
-                    dist1 = w[0 as usize] * celt_inner_prod_c(X_save.as_mut_ptr(), X, N)
-                        + w[1 as usize] * celt_inner_prod_c(Y_save.as_mut_ptr(), Y, N);
+                    dist1 = w[0 as usize]
+                        * celt_inner_prod(
+                            &X_save,
+                            std::slice::from_raw_parts(X, N as usize),
+                            N as usize,
+                        )
+                        + w[1 as usize]
+                            * celt_inner_prod(
+                                &Y_save,
+                                std::slice::from_raw_parts(Y, N as usize),
+                                N as usize,
+                            );
                     if dist0 >= dist1 {
                         x_cm = cm2;
                         (*ec).restore(ec_save2);

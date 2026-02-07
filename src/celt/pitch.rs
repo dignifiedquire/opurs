@@ -1,424 +1,323 @@
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-    pub type celt_sig = f32;
-    pub const Q15ONE: f32 = 1.0f32;
-}
-pub use self::arch_h::{celt_sig, opus_val16, opus_val32, Q15ONE};
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
 
+/// Upstream C: celt/pitch.c:dual_inner_prod_c
+///
+/// Computes two inner products simultaneously: `(x . y01, x . y02)`.
+/// All slices must have at least `n` elements.
 #[inline]
-pub unsafe fn dual_inner_prod_c(
-    x: *const opus_val16,
-    y01: *const opus_val16,
-    y02: *const opus_val16,
-    N: i32,
-    xy1: *mut opus_val32,
-    xy2: *mut opus_val32,
-) {
-    let mut i: i32 = 0;
-    let mut xy01: opus_val32 = 0 as opus_val32;
-    let mut xy02: opus_val32 = 0 as opus_val32;
-    i = 0;
-    while i < N {
-        xy01 = xy01 + *x.offset(i as isize) * *y01.offset(i as isize);
-        xy02 = xy02 + *x.offset(i as isize) * *y02.offset(i as isize);
-        i += 1;
+pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+    let mut xy01: f32 = 0.0;
+    let mut xy02: f32 = 0.0;
+    for i in 0..n {
+        xy01 += x[i] * y01[i];
+        xy02 += x[i] * y02[i];
     }
-    *xy1 = xy01;
-    *xy2 = xy02;
-}
-#[inline]
-pub unsafe fn xcorr_kernel_c(
-    mut x: *const opus_val16,
-    mut y: *const opus_val16,
-    sum: *mut opus_val32,
-    len: i32,
-) {
-    let mut j: i32 = 0;
-    let mut y_0: opus_val16 = 0.;
-    let mut y_1: opus_val16 = 0.;
-    let mut y_2: opus_val16 = 0.;
-    let mut y_3: opus_val16 = 0.;
-    assert!(len >= 3);
-    y_3 = 0 as opus_val16;
-    let fresh0 = y;
-    y = y.offset(1);
-    y_0 = *fresh0;
-    let fresh1 = y;
-    y = y.offset(1);
-    y_1 = *fresh1;
-    let fresh2 = y;
-    y = y.offset(1);
-    y_2 = *fresh2;
-    j = 0;
-    while j < len - 3 {
-        let mut tmp: opus_val16 = 0.;
-        let fresh3 = x;
-        x = x.offset(1);
-        tmp = *fresh3;
-        let fresh4 = y;
-        y = y.offset(1);
-        y_3 = *fresh4;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp * y_0;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp * y_1;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp * y_2;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp * y_3;
-        let fresh5 = x;
-        x = x.offset(1);
-        tmp = *fresh5;
-        let fresh6 = y;
-        y = y.offset(1);
-        y_0 = *fresh6;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp * y_1;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp * y_2;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp * y_3;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp * y_0;
-        let fresh7 = x;
-        x = x.offset(1);
-        tmp = *fresh7;
-        let fresh8 = y;
-        y = y.offset(1);
-        y_1 = *fresh8;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp * y_2;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp * y_3;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp * y_0;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp * y_1;
-        let fresh9 = x;
-        x = x.offset(1);
-        tmp = *fresh9;
-        let fresh10 = y;
-        y = y.offset(1);
-        y_2 = *fresh10;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp * y_3;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp * y_0;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp * y_1;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp * y_2;
-        j += 4;
-    }
-    let fresh11 = j;
-    j = j + 1;
-    if fresh11 < len {
-        let fresh12 = x;
-        x = x.offset(1);
-        let tmp_0: opus_val16 = *fresh12;
-        let fresh13 = y;
-        y = y.offset(1);
-        y_3 = *fresh13;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp_0 * y_0;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp_0 * y_1;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp_0 * y_2;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp_0 * y_3;
-    }
-    let fresh14 = j;
-    j = j + 1;
-    if fresh14 < len {
-        let fresh15 = x;
-        x = x.offset(1);
-        let tmp_1: opus_val16 = *fresh15;
-        let fresh16 = y;
-        y = y.offset(1);
-        y_0 = *fresh16;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp_1 * y_1;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp_1 * y_2;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp_1 * y_3;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp_1 * y_0;
-    }
-    if j < len {
-        let fresh17 = x;
-        x = x.offset(1);
-        let tmp_2: opus_val16 = *fresh17;
-        let fresh18 = y;
-        y = y.offset(1);
-        y_1 = *fresh18;
-        *sum.offset(0 as isize) = *sum.offset(0 as isize) + tmp_2 * y_2;
-        *sum.offset(1 as isize) = *sum.offset(1 as isize) + tmp_2 * y_3;
-        *sum.offset(2 as isize) = *sum.offset(2 as isize) + tmp_2 * y_0;
-        *sum.offset(3 as isize) = *sum.offset(3 as isize) + tmp_2 * y_1;
-    }
-}
-#[inline]
-pub unsafe fn celt_inner_prod_c(x: *const opus_val16, y: *const opus_val16, N: i32) -> opus_val32 {
-    let mut i: i32 = 0;
-    let mut xy: opus_val32 = 0 as opus_val32;
-    i = 0;
-    while i < N {
-        xy = xy + *x.offset(i as isize) * *y.offset(i as isize);
-        i += 1;
-    }
-    return xy;
+    (xy01, xy02)
 }
 
-unsafe fn find_best_pitch(
-    xcorr: *mut opus_val32,
-    y: *mut opus_val16,
-    len: i32,
-    max_pitch: i32,
-    best_pitch: *mut i32,
-) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut Syy: opus_val32 = 1 as opus_val32;
-    let mut best_num: [opus_val16; 2] = [0.; 2];
-    let mut best_den: [opus_val32; 2] = [0.; 2];
-    best_num[0 as usize] = -1 as opus_val16;
-    best_num[1 as usize] = -1 as opus_val16;
-    best_den[0 as usize] = 0 as opus_val32;
-    best_den[1 as usize] = 0 as opus_val32;
-    *best_pitch.offset(0 as isize) = 0;
-    *best_pitch.offset(1 as isize) = 1;
-    j = 0;
-    while j < len {
-        Syy = Syy + *y.offset(j as isize) * *y.offset(j as isize);
+/// Upstream C: celt/pitch.c:xcorr_kernel_c
+///
+/// 4-way cross-correlation kernel. Computes 4 consecutive correlation values.
+/// `x` must have at least `len` elements.
+/// `y` must have at least `len + 3` elements.
+/// Results are accumulated into `sum[0..4]`.
+#[inline]
+pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+    assert!(len >= 3);
+    let mut y_0: f32;
+    let mut y_1: f32;
+    let mut y_2: f32;
+    let mut y_3: f32 = 0.0;
+    let mut xi = 0usize;
+    let mut yi = 0usize;
+    y_0 = y[yi];
+    yi += 1;
+    y_1 = y[yi];
+    yi += 1;
+    y_2 = y[yi];
+    yi += 1;
+    let mut j = 0usize;
+    while j < len - 3 {
+        let tmp = x[xi];
+        xi += 1;
+        y_3 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_0;
+        sum[1] += tmp * y_1;
+        sum[2] += tmp * y_2;
+        sum[3] += tmp * y_3;
+
+        let tmp = x[xi];
+        xi += 1;
+        y_0 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_1;
+        sum[1] += tmp * y_2;
+        sum[2] += tmp * y_3;
+        sum[3] += tmp * y_0;
+
+        let tmp = x[xi];
+        xi += 1;
+        y_1 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_2;
+        sum[1] += tmp * y_3;
+        sum[2] += tmp * y_0;
+        sum[3] += tmp * y_1;
+
+        let tmp = x[xi];
+        xi += 1;
+        y_2 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_3;
+        sum[1] += tmp * y_0;
+        sum[2] += tmp * y_1;
+        sum[3] += tmp * y_2;
+
+        j += 4;
+    }
+    if j < len {
+        let tmp = x[xi];
+        xi += 1;
+        y_3 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_0;
+        sum[1] += tmp * y_1;
+        sum[2] += tmp * y_2;
+        sum[3] += tmp * y_3;
         j += 1;
     }
-    i = 0;
-    while i < max_pitch {
-        if *xcorr.offset(i as isize) > 0 as f32 {
-            let mut num: opus_val16 = 0.;
-            let mut xcorr16: opus_val32 = 0.;
-            xcorr16 = *xcorr.offset(i as isize);
-            xcorr16 *= 1e-12f32;
-            num = xcorr16 * xcorr16;
-            if num * best_den[1 as usize] > best_num[1 as usize] * Syy {
-                if num * best_den[0 as usize] > best_num[0 as usize] * Syy {
-                    best_num[1 as usize] = best_num[0 as usize];
-                    best_den[1 as usize] = best_den[0 as usize];
-                    *best_pitch.offset(1 as isize) = *best_pitch.offset(0 as isize);
-                    best_num[0 as usize] = num;
-                    best_den[0 as usize] = Syy;
-                    *best_pitch.offset(0 as isize) = i;
+    if j < len {
+        let tmp = x[xi];
+        xi += 1;
+        y_0 = y[yi];
+        yi += 1;
+        sum[0] += tmp * y_1;
+        sum[1] += tmp * y_2;
+        sum[2] += tmp * y_3;
+        sum[3] += tmp * y_0;
+        j += 1;
+    }
+    if j < len {
+        let tmp = x[xi];
+        y_1 = y[yi];
+        sum[0] += tmp * y_2;
+        sum[1] += tmp * y_3;
+        sum[2] += tmp * y_0;
+        sum[3] += tmp * y_1;
+    }
+}
+
+/// Upstream C: celt/pitch.c:celt_inner_prod_c
+///
+/// Computes the inner product (dot product) of `x` and `y`.
+/// Both slices must have at least `N` elements.
+#[inline]
+pub fn celt_inner_prod(x: &[f32], y: &[f32], N: usize) -> f32 {
+    let mut xy: f32 = 0.0;
+    for i in 0..N {
+        xy += x[i] * y[i];
+    }
+    xy
+}
+
+/// Upstream C: celt/pitch.c:find_best_pitch
+///
+/// Finds the two best pitch candidates from cross-correlation values.
+/// Returns `[best_pitch_0, best_pitch_1]`.
+fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i32; 2] {
+    let mut Syy: f32 = 1.0;
+    let mut best_num: [f32; 2] = [-1.0, -1.0];
+    let mut best_den: [f32; 2] = [0.0, 0.0];
+    let mut best_pitch: [i32; 2] = [0, 1];
+    for j in 0..len {
+        Syy += y[j] * y[j];
+    }
+    for i in 0..max_pitch {
+        if xcorr[i] > 0.0 {
+            let xcorr16 = xcorr[i] * 1e-12f32;
+            let num = xcorr16 * xcorr16;
+            if num * best_den[1] > best_num[1] * Syy {
+                if num * best_den[0] > best_num[0] * Syy {
+                    best_num[1] = best_num[0];
+                    best_den[1] = best_den[0];
+                    best_pitch[1] = best_pitch[0];
+                    best_num[0] = num;
+                    best_den[0] = Syy;
+                    best_pitch[0] = i as i32;
                 } else {
-                    best_num[1 as usize] = num;
-                    best_den[1 as usize] = Syy;
-                    *best_pitch.offset(1 as isize) = i;
+                    best_num[1] = num;
+                    best_den[1] = Syy;
+                    best_pitch[1] = i as i32;
                 }
             }
         }
-        Syy += *y.offset((i + len) as isize) * *y.offset((i + len) as isize)
-            - *y.offset(i as isize) * *y.offset(i as isize);
-        Syy = if 1 as f32 > Syy { 1 as f32 } else { Syy };
-        i += 1;
+        Syy += y[i + len] * y[i + len] - y[i] * y[i];
+        Syy = 1.0f32.max(Syy);
     }
+    best_pitch
 }
-unsafe fn celt_fir5(x: *mut opus_val16, num: *const opus_val16, N: i32) {
-    let mut i: i32 = 0;
-    let mut num0: opus_val16 = 0.;
-    let mut num1: opus_val16 = 0.;
-    let mut num2: opus_val16 = 0.;
-    let mut num3: opus_val16 = 0.;
-    let mut num4: opus_val16 = 0.;
-    let mut mem0: opus_val32 = 0.;
-    let mut mem1: opus_val32 = 0.;
-    let mut mem2: opus_val32 = 0.;
-    let mut mem3: opus_val32 = 0.;
-    let mut mem4: opus_val32 = 0.;
-    num0 = *num.offset(0 as isize);
-    num1 = *num.offset(1 as isize);
-    num2 = *num.offset(2 as isize);
-    num3 = *num.offset(3 as isize);
-    num4 = *num.offset(4 as isize);
-    mem0 = 0 as opus_val32;
-    mem1 = 0 as opus_val32;
-    mem2 = 0 as opus_val32;
-    mem3 = 0 as opus_val32;
-    mem4 = 0 as opus_val32;
-    i = 0;
-    while i < N {
-        let mut sum: opus_val32 = *x.offset(i as isize);
-        sum = sum + num0 * mem0;
-        sum = sum + num1 * mem1;
-        sum = sum + num2 * mem2;
-        sum = sum + num3 * mem3;
-        sum = sum + num4 * mem4;
+
+/// Upstream C: celt/pitch.c:celt_fir5
+///
+/// 5-tap FIR filter applied in-place.
+fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
+    let num0 = num[0];
+    let num1 = num[1];
+    let num2 = num[2];
+    let num3 = num[3];
+    let num4 = num[4];
+    let mut mem0: f32 = 0.0;
+    let mut mem1: f32 = 0.0;
+    let mut mem2: f32 = 0.0;
+    let mut mem3: f32 = 0.0;
+    let mut mem4: f32 = 0.0;
+    for i in 0..x.len() {
+        let mut sum = x[i];
+        sum += num0 * mem0;
+        sum += num1 * mem1;
+        sum += num2 * mem2;
+        sum += num3 * mem3;
+        sum += num4 * mem4;
         mem4 = mem3;
         mem3 = mem2;
         mem2 = mem1;
         mem1 = mem0;
-        mem0 = *x.offset(i as isize);
-        *x.offset(i as isize) = sum;
-        i += 1;
+        mem0 = x[i];
+        x[i] = sum;
     }
 }
-pub unsafe fn pitch_downsample(
-    x: *mut *mut celt_sig,
-    x_lp: *mut opus_val16,
-    len: i32,
-    C: i32,
-    _arch: i32,
-) {
-    let mut i: i32 = 0;
-    let mut ac: [opus_val32; 5] = [0.; 5];
-    let mut tmp: opus_val16 = Q15ONE;
-    let mut lpc: [opus_val16; 4] = [0.; 4];
-    let mut lpc2: [opus_val16; 5] = [0.; 5];
-    let c1: opus_val16 = 0.8f32;
-    i = 1;
-    while i < len >> 1 {
-        *x_lp.offset(i as isize) = 0.5f32
-            * (0.5f32
-                * (*(*x.offset(0 as isize)).offset((2 * i - 1) as isize)
-                    + *(*x.offset(0 as isize)).offset((2 * i + 1) as isize))
-                + *(*x.offset(0 as isize)).offset((2 * i) as isize));
-        i += 1;
+
+/// Upstream C: celt/pitch.c:pitch_downsample
+///
+/// Downsamples and LPC-filters audio for pitch analysis.
+/// `x` contains 1 or 2 channel slices of length `len`.
+/// `x_lp` receives the downsampled output of length `len/2`.
+pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize) {
+    let C = x.len();
+    assert!(C == 1 || C == 2);
+    assert!(x[0].len() >= len);
+    let half = len >> 1;
+    assert!(x_lp.len() >= half);
+
+    let mut ac: [f32; 5] = [0.0; 5];
+    let mut tmp: f32 = 1.0;
+    let mut lpc: [f32; 4] = [0.0; 4];
+    let mut lpc2: [f32; 5] = [0.0; 5];
+    let c1: f32 = 0.8f32;
+
+    for i in 1..half {
+        x_lp[i] = 0.5f32 * (0.5f32 * (x[0][2 * i - 1] + x[0][2 * i + 1]) + x[0][2 * i]);
     }
-    *x_lp.offset(0 as isize) = 0.5f32
-        * (0.5f32 * *(*x.offset(0 as isize)).offset(1 as isize)
-            + *(*x.offset(0 as isize)).offset(0 as isize));
+    x_lp[0] = 0.5f32 * (0.5f32 * x[0][1] + x[0][0]);
+
     if C == 2 {
-        i = 1;
-        while i < len >> 1 {
-            let ref mut fresh19 = *x_lp.offset(i as isize);
-            *fresh19 += 0.5f32
-                * (0.5f32
-                    * (*(*x.offset(1 as isize)).offset((2 * i - 1) as isize)
-                        + *(*x.offset(1 as isize)).offset((2 * i + 1) as isize))
-                    + *(*x.offset(1 as isize)).offset((2 * i) as isize));
-            i += 1;
+        for i in 1..half {
+            x_lp[i] += 0.5f32 * (0.5f32 * (x[1][2 * i - 1] + x[1][2 * i + 1]) + x[1][2 * i]);
         }
-        let ref mut fresh20 = *x_lp.offset(0 as isize);
-        *fresh20 += 0.5f32
-            * (0.5f32 * *(*x.offset(1 as isize)).offset(1 as isize)
-                + *(*x.offset(1 as isize)).offset(0 as isize));
+        x_lp[0] += 0.5f32 * (0.5f32 * x[1][1] + x[1][0]);
     }
-    _celt_autocorr(
-        std::slice::from_raw_parts(x_lp, (len >> 1) as usize),
-        &mut ac,
-        None,
-        0,
-        4,
-    );
-    ac[0 as usize] *= 1.0001f32;
-    i = 1;
-    while i <= 4 {
-        ac[i as usize] -= ac[i as usize] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
-        i += 1;
+
+    _celt_autocorr(&x_lp[..half], &mut ac, None, 0, 4);
+
+    ac[0] *= 1.0001f32;
+    for i in 1..=4 {
+        ac[i] -= ac[i] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
     }
     _celt_lpc(&mut lpc, &ac);
-    i = 0;
-    while i < 4 {
+    for i in 0..4 {
         tmp = 0.9f32 * tmp;
-        lpc[i as usize] = lpc[i as usize] * tmp;
-        i += 1;
+        lpc[i] *= tmp;
     }
-    lpc2[0 as usize] = lpc[0 as usize] + 0.8f32;
-    lpc2[1 as usize] = lpc[1 as usize] + c1 * lpc[0 as usize];
-    lpc2[2 as usize] = lpc[2 as usize] + c1 * lpc[1 as usize];
-    lpc2[3 as usize] = lpc[3 as usize] + c1 * lpc[2 as usize];
-    lpc2[4 as usize] = c1 * lpc[3 as usize];
-    celt_fir5(x_lp, lpc2.as_mut_ptr(), len >> 1);
+    lpc2[0] = lpc[0] + 0.8f32;
+    lpc2[1] = lpc[1] + c1 * lpc[0];
+    lpc2[2] = lpc[2] + c1 * lpc[1];
+    lpc2[3] = lpc[3] + c1 * lpc[2];
+    lpc2[4] = c1 * lpc[3];
+    celt_fir5(&mut x_lp[..half], &lpc2);
 }
-pub unsafe fn celt_pitch_xcorr_c(
-    mut _x: *const opus_val16,
-    mut _y: *const opus_val16,
-    xcorr: *mut opus_val32,
-    len: i32,
-    max_pitch: i32,
-    _arch: i32,
-) {
-    let mut i: i32 = 0;
+
+/// Upstream C: celt/pitch.c:celt_pitch_xcorr_c
+///
+/// Cross-correlation for pitch analysis.
+/// `x` must have at least `len` elements.
+/// `y` must have at least `len + max_pitch` elements (where `max_pitch = xcorr.len()`).
+/// Results are written to `xcorr[0..max_pitch]`.
+pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+    let max_pitch = xcorr.len();
     assert!(max_pitch > 0);
-    i = 0;
-    while i < max_pitch - 3 {
-        let mut sum: [opus_val32; 4] = [
-            0 as opus_val32,
-            0 as opus_val32,
-            0 as opus_val32,
-            0 as opus_val32,
-        ];
-        xcorr_kernel_c(_x, _y.offset(i as isize), sum.as_mut_ptr(), len);
-        *xcorr.offset(i as isize) = sum[0 as usize];
-        *xcorr.offset((i + 1) as isize) = sum[1 as usize];
-        *xcorr.offset((i + 2) as isize) = sum[2 as usize];
-        *xcorr.offset((i + 3) as isize) = sum[3 as usize];
+    let mut i = 0i32;
+    while i < max_pitch as i32 - 3 {
+        let mut sum: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
+        xcorr_kernel(&x[..len], &y[i as usize..], &mut sum, len);
+        xcorr[i as usize] = sum[0];
+        xcorr[i as usize + 1] = sum[1];
+        xcorr[i as usize + 2] = sum[2];
+        xcorr[i as usize + 3] = sum[3];
         i += 4;
     }
-    while i < max_pitch {
-        let mut sum_0: opus_val32 = 0.;
-        sum_0 = celt_inner_prod_c(_x, _y.offset(i as isize), len);
-        *xcorr.offset(i as isize) = sum_0;
+    while (i as usize) < max_pitch {
+        xcorr[i as usize] = celt_inner_prod(x, &y[i as usize..], len);
         i += 1;
     }
 }
-pub unsafe fn pitch_search(
-    x_lp: *const opus_val16,
-    y: *mut opus_val16,
-    len: i32,
-    max_pitch: i32,
-    pitch: *mut i32,
-    arch: i32,
-) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut lag: i32 = 0;
-    let mut best_pitch: [i32; 2] = [0, 0];
-    let mut offset: i32 = 0;
+
+/// Upstream C: celt/pitch.c:pitch_search
+///
+/// Pitch search: finds the best pitch period.
+/// Returns the pitch index.
+pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32) -> i32 {
     assert!(len > 0);
     assert!(max_pitch > 0);
-    lag = len + max_pitch;
-    let vla = (len >> 2) as usize;
-    let mut x_lp4: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
-    let vla_0 = (lag >> 2) as usize;
-    let mut y_lp4: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
-    let vla_1 = (max_pitch >> 1) as usize;
-    let mut xcorr: Vec<opus_val32> = ::std::vec::from_elem(0., vla_1);
-    j = 0;
-    while j < len >> 2 {
-        *x_lp4.as_mut_ptr().offset(j as isize) = *x_lp.offset((2 * j) as isize);
-        j += 1;
+    let lag: i32 = len + max_pitch;
+
+    let mut x_lp4: Vec<f32> = vec![0.0; (len >> 2) as usize];
+    let mut y_lp4: Vec<f32> = vec![0.0; (lag >> 2) as usize];
+    let mut xcorr: Vec<f32> = vec![0.0; (max_pitch >> 1) as usize];
+
+    for j in 0..(len >> 2) as usize {
+        x_lp4[j] = x_lp[2 * j];
     }
-    j = 0;
-    while j < lag >> 2 {
-        *y_lp4.as_mut_ptr().offset(j as isize) = *y.offset((2 * j) as isize);
-        j += 1;
+    for j in 0..(lag >> 2) as usize {
+        y_lp4[j] = y[2 * j];
     }
-    celt_pitch_xcorr_c(
-        x_lp4.as_mut_ptr(),
-        y_lp4.as_mut_ptr(),
-        xcorr.as_mut_ptr(),
-        len >> 2,
-        max_pitch >> 2,
-        arch,
+
+    celt_pitch_xcorr(
+        &x_lp4,
+        &y_lp4,
+        &mut xcorr[..(max_pitch >> 2) as usize],
+        (len >> 2) as usize,
     );
-    find_best_pitch(
-        xcorr.as_mut_ptr(),
-        y_lp4.as_mut_ptr(),
-        len >> 2,
-        max_pitch >> 2,
-        best_pitch.as_mut_ptr(),
+
+    let best_pitch = find_best_pitch(
+        &xcorr[..(max_pitch >> 2) as usize],
+        &y_lp4,
+        (len >> 2) as usize,
+        (max_pitch >> 2) as usize,
     );
-    i = 0;
-    while i < max_pitch >> 1 {
-        let mut sum: opus_val32 = 0.;
-        *xcorr.as_mut_ptr().offset(i as isize) = 0 as opus_val32;
-        if !((i - 2 * best_pitch[0 as usize]).abs() > 2
-            && (i - 2 * best_pitch[1 as usize]).abs() > 2)
-        {
-            sum = celt_inner_prod_c(x_lp, y.offset(i as isize), len >> 1);
-            *xcorr.as_mut_ptr().offset(i as isize) = if -1 as f32 > sum { -1 as f32 } else { sum };
+
+    for i in 0..(max_pitch >> 1) as usize {
+        xcorr[i] = 0.0;
+        if !((i as i32 - 2 * best_pitch[0]).abs() > 2 && (i as i32 - 2 * best_pitch[1]).abs() > 2) {
+            let sum = celt_inner_prod(x_lp, &y[i..], (len >> 1) as usize);
+            xcorr[i] = (-1.0f32).max(sum);
         }
-        i += 1;
     }
-    find_best_pitch(
-        xcorr.as_mut_ptr(),
+
+    let best_pitch = find_best_pitch(
+        &xcorr[..(max_pitch >> 1) as usize],
         y,
-        len >> 1,
-        max_pitch >> 1,
-        best_pitch.as_mut_ptr(),
+        (len >> 1) as usize,
+        (max_pitch >> 1) as usize,
     );
-    if best_pitch[0 as usize] > 0 && best_pitch[0 as usize] < (max_pitch >> 1) - 1 {
-        let mut a: opus_val32 = 0.;
-        let mut b: opus_val32 = 0.;
-        let mut c: opus_val32 = 0.;
-        a = *xcorr
-            .as_mut_ptr()
-            .offset((best_pitch[0 as usize] - 1) as isize);
-        b = *xcorr.as_mut_ptr().offset(best_pitch[0 as usize] as isize);
-        c = *xcorr
-            .as_mut_ptr()
-            .offset((best_pitch[0 as usize] + 1) as isize);
+
+    let offset;
+    if best_pitch[0] > 0 && best_pitch[0] < (max_pitch >> 1) - 1 {
+        let a = xcorr[(best_pitch[0] - 1) as usize];
+        let b = xcorr[best_pitch[0] as usize];
+        let c = xcorr[(best_pitch[0] + 1) as usize];
         if c - a > 0.7f32 * (b - a) {
             offset = 1;
         } else if a - c > 0.7f32 * (b - c) {
@@ -429,78 +328,83 @@ pub unsafe fn pitch_search(
     } else {
         offset = 0;
     }
-    *pitch = 2 * best_pitch[0 as usize] - offset;
+    2 * best_pitch[0] - offset
 }
-unsafe fn compute_pitch_gain(xy: opus_val32, xx: opus_val32, yy: opus_val32) -> opus_val16 {
-    return xy / celt_sqrt(1 as f32 + xx * yy);
+
+/// Upstream C: celt/pitch.c:compute_pitch_gain
+fn compute_pitch_gain(xy: f32, xx: f32, yy: f32) -> f32 {
+    xy / celt_sqrt(1.0f32 + xx * yy)
 }
-static mut second_check: [i32; 16] = [0, 0, 3, 2, 3, 2, 5, 2, 3, 2, 3, 2, 5, 2, 3, 2];
-pub unsafe fn remove_doubling(
-    mut x: *mut opus_val16,
+
+const SECOND_CHECK: [i32; 16] = [0, 0, 3, 2, 3, 2, 5, 2, 3, 2, 3, 2, 5, 2, 3, 2];
+
+/// Upstream C: celt/pitch.c:remove_doubling
+///
+/// Removes pitch period doubling/tripling.
+/// `x` is the full pitch buffer; `maxperiod` is the offset into `x` where
+/// the current frame starts (corresponding to `x += maxperiod` in the C code).
+/// `T0` is the initial pitch period (modified in place).
+/// Returns the pitch gain.
+pub fn remove_doubling(
+    x: &[f32],
     mut maxperiod: i32,
     mut minperiod: i32,
     mut N: i32,
-    T0_: *mut i32,
+    T0_: &mut i32,
     mut prev_period: i32,
-    prev_gain: opus_val16,
-    _arch: i32,
-) -> opus_val16 {
-    let mut k: i32 = 0;
-    let mut i: i32 = 0;
-    let mut T: i32 = 0;
-    let mut T0: i32 = 0;
-    let mut g: opus_val16 = 0.;
-    let mut g0: opus_val16 = 0.;
-    let mut pg: opus_val16 = 0.;
-    let mut xy: opus_val32 = 0.;
-    let mut xx: opus_val32 = 0.;
-    let mut yy: opus_val32 = 0.;
-    let mut xy2: opus_val32 = 0.;
-    let mut xcorr: [opus_val32; 3] = [0.; 3];
-    let mut best_xy: opus_val32 = 0.;
-    let mut best_yy: opus_val32 = 0.;
-    let mut offset: i32 = 0;
-    let mut minperiod0: i32 = 0;
-    minperiod0 = minperiod;
+    prev_gain: f32,
+) -> f32 {
+    let mut T: i32;
+    let T0: i32;
+    let mut g: f32;
+    let g0: f32;
+    let mut pg: f32;
+    let mut xy: f32;
+    let xx: f32;
+    let mut yy: f32;
+    let mut xcorr: [f32; 3] = [0.0; 3];
+    let mut best_xy: f32;
+    let mut best_yy: f32;
+    let offset: i32;
+    let minperiod0: i32 = minperiod;
     maxperiod /= 2;
     minperiod /= 2;
     *T0_ /= 2;
     prev_period /= 2;
     N /= 2;
-    x = x.offset(maxperiod as isize);
+    // x_off is the offset into the buffer (equivalent to x += maxperiod in C)
+    let x_off = maxperiod as usize;
     if *T0_ >= maxperiod {
         *T0_ = maxperiod - 1;
     }
     T0 = *T0_;
     T = T0;
-    let vla = (maxperiod + 1) as usize;
-    let mut yy_lookup: Vec<opus_val32> = ::std::vec::from_elem(0., vla);
-    dual_inner_prod_c(x, x, x.offset(-(T0 as isize)), N, &mut xx, &mut xy);
-    *yy_lookup.as_mut_ptr().offset(0 as isize) = xx;
+    let mut yy_lookup: Vec<f32> = vec![0.0; (maxperiod + 1) as usize];
+    let (xx_val, xy_val) = dual_inner_prod(
+        &x[x_off..],
+        &x[x_off..],
+        &x[x_off - T0 as usize..],
+        N as usize,
+    );
+    xx = xx_val;
+    xy = xy_val;
+    yy_lookup[0] = xx;
     yy = xx;
-    i = 1;
-    while i <= maxperiod {
-        yy = yy + *x.offset(-i as isize) * *x.offset(-i as isize)
-            - *x.offset((N - i) as isize) * *x.offset((N - i) as isize);
-        *yy_lookup.as_mut_ptr().offset(i as isize) = if 0 as f32 > yy { 0 as f32 } else { yy };
-        i += 1;
+    for i in 1..=maxperiod as usize {
+        yy += x[x_off - i] * x[x_off - i] - x[x_off + N as usize - i] * x[x_off + N as usize - i];
+        yy_lookup[i] = 0.0f32.max(yy);
     }
-    yy = *yy_lookup.as_mut_ptr().offset(T0 as isize);
+    yy = yy_lookup[T0 as usize];
     best_xy = xy;
     best_yy = yy;
     g0 = compute_pitch_gain(xy, xx, yy);
     g = g0;
-    k = 2;
-    while k <= 15 {
-        let mut T1: i32 = 0;
-        let mut T1b: i32 = 0;
-        let mut g1: opus_val16 = 0.;
-        let mut cont: opus_val16 = 0 as opus_val16;
-        let mut thresh: opus_val16 = 0.;
-        T1 = celt_udiv((2 * T0 + k) as u32, (2 * k) as u32) as i32;
+    for k in 2..=15 {
+        let T1 = celt_udiv((2 * T0 + k) as u32, (2 * k) as u32) as i32;
         if T1 < minperiod {
             break;
         }
+        let T1b;
         if k == 2 {
             if T1 + T0 > maxperiod {
                 T1b = T0;
@@ -509,47 +413,30 @@ pub unsafe fn remove_doubling(
             }
         } else {
             T1b = celt_udiv(
-                (2 * second_check[k as usize] * T0 + k) as u32,
+                (2 * SECOND_CHECK[k as usize] * T0 + k) as u32,
                 (2 * k) as u32,
             ) as i32;
         }
-        dual_inner_prod_c(
-            x,
-            &mut *x.offset(-T1 as isize),
-            &mut *x.offset(-T1b as isize),
-            N,
-            &mut xy,
-            &mut xy2,
+        let (xy_new, xy2_new) = dual_inner_prod(
+            &x[x_off..],
+            &x[x_off - T1 as usize..],
+            &x[x_off - T1b as usize..],
+            N as usize,
         );
-        xy = 0.5f32 * (xy + xy2);
-        yy = 0.5f32
-            * (*yy_lookup.as_mut_ptr().offset(T1 as isize)
-                + *yy_lookup.as_mut_ptr().offset(T1b as isize));
-        g1 = compute_pitch_gain(xy, xx, yy);
+        xy = 0.5f32 * (xy_new + xy2_new);
+        yy = 0.5f32 * (yy_lookup[T1 as usize] + yy_lookup[T1b as usize]);
+        let g1 = compute_pitch_gain(xy, xx, yy);
+        let mut cont: f32 = 0.0;
         if (T1 - prev_period).abs() <= 1 {
             cont = prev_gain;
         } else if (T1 - prev_period).abs() <= 2 && 5 * k * k < T0 {
             cont = 0.5f32 * prev_gain;
-        } else {
-            cont = 0 as opus_val16;
         }
-        thresh = if 0.3f32 > 0.7f32 * g0 - cont {
-            0.3f32
-        } else {
-            0.7f32 * g0 - cont
-        };
+        let mut thresh = 0.3f32.max(0.7f32 * g0 - cont);
         if T1 < 3 * minperiod {
-            thresh = if 0.4f32 > 0.85f32 * g0 - cont {
-                0.4f32
-            } else {
-                0.85f32 * g0 - cont
-            };
+            thresh = 0.4f32.max(0.85f32 * g0 - cont);
         } else if T1 < 2 * minperiod {
-            thresh = if 0.5f32 > 0.9f32 * g0 - cont {
-                0.5f32
-            } else {
-                0.9f32 * g0 - cont
-            };
+            thresh = 0.5f32.max(0.9f32 * g0 - cont);
         }
         if g1 > thresh {
             best_xy = xy;
@@ -557,28 +444,20 @@ pub unsafe fn remove_doubling(
             T = T1;
             g = g1;
         }
-        k += 1;
     }
-    best_xy = if 0 as f32 > best_xy {
-        0 as f32
-    } else {
-        best_xy
-    };
+    best_xy = 0.0f32.max(best_xy);
     if best_yy <= best_xy {
-        pg = Q15ONE;
+        pg = 1.0;
     } else {
-        pg = best_xy / (best_yy + 1 as f32);
+        pg = best_xy / (best_yy + 1.0);
     }
-    k = 0;
-    while k < 3 {
-        xcorr[k as usize] = celt_inner_prod_c(x, x.offset(-((T + k - 1) as isize)), N);
-        k += 1;
+    for k in 0..3i32 {
+        xcorr[k as usize] =
+            celt_inner_prod(&x[x_off..], &x[x_off - (T + k - 1) as usize..], N as usize);
     }
-    if xcorr[2 as usize] - xcorr[0 as usize] > 0.7f32 * (xcorr[1 as usize] - xcorr[0 as usize]) {
+    if xcorr[2] - xcorr[0] > 0.7f32 * (xcorr[1] - xcorr[0]) {
         offset = 1;
-    } else if xcorr[0 as usize] - xcorr[2 as usize]
-        > 0.7f32 * (xcorr[1 as usize] - xcorr[2 as usize])
-    {
+    } else if xcorr[0] - xcorr[2] > 0.7f32 * (xcorr[1] - xcorr[2]) {
         offset = -1;
     } else {
         offset = 0;
@@ -590,5 +469,5 @@ pub unsafe fn remove_doubling(
     if *T0_ < minperiod0 {
         *T0_ = minperiod0;
     }
-    return pg;
+    pg
 }

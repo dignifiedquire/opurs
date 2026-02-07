@@ -8,7 +8,7 @@ pub mod typedef_h {
 
 use self::arch_h::opus_val32;
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
-use crate::celt::pitch::celt_pitch_xcorr_c;
+use crate::celt::pitch::celt_pitch_xcorr;
 use crate::externs::memset;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
@@ -203,14 +203,18 @@ pub unsafe fn silk_pitch_analysis_core_FLP(
             basis_ptr.offset(sf_length_8kHz as isize)
                 <= frame_4kHz.as_mut_ptr().offset(frame_length_4kHz as isize) as *const f32
         );
-        celt_pitch_xcorr_c(
-            target_ptr,
-            target_ptr.offset(-(max_lag_4kHz as isize)),
-            xcorr.as_mut_ptr(),
-            sf_length_8kHz,
-            max_lag_4kHz - min_lag_4kHz + 1,
-            arch,
-        );
+        {
+            let xcorr_len = (max_lag_4kHz - min_lag_4kHz + 1) as usize;
+            celt_pitch_xcorr(
+                std::slice::from_raw_parts(target_ptr, sf_length_8kHz as usize),
+                std::slice::from_raw_parts(
+                    target_ptr.offset(-(max_lag_4kHz as isize)),
+                    sf_length_8kHz as usize + xcorr_len,
+                ),
+                &mut xcorr[..xcorr_len],
+                sf_length_8kHz as usize,
+            );
+        }
         cross_corr = xcorr[(max_lag_4kHz - min_lag_4kHz) as usize] as f64;
         normalizer = silk_energy_FLP(std::slice::from_raw_parts(
             target_ptr,
@@ -585,7 +589,7 @@ unsafe fn silk_P_Ana_calc_corr_st3(
     sf_length: i32,
     nb_subfr: i32,
     complexity: i32,
-    arch: i32,
+    _arch: i32,
 ) {
     let mut target_ptr: *const f32 = 0 as *const f32;
     let mut i: i32 = 0;
@@ -628,16 +632,20 @@ unsafe fn silk_P_Ana_calc_corr_st3(
         lag_counter = 0;
         lag_low = *Lag_range_ptr.offset((k * 2 + 0) as isize) as i32;
         lag_high = *Lag_range_ptr.offset((k * 2 + 1) as isize) as i32;
-        celt_pitch_xcorr_c(
-            target_ptr,
-            target_ptr
-                .offset(-(start_lag as isize))
-                .offset(-(lag_high as isize)),
-            xcorr.as_mut_ptr(),
-            sf_length,
-            lag_high - lag_low + 1,
-            arch,
-        );
+        {
+            let xcorr_len = (lag_high - lag_low + 1) as usize;
+            celt_pitch_xcorr(
+                std::slice::from_raw_parts(target_ptr, sf_length as usize),
+                std::slice::from_raw_parts(
+                    target_ptr
+                        .offset(-(start_lag as isize))
+                        .offset(-(lag_high as isize)),
+                    sf_length as usize + xcorr_len,
+                ),
+                &mut xcorr[..xcorr_len],
+                sf_length as usize,
+            );
+        }
         j = lag_low;
         while j <= lag_high {
             scratch_mem[lag_counter as usize] = xcorr[(lag_high - j) as usize];
