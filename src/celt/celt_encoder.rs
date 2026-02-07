@@ -48,7 +48,7 @@ use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
 };
 use crate::celt::rate::clt_compute_allocation;
-use crate::externs::{memcpy, memmove, memset};
+use crate::externs::{memcpy, memset};
 use crate::opus_custom_encoder_ctl;
 use crate::silk::macros::EC_CLZ0;
 use crate::src::analysis::AnalysisInfo;
@@ -614,18 +614,19 @@ fn l1_metric(tmp: &[celt_norm], N: i32, LM: i32, bias: opus_val16) -> opus_val32
     L1 = L1 + LM as f32 * bias * L1;
     return L1;
 }
-unsafe fn tf_analysis(
-    m: *const OpusCustomMode,
+/// Upstream C: celt/celt_encoder.c:tf_analysis
+fn tf_analysis(
+    m: &OpusCustomMode,
     len: i32,
     isTransient: i32,
-    tf_res: *mut i32,
+    tf_res: &mut [i32],
     lambda: i32,
-    X: *mut celt_norm,
+    X: &[celt_norm],
     N0: i32,
     LM: i32,
     tf_estimate: opus_val16,
     tf_chan: i32,
-    importance: *mut i32,
+    importance: &[i32],
 ) -> i32 {
     let mut i: i32 = 0;
     let mut cost0: i32 = 0;
@@ -642,13 +643,11 @@ unsafe fn tf_analysis(
         });
     let vla = len as usize;
     let mut metric: Vec<i32> = ::std::vec::from_elem(0, vla);
-    let vla_0 = ((*((*m).eBands.as_ptr()).offset(len as isize) as i32
-        - *((*m).eBands.as_ptr()).offset((len - 1) as isize) as i32)
-        << LM) as usize;
+    let vla_0 =
+        ((m.eBands[len as usize] as i32 - m.eBands[(len - 1) as usize] as i32) << LM) as usize;
     let mut tmp: Vec<celt_norm> = ::std::vec::from_elem(0., vla_0);
-    let vla_1 = ((*((*m).eBands.as_ptr()).offset(len as isize) as i32
-        - *((*m).eBands.as_ptr()).offset((len - 1) as isize) as i32)
-        << LM) as usize;
+    let vla_1 =
+        ((m.eBands[len as usize] as i32 - m.eBands[(len - 1) as usize] as i32) << LM) as usize;
     let mut tmp_1: Vec<celt_norm> = ::std::vec::from_elem(0., vla_1);
     let vla_2 = len as usize;
     let mut path0: Vec<i32> = ::std::vec::from_elem(0, vla_2);
@@ -662,39 +661,14 @@ unsafe fn tf_analysis(
         let mut L1: opus_val32 = 0.;
         let mut best_L1: opus_val32 = 0.;
         let mut best_level: i32 = 0;
-        N = (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-            - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-            << LM;
-        narrow = (*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-            - *((*m).eBands.as_ptr()).offset(i as isize) as i32
-            == 1) as i32;
-        memcpy(
-            tmp.as_mut_ptr() as *mut core::ffi::c_void,
-            &mut *X.offset(
-                (tf_chan * N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM))
-                    as isize,
-            ) as *mut celt_norm as *const core::ffi::c_void,
-            (N as u64)
-                .wrapping_mul(::core::mem::size_of::<celt_norm>() as u64)
-                .wrapping_add(
-                    (0 * tmp.as_mut_ptr().offset_from(&mut *X.offset(
-                        (tf_chan * N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM))
-                            as isize,
-                    )) as i64) as u64,
-                ),
-        );
+        N = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM;
+        narrow = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32 == 1) as i32;
+        let x_offset = (tf_chan * N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
+        tmp[..N as usize].copy_from_slice(&X[x_offset..x_offset + N as usize]);
         L1 = l1_metric(&tmp, N, if isTransient != 0 { LM } else { 0 }, bias);
         best_L1 = L1;
         if isTransient != 0 && narrow == 0 {
-            memcpy(
-                tmp_1.as_mut_ptr() as *mut core::ffi::c_void,
-                tmp.as_mut_ptr() as *const core::ffi::c_void,
-                (N as u64)
-                    .wrapping_mul(::core::mem::size_of::<celt_norm>() as u64)
-                    .wrapping_add(
-                        (0 * tmp_1.as_mut_ptr().offset_from(tmp.as_mut_ptr()) as i64) as u64,
-                    ),
-            );
+            tmp_1[..N as usize].copy_from_slice(&tmp[..N as usize]);
             haar1(&mut tmp_1, N >> LM, (1) << LM);
             L1 = l1_metric(&tmp_1, N, LM + 1, bias);
             if L1 < best_L1 {
@@ -719,28 +693,25 @@ unsafe fn tf_analysis(
             k += 1;
         }
         if isTransient != 0 {
-            *metric.as_mut_ptr().offset(i as isize) = 2 * best_level;
+            metric[i as usize] = 2 * best_level;
         } else {
-            *metric.as_mut_ptr().offset(i as isize) = -(2) * best_level;
+            metric[i as usize] = -(2) * best_level;
         }
-        if narrow != 0
-            && (*metric.as_mut_ptr().offset(i as isize) == 0
-                || *metric.as_mut_ptr().offset(i as isize) == -(2) * LM)
-        {
-            *metric.as_mut_ptr().offset(i as isize) -= 1;
+        if narrow != 0 && (metric[i as usize] == 0 || metric[i as usize] == -(2) * LM) {
+            metric[i as usize] -= 1;
         }
         i += 1;
     }
     tf_select = 0;
     sel = 0;
     while sel < 2 {
-        cost0 = *importance.offset(0 as isize)
-            * (*metric.as_mut_ptr().offset(0 as isize)
+        cost0 = importance[0]
+            * (metric[0]
                 - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 0) as usize]
                     as i32)
                 .abs();
-        cost1 = *importance.offset(0 as isize)
-            * (*metric.as_mut_ptr().offset(0 as isize)
+        cost1 = importance[0]
+            * (metric[0]
                 - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
                     as i32)
                 .abs()
@@ -760,14 +731,14 @@ unsafe fn tf_analysis(
                 cost1
             };
             cost0 = curr0
-                + *importance.offset(i as isize)
-                    * (*metric.as_mut_ptr().offset(i as isize)
+                + importance[i as usize]
+                    * (metric[i as usize]
                         - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 0) as usize]
                             as i32)
                         .abs();
             cost1 = curr1
-                + *importance.offset(i as isize)
-                    * (*metric.as_mut_ptr().offset(i as isize)
+                + importance[i as usize]
+                    * (metric[i as usize]
                         - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
                             as i32)
                         .abs();
@@ -780,13 +751,13 @@ unsafe fn tf_analysis(
     if selcost[1 as usize] < selcost[0 as usize] && isTransient != 0 {
         tf_select = 1;
     }
-    cost0 = *importance.offset(0 as isize)
-        * (*metric.as_mut_ptr().offset(0 as isize)
+    cost0 = importance[0]
+        * (metric[0]
             - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select + 0) as usize]
                 as i32)
             .abs();
-    cost1 = *importance.offset(0 as isize)
-        * (*metric.as_mut_ptr().offset(0 as isize)
+    cost1 = importance[0]
+        * (metric[0]
             - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select + 1) as usize]
                 as i32)
             .abs()
@@ -801,53 +772,54 @@ unsafe fn tf_analysis(
         from1 = cost1 + lambda;
         if from0 < from1 {
             curr0_0 = from0;
-            *path0.as_mut_ptr().offset(i as isize) = 0;
+            path0[i as usize] = 0;
         } else {
             curr0_0 = from1;
-            *path0.as_mut_ptr().offset(i as isize) = 1;
+            path0[i as usize] = 1;
         }
         from0 = cost0 + lambda;
         from1 = cost1;
         if from0 < from1 {
             curr1_0 = from0;
-            *path1.as_mut_ptr().offset(i as isize) = 0;
+            path1[i as usize] = 0;
         } else {
             curr1_0 = from1;
-            *path1.as_mut_ptr().offset(i as isize) = 1;
+            path1[i as usize] = 1;
         }
         cost0 = curr0_0
-            + *importance.offset(i as isize)
-                * (*metric.as_mut_ptr().offset(i as isize)
+            + importance[i as usize]
+                * (metric[i as usize]
                     - 2 * tf_select_table[LM as usize]
                         [(4 * isTransient + 2 * tf_select + 0) as usize]
                         as i32)
                     .abs();
         cost1 = curr1_0
-            + *importance.offset(i as isize)
-                * (*metric.as_mut_ptr().offset(i as isize)
+            + importance[i as usize]
+                * (metric[i as usize]
                     - 2 * tf_select_table[LM as usize]
                         [(4 * isTransient + 2 * tf_select + 1) as usize]
                         as i32)
                     .abs();
         i += 1;
     }
-    *tf_res.offset((len - 1) as isize) = if cost0 < cost1 { 0 } else { 1 };
+    tf_res[(len - 1) as usize] = if cost0 < cost1 { 0 } else { 1 };
     i = len - 2;
     while i >= 0 {
-        if *tf_res.offset((i + 1) as isize) == 1 {
-            *tf_res.offset(i as isize) = *path1.as_mut_ptr().offset((i + 1) as isize);
+        if tf_res[(i + 1) as usize] == 1 {
+            tf_res[i as usize] = path1[(i + 1) as usize];
         } else {
-            *tf_res.offset(i as isize) = *path0.as_mut_ptr().offset((i + 1) as isize);
+            tf_res[i as usize] = path0[(i + 1) as usize];
         }
         i -= 1;
     }
     return tf_select;
 }
-unsafe fn tf_encode(
+/// Upstream C: celt/celt_encoder.c:tf_encode
+fn tf_encode(
     start: i32,
     end: i32,
     isTransient: i32,
-    tf_res: *mut i32,
+    tf_res: &mut [i32],
     LM: i32,
     mut tf_select: i32,
     enc: &mut ec_enc,
@@ -869,12 +841,12 @@ unsafe fn tf_encode(
     i = start;
     while i < end {
         if tell.wrapping_add(logp as u32) <= budget {
-            ec_enc_bit_logp(enc, *tf_res.offset(i as isize) ^ curr, logp as u32);
+            ec_enc_bit_logp(enc, tf_res[i as usize] ^ curr, logp as u32);
             tell = ec_tell(enc) as u32;
-            curr = *tf_res.offset(i as isize);
+            curr = tf_res[i as usize];
             tf_changed |= curr;
         } else {
-            *tf_res.offset(i as isize) = curr;
+            tf_res[i as usize] = curr;
         }
         logp = if isTransient != 0 { 4 } else { 5 };
         i += 1;
@@ -889,22 +861,23 @@ unsafe fn tf_encode(
     }
     i = start;
     while i < end {
-        *tf_res.offset(i as isize) = tf_select_table[LM as usize]
-            [(4 * isTransient + 2 * tf_select + *tf_res.offset(i as isize)) as usize]
+        tf_res[i as usize] = tf_select_table[LM as usize]
+            [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
             as i32;
         i += 1;
     }
 }
-unsafe fn alloc_trim_analysis(
-    m: *const OpusCustomMode,
-    X: *const celt_norm,
-    bandLogE: *const opus_val16,
+/// Upstream C: celt/celt_encoder.c:alloc_trim_analysis
+fn alloc_trim_analysis(
+    m: &OpusCustomMode,
+    X: &[celt_norm],
+    bandLogE: &[opus_val16],
     end: i32,
     LM: i32,
     C: i32,
     N0: i32,
-    analysis: *mut AnalysisInfo,
-    stereo_saving: *mut opus_val16,
+    analysis: &AnalysisInfo,
+    stereo_saving: &mut opus_val16,
     tf_estimate: opus_val16,
     intensity: i32,
     surround_trim: opus_val16,
@@ -930,15 +903,13 @@ unsafe fn alloc_trim_analysis(
         i = 0;
         while i < 8 {
             let mut partial: opus_val32 = 0.;
-            let band_off = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
-            let band_off2 =
-                (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
-            let band_len = ((*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                << LM) as usize;
+            let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
+            let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
+            let band_len =
+                ((m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM) as usize;
             partial = celt_inner_prod(
-                std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
-                std::slice::from_raw_parts(X.offset(band_off2 as isize), band_len),
+                &X[band_off..band_off + band_len],
+                &X[band_off2..band_off2 + band_len],
                 band_len,
             );
             sum = sum + partial;
@@ -954,15 +925,13 @@ unsafe fn alloc_trim_analysis(
         i = 8;
         while i < intensity {
             let mut partial_0: opus_val32 = 0.;
-            let band_off = ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM) as usize;
-            let band_off2 =
-                (N0 + ((*((*m).eBands.as_ptr()).offset(i as isize) as i32) << LM)) as usize;
-            let band_len = ((*((*m).eBands.as_ptr()).offset((i + 1) as isize) as i32
-                - *((*m).eBands.as_ptr()).offset(i as isize) as i32)
-                << LM) as usize;
+            let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
+            let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
+            let band_len =
+                ((m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM) as usize;
             partial_0 = celt_inner_prod(
-                std::slice::from_raw_parts(X.offset(band_off as isize), band_len),
-                std::slice::from_raw_parts(X.offset(band_off2 as isize), band_len),
+                &X[band_off..band_off + band_len],
+                &X[band_off2..band_off2 + band_len],
                 band_len,
             );
             minXC = if minXC < (partial_0).abs() {
@@ -998,8 +967,7 @@ unsafe fn alloc_trim_analysis(
     loop {
         i = 0;
         while i < end - 1 {
-            diff += *bandLogE.offset((i + c * (*m).nbEBands as i32) as isize)
-                * (2 + 2 * i - end) as f32;
+            diff += bandLogE[(i + c * m.nbEBands as i32) as usize] * (2 + 2 * i - end) as f32;
             i += 1;
         }
         c += 1;
@@ -1022,18 +990,18 @@ unsafe fn alloc_trim_analysis(
     };
     trim -= surround_trim;
     trim -= 2 as f32 * tf_estimate;
-    if (*analysis).valid != 0 {
+    if analysis.valid != 0 {
         trim -= if -2.0f32
-            > (if 2.0f32 < 2.0f32 * ((*analysis).tonality_slope + 0.05f32) {
+            > (if 2.0f32 < 2.0f32 * (analysis.tonality_slope + 0.05f32) {
                 2.0f32
             } else {
-                2.0f32 * ((*analysis).tonality_slope + 0.05f32)
+                2.0f32 * (analysis.tonality_slope + 0.05f32)
             }) {
             -2.0f32
-        } else if 2.0f32 < 2.0f32 * ((*analysis).tonality_slope + 0.05f32) {
+        } else if 2.0f32 < 2.0f32 * (analysis.tonality_slope + 0.05f32) {
             2.0f32
         } else {
-            2.0f32 * ((*analysis).tonality_slope + 0.05f32)
+            2.0f32 * (analysis.tonality_slope + 0.05f32)
         };
     }
     trim_index = (0.5f32 + trim).floor() as i32;
@@ -1142,28 +1110,29 @@ fn median_of_3(x: &[opus_val16]) -> opus_val16 {
         return t0;
     };
 }
-unsafe fn dynalloc_analysis(
-    bandLogE: *const opus_val16,
-    bandLogE2: *const opus_val16,
+/// Upstream C: celt/celt_encoder.c:dynalloc_analysis
+fn dynalloc_analysis(
+    bandLogE: &[opus_val16],
+    bandLogE2: &[opus_val16],
     nbEBands: i32,
     start: i32,
     end: i32,
     C: i32,
-    offsets: *mut i32,
+    offsets: &mut [i32],
     lsb_depth: i32,
-    logN: *const i16,
+    logN: &[i16],
     isTransient: i32,
     vbr: i32,
     constrained_vbr: i32,
-    eBands: *const i16,
+    eBands: &[i16],
     LM: i32,
     effectiveBytes: i32,
-    tot_boost_: *mut i32,
+    tot_boost_: &mut i32,
     lfe: i32,
-    surround_dynalloc: *mut opus_val16,
-    analysis: *mut AnalysisInfo,
-    importance: *mut i32,
-    spread_weight: *mut i32,
+    surround_dynalloc: &[opus_val16],
+    analysis: &AnalysisInfo,
+    importance: &mut [i32],
+    spread_weight: &mut [i32],
 ) -> opus_val16 {
     let mut i: i32 = 0;
     let mut c: i32 = 0;
@@ -1173,16 +1142,12 @@ unsafe fn dynalloc_analysis(
     let mut follower: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
     let vla_0 = (C * nbEBands) as usize;
     let mut noise_floor: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
-    memset(
-        offsets as *mut core::ffi::c_void,
-        0,
-        (nbEBands as u64).wrapping_mul(::core::mem::size_of::<i32>() as u64),
-    );
+    offsets[..nbEBands as usize].fill(0);
     maxDepth = -31.9f32;
     i = 0;
     while i < end {
-        *noise_floor.as_mut_ptr().offset(i as isize) =
-            0.0625f32 * *logN.offset(i as isize) as opus_val32 + 0.5f32 + (9 - lsb_depth) as f32
+        noise_floor[i as usize] =
+            0.0625f32 * logN[i as usize] as opus_val32 + 0.5f32 + (9 - lsb_depth) as f32
                 - eMeans[i as usize]
                 + 0.0062f64 as opus_val32 * ((i + 5) * (i + 5)) as opus_val32;
         i += 1;
@@ -1191,14 +1156,11 @@ unsafe fn dynalloc_analysis(
     loop {
         i = 0;
         while i < end {
-            maxDepth = if maxDepth
-                > *bandLogE.offset((c * nbEBands + i) as isize)
-                    - *noise_floor.as_mut_ptr().offset(i as isize)
+            maxDepth = if maxDepth > bandLogE[(c * nbEBands + i) as usize] - noise_floor[i as usize]
             {
                 maxDepth
             } else {
-                *bandLogE.offset((c * nbEBands + i) as isize)
-                    - *noise_floor.as_mut_ptr().offset(i as isize)
+                bandLogE[(c * nbEBands + i) as usize] - noise_floor[i as usize]
             };
             i += 1;
         }
@@ -1213,62 +1175,48 @@ unsafe fn dynalloc_analysis(
     let mut sig: Vec<opus_val16> = ::std::vec::from_elem(0., vla_2);
     i = 0;
     while i < end {
-        *mask.as_mut_ptr().offset(i as isize) =
-            *bandLogE.offset(i as isize) - *noise_floor.as_mut_ptr().offset(i as isize);
+        mask[i as usize] = bandLogE[i as usize] - noise_floor[i as usize];
         i += 1;
     }
     if C == 2 {
         i = 0;
         while i < end {
-            *mask.as_mut_ptr().offset(i as isize) = if *mask.as_mut_ptr().offset(i as isize)
-                > *bandLogE.offset((nbEBands + i) as isize)
-                    - *noise_floor.as_mut_ptr().offset(i as isize)
-            {
-                *mask.as_mut_ptr().offset(i as isize)
-            } else {
-                *bandLogE.offset((nbEBands + i) as isize)
-                    - *noise_floor.as_mut_ptr().offset(i as isize)
-            };
+            mask[i as usize] =
+                if mask[i as usize] > bandLogE[(nbEBands + i) as usize] - noise_floor[i as usize] {
+                    mask[i as usize]
+                } else {
+                    bandLogE[(nbEBands + i) as usize] - noise_floor[i as usize]
+                };
             i += 1;
         }
     }
-    memcpy(
-        sig.as_mut_ptr() as *mut core::ffi::c_void,
-        mask.as_mut_ptr() as *const core::ffi::c_void,
-        (end as u64)
-            .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-            .wrapping_add((0 * sig.as_mut_ptr().offset_from(mask.as_mut_ptr()) as i64) as u64),
-    );
+    sig[..end as usize].copy_from_slice(&mask[..end as usize]);
     i = 1;
     while i < end {
-        *mask.as_mut_ptr().offset(i as isize) = if *mask.as_mut_ptr().offset(i as isize)
-            > *mask.as_mut_ptr().offset((i - 1) as isize) - 2.0f32
-        {
-            *mask.as_mut_ptr().offset(i as isize)
+        mask[i as usize] = if mask[i as usize] > mask[(i - 1) as usize] - 2.0f32 {
+            mask[i as usize]
         } else {
-            *mask.as_mut_ptr().offset((i - 1) as isize) - 2.0f32
+            mask[(i - 1) as usize] - 2.0f32
         };
         i += 1;
     }
     i = end - 2;
     while i >= 0 {
-        *mask.as_mut_ptr().offset(i as isize) = if *mask.as_mut_ptr().offset(i as isize)
-            > *mask.as_mut_ptr().offset((i + 1) as isize) - 3.0f32
-        {
-            *mask.as_mut_ptr().offset(i as isize)
+        mask[i as usize] = if mask[i as usize] > mask[(i + 1) as usize] - 3.0f32 {
+            mask[i as usize]
         } else {
-            *mask.as_mut_ptr().offset((i + 1) as isize) - 3.0f32
+            mask[(i + 1) as usize] - 3.0f32
         };
         i -= 1;
     }
     i = 0;
     while i < end {
-        let smr: opus_val16 = *sig.as_mut_ptr().offset(i as isize)
+        let smr: opus_val16 = sig[i as usize]
             - (if (if 0 as f32 > maxDepth - 12.0f32 {
                 0 as f32
             } else {
                 maxDepth - 12.0f32
-            }) > *mask.as_mut_ptr().offset(i as isize)
+            }) > mask[i as usize]
             {
                 if 0 as f32 > maxDepth - 12.0f32 {
                     0 as f32
@@ -1276,7 +1224,7 @@ unsafe fn dynalloc_analysis(
                     maxDepth - 12.0f32
                 }
             } else {
-                *mask.as_mut_ptr().offset(i as isize)
+                mask[i as usize]
             });
         let shift: i32 = if (5)
             < (if 0 > -((0.5f32 + smr).floor() as i32) {
@@ -1290,7 +1238,7 @@ unsafe fn dynalloc_analysis(
         } else {
             -((0.5f32 + smr).floor() as i32)
         };
-        *spread_weight.offset(i as isize) = 32 >> shift;
+        spread_weight[i as usize] = 32 >> shift;
         i += 1;
     }
     if effectiveBytes > 50 && LM >= 1 && lfe == 0 {
@@ -1299,95 +1247,89 @@ unsafe fn dynalloc_analysis(
         loop {
             let mut offset: opus_val16 = 0.;
             let mut tmp: opus_val16 = 0.;
-            let mut f: *mut opus_val16 = 0 as *mut opus_val16;
-            f = &mut *follower.as_mut_ptr().offset((c * nbEBands) as isize) as *mut opus_val16;
-            *f.offset(0 as isize) = *bandLogE2.offset((c * nbEBands) as isize);
+            let fb = (c * nbEBands) as usize;
+            follower[fb] = bandLogE2[(c * nbEBands) as usize];
             i = 1;
             while i < end {
-                if *bandLogE2.offset((c * nbEBands + i) as isize)
-                    > *bandLogE2.offset((c * nbEBands + i - 1) as isize) + 0.5f32
+                if bandLogE2[(c * nbEBands + i) as usize]
+                    > bandLogE2[(c * nbEBands + i - 1) as usize] + 0.5f32
                 {
                     last = i;
                 }
-                *f.offset(i as isize) = if *f.offset((i - 1) as isize) + 1.5f32
-                    < *bandLogE2.offset((c * nbEBands + i) as isize)
+                follower[fb + i as usize] = if follower[fb + (i - 1) as usize] + 1.5f32
+                    < bandLogE2[(c * nbEBands + i) as usize]
                 {
-                    *f.offset((i - 1) as isize) + 1.5f32
+                    follower[fb + (i - 1) as usize] + 1.5f32
                 } else {
-                    *bandLogE2.offset((c * nbEBands + i) as isize)
+                    bandLogE2[(c * nbEBands + i) as usize]
                 };
                 i += 1;
             }
             i = last - 1;
             while i >= 0 {
-                *f.offset(i as isize) = if *f.offset(i as isize)
-                    < (if *f.offset((i + 1) as isize) + 2.0f32
-                        < *bandLogE2.offset((c * nbEBands + i) as isize)
+                follower[fb + i as usize] = if follower[fb + i as usize]
+                    < (if follower[fb + (i + 1) as usize] + 2.0f32
+                        < bandLogE2[(c * nbEBands + i) as usize]
                     {
-                        *f.offset((i + 1) as isize) + 2.0f32
+                        follower[fb + (i + 1) as usize] + 2.0f32
                     } else {
-                        *bandLogE2.offset((c * nbEBands + i) as isize)
+                        bandLogE2[(c * nbEBands + i) as usize]
                     }) {
-                    *f.offset(i as isize)
-                } else if *f.offset((i + 1) as isize) + 2.0f32
-                    < *bandLogE2.offset((c * nbEBands + i) as isize)
+                    follower[fb + i as usize]
+                } else if follower[fb + (i + 1) as usize] + 2.0f32
+                    < bandLogE2[(c * nbEBands + i) as usize]
                 {
-                    *f.offset((i + 1) as isize) + 2.0f32
+                    follower[fb + (i + 1) as usize] + 2.0f32
                 } else {
-                    *bandLogE2.offset((c * nbEBands + i) as isize)
+                    bandLogE2[(c * nbEBands + i) as usize]
                 };
                 i -= 1;
             }
             offset = 1.0f32;
             i = 2;
             while i < end - 2 {
-                let med = median_of_5(&std::slice::from_raw_parts(
-                    bandLogE2.offset((c * nbEBands + i - 2) as isize),
-                    5,
-                )) - offset;
-                *f.offset(i as isize) = if *f.offset(i as isize) > med {
-                    *f.offset(i as isize)
+                let med = median_of_5(
+                    &bandLogE2[(c * nbEBands + i - 2) as usize..(c * nbEBands + i + 3) as usize],
+                ) - offset;
+                follower[fb + i as usize] = if follower[fb + i as usize] > med {
+                    follower[fb + i as usize]
                 } else {
                     med
                 };
                 i += 1;
             }
-            tmp = median_of_3(&std::slice::from_raw_parts(
-                bandLogE2.offset((c * nbEBands) as isize),
-                3,
-            )) - offset;
-            *f.offset(0 as isize) = if *f.offset(0 as isize) > tmp {
-                *f.offset(0 as isize)
+            tmp = median_of_3(&bandLogE2[(c * nbEBands) as usize..(c * nbEBands + 3) as usize])
+                - offset;
+            follower[fb] = if follower[fb] > tmp {
+                follower[fb]
             } else {
                 tmp
             };
-            *f.offset(1 as isize) = if *f.offset(1 as isize) > tmp {
-                *f.offset(1 as isize)
+            follower[fb + 1] = if follower[fb + 1] > tmp {
+                follower[fb + 1]
             } else {
                 tmp
             };
-            tmp = median_of_3(&std::slice::from_raw_parts(
-                bandLogE2.offset((c * nbEBands + end - 3) as isize),
-                3,
-            )) - offset;
-            *f.offset((end - 2) as isize) = if *f.offset((end - 2) as isize) > tmp {
-                *f.offset((end - 2) as isize)
+            tmp = median_of_3(
+                &bandLogE2[(c * nbEBands + end - 3) as usize..(c * nbEBands + end) as usize],
+            ) - offset;
+            follower[fb + (end - 2) as usize] = if follower[fb + (end - 2) as usize] > tmp {
+                follower[fb + (end - 2) as usize]
             } else {
                 tmp
             };
-            *f.offset((end - 1) as isize) = if *f.offset((end - 1) as isize) > tmp {
-                *f.offset((end - 1) as isize)
+            follower[fb + (end - 1) as usize] = if follower[fb + (end - 1) as usize] > tmp {
+                follower[fb + (end - 1) as usize]
             } else {
                 tmp
             };
             i = 0;
             while i < end {
-                *f.offset(i as isize) =
-                    if *f.offset(i as isize) > *noise_floor.as_mut_ptr().offset(i as isize) {
-                        *f.offset(i as isize)
-                    } else {
-                        *noise_floor.as_mut_ptr().offset(i as isize)
-                    };
+                follower[fb + i as usize] = if follower[fb + i as usize] > noise_floor[i as usize] {
+                    follower[fb + i as usize]
+                } else {
+                    noise_floor[i as usize]
+                };
                 i += 1;
             }
             c += 1;
@@ -1398,70 +1340,58 @@ unsafe fn dynalloc_analysis(
         if C == 2 {
             i = start;
             while i < end {
-                *follower.as_mut_ptr().offset((nbEBands + i) as isize) =
-                    if *follower.as_mut_ptr().offset((nbEBands + i) as isize)
-                        > *follower.as_mut_ptr().offset(i as isize) - 4.0f32
-                    {
-                        *follower.as_mut_ptr().offset((nbEBands + i) as isize)
+                follower[(nbEBands + i) as usize] =
+                    if follower[(nbEBands + i) as usize] > follower[i as usize] - 4.0f32 {
+                        follower[(nbEBands + i) as usize]
                     } else {
-                        *follower.as_mut_ptr().offset(i as isize) - 4.0f32
+                        follower[i as usize] - 4.0f32
                     };
-                *follower.as_mut_ptr().offset(i as isize) =
-                    if *follower.as_mut_ptr().offset(i as isize)
-                        > *follower.as_mut_ptr().offset((nbEBands + i) as isize) - 4.0f32
-                    {
-                        *follower.as_mut_ptr().offset(i as isize)
+                follower[i as usize] =
+                    if follower[i as usize] > follower[(nbEBands + i) as usize] - 4.0f32 {
+                        follower[i as usize]
                     } else {
-                        *follower.as_mut_ptr().offset((nbEBands + i) as isize) - 4.0f32
+                        follower[(nbEBands + i) as usize] - 4.0f32
                     };
-                *follower.as_mut_ptr().offset(i as isize) = 0.5f32
-                    * ((if 0 as f32
-                        > *bandLogE.offset(i as isize) - *follower.as_mut_ptr().offset(i as isize)
-                    {
+                follower[i as usize] = 0.5f32
+                    * ((if 0 as f32 > bandLogE[i as usize] - follower[i as usize] {
                         0 as f32
                     } else {
-                        *bandLogE.offset(i as isize) - *follower.as_mut_ptr().offset(i as isize)
+                        bandLogE[i as usize] - follower[i as usize]
                     }) + (if 0 as f32
-                        > *bandLogE.offset((nbEBands + i) as isize)
-                            - *follower.as_mut_ptr().offset((nbEBands + i) as isize)
+                        > bandLogE[(nbEBands + i) as usize] - follower[(nbEBands + i) as usize]
                     {
                         0 as f32
                     } else {
-                        *bandLogE.offset((nbEBands + i) as isize)
-                            - *follower.as_mut_ptr().offset((nbEBands + i) as isize)
+                        bandLogE[(nbEBands + i) as usize] - follower[(nbEBands + i) as usize]
                     }));
                 i += 1;
             }
         } else {
             i = start;
             while i < end {
-                *follower.as_mut_ptr().offset(i as isize) = if 0 as f32
-                    > *bandLogE.offset(i as isize) - *follower.as_mut_ptr().offset(i as isize)
-                {
+                follower[i as usize] = if 0 as f32 > bandLogE[i as usize] - follower[i as usize] {
                     0 as f32
                 } else {
-                    *bandLogE.offset(i as isize) - *follower.as_mut_ptr().offset(i as isize)
+                    bandLogE[i as usize] - follower[i as usize]
                 };
                 i += 1;
             }
         }
         i = start;
         while i < end {
-            *follower.as_mut_ptr().offset(i as isize) = if *follower.as_mut_ptr().offset(i as isize)
-                > *surround_dynalloc.offset(i as isize)
-            {
-                *follower.as_mut_ptr().offset(i as isize)
+            follower[i as usize] = if follower[i as usize] > surround_dynalloc[i as usize] {
+                follower[i as usize]
             } else {
-                *surround_dynalloc.offset(i as isize)
+                surround_dynalloc[i as usize]
             };
             i += 1;
         }
         i = start;
         while i < end {
-            *importance.offset(i as isize) = (0.5f32
+            importance[i as usize] = (0.5f32
                 + 13.0
-                    * celt_exp2(if *follower.as_mut_ptr().offset(i as isize) < 4.0f32 {
-                        *follower.as_mut_ptr().offset(i as isize)
+                    * celt_exp2(if follower[i as usize] < 4.0f32 {
+                        follower[i as usize]
                     } else {
                         4.0f32
                     }))
@@ -1471,29 +1401,25 @@ unsafe fn dynalloc_analysis(
         if (vbr == 0 || constrained_vbr != 0) && isTransient == 0 {
             i = start;
             while i < end {
-                *follower.as_mut_ptr().offset(i as isize) =
-                    0.5f32 * *follower.as_mut_ptr().offset(i as isize);
+                follower[i as usize] = 0.5f32 * follower[i as usize];
                 i += 1;
             }
         }
         i = start;
         while i < end {
             if i < 8 {
-                let ref mut fresh1 = *follower.as_mut_ptr().offset(i as isize);
-                *fresh1 *= 2 as f32;
+                follower[i as usize] *= 2 as f32;
             }
             if i >= 12 {
-                *follower.as_mut_ptr().offset(i as isize) =
-                    0.5f32 * *follower.as_mut_ptr().offset(i as isize);
+                follower[i as usize] = 0.5f32 * follower[i as usize];
             }
             i += 1;
         }
-        if (*analysis).valid != 0 {
+        if analysis.valid != 0 {
             i = start;
             while i < (if (19) < end { 19 } else { end }) {
-                *follower.as_mut_ptr().offset(i as isize) =
-                    *follower.as_mut_ptr().offset(i as isize)
-                        + 1.0f32 / 64.0f32 * (*analysis).leak_boost[i as usize] as i32 as f32;
+                follower[i as usize] = follower[i as usize]
+                    + 1.0f32 / 64.0f32 * analysis.leak_boost[i as usize] as i32 as f32;
                 i += 1;
             }
         }
@@ -1502,35 +1428,31 @@ unsafe fn dynalloc_analysis(
             let mut width: i32 = 0;
             let mut boost: i32 = 0;
             let mut boost_bits: i32 = 0;
-            *follower.as_mut_ptr().offset(i as isize) =
-                if *follower.as_mut_ptr().offset(i as isize) < 4 as f32 {
-                    *follower.as_mut_ptr().offset(i as isize)
-                } else {
-                    4 as f32
-                };
-            width = C
-                * (*eBands.offset((i + 1) as isize) as i32 - *eBands.offset(i as isize) as i32)
-                << LM;
+            follower[i as usize] = if follower[i as usize] < 4 as f32 {
+                follower[i as usize]
+            } else {
+                4 as f32
+            };
+            width = C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) << LM;
             if width < 6 {
-                boost = *follower.as_mut_ptr().offset(i as isize) as i32;
+                boost = follower[i as usize] as i32;
                 boost_bits = boost * width << BITRES;
             } else if width > 48 {
-                boost = (*follower.as_mut_ptr().offset(i as isize) * 8 as f32) as i32;
+                boost = (follower[i as usize] * 8 as f32) as i32;
                 boost_bits = (boost * width << BITRES) / 8;
             } else {
-                boost =
-                    (*follower.as_mut_ptr().offset(i as isize) * width as f32 / 6 as f32) as i32;
+                boost = (follower[i as usize] * width as f32 / 6 as f32) as i32;
                 boost_bits = (boost * 6) << BITRES;
             }
             if (vbr == 0 || constrained_vbr != 0 && isTransient == 0)
                 && tot_boost + boost_bits >> BITRES >> 3 > 2 * effectiveBytes / 3
             {
                 let cap: i32 = (2 * effectiveBytes / 3) << BITRES << 3;
-                *offsets.offset(i as isize) = cap - tot_boost;
+                offsets[i as usize] = cap - tot_boost;
                 tot_boost = cap;
                 break;
             } else {
-                *offsets.offset(i as isize) = boost;
+                offsets[i as usize] = boost;
                 tot_boost += boost_bits;
                 i += 1;
             }
@@ -1538,82 +1460,59 @@ unsafe fn dynalloc_analysis(
     } else {
         i = start;
         while i < end {
-            *importance.offset(i as isize) = 13;
+            importance[i as usize] = 13;
             i += 1;
         }
     }
     *tot_boost_ = tot_boost;
     return maxDepth;
 }
-unsafe fn run_prefilter(
-    st: *mut OpusCustomEncoder,
-    in_0: *mut celt_sig,
-    prefilter_mem: *mut celt_sig,
+/// Upstream C: celt/celt_encoder.c:run_prefilter
+fn run_prefilter(
+    st: &mut OpusCustomEncoder,
+    in_0: &mut [celt_sig],
     CC: i32,
     N: i32,
     prefilter_tapset: i32,
-    pitch: *mut i32,
-    gain: *mut opus_val16,
-    qgain: *mut i32,
+    pitch: &mut i32,
+    gain: &mut opus_val16,
+    qgain: &mut i32,
     enabled: i32,
     nbAvailableBytes: i32,
-    analysis: *mut AnalysisInfo,
+    analysis: &AnalysisInfo,
 ) -> i32 {
-    let mut c: i32 = 0;
-    let mut pre: [*mut celt_sig; 2] = [0 as *mut celt_sig; 2];
-    let mut mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
     let mut pitch_index: i32 = 0;
     let mut gain1: opus_val16 = 0.;
-    let mut pf_threshold: opus_val16 = 0.;
-    let mut pf_on: i32 = 0;
+    let mut pf_threshold: opus_val16;
+    let pf_on: i32;
     let mut qg: i32 = 0;
-    let mut overlap: i32 = 0;
-    mode = (*st).mode;
-    overlap = (*mode).overlap as i32;
-    let vla = (CC * (N + 1024)) as usize;
+    let mode = st.mode;
+    let overlap = mode.overlap as i32;
+    let pre_chan_len = (N + COMBFILTER_MAXPERIOD) as usize;
+    let vla = (CC as usize) * pre_chan_len;
     let mut _pre: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
-    pre[0 as usize] = _pre.as_mut_ptr();
-    pre[1 as usize] = _pre
-        .as_mut_ptr()
-        .offset((N + COMBFILTER_MAXPERIOD) as isize);
-    c = 0;
-    loop {
-        memcpy(
-            pre[c as usize] as *mut core::ffi::c_void,
-            prefilter_mem.offset((c * 1024) as isize) as *const core::ffi::c_void,
-            (1024_u64)
-                .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                .wrapping_add(
-                    (0 * (pre[c as usize]).offset_from(prefilter_mem.offset((c * 1024) as isize))
-                        as i64) as u64,
-                ),
+    // pre[c] starts at c * pre_chan_len in _pre
+    for c in 0..CC as usize {
+        let pre_base = c * pre_chan_len;
+        // Copy prefilter_mem[c*1024 .. c*1024 + 1024] into pre[c][0..1024]
+        _pre[pre_base..pre_base + COMBFILTER_MAXPERIOD as usize].copy_from_slice(
+            &st.prefilter_mem
+                [c * COMBFILTER_MAXPERIOD as usize..(c + 1) * COMBFILTER_MAXPERIOD as usize],
         );
-        memcpy(
-            (pre[c as usize]).offset(1024 as isize) as *mut core::ffi::c_void,
-            in_0.offset((c * (N + overlap)) as isize)
-                .offset(overlap as isize) as *const core::ffi::c_void,
-            (N as u64)
-                .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                .wrapping_add(
-                    (0 * (pre[c as usize]).offset(1024 as isize).offset_from(
-                        in_0.offset((c * (N + overlap)) as isize)
-                            .offset(overlap as isize),
-                    ) as i64) as u64,
-                ),
-        );
-        c += 1;
-        if !(c < CC) {
-            break;
-        }
+        // Copy in_0[c*(N+overlap)+overlap .. +N] into pre[c][1024..1024+N]
+        let in_src = c * (N + overlap) as usize + overlap as usize;
+        _pre[pre_base + COMBFILTER_MAXPERIOD as usize
+            ..pre_base + COMBFILTER_MAXPERIOD as usize + N as usize]
+            .copy_from_slice(&in_0[in_src..in_src + N as usize]);
     }
     if enabled != 0 {
-        let vla_0 = (1024 + N >> 1) as usize;
+        let vla_0 = (COMBFILTER_MAXPERIOD + N >> 1) as usize;
         let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
         {
             let ds_len = (COMBFILTER_MAXPERIOD + N) as usize;
-            let ch0 = std::slice::from_raw_parts(pre[0], ds_len);
+            let ch0 = &_pre[..ds_len];
             if CC == 2 {
-                let ch1 = std::slice::from_raw_parts(pre[1], ds_len);
+                let ch1 = &_pre[pre_chan_len..pre_chan_len + ds_len];
                 pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), ds_len);
             } else {
                 pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), ds_len);
@@ -1632,31 +1531,31 @@ unsafe fn run_prefilter(
             COMBFILTER_MINPERIOD,
             N,
             &mut pitch_index,
-            (*st).prefilter_period,
-            (*st).prefilter_gain,
+            st.prefilter_period,
+            st.prefilter_gain,
         );
         if pitch_index > COMBFILTER_MAXPERIOD - 2 {
             pitch_index = COMBFILTER_MAXPERIOD - 2;
         }
         gain1 = 0.7f32 * gain1;
-        if (*st).loss_rate > 2 {
+        if st.loss_rate > 2 {
             gain1 = 0.5f32 * gain1;
         }
-        if (*st).loss_rate > 4 {
+        if st.loss_rate > 4 {
             gain1 = 0.5f32 * gain1;
         }
-        if (*st).loss_rate > 8 {
+        if st.loss_rate > 8 {
             gain1 = 0 as opus_val16;
         }
     } else {
         gain1 = 0 as opus_val16;
         pitch_index = COMBFILTER_MINPERIOD;
     }
-    if (*analysis).valid != 0 {
-        gain1 = gain1 * (*analysis).max_pitch_ratio;
+    if analysis.valid != 0 {
+        gain1 = gain1 * analysis.max_pitch_ratio;
     }
     pf_threshold = 0.2f32;
-    if (pitch_index - (*st).prefilter_period).abs() * 10 > pitch_index {
+    if (pitch_index - st.prefilter_period).abs() * 10 > pitch_index {
         pf_threshold += 0.2f32;
     }
     if nbAvailableBytes < 25 {
@@ -1665,10 +1564,10 @@ unsafe fn run_prefilter(
     if nbAvailableBytes < 35 {
         pf_threshold += 0.1f32;
     }
-    if (*st).prefilter_gain > 0.4f32 {
+    if st.prefilter_gain > 0.4f32 {
         pf_threshold -= 0.1f32;
     }
-    if (*st).prefilter_gain > 0.55f32 {
+    if st.prefilter_gain > 0.55f32 {
         pf_threshold -= 0.1f32;
     }
     pf_threshold = if pf_threshold > 0.2f32 {
@@ -1681,8 +1580,8 @@ unsafe fn run_prefilter(
         pf_on = 0;
         qg = 0;
     } else {
-        if ((gain1 - (*st).prefilter_gain).abs()) < 0.1f32 {
-            gain1 = (*st).prefilter_gain;
+        if ((gain1 - st.prefilter_gain).abs()) < 0.1f32 {
+            gain1 = st.prefilter_gain;
         }
         qg = (0.5f32 + gain1 * 32 as f32 / 3 as f32).floor() as i32 - 1;
         qg = if 0 > (if (7) < qg { 7 } else { qg }) {
@@ -1695,48 +1594,38 @@ unsafe fn run_prefilter(
         gain1 = 0.09375f32 * (qg + 1) as f32;
         pf_on = 1;
     }
-    c = 0;
-    loop {
-        let offset: i32 = (*mode).shortMdctSize - overlap;
-        (*st).prefilter_period = if (*st).prefilter_period > 15 {
-            (*st).prefilter_period
+    for c in 0..CC as usize {
+        let offset: i32 = mode.shortMdctSize - overlap;
+        st.prefilter_period = if st.prefilter_period > 15 {
+            st.prefilter_period
         } else {
             15
         };
-        memcpy(
-            in_0.offset((c * (N + overlap)) as isize) as *mut core::ffi::c_void,
-            ((*st).in_mem).as_mut_ptr().offset((c * overlap) as isize) as *const core::ffi::c_void,
-            (overlap as u64)
-                .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                .wrapping_add(
-                    (0 * in_0
-                        .offset((c * (N + overlap)) as isize)
-                        .offset_from(((*st).in_mem).as_mut_ptr().offset((c * overlap) as isize))
-                        as i64) as u64,
-                ),
-        );
+        // Copy in_mem overlap into in_0
+        let in_dst = c * (N + overlap) as usize;
+        in_0[in_dst..in_dst + overlap as usize]
+            .copy_from_slice(&st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]);
         {
-            let pre_len = N + COMBFILTER_MAXPERIOD;
-            let pre_slice = std::slice::from_raw_parts(pre[c as usize], pre_len as usize);
-            let in_base = (c * (N + overlap) + overlap) as usize;
-            let in_len = (N + overlap) as usize; // remaining from in_base
-            let in_slice = std::slice::from_raw_parts_mut(in_0.offset(in_base as isize), in_len);
+            let pre_base = c * pre_chan_len;
+            let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
+            let in_base = c * (N + overlap) as usize + overlap as usize;
+            let in_slice = &mut in_0[in_base..in_base + N as usize];
             if offset != 0 {
                 comb_filter(
                     in_slice,
                     0,
                     pre_slice,
                     COMBFILTER_MAXPERIOD as usize,
-                    (*st).prefilter_period,
-                    (*st).prefilter_period,
+                    st.prefilter_period,
+                    st.prefilter_period,
                     offset,
-                    -(*st).prefilter_gain,
-                    -(*st).prefilter_gain,
-                    (*st).prefilter_tapset,
-                    (*st).prefilter_tapset,
+                    -st.prefilter_gain,
+                    -st.prefilter_gain,
+                    st.prefilter_tapset,
+                    st.prefilter_tapset,
                     &[],
                     0,
-                    (*st).arch,
+                    st.arch,
                 );
             }
             comb_filter(
@@ -1744,79 +1633,42 @@ unsafe fn run_prefilter(
                 offset as usize,
                 pre_slice,
                 (COMBFILTER_MAXPERIOD + offset) as usize,
-                (*st).prefilter_period,
+                st.prefilter_period,
                 pitch_index,
                 N - offset,
-                -(*st).prefilter_gain,
+                -st.prefilter_gain,
                 -gain1,
-                (*st).prefilter_tapset,
+                st.prefilter_tapset,
                 prefilter_tapset,
-                &(*mode).window,
+                &mode.window,
                 overlap,
-                (*st).arch,
+                st.arch,
             );
         }
-        memcpy(
-            ((*st).in_mem).as_mut_ptr().offset((c * overlap) as isize) as *mut core::ffi::c_void,
-            in_0.offset((c * (N + overlap)) as isize).offset(N as isize)
-                as *const core::ffi::c_void,
-            (overlap as u64)
-                .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                .wrapping_add(
-                    (0 * ((*st).in_mem)
-                        .as_mut_ptr()
-                        .offset((c * overlap) as isize)
-                        .offset_from(in_0.offset((c * (N + overlap)) as isize).offset(N as isize))
-                        as i64) as u64,
-                ),
-        );
+        // Copy end of in_0 back into in_mem overlap
+        let in_src = c * (N + overlap) as usize + N as usize;
+        st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]
+            .copy_from_slice(&in_0[in_src..in_src + overlap as usize]);
+        // Update prefilter_mem from _pre
+        let pre_base = c * pre_chan_len;
+        let pfm_base = c * COMBFILTER_MAXPERIOD as usize;
         if N > COMBFILTER_MAXPERIOD {
-            memcpy(
-                prefilter_mem.offset((c * 1024) as isize) as *mut core::ffi::c_void,
-                (pre[c as usize]).offset(N as isize) as *const core::ffi::c_void,
-                (1024_u64)
-                    .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                    .wrapping_add(
-                        (0 * prefilter_mem
-                            .offset((c * 1024) as isize)
-                            .offset_from((pre[c as usize]).offset(N as isize))
-                            as i64) as u64,
-                    ),
+            st.prefilter_mem[pfm_base..pfm_base + COMBFILTER_MAXPERIOD as usize].copy_from_slice(
+                &_pre[pre_base + N as usize..pre_base + N as usize + COMBFILTER_MAXPERIOD as usize],
             );
         } else {
-            memmove(
-                prefilter_mem.offset((c * 1024) as isize) as *mut core::ffi::c_void,
-                prefilter_mem.offset((c * 1024) as isize).offset(N as isize)
-                    as *const core::ffi::c_void,
-                ((1024 - N) as u64)
-                    .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                    .wrapping_add(
-                        (0 * prefilter_mem.offset((c * 1024) as isize).offset_from(
-                            prefilter_mem.offset((c * 1024) as isize).offset(N as isize),
-                        ) as i64) as u64,
-                    ),
+            // Shift prefilter_mem left by N
+            st.prefilter_mem.copy_within(
+                pfm_base + N as usize..pfm_base + COMBFILTER_MAXPERIOD as usize,
+                pfm_base,
             );
-            memcpy(
-                prefilter_mem
-                    .offset((c * 1024) as isize)
-                    .offset(1024 as isize)
-                    .offset(-(N as isize)) as *mut core::ffi::c_void,
-                (pre[c as usize]).offset(1024 as isize) as *const core::ffi::c_void,
-                (N as u64)
-                    .wrapping_mul(::core::mem::size_of::<celt_sig>() as u64)
-                    .wrapping_add(
-                        (0 * prefilter_mem
-                            .offset((c * 1024) as isize)
-                            .offset(1024 as isize)
-                            .offset(-(N as isize))
-                            .offset_from((pre[c as usize]).offset(1024 as isize))
-                            as i64) as u64,
-                    ),
-            );
-        }
-        c += 1;
-        if !(c < CC) {
-            break;
+            // Copy last N samples from _pre[1024..1024+N] (which is _pre[pre_base+1024..])
+            st.prefilter_mem[pfm_base + COMBFILTER_MAXPERIOD as usize - N as usize
+                ..pfm_base + COMBFILTER_MAXPERIOD as usize]
+                .copy_from_slice(
+                    &_pre[pre_base + COMBFILTER_MAXPERIOD as usize
+                        ..pre_base + COMBFILTER_MAXPERIOD as usize + N as usize],
+                );
         }
     }
     *gain = gain1;
@@ -1824,9 +1676,10 @@ unsafe fn run_prefilter(
     *qgain = qg;
     return pf_on;
 }
-unsafe fn compute_vbr(
-    mode: *const OpusCustomMode,
-    analysis: *mut AnalysisInfo,
+/// Upstream C: celt/celt_encoder.c:compute_vbr
+fn compute_vbr(
+    mode: &OpusCustomMode,
+    analysis: &AnalysisInfo,
     base_target: i32,
     LM: i32,
     bitrate: i32,
@@ -1849,28 +1702,25 @@ unsafe fn compute_vbr(
     let mut coded_bands: i32 = 0;
     let mut tf_calibration: opus_val16 = 0.;
     let mut nbEBands: i32 = 0;
-    let mut eBands: *const i16 = 0 as *const i16;
-    nbEBands = (*mode).nbEBands as i32;
-    eBands = (*mode).eBands.as_ptr();
+    let eBands = &mode.eBands;
+    nbEBands = mode.nbEBands as i32;
     coded_bands = if lastCodedBands != 0 {
         lastCodedBands
     } else {
         nbEBands
     };
-    coded_bins = (*eBands.offset(coded_bands as isize) as i32) << LM;
+    coded_bins = (eBands[coded_bands as usize] as i32) << LM;
     if C == 2 {
-        coded_bins += (*eBands.offset(
-            (if intensity < coded_bands {
-                intensity
-            } else {
-                coded_bands
-            }) as isize,
-        ) as i32)
+        coded_bins += (eBands[(if intensity < coded_bands {
+            intensity
+        } else {
+            coded_bands
+        }) as usize] as i32)
             << LM;
     }
     target = base_target;
-    if (*analysis).valid != 0 && ((*analysis).activity as f64) < 0.4f64 {
-        target -= ((coded_bins << BITRES) as f32 * (0.4f32 - (*analysis).activity)) as i32;
+    if analysis.valid != 0 && (analysis.activity as f64) < 0.4f64 {
+        target -= ((coded_bins << BITRES) as f32 * (0.4f32 - analysis.activity)) as i32;
     }
     if C == 2 {
         let mut coded_stereo_bands: i32 = 0;
@@ -1882,7 +1732,7 @@ unsafe fn compute_vbr(
             coded_bands
         };
         coded_stereo_dof =
-            ((*eBands.offset(coded_stereo_bands as isize) as i32) << LM) - coded_stereo_bands;
+            ((eBands[coded_stereo_bands as usize] as i32) << LM) - coded_stereo_bands;
         max_frac = 0.8f32 * coded_stereo_dof as opus_val32 / coded_bins as opus_val16;
         stereo_saving = if stereo_saving < 1.0f32 {
             stereo_saving
@@ -1900,13 +1750,13 @@ unsafe fn compute_vbr(
     target += tot_boost - ((19) << LM);
     tf_calibration = 0.044f32;
     target += ((tf_estimate - tf_calibration) * target as f32) as i32;
-    if (*analysis).valid != 0 && lfe == 0 {
+    if analysis.valid != 0 && lfe == 0 {
         let mut tonal_target: i32 = 0;
         let mut tonal: f32 = 0.;
-        tonal = (if 0.0f32 > (*analysis).tonality - 0.15f32 {
+        tonal = (if 0.0f32 > analysis.tonality - 0.15f32 {
             0.0f32
         } else {
-            (*analysis).tonality - 0.15f32
+            analysis.tonality - 0.15f32
         }) - 0.12f32;
         tonal_target = target + ((coded_bins << BITRES) as f32 * 1.2f32 * tonal) as i32;
         if pitch_change != 0 {
@@ -1925,7 +1775,7 @@ unsafe fn compute_vbr(
     }
     let mut floor_depth: i32 = 0;
     let mut bins: i32 = 0;
-    bins = (*eBands.offset((nbEBands - 2) as isize) as i32) << LM;
+    bins = (eBands[(nbEBands - 2) as usize] as i32) << LM;
     floor_depth = ((C * bins << 3) as opus_val32 * maxDepth) as i32;
     floor_depth = if floor_depth > target >> 2 {
         floor_depth
@@ -1995,7 +1845,6 @@ pub unsafe fn celt_encode_with_ec(
         rem: 0,
         error: 0,
     };
-    let mut prefilter_mem: *mut celt_sig = 0 as *mut celt_sig;
     let mut oldBandE: *mut opus_val16 = 0 as *mut opus_val16;
     let mut oldLogE: *mut opus_val16 = 0 as *mut opus_val16;
     let mut oldLogE2: *mut opus_val16 = 0 as *mut opus_val16;
@@ -2074,7 +1923,6 @@ pub unsafe fn celt_encode_with_ec(
     }
     M = (1) << LM;
     N = M * (*mode).shortMdctSize;
-    prefilter_mem = (*st).prefilter_mem.as_mut_ptr();
     oldBandE = (*st).oldBandE.as_mut_ptr();
     oldLogE = (*st).oldLogE.as_mut_ptr();
     oldLogE2 = (*st).oldLogE2.as_mut_ptr();
@@ -2253,20 +2101,22 @@ pub unsafe fn celt_encode_with_ec(
         && (*st).disable_pf == 0
         && (*st).complexity >= 5) as i32;
     prefilter_tapset = (*st).tapset_decision;
-    pf_on = run_prefilter(
-        st,
-        in_0.as_mut_ptr(),
-        prefilter_mem,
-        CC,
-        N,
-        prefilter_tapset,
-        &mut pitch_index,
-        &mut gain1,
-        &mut qg,
-        enabled,
-        nbAvailableBytes,
-        &mut (*st).analysis,
-    );
+    {
+        let analysis = (*st).analysis;
+        pf_on = run_prefilter(
+            &mut *st,
+            &mut in_0,
+            CC,
+            N,
+            prefilter_tapset,
+            &mut pitch_index,
+            &mut gain1,
+            &mut qg,
+            enabled,
+            nbAvailableBytes,
+            &analysis,
+        );
+    }
     #[cfg(feature = "ent-dump")]
     eprintln!("prefilter: pitch_index={pitch_index}, gain1={gain1:1.6}, qg={qg}");
     if (gain1 > 0.4f32 || (*st).prefilter_gain > 0.4f32)
@@ -2605,27 +2455,27 @@ pub unsafe fn celt_encode_with_ec(
     let vla_8 = nbEBands as usize;
     let mut spread_weight: Vec<i32> = ::std::vec::from_elem(0, vla_8);
     maxDepth = dynalloc_analysis(
-        bandLogE.as_mut_ptr(),
-        bandLogE2.as_mut_ptr(),
+        &bandLogE,
+        &bandLogE2,
         nbEBands,
         start,
         end,
         C,
-        offsets.as_mut_ptr(),
+        &mut offsets,
         (*st).lsb_depth,
-        (*mode).logN.as_ptr(),
+        &(*mode).logN,
         isTransient,
         (*st).vbr,
         (*st).constrained_vbr,
-        eBands,
+        &(*mode).eBands,
         LM,
         effectiveBytes,
         &mut tot_boost,
         (*st).lfe,
-        surround_dynalloc.as_mut_ptr(),
-        &mut (*st).analysis,
-        importance.as_mut_ptr(),
-        spread_weight.as_mut_ptr(),
+        &surround_dynalloc,
+        &(*st).analysis,
+        &mut importance,
+        &mut spread_weight,
     );
     let vla_9 = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla_9);
@@ -2637,17 +2487,17 @@ pub unsafe fn celt_encode_with_ec(
             20480 / effectiveBytes + 2
         };
         tf_select = tf_analysis(
-            mode,
+            &*mode,
             effEnd,
             isTransient,
-            tf_res.as_mut_ptr(),
+            &mut tf_res,
             lambda,
-            X.as_mut_ptr(),
+            &X,
             N,
             LM,
             tf_estimate,
             tf_chan,
-            importance.as_mut_ptr(),
+            &importance,
         );
         i = effEnd;
         while i < end {
@@ -2717,15 +2567,7 @@ pub unsafe fn celt_encode_with_ec(
         (*st).loss_rate,
         (*st).lfe,
     );
-    tf_encode(
-        start,
-        end,
-        isTransient,
-        tf_res.as_mut_ptr(),
-        LM,
-        tf_select,
-        enc,
-    );
+    tf_encode(start, end, isTransient, &mut tf_res, LM, tf_select, enc);
     if ec_tell(enc) + 4 <= total_bits {
         if (*st).lfe != 0 {
             (*st).tapset_decision = 0;
@@ -2896,14 +2738,14 @@ pub unsafe fn celt_encode_with_ec(
             alloc_trim = 5;
         } else {
             alloc_trim = alloc_trim_analysis(
-                mode,
-                X.as_mut_ptr(),
-                bandLogE.as_mut_ptr(),
+                &*mode,
+                &X,
+                &bandLogE,
                 end,
                 LM,
                 C,
                 N,
-                &mut (*st).analysis,
+                &(*st).analysis,
                 &mut (*st).stereo_saving,
                 tf_estimate,
                 (*st).intensity,
@@ -2941,8 +2783,8 @@ pub unsafe fn celt_encode_with_ec(
         }
         if hybrid == 0 {
             target = compute_vbr(
-                mode,
-                &mut (*st).analysis,
+                &*mode,
+                &(*st).analysis,
                 base_target,
                 LM,
                 equiv_rate,
