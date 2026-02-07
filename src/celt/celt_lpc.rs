@@ -1,236 +1,227 @@
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-}
-pub use self::arch_h::{opus_val16, opus_val32};
 use crate::celt::pitch::{celt_pitch_xcorr_c, xcorr_kernel_c};
-use crate::externs::memset;
 
 pub const LPC_ORDER: usize = 24;
 
-pub unsafe fn _celt_lpc(mut _lpc: *mut opus_val16, ac: *const opus_val32, p: i32) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut r: opus_val32 = 0.;
-    let mut error: opus_val32 = *ac.offset(0 as isize);
-    let lpc: *mut f32 = _lpc;
-    memset(
-        lpc as *mut core::ffi::c_void,
-        0,
-        (p as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
-    );
-    if *ac.offset(0 as isize) != 0 as f32 {
-        i = 0;
-        while i < p {
-            let mut rr: opus_val32 = 0 as opus_val32;
-            j = 0;
-            while j < i {
-                rr += *lpc.offset(j as isize) * *ac.offset((i - j) as isize);
-                j += 1;
+/// Levinson-Durbin LPC analysis.
+///
+/// Computes `lpc.len()` LPC coefficients from autocorrelation values `ac`.
+/// `ac` must have at least `lpc.len() + 1` elements.
+///
+/// Upstream C: celt/celt_lpc.c:_celt_lpc
+pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
+    let p = lpc.len();
+    assert!(ac.len() > p);
+    lpc.fill(0.0);
+    if ac[0] != 0.0 {
+        let mut error = ac[0];
+        for i in 0..p {
+            let mut rr = 0.0f32;
+            for j in 0..i {
+                rr += lpc[j] * ac[i - j];
             }
-            rr += *ac.offset((i + 1) as isize);
-            r = -(rr / error);
-            *lpc.offset(i as isize) = r;
-            j = 0;
-            while j < i + 1 >> 1 {
-                let mut tmp1: opus_val32 = 0.;
-                let mut tmp2: opus_val32 = 0.;
-                tmp1 = *lpc.offset(j as isize);
-                tmp2 = *lpc.offset((i - 1 - j) as isize);
-                *lpc.offset(j as isize) = tmp1 + r * tmp2;
-                *lpc.offset((i - 1 - j) as isize) = tmp2 + r * tmp1;
-                j += 1;
+            rr += ac[i + 1];
+            let r = -(rr / error);
+            lpc[i] = r;
+            for j in 0..((i + 1) >> 1) {
+                let tmp1 = lpc[j];
+                let tmp2 = lpc[i - 1 - j];
+                lpc[j] = tmp1 + r * tmp2;
+                lpc[i - 1 - j] = tmp2 + r * tmp1;
             }
-            error = error - r * r * error;
-            if error < 0.001f32 * *ac.offset(0 as isize) {
+            error -= r * r * error;
+            if error < 0.001f32 * ac[0] {
                 break;
             }
-            i += 1;
         }
     }
 }
-pub unsafe fn celt_fir_c(
-    x: *const opus_val16,
-    num: *const opus_val16,
-    y: *mut opus_val16,
-    N: i32,
-    ord: i32,
-    _arch: i32,
-) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    assert!(x != y as *const opus_val16);
-    let vla = ord as usize;
-    let mut rnum: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
-    i = 0;
-    while i < ord {
-        *rnum.as_mut_ptr().offset(i as isize) = *num.offset((ord - i - 1) as isize);
-        i += 1;
+
+/// FIR filter.
+///
+/// `x` must contain at least `N + ord` elements, where the first `ord`
+/// elements are history (accessed as negative offsets in the C version).
+/// The filter reads `x[0..N+ord]` and writes `N` samples to `y`.
+/// `num` has `ord` coefficients.
+///
+/// Upstream C: celt/celt_lpc.c:celt_fir_c
+pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
+    let n = y.len();
+    assert!(x.len() >= n + ord);
+    assert!(num.len() >= ord);
+
+    // Reverse the numerator coefficients
+    let mut rnum: Vec<f32> = vec![0.0; ord];
+    for i in 0..ord {
+        rnum[i] = num[ord - i - 1];
     }
-    i = 0;
-    while i < N - 3 {
-        let mut sum: [opus_val32; 4] = [0.; 4];
-        sum[0 as usize] = *x.offset(i as isize);
-        sum[1 as usize] = *x.offset((i + 1) as isize);
-        sum[2 as usize] = *x.offset((i + 2) as isize);
-        sum[3 as usize] = *x.offset((i + 3) as isize);
-        xcorr_kernel_c(
-            rnum.as_mut_ptr(),
-            x.offset(i as isize).offset(-(ord as isize)),
-            sum.as_mut_ptr(),
-            ord,
-        );
-        *y.offset(i as isize) = sum[0 as usize];
-        *y.offset((i + 1) as isize) = sum[1 as usize];
-        *y.offset((i + 2) as isize) = sum[2 as usize];
-        *y.offset((i + 3) as isize) = sum[3 as usize];
+
+    let mut i = 0i32;
+    while i < n as i32 - 3 {
+        let ix = i as usize;
+        let mut sum = [0.0f32; 4];
+        // x is indexed with ord offset: x[ord + ix] is the "current" sample
+        sum[0] = x[ord + ix];
+        sum[1] = x[ord + ix + 1];
+        sum[2] = x[ord + ix + 2];
+        sum[3] = x[ord + ix + 3];
+        // SAFETY: xcorr_kernel_c reads rnum[0..ord] and y_ptr[0..ord+3], writes sum[0..4].
+        // All within bounds of our slices.
+        unsafe {
+            xcorr_kernel_c(
+                rnum.as_ptr(),
+                x[ix..].as_ptr(),
+                sum.as_mut_ptr(),
+                ord as i32,
+            );
+        }
+        y[ix] = sum[0];
+        y[ix + 1] = sum[1];
+        y[ix + 2] = sum[2];
+        y[ix + 3] = sum[3];
         i += 4;
     }
-    while i < N {
-        let mut sum_0: opus_val32 = *x.offset(i as isize);
-        j = 0;
-        while j < ord {
-            sum_0 =
-                sum_0 + *rnum.as_mut_ptr().offset(j as isize) * *x.offset((i + j - ord) as isize);
-            j += 1;
+    while (i as usize) < n {
+        let ix = i as usize;
+        let mut sum = x[ord + ix];
+        for j in 0..ord {
+            sum += rnum[j] * x[ix + j];
         }
-        *y.offset(i as isize) = sum_0;
+        y[ix] = sum;
         i += 1;
     }
 }
-pub unsafe fn celt_iir(
-    mut _x: *const opus_val32,
-    den: *const opus_val16,
-    mut _y: *mut opus_val32,
-    N: i32,
-    ord: i32,
-    mem: *mut opus_val16,
-    _arch: i32,
-) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+
+/// IIR filter (in-place).
+///
+/// Filters `buf[0..n]` in-place using `den` (length `ord`) denominator
+/// coefficients. `mem` (length `ord`) holds filter state and is updated
+/// on return.
+///
+/// Upstream C: celt/celt_lpc.c:celt_iir
+pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f32]) {
+    assert!(buf.len() >= n);
+    assert!(den.len() >= ord);
+    assert!(mem.len() >= ord);
     assert!(ord & 3 == 0);
-    let vla = ord as usize;
-    let mut rden: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
-    let vla_0 = (N + ord) as usize;
-    let mut y: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
-    i = 0;
-    while i < ord {
-        *rden.as_mut_ptr().offset(i as isize) = *den.offset((ord - i - 1) as isize);
-        i += 1;
+
+    // Reverse the denominator coefficients
+    let mut rden: Vec<f32> = vec![0.0; ord];
+    for i in 0..ord {
+        rden[i] = den[ord - i - 1];
     }
-    i = 0;
-    while i < ord {
-        *y.as_mut_ptr().offset(i as isize) = -*mem.offset((ord - i - 1) as isize);
-        i += 1;
+
+    // Internal y buffer with ord prefix for history
+    let mut yy: Vec<f32> = vec![0.0; n + ord];
+    for i in 0..ord {
+        yy[i] = -mem[ord - i - 1];
     }
-    while i < N + ord {
-        *y.as_mut_ptr().offset(i as isize) = 0 as opus_val16;
-        i += 1;
-    }
-    i = 0;
-    while i < N - 3 {
-        let mut sum: [opus_val32; 4] = [0.; 4];
-        sum[0 as usize] = *_x.offset(i as isize);
-        sum[1 as usize] = *_x.offset((i + 1) as isize);
-        sum[2 as usize] = *_x.offset((i + 2) as isize);
-        sum[3 as usize] = *_x.offset((i + 3) as isize);
-        xcorr_kernel_c(
-            rden.as_mut_ptr(),
-            y.as_mut_ptr().offset(i as isize),
-            sum.as_mut_ptr(),
-            ord,
-        );
-        *y.as_mut_ptr().offset((i + ord) as isize) = -sum[0 as usize];
-        *_y.offset(i as isize) = sum[0 as usize];
-        sum[1 as usize] =
-            sum[1 as usize] + *y.as_mut_ptr().offset((i + ord) as isize) * *den.offset(0 as isize);
-        *y.as_mut_ptr().offset((i + ord + 1) as isize) = -sum[1 as usize];
-        *_y.offset((i + 1) as isize) = sum[1 as usize];
-        sum[2 as usize] = sum[2 as usize]
-            + *y.as_mut_ptr().offset((i + ord + 1) as isize) * *den.offset(0 as isize);
-        sum[2 as usize] =
-            sum[2 as usize] + *y.as_mut_ptr().offset((i + ord) as isize) * *den.offset(1 as isize);
-        *y.as_mut_ptr().offset((i + ord + 2) as isize) = -sum[2 as usize];
-        *_y.offset((i + 2) as isize) = sum[2 as usize];
-        sum[3 as usize] = sum[3 as usize]
-            + *y.as_mut_ptr().offset((i + ord + 2) as isize) * *den.offset(0 as isize);
-        sum[3 as usize] = sum[3 as usize]
-            + *y.as_mut_ptr().offset((i + ord + 1) as isize) * *den.offset(1 as isize);
-        sum[3 as usize] =
-            sum[3 as usize] + *y.as_mut_ptr().offset((i + ord) as isize) * *den.offset(2 as isize);
-        *y.as_mut_ptr().offset((i + ord + 3) as isize) = -sum[3 as usize];
-        *_y.offset((i + 3) as isize) = sum[3 as usize];
+
+    let mut i = 0i32;
+    while i < n as i32 - 3 {
+        let ix = i as usize;
+        let mut sum = [0.0f32; 4];
+        sum[0] = buf[ix];
+        sum[1] = buf[ix + 1];
+        sum[2] = buf[ix + 2];
+        sum[3] = buf[ix + 3];
+        // SAFETY: xcorr_kernel_c reads rden[0..ord] and yy[ix..ix+ord+3], writes sum[0..4].
+        // All within bounds.
+        unsafe {
+            xcorr_kernel_c(
+                rden.as_ptr(),
+                yy[ix..].as_ptr(),
+                sum.as_mut_ptr(),
+                ord as i32,
+            );
+        }
+        yy[ix + ord] = -sum[0];
+        buf[ix] = sum[0];
+        sum[1] += yy[ix + ord] * den[0];
+        yy[ix + ord + 1] = -sum[1];
+        buf[ix + 1] = sum[1];
+        sum[2] += yy[ix + ord + 1] * den[0];
+        sum[2] += yy[ix + ord] * den[1];
+        yy[ix + ord + 2] = -sum[2];
+        buf[ix + 2] = sum[2];
+        sum[3] += yy[ix + ord + 2] * den[0];
+        sum[3] += yy[ix + ord + 1] * den[1];
+        sum[3] += yy[ix + ord] * den[2];
+        yy[ix + ord + 3] = -sum[3];
+        buf[ix + 3] = sum[3];
         i += 4;
     }
-    while i < N {
-        let mut sum_0: opus_val32 = *_x.offset(i as isize);
-        j = 0;
-        while j < ord {
-            sum_0 -=
-                *rden.as_mut_ptr().offset(j as isize) * *y.as_mut_ptr().offset((i + j) as isize);
-            j += 1;
+    while (i as usize) < n {
+        let ix = i as usize;
+        let mut sum = buf[ix];
+        for j in 0..ord {
+            sum -= rden[j] * yy[ix + j];
         }
-        *y.as_mut_ptr().offset((i + ord) as isize) = sum_0;
-        *_y.offset(i as isize) = sum_0;
+        yy[ix + ord] = sum;
+        buf[ix] = sum;
         i += 1;
     }
-    i = 0;
-    while i < ord {
-        *mem.offset(i as isize) = *_y.offset((N - i - 1) as isize);
-        i += 1;
+    for i in 0..ord {
+        mem[i] = buf[n - i - 1];
     }
 }
-pub unsafe fn _celt_autocorr(
-    x: *const opus_val16,
-    ac: *mut opus_val32,
-    window: *const opus_val16,
-    overlap: i32,
-    lag: i32,
-    n: i32,
-    arch: i32,
+
+/// Autocorrelation.
+///
+/// Computes `lag + 1` autocorrelation values from `x` (length `n`),
+/// optionally applying `window` (length `overlap`) at both ends.
+/// Results are written to `ac[0..=lag]`.
+///
+/// Upstream C: celt/celt_lpc.c:_celt_autocorr
+pub fn _celt_autocorr(
+    x: &[f32],
+    ac: &mut [f32],
+    window: Option<&[f32]>,
+    overlap: usize,
+    lag: usize,
 ) -> i32 {
-    let mut d: opus_val32 = 0.;
-    let mut i: i32 = 0;
-    let mut k: i32 = 0;
-    let fastN: i32 = n - lag;
-    let mut shift: i32 = 0;
-    let mut xptr: *const opus_val16 = 0 as *const opus_val16;
-    let vla = n as usize;
-    let mut xx: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
+    let n = x.len();
+    let fast_n = n - lag;
     assert!(n > 0);
-    assert!(overlap >= 0);
-    if overlap == 0 {
-        xptr = x;
+    assert!(ac.len() > lag);
+
+    let mut xx: Vec<f32>;
+    let xptr: &[f32];
+
+    if let Some(win) = window {
+        assert!(win.len() >= overlap);
+        xx = x.to_vec();
+        for i in 0..overlap {
+            xx[i] = x[i] * win[i];
+            xx[n - i - 1] = x[n - i - 1] * win[i];
+        }
+        xptr = &xx;
     } else {
-        i = 0;
-        while i < n {
-            *xx.as_mut_ptr().offset(i as isize) = *x.offset(i as isize);
-            i += 1;
-        }
-        i = 0;
-        while i < overlap {
-            *xx.as_mut_ptr().offset(i as isize) =
-                *x.offset(i as isize) * *window.offset(i as isize);
-            *xx.as_mut_ptr().offset((n - i - 1) as isize) =
-                *x.offset((n - i - 1) as isize) * *window.offset(i as isize);
-            i += 1;
-        }
-        xptr = xx.as_mut_ptr();
+        // Use x directly — allocate xx as empty to satisfy borrow checker
+        xx = Vec::new();
+        let _ = &xx; // suppress unused warning
+        xptr = x;
     }
-    shift = 0;
-    celt_pitch_xcorr_c(xptr, xptr, ac, fastN, lag + 1, arch);
-    k = 0;
-    while k <= lag {
-        i = k + fastN;
-        d = 0 as opus_val32;
-        while i < n {
-            d = d + *xptr.offset(i as isize) * *xptr.offset((i - k) as isize);
-            i += 1;
-        }
-        let ref mut fresh19 = *ac.offset(k as isize);
-        *fresh19 += d;
-        k += 1;
+
+    // SAFETY: celt_pitch_xcorr_c takes raw pointers but only reads xptr[0..n]
+    // and writes ac[0..lag+1]. Both are within bounds of our slices.
+    unsafe {
+        celt_pitch_xcorr_c(
+            xptr.as_ptr(),
+            xptr.as_ptr(),
+            ac.as_mut_ptr(),
+            fast_n as i32,
+            (lag + 1) as i32,
+            0,
+        );
     }
-    return shift;
+
+    for k in 0..=lag {
+        let mut d = 0.0f32;
+        for i in (k + fast_n)..n {
+            d += xptr[i] * xptr[i - k];
+        }
+        ac[k] += d;
+    }
+
+    0 // shift (always 0 for float)
 }

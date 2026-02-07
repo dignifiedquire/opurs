@@ -2154,15 +2154,14 @@ pub unsafe fn celt_encode_with_ec(
     }
     let vla = (CC * (N + overlap)) as usize;
     let mut in_0: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
-    sample_max = if (*st).overlap_max > celt_maxabs16(pcm, C * (N - overlap) / (*st).upsample) {
+    let main_len = (C * (N - overlap) / (*st).upsample) as usize;
+    let overlap_len = (C * overlap / (*st).upsample) as usize;
+    sample_max = if (*st).overlap_max > celt_maxabs16(std::slice::from_raw_parts(pcm, main_len)) {
         (*st).overlap_max
     } else {
-        celt_maxabs16(pcm, C * (N - overlap) / (*st).upsample)
+        celt_maxabs16(std::slice::from_raw_parts(pcm, main_len))
     };
-    (*st).overlap_max = celt_maxabs16(
-        pcm.offset((C * (N - overlap) / (*st).upsample) as isize),
-        C * overlap / (*st).upsample,
-    );
+    (*st).overlap_max = celt_maxabs16(std::slice::from_raw_parts(pcm.add(main_len), overlap_len));
     sample_max = if sample_max > (*st).overlap_max {
         sample_max
     } else {

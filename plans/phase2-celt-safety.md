@@ -35,21 +35,23 @@ Key: `qb` = quant_bands.rs
 
 ### Stage 2.1 — Math Primitives (no cross-module unsafe calls)
 
-- [ ] `float_cast.rs`
+- [x] `float_cast.rs`
   - Upstream C: `celt/float_cast.h`
   - Scope: float ↔ int conversion helpers
   - Risk: Low — pure math, no pointers
-- [ ] `mathops.rs`
+- [x] `mathops.rs`
   - Upstream C: `celt/mathops.h`, `celt/mathops.c`
   - Functions: `isqrt32`, `fast_atan2f`, `celt_maxabs16`, `celt_cos_norm`, etc.
   - Risk: Low — bounded integer math
   - Watch: `celt_maxabs16` takes a pointer + length → convert to `&[f32]`
-- [ ] `celt_lpc.rs`
+- [x] `celt_lpc.rs`
   - Upstream C: `celt/celt_lpc.h`, `celt/celt_lpc.c`
   - Functions: `_celt_lpc`, `_celt_autocorr`, `celt_fir_c`, `celt_iir`
   - Risk: Medium — inner loop pointer arithmetic for filter operations
   - Pattern: Convert `*const f32` + length → `&[f32]` slices
-- [ ] **Commit per file**: `refactor: make celt::<module> safe`
+  - Note: `celt_fir_c`, `celt_iir`, `_celt_autocorr` retain internal unsafe
+    blocks for calls to `xcorr_kernel_c`/`celt_pitch_xcorr_c` (pitch.rs Stage 2.3)
+- [x] **Commit per file**: `refactor: make celt::<module> safe`
 
 ### Stage 2.2 — Entropy Coding
 

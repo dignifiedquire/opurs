@@ -719,13 +719,11 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             if loss_count == 0 {
                 let mut ac: [opus_val32; 25] = [0.; 25];
                 _celt_autocorr(
-                    exc,
-                    ac.as_mut_ptr(),
-                    window,
-                    overlap,
-                    LPC_ORDER as i32,
-                    MAX_PERIOD,
-                    st.arch,
+                    std::slice::from_raw_parts(exc, MAX_PERIOD as usize),
+                    &mut ac,
+                    Some(std::slice::from_raw_parts(window, overlap as usize)),
+                    overlap as usize,
+                    LPC_ORDER,
                 );
                 ac[0 as usize] *= 1.0001f32;
                 i = 1;
@@ -733,33 +731,38 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     ac[i as usize] -= ac[i as usize] * (0.008f32 * 0.008f32) * i as f32 * i as f32;
                     i += 1;
                 }
-                _celt_lpc(
-                    lpc.offset((c * LPC_ORDER as i32) as isize),
-                    ac.as_mut_ptr(),
-                    LPC_ORDER as i32,
-                );
+                {
+                    let lpc_slice = std::slice::from_raw_parts_mut(
+                        lpc.offset((c * LPC_ORDER as i32) as isize),
+                        LPC_ORDER,
+                    );
+                    _celt_lpc(lpc_slice, &ac);
+                }
             }
-            celt_fir_c(
-                exc.offset(1024 as isize).offset(-(exc_length as isize)),
-                lpc.offset((c * 24) as isize),
-                fir_tmp.as_mut_ptr(),
-                exc_length,
-                24,
-                st.arch,
-            );
-            memcpy(
-                exc.offset(1024 as isize).offset(-(exc_length as isize)) as *mut core::ffi::c_void,
-                fir_tmp.as_mut_ptr() as *const core::ffi::c_void,
-                (exc_length as u64)
-                    .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                    .wrapping_add(
-                        (0 * exc
-                            .offset(1024 as isize)
-                            .offset(-(exc_length as isize))
-                            .offset_from(fir_tmp.as_mut_ptr()) as i64)
-                            as u64,
-                    ),
-            );
+            {
+                // x needs ord history samples before the data start
+                let fir_ord = LPC_ORDER;
+                let fir_n = exc_length as usize;
+                let x_start = (1024 - exc_length as usize) - fir_ord;
+                // exc is _exc[LPC_ORDER..], so exc-relative offsets map to _exc[LPC_ORDER + offset]
+                // x_start in exc-relative = 1024 - exc_length - 24
+                // In _exc-relative = LPC_ORDER + 1024 - exc_length - 24 = 1024 - exc_length
+                let fir_x =
+                    std::slice::from_raw_parts(exc.offset(x_start as isize), fir_ord + fir_n);
+                let fir_num = std::slice::from_raw_parts(
+                    lpc.offset((c * LPC_ORDER as i32) as isize),
+                    fir_ord,
+                );
+                celt_fir_c(fir_x, fir_num, &mut fir_tmp, fir_ord);
+            }
+            // Copy filtered result back to exc buffer
+            {
+                let dst = std::slice::from_raw_parts_mut(
+                    exc.offset(1024 as isize).offset(-(exc_length as isize)),
+                    exc_length as usize,
+                );
+                dst.copy_from_slice(&fir_tmp[..exc_length as usize]);
+            }
             let mut E1: opus_val32 = 1 as opus_val32;
             let mut E2: opus_val32 = 1 as opus_val32;
             let mut decay_length: i32 = 0;
@@ -806,17 +809,24 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 lpc_mem[i as usize] = *buf.offset((2048 - N - 1 - i) as isize);
                 i += 1;
             }
-            celt_iir(
-                buf.offset(DECODE_BUFFER_SIZE as isize)
-                    .offset(-(N as isize)),
-                lpc.offset((c * LPC_ORDER as i32) as isize),
-                buf.offset(DECODE_BUFFER_SIZE as isize)
-                    .offset(-(N as isize)),
-                extrapolation_len,
-                LPC_ORDER as i32,
-                lpc_mem.as_mut_ptr(),
-                st.arch,
-            );
+            {
+                let iir_den = std::slice::from_raw_parts(
+                    lpc.offset((c * LPC_ORDER as i32) as isize),
+                    LPC_ORDER,
+                );
+                let iir_buf = std::slice::from_raw_parts_mut(
+                    buf.offset(DECODE_BUFFER_SIZE as isize)
+                        .offset(-(N as isize)),
+                    extrapolation_len as usize,
+                );
+                celt_iir(
+                    iir_buf,
+                    extrapolation_len as usize,
+                    iir_den,
+                    LPC_ORDER,
+                    &mut lpc_mem,
+                );
+            }
             let mut S2: opus_val32 = 0 as opus_val32;
             i = 0;
             while i < extrapolation_len {

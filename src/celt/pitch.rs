@@ -4,11 +4,7 @@ pub mod arch_h {
     pub type celt_sig = f32;
     pub const Q15ONE: f32 = 1.0f32;
 }
-pub mod stddef_h {
-    pub const NULL: i32 = 0;
-}
 pub use self::arch_h::{celt_sig, opus_val16, opus_val32, Q15ONE};
-pub use self::stddef_h::NULL;
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
@@ -251,7 +247,7 @@ pub unsafe fn pitch_downsample(
     x_lp: *mut opus_val16,
     len: i32,
     C: i32,
-    arch: i32,
+    _arch: i32,
 ) {
     let mut i: i32 = 0;
     let mut ac: [opus_val32; 5] = [0.; 5];
@@ -288,13 +284,11 @@ pub unsafe fn pitch_downsample(
                 + *(*x.offset(1 as isize)).offset(0 as isize));
     }
     _celt_autocorr(
-        x_lp,
-        ac.as_mut_ptr(),
-        NULL as *const opus_val16,
+        std::slice::from_raw_parts(x_lp, (len >> 1) as usize),
+        &mut ac,
+        None,
         0,
         4,
-        len >> 1,
-        arch,
     );
     ac[0 as usize] *= 1.0001f32;
     i = 1;
@@ -302,7 +296,7 @@ pub unsafe fn pitch_downsample(
         ac[i as usize] -= ac[i as usize] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
         i += 1;
     }
-    _celt_lpc(lpc.as_mut_ptr(), ac.as_mut_ptr(), 4);
+    _celt_lpc(&mut lpc, &ac);
     i = 0;
     while i < 4 {
         tmp = 0.9f32 * tmp;

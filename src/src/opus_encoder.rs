@@ -937,7 +937,10 @@ pub unsafe fn is_digital_silence(
 ) -> i32 {
     let mut silence: i32 = 0;
     let mut sample_max: opus_val32 = 0 as opus_val32;
-    sample_max = celt_maxabs16(pcm, frame_size * channels);
+    sample_max = celt_maxabs16(std::slice::from_raw_parts(
+        pcm,
+        (frame_size * channels) as usize,
+    ));
     silence = (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32;
     return silence;
 }
