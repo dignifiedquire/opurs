@@ -415,19 +415,15 @@ pub fn version() -> &'static str;
 Create the type-safe public API types that the rest of the stages will
 target. This can be done before any internal refactoring.
 
-- [ ] Create `src/api/` module directory
-- [ ] `src/api/error.rs` — `ErrorCode` enum, `Error` struct, `Result<T>` alias
-  - `ErrorCode` is `#[repr(i32)]`, implements `Display`, `std::error::Error`
-  - Conversion from raw `i32` error codes via `TryFrom`
-  - `Error::description()` delegates to `opus_strerror`
-- [ ] `src/api/enums.rs` — `Application`, `Channels`, `Bandwidth`, `Bitrate`,
-  `Signal`, `FrameSize` enums
-  - Each `#[repr(i32)]` where applicable
-  - `TryFrom<i32>` for each (mapping from OPUS_* constants)
-  - `Into<i32>` for passing to internal functions
-- [ ] `src/api/mod.rs` — re-export all types
-- [ ] Wire `pub mod api` into `lib.rs`, re-export types at crate root
-- [ ] **Commit**: `refactor: define typed public API enums and error types`
+- [x] Create `src/api/` module directory
+- [x] `src/api/error.rs` — `ErrorCode` enum (thiserror-derived, no `#[repr(i32)]`),
+  `Unknown(i32)` variant carries raw code, `Result<T>` alias
+- [x] `src/api/enums.rs` — `Application`, `Channels`, `Bandwidth`, `Bitrate`,
+  `Signal`, `FrameSize` enums (no `#[repr(i32)]`, no `Auto` variants on
+  Bandwidth/Signal — use `Option<T>` at API boundary instead)
+- [x] `src/api/mod.rs` — re-export all types
+- [x] Wire `pub mod api` into `lib.rs`, re-export types at crate root
+- [x] **Commit**: `refactor: define typed public API enums and error types`
 
 ### Stage 4.2 — Clean up analysis.rs signatures
 

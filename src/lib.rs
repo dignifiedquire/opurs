@@ -1,5 +1,6 @@
 extern crate core;
 
+pub mod api;
 pub mod externs;
 pub mod util;
 pub mod varargs;
@@ -237,6 +238,11 @@ pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 
 // expose opus_private
 pub use crate::src::opus_private;
+
+// Public API types (Stage 4.1)
+pub use api::{
+    Application, Bandwidth, Bitrate, Channels, ErrorCode, FrameSize, Result as OpusResult, Signal,
+};
 
 // =====
 // Internal re-exports for unit tests

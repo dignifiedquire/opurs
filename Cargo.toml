@@ -38,6 +38,9 @@ nalgebra = "0.33.0"
 # iterate over stuff
 itertools = "0.13.0"
 
+# idiomatic error types
+thiserror = "2"
+
 # for dumping data in ent-dump
 hex = { version = "0.4.3", optional = true }
 
