@@ -1686,41 +1686,47 @@ unsafe fn run_prefilter(
                         as i64) as u64,
                 ),
         );
-        if offset != 0 {
+        {
+            let pre_len = N + COMBFILTER_MAXPERIOD;
+            let pre_slice = std::slice::from_raw_parts(pre[c as usize], pre_len as usize);
+            let in_base = (c * (N + overlap) + overlap) as usize;
+            let in_len = (N + overlap) as usize; // remaining from in_base
+            let in_slice = std::slice::from_raw_parts_mut(in_0.offset(in_base as isize), in_len);
+            if offset != 0 {
+                comb_filter(
+                    in_slice,
+                    0,
+                    pre_slice,
+                    COMBFILTER_MAXPERIOD as usize,
+                    (*st).prefilter_period,
+                    (*st).prefilter_period,
+                    offset,
+                    -(*st).prefilter_gain,
+                    -(*st).prefilter_gain,
+                    (*st).prefilter_tapset,
+                    (*st).prefilter_tapset,
+                    &[],
+                    0,
+                    (*st).arch,
+                );
+            }
             comb_filter(
-                in_0.offset((c * (N + overlap)) as isize)
-                    .offset(overlap as isize),
-                (pre[c as usize]).offset(COMBFILTER_MAXPERIOD as isize),
+                in_slice,
+                offset as usize,
+                pre_slice,
+                (COMBFILTER_MAXPERIOD + offset) as usize,
                 (*st).prefilter_period,
-                (*st).prefilter_period,
-                offset,
+                pitch_index,
+                N - offset,
                 -(*st).prefilter_gain,
-                -(*st).prefilter_gain,
+                -gain1,
                 (*st).prefilter_tapset,
-                (*st).prefilter_tapset,
-                NULL as *const opus_val16,
-                0,
+                prefilter_tapset,
+                &(*mode).window,
+                overlap,
                 (*st).arch,
             );
         }
-        comb_filter(
-            in_0.offset((c * (N + overlap)) as isize)
-                .offset(overlap as isize)
-                .offset(offset as isize),
-            (pre[c as usize])
-                .offset(COMBFILTER_MAXPERIOD as isize)
-                .offset(offset as isize),
-            (*st).prefilter_period,
-            pitch_index,
-            N - offset,
-            -(*st).prefilter_gain,
-            -gain1,
-            (*st).prefilter_tapset,
-            prefilter_tapset,
-            (*mode).window.as_ptr(),
-            overlap,
-            (*st).arch,
-        );
         memcpy(
             ((*st).in_mem).as_mut_ptr().offset((c * overlap) as isize) as *mut core::ffi::c_void,
             in_0.offset((c * (N + overlap)) as isize).offset(N as isize)
@@ -2739,7 +2745,7 @@ pub unsafe fn celt_encode_with_ec(
     }
     let vla_11 = nbEBands as usize;
     let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_11);
-    init_caps(mode, cap.as_mut_ptr(), LM, C);
+    init_caps(&*mode, &mut cap, LM, C);
     dynalloc_logp = 6;
     total_bits <<= BITRES;
     total_boost = 0;

@@ -2,7 +2,8 @@ use crate::celt::bands::{
     anti_collapse, celt_lcg_rand, denormalise_bands, quant_all_bands, SPREAD_NORMAL,
 };
 use crate::celt::celt::{
-    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
+    comb_filter, comb_filter_inplace, init_caps, resampling_factor, spread_icdf, tapset_icdf,
+    tf_select_table, trim_icdf,
 };
 use crate::celt::celt::{
     CELT_GET_AND_CLEAR_ERROR_REQUEST, CELT_GET_MODE_REQUEST, CELT_SET_CHANNELS_REQUEST,
@@ -857,20 +858,26 @@ unsafe fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     i += 1;
                 }
             }
-            comb_filter(
-                etmp.as_mut_ptr(),
-                buf.offset(DECODE_BUFFER_SIZE as isize),
-                st.postfilter_period,
-                st.postfilter_period,
-                overlap,
-                -st.postfilter_gain,
-                -st.postfilter_gain,
-                st.postfilter_tapset,
-                st.postfilter_tapset,
-                NULL as *const opus_val16,
-                0,
-                st.arch,
-            );
+            {
+                let buf_len = DECODE_BUFFER_SIZE + overlap as usize;
+                let buf_slice = std::slice::from_raw_parts(buf, buf_len);
+                comb_filter(
+                    &mut etmp,
+                    0,
+                    buf_slice,
+                    DECODE_BUFFER_SIZE,
+                    st.postfilter_period,
+                    st.postfilter_period,
+                    overlap,
+                    -st.postfilter_gain,
+                    -st.postfilter_gain,
+                    st.postfilter_tapset,
+                    st.postfilter_tapset,
+                    &[],
+                    0,
+                    st.arch,
+                );
+            }
             i = 0;
             while i < overlap / 2 {
                 *buf.offset((DECODE_BUFFER_SIZE as i32 + i) as isize) = *window.offset(i as isize)
@@ -1095,7 +1102,7 @@ pub unsafe fn celt_decode_with_ec(
     }
     let vla_0 = nbEBands as usize;
     let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_0);
-    init_caps(mode, cap.as_mut_ptr(), LM, C);
+    init_caps(&*mode, &mut cap, LM, C);
     let vla_1 = nbEBands as usize;
     let mut offsets: Vec<i32> = ::std::vec::from_elem(0, vla_1);
     dynalloc_logp = 6;
@@ -1308,35 +1315,40 @@ pub unsafe fn celt_decode_with_ec(
         } else {
             15
         };
-        comb_filter(
-            out_syn[c as usize],
-            out_syn[c as usize],
-            st.postfilter_period_old,
-            st.postfilter_period,
-            (*mode).shortMdctSize,
-            st.postfilter_gain_old,
-            st.postfilter_gain,
-            st.postfilter_tapset_old,
-            st.postfilter_tapset,
-            (*mode).window.as_ptr(),
-            overlap,
-            st.arch,
-        );
-        if LM != 0 {
-            comb_filter(
-                (out_syn[c as usize]).offset((*mode).shortMdctSize as isize),
-                (out_syn[c as usize]).offset((*mode).shortMdctSize as isize),
+        {
+            let dm_len = DECODE_BUFFER_SIZE + overlap as usize;
+            let dm_slice = std::slice::from_raw_parts_mut(decode_mem[c as usize], dm_len);
+            let out_syn_off = (DECODE_BUFFER_SIZE as i32 - N) as usize;
+            comb_filter_inplace(
+                dm_slice,
+                out_syn_off,
+                st.postfilter_period_old,
                 st.postfilter_period,
-                postfilter_pitch,
-                N - (*mode).shortMdctSize,
+                (*mode).shortMdctSize,
+                st.postfilter_gain_old,
                 st.postfilter_gain,
-                postfilter_gain,
+                st.postfilter_tapset_old,
                 st.postfilter_tapset,
-                postfilter_tapset,
-                (*mode).window.as_ptr(),
+                &(&(*mode).window)[..overlap as usize],
                 overlap,
                 st.arch,
             );
+            if LM != 0 {
+                comb_filter_inplace(
+                    dm_slice,
+                    out_syn_off + (*mode).shortMdctSize as usize,
+                    st.postfilter_period,
+                    postfilter_pitch,
+                    N - (*mode).shortMdctSize,
+                    st.postfilter_gain,
+                    postfilter_gain,
+                    st.postfilter_tapset,
+                    postfilter_tapset,
+                    &(&(*mode).window)[..overlap as usize],
+                    overlap,
+                    st.arch,
+                );
+            }
         }
         c += 1;
         if !(c < CC) {
