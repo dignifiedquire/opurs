@@ -1,0 +1,7 @@
+[profile.default]
+slow-timeout = { period = "10s" }
+fail-fast = false
+
+[[profile.default.overrides]]
+filter = "all()"
+timeout = "20s"
