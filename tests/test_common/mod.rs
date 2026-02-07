@@ -31,9 +31,18 @@ impl TestRng {
     }
 
     /// Create a new RNG seeded the way upstream integration tests do it:
-    /// `Rz = iseed; Rw = 1;`
+    /// `Rz = iseed; Rw = iseed;`
     pub fn from_iseed(iseed: u32) -> Self {
-        Self { rz: iseed, rw: 1 }
+        Self {
+            rz: iseed,
+            rw: iseed,
+        }
+    }
+
+    /// Re-seed the RNG with `Rz = Rw = seed`.
+    pub fn reseed(&mut self, seed: u32) {
+        self.rz = seed;
+        self.rw = seed;
     }
 
     /// Generate next u32, identical output to C `fast_rand()`.

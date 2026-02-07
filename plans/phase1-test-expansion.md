@@ -258,25 +258,25 @@ through its current (still-unsafe) API, so they'll keep `unsafe` blocks for
 now. The focus here is structural cleanup:
 
 #### 1.4.1 — opus_decode.rs
-- [ ] Replace `static mut Rz/Rw` with `TestRng` passed to each helper
-- [ ] Replace `_test_failed()` with `assert!`/`assert_eq!` with context
-- [ ] Replace `malloc`/`free` with `Vec`
-- [ ] Replace `memcpy`/`memcmp` with slice operations
-- [ ] Split `test_opus_decode` into:
+- [x] Replace `static mut Rz/Rw` with `TestRng` passed to each helper
+- [x] Replace `_test_failed()` with `assert!`/`assert_eq!` with context
+- [x] Replace `malloc`/`free` with `Vec`
+- [x] Replace `memcpy`/`memcmp` with slice operations
+- [x] Split `test_opus_decode` into:
   - `test_decoder_code0_48khz_stereo` — most common config
   - `test_decoder_code0_8khz_mono` — narrowband edge case
   - `test_decoder_code0_fuzzing` — random packet robustness
   - `test_soft_clip_basic` — normal clipping behavior
   - `test_soft_clip_edge_cases` — boundary conditions
-- [ ] Add seed printing at test start for reproducibility
+- [x] Add seed printing at test start for reproducibility
 - [ ] **Commit**: `test: make opus_decode tests idiomatic with granular assertions`
 
 #### 1.4.2 — opus_encode
-- [ ] Replace `static mut` RNG state with `TestRng`
-- [ ] Replace `DUMMY_ARGS` seed handling with `get_test_seed()`
-- [ ] Replace all `malloc`/`free` with `Vec`
-- [ ] Replace `fail()` macro calls with `assert!`/`assert_eq!` with context
-- [ ] Split `test_opus_encode` into:
+- [x] Replace `static mut` RNG state with `TestRng`
+- [x] Replace `DUMMY_ARGS` seed handling with `get_test_seed()`
+- [x] Replace all `malloc`/`free` with `Vec`
+- [x] Replace `fail()` macro calls with `assert!`/`assert_eq!` with context
+- [x] Split `test_opus_encode` into:
   - `test_encode_basic_roundtrip` — encode then decode, verify samples
   - `test_encode_multimode` — LP/Hybrid/MDCT mode switching
   - `test_encode_bitrate_range` — 6k to 510k bps
@@ -287,11 +287,11 @@ now. The focus here is structural cleanup:
   - `test_encode_final_range_determinism` — enc_final_range == dec_final_range
   - `test_encode_padding` — packet padding/unpadding during encode
   - `test_fuzz_encoder_settings` — random parameter combinations
-- [ ] Move regression tests to individual `#[test]` functions:
+- [x] Move regression tests to individual `#[test]` functions:
   - `test_regression_ec_enc_shrink` (from opus_encode_regressions.rs)
   - `test_regression_ec_enc_shrink2`
   - `test_regression_silk_gain`
-- [ ] Add context to every assertion:
+- [x] Add context to every assertion:
   ```rust
   assert_eq!(
       out_samples, frame_size,
@@ -304,13 +304,13 @@ now. The focus here is structural cleanup:
 
 #### 1.4.3 — opus_api.rs
 This is already the best-structured test file (15 `#[test]` fns). Cleanup:
-- [ ] Replace remaining `malloc`/`free` patterns with `Vec`
-- [ ] Replace `fail()` macro with `assert!` where possible
-- [ ] Improve assertion messages (currently generic "line N")
+- [x] Replace remaining `malloc`/`free` patterns with `Vec`
+- [x] Replace `fail()` macro with `assert!` where possible
+- [x] Improve assertion messages (currently generic "line N")
 - [ ] **Commit**: `test: clean up opus_api test idioms`
 
 #### 1.4.4 — opus_padding.rs
-- [ ] Minor cleanup: improve assertion messages
+- [x] Minor cleanup: improve assertion messages
 - [ ] **Commit**: `test: clean up opus_padding test`
 
 ### 1.5 — Port missing upstream tests

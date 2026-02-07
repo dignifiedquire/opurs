@@ -3,12 +3,6 @@
 
 use std::ptr;
 
-fn fail(file: &str, line: usize) {
-    panic!("test failed, original: {file} at line {line}");
-}
-
-use unsafe_libopus::externs::{free, malloc};
-use unsafe_libopus::externs::{memcmp, memcpy, memset};
 use unsafe_libopus::{
     opus_decode, opus_decode_float, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
     opus_decoder_get_nb_samples, opus_decoder_get_size, opus_decoder_init, opus_encode,
@@ -25,14 +19,23 @@ static OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
 fn test_opus_decoder_get_size() {
     for c in 0..4 {
         let i = opus_decoder_get_size(c);
-        if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 16) || c != 1 && c != 2 && i != 0 {
-            fail("tests/test_opus_api.c", 106);
+        if c == 1 || c == 2 {
+            assert!(
+                i > 2048 && i <= (1 << 16),
+                "opus_decoder_get_size({c}) = {i}, expected in (2048, 65536]"
+            );
+        } else {
+            assert_eq!(
+                i, 0,
+                "opus_decoder_get_size({c}) should be 0 for invalid channels"
+            );
         }
     }
 }
 
 #[test]
 fn test_opus_decoder_create_init() {
+    let dec_size = opus_decoder_get_size(2) as usize;
     for c in 0..4 {
         for i in -7..=96000 {
             if !((i == 8000 || i == 12000 || i == 16000 || i == 24000 || i == 48000)
@@ -46,24 +49,26 @@ fn test_opus_decoder_create_init() {
                 };
                 let mut err = 0;
                 let mut dec = unsafe { opus_decoder_create(fs, c, &mut err) };
-                if err != OPUS_BAD_ARG || !dec.is_null() {
-                    fail("tests/test_opus_api.c", 128);
-                }
+                assert_eq!(
+                    err, OPUS_BAD_ARG,
+                    "opus_decoder_create({fs}, {c}) should return OPUS_BAD_ARG"
+                );
+                assert!(
+                    dec.is_null(),
+                    "opus_decoder_create({fs}, {c}) should return null"
+                );
                 dec = unsafe { opus_decoder_create(fs, c, ptr::null_mut::<i32>()) };
-                if !dec.is_null() {
-                    fail("tests/test_opus_api.c", 131);
-                }
-                dec = unsafe { malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder };
-                if dec.is_null() {
-                    fail("tests/test_opus_api.c", 134);
-                }
-                let err = unsafe { opus_decoder_init(dec, fs, c) };
-                if err != OPUS_BAD_ARG {
-                    fail("tests/test_opus_api.c", 136);
-                }
-                unsafe {
-                    free(dec as *mut core::ffi::c_void);
-                }
+                assert!(
+                    dec.is_null(),
+                    "opus_decoder_create({fs}, {c}, null) should return null"
+                );
+                let mut dec_buf = vec![0u8; dec_size];
+                let dec_ptr = dec_buf.as_mut_ptr() as *mut OpusDecoder;
+                let err = unsafe { opus_decoder_init(dec_ptr, fs, c) };
+                assert_eq!(
+                    err, OPUS_BAD_ARG,
+                    "opus_decoder_init({fs}, {c}) should return OPUS_BAD_ARG"
+                );
             }
         }
     }
@@ -83,206 +88,188 @@ unsafe fn test_dec_api_inner() {
     let mut cfgs = 0;
 
     let dec = unsafe { opus_decoder_create(48000, 2, &mut err) };
-    if err != 0 || dec.is_null() {
-        fail("tests/test_opus_api.c", 144);
-    }
+    assert!(err == 0 && !dec.is_null(), "failed to create decoder");
     err = opus_decoder_ctl!(&mut *dec, 4031, &mut dec_final_range);
-    if err != 0 {
-        fail("tests/test_opus_api.c", 155);
-    }
+    assert_eq!(err, 0, "OPUS_GET_FINAL_RANGE failed");
     println!("    OPUS_GET_FINAL_RANGE ......................... OK.");
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, -(5));
-    if err != -(5) {
-        fail("tests/test_opus_api.c", 161);
-    }
+    assert_eq!(err, -5, "OPUS_UNIMPLEMENTED should return -5");
     println!("    OPUS_UNIMPLEMENTED ........................... OK.");
     cfgs += 1;
 
     let mut i = 0;
     err = opus_decoder_ctl!(&mut *dec, 4009, &mut i);
-    if err != 0 || i != 0 {
-        fail("tests/test_opus_api.c", 169);
-    }
+    assert!(err == 0 && i == 0, "OPUS_GET_BANDWIDTH failed");
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4029, &mut i);
-    if err != 0 || i != 48000 {
-        fail("tests/test_opus_api.c", 177);
-    }
+    assert!(err == 0 && i == 48000, "OPUS_GET_SAMPLE_RATE failed");
     println!("    OPUS_GET_SAMPLE_RATE ......................... OK.");
     cfgs += 1;
 
     // GET_PITCH has different execution paths depending on the previously decoded frame.
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
-    if err != 0 || i > 0 || i < -1 {
-        fail("tests/test_opus_api.c", 187);
-    }
+    assert!(
+        err == 0 && i <= 0 && i >= -1,
+        "OPUS_GET_PITCH initial check failed"
+    );
     cfgs += 1;
     packet[0] = ((63) << 2) as u8;
     packet[2] = 0;
     packet[1] = packet[2];
-    if opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0) != 960 {
-        fail("tests/test_opus_api.c", 191);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0),
+        960,
+        "decode CELT silence failed"
+    );
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
-    if err != 0 || i > 0 || i < -1 {
-        fail("tests/test_opus_api.c", 195);
-    }
+    assert!(
+        err == 0 && i <= 0 && i >= -1,
+        "OPUS_GET_PITCH after CELT decode failed"
+    );
     cfgs += 1;
     packet[0] = 1;
-    if opus_decode(&mut *dec, &packet[..1], sbuf.as_mut_ptr(), 960, 0) != 960 {
-        fail("tests/test_opus_api.c", 198);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..1], sbuf.as_mut_ptr(), 960, 0),
+        960,
+        "decode SILK failed"
+    );
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4033, &mut i);
-    if err != 0 || i > 0 || i < -1 {
-        fail("tests/test_opus_api.c", 202);
-    }
+    assert!(
+        err == 0 && i <= 0 && i >= -1,
+        "OPUS_GET_PITCH after SILK decode failed"
+    );
     cfgs += 1;
     println!("    OPUS_GET_PITCH ............................... OK.");
     err = opus_decoder_ctl!(&mut *dec, 4039, &mut i);
-    if err != 0 || i != 960 {
-        fail("tests/test_opus_api.c", 210);
-    }
+    assert!(err == 0 && i == 960, "OPUS_GET_LAST_PACKET_DURATION failed");
     cfgs += 1;
     println!("    OPUS_GET_LAST_PACKET_DURATION ................ OK.");
     err = opus_decoder_ctl!(&mut *dec, 4045, &mut i);
-    if err != 0 || i != 0 {
-        fail("tests/test_opus_api.c", 217);
-    }
+    assert!(
+        err == 0 && i == 0,
+        "OPUS_GET_GAIN initial value should be 0"
+    );
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, -(32769));
-    if err != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 223);
-    }
+    assert_eq!(
+        err, OPUS_BAD_ARG,
+        "OPUS_SET_GAIN(-32769) should return BAD_ARG"
+    );
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, 32768);
-    if err != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 226);
-    }
+    assert_eq!(
+        err, OPUS_BAD_ARG,
+        "OPUS_SET_GAIN(32768) should return BAD_ARG"
+    );
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4034, -(15));
-    if err != 0 {
-        fail("tests/test_opus_api.c", 229);
-    }
+    assert_eq!(err, 0, "OPUS_SET_GAIN(-15) failed");
     cfgs += 1;
     err = opus_decoder_ctl!(&mut *dec, 4045, &mut i);
-    if err != 0 || i != -(15) {
-        fail("tests/test_opus_api.c", 234);
-    }
+    assert!(err == 0 && i == -15, "OPUS_GET_GAIN should return -15");
     cfgs += 1;
     println!("    OPUS_SET_GAIN ................................ OK.");
     println!("    OPUS_GET_GAIN ................................ OK.");
 
-    // Reset the decoder
-    let dec2 = malloc(opus_decoder_get_size(2) as u64) as *mut OpusDecoder;
-    memcpy(
-        dec2 as *mut core::ffi::c_void,
-        dec as *const core::ffi::c_void,
-        opus_decoder_get_size(2) as u64,
+    // Reset the decoder — verify state changed by comparing bytes before/after reset
+    let dec_size = opus_decoder_get_size(2) as usize;
+    let dec_bytes_before = std::slice::from_raw_parts(dec as *const u8, dec_size).to_vec();
+    assert_eq!(
+        opus_decoder_ctl!(&mut *dec, 4028),
+        0,
+        "OPUS_RESET_STATE failed"
     );
-    if opus_decoder_ctl!(&mut *dec, 4028) != 0 {
-        fail("tests/test_opus_api.c", 242);
-    }
-    if memcmp(
-        dec2 as *const core::ffi::c_void,
-        dec as *const core::ffi::c_void,
-        opus_decoder_get_size(2) as u64,
-    ) == 0
-    {
-        fail("tests/test_opus_api.c", 243);
-    }
-    free(dec2 as *mut core::ffi::c_void);
+    let dec_bytes_after = std::slice::from_raw_parts(dec as *const u8, dec_size);
+    assert_ne!(
+        dec_bytes_before.as_slice(),
+        dec_bytes_after,
+        "decoder state should change after reset"
+    );
     println!("    OPUS_RESET_STATE ............................. OK.");
     cfgs += 1;
     packet[0] = 0;
-    if opus_decoder_get_nb_samples(&mut *dec, &packet[..1]) != 480 {
-        fail("tests/test_opus_api.c", 250);
-    }
-    if opus_packet_get_nb_samples(&packet[..1], 48000) != 480 {
-        fail("tests/test_opus_api.c", 251);
-    }
-    if opus_packet_get_nb_samples(&packet[..1], 96000) != 960 {
-        fail("tests/test_opus_api.c", 252);
-    }
-    if opus_packet_get_nb_samples(&packet[..1], 32000) != 320 {
-        fail("tests/test_opus_api.c", 253);
-    }
-    if opus_packet_get_nb_samples(&packet[..1], 8000) != 80 {
-        fail("tests/test_opus_api.c", 254);
-    }
+    assert_eq!(opus_decoder_get_nb_samples(&mut *dec, &packet[..1]), 480);
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 48000), 480);
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 96000), 960);
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 32000), 320);
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 8000), 80);
     packet[0] = 3;
-    if opus_packet_get_nb_samples(&packet[..1], 24000) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 256);
-    }
+    assert_eq!(
+        opus_packet_get_nb_samples(&packet[..1], 24000),
+        OPUS_INVALID_PACKET
+    );
     packet[0] = ((63) << 2 | 3) as u8;
     packet[1] = 63;
-    if opus_packet_get_nb_samples(&[], 24000) != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 259);
-    }
-    if opus_packet_get_nb_samples(&packet[..2], 48000) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 260);
-    }
-    if opus_decoder_get_nb_samples(&mut *dec, &packet[..2]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 261);
-    }
+    assert_eq!(opus_packet_get_nb_samples(&[], 24000), OPUS_BAD_ARG);
+    assert_eq!(
+        opus_packet_get_nb_samples(&packet[..2], 48000),
+        OPUS_INVALID_PACKET
+    );
+    assert_eq!(
+        opus_decoder_get_nb_samples(&mut *dec, &packet[..2]),
+        OPUS_INVALID_PACKET
+    );
     println!("    opus_{{packet,decoder}}_get_nb_samples() ....... OK.");
     cfgs += 9;
-    if OPUS_BAD_ARG != opus_packet_get_nb_frames(&[]) {
-        fail("tests/test_opus_api.c", 265);
-    }
+    assert_eq!(opus_packet_get_nb_frames(&[]), OPUS_BAD_ARG);
 
     for i in 0..256 {
         let l1res: [i32; 4] = [1, 2, 2, OPUS_INVALID_PACKET];
         packet[0] = i as u8;
-        if l1res[(packet[0] as i32 & 3) as usize] != opus_packet_get_nb_frames(&packet[..1]) {
-            fail("tests/test_opus_api.c", 269);
-        }
+        assert_eq!(
+            l1res[(packet[0] as i32 & 3) as usize],
+            opus_packet_get_nb_frames(&packet[..1]),
+            "get_nb_frames 1-byte mismatch for toc={i}"
+        );
         cfgs += 1;
         for j in 0..256 {
             packet[1] = j as u8;
-            if (if packet[0] as i32 & 3 != 3 {
+            let expected = if packet[0] as i32 & 3 != 3 {
                 l1res[(packet[0] as i32 & 3) as usize]
             } else {
                 packet[1] as i32 & 63
-            }) != opus_packet_get_nb_frames(&packet[..2])
-            {
-                fail("tests/test_opus_api.c", 273);
-            }
+            };
+            assert_eq!(
+                expected,
+                opus_packet_get_nb_frames(&packet[..2]),
+                "get_nb_frames 2-byte mismatch for toc={i}, byte1={j}"
+            );
             cfgs += 1;
         }
     }
     println!("    opus_packet_get_nb_frames() .................. OK.");
 
     for i in 0..256 {
-        let mut bw: i32 = 0;
         packet[0] = i as u8;
-        bw = packet[0] as i32 >> 4;
+        let mut bw = packet[0] as i32 >> 4;
         bw = 1101 + (((((bw & 7) * 9) & (63 - (bw & 8))) + 2 + 12 * (bw & 8 != 0) as i32) >> 4);
-        if bw != opus_packet_get_bandwidth(packet.as_mut_ptr()) {
-            fail("tests/test_opus_api.c", 284);
-        }
+        assert_eq!(
+            bw,
+            opus_packet_get_bandwidth(packet.as_mut_ptr()),
+            "get_bandwidth mismatch for toc={i}"
+        );
         cfgs += 1;
     }
     println!("    opus_packet_get_bandwidth() .................. OK.");
 
     for i in 0..256 {
-        let mut fp3s: i32 = 0;
-        let mut rate: i32 = 0;
         packet[0] = i as u8;
-        fp3s = packet[0] as i32 >> 3;
+        let mut fp3s = packet[0] as i32 >> 3;
         fp3s = (((((3 - (fp3s & 3)) * 13) & 119) + 9) >> 2)
             * ((fp3s > 13) as i32 * (3 - (fp3s & 3 == 3) as i32) + 1)
             * 25;
-        rate = 0;
+        let mut rate = 0;
         while rate < 5 {
-            if OPUS_RATES[rate as usize] * 3 / fp3s
-                != opus_packet_get_samples_per_frame(packet[0], OPUS_RATES[rate as usize])
-            {
-                fail("tests/test_opus_api.c", 295);
-            }
+            assert_eq!(
+                OPUS_RATES[rate as usize] * 3 / fp3s,
+                opus_packet_get_samples_per_frame(packet[0], OPUS_RATES[rate as usize]),
+                "get_samples_per_frame mismatch for toc={i}, rate={}",
+                OPUS_RATES[rate as usize]
+            );
             cfgs += 1;
             rate += 1;
         }
@@ -295,30 +282,35 @@ unsafe fn test_dec_api_inner() {
         packet[j as usize] = 0;
     }
 
-    if opus_decode(&mut *dec, &packet[..51], sbuf.as_mut_ptr(), 960, 0) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 305);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..51], sbuf.as_mut_ptr(), 960, 0),
+        OPUS_INVALID_PACKET
+    );
     cfgs += 1;
     packet[0] = ((63) << 2) as u8;
     packet[2] = 0;
     packet[1] = packet[2];
 
-    if opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 60, 0) != OPUS_BUFFER_TOO_SMALL {
-        fail("tests/test_opus_api.c", 311);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 60, 0),
+        OPUS_BUFFER_TOO_SMALL
+    );
     cfgs += 1;
-    if opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 480, 0) != OPUS_BUFFER_TOO_SMALL {
-        fail("tests/test_opus_api.c", 313);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 480, 0),
+        OPUS_BUFFER_TOO_SMALL
+    );
     cfgs += 1;
-    if opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0) != 960 {
-        fail("tests/test_opus_api.c", 315);
-    }
+    assert_eq!(
+        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0),
+        960
+    );
     cfgs += 1;
     println!("    opus_decode() ................................ OK.");
-    if opus_decode_float(&mut *dec, &packet[..3], &mut fbuf, 960, 0) != 960 {
-        fail("tests/test_opus_api.c", 320);
-    }
+    assert_eq!(
+        opus_decode_float(&mut *dec, &packet[..3], &mut fbuf, 960, 0),
+        960
+    );
     cfgs += 1;
     println!("    opus_decode_float() .......................... OK.");
     opus_decoder_destroy(dec);
@@ -351,15 +343,9 @@ unsafe fn test_parse_code_0_inner() {
             &mut size,
             Some(&mut payload_offset),
         );
-        if ret != 1 {
-            fail("tests/test_opus_api.c", 729);
-        }
-        if size[0] != 3 {
-            fail("tests/test_opus_api.c", 730);
-        }
-        if frames[0] != 1 {
-            fail("tests/test_opus_api.c", 731);
-        }
+        assert_eq!(ret, 1, "code 0: expected 1 frame for toc={i}");
+        assert_eq!(size[0], 3, "code 0: expected size 3 for toc={i}");
+        assert_eq!(frames[0], 1, "code 0: expected frame offset 1 for toc={i}");
     }
 }
 
@@ -399,22 +385,22 @@ unsafe fn test_parse_code_1_inner() {
                 // Must pass if payload length even (packet length odd) and
                 // size<=2551, must fail otherwise.
                 if ret != 2 {
-                    fail("tests/test_opus_api.c", 749);
+                    panic!("assertion failed at upstream test_opus_api.c:749");
                 }
                 if size[0] != size[1] || size[0] as i32 != (jj - 1) >> 1 {
-                    fail("tests/test_opus_api.c", 750);
+                    panic!("assertion failed at upstream test_opus_api.c:750");
                 }
                 if frames[0] != 1 {
-                    fail("tests/test_opus_api.c", 751);
+                    panic!("assertion failed at upstream test_opus_api.c:751");
                 }
                 if frames[1] != frames[0] + size[0] as usize {
-                    fail("tests/test_opus_api.c", 752);
+                    panic!("assertion failed at upstream test_opus_api.c:752");
                 }
                 if toc as i32 >> 2 != i {
-                    fail("tests/test_opus_api.c", 753);
+                    panic!("assertion failed at upstream test_opus_api.c:753");
                 }
             } else if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 754);
+                panic!("assertion failed at upstream test_opus_api.c:754");
             }
         }
     }
@@ -447,7 +433,7 @@ unsafe fn test_parse_code_2_inner() {
             Some(&mut payload_offset),
         );
         if ret != OPUS_INVALID_PACKET {
-            fail("tests/test_opus_api.c", 767);
+            panic!("assertion failed at upstream test_opus_api.c:767");
         }
         packet[1] = 252;
         frames[0] = 0;
@@ -464,7 +450,7 @@ unsafe fn test_parse_code_2_inner() {
             Some(&mut payload_offset),
         );
         if ret != OPUS_INVALID_PACKET {
-            fail("tests/test_opus_api.c", 772);
+            panic!("assertion failed at upstream test_opus_api.c:772");
         }
         for j in 0..1275 {
             if j < 252 {
@@ -488,7 +474,7 @@ unsafe fn test_parse_code_2_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 781);
+                panic!("assertion failed at upstream test_opus_api.c:781");
             }
 
             // Code 2, one too long
@@ -511,7 +497,7 @@ unsafe fn test_parse_code_2_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 786);
+                panic!("assertion failed at upstream test_opus_api.c:786");
             }
 
             // Code 2, second zero
@@ -534,16 +520,16 @@ unsafe fn test_parse_code_2_inner() {
                 Some(&mut payload_offset),
             );
             if ret != 2 {
-                fail("tests/test_opus_api.c", 791);
+                panic!("assertion failed at upstream test_opus_api.c:791");
             }
             if size[0] as usize != j || size[1] as i32 != 0 {
-                fail("tests/test_opus_api.c", 792);
+                panic!("assertion failed at upstream test_opus_api.c:792");
             }
             if frames[1] != frames[0] + size[0] as usize {
-                fail("tests/test_opus_api.c", 793);
+                panic!("assertion failed at upstream test_opus_api.c:793");
             }
             if toc as i32 >> 2 != i {
-                fail("tests/test_opus_api.c", 794);
+                panic!("assertion failed at upstream test_opus_api.c:794");
             }
 
             // Code 2, normal
@@ -567,18 +553,18 @@ unsafe fn test_parse_code_2_inner() {
                 Some(&mut payload_offset),
             );
             if ret != 2 {
-                fail("tests/test_opus_api.c", 799);
+                panic!("assertion failed at upstream test_opus_api.c:799");
             }
             if size[0] as usize != j
                 || size[1] as usize != (j << 1) + 3 - j - (if j < 252 { 1 } else { 2 })
             {
-                fail("tests/test_opus_api.c", 800);
+                panic!("assertion failed at upstream test_opus_api.c:800");
             }
             if frames[1] != frames[0] + size[0] as usize {
-                fail("tests/test_opus_api.c", 801);
+                panic!("assertion failed at upstream test_opus_api.c:801");
             }
             if toc as i32 >> 2 != i {
-                fail("tests/test_opus_api.c", 802);
+                panic!("assertion failed at upstream test_opus_api.c:802");
             }
         }
     }
@@ -609,7 +595,7 @@ unsafe fn test_parse_code_3_m_truncation_inner() {
         );
 
         if ret != OPUS_INVALID_PACKET {
-            fail("tests/test_opus_api.c", 815);
+            panic!("assertion failed at upstream test_opus_api.c:815");
         }
     }
 }
@@ -641,7 +627,7 @@ unsafe fn test_parse_code_3_m_0_49_64_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 830);
+                panic!("assertion failed at upstream test_opus_api.c:830");
             }
             packet[1] = (128 + (jj & 63)) as u8;
             frames[0] = 0;
@@ -656,7 +642,7 @@ unsafe fn test_parse_code_3_m_0_49_64_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 835);
+                panic!("assertion failed at upstream test_opus_api.c:835");
             }
             packet[1] = (64 + (jj & 63)) as u8;
             frames[0] = 0;
@@ -671,7 +657,7 @@ unsafe fn test_parse_code_3_m_0_49_64_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 840);
+                panic!("assertion failed at upstream test_opus_api.c:840");
             }
             packet[1] = (128 + 64 + (jj & 63)) as u8;
             frames[0] = 0;
@@ -686,7 +672,7 @@ unsafe fn test_parse_code_3_m_0_49_64_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 845);
+                panic!("assertion failed at upstream test_opus_api.c:845");
             }
         }
     }
@@ -725,13 +711,13 @@ unsafe fn test_parse_code_3_m_1_cbr_inner() {
                 Some(&mut payload_offset),
             );
             if ret != 1 {
-                fail("tests/test_opus_api.c", 861);
+                panic!("assertion failed at upstream test_opus_api.c:861");
             }
             if size[0] as i32 != j {
-                fail("tests/test_opus_api.c", 862);
+                panic!("assertion failed at upstream test_opus_api.c:862");
             }
             if toc as i32 >> 2 != i {
-                fail("tests/test_opus_api.c", 863);
+                panic!("assertion failed at upstream test_opus_api.c:863");
             }
         }
     }
@@ -773,20 +759,20 @@ unsafe fn test_parse_code_3_m_1_48_cbr_inner() {
                 );
                 if frame_samp * j as i32 <= 5760 && (sz - 2) % j == 0 && (sz - 2) / j < 1276 {
                     if ret != j as _ {
-                        fail("tests/test_opus_api.c", 890);
+                        panic!("assertion failed at upstream test_opus_api.c:890");
                     }
                     for jj in 1..ret {
                         if frames[jj as usize]
                             != (frames[(jj - 1) as usize] + size[(jj - 1) as usize] as usize)
                         {
-                            fail("tests/test_opus_api.c", 891);
+                            panic!("assertion failed at upstream test_opus_api.c:891");
                         }
                     }
                     if toc >> 2 != i {
-                        fail("tests/test_opus_api.c", 892);
+                        panic!("assertion failed at upstream test_opus_api.c:892");
                     }
                 } else if ret != OPUS_INVALID_PACKET {
-                    fail("tests/test_opus_api.c", 893);
+                    panic!("assertion failed at upstream test_opus_api.c:893");
                 }
             }
         }
@@ -812,11 +798,11 @@ unsafe fn test_parse_code_3_m_1_48_cbr_inner() {
             Some(&mut payload_offset),
         );
         if ret != packet[1] as i32 {
-            fail("tests/test_opus_api.c", 901);
+            panic!("assertion failed at upstream test_opus_api.c:901");
         }
         for jj in 0..ret {
             if size[jj as usize] != 1275 {
-                fail("tests/test_opus_api.c", 902);
+                panic!("assertion failed at upstream test_opus_api.c:902");
             }
         }
     }
@@ -858,13 +844,13 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
             );
 
             if ret != 1 {
-                fail("tests/test_opus_api.c", 919);
+                panic!("assertion failed at upstream test_opus_api.c:919");
             }
             if size[0] as i32 != jj {
-                fail("tests/test_opus_api.c", 920);
+                panic!("assertion failed at upstream test_opus_api.c:920");
             }
             if toc as i32 >> 2 != i {
-                fail("tests/test_opus_api.c", 921);
+                panic!("assertion failed at upstream test_opus_api.c:921");
             }
         }
 
@@ -882,7 +868,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 934);
+                panic!("assertion failed at upstream test_opus_api.c:934");
             }
             packet[2] = 252;
             packet[3 as usize] = 0;
@@ -901,7 +887,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 941);
+                panic!("assertion failed at upstream test_opus_api.c:941");
             }
             for jj in 2..2 + j {
                 packet[jj as usize] = 0;
@@ -918,7 +904,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
                 Some(&mut payload_offset),
             );
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 947);
+                panic!("assertion failed at upstream test_opus_api.c:947");
             }
             packet[2] = 252;
             packet[3] = 0;
@@ -938,7 +924,7 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
             );
 
             if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 955);
+                panic!("assertion failed at upstream test_opus_api.c:955");
             }
             for jj in 2..2 + j {
                 packet[jj as usize] = 0;
@@ -957,18 +943,18 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
 
             if frame_samp_0 * j as i32 <= 5760 {
                 if ret != j as i32 {
-                    fail("tests/test_opus_api.c", 962);
+                    panic!("assertion failed at upstream test_opus_api.c:962");
                 }
                 for jj in 0..j {
                     if size[jj as usize] as i32 != 0 {
-                        fail("tests/test_opus_api.c", 963);
+                        panic!("assertion failed at upstream test_opus_api.c:963");
                     }
                 }
                 if toc >> 2 != i as _ {
-                    fail("tests/test_opus_api.c", 964);
+                    panic!("assertion failed at upstream test_opus_api.c:964");
                 }
             } else if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 965);
+                panic!("assertion failed at upstream test_opus_api.c:965");
             }
             for sz in 0..8 {
                 let tsz: [i32; 8] = [50, 201, 403, 700, 1472, 5110, 20400, 61298];
@@ -1008,23 +994,23 @@ unsafe fn test_parse_code_3_m_1_48_vbr_inner() {
                     && tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1) < 1276
                 {
                     if ret != j as i32 {
-                        fail("tests/test_opus_api.c", 981);
+                        panic!("assertion failed at upstream test_opus_api.c:981");
                     }
                     for jj in 0..j - 1 {
                         if size[jj as usize] as i32 != as_0 {
-                            fail("tests/test_opus_api.c", 982);
+                            panic!("assertion failed at upstream test_opus_api.c:982");
                         }
                     }
                     if size[(j - 1) as usize] as i32
                         != tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1)
                     {
-                        fail("tests/test_opus_api.c", 983);
+                        panic!("assertion failed at upstream test_opus_api.c:983");
                     }
                     if toc as i32 >> 2 != i {
-                        fail("tests/test_opus_api.c", 984);
+                        panic!("assertion failed at upstream test_opus_api.c:984");
                     }
                 } else if ret != OPUS_INVALID_PACKET {
-                    fail("tests/test_opus_api.c", 985);
+                    panic!("assertion failed at upstream test_opus_api.c:985");
                 }
             }
         }
@@ -1061,7 +1047,7 @@ unsafe fn test_parse_code_3_padding_inner() {
         );
 
         if ret != OPUS_INVALID_PACKET {
-            fail("tests/test_opus_api.c", 1002);
+            panic!("assertion failed at upstream test_opus_api.c:1002");
         }
         for sz in 0..4 {
             let tsz_0: [i32; 4] = [0, 72, 512, 1275];
@@ -1095,7 +1081,7 @@ unsafe fn test_parse_code_3_padding_inner() {
                     );
 
                     if ret != OPUS_INVALID_PACKET {
-                        fail("tests/test_opus_api.c", 1019);
+                        panic!("assertion failed at upstream test_opus_api.c:1019");
                     }
                 }
                 frames[0] = 0;
@@ -1119,16 +1105,16 @@ unsafe fn test_parse_code_3_padding_inner() {
 
                 if tsz_0[sz as usize] + i < 1276 {
                     if ret != 1 {
-                        fail("tests/test_opus_api.c", 1026);
+                        panic!("assertion failed at upstream test_opus_api.c:1026");
                     }
                     if size[0] as i32 != tsz_0[sz as usize] + i {
-                        fail("tests/test_opus_api.c", 1027);
+                        panic!("assertion failed at upstream test_opus_api.c:1027");
                     }
                     if toc as i32 >> 2 != i {
-                        fail("tests/test_opus_api.c", 1028);
+                        panic!("assertion failed at upstream test_opus_api.c:1028");
                     }
                 } else if ret != OPUS_INVALID_PACKET {
-                    fail("tests/test_opus_api.c", 1029);
+                    panic!("assertion failed at upstream test_opus_api.c:1029");
                 }
             }
         }
@@ -1157,7 +1143,7 @@ unsafe fn test_enc_api_inner() {
     while c < 4 {
         i = opus_encoder_get_size(c);
         if (c == 1 || c == 2) && (i <= 2048 || i > (1) << 17) || c != 1 && c != 2 && i != 0 {
-            fail("tests/test_opus_api.c", 1084);
+            panic!("assertion failed at upstream test_opus_api.c:1084");
         }
         println!(
             "    opus_encoder_get_size({})={} ...............{} OK.",
@@ -1193,25 +1179,24 @@ unsafe fn test_enc_api_inner() {
                 err = 0;
                 enc = opus_encoder_create(fs, c, 2048, &mut err);
                 if err != OPUS_BAD_ARG || !enc.is_null() {
-                    fail("tests/test_opus_api.c", 1106);
+                    panic!("assertion failed at upstream test_opus_api.c:1106");
                 }
                 cfgs += 1;
                 enc = opus_encoder_create(fs, c, 2048, ptr::null_mut::<i32>());
                 if !enc.is_null() {
-                    fail("tests/test_opus_api.c", 1109);
+                    panic!("assertion failed at upstream test_opus_api.c:1109");
                 }
                 cfgs += 1;
                 opus_encoder_destroy(enc);
-                enc = malloc(opus_encoder_get_size(2) as u64) as *mut OpusEncoder;
-                if enc.is_null() {
-                    fail("tests/test_opus_api.c", 1113);
-                }
-                err = opus_encoder_init(enc, fs, c, 2048);
-                if err != OPUS_BAD_ARG {
-                    fail("tests/test_opus_api.c", 1115);
-                }
+                let enc_size = opus_encoder_get_size(2) as usize;
+                let mut enc_buf = vec![0u8; enc_size];
+                let enc_tmp = enc_buf.as_mut_ptr() as *mut OpusEncoder;
+                err = opus_encoder_init(enc_tmp, fs, c, 2048);
+                assert_eq!(
+                    err, OPUS_BAD_ARG,
+                    "opus_encoder_init({fs}, {c}) should return BAD_ARG"
+                );
                 cfgs += 1;
-                free(enc as *mut core::ffi::c_void);
             }
             i += 1;
         }
@@ -1219,45 +1204,45 @@ unsafe fn test_enc_api_inner() {
     }
     enc = opus_encoder_create(48000, 2, -(1000), ptr::null_mut::<i32>());
     if !enc.is_null() {
-        fail("tests/test_opus_api.c", 1122);
+        panic!("assertion failed at upstream test_opus_api.c:1122");
     }
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, -(1000), &mut err);
     if err != OPUS_BAD_ARG || !enc.is_null() {
-        fail("tests/test_opus_api.c", 1127);
+        panic!("assertion failed at upstream test_opus_api.c:1127");
     }
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2048, ptr::null_mut::<i32>());
     if enc.is_null() {
-        fail("tests/test_opus_api.c", 1132);
+        panic!("assertion failed at upstream test_opus_api.c:1132");
     }
     opus_encoder_destroy(enc);
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2051, &mut err);
     if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1138);
+        panic!("assertion failed at upstream test_opus_api.c:1138");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        fail("tests/test_opus_api.c", 1141);
+        panic!("assertion failed at upstream test_opus_api.c:1141");
     }
     cfgs += 1;
     opus_encoder_destroy(enc);
     enc = opus_encoder_create(48000, 2, 2049, &mut err);
     if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1147);
+        panic!("assertion failed at upstream test_opus_api.c:1147");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        fail("tests/test_opus_api.c", 1150);
+        panic!("assertion failed at upstream test_opus_api.c:1150");
     }
     opus_encoder_destroy(enc);
     cfgs += 1;
     enc = opus_encoder_create(48000, 2, 2048, &mut err);
     if err != 0 || enc.is_null() {
-        fail("tests/test_opus_api.c", 1156);
+        panic!("assertion failed at upstream test_opus_api.c:1156");
     }
     cfgs += 1;
     println!("    opus_encoder_create() ........................ OK.");
@@ -1265,611 +1250,583 @@ unsafe fn test_enc_api_inner() {
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4027, &mut i);
     if err != 0 || i < 0 || i > 32766 {
-        fail("tests/test_opus_api.c", 1165);
+        panic!("assertion failed at upstream test_opus_api.c:1165");
     }
     cfgs += 1;
     println!("    OPUS_GET_LOOKAHEAD ........................... OK.");
     err = opus_encoder_ctl!(enc, 4029, &mut i);
     if err != 0 || i != 48000 {
-        fail("tests/test_opus_api.c", 1173);
+        panic!("assertion failed at upstream test_opus_api.c:1173");
     }
     cfgs += 1;
     println!("    OPUS_GET_SAMPLE_RATE ......................... OK.");
     if opus_encoder_ctl!(enc, -(5)) != -(5) {
-        fail("tests/test_opus_api.c", 1180);
+        panic!("assertion failed at upstream test_opus_api.c:1180");
     }
     println!("    OPUS_UNIMPLEMENTED ........................... OK.");
     cfgs += 1;
     i = -1;
     if opus_encoder_ctl!(enc, 4000, i) == 0 {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     i = -(1000);
     if opus_encoder_ctl!(enc, 4000, i) == 0 {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     i = 2049;
     j = i;
     if opus_encoder_ctl!(enc, 4000, i) != 0 {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4001, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     i = 2051;
     j = i;
     if opus_encoder_ctl!(enc, 4000, i) != 0 {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     println!("    OPUS_SET_APPLICATION ......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4001, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1190);
+        panic!("assertion failed at upstream test_opus_api.c:1190");
     }
     println!("    OPUS_GET_APPLICATION ......................... OK.");
     cfgs += 6;
     if opus_encoder_ctl!(enc, 4002, 1073741832) != 0 {
-        fail("tests/test_opus_api.c", 1195);
+        panic!("assertion failed at upstream test_opus_api.c:1195");
     }
     cfgs += 1;
     if opus_encoder_ctl!(enc, 4003, &mut i) != 0 {
-        fail("tests/test_opus_api.c", 1198);
+        panic!("assertion failed at upstream test_opus_api.c:1198");
     }
     if i > 700000 || i < 256000 {
-        fail("tests/test_opus_api.c", 1199);
+        panic!("assertion failed at upstream test_opus_api.c:1199");
     }
     cfgs += 1;
     i = -(12345);
     if opus_encoder_ctl!(enc, 4002, i) == 0 {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     i = 0;
     if opus_encoder_ctl!(enc, 4002, i) == 0 {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     i = 500;
     j = i;
     if opus_encoder_ctl!(enc, 4002, i) != 0 {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4003, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     i = 256000;
     j = i;
     if opus_encoder_ctl!(enc, 4002, i) != 0 {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     println!("    OPUS_SET_BITRATE ............................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4003, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1204);
+        panic!("assertion failed at upstream test_opus_api.c:1204");
     }
     println!("    OPUS_GET_BITRATE ............................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4022, i) == 0 {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     i = 3;
     if opus_encoder_ctl!(enc, 4022, i) == 0 {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4022, i) != 0 {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4023, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     i = -(1000);
     j = i;
     if opus_encoder_ctl!(enc, 4022, i) != 0 {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     println!("    OPUS_SET_FORCE_CHANNELS ...................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4023, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1212);
+        panic!("assertion failed at upstream test_opus_api.c:1212");
     }
     println!("    OPUS_GET_FORCE_CHANNELS ...................... OK.");
     cfgs += 6;
     i = OPUS_BUFFER_TOO_SMALL;
     if opus_encoder_ctl!(enc, 4008, i) == 0 {
-        fail("tests/test_opus_api.c", 1215);
+        panic!("assertion failed at upstream test_opus_api.c:1215");
     }
     cfgs += 1;
     i = 1105 + 1;
     if opus_encoder_ctl!(enc, 4008, i) == 0 {
-        fail("tests/test_opus_api.c", 1218);
+        panic!("assertion failed at upstream test_opus_api.c:1218");
     }
     cfgs += 1;
     i = 1101;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        fail("tests/test_opus_api.c", 1221);
+        panic!("assertion failed at upstream test_opus_api.c:1221");
     }
     cfgs += 1;
     i = 1105;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        fail("tests/test_opus_api.c", 1224);
+        panic!("assertion failed at upstream test_opus_api.c:1224");
     }
     cfgs += 1;
     i = 1103;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        fail("tests/test_opus_api.c", 1227);
+        panic!("assertion failed at upstream test_opus_api.c:1227");
     }
     cfgs += 1;
     i = 1102;
     if opus_encoder_ctl!(enc, 4008, i) != 0 {
-        fail("tests/test_opus_api.c", 1230);
+        panic!("assertion failed at upstream test_opus_api.c:1230");
     }
     cfgs += 1;
     println!("    OPUS_SET_BANDWIDTH ........................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4009, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 && i != -(1000) {
-        fail("tests/test_opus_api.c", 1240);
+        panic!("assertion failed at upstream test_opus_api.c:1240");
     }
     cfgs += 1;
     if opus_encoder_ctl!(enc, 4008, -(1000)) != 0 {
-        fail("tests/test_opus_api.c", 1242);
+        panic!("assertion failed at upstream test_opus_api.c:1242");
     }
     cfgs += 1;
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     i = OPUS_BUFFER_TOO_SMALL;
     if opus_encoder_ctl!(enc, 4004, i) == 0 {
-        fail("tests/test_opus_api.c", 1250);
+        panic!("assertion failed at upstream test_opus_api.c:1250");
     }
     cfgs += 1;
     i = 1105 + 1;
     if opus_encoder_ctl!(enc, 4004, i) == 0 {
-        fail("tests/test_opus_api.c", 1253);
+        panic!("assertion failed at upstream test_opus_api.c:1253");
     }
     cfgs += 1;
     i = 1101;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        fail("tests/test_opus_api.c", 1256);
+        panic!("assertion failed at upstream test_opus_api.c:1256");
     }
     cfgs += 1;
     i = 1105;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        fail("tests/test_opus_api.c", 1259);
+        panic!("assertion failed at upstream test_opus_api.c:1259");
     }
     cfgs += 1;
     i = 1103;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        fail("tests/test_opus_api.c", 1262);
+        panic!("assertion failed at upstream test_opus_api.c:1262");
     }
     cfgs += 1;
     i = 1102;
     if opus_encoder_ctl!(enc, 4004, i) != 0 {
-        fail("tests/test_opus_api.c", 1265);
+        panic!("assertion failed at upstream test_opus_api.c:1265");
     }
     cfgs += 1;
     println!("    OPUS_SET_MAX_BANDWIDTH ....................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4005, &mut i);
     if err != 0 || i != 1101 && i != 1102 && i != 1103 && i != 1105 {
-        fail("tests/test_opus_api.c", 1275);
+        panic!("assertion failed at upstream test_opus_api.c:1275");
     }
     cfgs += 1;
     println!("    OPUS_GET_MAX_BANDWIDTH ....................... OK.");
     i = -1;
     if opus_encoder_ctl!(enc, 4016, i) == 0 {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4016, i) == 0 {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4016, i) != 0 {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4017, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4016, i) != 0 {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     println!("    OPUS_SET_DTX ................................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4017, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1288);
+        panic!("assertion failed at upstream test_opus_api.c:1288");
     }
     println!("    OPUS_GET_DTX ................................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4010, i) == 0 {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     i = 11;
     if opus_encoder_ctl!(enc, 4010, i) == 0 {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4010, i) != 0 {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4011, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     i = 10;
     j = i;
     if opus_encoder_ctl!(enc, 4010, i) != 0 {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     println!("    OPUS_SET_COMPLEXITY .......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4011, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1296);
+        panic!("assertion failed at upstream test_opus_api.c:1296");
     }
     println!("    OPUS_GET_COMPLEXITY .......................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4012, i) == 0 {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4012, i) == 0 {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4012, i) != 0 {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4013, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4012, i) != 0 {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     println!("    OPUS_SET_INBAND_FEC .......................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4013, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1304);
+        panic!("assertion failed at upstream test_opus_api.c:1304");
     }
     println!("    OPUS_GET_INBAND_FEC .......................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4014, i) == 0 {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     i = 101;
     if opus_encoder_ctl!(enc, 4014, i) == 0 {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     i = 100;
     j = i;
     if opus_encoder_ctl!(enc, 4014, i) != 0 {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4015, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4014, i) != 0 {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     println!("    OPUS_SET_PACKET_LOSS_PERC .................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4015, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1312);
+        panic!("assertion failed at upstream test_opus_api.c:1312");
     }
     println!("    OPUS_GET_PACKET_LOSS_PERC .................... OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4006, i) == 0 {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4006, i) == 0 {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4006, i) != 0 {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4007, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4006, i) != 0 {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     println!("    OPUS_SET_VBR ................................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4007, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1320);
+        panic!("assertion failed at upstream test_opus_api.c:1320");
     }
     println!("    OPUS_GET_VBR ................................. OK.");
     cfgs += 6;
     i = -1;
     if opus_encoder_ctl!(enc, 4020, i) == 0 {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4020, i) == 0 {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4020, i) != 0 {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4021, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4020, i) != 0 {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     println!("    OPUS_SET_VBR_CONSTRAINT ...................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4021, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1336);
+        panic!("assertion failed at upstream test_opus_api.c:1336");
     }
     println!("    OPUS_GET_VBR_CONSTRAINT ...................... OK.");
     cfgs += 6;
     i = -(12345);
     if opus_encoder_ctl!(enc, 4024, i) == 0 {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     i = 0x7fffffff;
     if opus_encoder_ctl!(enc, 4024, i) == 0 {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     i = 3002;
     j = i;
     if opus_encoder_ctl!(enc, 4024, i) != 0 {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4025, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     i = -(1000);
     j = i;
     if opus_encoder_ctl!(enc, 4024, i) != 0 {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     println!("    OPUS_SET_SIGNAL .............................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4025, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1344);
+        panic!("assertion failed at upstream test_opus_api.c:1344");
     }
     println!("    OPUS_GET_SIGNAL .............................. OK.");
     cfgs += 6;
     i = 7;
     if opus_encoder_ctl!(enc, 4036, i) == 0 {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     i = 25;
     if opus_encoder_ctl!(enc, 4036, i) == 0 {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     i = 16;
     j = i;
     if opus_encoder_ctl!(enc, 4036, i) != 0 {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4037, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     i = 24;
     j = i;
     if opus_encoder_ctl!(enc, 4036, i) != 0 {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     println!("    OPUS_SET_LSB_DEPTH ........................... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4037, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1351);
+        panic!("assertion failed at upstream test_opus_api.c:1351");
     }
     println!("    OPUS_GET_LSB_DEPTH ........................... OK.");
     cfgs += 6;
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if i != 0 {
-        fail("tests/test_opus_api.c", 1354);
+        panic!("assertion failed at upstream test_opus_api.c:1354");
     }
     cfgs += 1;
     i = -1;
     if opus_encoder_ctl!(enc, 4042, i) == 0 {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     i = 2;
     if opus_encoder_ctl!(enc, 4042, i) == 0 {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     i = 1;
     j = i;
     if opus_encoder_ctl!(enc, 4042, i) != 0 {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     i = 0;
     j = i;
     if opus_encoder_ctl!(enc, 4042, i) != 0 {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     println!("    OPUS_SET_PREDICTION_DISABLED ................. OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4043, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1361);
+        panic!("assertion failed at upstream test_opus_api.c:1361");
     }
     println!("    OPUS_GET_PREDICTION_DISABLED ................. OK.");
     cfgs += 6;
     err = opus_encoder_ctl!(enc, 4040, 5001);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1367);
+        panic!("assertion failed at upstream test_opus_api.c:1367");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5002);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1370);
+        panic!("assertion failed at upstream test_opus_api.c:1370");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5003);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1373);
+        panic!("assertion failed at upstream test_opus_api.c:1373");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5004);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1376);
+        panic!("assertion failed at upstream test_opus_api.c:1376");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5005);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1379);
+        panic!("assertion failed at upstream test_opus_api.c:1379");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5006);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1382);
+        panic!("assertion failed at upstream test_opus_api.c:1382");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5007);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1385);
+        panic!("assertion failed at upstream test_opus_api.c:1385");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5008);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1388);
+        panic!("assertion failed at upstream test_opus_api.c:1388");
     }
     cfgs += 1;
     err = opus_encoder_ctl!(enc, 4040, 5009);
     if err != 0 {
-        fail("tests/test_opus_api.c", 1391);
+        panic!("assertion failed at upstream test_opus_api.c:1391");
     }
     cfgs += 1;
     i = 0;
     if opus_encoder_ctl!(enc, 4040, i) == 0 {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     i = -1;
     if opus_encoder_ctl!(enc, 4040, i) == 0 {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     i = 5006;
     j = i;
     if opus_encoder_ctl!(enc, 4040, i) != 0 {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4041, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     i = 5000;
     j = i;
     if opus_encoder_ctl!(enc, 4040, i) != 0 {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     println!("    OPUS_SET_EXPERT_FRAME_DURATION ............... OK.");
     i = -(12345);
     err = opus_encoder_ctl!(enc, 4041, &mut i);
     if err != 0 || i != j {
-        fail("tests/test_opus_api.c", 1396);
+        panic!("assertion failed at upstream test_opus_api.c:1396");
     }
     println!("    OPUS_GET_EXPERT_FRAME_DURATION ............... OK.");
     cfgs += 6;
     if opus_encoder_ctl!(enc, 4031, &mut enc_final_range) != 0 {
-        fail("tests/test_opus_api.c", 1403);
+        panic!("assertion failed at upstream test_opus_api.c:1403");
     }
     cfgs += 1;
     println!("    OPUS_GET_FINAL_RANGE ......................... OK.");
     if opus_encoder_ctl!(enc, 4028) != 0 {
-        fail("tests/test_opus_api.c", 1408);
+        panic!("assertion failed at upstream test_opus_api.c:1408");
     }
     cfgs += 1;
     println!("    OPUS_RESET_STATE ............................. OK.");
-    memset(
-        sbuf.as_mut_ptr() as *mut core::ffi::c_void,
-        0,
-        (::core::mem::size_of::<i16>() as u64)
-            .wrapping_mul(2)
-            .wrapping_mul(960),
-    );
-    i = opus_encode(
-        enc,
-        sbuf.as_mut_ptr(),
-        960,
-        packet.as_mut_ptr(),
-        ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
-    );
-    if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
-        fail("tests/test_opus_api.c", 1415);
-    }
+    sbuf.fill(0);
+    i = opus_encode(enc, sbuf.as_mut_ptr(), 960, packet.as_mut_ptr(), 1276);
+    assert!(i >= 1 && i <= 1276, "opus_encode returned {i}");
     cfgs += 1;
     println!("    opus_encode() ................................ OK.");
-    memset(
-        fbuf.as_mut_ptr() as *mut core::ffi::c_void,
-        0,
-        (::core::mem::size_of::<f32>() as u64)
-            .wrapping_mul(2)
-            .wrapping_mul(960),
-    );
-    i = opus_encode_float(
-        enc,
-        fbuf.as_mut_ptr(),
-        960,
-        packet.as_mut_ptr(),
-        ::core::mem::size_of::<[u8; 1276]>() as u64 as i32,
-    );
-    if i < 1 || i > ::core::mem::size_of::<[u8; 1276]>() as u64 as i32 {
-        fail("tests/test_opus_api.c", 1423);
-    }
+    fbuf.fill(0.0);
+    i = opus_encode_float(enc, fbuf.as_mut_ptr(), 960, packet.as_mut_ptr(), 1276);
+    assert!(i >= 1 && i <= 1276, "opus_encode_float returned {i}");
     cfgs += 1;
     println!("    opus_encode_float() .......................... OK.");
     opus_encoder_destroy(enc);
@@ -1891,50 +1848,50 @@ fn test_repacketizer_api_0() {
     println!("  ---------------------------------------------------");
 
     if rp.get_nb_frames() != 0 {
-        fail("tests/test_opus_api.c", 1477);
+        panic!("assertion failed at upstream test_opus_api.c:1477");
     }
     println!("    opus_repacketizer_get_nb_frames .............. OK.");
     if rp.cat(&packet[..0]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1483);
+        panic!("assertion failed at upstream test_opus_api.c:1483");
     }
     packet[0] = 1;
     if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1486);
+        panic!("assertion failed at upstream test_opus_api.c:1486");
     }
     packet[0] = 2;
     if rp.cat(&packet[..1]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1489);
+        panic!("assertion failed at upstream test_opus_api.c:1489");
     }
     packet[0] = 3;
     if rp.cat(&packet[..1]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1492);
+        panic!("assertion failed at upstream test_opus_api.c:1492");
     }
     packet[0] = 2;
     packet[1] = 255;
     if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1496);
+        panic!("assertion failed at upstream test_opus_api.c:1496");
     }
     packet[0] = 2;
     packet[1] = 250;
     if rp.cat(&packet[..251]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1500);
+        panic!("assertion failed at upstream test_opus_api.c:1500");
     }
     packet[0] = 3;
     packet[1] = 0;
     if rp.cat(&packet[..2]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1504);
+        panic!("assertion failed at upstream test_opus_api.c:1504");
     }
     packet[1] = 49;
     if rp.cat(&packet[..100]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1507);
+        panic!("assertion failed at upstream test_opus_api.c:1507");
     }
     packet[0] = 0;
     if rp.cat(&packet[..3]) != 0 {
-        fail("tests/test_opus_api.c", 1510);
+        panic!("assertion failed at upstream test_opus_api.c:1510");
     }
     packet[0] = ((1) << 2) as u8;
     if rp.cat(&packet[..3]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1513);
+        panic!("assertion failed at upstream test_opus_api.c:1513");
     }
     rp.init();
 
@@ -1964,7 +1921,7 @@ fn test_repacketizer_api_0() {
                                 (ret != OPUS_INVALID_PACKET) as i32
                             } != 0
                             {
-                                fail("tests/test_opus_api.c", 1542);
+                                panic!("assertion failed at upstream test_opus_api.c:1542");
                             }
                         }
                         rcnt = if k <= 1275 * i {
@@ -1977,53 +1934,53 @@ fn test_repacketizer_api_0() {
                             0
                         };
                         if rp.get_nb_frames() != rcnt * i {
-                            fail("tests/test_opus_api.c", 1546);
+                            panic!("assertion failed at upstream test_opus_api.c:1546");
                         }
                         ret = rp.out_range(0, rcnt * i, &mut po[..1276 * 48 + 48 * 2 + 2]);
                         if rcnt > 0 {
                             let mut len: i32 = 0;
                             len = k * rcnt + (if rcnt * i > 2 { 2 } else { 1 });
                             if ret != len {
-                                fail("tests/test_opus_api.c", 1553);
+                                panic!("assertion failed at upstream test_opus_api.c:1553");
                             }
                             if rcnt * i < 2 && po[0] as i32 & 3 != 0 {
-                                fail("tests/test_opus_api.c", 1554);
+                                panic!("assertion failed at upstream test_opus_api.c:1554");
                             }
                             if rcnt * i == 2 && po[0] as i32 & 3 != 1 {
-                                fail("tests/test_opus_api.c", 1555);
+                                panic!("assertion failed at upstream test_opus_api.c:1555");
                             }
                             if rcnt * i > 2 && (po[0] as i32 & 3 != 3 || po[1] as i32 != rcnt * i) {
-                                fail("tests/test_opus_api.c", 1556);
+                                panic!("assertion failed at upstream test_opus_api.c:1556");
                             }
                             if rp.out(&mut po[..len as usize]) != len {
-                                fail("tests/test_opus_api.c", 1558);
+                                panic!("assertion failed at upstream test_opus_api.c:1558");
                             }
                             if opus_packet_unpad(&mut po[..len as _]) != len {
-                                fail("tests/test_opus_api.c", 1560);
+                                panic!("assertion failed at upstream test_opus_api.c:1560");
                             }
                             if opus_packet_pad(&mut po[..len as usize + 1], len, len + 1) != 0 {
-                                fail("tests/test_opus_api.c", 1562);
+                                panic!("assertion failed at upstream test_opus_api.c:1562");
                             }
                             if opus_packet_pad(&mut po, len + 1, len + 256) != 0 {
-                                fail("tests/test_opus_api.c", 1564);
+                                panic!("assertion failed at upstream test_opus_api.c:1564");
                             }
                             if opus_packet_unpad(&mut po[..len as usize + 256]) != len {
-                                fail("tests/test_opus_api.c", 1566);
+                                panic!("assertion failed at upstream test_opus_api.c:1566");
                             }
 
                             if rp.out(&mut po[..len as usize - 1]) != OPUS_BUFFER_TOO_SMALL {
-                                fail("tests/test_opus_api.c", 1576);
+                                panic!("assertion failed at upstream test_opus_api.c:1576");
                             }
                             if len > 1 {
                                 if rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
-                                    fail("tests/test_opus_api.c", 1580);
+                                    panic!("assertion failed at upstream test_opus_api.c:1580");
                                 }
                             }
                             if rp.out(&mut po[..0]) != OPUS_BUFFER_TOO_SMALL {
-                                fail("tests/test_opus_api.c", 1583);
+                                panic!("assertion failed at upstream test_opus_api.c:1583");
                             }
                         } else if ret != OPUS_BAD_ARG {
-                            fail("tests/test_opus_api.c", 1585);
+                            panic!("assertion failed at upstream test_opus_api.c:1585");
                         }
                         cnt += 1;
                     }
@@ -2035,33 +1992,33 @@ fn test_repacketizer_api_0() {
     rp.init();
     packet[0] = 0;
     if rp.cat(&packet[..5]) != 0 {
-        fail("tests/test_opus_api.c", 1595);
+        panic!("assertion failed at upstream test_opus_api.c:1595");
     }
     let fresh1 = &mut (packet[0]);
     *fresh1 = (*fresh1 as i32 + 1) as u8;
     if rp.cat(&packet[..9]) != 0 {
-        fail("tests/test_opus_api.c", 1598);
+        panic!("assertion failed at upstream test_opus_api.c:1598");
     }
     i = rp.out(&mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 4 + 8 + 2 || po[0] as i32 & 3 != 3 || po[1] as i32 & 63 != 3 || po[1] as i32 >> 7 != 0 {
-        fail("tests/test_opus_api.c", 1601);
+        panic!("assertion failed at upstream test_opus_api.c:1601");
     }
     i = rp.out_range(0, 1, &mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 5 || po[0] as i32 & 3 != 0 {
-        fail("tests/test_opus_api.c", 1604);
+        panic!("assertion failed at upstream test_opus_api.c:1604");
     }
     i = rp.out_range(1, 2, &mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 5 || po[0] as i32 & 3 != 0 {
-        fail("tests/test_opus_api.c", 1607);
+        panic!("assertion failed at upstream test_opus_api.c:1607");
     }
     rp.init();
     packet[0] = 1;
     if rp.cat(&packet[..9]) != 0 {
-        fail("tests/test_opus_api.c", 1613);
+        panic!("assertion failed at upstream test_opus_api.c:1613");
     }
     packet[0] = 0;
     if rp.cat(&packet[..3]) != 0 {
-        fail("tests/test_opus_api.c", 1616);
+        panic!("assertion failed at upstream test_opus_api.c:1616");
     }
     i = rp.out(&mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 2 + 8 + 2 + 2
@@ -2069,33 +2026,33 @@ fn test_repacketizer_api_0() {
         || po[1] as i32 & 63 != 3
         || po[1] as i32 >> 7 != 1
     {
-        fail("tests/test_opus_api.c", 1619);
+        panic!("assertion failed at upstream test_opus_api.c:1619");
     }
     rp.init();
     packet[0] = 2;
     packet[1] = 4;
     if rp.cat(&packet[..8]) != 0 {
-        fail("tests/test_opus_api.c", 1626);
+        panic!("assertion failed at upstream test_opus_api.c:1626");
     }
     if rp.cat(&packet[..8]) != 0 {
-        fail("tests/test_opus_api.c", 1628);
+        panic!("assertion failed at upstream test_opus_api.c:1628");
     }
     i = rp.out(&mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 2 + 1 + 1 + 1 + 4 + 2 + 4 + 2 || po[0] & 3 != 3 || po[1] & 63 != 4 || po[1] >> 7 != 1 {
-        fail("tests/test_opus_api.c", 1631);
+        panic!("assertion failed at upstream test_opus_api.c:1631");
     }
     rp.init();
     packet[0] = 2;
     packet[1] = 4;
     if rp.cat(&packet[..10]) != 0 {
-        fail("tests/test_opus_api.c", 1638);
+        panic!("assertion failed at upstream test_opus_api.c:1638");
     }
     if rp.cat(&packet[..10]) != 0 {
-        fail("tests/test_opus_api.c", 1640);
+        panic!("assertion failed at upstream test_opus_api.c:1640");
     }
     i = rp.out(&mut po[..1276 * 48 + 48 * 2 + 2]);
     if i != 2 + 4 + 4 + 4 + 4 || po[0] & 3 != 3 || po[1] & 63 != 4 || po[1] >> 7 != 0 {
-        fail("tests/test_opus_api.c", 1643);
+        panic!("assertion failed at upstream test_opus_api.c:1643");
     }
 }
 
@@ -2119,12 +2076,12 @@ fn test_repacketizer_api_1() {
             ret = rp.cat(&packet[..i as usize]);
             if rcnt_0 < maxi_0 {
                 if ret != 0 {
-                    fail("tests/test_opus_api.c", 1662);
+                    panic!("assertion failed at upstream test_opus_api.c:1662");
                 }
                 rcnt_0 += 1;
                 sum += i - 1;
             } else if ret != OPUS_INVALID_PACKET {
-                fail("tests/test_opus_api.c", 1665);
+                panic!("assertion failed at upstream test_opus_api.c:1665");
             }
             len_0 = sum
                 + (if rcnt_0 < 2 {
@@ -2135,49 +2092,49 @@ fn test_repacketizer_api_1() {
                     2 + rcnt_0 - 1
                 });
             if rp.out(&mut po[..1276 * 48 + 48 * 2 + 2]) != len_0 {
-                fail("tests/test_opus_api.c", 1668);
+                panic!("assertion failed at upstream test_opus_api.c:1668");
             }
             if rcnt_0 > 2 && po[1] as i32 & 63 != rcnt_0 {
-                fail("tests/test_opus_api.c", 1669);
+                panic!("assertion failed at upstream test_opus_api.c:1669");
             }
             if rcnt_0 == 2 && po[0] & 3 != 2 {
-                fail("tests/test_opus_api.c", 1670);
+                panic!("assertion failed at upstream test_opus_api.c:1670");
             }
             if rcnt_0 == 1 && po[0] & 3 != 0 {
-                fail("tests/test_opus_api.c", 1671);
+                panic!("assertion failed at upstream test_opus_api.c:1671");
             }
             if rp.out(&mut po[..len_0 as usize]) != len_0 {
-                fail("tests/test_opus_api.c", 1673);
+                panic!("assertion failed at upstream test_opus_api.c:1673");
             }
             if opus_packet_unpad(&mut po[..len_0 as _]) != len_0 {
-                fail("tests/test_opus_api.c", 1675);
+                panic!("assertion failed at upstream test_opus_api.c:1675");
             }
 
             let before = po[..len_0 as usize].to_vec();
             println!("---pad 1");
             if opus_packet_pad(&mut po[..len_0 as usize + 1], len_0, len_0 + 1) != 0 {
-                fail("tests/test_opus_api.c", 1677);
+                panic!("assertion failed at upstream test_opus_api.c:1677");
             }
             println!("---pad 256");
             if opus_packet_pad(&mut po[..len_0 as usize + 256], len_0 + 1, len_0 + 256) != 0 {
-                fail("tests/test_opus_api.c", 1679);
+                panic!("assertion failed at upstream test_opus_api.c:1679");
             }
             println!("---unpad ({len_0})");
             if opus_packet_unpad(&mut po[..len_0 as usize + 256]) != len_0 {
-                fail("tests/test_opus_api.c", 1681);
+                panic!("assertion failed at upstream test_opus_api.c:1681");
             }
             assert_eq!(before, &po[..len_0 as usize], "unpadding failed");
 
             if rp.out(&mut po[..len_0 as usize - 1]) != OPUS_BUFFER_TOO_SMALL {
-                fail("tests/test_opus_api.c", 1691);
+                panic!("assertion failed at upstream test_opus_api.c:1691");
             }
             if len_0 > 1 {
                 if rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
-                    fail("tests/test_opus_api.c", 1695);
+                    panic!("assertion failed at upstream test_opus_api.c:1695");
                 }
             }
             if rp.out(&mut po[..0]) != OPUS_BUFFER_TOO_SMALL {
-                fail("tests/test_opus_api.c", 1698);
+                panic!("assertion failed at upstream test_opus_api.c:1698");
             }
         }
     }
@@ -2186,25 +2143,25 @@ fn test_repacketizer_api_1() {
     po[1] = 'p' as u8;
 
     if opus_packet_pad(&mut po[..4], 4, 4) != 0 {
-        fail("tests/test_opus_api.c", 1705);
+        panic!("assertion failed at upstream test_opus_api.c:1705");
     }
     if opus_packet_pad(&mut po[..5], 4, 5) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1709);
+        panic!("assertion failed at upstream test_opus_api.c:1709");
     }
     if opus_packet_pad(&mut po[..5], 0, 5) != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 1713);
+        panic!("assertion failed at upstream test_opus_api.c:1713");
     }
     if opus_packet_unpad(&mut po[..0]) != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 1717);
+        panic!("assertion failed at upstream test_opus_api.c:1717");
     }
     if opus_packet_unpad(&mut po[..4]) != OPUS_INVALID_PACKET {
-        fail("tests/test_opus_api.c", 1721);
+        panic!("assertion failed at upstream test_opus_api.c:1721");
     }
     po[0] = 0;
     po[1] = 0;
     po[2] = 0;
 
     if opus_packet_pad(&mut po, 5, 4) != OPUS_BAD_ARG {
-        fail("tests/test_opus_api.c", 1728);
+        panic!("assertion failed at upstream test_opus_api.c:1728");
     }
 }
