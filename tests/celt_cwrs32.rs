@@ -41,9 +41,7 @@ fn test_cwrs_encode_decode_roundtrip() {
                 let mut y = [0i32; NMAX];
 
                 // Index → pulse vector
-                unsafe {
-                    cwrsi(n, k, i, y.as_mut_ptr());
-                }
+                cwrsi(n as usize, k, i, &mut y);
 
                 // Verify pulse count: sum of absolute values == K
                 let sy: i32 = y[..n as usize].iter().map(|v| v.abs()).sum();
@@ -53,7 +51,7 @@ fn test_cwrs_encode_decode_roundtrip() {
                 );
 
                 // Vector → index (roundtrip)
-                let ii = unsafe { icwrs(n, y.as_ptr()) };
+                let ii = icwrs(n as usize, &y);
                 assert_eq!(
                     ii, i,
                     "N={n} K={k}: combination index mismatch ({ii} != {i})"

@@ -1,15 +1,21 @@
 use crate::celt::entdec::{ec_dec, ec_dec_update, ec_decode_bin};
 use crate::celt::entenc::{ec_enc, ec_encode_bin};
 
+/// Upstream C: celt/laplace.h:LAPLACE_LOG_MINP
 pub const LAPLACE_LOG_MINP: i32 = 0;
+/// Upstream C: celt/laplace.h:LAPLACE_MINP
 pub const LAPLACE_MINP: i32 = (1) << LAPLACE_LOG_MINP;
+/// Upstream C: celt/laplace.h:LAPLACE_NMIN
 pub const LAPLACE_NMIN: i32 = 16;
-unsafe fn ec_laplace_get_freq1(fs0: u32, decay: i32) -> u32 {
-    let mut ft: u32 = 0;
-    ft = ((32768 - LAPLACE_MINP * (2 * LAPLACE_NMIN)) as u32).wrapping_sub(fs0);
-    return ft.wrapping_mul((16384 - decay) as u32) >> 15;
+
+/// Upstream C: celt/laplace.c:ec_laplace_get_freq1
+fn ec_laplace_get_freq1(fs0: u32, decay: i32) -> u32 {
+    let ft: u32 = ((32768 - LAPLACE_MINP * (2 * LAPLACE_NMIN)) as u32).wrapping_sub(fs0);
+    ft.wrapping_mul((16384 - decay) as u32) >> 15
 }
-pub unsafe fn ec_laplace_encode(enc: &mut ec_enc, value: *mut i32, mut fs: u32, decay: i32) {
+
+/// Upstream C: celt/laplace.c:ec_laplace_encode
+pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: i32) {
     let mut fl: u32 = 0;
     let mut val: i32 = *value;
     fl = 0;
@@ -57,7 +63,9 @@ pub unsafe fn ec_laplace_encode(enc: &mut ec_enc, value: *mut i32, mut fs: u32, 
     }
     ec_encode_bin(enc, fl, fl.wrapping_add(fs), 15);
 }
-pub unsafe fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
+
+/// Upstream C: celt/laplace.c:ec_laplace_decode
+pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
     let mut val: i32 = 0;
     let mut fl: u32 = 0;
     let mut fm: u32 = 0;

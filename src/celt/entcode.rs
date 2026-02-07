@@ -2,16 +2,25 @@
 
 use crate::silk::macros::EC_CLZ0;
 
+/// Upstream C: celt/entcode.h:EC_SYM_BITS
 pub const EC_SYM_BITS: i32 = 8;
+/// Upstream C: celt/entcode.h:EC_CODE_BITS
 pub const EC_CODE_BITS: i32 = 32;
+/// Upstream C: celt/entcode.h:EC_SYM_MAX
 pub const EC_SYM_MAX: u32 = (1_u32 << EC_SYM_BITS).wrapping_sub(1);
+/// Upstream C: celt/entcode.h:EC_CODE_SHIFT
 pub const EC_CODE_SHIFT: i32 = EC_CODE_BITS - EC_SYM_BITS - 1;
+/// Upstream C: celt/entcode.h:EC_CODE_TOP
 pub const EC_CODE_TOP: u32 = 1_u32 << (EC_CODE_BITS - 1);
+/// Upstream C: celt/entcode.h:EC_CODE_BOT
 pub const EC_CODE_BOT: u32 = EC_CODE_TOP >> EC_SYM_BITS;
+/// Upstream C: celt/entcode.h:EC_CODE_EXTRA
 pub const EC_CODE_EXTRA: i32 = (EC_CODE_BITS - 2) % EC_SYM_BITS + 1;
 
+/// Upstream C: celt/entcode.h:ec_window
 pub type ec_window = u32;
 
+/// Upstream C: celt/entcode.h:ec_ctx
 pub struct ec_ctx<'a> {
     pub buf: &'a mut [u8],
     pub storage: u32,
@@ -27,6 +36,7 @@ pub struct ec_ctx<'a> {
     pub error: i32,
 }
 
+/// Upstream C: (no direct C equivalent — Rust-only save/restore helper)
 #[derive(Default, Copy, Clone)]
 pub struct ec_ctx_saved {
     pub storage: u32,
@@ -77,30 +87,38 @@ impl ec_ctx<'_> {
     }
 }
 
+/// Upstream C: celt/entcode.h:EC_UINT_BITS
 pub const EC_UINT_BITS: i32 = 8;
+/// Upstream C: celt/entcode.h:EC_WINDOW_SIZE
 pub const EC_WINDOW_SIZE: i32 = ::core::mem::size_of::<ec_window>() as i32 * 8;
+/// Upstream C: celt/celt.h:BITRES
 pub const BITRES: i32 = 3;
 
+/// Upstream C: celt/entcode.h:ec_get_error (macro in C)
 #[inline]
 pub fn ec_get_error(this: &ec_ctx) -> i32 {
     this.error
 }
 
+/// Upstream C: celt/entcode.h:ec_tell (macro in C)
 #[inline]
 pub fn ec_tell(this: &ec_ctx) -> i32 {
     this.nbits_total - (EC_CLZ0 - this.rng.leading_zeros() as i32)
 }
 
+/// Upstream C: celt/entcode.h:celt_udiv
 #[inline]
 pub fn celt_udiv(n: u32, d: u32) -> u32 {
     n.wrapping_div(d)
 }
 
+/// Upstream C: celt/entcode.h:celt_sudiv
 #[inline]
 pub fn celt_sudiv(n: i32, d: i32) -> i32 {
     n / d
 }
 
+/// Upstream C: celt/entcode.c:ec_tell_frac
 pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
     static correction: [u32; 8] = [35733, 38967, 42495, 46340, 50535, 55109, 60097, 65535];
     let mut nbits: u32 = 0;

@@ -55,30 +55,12 @@ Key: `qb` = quant_bands.rs
 
 ### Stage 2.2 — Entropy Coding
 
-- [ ] `entcode.rs`
-  - Upstream C: `celt/entcode.h`, `celt/entcode.c`
-  - Scope: `ec_ctx` struct, shared infrastructure
-  - Risk: Low — mostly struct definitions
-  - Key change: `buf: *mut u8` → `buf: Vec<u8>` or `&mut [u8]`
-- [ ] `entenc.rs`
-  - Upstream C: `celt/entenc.h`, `celt/entenc.c`
-  - Functions: `ec_enc_init`, `ec_encode`, `ec_enc_bit_logp`, `ec_enc_icdf`, `ec_enc_uint`, `ec_enc_bits`, `ec_enc_done`, etc.
-  - Risk: Medium — buffer management with `buf` pointer
-  - Key: Once `ec_ctx.buf` is safe, all enc functions follow
-- [ ] `entdec.rs`
-  - Upstream C: `celt/entdec.h`, `celt/entdec.c`
-  - Functions: `ec_dec_init`, `ec_decode`, `ec_dec_bit_logp`, `ec_dec_icdf`, `ec_dec_uint`, `ec_dec_bits`, etc.
-  - Risk: Medium — same buffer pattern as entenc
-- [ ] `laplace.rs`
-  - Upstream C: `celt/laplace.h`, `celt/laplace.c`
-  - Functions: `ec_laplace_encode`, `ec_laplace_decode`, `ec_laplace_get_freq1`
-  - Risk: Low — thin wrapper over entenc/entdec
-  - Depends on: entenc, entdec being safe
-- [ ] `cwrs.rs`
-  - Upstream C: `celt/cwrs.h`, `celt/cwrs.c`
-  - Functions: `encode_pulses`, `decode_pulses`, `icwrs`, `cwrsi`, `get_required_bits`
-  - Risk: Medium — combinatorial encoding with index math
-- [ ] **Commit per file**: `refactor: make celt::<module> safe`
+- [x] `entcode.rs` — already safe (`#![forbid(unsafe_code)]`), added upstream comments
+- [x] `entenc.rs` — already safe (`#![forbid(unsafe_code)]`), added upstream comments
+- [x] `entdec.rs` — already safe (`#![forbid(unsafe_code)]`), added upstream comments
+- [x] `laplace.rs` — removed unsafe from all 3 functions, `value: *mut i32` → `&mut i32`
+- [x] `cwrs.rs` — converted all 4 functions to safe slice APIs, removed `arch_h` module
+- [x] **Commit**: `refactor: make celt entropy coding safe (Stage 2.2)`
 
 ### Stage 2.3 — Mid-level DSP
 

@@ -2,6 +2,7 @@
 
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 
+/// Upstream C: celt/entenc.h:ec_enc
 pub type ec_enc<'a> = ec_ctx<'a>;
 
 use crate::celt::entcode::{
@@ -10,6 +11,7 @@ use crate::celt::entcode::{
 
 use crate::silk::macros::EC_CLZ0;
 
+/// Upstream C: celt/entenc.c:ec_write_byte
 fn ec_write_byte(this: &mut ec_enc, value: u32) -> i32 {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_write_byte(0x{:x} @ 0x{:x})", value, this.offs);
@@ -23,6 +25,7 @@ fn ec_write_byte(this: &mut ec_enc, value: u32) -> i32 {
     0
 }
 
+/// Upstream C: celt/entenc.c:ec_write_byte_at_end
 fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
     #[cfg(feature = "ent-dump")]
     eprintln!(
@@ -39,6 +42,7 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
     0
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_carry_out
 fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
     if c as u32 != EC_SYM_MAX {
         let mut carry: i32 = 0;
@@ -63,6 +67,7 @@ fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
     };
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_normalize
 #[inline]
 fn ec_enc_normalize(this: &mut ec_enc) {
     while this.rng <= EC_CODE_BOT {
@@ -73,6 +78,7 @@ fn ec_enc_normalize(this: &mut ec_enc) {
     }
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_init
 pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc<'_> {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_init()");
@@ -92,6 +98,7 @@ pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc<'_> {
     }
 }
 
+/// Upstream C: celt/entenc.c:ec_encode
 pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode({}, {}, {})", _fl, _fh, _ft);
@@ -108,6 +115,7 @@ pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     ec_enc_normalize(this);
 }
 
+/// Upstream C: celt/entenc.c:ec_encode_bin
 pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode_bin({}, {}, {})", _fl, _fh, _bits);
@@ -127,6 +135,7 @@ pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u
     ec_enc_normalize(this);
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_bit_logp
 pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bit_logp({}, {})", _val, _logp);
@@ -144,6 +153,7 @@ pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     ec_enc_normalize(this);
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_icdf
 pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     // we do a sub-slice here because the C code doesn't have an idea about the icdf length (it doesn't need to)
     #[cfg(feature = "ent-dump")]
@@ -164,6 +174,7 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     ec_enc_normalize(this);
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_uint
 pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_uint({}, {})", _fl, _ft);
@@ -184,6 +195,7 @@ pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     };
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_bits
 pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bits({}, {})", _fl, _bits);
@@ -209,6 +221,7 @@ pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
     this.nbits_total = (this.nbits_total as u32).wrapping_add(_bits) as i32;
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_patch_initial_bits
 pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_patch_initial_bits({}, {})", _val, _nbits);
@@ -228,6 +241,7 @@ pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u
     };
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_shrink
 pub fn ec_enc_shrink(this: &mut ec_enc, new_size: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_shrink({})", new_size);
@@ -240,6 +254,7 @@ pub fn ec_enc_shrink(this: &mut ec_enc, new_size: u32) {
     this.storage = new_size;
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_done
 pub fn ec_enc_done(this: &mut ec_enc) {
     let mut window: ec_window = 0;
     let mut used: i32 = 0;

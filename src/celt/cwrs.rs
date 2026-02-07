@@ -1,7 +1,3 @@
-pub mod arch_h {
-    pub type opus_val32 = f32;
-}
-pub use self::arch_h::opus_val32;
 use crate::celt::entdec::{ec_dec, ec_dec_uint};
 use crate::celt::entenc::{ec_enc, ec_enc_uint};
 
@@ -277,6 +273,7 @@ static PVQ_U_DATA2: [&[u32]; 15] = [
     ],
 ];
 
+/// Upstream C: celt/cwrs.c:CELT_PVQ_U (macro table lookup)
 #[inline]
 fn pvq_u(n: u32, k: u32) -> u32 {
     // N = MIN(n, k)
@@ -286,6 +283,7 @@ fn pvq_u(n: u32, k: u32) -> u32 {
     PVQ_U_DATA2[n as usize][k as usize]
 }
 
+/// Upstream C: celt/cwrs.c:CELT_PVQ_V (macro)
 #[inline]
 pub fn pvq_v(n: u32, k: u32) -> u32 {
     pvq_u(n, k) + pvq_u(n, k + 1)
@@ -327,131 +325,121 @@ mod test {
     }
 }
 
-pub unsafe fn icwrs(mut _n: i32, mut _y: *const i32) -> u32 {
-    let mut i: u32 = 0;
-    let mut j: u32 = 0;
-    let mut k: u32 = 0;
-    assert!(_n >= 2);
-    let n = _n as u32;
-    j = _n as u32 - 1;
-    i = (*_y.offset(j as isize) < 0) as u32;
-    k = (*_y.offset(j as isize)).abs() as u32;
+/// Upstream C: celt/cwrs.c:icwrs
+pub fn icwrs(n: usize, y: &[i32]) -> u32 {
+    assert!(n >= 2);
+    let mut j = n - 1;
+    let mut i = (y[j] < 0) as u32;
+    let mut k = y[j].unsigned_abs();
     loop {
         j -= 1;
-        i = i.wrapping_add(pvq_u(n - j, k));
-        k += (*_y.offset(j as isize)).abs() as u32;
-        if *_y.offset(j as isize) < 0 {
-            i = i.wrapping_add(pvq_u(n - j, k + 1));
+        i = i.wrapping_add(pvq_u(n as u32 - j as u32, k));
+        k += y[j].unsigned_abs();
+        if y[j] < 0 {
+            i = i.wrapping_add(pvq_u(n as u32 - j as u32, k + 1));
         }
         if !(j > 0) {
             break;
         }
     }
-    return i;
+    i
 }
 
-pub unsafe fn encode_pulses(mut _y: *const i32, mut _n: i32, mut _k: i32, mut _enc: *mut ec_enc) {
-    assert!(_k > 0);
-    ec_enc_uint(&mut *_enc, icwrs(_n, _y), pvq_v(_n as u32, _k as u32));
+/// Upstream C: celt/cwrs.c:encode_pulses
+pub fn encode_pulses(y: &[i32], k: i32, enc: &mut ec_enc) {
+    let n = y.len();
+    assert!(k > 0);
+    ec_enc_uint(enc, icwrs(n, y), pvq_v(n as u32, k as u32));
 }
 
-pub unsafe fn cwrsi(mut _n: i32, mut _k: i32, mut _i: u32, mut _y: *mut i32) -> opus_val32 {
-    let mut p: u32 = 0;
-    let mut s: i32 = 0;
-    let mut k0: i32 = 0;
-    let mut val: i16 = 0;
-    let mut yy: opus_val32 = 0 as opus_val32;
-    assert!(_k > 0);
-    assert!(_n > 1);
-    while _n > 2 {
-        let mut q: u32 = 0;
-        if _k >= _n {
-            let row = PVQ_U_DATA2[_n as usize];
-            p = row[(_k + 1) as usize];
-            s = -((_i >= p) as i32);
-            _i = (_i).wrapping_sub(p & s as u32);
-            k0 = _k;
-            q = row[_n as usize];
-            if q > _i {
-                _k = _n;
+/// Upstream C: celt/cwrs.c:cwrsi
+pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
+    let mut p: u32;
+    let mut s: i32;
+    let mut k0: i32;
+    let mut val: i16;
+    let mut yy: f32 = 0.0;
+    let mut yi: usize = 0;
+    assert!(k > 0);
+    assert!(n > 1);
+    while n > 2 {
+        let q: u32;
+        if k >= n as i32 {
+            let row = PVQ_U_DATA2[n];
+            p = row[(k + 1) as usize];
+            s = -((i >= p) as i32);
+            i = i.wrapping_sub(p & s as u32);
+            k0 = k;
+            q = row[n];
+            if q > i {
+                k = n as i32;
                 loop {
-                    _k -= 1;
-                    p = PVQ_U_DATA2[_k as usize][_n as usize];
-                    if !(p > _i) {
+                    k -= 1;
+                    p = PVQ_U_DATA2[k as usize][n];
+                    if !(p > i) {
                         break;
                     }
                 }
             } else {
-                p = row[_k as usize];
-                while p > _i {
-                    _k -= 1;
-                    p = row[_k as usize];
+                p = row[k as usize];
+                while p > i {
+                    k -= 1;
+                    p = row[k as usize];
                 }
             }
-            _i = (_i).wrapping_sub(p);
-            val = (k0 - _k + s ^ s) as i16;
-            let fresh0 = _y;
-            _y = _y.offset(1);
-            *fresh0 = val as i32;
-            yy = yy + val as opus_val32 * val as opus_val32;
+            i = i.wrapping_sub(p);
+            val = (k0 - k + s ^ s) as i16;
+            y[yi] = val as i32;
+            yi += 1;
+            yy = yy + val as f32 * val as f32;
         } else {
-            p = PVQ_U_DATA2[_k as usize][_n as usize];
-            q = PVQ_U_DATA2[_k as usize + 1][_n as usize];
-            if p <= _i && _i < q {
-                _i = _i.wrapping_sub(p);
-                let fresh1 = _y;
-                _y = _y.offset(1);
-                *fresh1 = 0;
+            p = PVQ_U_DATA2[k as usize][n];
+            q = PVQ_U_DATA2[k as usize + 1][n];
+            if p <= i && i < q {
+                i = i.wrapping_sub(p);
+                y[yi] = 0;
+                yi += 1;
             } else {
-                s = -((_i >= q) as i32);
-                _i = _i.wrapping_sub(q & s as u32);
-                k0 = _k;
+                s = -((i >= q) as i32);
+                i = i.wrapping_sub(q & s as u32);
+                k0 = k;
                 loop {
-                    _k -= 1;
-                    p = PVQ_U_DATA2[_k as usize][_n as usize];
-                    if !(p > _i) {
+                    k -= 1;
+                    p = PVQ_U_DATA2[k as usize][n];
+                    if !(p > i) {
                         break;
                     }
                 }
-                _i = _i.wrapping_sub(p);
-                val = (k0 - _k + s ^ s) as i16;
-                let fresh2 = _y;
-                _y = _y.offset(1);
-                *fresh2 = val as i32;
-                yy = yy + val as opus_val32 * val as opus_val32;
+                i = i.wrapping_sub(p);
+                val = (k0 - k + s ^ s) as i16;
+                y[yi] = val as i32;
+                yi += 1;
+                yy = yy + val as f32 * val as f32;
             }
         }
-        _n -= 1;
+        n -= 1;
     }
-    p = (2 * _k + 1) as u32;
-    s = -((_i >= p) as i32);
-    _i = _i.wrapping_sub(p & s as u32);
-    k0 = _k;
-    _k = (_i.wrapping_add(1) >> 1) as i32;
-    if _k != 0 {
-        _i = _i.wrapping_sub((2 * _k - 1) as u32);
+    p = (2 * k + 1) as u32;
+    s = -((i >= p) as i32);
+    i = i.wrapping_sub(p & s as u32);
+    k0 = k;
+    k = (i.wrapping_add(1) >> 1) as i32;
+    if k != 0 {
+        i = i.wrapping_sub((2 * k - 1) as u32);
     }
-    val = (k0 - _k + s ^ s) as i16;
-    let fresh3 = _y;
-    _y = _y.offset(1);
-    *fresh3 = val as i32;
-    yy = yy + val as opus_val32 * val as opus_val32;
-    s = -(_i as i32);
-    val = (_k + s ^ s) as i16;
-    *_y = val as i32;
-    yy = yy + val as opus_val32 * val as opus_val32;
-    return yy;
+    val = (k0 - k + s ^ s) as i16;
+    y[yi] = val as i32;
+    yi += 1;
+    yy = yy + val as f32 * val as f32;
+    s = -(i as i32);
+    val = (k + s ^ s) as i16;
+    y[yi] = val as i32;
+    yy = yy + val as f32 * val as f32;
+    yy
 }
-pub unsafe fn decode_pulses(
-    mut _y: *mut i32,
-    mut _n: i32,
-    mut _k: i32,
-    mut _dec: *mut ec_dec,
-) -> opus_val32 {
-    return cwrsi(
-        _n,
-        _k,
-        ec_dec_uint(&mut *_dec, pvq_v(_n as u32, _k as u32)),
-        _y,
-    );
+
+/// Upstream C: celt/cwrs.c:decode_pulses
+pub fn decode_pulses(y: &mut [i32], k: i32, dec: &mut ec_dec) -> f32 {
+    let n = y.len();
+    cwrsi(n, k, ec_dec_uint(dec, pvq_v(n as u32, k as u32)), y)
 }

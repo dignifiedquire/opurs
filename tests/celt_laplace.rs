@@ -55,9 +55,7 @@ fn test_laplace_roundtrip() {
     let mut enc = ec_enc_init(&mut buf);
     for i in 0..10_000 {
         let fs = ec_laplace_get_start_freq(decay[i]) as u32;
-        unsafe {
-            ec_laplace_encode(&mut enc, &mut val[i], fs, decay[i]);
-        }
+        ec_laplace_encode(&mut enc, &mut val[i], fs, decay[i]);
     }
     ec_enc_done(&mut enc);
 
@@ -67,7 +65,7 @@ fn test_laplace_roundtrip() {
     let mut dec = ec_dec_init(&mut buf[..enc_bytes as usize]);
     for i in 0..10_000 {
         let fs = ec_laplace_get_start_freq(decay[i]) as u32;
-        let d = unsafe { ec_laplace_decode(&mut dec, fs, decay[i]) };
+        let d = ec_laplace_decode(&mut dec, fs, decay[i]);
         assert_eq!(
             d, val[i],
             "Laplace decode mismatch at index {i}: got {d}, expected {} (decay={}, seed={seed})",

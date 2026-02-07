@@ -3,12 +3,14 @@
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 use crate::silk::macros::EC_CLZ0;
 
+/// Upstream C: celt/entdec.h:ec_dec
 pub type ec_dec<'a> = ec_ctx<'a>;
 
 use crate::celt::entcode::{
     EC_CODE_BITS, EC_CODE_BOT, EC_CODE_EXTRA, EC_CODE_TOP, EC_SYM_BITS, EC_SYM_MAX,
 };
 
+/// Upstream C: celt/entdec.c:ec_read_byte
 fn ec_read_byte(this: &mut ec_dec) -> i32 {
     if this.offs < this.storage {
         let res = this.buf[this.offs as usize] as i32;
@@ -21,6 +23,7 @@ fn ec_read_byte(this: &mut ec_dec) -> i32 {
     }
 }
 
+/// Upstream C: celt/entdec.c:ec_read_byte_from_end
 fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
     if this.end_offs < this.storage {
         this.end_offs += 1;
@@ -31,6 +34,7 @@ fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
     }
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_normalize
 fn ec_dec_normalize(this: &mut ec_dec) {
     while this.rng <= EC_CODE_BOT {
         let mut sym: i32 = 0;
@@ -44,6 +48,7 @@ fn ec_dec_normalize(this: &mut ec_dec) {
     }
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_init
 pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
     let mut this = ec_dec {
         storage: buf.len() as u32,
@@ -71,6 +76,7 @@ pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
     this
 }
 
+/// Upstream C: celt/entdec.c:ec_decode
 pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
     let mut s: u32 = 0;
     this.ext = celt_udiv(this.rng, _ft);
@@ -81,6 +87,7 @@ pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
     ))
 }
 
+/// Upstream C: celt/entdec.c:ec_decode_bin
 pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
     let mut s: u32 = 0;
     this.ext = this.rng >> _bits;
@@ -92,6 +99,7 @@ pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
     ))
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_update
 pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     let mut s: u32 = 0;
     s = (_this.ext).wrapping_mul(_ft.wrapping_sub(_fh));
@@ -104,6 +112,7 @@ pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft
     ec_dec_normalize(_this);
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_bit_logp
 pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
     let mut r: u32 = 0;
     let mut d: u32 = 0;
@@ -122,6 +131,7 @@ pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
     ret
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_icdf
 pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
     let mut r: u32 = 0;
     let mut d: u32 = 0;
@@ -147,6 +157,7 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
     ret
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_uint
 pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
     let mut ft: u32 = 0;
     let mut s: u32 = 0;
@@ -174,6 +185,7 @@ pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
     }
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_bits
 pub fn ec_dec_bits(mut _this: &mut ec_dec, mut _bits: u32) -> u32 {
     let mut window: ec_window = 0;
     let mut available: i32 = 0;
