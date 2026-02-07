@@ -315,11 +315,11 @@ This is already the best-structured test file (15 `#[test]` fns). Cleanup:
 
 ### 1.5 — Port missing upstream tests
 
-- [ ] Evaluate `test_opus_projection.c` (394 lines)
+- [x] Evaluate `test_opus_projection.c` (394 lines)
   - This tests multistream/ambisonics which is not implemented in the Rust port
   - Decision: **Defer** — document as out-of-scope until multistream is ported
   - Add `plans/deferred-multistream.md` noting this gap
-- [ ] Port `opus_decode_fuzzer.c` as cargo-fuzz target
+- [x] Port `opus_decode_fuzzer.c` as cargo-fuzz target
   - Add `fuzz/` directory with `cargo-fuzz` setup
   - Port the libFuzzer harness logic
   - Document how to run: `cargo +nightly fuzz run decode_fuzzer`

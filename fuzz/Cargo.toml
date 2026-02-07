@@ -1,0 +1,24 @@
+[package]
+name = "unsafe-libopus-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.unsafe-libopus]
+path = ".."
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "decode_fuzzer"
+path = "fuzz_targets/decode_fuzzer.rs"
+test = false
+doc = false
+bench = false
