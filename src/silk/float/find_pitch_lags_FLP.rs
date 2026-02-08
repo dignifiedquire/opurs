@@ -64,13 +64,9 @@ pub unsafe fn silk_find_pitch_lags_FLP(
     );
     (*psEncCtrl).predGain =
         auto_corr[0 as usize] / (if res_nrg > 1.0f32 { res_nrg } else { 1.0f32 });
-    silk_k2a_FLP(
-        A.as_mut_ptr(),
-        refl_coef.as_mut_ptr(),
-        (*psEnc).sCmn.pitchEstimationLPCOrder,
-    );
+    silk_k2a_FLP(&mut A, &refl_coef, (*psEnc).sCmn.pitchEstimationLPCOrder);
     silk_bwexpander_FLP(
-        A.as_mut_ptr(),
+        &mut A,
         (*psEnc).sCmn.pitchEstimationLPCOrder,
         FIND_PITCH_BANDWIDTH_EXPANSION,
     );

@@ -100,12 +100,16 @@ pub unsafe fn silk_find_pred_coefs_FLP(
         x_pre_ptr = LPC_in_pre.as_mut_ptr();
         i = 0;
         while i < (*psEnc).sCmn.nb_subfr as i32 {
-            silk_scale_copy_vector_FLP(
-                x_pre_ptr,
-                x_ptr,
-                invGains[i as usize],
-                (*psEnc).sCmn.subfr_length as i32 + (*psEnc).sCmn.predictLPCOrder as i32,
-            );
+            {
+                let copy_len = ((*psEnc).sCmn.subfr_length as i32
+                    + (*psEnc).sCmn.predictLPCOrder as i32) as usize;
+                silk_scale_copy_vector_FLP(
+                    std::slice::from_raw_parts_mut(x_pre_ptr, copy_len),
+                    std::slice::from_raw_parts(x_ptr, copy_len),
+                    invGains[i as usize],
+                    copy_len as i32,
+                );
+            }
             x_pre_ptr = x_pre_ptr.offset(
                 ((*psEnc).sCmn.subfr_length as i32 + (*psEnc).sCmn.predictLPCOrder) as isize,
             );

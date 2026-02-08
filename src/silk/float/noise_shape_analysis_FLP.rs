@@ -82,7 +82,11 @@ unsafe fn warped_true2monic_coefs(coefs: *mut f32, lambda: f32, limit: f32, orde
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(coefs, order, chirp);
+        silk_bwexpander_FLP(
+            std::slice::from_raw_parts_mut(coefs, order as usize),
+            order,
+            chirp,
+        );
         i = order - 1;
         while i > 0 {
             *coefs.offset((i - 1) as isize) -= lambda * *coefs.offset(i as isize);
@@ -122,7 +126,11 @@ unsafe fn limit_coefs(coefs: *mut f32, limit: f32, order: i32) {
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(coefs, order, chirp);
+        silk_bwexpander_FLP(
+            std::slice::from_raw_parts_mut(coefs, order as usize),
+            order,
+            chirp,
+        );
         iter += 1;
     }
 }
@@ -248,10 +256,8 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
             (*psEnc).sCmn.shapingLPCOrder,
         );
         silk_k2a_FLP(
-            &mut *((*psEncCtrl).AR)
-                .as_mut_ptr()
-                .offset((k * MAX_SHAPE_LPC_ORDER) as isize),
-            rc.as_mut_ptr(),
+            &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+            &rc,
             (*psEnc).sCmn.shapingLPCOrder,
         );
         (*psEncCtrl).Gains[k as usize] = celt_sqrt(nrg);
@@ -265,9 +271,7 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
             );
         }
         silk_bwexpander_FLP(
-            &mut *((*psEncCtrl).AR)
-                .as_mut_ptr()
-                .offset((k * MAX_SHAPE_LPC_ORDER) as isize),
+            &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
             (*psEnc).sCmn.shapingLPCOrder,
             BWExp,
         );
