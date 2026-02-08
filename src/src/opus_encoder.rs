@@ -2322,10 +2322,15 @@ pub unsafe fn opus_encode_native(
         opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, 0);
         opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
         err = celt_encode_with_ec(
-            celt_enc,
-            pcm_buf.as_mut_ptr(),
+            &mut *celt_enc,
+            &pcm_buf,
             (*st).Fs / 200,
-            data.offset(nb_compr_bytes as isize),
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    data.offset(nb_compr_bytes as isize),
+                    redundancy_bytes as usize,
+                )
+            },
             redundancy_bytes,
             None,
         );
@@ -2345,10 +2350,10 @@ pub unsafe fn opus_encode_native(
             let mut dummy_0: [u8; 2] = [0; 2];
             opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
             celt_encode_with_ec(
-                celt_enc,
-                tmp_prefill.as_mut_ptr(),
+                &mut *celt_enc,
+                &tmp_prefill,
                 (*st).Fs / 400,
-                dummy_0.as_mut_ptr(),
+                &mut dummy_0,
                 2,
                 None,
             );
@@ -2368,10 +2373,10 @@ pub unsafe fn opus_encode_native(
             }
             opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, (*st).use_vbr);
             ret = celt_encode_with_ec(
-                celt_enc,
-                pcm_buf.as_mut_ptr(),
+                &mut *celt_enc,
+                &pcm_buf,
                 frame_size,
-                NULL as *mut u8,
+                &mut [],
                 nb_compr_bytes,
                 Some(&mut enc),
             );
@@ -2416,22 +2421,23 @@ pub unsafe fn opus_encode_native(
             ec_enc_shrink(&mut enc, nb_compr_bytes as u32);
         }
         celt_encode_with_ec(
-            celt_enc,
-            pcm_buf
-                .as_mut_ptr()
-                .offset(((*st).channels * (frame_size - N2 - N4)) as isize),
+            &mut *celt_enc,
+            &pcm_buf[((*st).channels * (frame_size - N2 - N4)) as usize..],
             N4,
-            dummy_1.as_mut_ptr(),
+            &mut dummy_1,
             2,
             None,
         );
         err_0 = celt_encode_with_ec(
-            celt_enc,
-            pcm_buf
-                .as_mut_ptr()
-                .offset(((*st).channels * (frame_size - N2)) as isize),
+            &mut *celt_enc,
+            &pcm_buf[((*st).channels * (frame_size - N2)) as usize..],
             N2,
-            data.offset(nb_compr_bytes as isize),
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    data.offset(nb_compr_bytes as isize),
+                    redundancy_bytes as usize,
+                )
+            },
             redundancy_bytes,
             None,
         );
