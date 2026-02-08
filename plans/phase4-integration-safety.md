@@ -495,10 +495,21 @@ The single hardest file (3034 lines, 30 unsafe fn).
     - etc. (full list in Target API section above)
 - [ ] Implement `Drop` for `Encoder` (replaces `opus_encoder_destroy`)
 - [ ] Deprecate old C-style free functions
-- [ ] Refactor internal helpers to safe:
-  - `opus_encode_native` — main encode path
-  - `compute_frame_size`, `compute_stereo_width`
-  - `decide_fec`, `is_digital_silence`, `pad_frame`
+- [x] Refactor internal leaf/helper functions to safe:
+  - [x] `gen_toc`, `frame_size_select`, `compute_silk_rate_for_hybrid`,
+        `compute_equiv_rate`, `compute_redundancy_bytes`, `opus_select_arch`
+  - [x] `user_bitrate_to_bitrate`, `is_digital_silence`, `compute_frame_energy`
+  - [x] `silk_biquad_float`, `hp_cutoff`, `dc_reject`
+  - [x] `stereo_fade`, `gain_fade`, `compute_stereo_width`
+  - [x] `decide_fec`, `decide_dtx_mode`
+  - [ ] `downmix_float`, `downmix_int` (blocked on function pointer plumbing)
+- [ ] Refactor remaining unsafe functions:
+  - `opus_encode_native` — main encode path (1300+ lines)
+  - `encode_multiframe_packet`
+  - `opus_encode`, `opus_encode_float` (public API, block on opus_encode_native)
+  - `opus_encoder_init`, `opus_encoder_create`, `opus_encoder_destroy`
+  - `opus_encoder_get_size` (blocked on silk_Get_Encoder_Size)
+  - `opus_encoder_ctl_impl` (complex varargs/CTL dispatch)
 - [ ] **Commit(s)**: `refactor: safe Encoder with idiomatic Rust API`
   (likely 3-5 commits)
 
