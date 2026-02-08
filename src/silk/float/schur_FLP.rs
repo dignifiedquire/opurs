@@ -1,4 +1,5 @@
-pub unsafe fn silk_schur_FLP(refl_coef: *mut f32, auto_corr: *const f32, order: i32) -> f32 {
+/// Upstream C: silk/float/schur_FLP.c:silk_schur_FLP
+pub fn silk_schur_FLP(refl_coef: &mut [f32], auto_corr: &[f32], order: i32) -> f32 {
     let mut k: i32 = 0;
     let mut n: i32 = 0;
     let mut C: [[f64; 2]; 25] = [[0.; 2]; 25];
@@ -8,7 +9,7 @@ pub unsafe fn silk_schur_FLP(refl_coef: *mut f32, auto_corr: *const f32, order: 
     assert!(order >= 0 && order <= 24);
     k = 0;
     loop {
-        C[k as usize][1 as usize] = *auto_corr.offset(k as isize) as f64;
+        C[k as usize][1 as usize] = auto_corr[k as usize] as f64;
         C[k as usize][0 as usize] = C[k as usize][1 as usize];
         k += 1;
         if !(k <= order) {
@@ -23,7 +24,7 @@ pub unsafe fn silk_schur_FLP(refl_coef: *mut f32, auto_corr: *const f32, order: 
             } else {
                 1e-9f32 as f64
             });
-        *refl_coef.offset(k as isize) = rc_tmp as f32;
+        refl_coef[k as usize] = rc_tmp as f32;
         n = 0;
         while n < order - k {
             Ctmp1 = C[(n + k + 1) as usize][0 as usize];

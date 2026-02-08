@@ -4,11 +4,12 @@ use crate::silk::SigProc_FIX::silk_max_int;
 
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_SQRT_APPROX};
 
-pub unsafe fn silk_stereo_find_predictor(
-    ratio_Q14: *mut i32,
-    x: *const i16,
-    y: *const i16,
-    mid_res_amp_Q0: *mut i32,
+/// Upstream C: silk/stereo_find_predictor.c:silk_stereo_find_predictor
+pub fn silk_stereo_find_predictor(
+    ratio_Q14: &mut i32,
+    x: &[i16],
+    y: &[i16],
+    mid_res_amp_Q0: &mut [i32],
     length: i32,
     mut smooth_coef_Q16: i32,
 ) -> i32 {
@@ -20,22 +21,15 @@ pub unsafe fn silk_stereo_find_predictor(
     let mut corr: i32 = 0;
     let mut pred_Q13: i32 = 0;
     let mut pred2_Q10: i32 = 0;
-    silk_sum_sqr_shift(
-        &mut nrgx,
-        &mut scale1,
-        std::slice::from_raw_parts(x, length as usize),
-    );
-    silk_sum_sqr_shift(
-        &mut nrgy,
-        &mut scale2,
-        std::slice::from_raw_parts(y, length as usize),
-    );
+    silk_sum_sqr_shift(&mut nrgx, &mut scale1, &x[..length as usize]);
+    silk_sum_sqr_shift(&mut nrgy, &mut scale2, &y[..length as usize]);
     scale = silk_max_int(scale1, scale2);
     scale = scale + (scale & 1);
     nrgy = nrgy >> scale - scale2;
     nrgx = nrgx >> scale - scale1;
     nrgx = silk_max_int(nrgx, 1);
-    corr = silk_inner_prod_aligned_scale(x, y, scale, length);
+    corr =
+        silk_inner_prod_aligned_scale(&x[..length as usize], &y[..length as usize], scale, length);
     pred_Q13 = silk_DIV32_varQ(corr, nrgx, 13);
     pred_Q13 = if -((1) << 14) > (1) << 14 {
         if pred_Q13 > -((1) << 14) {
@@ -58,22 +52,20 @@ pub unsafe fn silk_stereo_find_predictor(
         if pred2_Q10 > 0 { pred2_Q10 } else { -pred2_Q10 },
     );
     scale = scale >> 1;
-    *mid_res_amp_Q0.offset(0 as isize) = (*mid_res_amp_Q0.offset(0 as isize) as i64
-        + ((((silk_SQRT_APPROX(nrgx) as u32) << scale) as i32 - *mid_res_amp_Q0.offset(0 as isize))
-            as i64
+    mid_res_amp_Q0[0] = (mid_res_amp_Q0[0] as i64
+        + ((((silk_SQRT_APPROX(nrgx) as u32) << scale) as i32 - mid_res_amp_Q0[0]) as i64
             * smooth_coef_Q16 as i16 as i64
             >> 16)) as i32;
     nrgy = nrgy - (((corr as i64 * pred_Q13 as i16 as i64 >> 16) as i32 as u32) << 3 + 1) as i32;
     nrgy = nrgy + (((nrgx as i64 * pred2_Q10 as i16 as i64 >> 16) as i32 as u32) << 6) as i32;
-    *mid_res_amp_Q0.offset(1 as isize) = (*mid_res_amp_Q0.offset(1 as isize) as i64
-        + ((((silk_SQRT_APPROX(nrgy) as u32) << scale) as i32 - *mid_res_amp_Q0.offset(1 as isize))
-            as i64
+    mid_res_amp_Q0[1] = (mid_res_amp_Q0[1] as i64
+        + ((((silk_SQRT_APPROX(nrgy) as u32) << scale) as i32 - mid_res_amp_Q0[1]) as i64
             * smooth_coef_Q16 as i16 as i64
             >> 16)) as i32;
     *ratio_Q14 = silk_DIV32_varQ(
-        *mid_res_amp_Q0.offset(1 as isize),
-        if *mid_res_amp_Q0.offset(0 as isize) > 1 {
-            *mid_res_amp_Q0.offset(0 as isize)
+        mid_res_amp_Q0[1],
+        if mid_res_amp_Q0[0] > 1 {
+            mid_res_amp_Q0[0]
         } else {
             1
         },

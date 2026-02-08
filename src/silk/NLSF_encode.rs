@@ -50,8 +50,8 @@ pub unsafe fn silk_NLSF_encode(
     let vla_0 = nSurvivors as usize;
     let mut tempIndices1: Vec<i32> = ::std::vec::from_elem(0, vla_0);
     silk_insertion_sort_increasing(
-        err_Q24.as_mut_ptr(),
-        tempIndices1.as_mut_ptr(),
+        &mut err_Q24,
+        &mut tempIndices1,
         psNLSF_CB.nVectors as i32,
         nSurvivors,
     );
@@ -106,7 +106,12 @@ pub unsafe fn silk_NLSF_encode(
             + bits_q7 as i16 as i32 * (NLSF_mu_Q20 >> 2) as i16 as i32;
         s += 1;
     }
-    silk_insertion_sort_increasing(RD_Q25.as_mut_ptr(), &mut bestIndex, nSurvivors, 1);
+    silk_insertion_sort_increasing(
+        &mut RD_Q25,
+        std::slice::from_mut(&mut bestIndex),
+        nSurvivors,
+        1,
+    );
     *NLSFIndices.offset(0 as isize) = *tempIndices1.as_mut_ptr().offset(bestIndex as isize) as i8;
     memcpy(
         &mut *NLSFIndices.offset(1 as isize) as *mut i8 as *mut core::ffi::c_void,

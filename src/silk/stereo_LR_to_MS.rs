@@ -164,17 +164,17 @@ pub unsafe fn silk_stereo_LR_to_MS(
         >> 16) as i32;
     pred_Q13[0 as usize] = silk_stereo_find_predictor(
         &mut LP_ratio_Q14,
-        LP_mid.as_mut_ptr() as *const i16,
-        LP_side.as_mut_ptr() as *const i16,
-        &mut *((*state).mid_side_amp_Q0).as_mut_ptr().offset(0 as isize),
+        &LP_mid,
+        &LP_side,
+        &mut (&mut (*state).mid_side_amp_Q0)[0..2],
         frame_length,
         smooth_coef_Q16,
     );
     pred_Q13[1 as usize] = silk_stereo_find_predictor(
         &mut HP_ratio_Q14,
-        HP_mid.as_mut_ptr() as *const i16,
-        HP_side.as_mut_ptr() as *const i16,
-        &mut *((*state).mid_side_amp_Q0).as_mut_ptr().offset(2 as isize),
+        &HP_mid,
+        &HP_side,
+        &mut (&mut (*state).mid_side_amp_Q0)[2..4],
         frame_length,
         smooth_coef_Q16,
     );
@@ -234,7 +234,7 @@ pub unsafe fn silk_stereo_LR_to_MS(
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
-        silk_stereo_quant_pred(pred_Q13.as_mut_ptr(), ix);
+        silk_stereo_quant_pred(&mut pred_Q13, std::slice::from_raw_parts_mut(ix, 2));
     } else if (*state).width_prev_Q14 as i32 == 0
         && (8 * total_rate_bps < 13 * min_mid_rate_bps
             || ((frac_Q16 as i64 * (*state).smth_width_Q14 as i64 >> 16) as i32)
@@ -244,7 +244,7 @@ pub unsafe fn silk_stereo_LR_to_MS(
             (*state).smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             (*state).smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(pred_Q13.as_mut_ptr(), ix);
+        silk_stereo_quant_pred(&mut pred_Q13, std::slice::from_raw_parts_mut(ix, 2));
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
@@ -260,19 +260,19 @@ pub unsafe fn silk_stereo_LR_to_MS(
             (*state).smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             (*state).smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(pred_Q13.as_mut_ptr(), ix);
+        silk_stereo_quant_pred(&mut pred_Q13, std::slice::from_raw_parts_mut(ix, 2));
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
     } else if (*state).smth_width_Q14 as i32 > (0.95f64 * ((1) << 14) as f64 + 0.5f64) as i32 {
-        silk_stereo_quant_pred(pred_Q13.as_mut_ptr(), ix);
+        silk_stereo_quant_pred(&mut pred_Q13, std::slice::from_raw_parts_mut(ix, 2));
         width_Q14 = ((1 * ((1) << 14)) as f64 + 0.5f64) as i32;
     } else {
         pred_Q13[0 as usize] =
             (*state).smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             (*state).smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(pred_Q13.as_mut_ptr(), ix);
+        silk_stereo_quant_pred(&mut pred_Q13, std::slice::from_raw_parts_mut(ix, 2));
         width_Q14 = (*state).smth_width_Q14 as i32;
     }
     if *mid_only_flag as i32 == 1 {

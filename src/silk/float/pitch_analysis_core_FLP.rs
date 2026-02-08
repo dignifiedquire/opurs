@@ -246,10 +246,8 @@ pub unsafe fn silk_pitch_analysis_core_FLP(
     length_d_srch = 4 + 2 * complexity;
     assert!(3 * length_d_srch <= 24);
     silk_insertion_sort_decreasing_FLP(
-        &mut *(*C.as_mut_ptr().offset(0 as isize))
-            .as_mut_ptr()
-            .offset(min_lag_4kHz as isize),
-        d_srch.as_mut_ptr(),
+        &mut C[0][min_lag_4kHz as usize..],
+        &mut d_srch,
         max_lag_4kHz - min_lag_4kHz + 1,
         length_d_srch,
     );

@@ -1,6 +1,7 @@
-pub unsafe fn silk_warped_autocorrelation_FLP(
-    corr: *mut f32,
-    input: *const f32,
+/// Upstream C: silk/float/warped_autocorrelation_FLP.c:silk_warped_autocorrelation_FLP
+pub fn silk_warped_autocorrelation_FLP(
+    corr: &mut [f32],
+    input: &[f32],
     warping: f32,
     length: i32,
     order: i32,
@@ -20,7 +21,7 @@ pub unsafe fn silk_warped_autocorrelation_FLP(
     assert!(order & 1 == 0);
     n = 0;
     while n < length {
-        tmp1 = *input.offset(n as isize) as f64;
+        tmp1 = input[n as usize] as f64;
         i = 0;
         while i < order {
             tmp2 = state[i as usize] + warping as f64 * (state[(i + 1) as usize] - tmp1);
@@ -37,7 +38,7 @@ pub unsafe fn silk_warped_autocorrelation_FLP(
     }
     i = 0;
     while i < order + 1 {
-        *corr.offset(i as isize) = C[i as usize] as f32;
+        corr[i as usize] = C[i as usize] as f32;
         i += 1;
     }
 }

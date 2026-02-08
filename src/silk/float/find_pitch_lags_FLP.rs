@@ -58,8 +58,8 @@ pub unsafe fn silk_find_pitch_lags_FLP(
     );
     auto_corr[0 as usize] += auto_corr[0 as usize] * FIND_PITCH_WHITE_NOISE_FRACTION + 1 as f32;
     res_nrg = silk_schur_FLP(
-        refl_coef.as_mut_ptr(),
-        auto_corr.as_mut_ptr() as *const f32,
+        &mut refl_coef,
+        &auto_corr,
         (*psEnc).sCmn.pitchEstimationLPCOrder,
     );
     (*psEncCtrl).predGain =

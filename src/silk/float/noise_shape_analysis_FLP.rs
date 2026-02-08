@@ -237,8 +237,8 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
         x_ptr = x_ptr.offset((*psEnc).sCmn.subfr_length as isize);
         if (*psEnc).sCmn.warping_Q16 > 0 {
             silk_warped_autocorrelation_FLP(
-                auto_corr.as_mut_ptr(),
-                x_windowed.as_mut_ptr(),
+                &mut auto_corr,
+                &x_windowed,
                 warping,
                 (*psEnc).sCmn.shapeWinLength,
                 (*psEnc).sCmn.shapingLPCOrder,
@@ -250,11 +250,7 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
             );
         }
         auto_corr[0 as usize] += auto_corr[0 as usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;
-        nrg = silk_schur_FLP(
-            rc.as_mut_ptr(),
-            auto_corr.as_mut_ptr() as *const f32,
-            (*psEnc).sCmn.shapingLPCOrder,
-        );
+        nrg = silk_schur_FLP(&mut rc, &auto_corr, (*psEnc).sCmn.shapingLPCOrder);
         silk_k2a_FLP(
             &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
             &rc,
