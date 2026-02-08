@@ -113,7 +113,7 @@ fn test_decoder_initial_plc() {
 
             for fec in 0..2 {
                 // PLC with minimum frame size
-                let out_samples = opus_decode(dec, &[], outbuf.as_mut_ptr(), 120 / factor, fec);
+                let out_samples = opus_decode(dec, &[], outbuf, 120 / factor, fec);
                 assert_eq!(
                     out_samples,
                     120 / factor,
@@ -130,7 +130,7 @@ fn test_decoder_initial_plc() {
                 assert_eq!(dur, 120 / factor, "dec[{t}] duration mismatch after PLC");
 
                 // Non-multiple-of-2.5ms should fail
-                let out_samples = opus_decode(dec, &[], outbuf.as_mut_ptr(), 120 / factor + 2, fec);
+                let out_samples = opus_decode(dec, &[], outbuf, 120 / factor + 2, fec);
                 assert_eq!(
                     out_samples, -1,
                     "dec[{t}] non-2.5ms-multiple should fail, got {out_samples}"
@@ -148,8 +148,7 @@ fn test_decoder_initial_plc() {
                 );
 
                 // Empty packet slice
-                let out_samples =
-                    opus_decode(dec, &packet[..0], outbuf.as_mut_ptr(), 120 / factor, fec);
+                let out_samples = opus_decode(dec, &packet[..0], outbuf, 120 / factor, fec);
                 assert_eq!(
                     out_samples,
                     120 / factor,
@@ -159,14 +158,14 @@ fn test_decoder_initial_plc() {
 
                 // Zero-length decode
                 outbuf[0] = GUARD_VALUE;
-                let out_samples = opus_decode(dec, &packet[..0], outbuf.as_mut_ptr(), 0, fec);
+                let out_samples = opus_decode(dec, &packet[..0], outbuf, 0, fec);
                 assert!(
                     out_samples <= 0,
                     "dec[{t}] zero-length decode should return <= 0, got {out_samples}"
                 );
 
                 // Null output with zero length
-                let out_samples = opus_decode(dec, &packet[..0], std::ptr::null_mut(), 0, fec);
+                let out_samples = opus_decode(dec, &packet[..0], &mut [], 0, fec);
                 assert!(
                     out_samples <= 0,
                     "dec[{t}] null output zero-length should return <= 0, got {out_samples}"
@@ -178,13 +177,7 @@ fn test_decoder_initial_plc() {
 
                 // Invalid FEC value
                 let invalid_fec = if fec != 0 { -1 } else { 2 };
-                let out_samples = opus_decode(
-                    dec,
-                    &packet[..1],
-                    outbuf.as_mut_ptr(),
-                    MAX_FRAME,
-                    invalid_fec,
-                );
+                let out_samples = opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
                 assert!(
                     out_samples < 0,
                     "dec[{t}] invalid fec={invalid_fec} should fail, got {out_samples}"
@@ -244,8 +237,7 @@ fn test_decoder_all_2byte_prefixes() {
 
                 for t in 0..NUM_DECODERS {
                     let dec = dec_ref(&mut decoders[t]);
-                    let out_samples =
-                        opus_decode(dec, &packet[..3], outbuf.as_mut_ptr(), MAX_FRAME, 0);
+                    let out_samples = opus_decode(dec, &packet[..3], &mut outbuf, MAX_FRAME, 0);
                     assert_eq!(
                         out_samples, expected[t],
                         "dec[{t}] mode {i} byte {j}: expected {}, got {out_samples}",
@@ -281,7 +273,7 @@ fn test_decoder_all_2byte_prefixes() {
 
                 // 6 PLC frames at the expected size
                 for _ in 0..6 {
-                    let out_samples = opus_decode(dec, &[], outbuf.as_mut_ptr(), expected[t], 0);
+                    let out_samples = opus_decode(dec, &[], &mut outbuf, expected[t], 0);
                     assert_eq!(
                         out_samples, expected[t],
                         "dec[{t}] PLC recovery: expected {}, got {out_samples}",
@@ -294,7 +286,7 @@ fn test_decoder_all_2byte_prefixes() {
 
                 // Reset to minimum frame size if needed
                 if expected[t] != 120 / factor {
-                    let out_samples = opus_decode(dec, &[], outbuf.as_mut_ptr(), 120 / factor, 0);
+                    let out_samples = opus_decode(dec, &[], &mut outbuf, 120 / factor, 0);
                     assert_eq!(out_samples, 120 / factor);
                     let mut dur = 0;
                     assert_eq!(opus_decoder_ctl!(dec, 4039, &mut dur), 0);
@@ -302,8 +294,7 @@ fn test_decoder_all_2byte_prefixes() {
                 }
 
                 // Undersized buffer should fail
-                let out_samples =
-                    opus_decode(dec, &packet[..2], outbuf.as_mut_ptr(), expected[t] - 1, 0);
+                let out_samples = opus_decode(dec, &packet[..2], &mut outbuf, expected[t] - 1, 0);
                 assert!(
                     out_samples <= 0,
                     "dec[{t}] undersized buffer should fail, got {out_samples}"
@@ -344,7 +335,7 @@ fn test_decoder_fuzz() {
         let _ = rng.next_u32() % 65535;
 
         let mut outbuf_storage = vec![GUARD_VALUE; (MAX_FRAME as usize + 2 * GUARD_SAMPLES) * 2];
-        let outbuf = outbuf_storage[GUARD_SAMPLES * 2..].as_mut_ptr();
+        let outbuf = &mut outbuf_storage[GUARD_SAMPLES * 2..];
         let mut packet = vec![0u8; 1500];
         let mut modes = [0u8; 4096];
 

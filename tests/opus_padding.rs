@@ -31,7 +31,7 @@ fn test_padding_overflow() {
     let decoder = unsafe { opus_decoder_create(48000, 2, &mut error) };
     assert!(!decoder.is_null(), "Failed to create decoder");
 
-    let result = unsafe { opus_decode(&mut *decoder, &packet, out.as_mut_ptr(), 5760, 0) };
+    let result = unsafe { opus_decode(&mut *decoder, &packet, &mut out, 5760, 0) };
 
     unsafe { opus_decoder_destroy(decoder) };
 

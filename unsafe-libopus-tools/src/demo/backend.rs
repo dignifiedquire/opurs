@@ -98,6 +98,7 @@ mod unsafe_libopus {
             decode_fec: i32,
         ) -> i32 {
             let data = std::slice::from_raw_parts(data, len as _);
+            let pcm = std::slice::from_raw_parts_mut(pcm, (frame_size * st.channels()) as usize);
             opus_decode(st, data, pcm, frame_size, decode_fec)
         }
 

@@ -122,13 +122,7 @@ unsafe fn test_encode(
             eprintln!("opus_encode() returned {len}");
             return -1;
         }
-        let out_samples = opus_decode(
-            &mut *dec,
-            &packet[..len as usize],
-            outbuf.as_mut_ptr(),
-            5760,
-            0,
-        );
+        let out_samples = opus_decode(&mut *dec, &packet[..len as usize], &mut outbuf, 5760, 0);
         if out_samples != frame_size {
             eprintln!("opus_decode() returned {out_samples}");
             return -1;
@@ -486,7 +480,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 let out_samples = opus_decode(
                     &mut *dec,
                     &packet[..len as usize],
-                    outbuf.as_mut_ptr().add((i << 1) as usize),
+                    &mut outbuf[((i << 1) as usize)..],
                     5760,
                     0,
                 );
@@ -504,7 +498,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 let out_samples = opus_decode(
                     &mut *dec_err[0],
                     &packet[..len as usize],
-                    out2buf.as_mut_ptr(),
+                    &mut out2buf,
                     frame_size,
                     (rng.next_u32() & 3 != 0) as i32,
                 );
@@ -514,7 +508,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 let out_samples = opus_decode(
                     &mut *dec_err[1],
                     &packet[..l as usize],
-                    out2buf.as_mut_ptr(),
+                    &mut out2buf,
                     5760,
                     (rng.next_u32() & 7 != 0) as i32,
                 );
@@ -579,7 +573,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         let out_samples = opus_decode(
             &mut *dec,
             &packet[..len as usize],
-            outbuf.as_mut_ptr().add((offset << 1) as usize),
+            &mut outbuf[((offset << 1) as usize)..],
             5760,
             0,
         );
@@ -614,7 +608,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         let out_samples = opus_decode(
             &mut *dec_err[0],
             &packet[..len as usize],
-            out2buf.as_mut_ptr(),
+            &mut out2buf,
             5760,
             0,
         );
@@ -631,7 +625,7 @@ unsafe fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         let out_samples = opus_decode(
             &mut *dec_err[dec2],
             &packet[..len as usize],
-            out2buf.as_mut_ptr(),
+            &mut out2buf,
             5760,
             0,
         );

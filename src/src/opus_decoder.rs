@@ -11,7 +11,7 @@ pub mod stddef_h {
 pub mod stack_alloc_h {
     pub const ALLOC_NONE: i32 = 1;
     #[inline]
-    pub unsafe fn _opus_false() -> i32 {
+    pub fn _opus_false() -> i32 {
         return 0;
     }
 }
@@ -63,7 +63,10 @@ pub struct OpusDecoder {
     pub(crate) rangeFinal: u32,
 }
 impl OpusDecoder {
-    pub unsafe fn new(Fs: i32, channels: usize) -> Result<OpusDecoder, i32> {
+    pub fn channels(&self) -> i32 {
+        self.channels
+    }
+    pub fn new(Fs: i32, channels: usize) -> Result<OpusDecoder, i32> {
         if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
             || channels != 1 && channels != 2
         {
@@ -812,18 +815,15 @@ pub unsafe fn opus_decode_native(
 pub unsafe fn opus_decode(
     st: &mut OpusDecoder,
     data: &[u8],
-    pcm: *mut i16,
+    pcm: &mut [i16],
     mut frame_size: i32,
     decode_fec: i32,
 ) -> i32 {
-    let mut ret: i32 = 0;
-    let mut i: i32 = 0;
-    let mut nb_samples: i32 = 0;
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
     if data.len() > 0 && decode_fec == 0 {
-        nb_samples = opus_decoder_get_nb_samples(st, data);
+        let nb_samples = opus_decoder_get_nb_samples(st, data);
         if nb_samples > 0 {
             frame_size = if frame_size < nb_samples {
                 frame_size
@@ -837,15 +837,13 @@ pub unsafe fn opus_decode(
     assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
+    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
     if ret > 0 {
-        i = 0;
-        while i < ret * st.channels {
-            *pcm.offset(i as isize) = FLOAT2INT16(*out.as_mut_ptr().offset(i as isize));
-            i += 1;
+        for j in 0..(ret * st.channels) as usize {
+            pcm[j] = FLOAT2INT16(out[j]);
         }
     }
-    return ret;
+    ret
 }
 pub unsafe fn opus_decode_float(
     st: &mut OpusDecoder,

@@ -119,7 +119,7 @@ unsafe fn test_dec_api_inner() {
     packet[2] = 0;
     packet[1] = packet[2];
     assert_eq!(
-        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0),
+        opus_decode(&mut *dec, &packet[..3], &mut sbuf, 960, 0),
         960,
         "decode CELT silence failed"
     );
@@ -132,7 +132,7 @@ unsafe fn test_dec_api_inner() {
     cfgs += 1;
     packet[0] = 1;
     assert_eq!(
-        opus_decode(&mut *dec, &packet[..1], sbuf.as_mut_ptr(), 960, 0),
+        opus_decode(&mut *dec, &packet[..1], &mut sbuf, 960, 0),
         960,
         "decode SILK failed"
     );
@@ -283,7 +283,7 @@ unsafe fn test_dec_api_inner() {
     }
 
     assert_eq!(
-        opus_decode(&mut *dec, &packet[..51], sbuf.as_mut_ptr(), 960, 0),
+        opus_decode(&mut *dec, &packet[..51], &mut sbuf, 960, 0),
         OPUS_INVALID_PACKET
     );
     cfgs += 1;
@@ -292,19 +292,16 @@ unsafe fn test_dec_api_inner() {
     packet[1] = packet[2];
 
     assert_eq!(
-        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 60, 0),
+        opus_decode(&mut *dec, &packet[..3], &mut sbuf, 60, 0),
         OPUS_BUFFER_TOO_SMALL
     );
     cfgs += 1;
     assert_eq!(
-        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 480, 0),
+        opus_decode(&mut *dec, &packet[..3], &mut sbuf, 480, 0),
         OPUS_BUFFER_TOO_SMALL
     );
     cfgs += 1;
-    assert_eq!(
-        opus_decode(&mut *dec, &packet[..3], sbuf.as_mut_ptr(), 960, 0),
-        960
-    );
+    assert_eq!(opus_decode(&mut *dec, &packet[..3], &mut sbuf, 960, 0), 960);
     cfgs += 1;
     println!("    opus_decode() ................................ OK.");
     assert_eq!(
