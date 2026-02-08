@@ -38,7 +38,7 @@ use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::modes::OpusCustomMode;
 use crate::celt::pitch::celt_inner_prod;
-use crate::externs::{memcpy, memmove, memset};
+
 use crate::silk::define::{
     DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX, VAD_NO_DECISION,
 };
@@ -189,11 +189,7 @@ pub unsafe fn opus_encoder_init(
     {
         return OPUS_BAD_ARG;
     }
-    memset(
-        st as *mut i8 as *mut core::ffi::c_void,
-        0,
-        (opus_encoder_get_size(channels) as u64).wrapping_mul(::core::mem::size_of::<i8>() as u64),
-    );
+    std::ptr::write_bytes(st as *mut u8, 0, opus_encoder_get_size(channels) as usize);
     ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
     if ret != 0 {
         return OPUS_BAD_ARG;
@@ -1758,22 +1754,11 @@ pub unsafe fn opus_encode_native(
     ));
     let vla = ((total_buffer + frame_size) * (*st).channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
-    memcpy(
-        pcm_buf.as_mut_ptr() as *mut core::ffi::c_void,
-        &mut *((*st).delay_buffer)
-            .as_mut_ptr()
-            .offset((((*st).encoder_buffer - total_buffer) * (*st).channels) as isize)
-            as *mut opus_val16 as *const core::ffi::c_void,
-        ((total_buffer * (*st).channels) as u64)
-            .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-            .wrapping_add(
-                (0 * pcm_buf.as_mut_ptr().offset_from(
-                    &mut *((*st).delay_buffer)
-                        .as_mut_ptr()
-                        .offset((((*st).encoder_buffer - total_buffer) * (*st).channels) as isize),
-                ) as i64) as u64,
-            ),
-    );
+    {
+        let src_off = (((*st).encoder_buffer - total_buffer) * (*st).channels) as usize;
+        let len = (total_buffer * (*st).channels) as usize;
+        pcm_buf[..len].copy_from_slice(&(&(*st).delay_buffer)[src_off..src_off + len]);
+    }
     if (*st).mode == MODE_CELT_ONLY {
         hp_freq_smth1 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
     } else {
@@ -1820,15 +1805,11 @@ pub unsafe fn opus_encode_native(
             sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n);
         }
         if !(sum < 1e9f32) || sum != sum {
-            memset(
-                &mut *pcm_buf
-                    .as_mut_ptr()
-                    .offset((total_buffer * (*st).channels) as isize)
-                    as *mut opus_val16 as *mut core::ffi::c_void,
-                0,
-                ((frame_size * (*st).channels) as u64)
-                    .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64),
-            );
+            {
+                let off = (total_buffer * (*st).channels) as usize;
+                let len = (frame_size * (*st).channels) as usize;
+                pcm_buf[off..off + len].fill(0.0);
+            }
             (*st).hp_mem[3 as usize] = 0 as opus_val32;
             (*st).hp_mem[2 as usize] = (*st).hp_mem[3 as usize];
             (*st).hp_mem[1 as usize] = (*st).hp_mem[2 as usize];
@@ -2009,11 +1990,7 @@ pub unsafe fn opus_encode_native(
                 (*celt_mode).window.as_ptr(),
                 (*st).Fs,
             );
-            memset(
-                ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
-                0,
-                (prefill_offset as u64).wrapping_mul(::core::mem::size_of::<opus_val16>() as u64),
-            );
+            (&mut (*st).delay_buffer)[..prefill_offset as usize].fill(0.0);
             i = 0;
             while i < (*st).encoder_buffer * (*st).channels {
                 *pcm_silk.as_mut_ptr().offset(i as isize) =
@@ -2145,74 +2122,33 @@ pub unsafe fn opus_encode_native(
     let vla_1 = ((*st).channels * (*st).Fs / 400) as usize;
     let mut tmp_prefill: Vec<opus_val16> = ::std::vec::from_elem(0., vla_1);
     if (*st).mode != MODE_SILK_ONLY && (*st).mode != (*st).prev_mode && (*st).prev_mode > 0 {
-        memcpy(
-            tmp_prefill.as_mut_ptr() as *mut core::ffi::c_void,
-            &mut *((*st).delay_buffer).as_mut_ptr().offset(
-                (((*st).encoder_buffer - total_buffer - (*st).Fs / 400) * (*st).channels) as isize,
-            ) as *mut opus_val16 as *const core::ffi::c_void,
-            (((*st).channels * (*st).Fs / 400) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add(
-                    (0 * tmp_prefill.as_mut_ptr().offset_from(
-                        &mut *((*st).delay_buffer).as_mut_ptr().offset(
-                            (((*st).encoder_buffer - total_buffer - (*st).Fs / 400)
-                                * (*st).channels) as isize,
-                        ),
-                    ) as i64) as u64,
-                ),
-        );
+        {
+            let src_off =
+                (((*st).encoder_buffer - total_buffer - (*st).Fs / 400) * (*st).channels) as usize;
+            let len = ((*st).channels * (*st).Fs / 400) as usize;
+            tmp_prefill[..len].copy_from_slice(&(&(*st).delay_buffer)[src_off..src_off + len]);
+        }
     }
     if (*st).channels * ((*st).encoder_buffer - (frame_size + total_buffer)) > 0 {
-        memmove(
-            ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
-            &mut *((*st).delay_buffer)
-                .as_mut_ptr()
-                .offset(((*st).channels * frame_size) as isize) as *mut opus_val16
-                as *const core::ffi::c_void,
-            (((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add(
-                    (0 * ((*st).delay_buffer).as_mut_ptr().offset_from(
-                        &mut *((*st).delay_buffer)
-                            .as_mut_ptr()
-                            .offset(((*st).channels * frame_size) as isize),
-                    ) as i64) as u64,
-                ),
-        );
-        memcpy(
-            &mut *((*st).delay_buffer).as_mut_ptr().offset(
-                ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as isize,
-            ) as *mut opus_val16 as *mut core::ffi::c_void,
-            &mut *pcm_buf.as_mut_ptr().offset(0 as isize) as *mut opus_val16
-                as *const core::ffi::c_void,
-            (((frame_size + total_buffer) * (*st).channels) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add(
-                    (0 * (&mut *((*st).delay_buffer).as_mut_ptr().offset(
-                        ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer))
-                            as isize,
-                    ) as *mut opus_val16)
-                        .offset_from(&mut *pcm_buf.as_mut_ptr().offset(0 as isize))
-                        as i64) as u64,
-                ),
-        );
+        {
+            let src_off = ((*st).channels * frame_size) as usize;
+            let len =
+                ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as usize;
+            (&mut (*st).delay_buffer).copy_within(src_off..src_off + len, 0);
+        }
+        {
+            let dst_off =
+                ((*st).channels * ((*st).encoder_buffer - frame_size - total_buffer)) as usize;
+            let len = ((frame_size + total_buffer) * (*st).channels) as usize;
+            (&mut (*st).delay_buffer)[dst_off..dst_off + len].copy_from_slice(&pcm_buf[..len]);
+        }
     } else {
-        memcpy(
-            ((*st).delay_buffer).as_mut_ptr() as *mut core::ffi::c_void,
-            &mut *pcm_buf.as_mut_ptr().offset(
-                ((frame_size + total_buffer - (*st).encoder_buffer) * (*st).channels) as isize,
-            ) as *mut opus_val16 as *const core::ffi::c_void,
-            (((*st).encoder_buffer * (*st).channels) as u64)
-                .wrapping_mul(::core::mem::size_of::<opus_val16>() as u64)
-                .wrapping_add(
-                    (0 * ((*st).delay_buffer).as_mut_ptr().offset_from(
-                        &mut *pcm_buf.as_mut_ptr().offset(
-                            ((frame_size + total_buffer - (*st).encoder_buffer) * (*st).channels)
-                                as isize,
-                        ),
-                    ) as i64) as u64,
-                ),
-        );
+        {
+            let src_off =
+                ((frame_size + total_buffer - (*st).encoder_buffer) * (*st).channels) as usize;
+            let len = ((*st).encoder_buffer * (*st).channels) as usize;
+            (&mut (*st).delay_buffer)[..len].copy_from_slice(&pcm_buf[src_off..src_off + len]);
+        }
     }
     if (*st).prev_HB_gain < Q15ONE || HB_gain < Q15ONE {
         gain_fade(
@@ -2404,17 +2340,10 @@ pub unsafe fn opus_encode_native(
                 && (*st).mode == MODE_HYBRID
                 && (*st).use_vbr != 0
             {
-                memmove(
-                    data.offset(ret as isize) as *mut core::ffi::c_void,
-                    data.offset(nb_compr_bytes as isize) as *const core::ffi::c_void,
-                    (redundancy_bytes as u64)
-                        .wrapping_mul(::core::mem::size_of::<u8>() as u64)
-                        .wrapping_add(
-                            (0 * data
-                                .offset(ret as isize)
-                                .offset_from(data.offset(nb_compr_bytes as isize))
-                                as i64) as u64,
-                        ),
+                std::ptr::copy(
+                    data.offset(nb_compr_bytes as isize),
+                    data.offset(ret as isize),
+                    redundancy_bytes as usize,
                 );
                 nb_compr_bytes = nb_compr_bytes + redundancy_bytes;
             }
@@ -2973,18 +2902,13 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 signalType: 0,
                 offset: 0,
             };
-            let mut start: *mut i8 = 0 as *mut i8;
             silk_enc =
                 (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
             tonality_analysis_reset(&mut (*st).analysis);
-            start = &mut (*st).stream_channels as *mut i32 as *mut i8;
-            memset(
-                start as *mut core::ffi::c_void,
-                0,
-                (::core::mem::size_of::<OpusEncoder>() as u64)
-                    .wrapping_sub(start.offset_from(st as *mut i8) as i64 as u64)
-                    .wrapping_mul(::core::mem::size_of::<i8>() as u64),
-            );
+            let start: *mut u8 = &mut (*st).stream_channels as *mut i32 as *mut u8;
+            let start_offset = start.offset_from(st as *mut u8) as usize;
+            let total_size = ::core::mem::size_of::<OpusEncoder>();
+            std::ptr::write_bytes(start, 0, total_size - start_offset);
             opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
             silk_InitEncoder(silk_enc, (*st).arch, &mut dummy);
             (*st).stream_channels = (*st).channels;
