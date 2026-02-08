@@ -17,9 +17,9 @@ pub unsafe fn silk_residual_energy_FLP(
     LPC_res_ptr = LPC_res.as_mut_ptr().offset(LPC_order as isize);
     shift = LPC_order + subfr_length;
     silk_LPC_analysis_filter_FLP(
-        LPC_res.as_mut_ptr(),
-        (*a.offset(0 as isize)).as_mut_ptr() as *const f32,
-        x.offset((0 * shift) as isize),
+        &mut LPC_res,
+        &(*a.offset(0 as isize)),
+        std::slice::from_raw_parts(x.offset((0 * shift) as isize), (2 * shift) as usize),
         2 * shift,
         LPC_order,
     );
@@ -35,9 +35,9 @@ pub unsafe fn silk_residual_energy_FLP(
         ))) as f32;
     if nb_subfr == MAX_NB_SUBFR as i32 {
         silk_LPC_analysis_filter_FLP(
-            LPC_res.as_mut_ptr(),
-            (*a.offset(1 as isize)).as_mut_ptr() as *const f32,
-            x.offset((2 * shift) as isize),
+            &mut LPC_res,
+            &(*a.offset(1 as isize)),
+            std::slice::from_raw_parts(x.offset((2 * shift) as isize), (2 * shift) as usize),
             2 * shift,
             LPC_order,
         );

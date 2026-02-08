@@ -71,9 +71,9 @@ pub unsafe fn silk_find_LPC_FLP(
                 psEncC.predictLPCOrder,
             );
             silk_LPC_analysis_filter_FLP(
-                LPC_res.as_mut_ptr(),
-                a_tmp.as_mut_ptr() as *const f32,
-                x,
+                &mut LPC_res,
+                &a_tmp,
+                std::slice::from_raw_parts(x, (2 * subfr_length) as usize),
                 2 * subfr_length,
                 psEncC.predictLPCOrder,
             );

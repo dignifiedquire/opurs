@@ -71,9 +71,9 @@ pub unsafe fn silk_find_pitch_lags_FLP(
         FIND_PITCH_BANDWIDTH_EXPANSION,
     );
     silk_LPC_analysis_filter_FLP(
-        res,
-        A.as_mut_ptr() as *const f32,
-        x_buf,
+        std::slice::from_raw_parts_mut(res, buf_len as usize),
+        &A,
+        std::slice::from_raw_parts(x_buf, buf_len as usize),
         buf_len,
         (*psEnc).sCmn.pitchEstimationLPCOrder,
     );

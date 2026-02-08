@@ -1,145 +1,105 @@
-use crate::externs::memset;
 #[inline]
-unsafe fn silk_LPC_analysis_filter16_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
-    length: i32,
-) {
-    let mut ix: i32 = 0;
-    let mut LPC_pred: f32 = 0.;
-    let mut s_ptr: *const f32 = 0 as *const f32;
-    ix = 16;
+fn silk_LPC_analysis_filter16_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
+    let mut ix: i32 = 16;
     while ix < length {
-        s_ptr = &*s.offset((ix - 1) as isize) as *const f32;
-        LPC_pred = *s_ptr.offset(0 as isize) * *PredCoef.offset(0 as isize)
-            + *s_ptr.offset(-1 as isize) * *PredCoef.offset(1 as isize)
-            + *s_ptr.offset(-(2) as isize) * *PredCoef.offset(2 as isize)
-            + *s_ptr.offset(-(3) as isize) * *PredCoef.offset(3 as isize)
-            + *s_ptr.offset(-(4) as isize) * *PredCoef.offset(4 as isize)
-            + *s_ptr.offset(-(5) as isize) * *PredCoef.offset(5 as isize)
-            + *s_ptr.offset(-(6) as isize) * *PredCoef.offset(6 as isize)
-            + *s_ptr.offset(-(7) as isize) * *PredCoef.offset(7 as isize)
-            + *s_ptr.offset(-(8) as isize) * *PredCoef.offset(8 as isize)
-            + *s_ptr.offset(-(9) as isize) * *PredCoef.offset(9 as isize)
-            + *s_ptr.offset(-(10) as isize) * *PredCoef.offset(10 as isize)
-            + *s_ptr.offset(-(11) as isize) * *PredCoef.offset(11 as isize)
-            + *s_ptr.offset(-(12) as isize) * *PredCoef.offset(12 as isize)
-            + *s_ptr.offset(-(13) as isize) * *PredCoef.offset(13 as isize)
-            + *s_ptr.offset(-(14) as isize) * *PredCoef.offset(14 as isize)
-            + *s_ptr.offset(-(15) as isize) * *PredCoef.offset(15 as isize);
-        *r_LPC.offset(ix as isize) = *s_ptr.offset(1 as isize) - LPC_pred;
+        let si = (ix - 1) as usize;
+        let LPC_pred = s[si] * PredCoef[0]
+            + s[si - 1] * PredCoef[1]
+            + s[si - 2] * PredCoef[2]
+            + s[si - 3] * PredCoef[3]
+            + s[si - 4] * PredCoef[4]
+            + s[si - 5] * PredCoef[5]
+            + s[si - 6] * PredCoef[6]
+            + s[si - 7] * PredCoef[7]
+            + s[si - 8] * PredCoef[8]
+            + s[si - 9] * PredCoef[9]
+            + s[si - 10] * PredCoef[10]
+            + s[si - 11] * PredCoef[11]
+            + s[si - 12] * PredCoef[12]
+            + s[si - 13] * PredCoef[13]
+            + s[si - 14] * PredCoef[14]
+            + s[si - 15] * PredCoef[15];
+        r_LPC[ix as usize] = s[si + 1] - LPC_pred;
         ix += 1;
     }
 }
 #[inline]
-unsafe fn silk_LPC_analysis_filter12_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
-    length: i32,
-) {
-    let mut ix: i32 = 0;
-    let mut LPC_pred: f32 = 0.;
-    let mut s_ptr: *const f32 = 0 as *const f32;
-    ix = 12;
+fn silk_LPC_analysis_filter12_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
+    let mut ix: i32 = 12;
     while ix < length {
-        s_ptr = &*s.offset((ix - 1) as isize) as *const f32;
-        LPC_pred = *s_ptr.offset(0 as isize) * *PredCoef.offset(0 as isize)
-            + *s_ptr.offset(-1 as isize) * *PredCoef.offset(1 as isize)
-            + *s_ptr.offset(-(2) as isize) * *PredCoef.offset(2 as isize)
-            + *s_ptr.offset(-(3) as isize) * *PredCoef.offset(3 as isize)
-            + *s_ptr.offset(-(4) as isize) * *PredCoef.offset(4 as isize)
-            + *s_ptr.offset(-(5) as isize) * *PredCoef.offset(5 as isize)
-            + *s_ptr.offset(-(6) as isize) * *PredCoef.offset(6 as isize)
-            + *s_ptr.offset(-(7) as isize) * *PredCoef.offset(7 as isize)
-            + *s_ptr.offset(-(8) as isize) * *PredCoef.offset(8 as isize)
-            + *s_ptr.offset(-(9) as isize) * *PredCoef.offset(9 as isize)
-            + *s_ptr.offset(-(10) as isize) * *PredCoef.offset(10 as isize)
-            + *s_ptr.offset(-(11) as isize) * *PredCoef.offset(11 as isize);
-        *r_LPC.offset(ix as isize) = *s_ptr.offset(1 as isize) - LPC_pred;
+        let si = (ix - 1) as usize;
+        let LPC_pred = s[si] * PredCoef[0]
+            + s[si - 1] * PredCoef[1]
+            + s[si - 2] * PredCoef[2]
+            + s[si - 3] * PredCoef[3]
+            + s[si - 4] * PredCoef[4]
+            + s[si - 5] * PredCoef[5]
+            + s[si - 6] * PredCoef[6]
+            + s[si - 7] * PredCoef[7]
+            + s[si - 8] * PredCoef[8]
+            + s[si - 9] * PredCoef[9]
+            + s[si - 10] * PredCoef[10]
+            + s[si - 11] * PredCoef[11];
+        r_LPC[ix as usize] = s[si + 1] - LPC_pred;
         ix += 1;
     }
 }
 #[inline]
-unsafe fn silk_LPC_analysis_filter10_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
-    length: i32,
-) {
-    let mut ix: i32 = 0;
-    let mut LPC_pred: f32 = 0.;
-    let mut s_ptr: *const f32 = 0 as *const f32;
-    ix = 10;
+fn silk_LPC_analysis_filter10_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
+    let mut ix: i32 = 10;
     while ix < length {
-        s_ptr = &*s.offset((ix - 1) as isize) as *const f32;
-        LPC_pred = *s_ptr.offset(0 as isize) * *PredCoef.offset(0 as isize)
-            + *s_ptr.offset(-1 as isize) * *PredCoef.offset(1 as isize)
-            + *s_ptr.offset(-(2) as isize) * *PredCoef.offset(2 as isize)
-            + *s_ptr.offset(-(3) as isize) * *PredCoef.offset(3 as isize)
-            + *s_ptr.offset(-(4) as isize) * *PredCoef.offset(4 as isize)
-            + *s_ptr.offset(-(5) as isize) * *PredCoef.offset(5 as isize)
-            + *s_ptr.offset(-(6) as isize) * *PredCoef.offset(6 as isize)
-            + *s_ptr.offset(-(7) as isize) * *PredCoef.offset(7 as isize)
-            + *s_ptr.offset(-(8) as isize) * *PredCoef.offset(8 as isize)
-            + *s_ptr.offset(-(9) as isize) * *PredCoef.offset(9 as isize);
-        *r_LPC.offset(ix as isize) = *s_ptr.offset(1 as isize) - LPC_pred;
+        let si = (ix - 1) as usize;
+        let LPC_pred = s[si] * PredCoef[0]
+            + s[si - 1] * PredCoef[1]
+            + s[si - 2] * PredCoef[2]
+            + s[si - 3] * PredCoef[3]
+            + s[si - 4] * PredCoef[4]
+            + s[si - 5] * PredCoef[5]
+            + s[si - 6] * PredCoef[6]
+            + s[si - 7] * PredCoef[7]
+            + s[si - 8] * PredCoef[8]
+            + s[si - 9] * PredCoef[9];
+        r_LPC[ix as usize] = s[si + 1] - LPC_pred;
         ix += 1;
     }
 }
 #[inline]
-unsafe fn silk_LPC_analysis_filter8_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
-    length: i32,
-) {
-    let mut ix: i32 = 0;
-    let mut LPC_pred: f32 = 0.;
-    let mut s_ptr: *const f32 = 0 as *const f32;
-    ix = 8;
+fn silk_LPC_analysis_filter8_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
+    let mut ix: i32 = 8;
     while ix < length {
-        s_ptr = &*s.offset((ix - 1) as isize) as *const f32;
-        LPC_pred = *s_ptr.offset(0 as isize) * *PredCoef.offset(0 as isize)
-            + *s_ptr.offset(-1 as isize) * *PredCoef.offset(1 as isize)
-            + *s_ptr.offset(-(2) as isize) * *PredCoef.offset(2 as isize)
-            + *s_ptr.offset(-(3) as isize) * *PredCoef.offset(3 as isize)
-            + *s_ptr.offset(-(4) as isize) * *PredCoef.offset(4 as isize)
-            + *s_ptr.offset(-(5) as isize) * *PredCoef.offset(5 as isize)
-            + *s_ptr.offset(-(6) as isize) * *PredCoef.offset(6 as isize)
-            + *s_ptr.offset(-(7) as isize) * *PredCoef.offset(7 as isize);
-        *r_LPC.offset(ix as isize) = *s_ptr.offset(1 as isize) - LPC_pred;
+        let si = (ix - 1) as usize;
+        let LPC_pred = s[si] * PredCoef[0]
+            + s[si - 1] * PredCoef[1]
+            + s[si - 2] * PredCoef[2]
+            + s[si - 3] * PredCoef[3]
+            + s[si - 4] * PredCoef[4]
+            + s[si - 5] * PredCoef[5]
+            + s[si - 6] * PredCoef[6]
+            + s[si - 7] * PredCoef[7];
+        r_LPC[ix as usize] = s[si + 1] - LPC_pred;
         ix += 1;
     }
 }
 #[inline]
-unsafe fn silk_LPC_analysis_filter6_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
-    length: i32,
-) {
-    let mut ix: i32 = 0;
-    let mut LPC_pred: f32 = 0.;
-    let mut s_ptr: *const f32 = 0 as *const f32;
-    ix = 6;
+fn silk_LPC_analysis_filter6_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
+    let mut ix: i32 = 6;
     while ix < length {
-        s_ptr = &*s.offset((ix - 1) as isize) as *const f32;
-        LPC_pred = *s_ptr.offset(0 as isize) * *PredCoef.offset(0 as isize)
-            + *s_ptr.offset(-1 as isize) * *PredCoef.offset(1 as isize)
-            + *s_ptr.offset(-(2) as isize) * *PredCoef.offset(2 as isize)
-            + *s_ptr.offset(-(3) as isize) * *PredCoef.offset(3 as isize)
-            + *s_ptr.offset(-(4) as isize) * *PredCoef.offset(4 as isize)
-            + *s_ptr.offset(-(5) as isize) * *PredCoef.offset(5 as isize);
-        *r_LPC.offset(ix as isize) = *s_ptr.offset(1 as isize) - LPC_pred;
+        let si = (ix - 1) as usize;
+        let LPC_pred = s[si] * PredCoef[0]
+            + s[si - 1] * PredCoef[1]
+            + s[si - 2] * PredCoef[2]
+            + s[si - 3] * PredCoef[3]
+            + s[si - 4] * PredCoef[4]
+            + s[si - 5] * PredCoef[5];
+        r_LPC[ix as usize] = s[si + 1] - LPC_pred;
         ix += 1;
     }
 }
-pub unsafe fn silk_LPC_analysis_filter_FLP(
-    r_LPC: *mut f32,
-    PredCoef: *const f32,
-    s: *const f32,
+/// Upstream C: silk/float/LPC_analysis_filter_FLP.c:silk_LPC_analysis_filter_FLP
+pub fn silk_LPC_analysis_filter_FLP(
+    r_LPC: &mut [f32],
+    PredCoef: &[f32],
+    s: &[f32],
     length: i32,
     Order: i32,
 ) {
@@ -164,9 +124,5 @@ pub unsafe fn silk_LPC_analysis_filter_FLP(
             panic!("libopus: assert(0) called");
         }
     }
-    memset(
-        r_LPC as *mut core::ffi::c_void,
-        0,
-        (Order as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
-    );
+    r_LPC[..Order as usize].fill(0.0);
 }
