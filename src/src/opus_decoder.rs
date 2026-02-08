@@ -812,7 +812,7 @@ pub unsafe fn opus_decode_native(
     nb_samples as i32
 }
 
-pub unsafe fn opus_decode(
+pub fn opus_decode(
     st: &mut OpusDecoder,
     data: &[u8],
     pcm: &mut [i16],
@@ -837,7 +837,8 @@ pub unsafe fn opus_decode(
     assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
+    let ret =
+        unsafe { opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1) };
     if ret > 0 {
         for j in 0..(ret * st.channels) as usize {
             pcm[j] = FLOAT2INT16(out[j]);
@@ -845,7 +846,7 @@ pub unsafe fn opus_decode(
     }
     ret
 }
-pub unsafe fn opus_decode_float(
+pub fn opus_decode_float(
     st: &mut OpusDecoder,
     data: &[u8],
     pcm: &mut [opus_val16],
@@ -855,9 +856,9 @@ pub unsafe fn opus_decode_float(
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    return opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0);
+    return unsafe { opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0) };
 }
-pub unsafe fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) -> i32 {
+pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) -> i32 {
     let celt_dec = &mut st.celt_dec;
 
     let mut ap = args;
