@@ -15,7 +15,7 @@ pub mod stddef_h {
 }
 pub mod cpu_support_h {
     #[inline]
-    pub unsafe fn opus_select_arch() -> i32 {
+    pub fn opus_select_arch() -> i32 {
         return 0;
     }
 }
@@ -256,7 +256,7 @@ pub unsafe fn opus_encoder_init(
     (*st).analysis.application = (*st).application;
     return OPUS_OK;
 }
-unsafe fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
+fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
     let mut period: i32 = 0;
     let mut toc: u8 = 0;
     period = 0;
@@ -548,20 +548,16 @@ pub unsafe fn opus_encoder_create(
     }
     return st;
 }
-unsafe fn user_bitrate_to_bitrate(
-    st: *mut OpusEncoder,
-    mut frame_size: i32,
-    max_data_bytes: i32,
-) -> i32 {
+fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
     if frame_size == 0 {
-        frame_size = (*st).Fs / 400;
+        frame_size = st.Fs / 400;
     }
-    if (*st).user_bitrate_bps == OPUS_AUTO {
-        return 60 * (*st).Fs / frame_size + (*st).Fs * (*st).channels;
-    } else if (*st).user_bitrate_bps == OPUS_BITRATE_MAX {
-        return max_data_bytes * 8 * (*st).Fs / frame_size;
+    if st.user_bitrate_bps == OPUS_AUTO {
+        return 60 * st.Fs / frame_size + st.Fs * st.channels;
+    } else if st.user_bitrate_bps == OPUS_BITRATE_MAX {
+        return max_data_bytes * 8 * st.Fs / frame_size;
     } else {
-        return (*st).user_bitrate_bps;
+        return st.user_bitrate_bps;
     };
 }
 pub unsafe fn downmix_float(
@@ -640,7 +636,7 @@ pub unsafe fn downmix_int(
         }
     }
 }
-pub unsafe fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
+pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
     let mut new_size: i32 = 0;
     if frame_size < Fs / 400 {
         return -1;
@@ -835,7 +831,7 @@ unsafe fn decide_fec(
     *bandwidth = orig_bandwidth;
     return 0;
 }
-unsafe fn compute_silk_rate_for_hybrid(
+fn compute_silk_rate_for_hybrid(
     mut rate: i32,
     bandwidth: i32,
     frame20ms: i32,
@@ -847,7 +843,7 @@ unsafe fn compute_silk_rate_for_hybrid(
     let mut i: i32 = 0;
     let mut N: i32 = 0;
     let mut silk_rate: i32 = 0;
-    static mut rate_table: [[i32; 5]; 7] = [
+    static rate_table: [[i32; 5]; 7] = [
         [0, 0, 0, 0, 0],
         [12000, 10000, 10000, 11000, 11000],
         [16000, 13500, 13500, 15000, 15000],
@@ -893,7 +889,7 @@ unsafe fn compute_silk_rate_for_hybrid(
     }
     return silk_rate;
 }
-unsafe fn compute_equiv_rate(
+fn compute_equiv_rate(
     bitrate: i32,
     channels: i32,
     frame_rate: i32,
@@ -925,30 +921,24 @@ unsafe fn compute_equiv_rate(
     }
     return equiv;
 }
-pub unsafe fn is_digital_silence(
-    pcm: *const opus_val16,
+pub fn is_digital_silence(
+    pcm: &[opus_val16],
     frame_size: i32,
     channels: i32,
     lsb_depth: i32,
 ) -> i32 {
-    let mut silence: i32 = 0;
-    let mut sample_max: opus_val32 = 0 as opus_val32;
-    sample_max = celt_maxabs16(std::slice::from_raw_parts(
-        pcm,
-        (frame_size * channels) as usize,
-    ));
-    silence = (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32;
-    return silence;
+    let sample_max = celt_maxabs16(&pcm[..(frame_size * channels) as usize]);
+    (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32
 }
-unsafe fn compute_frame_energy(
-    pcm: *const opus_val16,
+fn compute_frame_energy(
+    pcm: &[opus_val16],
     frame_size: i32,
     channels: i32,
     _arch: i32,
 ) -> opus_val32 {
-    let len: i32 = frame_size * channels;
-    let s = std::slice::from_raw_parts(pcm, len as usize);
-    return celt_inner_prod(s, s, len as usize) / len as f32;
+    let len = (frame_size * channels) as usize;
+    let s = &pcm[..len];
+    celt_inner_prod(s, s, len) / len as f32
 }
 unsafe fn decide_dtx_mode(
     activity_probability: f32,
@@ -963,7 +953,12 @@ unsafe fn decide_dtx_mode(
     let mut noise_energy: opus_val32 = 0.;
     if is_silence == 0 {
         if activity_probability < DTX_ACTIVITY_THRESHOLD {
-            noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
+            noise_energy = compute_frame_energy(
+                std::slice::from_raw_parts(pcm, (frame_size * channels) as usize),
+                frame_size,
+                channels,
+                arch,
+            );
             is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
         }
     }
@@ -1104,7 +1099,7 @@ unsafe fn encode_multiframe_packet(
     ret
 }
 
-unsafe fn compute_redundancy_bytes(
+fn compute_redundancy_bytes(
     max_data_bytes: i32,
     bitrate_bps: i32,
     frame_rate: i32,
@@ -1237,7 +1232,12 @@ pub unsafe fn opus_encode_native(
     opus_custom_encoder_ctl!(&mut *celt_enc, CELT_GET_MODE_REQUEST, &mut celt_mode);
     analysis_info.valid = 0;
     if (*st).silk_mode.complexity >= 7 && (*st).Fs >= 16000 {
-        is_silence = is_digital_silence(pcm, frame_size, (*st).channels, lsb_depth);
+        is_silence = is_digital_silence(
+            std::slice::from_raw_parts(pcm, (frame_size * (*st).channels) as usize),
+            frame_size,
+            (*st).channels,
+            lsb_depth,
+        );
         analysis_read_pos_bak = (*st).analysis.read_pos;
         analysis_read_subframe_bak = (*st).analysis.read_subframe;
         {
@@ -1271,12 +1271,13 @@ pub unsafe fn opus_encode_native(
             );
         }
         if is_silence == 0 && analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
+            let pcm_slice = std::slice::from_raw_parts(pcm, (frame_size * (*st).channels) as usize);
             (*st).peak_signal_energy = if 0.999f32 * (*st).peak_signal_energy
-                > compute_frame_energy(pcm, frame_size, (*st).channels, (*st).arch)
+                > compute_frame_energy(pcm_slice, frame_size, (*st).channels, (*st).arch)
             {
                 0.999f32 * (*st).peak_signal_energy
             } else {
-                compute_frame_energy(pcm, frame_size, (*st).channels, (*st).arch)
+                compute_frame_energy(pcm_slice, frame_size, (*st).channels, (*st).arch)
             };
         }
     } else if (*st).analysis.initialized != 0 {
@@ -1318,7 +1319,7 @@ pub unsafe fn opus_encode_native(
         stereo_width = 0 as opus_val16;
     }
     total_buffer = delay_compensation;
-    (*st).bitrate_bps = user_bitrate_to_bitrate(st, frame_size, max_data_bytes);
+    (*st).bitrate_bps = user_bitrate_to_bitrate(&*st, frame_size, max_data_bytes);
     frame_rate = (*st).Fs / frame_size;
     if (*st).use_vbr == 0 {
         let mut cbrBytes: i32 = 0;
@@ -2598,7 +2599,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
         }
         OPUS_GET_BITRATE_REQUEST => {
             let value_2 = ap.arg::<&mut i32>();
-            *value_2 = user_bitrate_to_bitrate(st, (*st).prev_framesize, 1276);
+            *value_2 = user_bitrate_to_bitrate(&*st, (*st).prev_framesize, 1276);
             current_block = 16167632229894708628;
         }
         OPUS_SET_FORCE_CHANNELS_REQUEST => {

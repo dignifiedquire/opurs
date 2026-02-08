@@ -1011,7 +1011,7 @@ fn tonality_analysis(
     if tonal.write_pos >= DETECT_SIZE {
         tonal.write_pos -= DETECT_SIZE;
     }
-    is_silence = unsafe { is_digital_silence(tonal.inmem.as_ptr(), 720, 1, lsb_depth) };
+    is_silence = is_digital_silence(&tonal.inmem, 720, 1, lsb_depth);
     let mut in_0: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
     let mut out: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
     let mut tonality: [f32; 240] = [0.; 240];
