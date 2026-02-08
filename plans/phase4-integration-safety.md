@@ -430,10 +430,14 @@ target. This can be done before any internal refactoring.
 `analysis.rs` bodies are already safe but function signatures are still
 marked `unsafe fn`. Convert to safe signatures and update all callers.
 
-- [ ] Audit all 9 `unsafe fn` in analysis.rs — confirm bodies are safe
-- [ ] Remove `unsafe` from function signatures
-- [ ] Update callers in opus_encoder.rs (wrap in safe calls)
-- [ ] **Commit**: `refactor: make analysis.rs function signatures safe`
+- [x] Audit all 9 `unsafe fn` in analysis.rs — confirm bodies are safe
+- [x] Remove `unsafe` from function signatures
+- [x] Replace `downmix_func` callback with safe `DownmixInput` enum
+- [x] Replace raw pointer params with slices/references
+- [x] Replace `memcpy`/`memmove`/`memset` with safe equivalents
+- [x] Convert `static mut` arrays to `static` (non-mut)
+- [x] Update callers in opus_encoder.rs
+- [x] **Commit**: `refactor: make analysis.rs function signatures safe`
 
 ### Stage 4.3 — Eliminate externs.rs usage
 

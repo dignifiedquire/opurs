@@ -50,7 +50,7 @@ use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
 use crate::src::analysis::{
     downmix_func, run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo,
-    TonalityAnalysisState,
+    DownmixInput, TonalityAnalysisState,
 };
 use crate::src::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
@@ -1244,20 +1244,36 @@ pub unsafe fn opus_encode_native(
         is_silence = is_digital_silence(pcm, frame_size, (*st).channels, lsb_depth);
         analysis_read_pos_bak = (*st).analysis.read_pos;
         analysis_read_subframe_bak = (*st).analysis.read_subframe;
-        run_analysis(
-            &mut (*st).analysis,
-            celt_mode,
-            analysis_pcm,
-            analysis_size,
-            frame_size,
-            c1,
-            c2,
-            analysis_channels,
-            (*st).Fs,
-            lsb_depth,
-            downmix,
-            &mut analysis_info,
-        );
+        {
+            let input = if analysis_pcm.is_null() {
+                None
+            } else if float_api != 0 {
+                let pcm_slice = std::slice::from_raw_parts(
+                    analysis_pcm as *const f32,
+                    (analysis_size * analysis_channels) as usize,
+                );
+                Some(DownmixInput::Float(pcm_slice))
+            } else {
+                let pcm_slice = std::slice::from_raw_parts(
+                    analysis_pcm as *const i16,
+                    (analysis_size * analysis_channels) as usize,
+                );
+                Some(DownmixInput::Int(pcm_slice))
+            };
+            run_analysis(
+                &mut (*st).analysis,
+                &*celt_mode,
+                input.as_ref(),
+                analysis_size,
+                frame_size,
+                c1,
+                c2,
+                analysis_channels,
+                (*st).Fs,
+                lsb_depth,
+                &mut analysis_info,
+            );
+        }
         if is_silence == 0 && analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
             (*st).peak_signal_energy = if 0.999f32 * (*st).peak_signal_energy
                 > compute_frame_energy(pcm, frame_size, (*st).channels, (*st).arch)
