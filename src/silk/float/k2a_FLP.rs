@@ -1,3 +1,4 @@
+/// Upstream C: silk/float/k2a_FLP.c:silk_k2a_FLP
 pub fn silk_k2a_FLP(A: &mut [f32], rc: &[f32], order: i32) {
     let mut k: i32 = 0;
     let mut n: i32 = 0;

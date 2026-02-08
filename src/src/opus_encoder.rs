@@ -256,6 +256,7 @@ pub unsafe fn opus_encoder_init(
     (*st).analysis.application = (*st).application;
     return OPUS_OK;
 }
+/// Upstream C: src/opus_encoder.c:gen_toc
 fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
     let mut period: i32 = 0;
     let mut toc: u8 = 0;
@@ -283,6 +284,7 @@ fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
     toc = (toc as i32 | ((channels == 2) as i32) << 2) as u8;
     return toc;
 }
+/// Upstream C: src/opus_encoder.c:silk_biquad_float
 fn silk_biquad_float(
     in_0: &[opus_val16],
     B_Q28: &[i32],
@@ -312,6 +314,7 @@ fn silk_biquad_float(
         k += 1;
     }
 }
+/// Upstream C: src/opus_encoder.c:hp_cutoff
 fn hp_cutoff(
     in_0: &[opus_val16],
     cutoff_Hz: i32,
@@ -354,6 +357,7 @@ fn hp_cutoff(
         );
     }
 }
+/// Upstream C: src/opus_encoder.c:dc_reject
 fn dc_reject(
     in_0: &[opus_val16],
     cutoff_Hz: i32,
@@ -407,6 +411,7 @@ fn dc_reject(
         hp_mem[0] = m0_0;
     };
 }
+/// Upstream C: src/opus_encoder.c:stereo_fade
 fn stereo_fade(
     in_0: &[opus_val16],
     out: &mut [opus_val16],
@@ -447,6 +452,7 @@ fn stereo_fade(
         i += 1;
     }
 }
+/// Upstream C: src/opus_encoder.c:gain_fade
 fn gain_fade(
     in_0: &[opus_val16],
     out: &mut [opus_val16],
@@ -535,6 +541,7 @@ pub unsafe fn opus_encoder_create(
     }
     return st;
 }
+/// Upstream C: src/opus_encoder.c:user_bitrate_to_bitrate
 fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
     if frame_size == 0 {
         frame_size = st.Fs / 400;
@@ -623,6 +630,7 @@ pub unsafe fn downmix_int(
         }
     }
 }
+/// Upstream C: src/opus_encoder.c:frame_size_select
 pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
     let mut new_size: i32 = 0;
     if frame_size < Fs / 400 {
@@ -658,6 +666,7 @@ pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i3
     }
     return new_size;
 }
+/// Upstream C: src/opus_encoder.c:compute_stereo_width
 pub fn compute_stereo_width(
     pcm: &[opus_val16],
     frame_size: i32,
@@ -752,6 +761,7 @@ pub fn compute_stereo_width(
         20 as opus_val32 * mem.max_follower
     };
 }
+/// Upstream C: src/opus_encoder.c:decide_fec
 fn decide_fec(
     useInBandFEC: i32,
     PacketLoss_perc: i32,
@@ -800,6 +810,7 @@ fn decide_fec(
     *bandwidth = orig_bandwidth;
     return 0;
 }
+/// Upstream C: src/opus_encoder.c:compute_silk_rate_for_hybrid
 fn compute_silk_rate_for_hybrid(
     mut rate: i32,
     bandwidth: i32,
@@ -858,6 +869,7 @@ fn compute_silk_rate_for_hybrid(
     }
     return silk_rate;
 }
+/// Upstream C: src/opus_encoder.c:compute_equiv_rate
 fn compute_equiv_rate(
     bitrate: i32,
     channels: i32,
@@ -890,6 +902,7 @@ fn compute_equiv_rate(
     }
     return equiv;
 }
+/// Upstream C: src/analysis.c:is_digital_silence
 pub fn is_digital_silence(
     pcm: &[opus_val16],
     frame_size: i32,
@@ -899,6 +912,7 @@ pub fn is_digital_silence(
     let sample_max = celt_maxabs16(&pcm[..(frame_size * channels) as usize]);
     (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32
 }
+/// Upstream C: src/opus_encoder.c:compute_frame_energy
 fn compute_frame_energy(
     pcm: &[opus_val16],
     frame_size: i32,
@@ -909,6 +923,7 @@ fn compute_frame_energy(
     let s = &pcm[..len];
     celt_inner_prod(s, s, len) / len as f32
 }
+/// Upstream C: src/opus_encoder.c:decide_dtx_mode
 fn decide_dtx_mode(
     activity_probability: f32,
     nb_no_activity_frames: &mut i32,
@@ -1063,6 +1078,7 @@ unsafe fn encode_multiframe_packet(
     ret
 }
 
+/// Upstream C: src/opus_encoder.c:compute_redundancy_bytes
 fn compute_redundancy_bytes(
     max_data_bytes: i32,
     bitrate_bps: i32,

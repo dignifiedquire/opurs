@@ -812,6 +812,7 @@ pub unsafe fn opus_decode_native(
     nb_samples as i32
 }
 
+/// Upstream C: src/opus_decoder.c:opus_decode
 pub fn opus_decode(
     st: &mut OpusDecoder,
     data: &[u8],
@@ -846,6 +847,7 @@ pub fn opus_decode(
     }
     ret
 }
+/// Upstream C: src/opus_decoder.c:opus_decode_float
 pub fn opus_decode_float(
     st: &mut OpusDecoder,
     data: &[u8],
@@ -858,6 +860,7 @@ pub fn opus_decode_float(
     }
     return unsafe { opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0) };
 }
+/// Upstream C: src/opus_decoder.c:opus_decoder_ctl
 pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) -> i32 {
     let celt_dec = &mut st.celt_dec;
 
