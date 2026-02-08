@@ -150,7 +150,7 @@ static stereo_music_bandwidth_thresholds: [i32; 8] =
 static mut stereo_voice_threshold: i32 = 19000;
 static mut stereo_music_threshold: i32 = 17000;
 static mut mode_thresholds: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
-static mut fec_thresholds: [i32; 10] = [
+static fec_thresholds: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
 pub unsafe fn opus_encoder_get_size(channels: i32) -> i32 {
@@ -283,12 +283,12 @@ fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
     toc = (toc as i32 | ((channels == 2) as i32) << 2) as u8;
     return toc;
 }
-unsafe fn silk_biquad_float(
-    in_0: *const opus_val16,
-    B_Q28: *const i32,
-    A_Q28: *const i32,
-    S: *mut opus_val32,
-    out: *mut opus_val16,
+fn silk_biquad_float(
+    in_0: &[opus_val16],
+    B_Q28: &[i32],
+    A_Q28: &[i32],
+    S: &mut [opus_val32],
+    out: &mut [opus_val16],
     len: i32,
     stride: i32,
 ) {
@@ -297,27 +297,26 @@ unsafe fn silk_biquad_float(
     let mut inval: opus_val32 = 0.;
     let mut A: [opus_val32; 2] = [0.; 2];
     let mut B: [opus_val32; 3] = [0.; 3];
-    A[0 as usize] = *A_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
-    A[1 as usize] = *A_Q28.offset(1 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[0 as usize] = *B_Q28.offset(0 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[1 as usize] = *B_Q28.offset(1 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[2 as usize] = *B_Q28.offset(2 as isize) as f32 * (1.0f32 / ((1) << 28) as f32);
+    A[0 as usize] = A_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
+    A[1 as usize] = A_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[0 as usize] = B_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[1 as usize] = B_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[2 as usize] = B_Q28[2] as f32 * (1.0f32 / ((1) << 28) as f32);
     k = 0;
     while k < len {
-        inval = *in_0.offset((k * stride) as isize);
-        vout = *S.offset(0 as isize) + B[0 as usize] * inval;
-        *S.offset(0 as isize) =
-            *S.offset(1 as isize) - vout * A[0 as usize] + B[1 as usize] * inval;
-        *S.offset(1 as isize) = -vout * A[1 as usize] + B[2 as usize] * inval + VERY_SMALL;
-        *out.offset((k * stride) as isize) = vout;
+        inval = in_0[(k * stride) as usize];
+        vout = S[0] + B[0 as usize] * inval;
+        S[0] = S[1] - vout * A[0 as usize] + B[1 as usize] * inval;
+        S[1] = -vout * A[1 as usize] + B[2 as usize] * inval + VERY_SMALL;
+        out[(k * stride) as usize] = vout;
         k += 1;
     }
 }
-unsafe fn hp_cutoff(
-    in_0: *const opus_val16,
+fn hp_cutoff(
+    in_0: &[opus_val16],
     cutoff_Hz: i32,
-    out: *mut opus_val16,
-    hp_mem: *mut opus_val32,
+    out: &mut [opus_val16],
+    hp_mem: &mut [opus_val32],
     len: i32,
     channels: i32,
     Fs: i32,
@@ -342,32 +341,24 @@ unsafe fn hp_cutoff(
             - (2.0f64 * ((1) << 22) as f64 + 0.5f64) as i32) as i64
         >> 16) as i32;
     A_Q28[1 as usize] = (r_Q22 as i64 * r_Q22 as i64 >> 16) as i32;
-    silk_biquad_float(
-        in_0,
-        B_Q28.as_mut_ptr(),
-        A_Q28.as_mut_ptr(),
-        hp_mem,
-        out,
-        len,
-        channels,
-    );
+    silk_biquad_float(in_0, &B_Q28, &A_Q28, hp_mem, out, len, channels);
     if channels == 2 {
         silk_biquad_float(
-            in_0.offset(1 as isize),
-            B_Q28.as_mut_ptr(),
-            A_Q28.as_mut_ptr(),
-            hp_mem.offset(2 as isize),
-            out.offset(1 as isize),
+            &in_0[1..],
+            &B_Q28,
+            &A_Q28,
+            &mut hp_mem[2..],
+            &mut out[1..],
             len,
             channels,
         );
     }
 }
-unsafe fn dc_reject(
-    in_0: *const opus_val16,
+fn dc_reject(
+    in_0: &[opus_val16],
     cutoff_Hz: i32,
-    out: *mut opus_val16,
-    hp_mem: *mut opus_val32,
+    out: &mut [opus_val16],
+    hp_mem: &mut [opus_val32],
     len: i32,
     channels: i32,
     Fs: i32,
@@ -380,51 +371,51 @@ unsafe fn dc_reject(
     if channels == 2 {
         let mut m0: f32 = 0.;
         let mut m2: f32 = 0.;
-        m0 = *hp_mem.offset(0 as isize);
-        m2 = *hp_mem.offset(2 as isize);
+        m0 = hp_mem[0];
+        m2 = hp_mem[2];
         i = 0;
         while i < len {
             let mut x0: opus_val32 = 0.;
             let mut x1: opus_val32 = 0.;
             let mut out0: opus_val32 = 0.;
             let mut out1: opus_val32 = 0.;
-            x0 = *in_0.offset((2 * i + 0) as isize);
-            x1 = *in_0.offset((2 * i + 1) as isize);
+            x0 = in_0[(2 * i + 0) as usize];
+            x1 = in_0[(2 * i + 1) as usize];
             out0 = x0 - m0;
             out1 = x1 - m2;
             m0 = coef * x0 + VERY_SMALL + coef2 * m0;
             m2 = coef * x1 + VERY_SMALL + coef2 * m2;
-            *out.offset((2 * i + 0) as isize) = out0;
-            *out.offset((2 * i + 1) as isize) = out1;
+            out[(2 * i + 0) as usize] = out0;
+            out[(2 * i + 1) as usize] = out1;
             i += 1;
         }
-        *hp_mem.offset(0 as isize) = m0;
-        *hp_mem.offset(2 as isize) = m2;
+        hp_mem[0] = m0;
+        hp_mem[2] = m2;
     } else {
         let mut m0_0: f32 = 0.;
-        m0_0 = *hp_mem.offset(0 as isize);
+        m0_0 = hp_mem[0];
         i = 0;
         while i < len {
             let mut x: opus_val32 = 0.;
             let mut y: opus_val32 = 0.;
-            x = *in_0.offset(i as isize);
+            x = in_0[i as usize];
             y = x - m0_0;
             m0_0 = coef * x + VERY_SMALL + coef2 * m0_0;
-            *out.offset(i as isize) = y;
+            out[i as usize] = y;
             i += 1;
         }
-        *hp_mem.offset(0 as isize) = m0_0;
+        hp_mem[0] = m0_0;
     };
 }
-unsafe fn stereo_fade(
-    in_0: *const opus_val16,
-    out: *mut opus_val16,
+fn stereo_fade(
+    in_0: &[opus_val16],
+    out: &mut [opus_val16],
     mut g1: opus_val16,
     mut g2: opus_val16,
     overlap48: i32,
     frame_size: i32,
     channels: i32,
-    window: *const opus_val16,
+    window: &[opus_val16],
     Fs: i32,
 ) {
     let mut i: i32 = 0;
@@ -439,35 +430,32 @@ unsafe fn stereo_fade(
         let mut diff: opus_val32 = 0.;
         let mut g: opus_val16 = 0.;
         let mut w: opus_val16 = 0.;
-        w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+        w = window[(i * inc) as usize] * window[(i * inc) as usize];
         g = w * g2 + (1.0f32 - w) * g1;
-        diff = 0.5f32
-            * (*in_0.offset((i * channels) as isize) - *in_0.offset((i * channels + 1) as isize));
+        diff = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
         diff = g * diff;
-        *out.offset((i * channels) as isize) = *out.offset((i * channels) as isize) - diff;
-        *out.offset((i * channels + 1) as isize) = *out.offset((i * channels + 1) as isize) + diff;
+        out[(i * channels) as usize] = out[(i * channels) as usize] - diff;
+        out[(i * channels + 1) as usize] = out[(i * channels + 1) as usize] + diff;
         i += 1;
     }
     while i < frame_size {
         let mut diff_0: opus_val32 = 0.;
-        diff_0 = 0.5f32
-            * (*in_0.offset((i * channels) as isize) - *in_0.offset((i * channels + 1) as isize));
+        diff_0 = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
         diff_0 = g2 * diff_0;
-        *out.offset((i * channels) as isize) = *out.offset((i * channels) as isize) - diff_0;
-        *out.offset((i * channels + 1) as isize) =
-            *out.offset((i * channels + 1) as isize) + diff_0;
+        out[(i * channels) as usize] = out[(i * channels) as usize] - diff_0;
+        out[(i * channels + 1) as usize] = out[(i * channels + 1) as usize] + diff_0;
         i += 1;
     }
 }
-unsafe fn gain_fade(
-    in_0: *const opus_val16,
-    out: *mut opus_val16,
+fn gain_fade(
+    in_0: &[opus_val16],
+    out: &mut [opus_val16],
     g1: opus_val16,
     g2: opus_val16,
     overlap48: i32,
     frame_size: i32,
     channels: i32,
-    window: *const opus_val16,
+    window: &[opus_val16],
     Fs: i32,
 ) {
     let mut i: i32 = 0;
@@ -481,9 +469,9 @@ unsafe fn gain_fade(
         while i < overlap {
             let mut g: opus_val16 = 0.;
             let mut w: opus_val16 = 0.;
-            w = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+            w = window[(i * inc) as usize] * window[(i * inc) as usize];
             g = w * g2 + (1.0f32 - w) * g1;
-            *out.offset(i as isize) = g * *in_0.offset(i as isize);
+            out[i as usize] = g * in_0[i as usize];
             i += 1;
         }
     } else {
@@ -491,10 +479,10 @@ unsafe fn gain_fade(
         while i < overlap {
             let mut g_0: opus_val16 = 0.;
             let mut w_0: opus_val16 = 0.;
-            w_0 = *window.offset((i * inc) as isize) * *window.offset((i * inc) as isize);
+            w_0 = window[(i * inc) as usize] * window[(i * inc) as usize];
             g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
-            *out.offset((i * 2) as isize) = g_0 * *in_0.offset((i * 2) as isize);
-            *out.offset((i * 2 + 1) as isize) = g_0 * *in_0.offset((i * 2 + 1) as isize);
+            out[(i * 2) as usize] = g_0 * in_0[(i * 2) as usize];
+            out[(i * 2 + 1) as usize] = g_0 * in_0[(i * 2 + 1) as usize];
             i += 1;
         }
     }
@@ -502,8 +490,7 @@ unsafe fn gain_fade(
     loop {
         i = overlap;
         while i < frame_size {
-            *out.offset((i * channels + c) as isize) =
-                g2 * *in_0.offset((i * channels + c) as isize);
+            out[(i * channels + c) as usize] = g2 * in_0[(i * channels + c) as usize];
             i += 1;
         }
         c += 1;
@@ -671,11 +658,11 @@ pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i3
     }
     return new_size;
 }
-pub unsafe fn compute_stereo_width(
-    pcm: *const opus_val16,
+pub fn compute_stereo_width(
+    pcm: &[opus_val16],
     frame_size: i32,
     Fs: i32,
-    mem: *mut StereoWidthState,
+    mem: &mut StereoWidthState,
 ) -> opus_val16 {
     let mut xx: opus_val32 = 0.;
     let mut xy: opus_val32 = 0.;
@@ -700,23 +687,23 @@ pub unsafe fn compute_stereo_width(
         let mut pyy: opus_val32 = 0 as opus_val32;
         let mut x: opus_val16 = 0.;
         let mut y: opus_val16 = 0.;
-        x = *pcm.offset((2 * i) as isize);
-        y = *pcm.offset((2 * i + 1) as isize);
+        x = pcm[(2 * i) as usize];
+        y = pcm[(2 * i + 1) as usize];
         pxx = x * x;
         pxy = x * y;
         pyy = y * y;
-        x = *pcm.offset((2 * i + 2) as isize);
-        y = *pcm.offset((2 * i + 3) as isize);
+        x = pcm[(2 * i + 2) as usize];
+        y = pcm[(2 * i + 3) as usize];
         pxx += x * x;
         pxy += x * y;
         pyy += y * y;
-        x = *pcm.offset((2 * i + 4) as isize);
-        y = *pcm.offset((2 * i + 5) as isize);
+        x = pcm[(2 * i + 4) as usize];
+        y = pcm[(2 * i + 5) as usize];
         pxx += x * x;
         pxy += x * y;
         pyy += y * y;
-        x = *pcm.offset((2 * i + 6) as isize);
-        y = *pcm.offset((2 * i + 7) as isize);
+        x = pcm[(2 * i + 6) as usize];
+        y = pcm[(2 * i + 7) as usize];
         pxx += x * x;
         pxy += x * y;
         pyy += y * y;
@@ -730,65 +717,47 @@ pub unsafe fn compute_stereo_width(
         xx = yy;
         xy = xx;
     }
-    (*mem).XX += short_alpha * (xx - (*mem).XX);
-    (*mem).XY += short_alpha * (xy - (*mem).XY);
-    (*mem).YY += short_alpha * (yy - (*mem).YY);
-    (*mem).XX = if 0 as f32 > (*mem).XX {
-        0 as f32
-    } else {
-        (*mem).XX
-    };
-    (*mem).XY = if 0 as f32 > (*mem).XY {
-        0 as f32
-    } else {
-        (*mem).XY
-    };
-    (*mem).YY = if 0 as f32 > (*mem).YY {
-        0 as f32
-    } else {
-        (*mem).YY
-    };
-    if (if (*mem).XX > (*mem).YY {
-        (*mem).XX
-    } else {
-        (*mem).YY
-    }) > 8e-4f32
-    {
+    mem.XX += short_alpha * (xx - mem.XX);
+    mem.XY += short_alpha * (xy - mem.XY);
+    mem.YY += short_alpha * (yy - mem.YY);
+    mem.XX = if 0 as f32 > mem.XX { 0 as f32 } else { mem.XX };
+    mem.XY = if 0 as f32 > mem.XY { 0 as f32 } else { mem.XY };
+    mem.YY = if 0 as f32 > mem.YY { 0 as f32 } else { mem.YY };
+    if (if mem.XX > mem.YY { mem.XX } else { mem.YY }) > 8e-4f32 {
         let mut corr: opus_val16 = 0.;
         let mut ldiff: opus_val16 = 0.;
         let mut width: opus_val16 = 0.;
-        sqrt_xx = celt_sqrt((*mem).XX);
-        sqrt_yy = celt_sqrt((*mem).YY);
+        sqrt_xx = celt_sqrt(mem.XX);
+        sqrt_yy = celt_sqrt(mem.YY);
         qrrt_xx = celt_sqrt(sqrt_xx);
         qrrt_yy = celt_sqrt(sqrt_yy);
-        (*mem).XY = if (*mem).XY < sqrt_xx * sqrt_yy {
-            (*mem).XY
+        mem.XY = if mem.XY < sqrt_xx * sqrt_yy {
+            mem.XY
         } else {
             sqrt_xx * sqrt_yy
         };
-        corr = (*mem).XY / (1e-15f32 + sqrt_xx * sqrt_yy);
+        corr = mem.XY / (1e-15f32 + sqrt_xx * sqrt_yy);
         ldiff = 1.0f32 * (qrrt_xx - qrrt_yy).abs() / (EPSILON + qrrt_xx + qrrt_yy);
         width = celt_sqrt(1.0f32 - corr * corr) * ldiff;
-        (*mem).smoothed_width += (width - (*mem).smoothed_width) / frame_rate as f32;
-        (*mem).max_follower =
-            if (*mem).max_follower - 0.02f32 / frame_rate as f32 > (*mem).smoothed_width {
-                (*mem).max_follower - 0.02f32 / frame_rate as f32
-            } else {
-                (*mem).smoothed_width
-            };
+        mem.smoothed_width += (width - mem.smoothed_width) / frame_rate as f32;
+        mem.max_follower = if mem.max_follower - 0.02f32 / frame_rate as f32 > mem.smoothed_width {
+            mem.max_follower - 0.02f32 / frame_rate as f32
+        } else {
+            mem.smoothed_width
+        };
     }
-    return if 1.0f32 < 20 as opus_val32 * (*mem).max_follower {
+    return if 1.0f32 < 20 as opus_val32 * mem.max_follower {
         1.0f32
     } else {
-        20 as opus_val32 * (*mem).max_follower
+        20 as opus_val32 * mem.max_follower
     };
 }
-unsafe fn decide_fec(
+fn decide_fec(
     useInBandFEC: i32,
     PacketLoss_perc: i32,
     last_fec: i32,
     mode: i32,
-    bandwidth: *mut i32,
+    bandwidth: &mut i32,
     rate: i32,
 ) -> i32 {
     let mut orig_bandwidth: i32 = 0;
@@ -940,11 +909,11 @@ fn compute_frame_energy(
     let s = &pcm[..len];
     celt_inner_prod(s, s, len) / len as f32
 }
-unsafe fn decide_dtx_mode(
+fn decide_dtx_mode(
     activity_probability: f32,
-    nb_no_activity_frames: *mut i32,
+    nb_no_activity_frames: &mut i32,
     peak_signal_energy: opus_val32,
-    pcm: *const opus_val16,
+    pcm: &[opus_val16],
     frame_size: i32,
     channels: i32,
     mut is_silence: i32,
@@ -953,12 +922,7 @@ unsafe fn decide_dtx_mode(
     let mut noise_energy: opus_val32 = 0.;
     if is_silence == 0 {
         if activity_probability < DTX_ACTIVITY_THRESHOLD {
-            noise_energy = compute_frame_energy(
-                std::slice::from_raw_parts(pcm, (frame_size * channels) as usize),
-                frame_size,
-                channels,
-                arch,
-            );
+            noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
             is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
         }
     }
@@ -1314,7 +1278,12 @@ pub unsafe fn opus_encode_native(
         }
     }
     if (*st).channels == 2 && (*st).force_channels != 1 {
-        stereo_width = compute_stereo_width(pcm, frame_size, (*st).Fs, &mut (*st).width_mem);
+        stereo_width = compute_stereo_width(
+            std::slice::from_raw_parts(pcm, (frame_size * 2) as usize),
+            frame_size,
+            (*st).Fs,
+            &mut (*st).width_mem,
+        );
     } else {
         stereo_width = 0 as opus_val16;
     }
@@ -1772,31 +1741,31 @@ pub unsafe fn opus_encode_native(
             * ((VARIABLE_HP_SMTH_COEF2 * ((1) << 16) as f32) as f64 + 0.5f64) as i32 as i16 as i64
             >> 16)) as i32;
     cutoff_Hz = silk_log2lin((*st).variable_HP_smth2_Q15 >> 8);
-    if (*st).application == OPUS_APPLICATION_VOIP {
-        hp_cutoff(
-            pcm,
-            cutoff_Hz,
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
-            ((*st).hp_mem).as_mut_ptr(),
-            frame_size,
-            (*st).channels,
-            (*st).Fs,
-            (*st).arch,
-        );
-    } else {
-        dc_reject(
-            pcm,
-            3,
-            &mut *pcm_buf
-                .as_mut_ptr()
-                .offset((total_buffer * (*st).channels) as isize),
-            ((*st).hp_mem).as_mut_ptr(),
-            frame_size,
-            (*st).channels,
-            (*st).Fs,
-        );
+    {
+        let pcm_slice = std::slice::from_raw_parts(pcm, (frame_size * (*st).channels) as usize);
+        let out_off = (total_buffer * (*st).channels) as usize;
+        if (*st).application == OPUS_APPLICATION_VOIP {
+            hp_cutoff(
+                pcm_slice,
+                cutoff_Hz,
+                &mut pcm_buf[out_off..],
+                &mut (*st).hp_mem,
+                frame_size,
+                (*st).channels,
+                (*st).Fs,
+                (*st).arch,
+            );
+        } else {
+            dc_reject(
+                pcm_slice,
+                3,
+                &mut pcm_buf[out_off..],
+                &mut (*st).hp_mem,
+                frame_size,
+                (*st).channels,
+                (*st).Fs,
+            );
+        }
     }
     if float_api != 0 {
         let mut sum: opus_val32 = 0.;
@@ -1976,21 +1945,21 @@ pub unsafe fn opus_encode_native(
             let mut prefill_offset: i32 = 0;
             prefill_offset =
                 (*st).channels * ((*st).encoder_buffer - (*st).delay_compensation - (*st).Fs / 400);
-            gain_fade(
-                ((*st).delay_buffer)
-                    .as_mut_ptr()
-                    .offset(prefill_offset as isize),
-                ((*st).delay_buffer)
-                    .as_mut_ptr()
-                    .offset(prefill_offset as isize),
-                0 as opus_val16,
-                Q15ONE,
-                (*celt_mode).overlap as i32,
-                (*st).Fs / 400,
-                (*st).channels,
-                (*celt_mode).window.as_ptr(),
-                (*st).Fs,
-            );
+            {
+                let off = prefill_offset as usize;
+                let tmp: Vec<opus_val16> = (&(*st).delay_buffer)[off..].to_vec();
+                gain_fade(
+                    &tmp,
+                    &mut (&mut (*st).delay_buffer)[off..],
+                    0 as opus_val16,
+                    Q15ONE,
+                    (*celt_mode).overlap as i32,
+                    (*st).Fs / 400,
+                    (*st).channels,
+                    (*celt_mode).window,
+                    (*st).Fs,
+                );
+            }
             (&mut (*st).delay_buffer)[..prefill_offset as usize].fill(0.0);
             i = 0;
             while i < (*st).encoder_buffer * (*st).channels {
@@ -2152,15 +2121,16 @@ pub unsafe fn opus_encode_native(
         }
     }
     if (*st).prev_HB_gain < Q15ONE || HB_gain < Q15ONE {
+        let tmp: Vec<opus_val16> = pcm_buf.clone();
         gain_fade(
-            pcm_buf.as_mut_ptr(),
-            pcm_buf.as_mut_ptr(),
+            &tmp,
+            &mut pcm_buf,
             (*st).prev_HB_gain,
             HB_gain,
             (*celt_mode).overlap as i32,
             frame_size,
             (*st).channels,
-            (*celt_mode).window.as_ptr(),
+            (*celt_mode).window,
             (*st).Fs,
         );
     }
@@ -2185,17 +2155,20 @@ pub unsafe fn opus_encode_native(
             g2 = (*st).silk_mode.stereoWidth_Q14 as opus_val16;
             g1 *= 1.0f32 / 16384 as f32;
             g2 *= 1.0f32 / 16384 as f32;
-            stereo_fade(
-                pcm_buf.as_mut_ptr(),
-                pcm_buf.as_mut_ptr(),
-                g1,
-                g2,
-                (*celt_mode).overlap as i32,
-                frame_size,
-                (*st).channels,
-                (*celt_mode).window.as_ptr(),
-                (*st).Fs,
-            );
+            {
+                let tmp: Vec<opus_val16> = pcm_buf.clone();
+                stereo_fade(
+                    &tmp,
+                    &mut pcm_buf,
+                    g1,
+                    g2,
+                    (*celt_mode).overlap as i32,
+                    frame_size,
+                    (*st).channels,
+                    (*celt_mode).window,
+                    (*st).Fs,
+                );
+            }
             (*st).hybrid_stereo_width_Q14 = (*st).silk_mode.stereoWidth_Q14 as i16;
         }
     }
@@ -2417,7 +2390,7 @@ pub unsafe fn opus_encode_native(
             analysis_info.activity_probability,
             &mut (*st).nb_no_activity_frames,
             (*st).peak_signal_energy,
-            pcm,
+            std::slice::from_raw_parts(pcm, (frame_size * (*st).channels) as usize),
             frame_size,
             (*st).channels,
             is_silence,
