@@ -53,12 +53,11 @@ use crate::opus_custom_encoder_ctl;
 use crate::silk::macros::EC_CLZ0;
 use crate::src::analysis::AnalysisInfo;
 use crate::src::opus_defines::{
-    OPUS_ALLOC_FAIL, OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_GET_FINAL_RANGE_REQUEST,
-    OPUS_GET_LSB_DEPTH_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_INTERNAL_ERROR,
-    OPUS_OK, OPUS_RESET_STATE, OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST,
-    OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
-    OPUS_SET_VBR_REQUEST, OPUS_UNIMPLEMENTED,
+    OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LSB_DEPTH_REQUEST,
+    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_INTERNAL_ERROR, OPUS_OK, OPUS_RESET_STATE,
+    OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST,
+    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST, OPUS_UNIMPLEMENTED,
 };
 use crate::varargs::VarArgs;
 
@@ -131,17 +130,14 @@ pub fn celt_encoder_get_size(_channels: i32) -> i32 {
     ::core::mem::size_of::<OpusCustomEncoder>() as i32
 }
 /// Upstream C: celt/celt_encoder.c:opus_custom_encoder_init_arch
-unsafe fn opus_custom_encoder_init_arch(
-    st: *mut OpusCustomEncoder,
+fn opus_custom_encoder_init_arch(
+    st: &mut OpusCustomEncoder,
     mode: &'static OpusCustomMode,
     channels: i32,
     arch: i32,
 ) -> i32 {
     if channels < 0 || channels > 2 {
         return OPUS_BAD_ARG;
-    }
-    if st.is_null() {
-        return OPUS_ALLOC_FAIL;
     }
     // Write the entire struct with zeroed arrays and proper defaults.
     // This replaces the C pattern of memset(st, 0, size) + field assignments.
@@ -216,8 +212,8 @@ unsafe fn opus_custom_encoder_init_arch(
     return OPUS_OK;
 }
 /// Upstream C: celt/celt_encoder.c:celt_encoder_init
-pub unsafe fn celt_encoder_init(
-    st: *mut OpusCustomEncoder,
+pub fn celt_encoder_init(
+    st: &mut OpusCustomEncoder,
     sampling_rate: i32,
     channels: i32,
     arch: i32,
@@ -231,7 +227,7 @@ pub unsafe fn celt_encoder_init(
     if ret != OPUS_OK {
         return ret;
     }
-    (*st).upsample = resampling_factor(sampling_rate);
+    st.upsample = resampling_factor(sampling_rate);
     return OPUS_OK;
 }
 /// Upstream C: celt/celt_encoder.c:transient_analysis
@@ -3145,8 +3141,8 @@ pub unsafe fn celt_encode_with_ec(
         return nbCompressedBytes;
     };
 }
-pub unsafe fn opus_custom_encoder_ctl_impl(
-    st: *mut OpusCustomEncoder,
+pub fn opus_custom_encoder_ctl_impl(
+    st: &mut OpusCustomEncoder,
     request: i32,
     args: VarArgs,
 ) -> i32 {
@@ -3158,25 +3154,25 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value < 0 || value > 10 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).complexity = value;
+                st.complexity = value;
                 current_block = 10007731352114176167;
             }
         }
         CELT_SET_START_BAND_REQUEST => {
             let value_0: i32 = ap.arg::<i32>();
-            if value_0 < 0 || value_0 >= (*(*st).mode).nbEBands as i32 {
+            if value_0 < 0 || value_0 >= st.mode.nbEBands as i32 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).start = value_0;
+                st.start = value_0;
                 current_block = 10007731352114176167;
             }
         }
         CELT_SET_END_BAND_REQUEST => {
             let value_1: i32 = ap.arg::<i32>();
-            if value_1 < 1 || value_1 > (*(*st).mode).nbEBands as i32 {
+            if value_1 < 1 || value_1 > st.mode.nbEBands as i32 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).end = value_1;
+                st.end = value_1;
                 current_block = 10007731352114176167;
             }
         }
@@ -3185,8 +3181,8 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_2 < 0 || value_2 > 2 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).disable_pf = (value_2 <= 1) as i32;
-                (*st).force_intra = (value_2 == 0) as i32;
+                st.disable_pf = (value_2 <= 1) as i32;
+                st.force_intra = (value_2 == 0) as i32;
                 current_block = 10007731352114176167;
             }
         }
@@ -3195,18 +3191,18 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_3 < 0 || value_3 > 100 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).loss_rate = value_3;
+                st.loss_rate = value_3;
                 current_block = 10007731352114176167;
             }
         }
         OPUS_SET_VBR_CONSTRAINT_REQUEST => {
             let value_4: i32 = ap.arg::<i32>();
-            (*st).constrained_vbr = value_4;
+            st.constrained_vbr = value_4;
             current_block = 10007731352114176167;
         }
         OPUS_SET_VBR_REQUEST => {
             let value_5: i32 = ap.arg::<i32>();
-            (*st).vbr = value_5;
+            st.vbr = value_5;
             current_block = 10007731352114176167;
         }
         OPUS_SET_BITRATE_REQUEST => {
@@ -3214,12 +3210,12 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_6 <= 500 && value_6 != OPUS_BITRATE_MAX {
                 current_block = 2472048668343472511;
             } else {
-                value_6 = if value_6 < 260000 * (*st).channels {
+                value_6 = if value_6 < 260000 * st.channels {
                     value_6
                 } else {
-                    260000 * (*st).channels
+                    260000 * st.channels
                 };
-                (*st).bitrate = value_6;
+                st.bitrate = value_6;
                 current_block = 10007731352114176167;
             }
         }
@@ -3228,7 +3224,7 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_7 < 1 || value_7 > 2 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).stream_channels = value_7;
+                st.stream_channels = value_7;
                 current_block = 10007731352114176167;
             }
         }
@@ -3237,13 +3233,13 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_8 < 8 || value_8 > 24 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).lsb_depth = value_8;
+                st.lsb_depth = value_8;
                 current_block = 10007731352114176167;
             }
         }
         OPUS_GET_LSB_DEPTH_REQUEST => {
             let value_9: &mut i32 = ap.arg::<&mut i32>();
-            *value_9 = (*st).lsb_depth;
+            *value_9 = st.lsb_depth;
             current_block = 10007731352114176167;
         }
         OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST => {
@@ -3251,32 +3247,32 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
             if value_10 < 0 || value_10 > 1 {
                 current_block = 2472048668343472511;
             } else {
-                (*st).disable_inv = value_10;
+                st.disable_inv = value_10;
                 current_block = 10007731352114176167;
             }
         }
         OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
             let value_11: &mut i32 = ap.arg::<&mut i32>();
-            *value_11 = (*st).disable_inv;
+            *value_11 = st.disable_inv;
             current_block = 10007731352114176167;
         }
         OPUS_RESET_STATE => {
-            let nbEBands = (*st).mode.nbEBands as usize;
-            let cc = (*st).channels as usize;
-            let overlap = (*st).mode.overlap;
+            let nbEBands = st.mode.nbEBands as usize;
+            let cc = st.channels as usize;
+            let overlap = st.mode.overlap;
             // Zero all state fields from rng onward (matching C's memset from &st->rng)
-            (*st).rng = 0;
-            (*st).spread_decision = SPREAD_NORMAL;
-            (*st).delayedIntra = 1 as opus_val32;
-            (*st).tonal_average = 256;
-            (*st).lastCodedBands = 0;
-            (*st).hf_average = 0;
-            (*st).tapset_decision = 0;
-            (*st).prefilter_period = 0;
-            (*st).prefilter_gain = 0.0;
-            (*st).prefilter_tapset = 0;
-            (*st).consec_transient = 0;
-            (*st).analysis = AnalysisInfo {
+            st.rng = 0;
+            st.spread_decision = SPREAD_NORMAL;
+            st.delayedIntra = 1 as opus_val32;
+            st.tonal_average = 256;
+            st.lastCodedBands = 0;
+            st.hf_average = 0;
+            st.tapset_decision = 0;
+            st.prefilter_period = 0;
+            st.prefilter_gain = 0.0;
+            st.prefilter_tapset = 0;
+            st.consec_transient = 0;
+            st.analysis = AnalysisInfo {
                 valid: 0,
                 tonality: 0.0,
                 tonality_slope: 0.0,
@@ -3290,61 +3286,61 @@ pub unsafe fn opus_custom_encoder_ctl_impl(
                 max_pitch_ratio: 0.0,
                 leak_boost: [0; 19],
             };
-            (*st).silk_info = SILKInfo {
+            st.silk_info = SILKInfo {
                 signalType: 0,
                 offset: 0,
             };
-            (*st).preemph_memE = [0.0; 2];
-            (*st).preemph_memD = [0.0; 2];
-            (*st).vbr_reservoir = 0;
-            (*st).vbr_drift = 0;
-            (*st).vbr_offset = 0;
-            (*st).vbr_count = 0;
-            (*st).overlap_max = 0.0;
-            (*st).stereo_saving = 0.0;
-            (*st).intensity = 0;
-            (*st).spec_avg = 0.0;
-            (&mut (*st).in_mem)[..cc * overlap].fill(0.0);
-            (&mut (*st).prefilter_mem)[..cc * COMBFILTER_MAXPERIOD as usize].fill(0.0);
-            (&mut (*st).oldBandE)[..cc * nbEBands].fill(0.0);
-            (&mut (*st).oldLogE)[..cc * nbEBands].fill(-28.0);
-            (&mut (*st).oldLogE2)[..cc * nbEBands].fill(-28.0);
-            (&mut (*st).energyError)[..cc * nbEBands].fill(0.0);
+            st.preemph_memE = [0.0; 2];
+            st.preemph_memD = [0.0; 2];
+            st.vbr_reservoir = 0;
+            st.vbr_drift = 0;
+            st.vbr_offset = 0;
+            st.vbr_count = 0;
+            st.overlap_max = 0.0;
+            st.stereo_saving = 0.0;
+            st.intensity = 0;
+            st.spec_avg = 0.0;
+            (&mut st.in_mem)[..cc * overlap].fill(0.0);
+            (&mut st.prefilter_mem)[..cc * COMBFILTER_MAXPERIOD as usize].fill(0.0);
+            (&mut st.oldBandE)[..cc * nbEBands].fill(0.0);
+            (&mut st.oldLogE)[..cc * nbEBands].fill(-28.0);
+            (&mut st.oldLogE2)[..cc * nbEBands].fill(-28.0);
+            (&mut st.energyError)[..cc * nbEBands].fill(0.0);
             current_block = 10007731352114176167;
         }
         CELT_SET_SIGNALLING_REQUEST => {
             let value_12: i32 = ap.arg::<i32>();
-            (*st).signalling = value_12;
+            st.signalling = value_12;
             current_block = 10007731352114176167;
         }
         CELT_SET_ANALYSIS_REQUEST => {
             let info = ap.arg::<&mut AnalysisInfo>();
-            (*st).analysis = *info;
+            st.analysis = *info;
             current_block = 10007731352114176167;
         }
         CELT_SET_SILK_INFO_REQUEST => {
             let info_0 = ap.arg::<&mut SILKInfo>();
-            (*st).silk_info = *info_0;
+            st.silk_info = *info_0;
             current_block = 10007731352114176167;
         }
         CELT_GET_MODE_REQUEST => {
             let value_13 = ap.arg::<&mut *const OpusCustomMode>();
-            *value_13 = (*st).mode;
+            *value_13 = st.mode;
             current_block = 10007731352114176167;
         }
         OPUS_GET_FINAL_RANGE_REQUEST => {
             let value_14 = ap.arg::<&mut u32>();
-            *value_14 = (*st).rng;
+            *value_14 = st.rng;
             current_block = 10007731352114176167;
         }
         OPUS_SET_LFE_REQUEST => {
             let value_15: i32 = ap.arg::<i32>();
-            (*st).lfe = value_15;
+            st.lfe = value_15;
             current_block = 10007731352114176167;
         }
         OPUS_SET_ENERGY_MASK_REQUEST => {
             let value_16: *const opus_val16 = ap.arg::<*mut opus_val16>();
-            (*st).energy_mask = value_16;
+            st.energy_mask = value_16;
             current_block = 10007731352114176167;
         }
         _ => return OPUS_UNIMPLEMENTED,
