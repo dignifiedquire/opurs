@@ -107,14 +107,17 @@ Key: `qb` = quant_bands.rs
   - `celt_decode_lost`: raw pointer struct access → direct field indexing, memmove → copy_within
   - `deemphasis`, `tf_decode`, `celt_plc_pitch_search`: pointer params → slices
   - 2 minimal unsafe blocks remain (non-overlapping slice creation, lifetime erasure for ec_dec)
-- [ ] `celt_encoder.rs`
+- [x] `celt_encoder.rs`
   - Upstream C: `celt/celt_encoder.c`
-  - Functions (20 unsafe): `celt_encode_with_ec`, `opus_custom_encoder_ctl_impl`, etc.
-  - Risk: **Very High** — 3523 lines, largest file, calls everything
-  - Strategy: Convert state struct, then encoding pipeline in stages
-  - Sub-commits for logical groups of functions
+  - Functions (20 unsafe fn → 0): all converted to safe APIs
+  - `celt_encode_with_ec`: `st: *mut` → `&mut`, `pcm: *const` → `&[opus_val16]`, `compressed: *mut u8` → `&mut [u8]`
+  - `opus_custom_encoder_init_arch`, `celt_encoder_init`: `unsafe fn *mut` → `fn &mut`
+  - `opus_custom_encoder_ctl_impl`: `unsafe fn *mut` → `fn &mut`
+  - Eliminated pointer aliases (oldBandE/oldLogE/oldLogE2/energyError) → direct field indexing
+  - Replaced all memcpy/memset with copy_from_slice/copy_within/fill
+  - 1 minimal unsafe block remains (energy_mask from_raw_parts, externally-owned pointer)
 - [x] **Commit**: `refactor: make celt::celt_decoder safe (Stage 2.5)` (3 commits)
-- [ ] **Commit(s)**: `refactor: make celt::celt_encoder safe` (likely 3-5 commits)
+- [x] **Commit(s)**: `refactor: make celt::celt_encoder safe` (5 commits: FAM elimination, leaf fns, analysis/prefilter, init/CTL, celt_encode_with_ec)
 
 ---
 
