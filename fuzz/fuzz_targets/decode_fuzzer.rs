@@ -30,13 +30,13 @@ fuzz_target!(|data: &[u8]| {
 
     // Parse ToC from the first packet to determine sample rate and channels
     let toc = data[SETUP_BYTE_COUNT];
-    let bandwidth = unsafe { opus_packet_get_bandwidth(&toc as *const u8) };
+    let bandwidth = opus_packet_get_bandwidth(toc);
     let bw_idx = bandwidth - OPUS_BANDWIDTH_NARROWBAND;
     if !(0..5).contains(&bw_idx) {
         return;
     }
     let fs = SAMP_FREQS[bw_idx as usize];
-    let channels = unsafe { opus_packet_get_nb_channels(&toc as *const u8) };
+    let channels = opus_packet_get_nb_channels(toc);
 
     let mut err = 0;
     let dec = unsafe { opus_decoder_create(fs, channels, &mut err) };

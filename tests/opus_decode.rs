@@ -219,7 +219,7 @@ fn test_decoder_all_2byte_prefixes() {
             packet[2] = 255;
 
             // Verify channel count from packet header
-            let nb_channels = opus_packet_get_nb_channels(packet.as_mut_ptr());
+            let nb_channels = opus_packet_get_nb_channels(packet[0]);
             assert_eq!(
                 nb_channels,
                 (i & 1) + 1,

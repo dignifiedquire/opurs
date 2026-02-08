@@ -249,7 +249,7 @@ unsafe fn test_dec_api_inner() {
         bw = 1101 + (((((bw & 7) * 9) & (63 - (bw & 8))) + 2 + 12 * (bw & 8 != 0) as i32) >> 4);
         assert_eq!(
             bw,
-            opus_packet_get_bandwidth(packet.as_mut_ptr()),
+            opus_packet_get_bandwidth(packet[0]),
             "get_bandwidth mismatch for toc={i}"
         );
         cfgs += 1;
