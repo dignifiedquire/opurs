@@ -460,8 +460,14 @@ Before removing `externs.rs`, all callers must be converted:
 
 ### Stage 4.4 — Safe opus_decoder.rs
 
-- [ ] Convert `OpusDecoder` from malloc'd blob to proper Rust struct
-  - Named fields, embedded `CeltDecoder` and SILK state
+- [x] Convert `OpusDecoder` from malloc'd blob to proper Rust struct
+  - Named fields, embedded `CeltDecoder` and SILK state (already done)
+- [x] Make leaf functions safe (validate, smooth_fade, get_mode, get_bandwidth, get_nb_channels)
+- [x] Make opus_decode_frame use safe types (Option<&[u8]>, &mut [opus_val16])
+- [x] Make opus_decode take &mut [i16] instead of *mut i16
+- [x] Make OpusDecoder::new safe (no unsafe needed)
+- [x] Add OpusDecoder::channels() public accessor
+- [x] Deprecate old C-style free functions (`opus_decoder_create`, etc.)
 - [ ] Implement `Decoder` wrapper struct (public API)
   - `Decoder::new(sample_rate, channels)` — validates args, creates inner state
   - `Decoder::decode(input, output, fec)` — delegates to safe internals
@@ -469,7 +475,6 @@ Before removing `externs.rs`, all callers must be converted:
   - `Decoder::get_nb_samples(packet)`
   - All CTL methods as typed methods (no more VarArgs for public use)
 - [ ] Implement `Drop` for `Decoder` (replaces `opus_decoder_destroy`)
-- [ ] Deprecate old C-style free functions (`opus_decoder_create`, etc.)
 - [ ] **Commit**: `refactor: safe Decoder with idiomatic Rust API`
 
 ### Stage 4.5 — Safe opus_encoder.rs
