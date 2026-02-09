@@ -22,7 +22,18 @@ pub struct silk_encoder_state_FLP {
     pub x_buf: [f32; 720],
     pub LTPCorr: f32,
 }
-#[derive(Copy, Clone)]
+
+impl Default for silk_encoder_state_FLP {
+    fn default() -> Self {
+        Self {
+            sCmn: Default::default(),
+            sShape: Default::default(),
+            x_buf: [0.0; 720],
+            LTPCorr: 0.0,
+        }
+    }
+}
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_shape_state_FLP {
     pub LastGainIndex: i8,

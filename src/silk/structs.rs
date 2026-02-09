@@ -1,5 +1,6 @@
 use crate::silk::define::{LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR};
 use crate::silk::resampler::ResamplerState;
+use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -143,7 +144,26 @@ pub struct silk_nsq_state {
     pub prev_gain_Q16: i32,
     pub rewhite_flag: i32,
 }
-#[derive(Copy, Clone)]
+
+impl Default for silk_nsq_state {
+    fn default() -> Self {
+        Self {
+            xq: [0; 640],
+            sLTP_shp_Q14: [0; 640],
+            sLPC_Q14: [0; 96],
+            sAR2_Q14: [0; 24],
+            sLF_AR_shp_Q14: 0,
+            sDiff_shp_Q14: 0,
+            lagPrev: 0,
+            sLTP_buf_idx: 0,
+            sLTP_shp_buf_idx: 0,
+            rand_seed: 0,
+            prev_gain_Q16: 0,
+            rewhite_flag: 0,
+        }
+    }
+}
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_VAD_state {
     pub AnaState: [i32; 2],
@@ -157,7 +177,7 @@ pub struct silk_VAD_state {
     pub NoiseLevelBias: [i32; 4],
     pub counter: i32,
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_LP_state {
     pub In_LP_State: [i32; 2],
@@ -245,6 +265,90 @@ pub struct silk_encoder_state {
     pub LBRR_GainIncreases: i32,
     pub indices_LBRR: [SideInfoIndices; 3],
     pub pulses_LBRR: [[i8; 320]; 3],
+}
+
+impl Default for silk_encoder_state {
+    fn default() -> Self {
+        Self {
+            In_HP_State: [0; 2],
+            variable_HP_smth1_Q15: 0,
+            variable_HP_smth2_Q15: 0,
+            sLP: Default::default(),
+            sVAD: Default::default(),
+            sNSQ: Default::default(),
+            prev_NLSFq_Q15: [0; 16],
+            speech_activity_Q8: 0,
+            allow_bandwidth_switch: 0,
+            LBRRprevLastGainIndex: 0,
+            prevSignalType: 0,
+            prevLag: 0,
+            pitch_LPC_win_length: 0,
+            max_pitch_lag: 0,
+            API_fs_Hz: 0,
+            prev_API_fs_Hz: 0,
+            maxInternal_fs_Hz: 0,
+            minInternal_fs_Hz: 0,
+            desiredInternal_fs_Hz: 0,
+            fs_kHz: 0,
+            nb_subfr: 0,
+            frame_length: 0,
+            subfr_length: 0,
+            ltp_mem_length: 0,
+            la_pitch: 0,
+            la_shape: 0,
+            shapeWinLength: 0,
+            TargetRate_bps: 0,
+            PacketSize_ms: 0,
+            PacketLoss_perc: 0,
+            frameCounter: 0,
+            Complexity: 0,
+            nStatesDelayedDecision: 0,
+            useInterpolatedNLSFs: 0,
+            shapingLPCOrder: 0,
+            predictLPCOrder: 0,
+            pitchEstimationComplexity: 0,
+            pitchEstimationLPCOrder: 0,
+            pitchEstimationThreshold_Q16: 0,
+            sum_log_gain_Q7: 0,
+            NLSF_MSVQ_Survivors: 0,
+            first_frame_after_reset: 0,
+            controlled_since_last_payload: 0,
+            warping_Q16: 0,
+            useCBR: 0,
+            prefillFlag: 0,
+            pitch_lag_low_bits_iCDF: &[],
+            pitch_contour_iCDF: &[],
+            psNLSF_CB: &silk_NLSF_CB_NB_MB,
+            input_quality_bands_Q15: [0; 4],
+            input_tilt_Q15: 0,
+            SNR_dB_Q7: 0,
+            VAD_flags: [0; 3],
+            LBRR_flag: 0,
+            LBRR_flags: [0; 3],
+            indices: Default::default(),
+            pulses: [0; 320],
+            arch: 0,
+            inputBuf: [0; 322],
+            inputBufIx: 0,
+            nFramesPerPacket: 0,
+            nFramesEncoded: 0,
+            nChannelsAPI: 0,
+            nChannelsInternal: 0,
+            channelNb: 0,
+            frames_since_onset: 0,
+            ec_prevSignalType: 0,
+            ec_prevLagIndex: 0,
+            resampler_state: Default::default(),
+            useDTX: 0,
+            inDTX: 0,
+            noSpeechCounter: 0,
+            useInBandFEC: 0,
+            LBRR_enabled: 0,
+            LBRR_GainIncreases: 0,
+            indices_LBRR: [Default::default(); 3],
+            pulses_LBRR: [[0; 320]; 3],
+        }
+    }
 }
 
 #[derive(Copy, Clone)]

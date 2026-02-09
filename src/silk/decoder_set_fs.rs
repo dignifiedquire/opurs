@@ -1,4 +1,3 @@
-use crate::externs::memset;
 use crate::silk::define::{MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY};
 use crate::silk::resampler::silk_resampler_init;
 use crate::silk::structs::silk_decoder_state;
@@ -10,11 +9,8 @@ use crate::silk::tables_pitch_lag::{
     silk_pitch_contour_iCDF,
 };
 
-pub unsafe fn silk_decoder_set_fs(
-    psDec: &mut silk_decoder_state,
-    fs_kHz: i32,
-    fs_API_Hz: i32,
-) -> i32 {
+/// Upstream C: silk/decoder_set_fs.c:silk_decoder_set_fs
+pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_Hz: i32) -> i32 {
     let mut frame_length: i32 = 0;
     assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
     assert!(psDec.nb_subfr == 4 || psDec.nb_subfr == 4 / 2);
@@ -58,16 +54,8 @@ pub unsafe fn silk_decoder_set_fs(
             psDec.lagPrev = 100;
             psDec.LastGainIndex = 10;
             psDec.prevSignalType = TYPE_NO_VOICE_ACTIVITY;
-            memset(
-                (psDec.outBuf).as_mut_ptr() as *mut core::ffi::c_void,
-                0,
-                ::core::mem::size_of::<[i16; 480]>() as u64,
-            );
-            memset(
-                (psDec.sLPC_Q14_buf).as_mut_ptr() as *mut core::ffi::c_void,
-                0,
-                ::core::mem::size_of::<[i32; 16]>() as u64,
-            );
+            psDec.outBuf.fill(0);
+            psDec.sLPC_Q14_buf.fill(0);
         }
         psDec.fs_kHz = fs_kHz;
         psDec.frame_length = frame_length as usize;
