@@ -37,8 +37,10 @@ pub fn silk_LTP_analysis_filter_FLP(
             LTP_res[res_off + i as usize] = x[x_off + i as usize];
             j = 0;
             while j < LTP_ORDER as i32 {
-                LTP_res[res_off + i as usize] -= Btmp[j as usize]
-                    * x[x_lag_base + i as usize + (LTP_ORDER as i32 / 2 - j) as usize];
+                let lag_idx = (x_lag_base as isize
+                    + i as isize
+                    + (LTP_ORDER as i32 / 2 - j) as isize) as usize;
+                LTP_res[res_off + i as usize] -= Btmp[j as usize] * x[lag_idx];
                 j += 1;
             }
             LTP_res[res_off + i as usize] *= inv_gain;

@@ -7,13 +7,13 @@ use crate::silk::define::{
 
 pub use self::typedef_h::silk_int32_MAX;
 
-use crate::externs::memcpy;
-pub unsafe fn silk_NLSF_del_dec_quant(
-    indices: *mut i8,
-    x_Q10: *const i16,
-    w_Q5: *const i16,
-    pred_coef_Q8: *const u8,
-    ec_ix: *const i16,
+/// Upstream C: silk/NLSF_del_dec_quant.c:silk_NLSF_del_dec_quant
+pub fn silk_NLSF_del_dec_quant(
+    indices: &mut [i8],
+    x_Q10: &[i16],
+    w_Q5: &[i16],
+    pred_coef_Q8: &[u8],
+    ec_ix: &[i16],
     ec_rates_Q5: &[u8],
     quant_step_size_Q16: i32,
     inv_quant_step_size_Q6: i16,
@@ -44,7 +44,6 @@ pub unsafe fn silk_NLSF_del_dec_quant(
     let mut RD_Q25: [i32; 8] = [0; 8];
     let mut RD_min_Q25: [i32; 4] = [0; 4];
     let mut RD_max_Q25: [i32; 4] = [0; 4];
-    let mut rates_Q5: *const u8 = 0 as *const u8;
     let mut out0_Q10_table: [i32; 20] = [0; 20];
     let mut out1_Q10_table: [i32; 20] = [0; 20];
     i = -NLSF_QUANT_MAX_AMPLITUDE_EXT;
@@ -73,15 +72,12 @@ pub unsafe fn silk_NLSF_del_dec_quant(
     prev_out_Q10[0 as usize] = 0;
     i = order as i32 - 1;
     while i >= 0 {
-        rates_Q5 = &*ec_rates_Q5
-            .as_ptr()
-            .offset(*ec_ix.offset(i as isize) as isize) as *const u8;
-        in_Q10 = *x_Q10.offset(i as isize) as i32;
+        let rates_Q5 = &ec_rates_Q5[ec_ix[i as usize] as usize..];
+        in_Q10 = x_Q10[i as usize] as i32;
         j = 0;
         while j < nStates {
-            pred_Q10 = *pred_coef_Q8.offset(i as isize) as i16 as i32
-                * prev_out_Q10[j as usize] as i32
-                >> 8;
+            pred_Q10 =
+                pred_coef_Q8[i as usize] as i16 as i32 * prev_out_Q10[j as usize] as i32 >> 8;
             res_Q10 = in_Q10 - pred_Q10;
             ind_tmp = inv_quant_step_size_Q6 as i32 * res_Q10 as i16 as i32 >> 16;
             ind_tmp = if -(10) > 10 - 1 {
@@ -108,8 +104,7 @@ pub unsafe fn silk_NLSF_del_dec_quant(
             prev_out_Q10[(j + nStates) as usize] = out1_Q10;
             if ind_tmp + 1 >= NLSF_QUANT_MAX_AMPLITUDE {
                 if ind_tmp + 1 == NLSF_QUANT_MAX_AMPLITUDE {
-                    rate0_Q5 =
-                        *rates_Q5.offset((ind_tmp + NLSF_QUANT_MAX_AMPLITUDE) as isize) as i32;
+                    rate0_Q5 = rates_Q5[(ind_tmp + NLSF_QUANT_MAX_AMPLITUDE) as usize] as i32;
                     rate1_Q5 = 280;
                 } else {
                     rate0_Q5 = 280 - 43 * 4 + 43 * ind_tmp as i16 as i32;
@@ -118,25 +113,23 @@ pub unsafe fn silk_NLSF_del_dec_quant(
             } else if ind_tmp <= -NLSF_QUANT_MAX_AMPLITUDE {
                 if ind_tmp == -NLSF_QUANT_MAX_AMPLITUDE {
                     rate0_Q5 = 280;
-                    rate1_Q5 =
-                        *rates_Q5.offset((ind_tmp + 1 + NLSF_QUANT_MAX_AMPLITUDE) as isize) as i32;
+                    rate1_Q5 = rates_Q5[(ind_tmp + 1 + NLSF_QUANT_MAX_AMPLITUDE) as usize] as i32;
                 } else {
                     rate0_Q5 = 280 - 43 * 4 + -(43) as i16 as i32 * ind_tmp as i16 as i32;
                     rate1_Q5 = rate0_Q5 - 43;
                 }
             } else {
-                rate0_Q5 = *rates_Q5.offset((ind_tmp + NLSF_QUANT_MAX_AMPLITUDE) as isize) as i32;
-                rate1_Q5 =
-                    *rates_Q5.offset((ind_tmp + 1 + NLSF_QUANT_MAX_AMPLITUDE) as isize) as i32;
+                rate0_Q5 = rates_Q5[(ind_tmp + NLSF_QUANT_MAX_AMPLITUDE) as usize] as i32;
+                rate1_Q5 = rates_Q5[(ind_tmp + 1 + NLSF_QUANT_MAX_AMPLITUDE) as usize] as i32;
             }
             RD_tmp_Q25 = RD_Q25[j as usize];
             diff_Q10 = in_Q10 - out0_Q10 as i32;
             RD_Q25[j as usize] = RD_tmp_Q25
-                + diff_Q10 as i16 as i32 * diff_Q10 as i16 as i32 * *w_Q5.offset(i as isize) as i32
+                + diff_Q10 as i16 as i32 * diff_Q10 as i16 as i32 * w_Q5[i as usize] as i32
                 + mu_Q20 as i16 as i32 * rate0_Q5 as i16 as i32;
             diff_Q10 = in_Q10 - out1_Q10 as i32;
             RD_Q25[(j + nStates) as usize] = RD_tmp_Q25
-                + diff_Q10 as i16 as i32 * diff_Q10 as i16 as i32 * *w_Q5.offset(i as isize) as i32
+                + diff_Q10 as i16 as i32 * diff_Q10 as i16 as i32 * w_Q5[i as usize] as i32
                 + mu_Q20 as i16 as i32 * rate1_Q5 as i16 as i32;
             j += 1;
         }
@@ -201,11 +194,8 @@ pub unsafe fn silk_NLSF_del_dec_quant(
                     prev_out_Q10[(ind_min_max + NLSF_QUANT_DEL_DEC_STATES) as usize];
                 RD_min_Q25[ind_max_min as usize] = 0;
                 RD_max_Q25[ind_min_max as usize] = silk_int32_MAX;
-                memcpy(
-                    (ind[ind_max_min as usize]).as_mut_ptr() as *mut core::ffi::c_void,
-                    (ind[ind_min_max as usize]).as_mut_ptr() as *const core::ffi::c_void,
-                    16_u64.wrapping_mul(::core::mem::size_of::<i8>() as u64),
-                );
+                let tmp = ind[ind_min_max as usize];
+                ind[ind_max_min as usize] = tmp;
             }
             j = 0;
             while j < NLSF_QUANT_DEL_DEC_STATES {
@@ -228,11 +218,9 @@ pub unsafe fn silk_NLSF_del_dec_quant(
     }
     j = 0;
     while j < order as i32 {
-        *indices.offset(j as isize) =
-            ind[(ind_tmp & NLSF_QUANT_DEL_DEC_STATES - 1) as usize][j as usize];
+        indices[j as usize] = ind[(ind_tmp & NLSF_QUANT_DEL_DEC_STATES - 1) as usize][j as usize];
         j += 1;
     }
-    let ref mut fresh0 = *indices.offset(0 as isize);
-    *fresh0 = (*fresh0 as i32 + (ind_tmp >> 2)) as i8;
+    indices[0] = (indices[0] as i32 + (ind_tmp >> 2)) as i8;
     return min_Q25;
 }
