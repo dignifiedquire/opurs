@@ -19,7 +19,7 @@ pub mod errors_h {
 }
 use self::errors_h::{SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR};
 use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_icdf};
-use crate::externs::{memcpy, memset};
+// memcpy/memset eliminated — using safe Rust equivalents
 use crate::silk::decode_frame::silk_decode_frame;
 use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_pulses::silk_decode_pulses;
@@ -30,7 +30,6 @@ use crate::silk::define::{
 };
 use crate::silk::init_decoder::silk_init_decoder;
 use crate::silk::resampler::silk_resampler;
-use crate::silk::resampler::ResamplerState;
 use crate::silk::stereo_MS_to_LR::silk_stereo_MS_to_LR;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
 use crate::silk::structs::{silk_decoder_state, stereo_dec_state};
@@ -134,22 +133,9 @@ pub unsafe fn silk_Decode(
         && decControl.nChannelsInternal == 2
         && (psDec.nChannelsAPI == 1 || psDec.nChannelsInternal == 1)
     {
-        memset(
-            (psDec.sStereo.pred_prev_Q13).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            ::core::mem::size_of::<[i16; 2]>() as u64,
-        );
-        memset(
-            (psDec.sStereo.sSide).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            ::core::mem::size_of::<[i16; 2]>() as u64,
-        );
-        memcpy(
-            &mut channel_state[1].resampler_state as *mut ResamplerState as *mut core::ffi::c_void,
-            &mut channel_state[0].resampler_state as *mut ResamplerState
-                as *const core::ffi::c_void,
-            ::core::mem::size_of::<ResamplerState>() as u64,
-        );
+        psDec.sStereo.pred_prev_Q13.fill(0);
+        psDec.sStereo.sSide.fill(0);
+        channel_state[1].resampler_state = channel_state[0].resampler_state;
     }
     psDec.nChannelsAPI = decControl.nChannelsAPI as i32;
     psDec.nChannelsInternal = decControl.nChannelsInternal;
@@ -170,11 +156,7 @@ pub unsafe fn silk_Decode(
         }
         n = 0;
         while n < decControl.nChannelsInternal {
-            memset(
-                (channel_state[n as usize].LBRR_flags).as_mut_ptr() as *mut core::ffi::c_void,
-                0,
-                ::core::mem::size_of::<[i32; 3]>() as u64,
-            );
+            channel_state[n as usize].LBRR_flags.fill(0);
             if channel_state[n as usize].LBRR_flag != 0 {
                 if channel_state[n as usize].nFramesPerPacket == 1 {
                     channel_state[n as usize].LBRR_flags[0 as usize] = 1;
@@ -269,16 +251,8 @@ pub unsafe fn silk_Decode(
         && decode_only_middle == false
         && psDec.prev_decode_only_middle == true
     {
-        memset(
-            (channel_state[1].outBuf).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            ::core::mem::size_of::<[i16; 480]>() as u64,
-        );
-        memset(
-            (channel_state[1].sLPC_Q14_buf).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            ::core::mem::size_of::<[i32; 16]>() as u64,
-        );
+        channel_state[1].outBuf.fill(0);
+        channel_state[1].sLPC_Q14_buf.fill(0);
         channel_state[1].lagPrev = 100;
         channel_state[1].LastGainIndex = 10;
         channel_state[1].prevSignalType = TYPE_NO_VOICE_ACTIVITY;
@@ -344,12 +318,8 @@ pub unsafe fn silk_Decode(
                 arch,
             );
         } else {
-            memset(
-                &mut *(*samplesOut1_tmp.as_mut_ptr().offset(n as isize)).offset(2 as isize)
-                    as *mut i16 as *mut core::ffi::c_void,
-                0,
-                (nSamplesOutDec as u64).wrapping_mul(::core::mem::size_of::<i16>() as u64),
-            );
+            let side_ptr = samplesOut1_tmp[n as usize].offset(2);
+            std::slice::from_raw_parts_mut(side_ptr, nSamplesOutDec as usize).fill(0);
         }
         let ref mut fresh0 = channel_state[n as usize].nFramesDecoded;
         *fresh0 += 1;
@@ -365,17 +335,13 @@ pub unsafe fn silk_Decode(
             nSamplesOutDec,
         );
     } else {
-        memcpy(
-            samplesOut1_tmp[0 as usize] as *mut core::ffi::c_void,
-            (psDec.sStereo.sMid).as_mut_ptr() as *const core::ffi::c_void,
-            2_u64.wrapping_mul(::core::mem::size_of::<i16>() as u64),
-        );
-        memcpy(
-            (psDec.sStereo.sMid).as_mut_ptr() as *mut core::ffi::c_void,
-            &mut *(*samplesOut1_tmp.as_mut_ptr().offset(0 as isize)).offset(nSamplesOutDec as isize)
-                as *mut i16 as *const core::ffi::c_void,
-            2_u64.wrapping_mul(::core::mem::size_of::<i16>() as u64),
-        );
+        // Copy sMid[0..2] to beginning of samplesOut1_tmp[0]
+        let tmp0 = std::slice::from_raw_parts_mut(samplesOut1_tmp[0], nSamplesOutDec as usize + 2);
+        tmp0[0] = psDec.sStereo.sMid[0];
+        tmp0[1] = psDec.sStereo.sMid[1];
+        // Save last 2 samples back to sMid
+        psDec.sStereo.sMid[0] = tmp0[nSamplesOutDec as usize];
+        psDec.sStereo.sMid[1] = tmp0[nSamplesOutDec as usize + 1];
     }
     *nSamplesOut =
         nSamplesOutDec * decControl.API_sampleRate / (channel_state[0].fs_kHz as i16 as i32 * 1000);
@@ -400,17 +366,10 @@ pub unsafe fn silk_Decode(
     }) as usize;
     let mut samplesOut1_tmp_storage2: Vec<i16> = ::std::vec::from_elem(0, vla_1);
     if delay_stack_alloc != 0 {
-        memcpy(
-            samplesOut1_tmp_storage2.as_mut_ptr() as *mut core::ffi::c_void,
-            samplesOut as *const core::ffi::c_void,
-            ((decControl.nChannelsInternal * (channel_state[0].frame_length + 2) as i32) as u64)
-                .wrapping_mul(::core::mem::size_of::<i16>() as u64)
-                .wrapping_add(
-                    (0 * samplesOut1_tmp_storage2
-                        .as_mut_ptr()
-                        .offset_from(samplesOut) as i64) as u64,
-                ),
-        );
+        let copy_len =
+            (decControl.nChannelsInternal * (channel_state[0].frame_length + 2) as i32) as usize;
+        let src = std::slice::from_raw_parts(samplesOut, copy_len);
+        samplesOut1_tmp_storage2[..copy_len].copy_from_slice(src);
         samplesOut1_tmp[0 as usize] = samplesOut1_tmp_storage2.as_mut_ptr();
         samplesOut1_tmp[1 as usize] = samplesOut1_tmp_storage2
             .as_mut_ptr()
