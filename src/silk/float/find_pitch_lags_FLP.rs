@@ -84,23 +84,20 @@ pub fn silk_find_pitch_lags_FLP(
         thrhld -= 0.1f32 * psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
         thrhld -= 0.15f32 * (psEnc.sCmn.prevSignalType as i32 >> 1) as f32;
         thrhld -= 0.1f32 * psEnc.sCmn.input_tilt_Q15 as f32 * (1.0f32 / 32768.0f32);
-        // silk_pitch_analysis_core_FLP still takes raw pointers
-        if unsafe {
-            silk_pitch_analysis_core_FLP(
-                res.as_ptr(),
-                psEncCtrl.pitchL.as_mut_ptr(),
-                &mut psEnc.sCmn.indices.lagIndex,
-                &mut psEnc.sCmn.indices.contourIndex,
-                &mut psEnc.LTPCorr,
-                psEnc.sCmn.prevLag,
-                psEnc.sCmn.pitchEstimationThreshold_Q16 as f32 / 65536.0f32,
-                thrhld,
-                psEnc.sCmn.fs_kHz,
-                psEnc.sCmn.pitchEstimationComplexity,
-                psEnc.sCmn.nb_subfr as i32,
-                arch,
-            )
-        } == 0
+        if silk_pitch_analysis_core_FLP(
+            res,
+            &mut psEncCtrl.pitchL,
+            &mut psEnc.sCmn.indices.lagIndex,
+            &mut psEnc.sCmn.indices.contourIndex,
+            &mut psEnc.LTPCorr,
+            psEnc.sCmn.prevLag,
+            psEnc.sCmn.pitchEstimationThreshold_Q16 as f32 / 65536.0f32,
+            thrhld,
+            psEnc.sCmn.fs_kHz,
+            psEnc.sCmn.pitchEstimationComplexity,
+            psEnc.sCmn.nb_subfr as i32,
+            arch,
+        ) == 0
         {
             psEnc.sCmn.indices.signalType = TYPE_VOICED as i8;
         } else {

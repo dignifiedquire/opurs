@@ -42,20 +42,23 @@ pub fn silk_PLC_Reset(psDec: &mut silk_decoder_state) {
     psDec.sPLC.nb_subfr = 2;
 }
 
-pub unsafe fn silk_PLC(
+/// Upstream C: silk/PLC.c:silk_PLC
+pub fn silk_PLC(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
-    frame: *mut i16,
+    frame: &mut [i16],
     lost: i32,
     arch: i32,
 ) {
     if psDec.fs_kHz != psDec.sPLC.fs_kHz {
-        silk_PLC_Reset(&mut *psDec);
+        silk_PLC_Reset(psDec);
         psDec.sPLC.fs_kHz = psDec.fs_kHz;
     }
     if lost != 0 {
-        // Not refactoring this, as the current testing implementation doesn't test it
-        silk_PLC_conceal(psDec, psDecCtrl, frame, arch);
+        // Not refactoring conceal internals, as the current testing implementation doesn't test it
+        unsafe {
+            silk_PLC_conceal(psDec, psDecCtrl, frame.as_mut_ptr(), arch);
+        }
         psDec.lossCnt += 1;
     } else {
         silk_PLC_update(psDec, psDecCtrl);
@@ -747,49 +750,44 @@ unsafe fn silk_PLC_conceal(
     }
 }
 
-pub unsafe fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: *mut i16, length: i32) {
-    let mut i: i32 = 0;
+/// Upstream C: silk/PLC.c:silk_PLC_glue_frames
+pub fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], length: i32) {
+    let mut i: i32;
     let mut energy_shift: i32 = 0;
     let mut energy: i32 = 0;
-    let mut psPLC: *mut silk_PLC_struct = 0 as *mut silk_PLC_struct;
-    psPLC = &mut psDec.sPLC;
+    let psPLC = &mut psDec.sPLC;
     if psDec.lossCnt != 0 {
         silk_sum_sqr_shift(
-            &mut (*psPLC).conc_energy,
-            &mut (*psPLC).conc_energy_shift,
-            std::slice::from_raw_parts(frame, length as usize),
+            &mut psPLC.conc_energy,
+            &mut psPLC.conc_energy_shift,
+            &frame[..length as usize],
         );
-        (*psPLC).last_frame_lost = 1;
+        psPLC.last_frame_lost = 1;
     } else {
-        if psDec.sPLC.last_frame_lost != 0 {
-            silk_sum_sqr_shift(
-                &mut energy,
-                &mut energy_shift,
-                std::slice::from_raw_parts(frame, length as usize),
-            );
-            if energy_shift > (*psPLC).conc_energy_shift {
-                (*psPLC).conc_energy =
-                    (*psPLC).conc_energy >> energy_shift - (*psPLC).conc_energy_shift;
-            } else if energy_shift < (*psPLC).conc_energy_shift {
-                energy = energy >> (*psPLC).conc_energy_shift - energy_shift;
+        if psPLC.last_frame_lost != 0 {
+            silk_sum_sqr_shift(&mut energy, &mut energy_shift, &frame[..length as usize]);
+            if energy_shift > psPLC.conc_energy_shift {
+                psPLC.conc_energy = psPLC.conc_energy >> energy_shift - psPLC.conc_energy_shift;
+            } else if energy_shift < psPLC.conc_energy_shift {
+                energy = energy >> psPLC.conc_energy_shift - energy_shift;
             }
-            if energy > (*psPLC).conc_energy {
-                let mut frac_Q24: i32 = 0;
-                let mut LZ: i32 = 0;
-                let mut gain_Q16: i32 = 0;
-                let mut slope_Q16: i32 = 0;
-                LZ = silk_CLZ32((*psPLC).conc_energy);
+            if energy > psPLC.conc_energy {
+                let mut frac_Q24: i32;
+                let mut LZ: i32;
+                let mut gain_Q16: i32;
+                let mut slope_Q16: i32;
+                LZ = silk_CLZ32(psPLC.conc_energy);
                 LZ = LZ - 1;
-                (*psPLC).conc_energy = (((*psPLC).conc_energy as u32) << LZ) as i32;
+                psPLC.conc_energy = ((psPLC.conc_energy as u32) << LZ) as i32;
                 energy = energy >> silk_max_32(24 - LZ, 0);
-                frac_Q24 = (*psPLC).conc_energy / (if energy > 1 { energy } else { 1 });
+                frac_Q24 = psPLC.conc_energy / (if energy > 1 { energy } else { 1 });
                 gain_Q16 = ((silk_SQRT_APPROX(frac_Q24) as u32) << 4) as i32;
                 slope_Q16 = (((1) << 16) - gain_Q16) / length;
                 slope_Q16 = ((slope_Q16 as u32) << 2) as i32;
                 i = 0;
                 while i < length {
-                    *frame.offset(i as isize) =
-                        (gain_Q16 as i64 * *frame.offset(i as isize) as i64 >> 16) as i32 as i16;
+                    frame[i as usize] =
+                        (gain_Q16 as i64 * frame[i as usize] as i64 >> 16) as i32 as i16;
                     gain_Q16 += slope_Q16;
                     if gain_Q16 > (1) << 16 {
                         break;
@@ -798,6 +796,6 @@ pub unsafe fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: *mut i
                 }
             }
         }
-        (*psPLC).last_frame_lost = 0;
+        psPLC.last_frame_lost = 0;
     };
 }

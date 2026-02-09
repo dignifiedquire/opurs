@@ -20,8 +20,8 @@ pub unsafe fn silk_decode_frame(
     condCoding: i32,
     arch: i32,
 ) -> i32 {
-    let mut L: i32 = 0;
-    let mut mv_len: i32 = 0;
+    let mut L: i32;
+    let mut mv_len: i32;
     let ret: i32 = 0;
     L = psDec.frame_length as i32;
     let mut psDecCtrl = silk_decoder_control {
@@ -33,6 +33,7 @@ pub unsafe fn silk_decode_frame(
     };
     psDecCtrl.LTP_scale_Q14 = 0;
     assert!(L > 0 && L <= 5 * 4 * 16);
+    let pOut_slice = std::slice::from_raw_parts_mut(pOut, L as usize);
     if lostFlag == FLAG_DECODE_NORMAL
         || lostFlag == FLAG_DECODE_LBRR && psDec.LBRR_flags[psDec.nFramesDecoded as usize] == 1
     {
@@ -57,31 +58,27 @@ pub unsafe fn silk_decode_frame(
         silk_decode_core(
             psDec,
             &mut psDecCtrl,
-            std::slice::from_raw_parts_mut(pOut, psDec.frame_length),
+            &mut pOut_slice[..psDec.frame_length],
             &pulses[..psDec.frame_length],
         );
-        silk_PLC(psDec, &mut psDecCtrl, pOut, 0, arch);
+        silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 0, arch);
         psDec.lossCnt = 0;
         psDec.prevSignalType = psDec.indices.signalType as i32;
         assert!(psDec.prevSignalType >= 0 && psDec.prevSignalType <= 2);
         psDec.first_frame_after_reset = 0;
     } else {
         psDec.indices.signalType = psDec.prevSignalType as i8;
-        silk_PLC(psDec, &mut psDecCtrl, pOut, 1, arch);
+        silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 1, arch);
     }
     assert!(psDec.ltp_mem_length >= psDec.frame_length);
     mv_len = psDec.ltp_mem_length as i32 - psDec.frame_length as i32;
     psDec
         .outBuf
         .copy_within(psDec.frame_length..psDec.ltp_mem_length, 0);
-    let pOut_slice = std::slice::from_raw_parts(pOut, psDec.frame_length);
-    psDec.outBuf[mv_len as usize..mv_len as usize + psDec.frame_length].copy_from_slice(pOut_slice);
-    silk_CNG(
-        psDec,
-        &mut psDecCtrl,
-        std::slice::from_raw_parts_mut(pOut, L as usize),
-    );
-    silk_PLC_glue_frames(psDec, pOut, L);
+    psDec.outBuf[mv_len as usize..mv_len as usize + psDec.frame_length]
+        .copy_from_slice(&pOut_slice[..psDec.frame_length]);
+    silk_CNG(psDec, &mut psDecCtrl, pOut_slice);
+    silk_PLC_glue_frames(psDec, pOut_slice, L);
     psDec.lagPrev = psDecCtrl.pitchL[psDec.nb_subfr - 1];
     *pN = L;
     return ret;
