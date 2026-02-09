@@ -1,4 +1,3 @@
-use crate::externs::{memcpy, memset};
 use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_PREDICTION_POWER_GAIN,
     MAX_PREDICTION_POWER_GAIN_AFTER_RESET, TYPE_VOICED,
@@ -27,8 +26,6 @@ pub unsafe fn silk_find_pred_coefs_FLP(
     let mut xXLTP: [f32; MAX_NB_SUBFR * LTP_ORDER] = [0.; 20];
     let mut invGains: [f32; MAX_NB_SUBFR] = [0.; 4];
     let mut NLSF_Q15: [i16; MAX_LPC_ORDER] = [0; 16];
-    let mut x_ptr: *const f32 = 0 as *const f32;
-    let mut x_pre_ptr: *mut f32 = 0 as *mut f32;
     let mut LPC_in_pre: [f32; MAX_NB_SUBFR * MAX_LPC_ORDER + 320] = [0.; 384];
     let mut minInvGain: f32 = 0.;
     i = 0;
@@ -110,32 +107,26 @@ pub unsafe fn silk_find_pred_coefs_FLP(
             );
         }
     } else {
-        x_ptr = x.offset(-((*psEnc).sCmn.predictLPCOrder as isize));
-        x_pre_ptr = LPC_in_pre.as_mut_ptr();
+        let pred_order = (*psEnc).sCmn.predictLPCOrder as usize;
+        let subfr_len = (*psEnc).sCmn.subfr_length as usize;
+        let copy_len = subfr_len + pred_order;
+        let x_base = std::slice::from_raw_parts(
+            x.offset(-(pred_order as isize)),
+            pred_order + (*psEnc).sCmn.nb_subfr as usize * subfr_len,
+        );
         i = 0;
         while i < (*psEnc).sCmn.nb_subfr as i32 {
-            {
-                let copy_len = ((*psEnc).sCmn.subfr_length as i32
-                    + (*psEnc).sCmn.predictLPCOrder as i32) as usize;
-                silk_scale_copy_vector_FLP(
-                    std::slice::from_raw_parts_mut(x_pre_ptr, copy_len),
-                    std::slice::from_raw_parts(x_ptr, copy_len),
-                    invGains[i as usize],
-                    copy_len as i32,
-                );
-            }
-            x_pre_ptr = x_pre_ptr.offset(
-                ((*psEnc).sCmn.subfr_length as i32 + (*psEnc).sCmn.predictLPCOrder) as isize,
+            let x_off = i as usize * subfr_len;
+            let pre_off = i as usize * copy_len;
+            silk_scale_copy_vector_FLP(
+                &mut LPC_in_pre[pre_off..pre_off + copy_len],
+                &x_base[x_off..x_off + copy_len],
+                invGains[i as usize],
+                copy_len as i32,
             );
-            x_ptr = x_ptr.offset((*psEnc).sCmn.subfr_length as isize);
             i += 1;
         }
-        memset(
-            ((*psEncCtrl).LTPCoef).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            (((*psEnc).sCmn.nb_subfr * 5) as u64)
-                .wrapping_mul(::core::mem::size_of::<f32>() as u64),
-        );
+        (&mut (*psEncCtrl).LTPCoef)[..((*psEnc).sCmn.nb_subfr as usize * 5)].fill(0.0);
         (*psEncCtrl).LTPredCodGain = 0.0f32;
         (*psEnc).sCmn.sum_log_gain_Q7 = 0;
     }
@@ -145,12 +136,7 @@ pub unsafe fn silk_find_pred_coefs_FLP(
         minInvGain = silk_exp2((*psEncCtrl).LTPredCodGain / 3.0) / MAX_PREDICTION_POWER_GAIN;
         minInvGain /= 0.25f32 + 0.75f32 * (*psEncCtrl).coding_quality;
     }
-    silk_find_LPC_FLP(
-        &mut (*psEnc).sCmn,
-        NLSF_Q15.as_mut_ptr(),
-        LPC_in_pre.as_mut_ptr() as *const f32,
-        minInvGain,
-    );
+    silk_find_LPC_FLP(&mut (*psEnc).sCmn, &mut NLSF_Q15, &LPC_in_pre, minInvGain);
     silk_process_NLSFs_FLP(
         &mut (*psEnc).sCmn,
         &mut (*psEncCtrl).PredCoef,
@@ -166,9 +152,5 @@ pub unsafe fn silk_find_pred_coefs_FLP(
         (*psEnc).sCmn.nb_subfr as i32,
         (*psEnc).sCmn.predictLPCOrder,
     );
-    memcpy(
-        ((*psEnc).sCmn.prev_NLSFq_Q15).as_mut_ptr() as *mut core::ffi::c_void,
-        NLSF_Q15.as_mut_ptr() as *const core::ffi::c_void,
-        ::core::mem::size_of::<[i16; 16]>() as u64,
-    );
+    (*psEnc).sCmn.prev_NLSFq_Q15.copy_from_slice(&NLSF_Q15);
 }

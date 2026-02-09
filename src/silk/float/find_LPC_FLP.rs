@@ -18,10 +18,11 @@ use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 
-pub unsafe fn silk_find_LPC_FLP(
+/// Upstream C: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
+pub fn silk_find_LPC_FLP(
     psEncC: &mut silk_encoder_state,
-    NLSF_Q15: *mut i16,
-    x: *const f32,
+    NLSF_Q15: &mut [i16],
+    x: &[f32],
     minInvGain: f32,
 ) {
     let mut k: i32 = 0;
@@ -35,11 +36,9 @@ pub unsafe fn silk_find_LPC_FLP(
     let mut LPC_res: [f32; 384] = [0.; 384];
     subfr_length = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
     psEncC.indices.NLSFInterpCoef_Q2 = 4;
-    let x_total = (psEncC.nb_subfr as i32 * subfr_length) as usize;
-    let x_slice = std::slice::from_raw_parts(x, x_total);
     res_nrg = silk_burg_modified_FLP(
         &mut a,
-        x_slice,
+        x,
         minInvGain,
         subfr_length,
         psEncC.nb_subfr as i32,
@@ -52,31 +51,27 @@ pub unsafe fn silk_find_LPC_FLP(
         let half_off = (MAX_NB_SUBFR as i32 / 2 * subfr_length) as usize;
         res_nrg -= silk_burg_modified_FLP(
             &mut a_tmp,
-            &x_slice[half_off..],
+            &x[half_off..],
             minInvGain,
             subfr_length,
             MAX_NB_SUBFR as i32 / 2,
             psEncC.predictLPCOrder,
         );
-        silk_A2NLSF_FLP(
-            std::slice::from_raw_parts_mut(NLSF_Q15, psEncC.predictLPCOrder as usize),
-            &a_tmp,
-            psEncC.predictLPCOrder,
-        );
+        silk_A2NLSF_FLP(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
         res_nrg_2nd = silk_float_MAX;
         k = 3;
         while k >= 0 {
             silk_interpolate(
                 &mut NLSF0_Q15[..psEncC.predictLPCOrder as usize],
                 &psEncC.prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
-                std::slice::from_raw_parts(NLSF_Q15, psEncC.predictLPCOrder as usize),
+                &NLSF_Q15[..psEncC.predictLPCOrder as usize],
                 k,
             );
             silk_NLSF2A_FLP(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder);
             silk_LPC_analysis_filter_FLP(
                 &mut LPC_res,
                 &a_tmp,
-                std::slice::from_raw_parts(x, (2 * subfr_length) as usize),
+                &x[..(2 * subfr_length) as usize],
                 2 * subfr_length,
                 psEncC.predictLPCOrder,
             );
@@ -98,11 +93,7 @@ pub unsafe fn silk_find_LPC_FLP(
         }
     }
     if psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4 {
-        silk_A2NLSF_FLP(
-            std::slice::from_raw_parts_mut(NLSF_Q15, psEncC.predictLPCOrder as usize),
-            &a,
-            psEncC.predictLPCOrder,
-        );
+        silk_A2NLSF_FLP(NLSF_Q15, &a, psEncC.predictLPCOrder);
     }
     assert!(
         psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4

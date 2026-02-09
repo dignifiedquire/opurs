@@ -1,4 +1,3 @@
-use crate::externs::{memcpy, memset};
 use crate::silk::define::{TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, TYPE_VOICED};
 use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
 use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;
@@ -22,52 +21,39 @@ pub unsafe fn silk_find_pitch_lags_FLP(
     let mut buf_len: i32 = 0;
     let mut thrhld: f32 = 0.;
     let mut res_nrg: f32 = 0.;
-    let mut x_buf_ptr: *const f32 = 0 as *const f32;
-    let mut x_buf: *const f32 = 0 as *const f32;
     let mut auto_corr: [f32; 17] = [0.; 17];
     let mut A: [f32; 16] = [0.; 16];
     let mut refl_coef: [f32; 16] = [0.; 16];
     let mut Wsig: [f32; 384] = [0.; 384];
-    let mut Wsig_ptr: *mut f32 = 0 as *mut f32;
     buf_len = (*psEnc).sCmn.la_pitch
         + (*psEnc).sCmn.frame_length as i32
         + (*psEnc).sCmn.ltp_mem_length as i32;
     assert!(buf_len >= (*psEnc).sCmn.pitch_LPC_win_length);
-    x_buf = x.offset(-((*psEnc).sCmn.ltp_mem_length as isize));
-    x_buf_ptr = x_buf
-        .offset(buf_len as isize)
-        .offset(-((*psEnc).sCmn.pitch_LPC_win_length as isize));
-    Wsig_ptr = Wsig.as_mut_ptr();
-    {
-        let la = (*psEnc).sCmn.la_pitch as usize;
-        silk_apply_sine_window_FLP(
-            std::slice::from_raw_parts_mut(Wsig_ptr, la),
-            std::slice::from_raw_parts(x_buf_ptr, la),
-            1,
-            la as i32,
-        );
-        Wsig_ptr = Wsig_ptr.offset(la as isize);
-        x_buf_ptr = x_buf_ptr.offset(la as isize);
-    }
-    memcpy(
-        Wsig_ptr as *mut core::ffi::c_void,
-        x_buf_ptr as *const core::ffi::c_void,
-        (((*psEnc).sCmn.pitch_LPC_win_length - ((*psEnc).sCmn.la_pitch << 1)) as u64)
-            .wrapping_mul(::core::mem::size_of::<f32>() as u64),
+    let x_buf = std::slice::from_raw_parts(
+        x.offset(-((*psEnc).sCmn.ltp_mem_length as isize)),
+        buf_len as usize,
     );
-    Wsig_ptr = Wsig_ptr
-        .offset(((*psEnc).sCmn.pitch_LPC_win_length - ((*psEnc).sCmn.la_pitch << 1)) as isize);
-    x_buf_ptr = x_buf_ptr
-        .offset(((*psEnc).sCmn.pitch_LPC_win_length - ((*psEnc).sCmn.la_pitch << 1)) as isize);
-    {
-        let la = (*psEnc).sCmn.la_pitch as usize;
-        silk_apply_sine_window_FLP(
-            std::slice::from_raw_parts_mut(Wsig_ptr, la),
-            std::slice::from_raw_parts(x_buf_ptr, la),
-            2,
-            la as i32,
-        );
-    }
+    let la = (*psEnc).sCmn.la_pitch as usize;
+    let win_len = (*psEnc).sCmn.pitch_LPC_win_length as usize;
+    let x_buf_off = buf_len as usize - win_len;
+    // Apply first half sine window
+    silk_apply_sine_window_FLP(
+        &mut Wsig[..la],
+        &x_buf[x_buf_off..x_buf_off + la],
+        1,
+        la as i32,
+    );
+    // Copy flat middle section
+    let flat_len = win_len - (la << 1);
+    Wsig[la..la + flat_len].copy_from_slice(&x_buf[x_buf_off + la..x_buf_off + la + flat_len]);
+    // Apply second half sine window
+    let shift = la + flat_len;
+    silk_apply_sine_window_FLP(
+        &mut Wsig[shift..shift + la],
+        &x_buf[x_buf_off + shift..x_buf_off + shift + la],
+        2,
+        la as i32,
+    );
     silk_autocorrelation_FLP(
         &mut auto_corr[..((*psEnc).sCmn.pitchEstimationLPCOrder + 1) as usize],
         &Wsig[..(*psEnc).sCmn.pitch_LPC_win_length as usize],
@@ -89,7 +75,7 @@ pub unsafe fn silk_find_pitch_lags_FLP(
     silk_LPC_analysis_filter_FLP(
         std::slice::from_raw_parts_mut(res, buf_len as usize),
         &A,
-        std::slice::from_raw_parts(x_buf, buf_len as usize),
+        x_buf,
         buf_len,
         (*psEnc).sCmn.pitchEstimationLPCOrder,
     );
@@ -121,11 +107,7 @@ pub unsafe fn silk_find_pitch_lags_FLP(
             (*psEnc).sCmn.indices.signalType = TYPE_UNVOICED as i8;
         }
     } else {
-        memset(
-            ((*psEncCtrl).pitchL).as_mut_ptr() as *mut core::ffi::c_void,
-            0,
-            ::core::mem::size_of::<[i32; 4]>() as u64,
-        );
+        (*psEncCtrl).pitchL.fill(0);
         (*psEnc).sCmn.indices.lagIndex = 0;
         (*psEnc).sCmn.indices.contourIndex = 0;
         (*psEnc).LTPCorr = 0 as f32;

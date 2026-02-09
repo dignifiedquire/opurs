@@ -10,7 +10,6 @@ use crate::silk::tuning_parameters::{
     LOW_QUALITY_LOW_FREQ_SHAPING_DECR, SHAPE_WHITE_NOISE_FRACTION, SUBFR_SMTH_COEF,
 };
 
-use crate::externs::memcpy;
 use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
 use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;
 use crate::silk::float::bwexpander_FLP::silk_bwexpander_FLP;
@@ -222,11 +221,10 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
             slope_part,
         );
         shift = slope_part;
-        memcpy(
-            x_windowed.as_mut_ptr().offset(shift as isize) as *mut core::ffi::c_void,
-            x_ptr.offset(shift as isize) as *const core::ffi::c_void,
-            (flat_part as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
-        );
+        let x_ptr_slice =
+            std::slice::from_raw_parts(x_ptr.offset(shift as isize), flat_part as usize);
+        x_windowed[shift as usize..shift as usize + flat_part as usize]
+            .copy_from_slice(x_ptr_slice);
         shift += flat_part;
         silk_apply_sine_window_FLP(
             &mut x_windowed[shift as usize..shift as usize + slope_part as usize],
