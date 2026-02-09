@@ -73,13 +73,13 @@ pub unsafe fn silk_find_pred_coefs_FLP(
             subfr_length,
         );
         silk_quant_LTP_gains_FLP(
-            ((*psEncCtrl).LTPCoef).as_mut_ptr(),
-            ((*psEnc).sCmn.indices.LTPIndex).as_mut_ptr(),
+            &mut (*psEncCtrl).LTPCoef,
+            &mut (*psEnc).sCmn.indices.LTPIndex,
             &mut (*psEnc).sCmn.indices.PERIndex,
             &mut (*psEnc).sCmn.sum_log_gain_Q7,
             &mut (*psEncCtrl).LTPredCodGain,
-            XXLTP.as_mut_ptr() as *const f32,
-            xXLTP.as_mut_ptr() as *const f32,
+            &XXLTP,
+            &xXLTP,
             (*psEnc).sCmn.subfr_length as i32,
             (*psEnc).sCmn.nb_subfr as i32,
             (*psEnc).sCmn.arch,
@@ -153,9 +153,9 @@ pub unsafe fn silk_find_pred_coefs_FLP(
     );
     silk_process_NLSFs_FLP(
         &mut (*psEnc).sCmn,
-        ((*psEncCtrl).PredCoef).as_mut_ptr(),
-        NLSF_Q15.as_mut_ptr(),
-        ((*psEnc).sCmn.prev_NLSFq_Q15).as_mut_ptr() as *const i16,
+        &mut (*psEncCtrl).PredCoef,
+        &mut NLSF_Q15,
+        &(*psEnc).sCmn.prev_NLSFq_Q15,
     );
     silk_residual_energy_FLP(
         &mut (*psEncCtrl).ResNrg,

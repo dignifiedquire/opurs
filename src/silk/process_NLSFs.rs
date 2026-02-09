@@ -1,15 +1,15 @@
-use crate::externs::memcpy;
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::NLSF_VQ_weights_laroia::silk_NLSF_VQ_weights_laroia;
 use crate::silk::NLSF_encode::silk_NLSF_encode;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
+/// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
 pub unsafe fn silk_process_NLSFs(
     psEncC: &mut silk_encoder_state,
-    PredCoef_Q12: *mut [i16; 16],
-    pNLSF_Q15: *mut i16,
-    prev_NLSFq_Q15: *const i16,
+    PredCoef_Q12: &mut [[i16; 16]; 2],
+    pNLSF_Q15: &mut [i16],
+    prev_NLSFq_Q15: &[i16],
 ) {
     let mut i: i32 = 0;
     let mut doInterpolate: i32 = 0;
@@ -31,15 +31,15 @@ pub unsafe fn silk_process_NLSFs(
     assert!(NLSF_mu_Q20 > 0);
     silk_NLSF_VQ_weights_laroia(
         &mut pNLSFW_QW[..psEncC.predictLPCOrder as usize],
-        std::slice::from_raw_parts(pNLSF_Q15, psEncC.predictLPCOrder as usize),
+        &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
     );
     doInterpolate =
         (psEncC.useInterpolatedNLSFs == 1 && (psEncC.indices.NLSFInterpCoef_Q2 as i32) < 4) as i32;
     if doInterpolate != 0 {
         silk_interpolate(
             &mut pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
-            std::slice::from_raw_parts(prev_NLSFq_Q15, psEncC.predictLPCOrder as usize),
-            std::slice::from_raw_parts(pNLSF_Q15, psEncC.predictLPCOrder as usize),
+            &prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
+            &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
             psEncC.indices.NLSFInterpCoef_Q2 as i32,
         );
         silk_NLSF_VQ_weights_laroia(
@@ -59,7 +59,7 @@ pub unsafe fn silk_process_NLSFs(
     }
     silk_NLSF_encode(
         (psEncC.indices.NLSFIndices).as_mut_ptr(),
-        pNLSF_Q15,
+        pNLSF_Q15.as_mut_ptr(),
         psEncC.psNLSF_CB,
         pNLSFW_QW.as_mut_ptr(),
         NLSF_mu_Q20,
@@ -67,26 +67,24 @@ pub unsafe fn silk_process_NLSFs(
         psEncC.indices.signalType as i32,
     );
     silk_NLSF2A(
-        &mut (&mut (*PredCoef_Q12.offset(1)))[..psEncC.predictLPCOrder as usize],
-        std::slice::from_raw_parts(pNLSF_Q15, psEncC.predictLPCOrder as usize),
+        &mut PredCoef_Q12[1][..psEncC.predictLPCOrder as usize],
+        &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
     );
     if doInterpolate != 0 {
         silk_interpolate(
             &mut pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
-            std::slice::from_raw_parts(prev_NLSFq_Q15, psEncC.predictLPCOrder as usize),
-            std::slice::from_raw_parts(pNLSF_Q15 as *const i16, psEncC.predictLPCOrder as usize),
+            &prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
+            &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
             psEncC.indices.NLSFInterpCoef_Q2 as i32,
         );
         silk_NLSF2A(
-            &mut (&mut (*PredCoef_Q12))[..psEncC.predictLPCOrder as usize],
+            &mut PredCoef_Q12[0][..psEncC.predictLPCOrder as usize],
             &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
         );
     } else {
         assert!(psEncC.predictLPCOrder <= 16);
-        memcpy(
-            (*PredCoef_Q12.offset(0 as isize)).as_mut_ptr() as *mut core::ffi::c_void,
-            (*PredCoef_Q12.offset(1 as isize)).as_mut_ptr() as *const core::ffi::c_void,
-            (psEncC.predictLPCOrder as u64).wrapping_mul(::core::mem::size_of::<i16>() as u64),
-        );
+        let order = psEncC.predictLPCOrder as usize;
+        let [ref mut dst, ref src] = *PredCoef_Q12;
+        dst[..order].copy_from_slice(&src[..order]);
     };
 }

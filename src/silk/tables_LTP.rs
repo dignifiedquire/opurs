@@ -100,11 +100,9 @@ static silk_LTP_gain_vq_2_gain: [u8; 32] = [
     126, 124, 125, 124, 129, 121, 126, 23, 132, 127, 127, 127, 126, 127, 122, 133, 130, 134, 101,
     118, 119, 145, 126, 86, 124, 120, 123, 119, 170, 173, 107, 109,
 ];
-pub static mut silk_LTP_vq_gain_ptrs_Q7: [*const u8; 3] = unsafe {
-    [
-        &*silk_LTP_gain_vq_0_gain.as_ptr().offset(0) as *const u8,
-        &*silk_LTP_gain_vq_1_gain.as_ptr().offset(0) as *const u8,
-        &*silk_LTP_gain_vq_2_gain.as_ptr().offset(0) as *const u8,
-    ]
-};
+pub static silk_LTP_vq_gain_ptrs_Q7: [&[u8]; 3] = [
+    &silk_LTP_gain_vq_0_gain,
+    &silk_LTP_gain_vq_1_gain,
+    &silk_LTP_gain_vq_2_gain,
+];
 pub static silk_LTP_vq_sizes: [i8; 3] = [8, 16, 32];

@@ -11,48 +11,51 @@ use crate::silk::tables_other::silk_LTPScales_table_Q14;
 use crate::silk::NSQ_del_dec::silk_NSQ_del_dec_c;
 use crate::silk::NSQ::silk_NSQ_c;
 
-pub unsafe fn silk_A2NLSF_FLP(NLSF_Q15: *mut i16, pAR: *const f32, LPC_order: i32) {
+/// Upstream C: silk/float/wrappers_FLP.c:silk_A2NLSF_FLP
+pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
     let mut i: i32 = 0;
     let mut a_fix_Q16: [i32; 16] = [0; 16];
     i = 0;
     while i < LPC_order {
-        a_fix_Q16[i as usize] = silk_float2int(*pAR.offset(i as isize) * 65536.0f32);
+        a_fix_Q16[i as usize] = silk_float2int(pAR[i as usize] * 65536.0f32);
         i += 1;
     }
     silk_A2NLSF(
-        std::slice::from_raw_parts_mut(NLSF_Q15, LPC_order as usize),
+        &mut NLSF_Q15[..LPC_order as usize],
         &mut a_fix_Q16,
         LPC_order,
     );
 }
-pub unsafe fn silk_NLSF2A_FLP(pAR: *mut f32, NLSF_Q15: *const i16, LPC_order: i32) {
+/// Upstream C: silk/float/wrappers_FLP.c:silk_NLSF2A_FLP
+pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32) {
     let mut i: i32 = 0;
     let mut a_fix_Q12: [i16; 16] = [0; 16];
     silk_NLSF2A(
         &mut a_fix_Q12[..LPC_order as usize],
-        std::slice::from_raw_parts(NLSF_Q15, LPC_order as usize),
+        &NLSF_Q15[..LPC_order as usize],
     );
     i = 0;
     while i < LPC_order {
-        *pAR.offset(i as isize) = a_fix_Q12[i as usize] as f32 * (1.0f32 / 4096.0f32);
+        pAR[i as usize] = a_fix_Q12[i as usize] as f32 * (1.0f32 / 4096.0f32);
         i += 1;
     }
 }
+/// Upstream C: silk/float/wrappers_FLP.c:silk_process_NLSFs_FLP
 pub unsafe fn silk_process_NLSFs_FLP(
     psEncC: &mut silk_encoder_state,
-    PredCoef: *mut [f32; 16],
-    NLSF_Q15: *mut i16,
-    prev_NLSF_Q15: *const i16,
+    PredCoef: &mut [[f32; 16]; 2],
+    NLSF_Q15: &mut [i16],
+    prev_NLSF_Q15: &[i16],
 ) {
     let mut i: i32 = 0;
     let mut j: i32 = 0;
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
-    silk_process_NLSFs(psEncC, PredCoef_Q12.as_mut_ptr(), NLSF_Q15, prev_NLSF_Q15);
+    silk_process_NLSFs(psEncC, &mut PredCoef_Q12, NLSF_Q15, prev_NLSF_Q15);
     j = 0;
     while j < 2 {
         i = 0;
         while i < psEncC.predictLPCOrder {
-            (*PredCoef.offset(j as isize))[i as usize] =
+            PredCoef[j as usize][i as usize] =
                 PredCoef_Q12[j as usize][i as usize] as f32 * (1.0f32 / 4096.0f32);
             i += 1;
         }
@@ -170,14 +173,15 @@ pub unsafe fn silk_NSQ_wrapper_FLP(
         );
     };
 }
-pub unsafe fn silk_quant_LTP_gains_FLP(
-    B: *mut f32,
-    cbk_index: *mut i8,
-    periodicity_index: *mut i8,
-    sum_log_gain_Q7: *mut i32,
-    pred_gain_dB: *mut f32,
-    XX: *const f32,
-    xX: *const f32,
+/// Upstream C: silk/float/wrappers_FLP.c:silk_quant_LTP_gains_FLP
+pub fn silk_quant_LTP_gains_FLP(
+    B: &mut [f32],
+    cbk_index: &mut [i8],
+    periodicity_index: &mut i8,
+    sum_log_gain_Q7: &mut i32,
+    pred_gain_dB: &mut f32,
+    XX: &[f32],
+    xX: &[f32],
     subfr_len: i32,
     nb_subfr: i32,
     arch: i32,
@@ -189,29 +193,29 @@ pub unsafe fn silk_quant_LTP_gains_FLP(
     let mut xX_Q17: [i32; 20] = [0; 20];
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 * LTP_ORDER as i32 {
-        XX_Q17[i as usize] = silk_float2int(*XX.offset(i as isize) * 131072.0f32);
+        XX_Q17[i as usize] = silk_float2int(XX[i as usize] * 131072.0f32);
         i += 1;
     }
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 {
-        xX_Q17[i as usize] = silk_float2int(*xX.offset(i as isize) * 131072.0f32);
+        xX_Q17[i as usize] = silk_float2int(xX[i as usize] * 131072.0f32);
         i += 1;
     }
     silk_quant_LTP_gains(
-        B_Q14.as_mut_ptr(),
+        &mut B_Q14,
         cbk_index,
         periodicity_index,
         sum_log_gain_Q7,
         &mut pred_gain_dB_Q7,
-        XX_Q17.as_mut_ptr() as *const i32,
-        xX_Q17.as_mut_ptr() as *const i32,
+        &XX_Q17,
+        &xX_Q17,
         subfr_len,
         nb_subfr,
         arch,
     );
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 {
-        *B.offset(i as isize) = B_Q14[i as usize] as f32 * (1.0f32 / 16384.0f32);
+        B[i as usize] = B_Q14[i as usize] as f32 * (1.0f32 / 16384.0f32);
         i += 1;
     }
     *pred_gain_dB = pred_gain_dB_Q7 as f32 * (1.0f32 / 128.0f32);

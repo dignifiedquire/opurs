@@ -21,21 +21,23 @@ use crate::silk::float::warped_autocorrelation_FLP::silk_warped_autocorrelation_
 use crate::silk::float::SigProc_FLP::{silk_log2, silk_sigmoid};
 use crate::silk::mathops::silk_exp2;
 
+/// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_gain
 #[inline]
-unsafe fn warped_gain(coefs: *const f32, mut lambda: f32, order: i32) -> f32 {
+fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
     let mut i: i32 = 0;
     let mut gain: f32 = 0.;
     lambda = -lambda;
-    gain = *coefs.offset((order - 1) as isize);
+    gain = coefs[(order - 1) as usize];
     i = order - 2;
     while i >= 0 {
-        gain = lambda * gain + *coefs.offset(i as isize);
+        gain = lambda * gain + coefs[i as usize];
         i -= 1;
     }
     return 1.0f32 / (1.0f32 - lambda * gain);
 }
+/// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_true2monic_coefs
 #[inline]
-unsafe fn warped_true2monic_coefs(coefs: *mut f32, lambda: f32, limit: f32, order: i32) {
+fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i32) {
     let mut i: i32 = 0;
     let mut iter: i32 = 0;
     let mut ind: i32 = 0;
@@ -45,13 +47,13 @@ unsafe fn warped_true2monic_coefs(coefs: *mut f32, lambda: f32, limit: f32, orde
     let mut gain: f32 = 0.;
     i = order - 1;
     while i > 0 {
-        *coefs.offset((i - 1) as isize) -= lambda * *coefs.offset(i as isize);
+        coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
         i -= 1;
     }
-    gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * *coefs.offset(0 as isize));
+    gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * coefs[0]);
     i = 0;
     while i < order {
-        *coefs.offset(i as isize) *= gain;
+        coefs[i as usize] *= gain;
         i += 1;
     }
     iter = 0;
@@ -59,7 +61,7 @@ unsafe fn warped_true2monic_coefs(coefs: *mut f32, lambda: f32, limit: f32, orde
         maxabs = -1.0f32;
         i = 0;
         while i < order {
-            tmp = (*coefs.offset(i as isize)).abs();
+            tmp = coefs[i as usize].abs();
             if tmp > maxabs {
                 maxabs = tmp;
                 ind = i;
@@ -71,38 +73,35 @@ unsafe fn warped_true2monic_coefs(coefs: *mut f32, lambda: f32, limit: f32, orde
         }
         i = 1;
         while i < order {
-            *coefs.offset((i - 1) as isize) += lambda * *coefs.offset(i as isize);
+            coefs[(i - 1) as usize] += lambda * coefs[i as usize];
             i += 1;
         }
         gain = 1.0f32 / gain;
         i = 0;
         while i < order {
-            *coefs.offset(i as isize) *= gain;
+            coefs[i as usize] *= gain;
             i += 1;
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(
-            std::slice::from_raw_parts_mut(coefs, order as usize),
-            order,
-            chirp,
-        );
+        silk_bwexpander_FLP(coefs, order, chirp);
         i = order - 1;
         while i > 0 {
-            *coefs.offset((i - 1) as isize) -= lambda * *coefs.offset(i as isize);
+            coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
             i -= 1;
         }
-        gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * *coefs.offset(0 as isize));
+        gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * coefs[0]);
         i = 0;
         while i < order {
-            *coefs.offset(i as isize) *= gain;
+            coefs[i as usize] *= gain;
             i += 1;
         }
         iter += 1;
     }
 }
+/// Upstream C: silk/float/noise_shape_analysis_FLP.c:limit_coefs
 #[inline]
-unsafe fn limit_coefs(coefs: *mut f32, limit: f32, order: i32) {
+fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
     let mut i: i32 = 0;
     let mut iter: i32 = 0;
     let mut ind: i32 = 0;
@@ -114,7 +113,7 @@ unsafe fn limit_coefs(coefs: *mut f32, limit: f32, order: i32) {
         maxabs = -1.0f32;
         i = 0;
         while i < order {
-            tmp = (*coefs.offset(i as isize)).abs();
+            tmp = coefs[i as usize].abs();
             if tmp > maxabs {
                 maxabs = tmp;
                 ind = i;
@@ -126,11 +125,7 @@ unsafe fn limit_coefs(coefs: *mut f32, limit: f32, order: i32) {
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(
-            std::slice::from_raw_parts_mut(coefs, order as usize),
-            order,
-            chirp,
-        );
+        silk_bwexpander_FLP(coefs, order, chirp);
         iter += 1;
     }
 }
@@ -264,9 +259,7 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
         (*psEncCtrl).Gains[k as usize] = celt_sqrt(nrg);
         if (*psEnc).sCmn.warping_Q16 > 0 {
             (*psEncCtrl).Gains[k as usize] *= warped_gain(
-                &mut *((*psEncCtrl).AR)
-                    .as_mut_ptr()
-                    .offset((k * MAX_SHAPE_LPC_ORDER) as isize),
+                &(&(*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 warping,
                 (*psEnc).sCmn.shapingLPCOrder,
             );
@@ -278,18 +271,14 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
         );
         if (*psEnc).sCmn.warping_Q16 > 0 {
             warped_true2monic_coefs(
-                &mut *((*psEncCtrl).AR)
-                    .as_mut_ptr()
-                    .offset((k * MAX_SHAPE_LPC_ORDER) as isize),
+                &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 warping,
                 3.999f32,
                 (*psEnc).sCmn.shapingLPCOrder,
             );
         } else {
             limit_coefs(
-                &mut *((*psEncCtrl).AR)
-                    .as_mut_ptr()
-                    .offset((k * MAX_SHAPE_LPC_ORDER) as isize),
+                &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 3.999f32,
                 (*psEnc).sCmn.shapingLPCOrder,
             );
