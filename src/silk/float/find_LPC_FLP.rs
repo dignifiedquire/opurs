@@ -35,9 +35,11 @@ pub unsafe fn silk_find_LPC_FLP(
     let mut LPC_res: [f32; 384] = [0.; 384];
     subfr_length = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
     psEncC.indices.NLSFInterpCoef_Q2 = 4;
+    let x_total = (psEncC.nb_subfr as i32 * subfr_length) as usize;
+    let x_slice = std::slice::from_raw_parts(x, x_total);
     res_nrg = silk_burg_modified_FLP(
-        a.as_mut_ptr(),
-        x,
+        &mut a,
+        x_slice,
         minInvGain,
         subfr_length,
         psEncC.nb_subfr as i32,
@@ -47,9 +49,10 @@ pub unsafe fn silk_find_LPC_FLP(
         && psEncC.first_frame_after_reset == 0
         && psEncC.nb_subfr == MAX_NB_SUBFR
     {
+        let half_off = (MAX_NB_SUBFR as i32 / 2 * subfr_length) as usize;
         res_nrg -= silk_burg_modified_FLP(
-            a_tmp.as_mut_ptr(),
-            x.offset((MAX_NB_SUBFR as i32 / 2 * subfr_length) as isize),
+            &mut a_tmp,
+            &x_slice[half_off..],
             minInvGain,
             subfr_length,
             MAX_NB_SUBFR as i32 / 2,

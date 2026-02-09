@@ -1,11 +1,11 @@
-use crate::externs::{memcpy, memset};
 use crate::silk::float::energy_FLP::silk_energy_FLP;
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 use crate::silk::tuning_parameters::FIND_LPC_COND_FAC;
 
-pub unsafe fn silk_burg_modified_FLP(
-    A: *mut f32,
-    x: *const f32,
+/// Upstream C: silk/float/burg_modified_FLP.c:silk_burg_modified_FLP
+pub fn silk_burg_modified_FLP(
+    A: &mut [f32],
+    x: &[f32],
     minInvGain: f32,
     subfr_length: i32,
     nb_subfr: i32,
@@ -24,42 +24,29 @@ pub unsafe fn silk_burg_modified_FLP(
     let mut Atmp: f64 = 0.;
     let mut tmp1: f64 = 0.;
     let mut tmp2: f64 = 0.;
-    let mut x_ptr: *const f32 = 0 as *const f32;
     let mut C_first_row: [f64; 24] = [0.; 24];
     let mut C_last_row: [f64; 24] = [0.; 24];
     let mut CAf: [f64; 25] = [0.; 25];
     let mut CAb: [f64; 25] = [0.; 25];
     let mut Af: [f64; 24] = [0.; 24];
     assert!(subfr_length * nb_subfr <= 384);
-    C0 = silk_energy_FLP(std::slice::from_raw_parts(
-        x,
-        (nb_subfr * subfr_length) as usize,
-    ));
-    memset(
-        C_first_row.as_mut_ptr() as *mut core::ffi::c_void,
-        0,
-        24_u64.wrapping_mul(::core::mem::size_of::<f64>() as u64),
-    );
+    C0 = silk_energy_FLP(&x[..(nb_subfr * subfr_length) as usize]);
+    C_first_row[..24].fill(0.0);
     s = 0;
     while s < nb_subfr {
-        x_ptr = x.offset((s * subfr_length) as isize);
+        let x_off = (s * subfr_length) as usize;
         n = 1;
         while n < D + 1 {
             let size = (subfr_length - n) as usize;
-
             C_first_row[(n - 1) as usize] += silk_inner_product_FLP(
-                std::slice::from_raw_parts(x_ptr, size),
-                std::slice::from_raw_parts(x_ptr.offset(n as isize), size),
+                &x[x_off..x_off + size],
+                &x[x_off + n as usize..x_off + n as usize + size],
             );
             n += 1;
         }
         s += 1;
     }
-    memcpy(
-        C_last_row.as_mut_ptr() as *mut core::ffi::c_void,
-        C_first_row.as_mut_ptr() as *const core::ffi::c_void,
-        24_u64.wrapping_mul(::core::mem::size_of::<f64>() as u64),
-    );
+    C_last_row.copy_from_slice(&C_first_row);
     CAf[0 as usize] = C0 + FIND_LPC_COND_FAC as f64 * C0 + 1e-9f32 as f64;
     CAb[0 as usize] = CAf[0 as usize];
     invGain = 1.0f32 as f64;
@@ -68,25 +55,25 @@ pub unsafe fn silk_burg_modified_FLP(
     while n < D {
         s = 0;
         while s < nb_subfr {
-            x_ptr = x.offset((s * subfr_length) as isize);
-            tmp1 = *x_ptr.offset(n as isize) as f64;
-            tmp2 = *x_ptr.offset((subfr_length - n - 1) as isize) as f64;
+            let x_off = (s * subfr_length) as usize;
+            tmp1 = x[x_off + n as usize] as f64;
+            tmp2 = x[x_off + (subfr_length - n - 1) as usize] as f64;
             k = 0;
             while k < n {
                 C_first_row[k as usize] -=
-                    (*x_ptr.offset(n as isize) * *x_ptr.offset((n - k - 1) as isize)) as f64;
-                C_last_row[k as usize] -= (*x_ptr.offset((subfr_length - n - 1) as isize)
-                    * *x_ptr.offset((subfr_length - n + k) as isize))
+                    (x[x_off + n as usize] * x[x_off + (n - k - 1) as usize]) as f64;
+                C_last_row[k as usize] -= (x[x_off + (subfr_length - n - 1) as usize]
+                    * x[x_off + (subfr_length - n + k) as usize])
                     as f64;
                 Atmp = Af[k as usize];
-                tmp1 += *x_ptr.offset((n - k - 1) as isize) as f64 * Atmp;
-                tmp2 += *x_ptr.offset((subfr_length - n + k) as isize) as f64 * Atmp;
+                tmp1 += x[x_off + (n - k - 1) as usize] as f64 * Atmp;
+                tmp2 += x[x_off + (subfr_length - n + k) as usize] as f64 * Atmp;
                 k += 1;
             }
             k = 0;
             while k <= n {
-                CAf[k as usize] -= tmp1 * *x_ptr.offset((n - k) as isize) as f64;
-                CAb[k as usize] -= tmp2 * *x_ptr.offset((subfr_length - n + k - 1) as isize) as f64;
+                CAf[k as usize] -= tmp1 * x[x_off + (n - k) as usize] as f64;
+                CAb[k as usize] -= tmp2 * x[x_off + (subfr_length - n + k - 1) as usize] as f64;
                 k += 1;
             }
             s += 1;
@@ -155,15 +142,13 @@ pub unsafe fn silk_burg_modified_FLP(
     if reached_max_gain != 0 {
         k = 0;
         while k < D {
-            *A.offset(k as isize) = -Af[k as usize] as f32;
+            A[k as usize] = -Af[k as usize] as f32;
             k += 1;
         }
         s = 0;
         while s < nb_subfr {
-            C0 -= silk_energy_FLP(std::slice::from_raw_parts(
-                x.offset((s * subfr_length) as isize),
-                D as usize,
-            ));
+            let x_off = (s * subfr_length) as usize;
+            C0 -= silk_energy_FLP(&x[x_off..x_off + D as usize]);
             s += 1;
         }
         nrg_f = C0 * invGain;
@@ -175,7 +160,7 @@ pub unsafe fn silk_burg_modified_FLP(
             Atmp = Af[k as usize];
             nrg_f += CAf[(k + 1) as usize] * Atmp;
             tmp1 += Atmp * Atmp;
-            *A.offset(k as isize) = -Atmp as f32;
+            A[k as usize] = -Atmp as f32;
             k += 1;
         }
         nrg_f -= FIND_LPC_COND_FAC as f64 * C0 * tmp1;

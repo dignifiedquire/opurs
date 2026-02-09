@@ -220,7 +220,12 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
         let mut flat_part: i32 = 0;
         flat_part = (*psEnc).sCmn.fs_kHz * 3;
         slope_part = ((*psEnc).sCmn.shapeWinLength - flat_part) / 2;
-        silk_apply_sine_window_FLP(x_windowed.as_mut_ptr(), x_ptr, 1, slope_part);
+        silk_apply_sine_window_FLP(
+            &mut x_windowed[..slope_part as usize],
+            std::slice::from_raw_parts(x_ptr, slope_part as usize),
+            1,
+            slope_part,
+        );
         shift = slope_part;
         memcpy(
             x_windowed.as_mut_ptr().offset(shift as isize) as *mut core::ffi::c_void,
@@ -229,8 +234,8 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
         );
         shift += flat_part;
         silk_apply_sine_window_FLP(
-            x_windowed.as_mut_ptr().offset(shift as isize),
-            x_ptr.offset(shift as isize),
+            &mut x_windowed[shift as usize..shift as usize + slope_part as usize],
+            std::slice::from_raw_parts(x_ptr.offset(shift as isize), slope_part as usize),
             2,
             slope_part,
         );

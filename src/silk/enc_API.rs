@@ -166,7 +166,7 @@ pub unsafe fn silk_Encode(
     (*psEnc).state_Fxx[1 as usize].sCmn.nFramesEncoded = 0;
     (*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded =
         (*psEnc).state_Fxx[1 as usize].sCmn.nFramesEncoded;
-    ret = check_control_input(encControl);
+    ret = check_control_input(&*encControl);
     if ret != 0 {
         // see comments in `[unsafe_libopus::silk::check_control_input]`
         panic!("libopus: assert(0) called");
@@ -506,7 +506,7 @@ pub unsafe fn silk_Encode(
                         if (*encControl).nChannelsInternal == 2 && n == 0 {
                             silk_stereo_encode_pred(
                                 psRangeEnc,
-                                ((*psEnc).sStereo.predIx[i as usize]).as_mut_ptr(),
+                                &(*psEnc).sStereo.predIx[i as usize],
                             );
                             if (*psEnc).state_Fxx[1 as usize].sCmn.LBRR_flags[i as usize] == 0 {
                                 silk_stereo_encode_mid_only(
@@ -555,7 +555,7 @@ pub unsafe fn silk_Encode(
             }
             (*psEnc).nBitsUsedLBRR = ec_tell(psRangeEnc);
         }
-        silk_HP_variable_cutoff(((*psEnc).state_Fxx).as_mut_ptr());
+        silk_HP_variable_cutoff(&mut (*psEnc).state_Fxx);
         nBits = (*encControl).bitRate * (*encControl).payloadSize_ms / 1000;
         if prefillFlag == 0 {
             nBits -= (*psEnc).nBitsUsedLBRR;
@@ -671,9 +671,8 @@ pub unsafe fn silk_Encode(
                 let psRangeEnc = &mut **psRangeEnc.as_mut().unwrap();
                 silk_stereo_encode_pred(
                     psRangeEnc,
-                    ((*psEnc).sStereo.predIx
-                        [(*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded as usize])
-                        .as_mut_ptr(),
+                    &(*psEnc).sStereo.predIx
+                        [(*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded as usize],
                 );
                 if (*psEnc).state_Fxx[1 as usize].sCmn.VAD_flags
                     [(*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded as usize]

@@ -189,7 +189,7 @@ pub unsafe fn silk_encode_frame_FLP(
             x_frame as *const f32,
             condCoding,
         );
-        silk_process_gains_FLP(psEnc, &mut sEncCtrl, condCoding);
+        silk_process_gains_FLP(&mut *psEnc, &mut sEncCtrl, condCoding);
         silk_LBRR_encode_FLP(psEnc, &mut sEncCtrl, x_frame as *const f32, condCoding);
         maxIter = 6;
         gainMult_Q8 = ((1 * ((1) << 8)) as f64 + 0.5f64) as i32 as i16;

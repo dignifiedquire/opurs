@@ -54,7 +54,7 @@ pub unsafe fn silk_control_encoder(
         }
         return ret;
     }
-    fs_kHz = silk_control_audio_bandwidth(&mut (*psEnc).sCmn, encControl);
+    fs_kHz = silk_control_audio_bandwidth(&mut (*psEnc).sCmn, &mut *encControl);
     if force_fs_kHz != 0 {
         fs_kHz = force_fs_kHz;
     }

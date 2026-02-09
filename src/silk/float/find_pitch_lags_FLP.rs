@@ -38,9 +38,17 @@ pub unsafe fn silk_find_pitch_lags_FLP(
         .offset(buf_len as isize)
         .offset(-((*psEnc).sCmn.pitch_LPC_win_length as isize));
     Wsig_ptr = Wsig.as_mut_ptr();
-    silk_apply_sine_window_FLP(Wsig_ptr, x_buf_ptr, 1, (*psEnc).sCmn.la_pitch);
-    Wsig_ptr = Wsig_ptr.offset((*psEnc).sCmn.la_pitch as isize);
-    x_buf_ptr = x_buf_ptr.offset((*psEnc).sCmn.la_pitch as isize);
+    {
+        let la = (*psEnc).sCmn.la_pitch as usize;
+        silk_apply_sine_window_FLP(
+            std::slice::from_raw_parts_mut(Wsig_ptr, la),
+            std::slice::from_raw_parts(x_buf_ptr, la),
+            1,
+            la as i32,
+        );
+        Wsig_ptr = Wsig_ptr.offset(la as isize);
+        x_buf_ptr = x_buf_ptr.offset(la as isize);
+    }
     memcpy(
         Wsig_ptr as *mut core::ffi::c_void,
         x_buf_ptr as *const core::ffi::c_void,
@@ -51,7 +59,15 @@ pub unsafe fn silk_find_pitch_lags_FLP(
         .offset(((*psEnc).sCmn.pitch_LPC_win_length - ((*psEnc).sCmn.la_pitch << 1)) as isize);
     x_buf_ptr = x_buf_ptr
         .offset(((*psEnc).sCmn.pitch_LPC_win_length - ((*psEnc).sCmn.la_pitch << 1)) as isize);
-    silk_apply_sine_window_FLP(Wsig_ptr, x_buf_ptr, 2, (*psEnc).sCmn.la_pitch);
+    {
+        let la = (*psEnc).sCmn.la_pitch as usize;
+        silk_apply_sine_window_FLP(
+            std::slice::from_raw_parts_mut(Wsig_ptr, la),
+            std::slice::from_raw_parts(x_buf_ptr, la),
+            2,
+            la as i32,
+        );
+    }
     silk_autocorrelation_FLP(
         &mut auto_corr[..((*psEnc).sCmn.pitchEstimationLPCOrder + 1) as usize],
         &Wsig[..(*psEnc).sCmn.pitch_LPC_win_length as usize],

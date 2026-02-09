@@ -1,48 +1,51 @@
 use crate::silk::define::LTP_ORDER;
-pub unsafe fn silk_LTP_analysis_filter_FLP(
-    LTP_res: *mut f32,
-    x: *const f32,
-    B: *const f32,
-    pitchL: *const i32,
-    invGains: *const f32,
+/// Upstream C: silk/float/LTP_analysis_filter_FLP.c:silk_LTP_analysis_filter_FLP
+///
+/// `x_offset` is the index within `x` where the first subframe's data starts
+/// (corresponding to the `x` pointer in the original C code). The slice `x`
+/// must extend backwards from `x_offset` by at least `max(pitchL) + LTP_ORDER/2`
+/// samples to cover pitch lag history.
+pub fn silk_LTP_analysis_filter_FLP(
+    LTP_res: &mut [f32],
+    x: &[f32],
+    x_offset: usize,
+    B: &[f32],
+    pitchL: &[i32],
+    invGains: &[f32],
     subfr_length: i32,
     nb_subfr: i32,
     pre_length: i32,
 ) {
-    let mut x_ptr: *const f32 = 0 as *const f32;
-    let mut x_lag_ptr: *const f32 = 0 as *const f32;
     let mut Btmp: [f32; 5] = [0.; 5];
-    let mut LTP_res_ptr: *mut f32 = 0 as *mut f32;
     let mut inv_gain: f32 = 0.;
     let mut k: i32 = 0;
     let mut i: i32 = 0;
     let mut j: i32 = 0;
-    x_ptr = x;
-    LTP_res_ptr = LTP_res;
+    let mut x_off: usize = x_offset;
+    let mut res_off: usize = 0;
     k = 0;
     while k < nb_subfr {
-        x_lag_ptr = x_ptr.offset(-(*pitchL.offset(k as isize) as isize));
-        inv_gain = *invGains.offset(k as isize);
+        let x_lag_base: usize = x_off - pitchL[k as usize] as usize;
+        inv_gain = invGains[k as usize];
         i = 0;
         while i < LTP_ORDER as i32 {
-            Btmp[i as usize] = *B.offset((k * LTP_ORDER as i32 + i) as isize);
+            Btmp[i as usize] = B[(k * LTP_ORDER as i32 + i) as usize];
             i += 1;
         }
         i = 0;
         while i < subfr_length + pre_length {
-            *LTP_res_ptr.offset(i as isize) = *x_ptr.offset(i as isize);
+            LTP_res[res_off + i as usize] = x[x_off + i as usize];
             j = 0;
             while j < LTP_ORDER as i32 {
-                *LTP_res_ptr.offset(i as isize) -=
-                    Btmp[j as usize] * *x_lag_ptr.offset((LTP_ORDER as i32 / 2 - j) as isize);
+                LTP_res[res_off + i as usize] -= Btmp[j as usize]
+                    * x[x_lag_base + i as usize + (LTP_ORDER as i32 / 2 - j) as usize];
                 j += 1;
             }
-            *LTP_res_ptr.offset(i as isize) *= inv_gain;
-            x_lag_ptr = x_lag_ptr.offset(1);
+            LTP_res[res_off + i as usize] *= inv_gain;
             i += 1;
         }
-        LTP_res_ptr = LTP_res_ptr.offset((subfr_length + pre_length) as isize);
-        x_ptr = x_ptr.offset(subfr_length as isize);
+        res_off += (subfr_length + pre_length) as usize;
+        x_off += subfr_length as usize;
         k += 1;
     }
 }

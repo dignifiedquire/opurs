@@ -77,31 +77,38 @@ pub unsafe fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: *const i
     X_offset[3 as usize] = X_offset[2 as usize] + decimated_framelength2;
     let vla = (X_offset[3 as usize] + decimated_framelength1) as usize;
     let mut X: Vec<i16> = ::std::vec::from_elem(0, vla);
+    // First call: pIn -> X[0..] and X[X_offset[3]..] — no aliasing with input
+    {
+        let (outL, rest) = X.split_at_mut(X_offset[3] as usize);
+        silk_ana_filt_bank_1(
+            std::slice::from_raw_parts(pIn, psEncC.frame_length as usize),
+            &mut (*psSilk_VAD).AnaState,
+            outL,
+            rest,
+            psEncC.frame_length as i32,
+        );
+    }
+    // Second/third calls: in_0 and outL alias (decimation in-place).
+    // The filter reads in_0[2*k] and in_0[2*k+1] before writing outL[k],
+    // so in-place is safe. We use raw pointer wrapping for the aliased input.
     silk_ana_filt_bank_1(
-        pIn,
-        &mut *((*psSilk_VAD).AnaState).as_mut_ptr().offset(0 as isize),
-        X.as_mut_ptr(),
-        &mut *X
-            .as_mut_ptr()
-            .offset(*X_offset.as_mut_ptr().offset(3 as isize) as isize),
-        psEncC.frame_length as i32,
-    );
-    silk_ana_filt_bank_1(
-        X.as_mut_ptr(),
-        &mut *((*psSilk_VAD).AnaState1).as_mut_ptr().offset(0 as isize),
-        X.as_mut_ptr(),
-        &mut *X
-            .as_mut_ptr()
-            .offset(*X_offset.as_mut_ptr().offset(2 as isize) as isize),
+        std::slice::from_raw_parts(X.as_ptr(), decimated_framelength1 as usize),
+        &mut (*psSilk_VAD).AnaState1,
+        std::slice::from_raw_parts_mut(X.as_mut_ptr(), decimated_framelength2 as usize),
+        std::slice::from_raw_parts_mut(
+            X.as_mut_ptr().offset(X_offset[2] as isize),
+            decimated_framelength2 as usize,
+        ),
         decimated_framelength1,
     );
     silk_ana_filt_bank_1(
-        X.as_mut_ptr(),
-        &mut *((*psSilk_VAD).AnaState2).as_mut_ptr().offset(0 as isize),
-        X.as_mut_ptr(),
-        &mut *X
-            .as_mut_ptr()
-            .offset(*X_offset.as_mut_ptr().offset(1 as isize) as isize),
+        std::slice::from_raw_parts(X.as_ptr(), decimated_framelength2 as usize),
+        &mut (*psSilk_VAD).AnaState2,
+        std::slice::from_raw_parts_mut(X.as_mut_ptr(), decimated_framelength as usize),
+        std::slice::from_raw_parts_mut(
+            X.as_mut_ptr().offset(X_offset[1] as isize),
+            decimated_framelength as usize,
+        ),
         decimated_framelength2,
     );
     *X.as_mut_ptr().offset((decimated_framelength - 1) as isize) =

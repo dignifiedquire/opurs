@@ -84,17 +84,31 @@ pub unsafe fn silk_find_pred_coefs_FLP(
             (*psEnc).sCmn.nb_subfr as i32,
             (*psEnc).sCmn.arch,
         );
-        silk_LTP_scale_ctrl_FLP(psEnc, psEncCtrl, condCoding);
-        silk_LTP_analysis_filter_FLP(
-            LPC_in_pre.as_mut_ptr(),
-            x.offset(-((*psEnc).sCmn.predictLPCOrder as isize)),
-            ((*psEncCtrl).LTPCoef).as_mut_ptr() as *const f32,
-            ((*psEncCtrl).pitchL).as_mut_ptr() as *const i32,
-            invGains.as_mut_ptr() as *const f32,
-            (*psEnc).sCmn.subfr_length as i32,
-            (*psEnc).sCmn.nb_subfr as i32,
-            (*psEnc).sCmn.predictLPCOrder,
-        );
+        silk_LTP_scale_ctrl_FLP(&mut *psEnc, &mut *psEncCtrl, condCoding);
+        {
+            // The LTP filter needs pitch lag history before the subframe data.
+            // Build a slice from x - ltp_mem_length to x + nb_subfr * subfr_length.
+            // x_offset within that slice = ltp_mem_length - predictLPCOrder.
+            let ltp_mem = (*psEnc).sCmn.ltp_mem_length as usize;
+            let pred_order = (*psEnc).sCmn.predictLPCOrder as usize;
+            let nb = (*psEnc).sCmn.nb_subfr as usize;
+            let subfr_len = (*psEnc).sCmn.subfr_length as usize;
+            let x_start = x.offset(-(ltp_mem as isize));
+            let total_len = ltp_mem + nb * subfr_len;
+            let x_slice = std::slice::from_raw_parts(x_start, total_len);
+            let x_offset = ltp_mem - pred_order;
+            silk_LTP_analysis_filter_FLP(
+                &mut LPC_in_pre,
+                x_slice,
+                x_offset,
+                &(*psEncCtrl).LTPCoef,
+                &(*psEncCtrl).pitchL,
+                &invGains,
+                subfr_len as i32,
+                nb as i32,
+                pred_order as i32,
+            );
+        }
     } else {
         x_ptr = x.offset(-((*psEnc).sCmn.predictLPCOrder as isize));
         x_pre_ptr = LPC_in_pre.as_mut_ptr();
@@ -144,10 +158,10 @@ pub unsafe fn silk_find_pred_coefs_FLP(
         ((*psEnc).sCmn.prev_NLSFq_Q15).as_mut_ptr() as *const i16,
     );
     silk_residual_energy_FLP(
-        ((*psEncCtrl).ResNrg).as_mut_ptr(),
-        LPC_in_pre.as_mut_ptr() as *const f32,
-        ((*psEncCtrl).PredCoef).as_mut_ptr(),
-        ((*psEncCtrl).Gains).as_mut_ptr() as *const f32,
+        &mut (*psEncCtrl).ResNrg,
+        &LPC_in_pre,
+        &(*psEncCtrl).PredCoef,
+        &(*psEncCtrl).Gains,
         (*psEnc).sCmn.subfr_length as i32,
         (*psEnc).sCmn.nb_subfr as i32,
         (*psEnc).sCmn.predictLPCOrder,
