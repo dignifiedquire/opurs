@@ -98,13 +98,16 @@ pub fn silk_find_pred_coefs_FLP(
             );
         }
     } else {
+        let ltp_mem = psEnc.sCmn.ltp_mem_length as usize;
         let pred_order = psEnc.sCmn.predictLPCOrder as usize;
         let subfr_len = psEnc.sCmn.subfr_length as usize;
         let copy_len = subfr_len + pred_order;
-        // x starts at -pred_order (relative to frame), total length covers nb_subfr * subfr_len + pred_order
+        // x starts at offset 0 of x_buf; frame data starts at ltp_mem.
+        // Each subframe needs pred_order samples before it, so base = ltp_mem - pred_order.
+        let x_base = ltp_mem - pred_order;
         i = 0;
         while i < psEnc.sCmn.nb_subfr as i32 {
-            let x_off = i as usize * subfr_len;
+            let x_off = x_base + i as usize * subfr_len;
             let pre_off = i as usize * copy_len;
             silk_scale_copy_vector_FLP(
                 &mut LPC_in_pre[pre_off..pre_off + copy_len],
