@@ -41,7 +41,7 @@ pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32) {
     }
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_process_NLSFs_FLP
-pub unsafe fn silk_process_NLSFs_FLP(
+pub fn silk_process_NLSFs_FLP(
     psEncC: &mut silk_encoder_state,
     PredCoef: &mut [[f32; 16]; 2],
     NLSF_Q15: &mut [i16],

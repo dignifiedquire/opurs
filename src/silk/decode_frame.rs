@@ -1,5 +1,5 @@
 use crate::celt::entdec::ec_dec;
-use crate::externs::{memcpy, memmove};
+
 use crate::silk::dec_API::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};
 use crate::silk::decode_core::silk_decode_core;
 use crate::silk::decode_indices::silk_decode_indices;
@@ -10,6 +10,7 @@ use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::CNG::silk_CNG;
 use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
 
+/// Upstream C: silk/decode_frame.c:silk_decode_frame
 pub unsafe fn silk_decode_frame(
     psDec: &mut silk_decoder_state,
     psRangeDec: &mut ec_dec,
@@ -70,19 +71,11 @@ pub unsafe fn silk_decode_frame(
     }
     assert!(psDec.ltp_mem_length >= psDec.frame_length);
     mv_len = psDec.ltp_mem_length as i32 - psDec.frame_length as i32;
-    memmove(
-        (psDec.outBuf).as_mut_ptr() as *mut core::ffi::c_void,
-        &mut *(psDec.outBuf)
-            .as_mut_ptr()
-            .offset(psDec.frame_length as isize) as *mut i16 as *const core::ffi::c_void,
-        (mv_len as u64).wrapping_mul(::core::mem::size_of::<i16>() as u64),
-    );
-    memcpy(
-        &mut *(psDec.outBuf).as_mut_ptr().offset(mv_len as isize) as *mut i16
-            as *mut core::ffi::c_void,
-        pOut as *const core::ffi::c_void,
-        (psDec.frame_length as u64).wrapping_mul(::core::mem::size_of::<i16>() as u64),
-    );
+    psDec
+        .outBuf
+        .copy_within(psDec.frame_length..psDec.ltp_mem_length, 0);
+    let pOut_slice = std::slice::from_raw_parts(pOut, psDec.frame_length);
+    psDec.outBuf[mv_len as usize..mv_len as usize + psDec.frame_length].copy_from_slice(pOut_slice);
     silk_CNG(
         psDec,
         &mut psDecCtrl,

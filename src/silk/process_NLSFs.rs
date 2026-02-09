@@ -5,7 +5,7 @@ use crate::silk::NLSF_encode::silk_NLSF_encode;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
 /// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
-pub unsafe fn silk_process_NLSFs(
+pub fn silk_process_NLSFs(
     psEncC: &mut silk_encoder_state,
     PredCoef_Q12: &mut [[i16; 16]; 2],
     pNLSF_Q15: &mut [i16],
@@ -58,10 +58,10 @@ pub unsafe fn silk_process_NLSFs(
         }
     }
     silk_NLSF_encode(
-        (psEncC.indices.NLSFIndices).as_mut_ptr(),
-        pNLSF_Q15.as_mut_ptr(),
+        &mut psEncC.indices.NLSFIndices,
+        pNLSF_Q15,
         psEncC.psNLSF_CB,
-        pNLSFW_QW.as_mut_ptr(),
+        &pNLSFW_QW,
         NLSF_mu_Q20,
         psEncC.NLSF_MSVQ_Survivors,
         psEncC.indices.signalType as i32,
