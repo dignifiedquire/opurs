@@ -39,7 +39,7 @@ pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
 }
 static TILT_WEIGHTS: [i32; 4] = [30000, 6000, -(12000), -(12000)];
 /// Upstream C: silk/VAD.c:silk_VAD_GetSA_Q8_c
-pub unsafe fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: *const i16) -> i32 {
+pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
     let mut SA_Q15: i32 = 0;
     let mut pSNR_dB_Q7: i32 = 0;
     let mut input_tilt: i32 = 0;
@@ -78,36 +78,40 @@ pub unsafe fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: *const i
     {
         let (outL, rest) = X.split_at_mut(X_offset[3] as usize);
         silk_ana_filt_bank_1(
-            std::slice::from_raw_parts(pIn, psEncC.frame_length as usize),
+            &pIn[..psEncC.frame_length as usize],
             &mut psSilk_VAD.AnaState,
             outL,
             rest,
             psEncC.frame_length as i32,
         );
     }
-    // Second/third calls: in_0 and outL alias (decimation in-place).
-    // The filter reads in_0[2*k] and in_0[2*k+1] before writing outL[k],
-    // so in-place is safe. We use raw pointer wrapping for the aliased input.
-    silk_ana_filt_bank_1(
-        std::slice::from_raw_parts(X.as_ptr(), decimated_framelength1 as usize),
-        &mut psSilk_VAD.AnaState1,
-        std::slice::from_raw_parts_mut(X.as_mut_ptr(), decimated_framelength2 as usize),
-        std::slice::from_raw_parts_mut(
-            X.as_mut_ptr().offset(X_offset[2] as isize),
-            decimated_framelength2 as usize,
-        ),
-        decimated_framelength1,
-    );
-    silk_ana_filt_bank_1(
-        std::slice::from_raw_parts(X.as_ptr(), decimated_framelength2 as usize),
-        &mut psSilk_VAD.AnaState2,
-        std::slice::from_raw_parts_mut(X.as_mut_ptr(), decimated_framelength as usize),
-        std::slice::from_raw_parts_mut(
-            X.as_mut_ptr().offset(X_offset[1] as isize),
-            decimated_framelength as usize,
-        ),
-        decimated_framelength2,
-    );
+    // Second/third calls: in-place decimation. The filter reads in_0[2*k] and
+    // in_0[2*k+1] before writing outL[k], so in-place is safe.
+    // Copy input to temp buffer to avoid aliasing.
+    {
+        let mut tmp_in = vec![0i16; decimated_framelength1 as usize];
+        tmp_in.copy_from_slice(&X[..decimated_framelength1 as usize]);
+        let (outL, rest) = X.split_at_mut(X_offset[2] as usize);
+        silk_ana_filt_bank_1(
+            &tmp_in,
+            &mut psSilk_VAD.AnaState1,
+            &mut outL[..decimated_framelength2 as usize],
+            &mut rest[..decimated_framelength2 as usize],
+            decimated_framelength1,
+        );
+    }
+    {
+        let mut tmp_in = vec![0i16; decimated_framelength2 as usize];
+        tmp_in.copy_from_slice(&X[..decimated_framelength2 as usize]);
+        let (outL, rest) = X.split_at_mut(X_offset[1] as usize);
+        silk_ana_filt_bank_1(
+            &tmp_in,
+            &mut psSilk_VAD.AnaState2,
+            &mut outL[..decimated_framelength as usize],
+            &mut rest[..decimated_framelength as usize],
+            decimated_framelength2,
+        );
+    }
     X[(decimated_framelength - 1) as usize] =
         (X[(decimated_framelength - 1) as usize] as i32 >> 1) as i16;
     HPstateTmp = X[(decimated_framelength - 1) as usize];

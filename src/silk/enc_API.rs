@@ -589,33 +589,33 @@ pub unsafe fn silk_Encode(
             TargetRate_bps
         };
         if (*encControl).nChannelsInternal == 2 {
-            silk_stereo_LR_to_MS(
-                &mut (*psEnc).sStereo,
-                &mut *((*((*psEnc).state_Fxx).as_mut_ptr().offset(0 as isize))
-                    .sCmn
-                    .inputBuf)
-                    .as_mut_ptr()
-                    .offset(2 as isize),
-                &mut *((*((*psEnc).state_Fxx).as_mut_ptr().offset(1 as isize))
-                    .sCmn
-                    .inputBuf)
-                    .as_mut_ptr()
-                    .offset(2 as isize),
-                ((*psEnc).sStereo.predIx
-                    [(*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded as usize])
-                    .as_mut_ptr(),
-                &mut *((*psEnc).sStereo.mid_only_flags).as_mut_ptr().offset(
-                    (*((*psEnc).state_Fxx).as_mut_ptr().offset(0 as isize))
-                        .sCmn
-                        .nFramesEncoded as isize,
-                ),
-                MStargetRates_bps.as_mut_ptr(),
-                TargetRate_bps,
-                (*psEnc).state_Fxx[0 as usize].sCmn.speech_activity_Q8,
-                (*encControl).toMono,
-                (*psEnc).state_Fxx[0 as usize].sCmn.fs_kHz,
-                (*psEnc).state_Fxx[0 as usize].sCmn.frame_length as i32,
-            );
+            {
+                let frame_length = (*psEnc).state_Fxx[0].sCmn.frame_length as usize;
+                let nfe = (*psEnc).state_Fxx[0].sCmn.nFramesEncoded as usize;
+                // x1/x2 slices: pass inputBuf[0..frame_length+2] (includes 2 history samples)
+                // We need separate mutable borrows for the two channels, so use raw pointer split
+                let x1 = std::slice::from_raw_parts_mut(
+                    (*psEnc).state_Fxx[0].sCmn.inputBuf.as_mut_ptr(),
+                    frame_length + 2,
+                );
+                let x2 = std::slice::from_raw_parts_mut(
+                    (*psEnc).state_Fxx[1].sCmn.inputBuf.as_mut_ptr(),
+                    frame_length + 2,
+                );
+                silk_stereo_LR_to_MS(
+                    &mut (*psEnc).sStereo,
+                    x1,
+                    x2,
+                    &mut (*psEnc).sStereo.predIx[nfe],
+                    &mut (*psEnc).sStereo.mid_only_flags[nfe],
+                    &mut MStargetRates_bps,
+                    TargetRate_bps,
+                    (*psEnc).state_Fxx[0].sCmn.speech_activity_Q8,
+                    (*encControl).toMono,
+                    (*psEnc).state_Fxx[0].sCmn.fs_kHz,
+                    (*psEnc).state_Fxx[0].sCmn.frame_length as i32,
+                );
+            }
             if (*psEnc).sStereo.mid_only_flags
                 [(*psEnc).state_Fxx[0 as usize].sCmn.nFramesEncoded as usize] as i32
                 == 0

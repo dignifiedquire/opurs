@@ -23,8 +23,8 @@ use crate::silk::mathops::silk_exp2;
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_gain
 #[inline]
 fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
-    let mut i: i32 = 0;
-    let mut gain: f32 = 0.;
+    let mut i: i32;
+    let mut gain: f32;
     lambda = -lambda;
     gain = coefs[(order - 1) as usize];
     i = order - 2;
@@ -37,13 +37,13 @@ fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_true2monic_coefs
 #[inline]
 fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i32) {
-    let mut i: i32 = 0;
-    let mut iter: i32 = 0;
+    let mut i: i32;
+    let mut iter: i32;
     let mut ind: i32 = 0;
-    let mut tmp: f32 = 0.;
-    let mut maxabs: f32 = 0.;
-    let mut chirp: f32 = 0.;
-    let mut gain: f32 = 0.;
+    let mut tmp: f32;
+    let mut maxabs: f32;
+    let mut chirp: f32;
+    let mut gain: f32;
     i = order - 1;
     while i > 0 {
         coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
@@ -101,12 +101,12 @@ fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i3
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:limit_coefs
 #[inline]
 fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
-    let mut i: i32 = 0;
-    let mut iter: i32 = 0;
+    let mut i: i32;
+    let mut iter: i32;
     let mut ind: i32 = 0;
-    let mut tmp: f32 = 0.;
-    let mut maxabs: f32 = 0.;
-    let mut chirp: f32 = 0.;
+    let mut tmp: f32;
+    let mut maxabs: f32;
+    let mut chirp: f32;
     iter = 0;
     while iter < 10 {
         maxabs = -1.0f32;
@@ -128,157 +128,158 @@ fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
         iter += 1;
     }
 }
-pub unsafe fn silk_noise_shape_analysis_FLP(
-    psEnc: *mut silk_encoder_state_FLP,
-    psEncCtrl: *mut silk_encoder_control_FLP,
-    pitch_res: *const f32,
-    x: *const f32,
+
+/// Upstream C: silk/float/noise_shape_analysis_FLP.c:silk_noise_shape_analysis_FLP
+pub fn silk_noise_shape_analysis_FLP(
+    psEnc: &mut silk_encoder_state_FLP,
+    psEncCtrl: &mut silk_encoder_control_FLP,
+    pitch_res: &[f32],
+    x: &[f32],
 ) {
-    let psShapeSt: *mut silk_shape_state_FLP = &mut (*psEnc).sShape;
-    let mut k: i32 = 0;
-    let mut nSamples: i32 = 0;
-    let mut nSegs: i32 = 0;
-    let mut SNR_adj_dB: f32 = 0.;
-    let mut HarmShapeGain: f32 = 0.;
-    let mut Tilt: f32 = 0.;
-    let mut nrg: f32 = 0.;
-    let mut log_energy: f32 = 0.;
-    let mut log_energy_prev: f32 = 0.;
-    let mut energy_variation: f32 = 0.;
-    let mut BWExp: f32 = 0.;
-    let mut gain_mult: f32 = 0.;
-    let mut gain_add: f32 = 0.;
-    let mut strength: f32 = 0.;
-    let mut b: f32 = 0.;
-    let mut warping: f32 = 0.;
+    let psShapeSt: &mut silk_shape_state_FLP = &mut psEnc.sShape;
+    let mut k: i32;
+    let mut nSamples: i32;
+    let mut nSegs: i32;
+    let mut SNR_adj_dB: f32;
+    let mut HarmShapeGain: f32;
+    let mut Tilt: f32;
+    let mut nrg: f32;
+    let mut log_energy: f32;
+    let mut log_energy_prev: f32;
+    let mut energy_variation: f32;
+    let mut BWExp: f32;
+    let mut gain_mult: f32;
+    let mut gain_add: f32;
+    let mut strength: f32;
+    let mut b: f32;
+    let mut warping: f32;
     let mut x_windowed: [f32; 240] = [0.; 240];
     let mut auto_corr: [f32; 25] = [0.; 25];
     let mut rc: [f32; 25] = [0.; 25];
-    let mut x_ptr: *const f32 = 0 as *const f32;
-    let mut pitch_res_ptr: *const f32 = 0 as *const f32;
-    x_ptr = x.offset(-((*psEnc).sCmn.la_shape as isize));
-    SNR_adj_dB = (*psEnc).sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32);
-    (*psEncCtrl).input_quality = 0.5f32
-        * ((*psEnc).sCmn.input_quality_bands_Q15[0 as usize]
-            + (*psEnc).sCmn.input_quality_bands_Q15[1 as usize]) as f32
+    let mut x_off: usize = 0;
+    let mut pitch_res_off: usize = 0;
+
+    // x starts at -la_shape offset relative to frame data
+    SNR_adj_dB = psEnc.sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32);
+    psEncCtrl.input_quality = 0.5f32
+        * (psEnc.sCmn.input_quality_bands_Q15[0 as usize]
+            + psEnc.sCmn.input_quality_bands_Q15[1 as usize]) as f32
         * (1.0f32 / 32768.0f32);
-    (*psEncCtrl).coding_quality = silk_sigmoid(0.25f32 * (SNR_adj_dB - 20.0f32));
-    if (*psEnc).sCmn.useCBR == 0 {
-        b = 1.0f32 - (*psEnc).sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
+    psEncCtrl.coding_quality = silk_sigmoid(0.25f32 * (SNR_adj_dB - 20.0f32));
+    if psEnc.sCmn.useCBR == 0 {
+        b = 1.0f32 - psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
         SNR_adj_dB -= BG_SNR_DECR_dB
-            * (*psEncCtrl).coding_quality
-            * (0.5f32 + 0.5f32 * (*psEncCtrl).input_quality)
+            * psEncCtrl.coding_quality
+            * (0.5f32 + 0.5f32 * psEncCtrl.input_quality)
             * b
             * b;
     }
-    if (*psEnc).sCmn.indices.signalType as i32 == TYPE_VOICED {
-        SNR_adj_dB += HARM_SNR_INCR_dB * (*psEnc).LTPCorr;
+    if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
+        SNR_adj_dB += HARM_SNR_INCR_dB * psEnc.LTPCorr;
     } else {
-        SNR_adj_dB += (-0.4f32 * (*psEnc).sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32) + 6.0f32)
-            * (1.0f32 - (*psEncCtrl).input_quality);
+        SNR_adj_dB += (-0.4f32 * psEnc.sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32) + 6.0f32)
+            * (1.0f32 - psEncCtrl.input_quality);
     }
-    if (*psEnc).sCmn.indices.signalType as i32 == TYPE_VOICED {
-        (*psEnc).sCmn.indices.quantOffsetType = 0;
+    if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
+        psEnc.sCmn.indices.quantOffsetType = 0;
     } else {
-        nSamples = 2 * (*psEnc).sCmn.fs_kHz;
+        nSamples = 2 * psEnc.sCmn.fs_kHz;
         energy_variation = 0.0f32;
         log_energy_prev = 0.0f32;
-        pitch_res_ptr = pitch_res;
-        nSegs = 5 * (*psEnc).sCmn.nb_subfr as i16 as i32 / 2;
+        nSegs = 5 * psEnc.sCmn.nb_subfr as i16 as i32 / 2;
         k = 0;
         while k < nSegs {
             nrg = nSamples as f32
-                + silk_energy_FLP(std::slice::from_raw_parts(pitch_res_ptr, nSamples as usize))
+                + silk_energy_FLP(&pitch_res[pitch_res_off..pitch_res_off + nSamples as usize])
                     as f32;
             log_energy = silk_log2(nrg as f64);
             if k > 0 {
                 energy_variation += (log_energy - log_energy_prev).abs();
             }
             log_energy_prev = log_energy;
-            pitch_res_ptr = pitch_res_ptr.offset(nSamples as isize);
+            pitch_res_off += nSamples as usize;
             k += 1;
         }
         if energy_variation > ENERGY_VARIATION_THRESHOLD_QNT_OFFSET * (nSegs - 1) as f32 {
-            (*psEnc).sCmn.indices.quantOffsetType = 0;
+            psEnc.sCmn.indices.quantOffsetType = 0;
         } else {
-            (*psEnc).sCmn.indices.quantOffsetType = 1;
+            psEnc.sCmn.indices.quantOffsetType = 1;
         }
     }
-    strength = FIND_PITCH_WHITE_NOISE_FRACTION * (*psEncCtrl).predGain;
+    strength = FIND_PITCH_WHITE_NOISE_FRACTION * psEncCtrl.predGain;
     BWExp = BANDWIDTH_EXPANSION / (1.0f32 + strength * strength);
-    warping = (*psEnc).sCmn.warping_Q16 as f32 / 65536.0f32 + 0.01f32 * (*psEncCtrl).coding_quality;
+    warping = psEnc.sCmn.warping_Q16 as f32 / 65536.0f32 + 0.01f32 * psEncCtrl.coding_quality;
     k = 0;
-    while k < (*psEnc).sCmn.nb_subfr as i32 {
-        let mut shift: i32 = 0;
-        let mut slope_part: i32 = 0;
-        let mut flat_part: i32 = 0;
-        flat_part = (*psEnc).sCmn.fs_kHz * 3;
-        slope_part = ((*psEnc).sCmn.shapeWinLength - flat_part) / 2;
+    while k < psEnc.sCmn.nb_subfr as i32 {
+        let mut shift: i32;
+        let mut slope_part: i32;
+        let mut flat_part: i32;
+        flat_part = psEnc.sCmn.fs_kHz * 3;
+        slope_part = (psEnc.sCmn.shapeWinLength - flat_part) / 2;
         silk_apply_sine_window_FLP(
             &mut x_windowed[..slope_part as usize],
-            std::slice::from_raw_parts(x_ptr, slope_part as usize),
+            &x[x_off..x_off + slope_part as usize],
             1,
             slope_part,
         );
         shift = slope_part;
-        let x_ptr_slice =
-            std::slice::from_raw_parts(x_ptr.offset(shift as isize), flat_part as usize);
-        x_windowed[shift as usize..shift as usize + flat_part as usize]
-            .copy_from_slice(x_ptr_slice);
+        x_windowed[shift as usize..shift as usize + flat_part as usize].copy_from_slice(
+            &x[x_off + shift as usize..x_off + shift as usize + flat_part as usize],
+        );
         shift += flat_part;
         silk_apply_sine_window_FLP(
             &mut x_windowed[shift as usize..shift as usize + slope_part as usize],
-            std::slice::from_raw_parts(x_ptr.offset(shift as isize), slope_part as usize),
+            &x[x_off + shift as usize..x_off + shift as usize + slope_part as usize],
             2,
             slope_part,
         );
-        x_ptr = x_ptr.offset((*psEnc).sCmn.subfr_length as isize);
-        if (*psEnc).sCmn.warping_Q16 > 0 {
+        x_off += psEnc.sCmn.subfr_length as usize;
+        if psEnc.sCmn.warping_Q16 > 0 {
             silk_warped_autocorrelation_FLP(
                 &mut auto_corr,
                 &x_windowed,
                 warping,
-                (*psEnc).sCmn.shapeWinLength,
-                (*psEnc).sCmn.shapingLPCOrder,
+                psEnc.sCmn.shapeWinLength,
+                psEnc.sCmn.shapingLPCOrder,
             );
         } else {
             silk_autocorrelation_FLP(
-                &mut auto_corr[..((*psEnc).sCmn.shapingLPCOrder + 1) as usize],
-                &x_windowed[..(*psEnc).sCmn.shapeWinLength as usize],
+                &mut auto_corr[..(psEnc.sCmn.shapingLPCOrder + 1) as usize],
+                &x_windowed[..psEnc.sCmn.shapeWinLength as usize],
             );
         }
         auto_corr[0 as usize] += auto_corr[0 as usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;
-        nrg = silk_schur_FLP(&mut rc, &auto_corr, (*psEnc).sCmn.shapingLPCOrder);
+        nrg = silk_schur_FLP(&mut rc, &auto_corr, psEnc.sCmn.shapingLPCOrder);
         silk_k2a_FLP(
-            &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+            &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
             &rc,
-            (*psEnc).sCmn.shapingLPCOrder,
+            psEnc.sCmn.shapingLPCOrder,
         );
-        (*psEncCtrl).Gains[k as usize] = celt_sqrt(nrg);
-        if (*psEnc).sCmn.warping_Q16 > 0 {
-            (*psEncCtrl).Gains[k as usize] *= warped_gain(
-                &(&(*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+        psEncCtrl.Gains[k as usize] = celt_sqrt(nrg);
+        if psEnc.sCmn.warping_Q16 > 0 {
+            psEncCtrl.Gains[k as usize] *= warped_gain(
+                &(&psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 warping,
-                (*psEnc).sCmn.shapingLPCOrder,
+                psEnc.sCmn.shapingLPCOrder,
             );
         }
         silk_bwexpander_FLP(
-            &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
-            (*psEnc).sCmn.shapingLPCOrder,
+            &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+            psEnc.sCmn.shapingLPCOrder,
             BWExp,
         );
-        if (*psEnc).sCmn.warping_Q16 > 0 {
+        if psEnc.sCmn.warping_Q16 > 0 {
             warped_true2monic_coefs(
-                &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+                &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 warping,
                 3.999f32,
-                (*psEnc).sCmn.shapingLPCOrder,
+                psEnc.sCmn.shapingLPCOrder,
             );
         } else {
             limit_coefs(
-                &mut (&mut (*psEncCtrl).AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+                &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
                 3.999f32,
-                (*psEnc).sCmn.shapingLPCOrder,
+                psEnc.sCmn.shapingLPCOrder,
             );
         }
         k += 1;
@@ -286,59 +287,57 @@ pub unsafe fn silk_noise_shape_analysis_FLP(
     gain_mult = silk_exp2(-0.16f32 * SNR_adj_dB);
     gain_add = silk_exp2(0.16f32 * MIN_QGAIN_DB as f32);
     k = 0;
-    while k < (*psEnc).sCmn.nb_subfr as i32 {
-        (*psEncCtrl).Gains[k as usize] *= gain_mult;
-        (*psEncCtrl).Gains[k as usize] += gain_add;
+    while k < psEnc.sCmn.nb_subfr as i32 {
+        psEncCtrl.Gains[k as usize] *= gain_mult;
+        psEncCtrl.Gains[k as usize] += gain_add;
         k += 1;
     }
     strength = LOW_FREQ_SHAPING
         * (1.0f32
             + LOW_QUALITY_LOW_FREQ_SHAPING_DECR
-                * ((*psEnc).sCmn.input_quality_bands_Q15[0 as usize] as f32
-                    * (1.0f32 / 32768.0f32)
+                * (psEnc.sCmn.input_quality_bands_Q15[0 as usize] as f32 * (1.0f32 / 32768.0f32)
                     - 1.0f32));
-    strength *= (*psEnc).sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
-    if (*psEnc).sCmn.indices.signalType as i32 == TYPE_VOICED {
+    strength *= psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
+    if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         k = 0;
-        while k < (*psEnc).sCmn.nb_subfr as i32 {
-            b = 0.2f32 / (*psEnc).sCmn.fs_kHz as f32
-                + 3.0f32 / (*psEncCtrl).pitchL[k as usize] as f32;
-            (*psEncCtrl).LF_MA_shp[k as usize] = -1.0f32 + b;
-            (*psEncCtrl).LF_AR_shp[k as usize] = 1.0f32 - b - b * strength;
+        while k < psEnc.sCmn.nb_subfr as i32 {
+            b = 0.2f32 / psEnc.sCmn.fs_kHz as f32 + 3.0f32 / psEncCtrl.pitchL[k as usize] as f32;
+            psEncCtrl.LF_MA_shp[k as usize] = -1.0f32 + b;
+            psEncCtrl.LF_AR_shp[k as usize] = 1.0f32 - b - b * strength;
             k += 1;
         }
         Tilt = -HP_NOISE_COEF
             - (1 as f32 - HP_NOISE_COEF)
                 * HARM_HP_NOISE_COEF
-                * (*psEnc).sCmn.speech_activity_Q8 as f32
+                * psEnc.sCmn.speech_activity_Q8 as f32
                 * (1.0f32 / 256.0f32);
     } else {
-        b = 1.3f32 / (*psEnc).sCmn.fs_kHz as f32;
-        (*psEncCtrl).LF_MA_shp[0 as usize] = -1.0f32 + b;
-        (*psEncCtrl).LF_AR_shp[0 as usize] = 1.0f32 - b - b * strength * 0.6f32;
+        b = 1.3f32 / psEnc.sCmn.fs_kHz as f32;
+        psEncCtrl.LF_MA_shp[0 as usize] = -1.0f32 + b;
+        psEncCtrl.LF_AR_shp[0 as usize] = 1.0f32 - b - b * strength * 0.6f32;
         k = 1;
-        while k < (*psEnc).sCmn.nb_subfr as i32 {
-            (*psEncCtrl).LF_MA_shp[k as usize] = (*psEncCtrl).LF_MA_shp[0 as usize];
-            (*psEncCtrl).LF_AR_shp[k as usize] = (*psEncCtrl).LF_AR_shp[0 as usize];
+        while k < psEnc.sCmn.nb_subfr as i32 {
+            psEncCtrl.LF_MA_shp[k as usize] = psEncCtrl.LF_MA_shp[0 as usize];
+            psEncCtrl.LF_AR_shp[k as usize] = psEncCtrl.LF_AR_shp[0 as usize];
             k += 1;
         }
         Tilt = -HP_NOISE_COEF;
     }
-    if USE_HARM_SHAPING != 0 && (*psEnc).sCmn.indices.signalType as i32 == TYPE_VOICED {
+    if USE_HARM_SHAPING != 0 && psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         HarmShapeGain = HARMONIC_SHAPING;
         HarmShapeGain += HIGH_RATE_OR_LOW_QUALITY_HARMONIC_SHAPING
-            * (1.0f32 - (1.0f32 - (*psEncCtrl).coding_quality) * (*psEncCtrl).input_quality);
-        HarmShapeGain *= celt_sqrt((*psEnc).LTPCorr);
+            * (1.0f32 - (1.0f32 - psEncCtrl.coding_quality) * psEncCtrl.input_quality);
+        HarmShapeGain *= celt_sqrt(psEnc.LTPCorr);
     } else {
         HarmShapeGain = 0.0f32;
     }
     k = 0;
-    while k < (*psEnc).sCmn.nb_subfr as i32 {
-        (*psShapeSt).HarmShapeGain_smth +=
-            SUBFR_SMTH_COEF * (HarmShapeGain - (*psShapeSt).HarmShapeGain_smth);
-        (*psEncCtrl).HarmShapeGain[k as usize] = (*psShapeSt).HarmShapeGain_smth;
-        (*psShapeSt).Tilt_smth += SUBFR_SMTH_COEF * (Tilt - (*psShapeSt).Tilt_smth);
-        (*psEncCtrl).Tilt[k as usize] = (*psShapeSt).Tilt_smth;
+    while k < psEnc.sCmn.nb_subfr as i32 {
+        psShapeSt.HarmShapeGain_smth +=
+            SUBFR_SMTH_COEF * (HarmShapeGain - psShapeSt.HarmShapeGain_smth);
+        psEncCtrl.HarmShapeGain[k as usize] = psShapeSt.HarmShapeGain_smth;
+        psShapeSt.Tilt_smth += SUBFR_SMTH_COEF * (Tilt - psShapeSt.Tilt_smth);
+        psEncCtrl.Tilt[k as usize] = psShapeSt.Tilt_smth;
         k += 1;
     }
 }

@@ -12,26 +12,46 @@ branch — merge those first, then continue upward.
 
 ---
 
-## Already Safe (from master branch)
+## Already Safe (from master branch or dig-safe work)
 
-These modules were refactored on `master` and should be merged/cherry-picked
-to `dig-safe` before starting new work:
+These modules have been made safe, either from `master` merges or
+direct refactoring on `dig-safe`:
 
-- [ ] `silk_PLC_Reset`, `silk_PLC_update` (PLC.rs partial)
-- [ ] `silk_sum_sqr_shift`
-- [ ] `silk_CNG`, `silk_CNG_exc`
-- [ ] `silk_decode_core`
-- [ ] `silk_stereo_MS_to_LR`
-- [ ] `silk_stereo_decode_pred`, `silk_stereo_decode_mid_only`
-- [ ] `silk_decode_pulses`
-- [ ] `silk_decode_signs`, `silk_encode_signs`
-- [ ] `silk_decode_parameters`
-- [ ] `silk_NLSF2A`
-- [ ] `silk_LPC_inverse_pred_gain_c`
-- [ ] `silk_LPC_fit`
-- [ ] `silk_bwexpander_32`
-- [ ] `silk_NLSF2A_find_poly`
-- [ ] **Commit**: `refactor: merge silk safety work from master`
+- [x] `silk_PLC_Reset`, `silk_PLC_update` (PLC.rs partial — glue/main PLC still unsafe)
+- [x] `silk_sum_sqr_shift`
+- [x] `silk_CNG`, `silk_CNG_exc`
+- [x] `silk_decode_core`
+- [x] `silk_stereo_MS_to_LR`
+- [x] `silk_stereo_decode_pred`, `silk_stereo_decode_mid_only`
+- [x] `silk_decode_pulses`
+- [x] `silk_decode_signs`, `silk_encode_signs`
+- [x] `silk_decode_parameters`
+- [x] `silk_NLSF2A`
+- [x] `silk_LPC_inverse_pred_gain_c`
+- [x] `silk_LPC_fit`
+- [x] `silk_bwexpander_32`
+- [x] `silk_NLSF2A_find_poly`
+
+### Made safe on dig-safe branch
+
+- [x] `silk_encode_indices` (encode_indices.rs)
+- [x] `silk_NLSF_del_dec_quant` (NLSF_del_dec_quant.rs)
+- [x] `silk_NLSF_encode` (NLSF_encode.rs)
+- [x] `silk_process_NLSFs` (process_NLSFs.rs)
+- [x] `silk_process_NLSFs_FLP` (float/wrappers_FLP.rs)
+- [x] `silk_decoder_set_fs` (decoder_set_fs.rs)
+- [x] `silk_VAD_Init` (VAD.rs)
+- [x] `silk_VAD_GetNoiseLevels` (VAD.rs)
+- [x] `silk_init_encoder` (init_encoder.rs)
+- [x] `silk_control_encoder` (control_codec.rs)
+- [x] `silk_setup_resamplers` (control_codec.rs)
+- [x] `silk_setup_fs` (control_codec.rs)
+- [x] `silk_setup_complexity` (control_codec.rs)
+- [x] `silk_setup_LBRR` (control_codec.rs)
+- [x] `silk_find_LPC_FLP` (float/find_LPC_FLP.rs)
+- [x] `silk_quant_LTP_gains` (quant_LTP_gains.rs)
+- [x] Various float leaf functions (energy, inner_product, autocorrelation, etc.)
+- [x] Default impls for silk_encoder_state, silk_encoder_state_FLP, silk_nsq_state, etc.
 
 ---
 
@@ -137,15 +157,15 @@ Decoder side:
   - Upstream C: `silk/NLSF_unpack.c`
 - [ ] `NLSF_decode.rs`
   - Upstream C: `silk/NLSF_decode.c`
-- [ ] `NLSF_del_dec_quant.rs`
+- [x] `NLSF_del_dec_quant.rs` ✓ (dig-safe: 0abfdd6, b088d75)
   - Upstream C: `silk/NLSF_del_dec_quant.c`
   - Risk: Medium — complex quantization with memcpy
-- [ ] `NLSF_encode.rs`
+- [x] `NLSF_encode.rs` ✓ (dig-safe: da3c42e)
   - Upstream C: `silk/NLSF_encode.c`
 - [ ] `A2NLSF.rs`
   - Upstream C: `silk/A2NLSF.c`
   - Risk: Medium — polynomial root finding
-- [ ] `process_NLSFs.rs`
+- [x] `process_NLSFs.rs` ✓ (dig-safe: da3c42e)
   - Upstream C: `silk/process_NLSFs.c`
 - [ ] **Commit**: `refactor: make silk NLSF subsystem safe`
 
@@ -157,11 +177,11 @@ Decoder side:
   - Upstream C: `silk/shell_coder.c`
 - [ ] `encode_pulses.rs`, `decode_pulses.rs`
   - Upstream C: `silk/encode_pulses.c`, `silk/decode_pulses.c`
-- [ ] `encode_indices.rs`, `decode_indices.rs`
+- [x] `encode_indices.rs` ✓ (dig-safe: 0abfdd6), [ ] `decode_indices.rs`
   - Upstream C: `silk/encode_indices.c`, `silk/decode_indices.c`
 - [ ] `gain_quant.rs`
   - Upstream C: `silk/gain_quant.c`
-- [ ] `quant_LTP_gains.rs`
+- [x] `quant_LTP_gains.rs` ✓ (dig-safe: d7966e9)
   - Upstream C: `silk/quant_LTP_gains.c`
 - [ ] `VQ_WMat_EC.rs`
   - Upstream C: `silk/VQ_WMat_EC.c`
@@ -169,7 +189,7 @@ Decoder side:
 
 ### Stage 3.6 — Stereo Processing
 
-- [ ] `stereo_LR_to_MS.rs`
+- [ ] `stereo_LR_to_MS.rs` (1 unsafe fn remaining)
   - Upstream C: `silk/stereo_LR_to_MS.c`
   - Risk: Medium — uses memcpy
 - [ ] `stereo_find_predictor.rs`
@@ -192,10 +212,9 @@ Decoder side:
   - Upstream C: `silk/HP_variable_cutoff.c`
 - [ ] `LP_variable_cutoff.rs`
   - Upstream C: `silk/LP_variable_cutoff.c`
-- [ ] `control_codec.rs`
+- [x] `control_codec.rs` ✓ (dig-safe: 4a97b0b) — all 5 functions safe
   - Upstream C: `silk/control_codec.c`
-  - Risk: Medium — 5 unsafe fn, calls resampler + control modules
-- [ ] **Commit**: `refactor: make silk control modules safe`
+- [x] **Commit**: `refactor: make all control_codec functions safe`
 
 ### Stage 3.8 — Resampler
 
@@ -237,27 +256,27 @@ Many of these follow the same pattern: pointer+length → slice.
   - Risk: Medium — 6 unsafe fn, FIR filter
 - [ ] `LTP_analysis_filter_FLP.rs`, `LTP_scale_ctrl_FLP.rs`
   - Medium
-- [ ] `find_LPC_FLP.rs`, `find_LTP_FLP.rs`, `find_pitch_lags_FLP.rs`, `find_pred_coefs_FLP.rs`
+- [x] `find_LPC_FLP.rs` ✓ (dig-safe: 6ee1f2d), [ ] `find_LTP_FLP.rs`, [ ] `find_pitch_lags_FLP.rs` (1 unsafe), [ ] `find_pred_coefs_FLP.rs` (1 unsafe)
   - Medium — analysis routines that combine multiple helpers
-- [ ] `noise_shape_analysis_FLP.rs`
+- [ ] `noise_shape_analysis_FLP.rs` (1 unsafe fn)
   - Upstream C: `silk/float/noise_shape_analysis_FLP.c`
   - Risk: High — complex analysis calling many modules
-- [ ] `pitch_analysis_core_FLP.rs`
+- [ ] `pitch_analysis_core_FLP.rs` (1 unsafe fn)
   - Upstream C: `silk/float/pitch_analysis_core_FLP.c`
   - Risk: High — 743 lines, heavy pointer arithmetic
 - [ ] `process_gains_FLP.rs`
   - Medium
-- [ ] `wrappers_FLP.rs`
+- [ ] `wrappers_FLP.rs` (1 unsafe fn: silk_NSQ_wrapper_FLP)
   - Upstream C: `silk/float/wrappers_FLP.c`
-  - Risk: Medium — bridges float/fixed-point
+  - Risk: Medium — bridges float/fixed-point, blocked by NSQ safety
 - [ ] **Commit per small group**: `refactor: make silk::float::<group> safe`
 
 ### Stage 3.10 — Core Quantizers
 
-- [ ] `NSQ.rs`
+- [ ] `NSQ.rs` (3 unsafe fn)
   - Upstream C: `silk/NSQ.c`
   - Risk: **Very High** — 572 lines, core noise shaping quantizer, heavy memcpy
-- [ ] `NSQ_del_dec.rs`
+- [ ] `NSQ_del_dec.rs` (2 unsafe fn)
   - Upstream C: `silk/NSQ_del_dec.c`
   - Risk: **Very High** — 1065 lines, delayed-decision NSQ variant
 - [ ] **Commit**: `refactor: make silk::NSQ safe`
@@ -265,33 +284,35 @@ Many of these follow the same pattern: pointer+length → slice.
 
 ### Stage 3.11 — Decoder Integration
 
-- [ ] `decode_frame.rs`
+- [ ] `decode_frame.rs` (1 unsafe fn — blocked by PLC)
   - Upstream C: `silk/decode_frame.c`
-- [ ] `decode_core.rs` (verify safe from master merge)
+  - Partial cleanup done: memmove/memcpy replaced with copy_within/copy_from_slice
+- [x] `decode_core.rs` ✓ (safe from master)
 - [ ] `decode_pitch.rs`
   - Upstream C: `silk/decode_pitch.c`
-- [ ] `PLC.rs` (remaining unsafe after master merge)
+- [ ] `PLC.rs` (2 unsafe fn: silk_PLC, silk_PLC_glue_frames)
   - Upstream C: `silk/PLC.c`
   - Risk: High — 803 lines, memcpy/memmove heavy
-- [ ] `CNG.rs` (verify safe from master merge)
-- [ ] `VAD.rs`
+- [x] `CNG.rs` ✓ (safe from master)
+- [ ] `VAD.rs` (1 unsafe fn: silk_VAD_GetSA_Q8_c — raw pIn pointer)
   - Upstream C: `silk/VAD.c`
-- [ ] `init_decoder.rs`, `decoder_set_fs.rs`
+  - silk_VAD_Init and silk_VAD_GetNoiseLevels already safe (dig-safe: ab4dea9)
+- [x] `init_decoder.rs` ✓, [x] `decoder_set_fs.rs` ✓ (dig-safe: ab4dea9)
   - Upstream C: respective `.c` files
-- [ ] `dec_API.rs`
+- [ ] `dec_API.rs` (1 unsafe fn: silk_Decode)
   - Upstream C: `silk/dec_API.c`
   - Risk: High — 490 lines, decoder hub
 - [ ] **Commit**: `refactor: make silk decoder pipeline safe`
 
 ### Stage 3.12 — Encoder Integration
 
-- [ ] `float/encode_frame_FLP.rs`
+- [ ] `float/encode_frame_FLP.rs` (2 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP)
   - Upstream C: `silk/float/encode_frame_FLP.c`
   - Risk: High — 571 lines, calls 10+ float modules
   - All float helpers must be safe first (Stage 3.9)
-- [ ] `init_encoder.rs`
+- [x] `init_encoder.rs` ✓ (dig-safe: ab4dea9) — uses Default::default()
   - Upstream C: `silk/init_encoder.c`
-- [ ] `enc_API.rs`
+- [ ] `enc_API.rs` (3 unsafe fn: silk_Get_Encoder_Size, silk_InitEncoder, silk_Encode)
   - Upstream C: `silk/enc_API.c`
   - Risk: **Very High** — 877 lines, encoder hub
   - Calls: control_codec, encode_indices, encode_pulses, float/encode_frame_FLP, init_encoder, resampler, stereo functions

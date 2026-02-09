@@ -23,12 +23,11 @@ use crate::silk::SigProc_FIX::silk_min_int;
 use crate::silk::VAD::silk_VAD_GetSA_Q8_c;
 
 pub unsafe fn silk_encode_do_VAD_FLP(psEnc: *mut silk_encoder_state_FLP, activity: i32) {
+    let psEnc = &mut *psEnc;
     let activity_threshold: i32 =
         ((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32;
-    silk_VAD_GetSA_Q8_c(
-        &mut (*psEnc).sCmn,
-        ((*psEnc).sCmn.inputBuf).as_mut_ptr().offset(1 as isize) as *const i16,
-    );
+    let vad_input: Vec<i16> = psEnc.sCmn.inputBuf[1..].to_vec();
+    silk_VAD_GetSA_Q8_c(&mut psEnc.sCmn, &vad_input);
     if activity == VAD_NO_ACTIVITY && (*psEnc).sCmn.speech_activity_Q8 >= activity_threshold {
         (*psEnc).sCmn.speech_activity_Q8 = activity_threshold - 1;
     }
@@ -174,21 +173,55 @@ pub unsafe fn silk_encode_frame_FLP(
     if (*psEnc).sCmn.prefillFlag == 0 {
         let psRangeEnc = &mut **psRangeEnc.as_mut().unwrap();
 
-        silk_find_pitch_lags_FLP(
-            psEnc,
-            &mut sEncCtrl,
-            res_pitch.as_mut_ptr(),
-            x_frame as *const f32,
-            (*psEnc).sCmn.arch,
-        );
-        silk_noise_shape_analysis_FLP(psEnc, &mut sEncCtrl, res_pitch_frame, x_frame);
-        silk_find_pred_coefs_FLP(
-            psEnc,
-            &mut sEncCtrl,
-            res_pitch_frame as *const f32,
-            x_frame as *const f32,
-            condCoding,
-        );
+        // Copy x_buf to local to avoid borrow conflicts (functions take &mut psEnc
+        // while also needing to read from psEnc.x_buf)
+        let x_buf_copy = (*psEnc).x_buf;
+        {
+            let psEnc = &mut *psEnc;
+            let ltp_mem = psEnc.sCmn.ltp_mem_length;
+            let frame_len = psEnc.sCmn.frame_length as usize;
+            let la_pitch = psEnc.sCmn.la_pitch as usize;
+            let buf_len = la_pitch + frame_len + ltp_mem;
+            silk_find_pitch_lags_FLP(
+                psEnc,
+                &mut sEncCtrl,
+                &mut res_pitch[..buf_len],
+                &x_buf_copy[..buf_len],
+                psEnc.sCmn.arch,
+            );
+        }
+        {
+            let psEnc = &mut *psEnc;
+            let ltp_mem = psEnc.sCmn.ltp_mem_length;
+            let la_shape = (LA_SHAPE_MS * psEnc.sCmn.fs_kHz) as usize;
+            let x_start = ltp_mem - la_shape;
+            let nb_subfr = psEnc.sCmn.nb_subfr as usize;
+            let subfr_len = psEnc.sCmn.subfr_length as usize;
+            // x range: from x_start, the function reads shapeWinLength per subframe,
+            // advancing by subfr_length each iteration
+            let x_len = (nb_subfr - 1) * subfr_len + psEnc.sCmn.shapeWinLength as usize;
+            silk_noise_shape_analysis_FLP(
+                psEnc,
+                &mut sEncCtrl,
+                &res_pitch[ltp_mem..ltp_mem + nb_subfr * subfr_len],
+                &x_buf_copy[x_start..x_start + x_len],
+            );
+        }
+        {
+            let psEnc = &mut *psEnc;
+            let ltp_mem = psEnc.sCmn.ltp_mem_length;
+            let nb_subfr = psEnc.sCmn.nb_subfr as usize;
+            let subfr_len = psEnc.sCmn.subfr_length as usize;
+            let res_total = ltp_mem + nb_subfr * subfr_len + crate::silk::define::LTP_ORDER;
+            let x_total = ltp_mem + nb_subfr * subfr_len;
+            silk_find_pred_coefs_FLP(
+                psEnc,
+                &mut sEncCtrl,
+                &res_pitch[..res_total],
+                &x_buf_copy[..x_total],
+                condCoding,
+            );
+        }
         silk_process_gains_FLP(&mut *psEnc, &mut sEncCtrl, condCoding);
         silk_LBRR_encode_FLP(psEnc, &mut sEncCtrl, x_frame as *const f32, condCoding);
         maxIter = 6;
