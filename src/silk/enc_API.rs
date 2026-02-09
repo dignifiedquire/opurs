@@ -287,8 +287,8 @@ pub unsafe fn silk_Encode(
             0
         };
         ret = silk_control_encoder(
-            &mut *((*psEnc).state_Fxx).as_mut_ptr().offset(n as isize),
-            encControl,
+            &mut (*psEnc).state_Fxx[n as usize],
+            &mut *encControl,
             (*psEnc).allowBandwidthSwitch,
             n,
             force_fs_kHz,
