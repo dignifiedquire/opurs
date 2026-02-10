@@ -154,20 +154,22 @@ pub unsafe fn silk_NSQ_wrapper_FLP(
             LTP_scale_Q14,
         );
     } else {
+        let total_len = (*psEnc).sCmn.nb_subfr as usize * (*psEnc).sCmn.subfr_length;
+        let pulses_slice = std::slice::from_raw_parts_mut(pulses, total_len);
         silk_NSQ_c(
             &mut (*psEnc).sCmn,
-            psNSQ,
-            psIndices,
-            x16.as_mut_ptr() as *const i16,
-            pulses,
-            (PredCoef_Q12[0 as usize]).as_mut_ptr() as *const i16,
-            LTPCoef_Q14.as_mut_ptr() as *const i16,
-            AR_Q13.as_mut_ptr() as *const i16,
-            HarmShapeGain_Q14.as_mut_ptr() as *const i32,
-            Tilt_Q14.as_mut_ptr() as *const i32,
-            LF_shp_Q14.as_mut_ptr() as *const i32,
-            Gains_Q16.as_mut_ptr() as *const i32,
-            ((*psEncCtrl).pitchL).as_mut_ptr() as *const i32,
+            &mut *psNSQ,
+            &mut *psIndices,
+            &x16[..(*psEnc).sCmn.frame_length],
+            pulses_slice,
+            PredCoef_Q12.as_flattened(),
+            &LTPCoef_Q14,
+            &AR_Q13,
+            &HarmShapeGain_Q14,
+            &Tilt_Q14,
+            &LF_shp_Q14,
+            &Gains_Q16,
+            &(*psEncCtrl).pitchL,
             Lambda_Q10,
             LTP_scale_Q14,
         );
