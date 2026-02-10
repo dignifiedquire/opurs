@@ -110,6 +110,7 @@ fn silk_QueryEncoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct
     SILK_NO_ERROR
 }
 /// Upstream C: silk/enc_API.c:silk_Encode
+#[allow(clippy::too_many_arguments)]
 pub fn silk_Encode(
     psEnc: &mut silk_encoder,
     encControl: &mut silk_EncControlStruct,
@@ -128,7 +129,6 @@ pub fn silk_Encode(
     let mut tmp_complexity: i32 = 0;
     let mut ret: i32 = 0;
     let mut nSamplesToBuffer: i32;
-    let mut nBlocksOf10ms: i32;
     let mut nSamplesFromInput: i32;
     let mut TargetRate_bps: i32;
     let mut MStargetRates_bps: [i32; 2] = [0; 2];
@@ -158,7 +158,7 @@ pub fn silk_Encode(
         psEnc.sStereo.mid_side_amp_Q0[2] = 0;
         psEnc.sStereo.mid_side_amp_Q0[3] = 1;
         psEnc.sStereo.width_prev_Q14 = 0;
-        psEnc.sStereo.smth_width_Q14 = ((1 * ((1) << 14)) as f64 + 0.5f64) as i32 as i16;
+        psEnc.sStereo.smth_width_Q14 = ((1 << 14) as f64 + 0.5f64) as i32 as i16;
         if psEnc.nChannelsAPI == 2 {
             psEnc.state_Fxx[1].sCmn.resampler_state = psEnc.state_Fxx[0].sCmn.resampler_state;
             psEnc.state_Fxx[1].sCmn.In_HP_State = psEnc.state_Fxx[0].sCmn.In_HP_State;
@@ -168,7 +168,7 @@ pub fn silk_Encode(
         || psEnc.nChannelsInternal != encControl.nChannelsInternal) as i32;
     psEnc.nChannelsAPI = encControl.nChannelsAPI;
     psEnc.nChannelsInternal = encControl.nChannelsInternal;
-    nBlocksOf10ms = 100 * nSamplesIn / encControl.API_sampleRate;
+    let nBlocksOf10ms = 100 * nSamplesIn / encControl.API_sampleRate;
     let tot_blocks = if nBlocksOf10ms > 1 {
         nBlocksOf10ms >> 1
     } else {
@@ -331,10 +331,10 @@ pub fn silk_Encode(
                 for k in 0..frame_len {
                     let idx0 = (ix0 + k + 2) as usize;
                     let idx1 = (ix1 + k + 2) as usize;
-                    psEnc.state_Fxx[0].sCmn.inputBuf[idx0] = (psEnc.state_Fxx[0].sCmn.inputBuf[idx0]
-                        as i32
-                        + psEnc.state_Fxx[1].sCmn.inputBuf[idx1] as i32
-                        >> 1) as i16;
+                    psEnc.state_Fxx[0].sCmn.inputBuf[idx0] =
+                        ((psEnc.state_Fxx[0].sCmn.inputBuf[idx0] as i32
+                            + psEnc.state_Fxx[1].sCmn.inputBuf[idx1] as i32)
+                            >> 1) as i16;
                 }
             }
             psEnc.state_Fxx[0].sCmn.inputBufIx += nSamplesToBuffer;
@@ -357,7 +357,7 @@ pub fn silk_Encode(
         samplesIn_off += (nSamplesFromInput * encControl.nChannelsAPI) as usize;
         nSamplesIn -= nSamplesFromInput;
         psEnc.allowBandwidthSwitch = 0;
-        if !(psEnc.state_Fxx[0].sCmn.inputBufIx >= psEnc.state_Fxx[0].sCmn.frame_length as i32) {
+        if psEnc.state_Fxx[0].sCmn.inputBufIx < psEnc.state_Fxx[0].sCmn.frame_length as i32 {
             break;
         }
         assert!(psEnc.state_Fxx[0].sCmn.inputBufIx == psEnc.state_Fxx[0].sCmn.frame_length as i32);
@@ -403,7 +403,6 @@ pub fn silk_Encode(
                 n = 0;
                 while n < encControl.nChannelsInternal {
                     if psEnc.state_Fxx[n as usize].sCmn.LBRR_flags[i as usize] != 0 {
-                        let condCoding: i32;
                         if encControl.nChannelsInternal == 2 && n == 0 {
                             silk_stereo_encode_pred(psRangeEnc, &psEnc.sStereo.predIx[i as usize]);
                             if psEnc.state_Fxx[1].sCmn.LBRR_flags[i as usize] == 0 {
@@ -413,13 +412,13 @@ pub fn silk_Encode(
                                 );
                             }
                         }
-                        if i > 0
+                        let condCoding = if i > 0
                             && psEnc.state_Fxx[n as usize].sCmn.LBRR_flags[(i - 1) as usize] != 0
                         {
-                            condCoding = CODE_CONDITIONALLY;
+                            CODE_CONDITIONALLY
                         } else {
-                            condCoding = CODE_INDEPENDENTLY;
-                        }
+                            CODE_INDEPENDENTLY
+                        };
                         silk_encode_indices(
                             &mut psEnc.state_Fxx[n as usize].sCmn,
                             psRangeEnc,
@@ -434,7 +433,7 @@ pub fn silk_Encode(
                             psEnc.state_Fxx[n as usize].sCmn.indices_LBRR[i as usize]
                                 .quantOffsetType as i32,
                             &mut psEnc.state_Fxx[n as usize].sCmn.pulses_LBRR[i as usize],
-                            psEnc.state_Fxx[n as usize].sCmn.frame_length as usize,
+                            psEnc.state_Fxx[n as usize].sCmn.frame_length,
                         );
                     }
                     n += 1;
@@ -453,7 +452,7 @@ pub fn silk_Encode(
         if prefillFlag == 0 {
             nBits -= psEnc.nBitsUsedLBRR;
         }
-        nBits = nBits / psEnc.state_Fxx[0].sCmn.nFramesPerPacket;
+        nBits /= psEnc.state_Fxx[0].sCmn.nFramesPerPacket;
         if encControl.payloadSize_ms == 10 {
             TargetRate_bps = nBits as i16 as i32 * 100;
         } else {
@@ -473,7 +472,7 @@ pub fn silk_Encode(
         };
         if encControl.nChannelsInternal == 2 {
             {
-                let frame_length = psEnc.state_Fxx[0].sCmn.frame_length as usize;
+                let frame_length = psEnc.state_Fxx[0].sCmn.frame_length;
                 let nfe = psEnc.state_Fxx[0].sCmn.nFramesEncoded as usize;
                 let speech_activity = psEnc.state_Fxx[0].sCmn.speech_activity_Q8;
                 let fs_kHz = psEnc.state_Fxx[0].sCmn.fs_kHz;
@@ -574,11 +573,7 @@ pub fn silk_Encode(
                 } else {
                     condCoding_0 = CODE_CONDITIONALLY;
                 }
-                let psRangeEnc = if let Some(psRangeEnc) = psRangeEnc.as_mut() {
-                    Some(&mut **psRangeEnc)
-                } else {
-                    None
-                };
+                let psRangeEnc = psRangeEnc.as_deref_mut();
 
                 ret = silk_encode_frame_FLP(
                     &mut psEnc.state_Fxx[n as usize],
@@ -631,27 +626,13 @@ pub fn silk_Encode(
             }
             psEnc.nBitsExceeded += *nBytesOut * 8;
             psEnc.nBitsExceeded -= encControl.bitRate * encControl.payloadSize_ms / 1000;
-            psEnc.nBitsExceeded = if 0 > 10000 {
-                if psEnc.nBitsExceeded > 0 {
-                    0
-                } else if psEnc.nBitsExceeded < 10000 {
-                    10000
-                } else {
-                    psEnc.nBitsExceeded
-                }
-            } else if psEnc.nBitsExceeded > 10000 {
-                10000
-            } else if psEnc.nBitsExceeded < 0 {
-                0
-            } else {
-                psEnc.nBitsExceeded
-            };
+            psEnc.nBitsExceeded = psEnc.nBitsExceeded.clamp(0, 10000);
             let speech_act_thr_for_switch_Q8 =
-                (((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32 as i64
-                    + ((((1 as f32 - SPEECH_ACTIVITY_DTX_THRES) / MAX_BANDWIDTH_SWITCH_DELAY_MS
-                        * ((1) << 16 + 8) as f32) as f64
+                (((SPEECH_ACTIVITY_DTX_THRES * (1 << 8) as f32) as f64 + 0.5f64) as i32 as i64
+                    + (((((1_f32 - SPEECH_ACTIVITY_DTX_THRES) / MAX_BANDWIDTH_SWITCH_DELAY_MS
+                        * (1 << (16 + 8)) as f32) as f64
                         + 0.5f64) as i32 as i64
-                        * psEnc.timeSinceSwitchAllowed_ms as i16 as i64
+                        * psEnc.timeSinceSwitchAllowed_ms as i16 as i64)
                         >> 16)) as i32;
             if psEnc.state_Fxx[0].sCmn.speech_activity_Q8 < speech_act_thr_for_switch_Q8 {
                 psEnc.allowBandwidthSwitch = 1;
