@@ -168,16 +168,8 @@ mod src {
 // =====
 
 // opus_encoder
-pub use crate::src::opus_encoder::{
-    opus_encode, opus_encode_float, opus_encoder_create, opus_encoder_ctl_impl,
-    opus_encoder_destroy, opus_encoder_get_size, opus_encoder_init, OpusEncoder,
-};
+pub use crate::src::opus_encoder::{opus_encode, opus_encoder_ctl_impl, OpusEncoder};
 // opus_decoder
-#[allow(deprecated)]
-pub use crate::src::opus_decoder::{
-    opus_decoder_create, opus_decoder_destroy, opus_decoder_get_size, opus_decoder_init,
-};
-
 pub use crate::src::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_ctl_impl, opus_decoder_get_nb_samples,
     opus_packet_get_bandwidth, opus_packet_get_nb_channels, opus_packet_get_nb_frames,

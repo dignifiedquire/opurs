@@ -223,42 +223,7 @@ fn validate_opus_decoder(st: &OpusDecoder) {
     );
     assert!(st.stream_channels == 1 || st.stream_channels == 2);
 }
-#[deprecated]
-pub fn opus_decoder_get_size(channels: i32) -> i32 {
-    if channels < 1 || channels > 2 {
-        return 0;
-    }
-    align(core::mem::size_of::<OpusDecoder>() as _)
-}
-#[deprecated]
-pub unsafe fn opus_decoder_init(st: *mut OpusDecoder, Fs: i32, channels: i32) -> i32 {
-    match OpusDecoder::new(Fs, channels as usize) {
-        Ok(dec) => {
-            *st = dec;
-            return OPUS_OK;
-        }
-        Err(err) => {
-            return err;
-        }
-    }
-}
-#[deprecated]
-pub unsafe fn opus_decoder_create(Fs: i32, channels: i32, error: *mut i32) -> *mut OpusDecoder {
-    match OpusDecoder::new(Fs, channels as usize) {
-        Ok(dec) => {
-            if !error.is_null() {
-                *error = OPUS_OK;
-            }
-            Box::into_raw(Box::new(dec))
-        }
-        Err(e) => {
-            if !error.is_null() {
-                *error = e;
-            }
-            std::ptr::null_mut()
-        }
-    }
-}
+
 fn smooth_fade(
     in1: &[opus_val16],
     in2: &[opus_val16],
@@ -1024,26 +989,7 @@ pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) 
         _ => OPUS_UNIMPLEMENTED,
     }
 }
-#[macro_export]
-macro_rules! opus_decoder_ctl {
-    ($st:expr,$request:expr, $($arg:expr),*) => {
-        $crate::opus_decoder_ctl_impl(
-            $st,
-            $request,
-            $crate::varargs!($($arg),*)
-        )
-    };
-    ($st:expr,$request:expr, $($arg:expr),*,) => {
-        opus_decoder_ctl!($st, $request, $($arg),*)
-    };
-    ($st:expr,$request:expr) => {
-        opus_decoder_ctl!($st, $request,)
-    };
-}
-#[deprecated]
-pub unsafe fn opus_decoder_destroy(st: *mut OpusDecoder) {
-    drop(Box::from_raw(st));
-}
+
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
     let mut bandwidth: i32;
     if toc as i32 & 0x80 != 0 {

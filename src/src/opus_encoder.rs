@@ -146,26 +146,6 @@ static mut mode_thresholds: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
 static fec_thresholds: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
-pub fn opus_encoder_get_size(channels: i32) -> i32 {
-    if channels < 1 || channels > 2 {
-        return 0;
-    }
-    ::core::mem::size_of::<OpusEncoder>() as i32
-}
-pub unsafe fn opus_encoder_init(
-    st: *mut OpusEncoder,
-    Fs: i32,
-    channels: i32,
-    application: i32,
-) -> i32 {
-    match OpusEncoder::new(Fs, channels, application) {
-        Ok(enc) => {
-            *st = enc;
-            OPUS_OK
-        }
-        Err(e) => e,
-    }
-}
 
 impl OpusEncoder {
     pub fn new(Fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
@@ -839,27 +819,7 @@ fn gain_fade(
         }
     }
 }
-pub unsafe fn opus_encoder_create(
-    Fs: i32,
-    channels: i32,
-    application: i32,
-    error: *mut i32,
-) -> *mut OpusEncoder {
-    match OpusEncoder::new(Fs, channels, application) {
-        Ok(enc) => {
-            if !error.is_null() {
-                *error = OPUS_OK;
-            }
-            Box::into_raw(Box::new(enc))
-        }
-        Err(e) => {
-            if !error.is_null() {
-                *error = e;
-            }
-            std::ptr::null_mut()
-        }
-    }
-}
+
 /// Upstream C: src/opus_encoder.c:user_bitrate_to_bitrate
 fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
     if frame_size == 0 {
@@ -2813,7 +2773,7 @@ pub unsafe fn opus_encode(
     );
     return ret;
 }
-pub unsafe fn opus_encode_float(
+unsafe fn opus_encode_float(
     st: *mut OpusEncoder,
     pcm: *const f32,
     analysis_frame_size: i32,
@@ -3286,19 +3246,4 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
         12343738388509029619 => return OPUS_BAD_ARG,
         _ => return ret,
     };
-}
-#[macro_export]
-macro_rules! opus_encoder_ctl {
-    ($st:expr, $request:expr, $($args:expr),*) => {
-        $crate::opus_encoder_ctl_impl($st, $request, $crate::varargs!($($args),*))
-    };
-    ($st:expr, $request:expr, $($args:expr),*,) => {
-        opus_encoder_ctl!($st, $request, $($args),*)
-    };
-    ($st:expr, $request:expr) => {
-        opus_encoder_ctl!($st, $request,)
-    };
-}
-pub unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {
-    drop(Box::from_raw(st));
 }
