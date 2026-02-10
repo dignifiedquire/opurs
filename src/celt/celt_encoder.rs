@@ -1032,7 +1032,7 @@ fn stereo_analysis(m: &OpusCustomMode, X: &[celt_norm], LM: i32, N0: i32) -> i32
         }
         i += 1;
     }
-    sumMS = 0.707107f32 * sumMS;
+    sumMS = std::f32::consts::FRAC_1_SQRT_2 * sumMS;
     thetas = 13;
     if LM <= 1 {
         thetas -= 8;
@@ -2179,7 +2179,7 @@ pub fn celt_encode_with_ec<'b>(
         LM,
         st.upsample,
     );
-    assert!(!(freq[0] != freq[0]) && (C == 1 || !(freq[N as usize] != freq[N as usize])));
+    assert!(!freq[0].is_nan() && (C == 1 || !freq[N as usize].is_nan()));
     if CC == 2 && C == 1 {
         tf_chan = 0;
     }

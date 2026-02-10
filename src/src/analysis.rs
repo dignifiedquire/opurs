@@ -146,7 +146,7 @@ pub const DETECT_SIZE: i32 = 100;
 pub const NB_FRAMES: i32 = 8;
 pub const NB_TBANDS: i32 = 18;
 pub mod math_h {
-    pub const M_PI: f64 = 3.14159265358979323846f64;
+    pub const M_PI: f64 = std::f64::consts::PI;
 }
 pub mod cpu_support_h {
     #[inline]
@@ -1053,7 +1053,7 @@ fn tonality_analysis(
         return;
     }
     opus_fft_c(kfft, &in_0, &mut out);
-    if out[0].re != out[0].re {
+    if out[0].re.is_nan() {
         tonal.info[info_idx].valid = 0;
         return;
     }
@@ -1177,7 +1177,7 @@ fn tonality_analysis(
             nE += binE_0 * 2.0f32 * (0.5f32 - noisiness[i as usize]);
             i += 1;
         }
-        if !(E_0 < 1e9f32) || E_0 != E_0 {
+        if !(E_0 < 1e9f32) || E_0.is_nan() {
             tonal.info[info_idx].valid = 0;
             return;
         }
@@ -1292,7 +1292,6 @@ fn tonality_analysis(
             };
         b -= 1;
     }
-    assert!(18 + 1 <= 19);
     b = 0;
     while b < NB_TBANDS + 1 {
         let boost: f32 =

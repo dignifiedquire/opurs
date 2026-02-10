@@ -330,7 +330,8 @@ fn hp_cutoff(
     let mut Fc_Q19: i32 = 0;
     let mut r_Q28: i32 = 0;
     let mut r_Q22: i32 = 0;
-    Fc_Q19 = (1.5f64 * 3.14159f64 / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16 as i32
+    Fc_Q19 = (1.5f64 * std::f64::consts::PI / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32
+        as i16 as i32
         * cutoff_Hz as i16 as i32
         / (Fs / 1000);
     r_Q28 = (1.0f64 * ((1) << 28) as f64 + 0.5f64) as i32
@@ -721,7 +722,7 @@ pub fn compute_stereo_width(
         yy += pyy;
         i += 4;
     }
-    if !(xx < 1e9f32) || xx != xx || !(yy < 1e9f32) || yy != yy {
+    if !(xx < 1e9f32) || xx.is_nan() || !(yy < 1e9f32) || yy.is_nan() {
         yy = 0 as opus_val32;
         xx = yy;
         xy = xx;
@@ -1788,7 +1789,7 @@ pub unsafe fn opus_encode_native(
             let n = (frame_size * (*st).channels) as usize;
             sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n);
         }
-        if !(sum < 1e9f32) || sum != sum {
+        if !(sum < 1e9f32) || sum.is_nan() {
             {
                 let off = (total_buffer * (*st).channels) as usize;
                 let len = (frame_size * (*st).channels) as usize;
