@@ -90,6 +90,7 @@ macro_rules! c {
     };
 }
 
+#[allow(clippy::approx_constant)]
 #[rustfmt::skip]
 pub static fft_twiddles48000_960: [kiss_twiddle_cpx; 480] = [
     c!(1.0000000, -0.0000000), c!(0.99991433, -0.013089596),

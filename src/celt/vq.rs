@@ -239,5 +239,5 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);
-    (0.5f32 + 16384.0 * 0.63662f32 * fast_atan2f(side, mid)).floor() as i32
+    (0.5f32 + 16384.0 * std::f32::consts::FRAC_2_PI * fast_atan2f(side, mid)).floor() as i32
 }

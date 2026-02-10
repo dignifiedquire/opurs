@@ -285,7 +285,7 @@ pub fn anti_collapse(
             let Ediff = if 0.0f32 > Ediff { 0.0f32 } else { Ediff };
             let mut r = 2.0f32 * celt_exp2(-Ediff);
             if LM == 3 {
-                r *= 1.41421356f32;
+                r *= std::f32::consts::SQRT_2;
             }
             r = if thresh < r { thresh } else { r };
             r = r * sqrt_1;
@@ -355,8 +355,8 @@ fn intensity_stereo(
 fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
     let mut j = 0;
     while j < N {
-        let l = 0.70710678f32 * X[j as usize];
-        let r = 0.70710678f32 * Y[j as usize];
+        let l = std::f32::consts::FRAC_1_SQRT_2 * X[j as usize];
+        let r = std::f32::consts::FRAC_1_SQRT_2 * Y[j as usize];
         X[j as usize] = l + r;
         Y[j as usize] = r - l;
         j += 1;
