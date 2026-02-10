@@ -183,9 +183,13 @@ pub struct ec_dec<'a> { pub buf: &'a [u8], ... }
 
 ## Definition of Done
 
-- [ ] Zero `unsafe fn` declarations in `src/celt/` (except FFI boundaries if any)
-- [ ] Zero `unsafe {}` blocks in `src/celt/`
-- [ ] Every function has `/// Upstream C:` comment
-- [ ] All tests pass (cargo test + vector tests)
-- [ ] Clippy clean, formatted
-- [ ] `externs::{memcpy,memmove,memset}` no longer called from celt/
+- [x] Zero `unsafe fn` declarations in `src/celt/` (except FFI boundaries if any)
+- [ ] Zero `unsafe {}` blocks in `src/celt/` — **21 remain across 4 files:**
+  - `bands.rs`: 16 blocks (non-overlapping slice creation from raw pointers for X/Y band splitting — borrow checker workaround)
+  - `celt_decoder.rs`: 2 blocks (non-overlapping channel slice creation, lifetime erasure for ec_dec)
+  - `celt_encoder.rs`: 1 block (energy_mask from_raw_parts, externally-owned pointer)
+  - `mdct.rs`: 2 blocks (ndarray interlaced view splitting)
+- [x] Every function has `/// Upstream C:` comment
+- [x] All tests pass (cargo test + vector tests)
+- [x] Clippy clean, formatted
+- [x] `externs::{memcpy,memmove,memset}` no longer called from celt/

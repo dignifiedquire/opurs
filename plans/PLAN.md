@@ -15,9 +15,9 @@ touching codec internals.
 | # | Phase | Plan File | Status |
 |---|-------|-----------|--------|
 | 1 | [Test Suite Expansion](#phase-1) | [phase1-test-expansion.md](phase1-test-expansion.md) | Not started |
-| 2 | [CELT Safety](#phase-2) | [phase2-celt-safety.md](phase2-celt-safety.md) | Not started |
-| 3 | [SILK Safety](#phase-3) | [phase3-silk-safety.md](phase3-silk-safety.md) | Not started |
-| 4 | [Integration Layer Safety](#phase-4) | [phase4-integration-safety.md](phase4-integration-safety.md) | Not started |
+| 2 | [CELT Safety](#phase-2) | [phase2-celt-safety.md](phase2-celt-safety.md) | ~Complete (21 residual unsafe blocks) |
+| 3 | [SILK Safety](#phase-3) | [phase3-silk-safety.md](phase3-silk-safety.md) | In progress |
+| 4 | [Integration Layer Safety](#phase-4) | [phase4-integration-safety.md](phase4-integration-safety.md) | In progress |
 | 5 | [Performance Parity](#phase-5) | [phase5-performance.md](phase5-performance.md) | Not started |
 
 ---

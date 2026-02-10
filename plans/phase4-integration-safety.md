@@ -391,20 +391,22 @@ pub fn version() -> &'static str;
 
 ---
 
-## Current State
+## Current State (updated 2026-02-10)
 
-| File | Lines | unsafe fn | Key issues |
-|------|-------|-----------|------------|
-| `opus_encoder.rs` | 3034 | 30 | malloc/free for state, memcpy/memmove, VarArgs CTL |
-| `opus_decoder.rs` | 1033 | 15 | malloc/free for state, memcpy, VarArgs CTL |
-| `opus.rs` | — | — | Packet parsing (partially safe already) |
-| `analysis.rs` | 1582 | 9 | Fn signatures still unsafe, bodies are safe |
-| `repacketizer.rs` | 429 | 0 | **Already safe** — needs API wrapper only |
-| `mlp/` | — | 0 | **Already safe** |
-| `opus_defines.rs` | — | 0 | Constants only — replace with enums |
-| `opus_private.rs` | — | — | Alignment helpers, struct layout |
-| `externs.rs` | 100 | 8 | malloc/free/memcpy/memmove/memset/memcmp |
-| `varargs.rs` | 85 | 0 | VarArgs type — replace with typed methods |
+| File | unsafe fn | unsafe {} | Key issues |
+|------|-----------|-----------|------------|
+| `opus_encoder.rs` | 13 | 2 | VarArgs CTL, encode_native, downmix |
+| `opus_decoder.rs` | 5 | 3 | C-style create/destroy, decode_frame |
+| `opus.rs` | 0 | 1 | 1 residual unsafe block |
+| `analysis.rs` | 0 | 0 | **Safe** ✓ (1 legacy type alias with `unsafe fn` in signature) |
+| `repacketizer.rs` | 0 | 0 | **Already safe** — needs API wrapper only |
+| `mlp/` | 0 | 0 | **Already safe** |
+| `opus_defines.rs` | 0 | 0 | Constants only — replace with enums |
+| `opus_private.rs` | 0 | 0 | Safe |
+| `externs.rs` | 8 | 0 | malloc/free/memcpy/memmove/memset/memcmp — still used by silk/celt |
+| `varargs.rs` | 0 | 0 | VarArgs type — replace with typed methods |
+
+**Total remaining in src/src/**: 18 unsafe fn + 6 unsafe blocks = 24
 
 ---
 

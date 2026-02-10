@@ -84,192 +84,99 @@ Decoder side:
 
 ## Stages
 
-### Stage 3.1 — Math/Utility Primitives
+### Stage 3.1 — Math/Utility Primitives ✅
 
-- [ ] `Inlines.rs`
-  - Upstream C: `silk/Inlines.h`
-  - Scope: inline math helpers (CLZ, shifts, saturation)
-  - Risk: Low — pure math
-- [ ] `SigProc_FIX.rs`
-  - Upstream C: `silk/SigProc_FIX.h`
-  - Scope: fixed-point signal processing macros/inlines
-  - Risk: Low
-- [ ] `macros.rs`
-  - Upstream C: `silk/macros.h`
-  - Scope: multiply-accumulate, saturation macros
-  - Risk: Low
-- [ ] `mathops.rs` (silk version)
-  - Upstream C: `silk/SigProc_FIX.h` (various)
-  - Risk: Low
-- [ ] `sigm_Q15.rs`
-  - Upstream C: `silk/sigm_Q15.c`
-  - Risk: Low — lookup table + interpolation
-- [ ] `lin2log.rs`, `log2lin.rs`
-  - Upstream C: `silk/lin2log.c`, `silk/log2lin.c`
-  - Risk: Low
-- [ ] `sort.rs`
-  - Upstream C: `silk/sort.c`
-  - Function: `silk_insertion_sort_increasing`
-  - Risk: Low — convert pointer+len to slice
-- [ ] **Commit**: `refactor: make silk math/utility primitives safe`
+- [x] `Inlines.rs` ✓ — safe
+- [x] `SigProc_FIX.rs` ✓ — safe
+- [x] `macros.rs` ✓ — safe
+- [x] `mathops.rs` ✓ — safe
+- [x] `sigm_Q15.rs` ✓ — safe
+- [x] `lin2log.rs`, `log2lin.rs` ✓ — safe
+- [x] `sort.rs` ✓ — safe
 
-### Stage 3.2 — Tables (static data, trivially safe)
+### Stage 3.2 — Tables (static data, trivially safe) ✅
 
-- [ ] `tables_gain.rs`, `tables_LTP.rs`, `tables_NLSF_CB_NB_MB.rs`, `tables_NLSF_CB_WB.rs`, `tables_other.rs`, `tables_pitch_lag.rs`, `tables_pulses_per_block.rs`, `table_LSF_cos.rs`, `pitch_est_tables.rs`
-  - Upstream C: `silk/tables_*.c`
-  - Risk: Very Low — static const arrays
-  - Some may have `unsafe` from c2rust that can simply be removed
-- [ ] **Commit**: `refactor: make silk table modules safe`
+- [x] All table modules safe — static const arrays, no unsafe
 
-### Stage 3.3 — Filter/Processing Leaf Modules
+### Stage 3.3 — Filter/Processing Leaf Modules ✅
 
-- [ ] `biquad_alt.rs`
-  - Upstream C: `silk/biquad_alt.c`
-  - Function: `silk_biquad_alt_stride1`
-  - Risk: Low — IIR filter with state array
-- [ ] `bwexpander.rs`
-  - Upstream C: `silk/bwexpander.c`
-  - Risk: Low — chirp filter
-- [ ] `ana_filt_bank_1.rs`
-  - Upstream C: `silk/ana_filt_bank_1.c`
-  - Risk: Low — analysis filter bank
-- [ ] `inner_prod_aligned.rs`
-  - Upstream C: `silk/inner_prod_aligned.c`
-  - Risk: Low — pointer+len → slice
-- [ ] `interpolate.rs`
-  - Upstream C: `silk/interpolate.c`
-  - Risk: Low
-- [ ] `LPC_analysis_filter.rs`
-  - Upstream C: `silk/LPC_analysis_filter.c`
-  - Risk: Medium — FIR filter with pointer arithmetic
-- [ ] `LPC_inv_pred_gain.rs`
-  - Upstream C: `silk/LPC_inv_pred_gain.c`
-  - Risk: Medium — already partially safe on master
-- [ ] **Commit per file or small group**: `refactor: make silk::<module> safe`
+- [x] `biquad_alt.rs` ✓ — safe
+- [x] `bwexpander.rs` ✓ — safe
+- [x] `ana_filt_bank_1.rs` ✓ — safe
+- [x] `inner_prod_aligned.rs` ✓ — safe
+- [x] `interpolate.rs` ✓ — safe
+- [x] `LPC_analysis_filter.rs` ✓ — safe
+- [x] `LPC_inv_pred_gain.rs` ✓ — safe
 
-### Stage 3.4 — NLSF Codec (self-contained subsystem)
+### Stage 3.4 — NLSF Codec (self-contained subsystem) ✅
 
-- [ ] `NLSF_stabilize.rs`
-  - Upstream C: `silk/NLSF_stabilize.c`
-- [ ] `NLSF_VQ.rs`, `NLSF_VQ_weights_laroia.rs`
-  - Upstream C: `silk/NLSF_VQ.c`, `silk/NLSF_VQ_weights_laroia.c`
-- [ ] `NLSF_unpack.rs`
-  - Upstream C: `silk/NLSF_unpack.c`
-- [ ] `NLSF_decode.rs`
-  - Upstream C: `silk/NLSF_decode.c`
+- [x] `NLSF_stabilize.rs` ✓ — safe
+- [x] `NLSF_VQ.rs`, `NLSF_VQ_weights_laroia.rs` ✓ — safe
+- [x] `NLSF_unpack.rs` ✓ — safe
+- [x] `NLSF_decode.rs` ✓ — safe
 - [x] `NLSF_del_dec_quant.rs` ✓ (dig-safe: 0abfdd6, b088d75)
-  - Upstream C: `silk/NLSF_del_dec_quant.c`
-  - Risk: Medium — complex quantization with memcpy
 - [x] `NLSF_encode.rs` ✓ (dig-safe: da3c42e)
-  - Upstream C: `silk/NLSF_encode.c`
-- [ ] `A2NLSF.rs`
-  - Upstream C: `silk/A2NLSF.c`
-  - Risk: Medium — polynomial root finding
+- [x] `A2NLSF.rs` ✓ — safe
 - [x] `process_NLSFs.rs` ✓ (dig-safe: da3c42e)
-  - Upstream C: `silk/process_NLSFs.c`
-- [ ] **Commit**: `refactor: make silk NLSF subsystem safe`
 
-### Stage 3.5 — Coding Modules
+### Stage 3.5 — Coding Modules ✅
 
-- [ ] `code_signs.rs`
-  - Upstream C: `silk/code_signs.c`
-- [ ] `shell_coder.rs`
-  - Upstream C: `silk/shell_coder.c`
-- [ ] `encode_pulses.rs`, `decode_pulses.rs`
-  - Upstream C: `silk/encode_pulses.c`, `silk/decode_pulses.c`
-- [x] `encode_indices.rs` ✓ (dig-safe: 0abfdd6), [ ] `decode_indices.rs`
-  - Upstream C: `silk/encode_indices.c`, `silk/decode_indices.c`
-- [ ] `gain_quant.rs`
-  - Upstream C: `silk/gain_quant.c`
+- [x] `code_signs.rs` ✓ — safe
+- [x] `shell_coder.rs` ✓ — safe (`#![forbid(unsafe_code)]`)
+- [x] `encode_pulses.rs`, `decode_pulses.rs` ✓ — safe
+- [x] `encode_indices.rs` ✓ (dig-safe: 0abfdd6), [x] `decode_indices.rs` ✓ — safe
+- [x] `gain_quant.rs` ✓ — safe
 - [x] `quant_LTP_gains.rs` ✓ (dig-safe: d7966e9)
-  - Upstream C: `silk/quant_LTP_gains.c`
-- [ ] `VQ_WMat_EC.rs`
-  - Upstream C: `silk/VQ_WMat_EC.c`
-- [ ] **Commit**: `refactor: make silk coding modules safe`
+- [x] `VQ_WMat_EC.rs` ✓ — safe
 
-### Stage 3.6 — Stereo Processing
+### Stage 3.6 — Stereo Processing ✅
 
-- [ ] `stereo_LR_to_MS.rs` (1 unsafe fn remaining)
-  - Upstream C: `silk/stereo_LR_to_MS.c`
-  - Risk: Medium — uses memcpy
-- [ ] `stereo_find_predictor.rs`
-  - Upstream C: `silk/stereo_find_predictor.c`
-- [ ] `stereo_quant_pred.rs`
-  - Upstream C: `silk/stereo_quant_pred.c`
-- [ ] `stereo_encode_pred.rs`
-  - Upstream C: `silk/stereo_encode_pred.c`
-- [ ] **Commit**: `refactor: make silk stereo processing safe`
+- [x] `stereo_LR_to_MS.rs` ✓ — safe
+- [x] `stereo_find_predictor.rs` ✓ — safe
+- [x] `stereo_quant_pred.rs` ✓ — safe
+- [x] `stereo_encode_pred.rs` ✓ — safe
 
-### Stage 3.7 — Control/Configuration
+### Stage 3.7 — Control/Configuration ✅
 
-- [ ] `check_control_input.rs`
-  - Upstream C: `silk/check_control_input.c`
-- [ ] `control_SNR.rs`
-  - Upstream C: `silk/control_SNR.c`
-- [ ] `control_audio_bandwidth.rs`
-  - Upstream C: `silk/control_audio_bandwidth.c`
-- [ ] `HP_variable_cutoff.rs`
-  - Upstream C: `silk/HP_variable_cutoff.c`
-- [ ] `LP_variable_cutoff.rs`
-  - Upstream C: `silk/LP_variable_cutoff.c`
+- [x] `check_control_input.rs` ✓ — safe
+- [x] `control_SNR.rs` ✓ — safe
+- [x] `control_audio_bandwidth.rs` ✓ — safe
+- [x] `HP_variable_cutoff.rs` ✓ — safe
+- [x] `LP_variable_cutoff.rs` ✓ — safe
 - [x] `control_codec.rs` ✓ (dig-safe: 4a97b0b) — all 5 functions safe
-  - Upstream C: `silk/control_codec.c`
-- [x] **Commit**: `refactor: make all control_codec functions safe`
 
-### Stage 3.8 — Resampler
+### Stage 3.8 — Resampler ✅
 
-- [ ] `resampler/down2.rs`, `resampler/down2_3.rs`
-  - Upstream C: `silk/resampler_down2.c`, `silk/resampler_down2_3.c`
-- [ ] `resampler/up2_hq.rs`
-  - Upstream C: `silk/resampler_up2_hq.c` (name may vary)
-- [ ] `resampler/iir_fir.rs`
-  - Upstream C: resampler IIR-FIR implementation
-- [ ] `resampler/ar2.rs`
-  - Upstream C: `silk/resampler_private_AR2.c`
-- [ ] `resampler/mod.rs` (orchestrator)
-  - Upstream C: `silk/resampler.c`
-  - Risk: Medium — dispatches to sub-resamplers
-- [ ] **Commit**: `refactor: make silk resampler safe`
+- [x] All resampler modules safe (`#![forbid(unsafe_code)]` on mod.rs, iir_fir.rs)
 
 ### Stage 3.9 — Float Processing (src/silk/float/)
 
 Many of these follow the same pattern: pointer+length → slice.
 
-- [ ] `SigProc_FLP.rs`, `structs_FLP.rs`
-  - Data types and helpers
-- [ ] `energy_FLP.rs`, `inner_product_FLP.rs`, `scale_copy_vector_FLP.rs`
-  - Upstream C: `silk/float/energy_FLP.c`, etc.
-  - Risk: Low — simple math kernels
-- [ ] `autocorrelation_FLP.rs`, `warped_autocorrelation_FLP.rs`
-  - Upstream C: respective `.c` files
-- [ ] `burg_modified_FLP.rs`
-  - Upstream C: `silk/float/burg_modified_FLP.c`
-  - Risk: Medium — Burg's method with array manipulation
-- [ ] `schur_FLP.rs`, `k2a_FLP.rs`, `sort_FLP.rs`
-  - Low complexity helpers
-- [ ] `apply_sine_window_FLP.rs`, `bwexpander_FLP.rs`
-  - Low complexity
-- [ ] `corrMatrix_FLP.rs`, `residual_energy_FLP.rs`
-  - Medium — matrix operations
-- [ ] `LPC_analysis_filter_FLP.rs`
-  - Upstream C: `silk/float/LPC_analysis_filter_FLP.c`
-  - Risk: Medium — 6 unsafe fn, FIR filter
-- [ ] `LTP_analysis_filter_FLP.rs`, `LTP_scale_ctrl_FLP.rs`
-  - Medium
-- [x] `find_LPC_FLP.rs` ✓ (dig-safe: 6ee1f2d), [ ] `find_LTP_FLP.rs`, [ ] `find_pitch_lags_FLP.rs` (1 unsafe), [ ] `find_pred_coefs_FLP.rs` (1 unsafe)
-  - Medium — analysis routines that combine multiple helpers
-- [ ] `noise_shape_analysis_FLP.rs` (1 unsafe fn)
-  - Upstream C: `silk/float/noise_shape_analysis_FLP.c`
-  - Risk: High — complex analysis calling many modules
-- [ ] `pitch_analysis_core_FLP.rs` (1 unsafe fn)
-  - Upstream C: `silk/float/pitch_analysis_core_FLP.c`
-  - Risk: High — 743 lines, heavy pointer arithmetic
-- [ ] `process_gains_FLP.rs`
-  - Medium
+- [x] `SigProc_FLP.rs`, `structs_FLP.rs` ✓ — safe (data types and helpers)
+- [x] `energy_FLP.rs`, `scale_copy_vector_FLP.rs` ✓ — safe
+- [x] `autocorrelation_FLP.rs`, `warped_autocorrelation_FLP.rs` ✓ — safe
+- [x] `burg_modified_FLP.rs` ✓ — safe
+- [x] `schur_FLP.rs`, `k2a_FLP.rs`, `sort_FLP.rs` ✓ — safe
+- [x] `apply_sine_window_FLP.rs`, `bwexpander_FLP.rs` ✓ — safe
+- [x] `corrMatrix_FLP.rs`, `residual_energy_FLP.rs` ✓ — safe
+- [x] `LPC_analysis_filter_FLP.rs` ✓ — safe
+- [x] `LTP_analysis_filter_FLP.rs`, `LTP_scale_ctrl_FLP.rs` ✓ — safe
+- [x] `find_LPC_FLP.rs` ✓, `find_LTP_FLP.rs` ✓, `find_pitch_lags_FLP.rs` ✓, `find_pred_coefs_FLP.rs` ✓
+  - All converted to safe slice APIs (dig-safe)
+- [x] `noise_shape_analysis_FLP.rs` ✓ — safe (dig-safe: 93ef28c)
+- [x] `pitch_analysis_core_FLP.rs` ✓ — safe (dig-safe: be723e4)
+- [x] `process_gains_FLP.rs` ✓ — safe
+- [ ] `inner_product_FLP.rs` — 9 unsafe blocks (`get_unchecked` for performance)
+  - Could convert to safe indexing but may impact performance
 - [ ] `wrappers_FLP.rs` (1 unsafe fn: silk_NSQ_wrapper_FLP)
   - Upstream C: `silk/float/wrappers_FLP.c`
   - Risk: Medium — bridges float/fixed-point, blocked by NSQ safety
-- [ ] **Commit per small group**: `refactor: make silk::float::<group> safe`
+- [ ] `encode_frame_FLP.rs` (3 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP, silk_LBRR_encode_FLP)
+  - All memcpy/memmove eliminated (dig-safe: 8e98913)
+  - Remaining unsafe: raw pointer params from callers, NSQ_wrapper calls
+  - Blocked by: wrappers_FLP (NSQ), enc_API callers
+- [ ] **Remaining**: 3 files with unsafe (encode_frame_FLP, inner_product_FLP, wrappers_FLP)
 
 ### Stage 3.10 — Core Quantizers
 
@@ -284,40 +191,38 @@ Many of these follow the same pattern: pointer+length → slice.
 
 ### Stage 3.11 — Decoder Integration
 
-- [ ] `decode_frame.rs` (1 unsafe fn — blocked by PLC)
+- [ ] `decode_frame.rs` (1 unsafe fn: silk_decode_frame)
   - Upstream C: `silk/decode_frame.c`
   - Partial cleanup done: memmove/memcpy replaced with copy_within/copy_from_slice
+  - Blocked by: PLC.rs conceal path
 - [x] `decode_core.rs` ✓ (safe from master)
-- [ ] `decode_pitch.rs`
-  - Upstream C: `silk/decode_pitch.c`
-- [ ] `PLC.rs` (2 unsafe fn: silk_PLC, silk_PLC_glue_frames)
-  - Upstream C: `silk/PLC.c`
-  - Risk: High — 803 lines, memcpy/memmove heavy
+- [x] `decode_pitch.rs` ✓ — safe
+- [x] `PLC.rs` — public functions safe (silk_PLC, silk_PLC_glue_frames) ✓ (dig-safe: be723e4)
+  - 2 private unsafe fn remain: silk_PLC_energy, silk_PLC_conceal (untested code paths)
+  - 1 unsafe block wrapping silk_PLC_conceal call
 - [x] `CNG.rs` ✓ (safe from master)
-- [ ] `VAD.rs` (1 unsafe fn: silk_VAD_GetSA_Q8_c — raw pIn pointer)
-  - Upstream C: `silk/VAD.c`
-  - silk_VAD_Init and silk_VAD_GetNoiseLevels already safe (dig-safe: ab4dea9)
+- [x] `VAD.rs` ✓ — all 3 functions safe (dig-safe: silk_VAD_GetSA_Q8_c converted)
 - [x] `init_decoder.rs` ✓, [x] `decoder_set_fs.rs` ✓ (dig-safe: ab4dea9)
-  - Upstream C: respective `.c` files
 - [ ] `dec_API.rs` (1 unsafe fn: silk_Decode)
   - Upstream C: `silk/dec_API.c`
-  - Risk: High — 490 lines, decoder hub
-- [ ] **Commit**: `refactor: make silk decoder pipeline safe`
+  - All memcpy/memset eliminated (dig-safe: da15295)
+  - Remaining: raw pointer params from callers
+- [ ] **Remaining**: 3 files with unsafe (decode_frame, PLC internals, dec_API)
 
 ### Stage 3.12 — Encoder Integration
 
-- [ ] `float/encode_frame_FLP.rs` (2 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP)
+- [ ] `float/encode_frame_FLP.rs` (3 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP, silk_LBRR_encode_FLP)
   - Upstream C: `silk/float/encode_frame_FLP.c`
-  - Risk: High — 571 lines, calls 10+ float modules
-  - All float helpers must be safe first (Stage 3.9)
+  - All memcpy/memmove eliminated ✓ (dig-safe: 8e98913)
+  - All float analysis helpers now safe ✓
+  - Remaining: raw pointer params from enc_API callers, silk_NSQ_wrapper_FLP calls
+  - Blocked by: wrappers_FLP (NSQ), enc_API
 - [x] `init_encoder.rs` ✓ (dig-safe: ab4dea9) — uses Default::default()
-  - Upstream C: `silk/init_encoder.c`
-- [ ] `enc_API.rs` (3 unsafe fn: silk_Get_Encoder_Size, silk_InitEncoder, silk_Encode)
+- [ ] `enc_API.rs` (4 unsafe fn: silk_Get_Encoder_Size, silk_InitEncoder, silk_QueryEncoder, silk_Encode)
   - Upstream C: `silk/enc_API.c`
   - Risk: **Very High** — 877 lines, encoder hub
-  - Calls: control_codec, encode_indices, encode_pulses, float/encode_frame_FLP, init_encoder, resampler, stereo functions
-  - Uses: memcpy, memset
-- [ ] **Commit**: `refactor: make silk encoder pipeline safe`
+  - Blocked by: encode_frame_FLP, NSQ
+- [ ] **Remaining**: 2 files with unsafe (encode_frame_FLP, enc_API)
 
 ---
 
