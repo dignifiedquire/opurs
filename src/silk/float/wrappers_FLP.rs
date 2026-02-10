@@ -2,7 +2,7 @@ use crate::silk::A2NLSF::silk_A2NLSF;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
 use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
-use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
+use crate::silk::float::structs_FLP::silk_encoder_control_FLP;
 use crate::silk::float::SigProc_FLP::silk_float2int;
 use crate::silk::process_NLSFs::silk_process_NLSFs;
 use crate::silk::quant_LTP_gains::silk_quant_LTP_gains;
@@ -62,13 +62,14 @@ pub fn silk_process_NLSFs_FLP(
         j += 1;
     }
 }
-pub unsafe fn silk_NSQ_wrapper_FLP(
-    psEnc: *mut silk_encoder_state_FLP,
-    psEncCtrl: *mut silk_encoder_control_FLP,
-    psIndices: *mut SideInfoIndices,
-    psNSQ: *mut silk_nsq_state,
-    pulses: *mut i8,
-    x: *const f32,
+/// Upstream C: silk/float/wrappers_FLP.c:silk_NSQ_wrapper_FLP
+pub fn silk_NSQ_wrapper_FLP(
+    psEncC: &silk_encoder_state,
+    psEncCtrl: &silk_encoder_control_FLP,
+    psIndices: &mut SideInfoIndices,
+    psNSQ: &mut silk_nsq_state,
+    pulses: &mut [i8],
+    x: &[f32],
 ) {
     let mut i: i32 = 0;
     let mut j: i32 = 0;
@@ -76,74 +77,72 @@ pub unsafe fn silk_NSQ_wrapper_FLP(
     let mut Gains_Q16: [i32; 4] = [0; 4];
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
     let mut LTPCoef_Q14: [i16; 20] = [0; 20];
-    let mut LTP_scale_Q14: i32 = 0;
+    let mut LTP_scale_Q14: i32;
     let mut AR_Q13: [i16; 96] = [0; 96];
     let mut LF_shp_Q14: [i32; 4] = [0; 4];
-    let mut Lambda_Q10: i32 = 0;
+    let mut Lambda_Q10: i32;
     let mut Tilt_Q14: [i32; 4] = [0; 4];
     let mut HarmShapeGain_Q14: [i32; 4] = [0; 4];
     i = 0;
-    while i < (*psEnc).sCmn.nb_subfr as i32 {
+    while i < psEncC.nb_subfr as i32 {
         j = 0;
-        while j < (*psEnc).sCmn.shapingLPCOrder {
+        while j < psEncC.shapingLPCOrder {
             AR_Q13[(i * MAX_SHAPE_LPC_ORDER + j) as usize] =
-                silk_float2int((*psEncCtrl).AR[(i * MAX_SHAPE_LPC_ORDER + j) as usize] * 8192.0f32)
+                silk_float2int(psEncCtrl.AR[(i * MAX_SHAPE_LPC_ORDER + j) as usize] * 8192.0f32)
                     as i16;
             j += 1;
         }
         i += 1;
     }
     i = 0;
-    while i < (*psEnc).sCmn.nb_subfr as i32 {
+    while i < psEncC.nb_subfr as i32 {
         LF_shp_Q14[i as usize] =
-            ((silk_float2int((*psEncCtrl).LF_AR_shp[i as usize] * 16384.0f32) as u32) << 16) as i32
-                | silk_float2int((*psEncCtrl).LF_MA_shp[i as usize] * 16384.0f32) as u16 as i32;
-        Tilt_Q14[i as usize] = silk_float2int((*psEncCtrl).Tilt[i as usize] * 16384.0f32);
+            ((silk_float2int(psEncCtrl.LF_AR_shp[i as usize] * 16384.0f32) as u32) << 16) as i32
+                | silk_float2int(psEncCtrl.LF_MA_shp[i as usize] * 16384.0f32) as u16 as i32;
+        Tilt_Q14[i as usize] = silk_float2int(psEncCtrl.Tilt[i as usize] * 16384.0f32);
         HarmShapeGain_Q14[i as usize] =
-            silk_float2int((*psEncCtrl).HarmShapeGain[i as usize] * 16384.0f32);
+            silk_float2int(psEncCtrl.HarmShapeGain[i as usize] * 16384.0f32);
         i += 1;
     }
-    Lambda_Q10 = silk_float2int((*psEncCtrl).Lambda * 1024.0f32);
+    Lambda_Q10 = silk_float2int(psEncCtrl.Lambda * 1024.0f32);
     i = 0;
-    while i < (*psEnc).sCmn.nb_subfr as i32 * LTP_ORDER as i32 {
-        LTPCoef_Q14[i as usize] =
-            silk_float2int((*psEncCtrl).LTPCoef[i as usize] * 16384.0f32) as i16;
+    while i < psEncC.nb_subfr as i32 * LTP_ORDER as i32 {
+        LTPCoef_Q14[i as usize] = silk_float2int(psEncCtrl.LTPCoef[i as usize] * 16384.0f32) as i16;
         i += 1;
     }
     j = 0;
     while j < 2 {
         i = 0;
-        while i < (*psEnc).sCmn.predictLPCOrder {
+        while i < psEncC.predictLPCOrder {
             PredCoef_Q12[j as usize][i as usize] =
-                silk_float2int((*psEncCtrl).PredCoef[j as usize][i as usize] * 4096.0f32) as i16;
+                silk_float2int(psEncCtrl.PredCoef[j as usize][i as usize] * 4096.0f32) as i16;
             i += 1;
         }
         j += 1;
     }
     i = 0;
-    while i < (*psEnc).sCmn.nb_subfr as i32 {
-        Gains_Q16[i as usize] = silk_float2int((*psEncCtrl).Gains[i as usize] * 65536.0f32);
+    while i < psEncC.nb_subfr as i32 {
+        Gains_Q16[i as usize] = silk_float2int(psEncCtrl.Gains[i as usize] * 65536.0f32);
         i += 1;
     }
-    if (*psIndices).signalType as i32 == TYPE_VOICED {
-        LTP_scale_Q14 = silk_LTPScales_table_Q14[(*psIndices).LTP_scaleIndex as usize] as i32;
+    if psIndices.signalType as i32 == TYPE_VOICED {
+        LTP_scale_Q14 = silk_LTPScales_table_Q14[psIndices.LTP_scaleIndex as usize] as i32;
     } else {
         LTP_scale_Q14 = 0;
     }
+    let frame_length = psEncC.frame_length;
     i = 0;
-    while i < (*psEnc).sCmn.frame_length as i32 {
-        x16[i as usize] = silk_float2int(*x.offset(i as isize)) as i16;
+    while i < frame_length as i32 {
+        x16[i as usize] = silk_float2int(x[i as usize]) as i16;
         i += 1;
     }
-    let total_len = (*psEnc).sCmn.nb_subfr as usize * (*psEnc).sCmn.subfr_length;
-    let pulses_slice = std::slice::from_raw_parts_mut(pulses, total_len);
-    if (*psEnc).sCmn.nStatesDelayedDecision > 1 || (*psEnc).sCmn.warping_Q16 > 0 {
+    if psEncC.nStatesDelayedDecision > 1 || psEncC.warping_Q16 > 0 {
         silk_NSQ_del_dec_c(
-            &mut (*psEnc).sCmn,
-            &mut *psNSQ,
-            &mut *psIndices,
-            &x16[..(*psEnc).sCmn.frame_length],
-            pulses_slice,
+            psEncC,
+            psNSQ,
+            psIndices,
+            &x16[..frame_length],
+            pulses,
             PredCoef_Q12.as_flattened(),
             &LTPCoef_Q14,
             &AR_Q13,
@@ -151,17 +150,17 @@ pub unsafe fn silk_NSQ_wrapper_FLP(
             &Tilt_Q14,
             &LF_shp_Q14,
             &Gains_Q16,
-            &(*psEncCtrl).pitchL,
+            &psEncCtrl.pitchL,
             Lambda_Q10,
             LTP_scale_Q14,
         );
     } else {
         silk_NSQ_c(
-            &mut (*psEnc).sCmn,
-            &mut *psNSQ,
-            &mut *psIndices,
-            &x16[..(*psEnc).sCmn.frame_length],
-            pulses_slice,
+            psEncC,
+            psNSQ,
+            psIndices,
+            &x16[..frame_length],
+            pulses,
             PredCoef_Q12.as_flattened(),
             &LTPCoef_Q14,
             &AR_Q13,
@@ -169,7 +168,7 @@ pub unsafe fn silk_NSQ_wrapper_FLP(
             &Tilt_Q14,
             &LF_shp_Q14,
             &Gains_Q16,
-            &(*psEncCtrl).pitchL,
+            &psEncCtrl.pitchL,
             Lambda_Q10,
             LTP_scale_Q14,
         );

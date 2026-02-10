@@ -250,14 +250,18 @@ pub unsafe fn silk_encode_frame_FLP(
                     (*psEnc).sCmn.ec_prevLagIndex = ec_prevLagIndex_copy;
                     (*psEnc).sCmn.ec_prevSignalType = ec_prevSignalType_copy;
                 }
-                silk_NSQ_wrapper_FLP(
-                    psEnc,
-                    &mut sEncCtrl,
-                    &mut (*psEnc).sCmn.indices,
-                    &mut (*psEnc).sCmn.sNSQ,
-                    ((*psEnc).sCmn.pulses).as_mut_ptr(),
-                    (*psEnc).x_buf.as_ptr().add(x_frame_off),
-                );
+                {
+                    let total_len = (*psEnc).sCmn.nb_subfr as usize * (*psEnc).sCmn.subfr_length;
+                    let frame_len = (*psEnc).sCmn.frame_length;
+                    silk_NSQ_wrapper_FLP(
+                        &(*psEnc).sCmn,
+                        &sEncCtrl,
+                        &mut (*psEnc).sCmn.indices,
+                        &mut (*psEnc).sCmn.sNSQ,
+                        &mut (&mut (*psEnc).sCmn.pulses)[..total_len],
+                        &(&(*psEnc).x_buf)[x_frame_off..x_frame_off + frame_len],
+                    );
+                }
                 if iter == maxIter && found_lower == 0 {
                     sRangeEnc_copy2 = psRangeEnc.save();
                 }
@@ -528,14 +532,19 @@ unsafe fn silk_LBRR_encode_FLP(
             (*psEncCtrl).Gains[k as usize] = Gains_Q16[k as usize] as f32 * (1.0f32 / 65536.0f32);
             k += 1;
         }
-        silk_NSQ_wrapper_FLP(
-            psEnc,
-            psEncCtrl,
-            &mut (*psEnc).sCmn.indices_LBRR[nFramesEncoded],
-            &mut sNSQ_LBRR,
-            (*psEnc).sCmn.pulses_LBRR[nFramesEncoded].as_mut_ptr(),
-            xfw,
-        );
+        {
+            let total_len = (*psEnc).sCmn.nb_subfr as usize * (*psEnc).sCmn.subfr_length;
+            let frame_len = (*psEnc).sCmn.frame_length;
+            let xfw_slice = std::slice::from_raw_parts(xfw, frame_len);
+            silk_NSQ_wrapper_FLP(
+                &(*psEnc).sCmn,
+                &*psEncCtrl,
+                &mut (*psEnc).sCmn.indices_LBRR[nFramesEncoded],
+                &mut sNSQ_LBRR,
+                &mut (&mut (*psEnc).sCmn.pulses_LBRR[nFramesEncoded])[..total_len],
+                xfw_slice,
+            );
+        }
         (&mut *psEncCtrl).Gains[..nb_subfr].copy_from_slice(&TempGains[..nb_subfr]);
     }
 }
