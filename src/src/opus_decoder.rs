@@ -96,6 +96,42 @@ impl OpusDecoder {
 
         Ok(st)
     }
+
+    /// Decode an Opus packet into interleaved `i16` PCM samples.
+    ///
+    /// `data` is the compressed Opus packet. `pcm` must be large enough to
+    /// hold `frame_size * channels` samples. `frame_size` is the maximum
+    /// number of samples per channel to decode.
+    ///
+    /// Returns the number of decoded samples per channel on success, or a
+    /// negative Opus error code on failure.
+    pub fn decode(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [i16],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        opus_decode(self, data, pcm, frame_size, decode_fec as i32)
+    }
+
+    /// Decode an Opus packet into interleaved `f32` PCM samples.
+    ///
+    /// `data` is the compressed Opus packet. `pcm` must be large enough to
+    /// hold `frame_size * channels` samples. `frame_size` is the maximum
+    /// number of samples per channel to decode.
+    ///
+    /// Returns the number of decoded samples per channel on success, or a
+    /// negative Opus error code on failure.
+    pub fn decode_float(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [f32],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        opus_decode_float(self, data, pcm, frame_size, decode_fec as i32)
+    }
 }
 
 fn validate_opus_decoder(st: &OpusDecoder) {

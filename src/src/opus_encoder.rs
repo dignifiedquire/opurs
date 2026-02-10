@@ -267,6 +267,50 @@ impl OpusEncoder {
             rangeFinal: 0,
         })
     }
+
+    /// Encode an audio frame from interleaved `i16` PCM samples.
+    ///
+    /// `pcm` must contain `frame_size * channels` samples where `frame_size`
+    /// is one of the valid Opus frame sizes for the configured sample rate.
+    /// `output` is the buffer for the encoded packet.
+    ///
+    /// Returns the number of bytes written into `output` on success, or a
+    /// negative Opus error code on failure.
+    pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
+        let frame_size = pcm.len() as i32 / self.channels;
+        unsafe {
+            opus_encode(
+                self as *mut OpusEncoder,
+                pcm.as_ptr(),
+                frame_size,
+                output.as_mut_ptr(),
+                output.len() as i32,
+            )
+        }
+    }
+
+    /// Encode an audio frame from interleaved `f32` PCM samples.
+    ///
+    /// `pcm` must contain `frame_size * channels` samples where `frame_size`
+    /// is one of the valid Opus frame sizes for the configured sample rate.
+    /// Samples should be in the range `[-1.0, 1.0]`; values outside this
+    /// range are supported but will be clipped on decoding.
+    /// `output` is the buffer for the encoded packet.
+    ///
+    /// Returns the number of bytes written into `output` on success, or a
+    /// negative Opus error code on failure.
+    pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> i32 {
+        let frame_size = pcm.len() as i32 / self.channels;
+        unsafe {
+            opus_encode_float(
+                self as *mut OpusEncoder,
+                pcm.as_ptr(),
+                frame_size,
+                output.as_mut_ptr(),
+                output.len() as i32,
+            )
+        }
+    }
 }
 /// Upstream C: src/opus_encoder.c:gen_toc
 fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
