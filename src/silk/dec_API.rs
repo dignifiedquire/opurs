@@ -308,15 +308,21 @@ pub unsafe fn silk_Decode(
             } else {
                 condCoding_0 = CODE_CONDITIONALLY;
             }
-            ret += silk_decode_frame(
-                &mut channel_state[n as usize],
-                psRangeDec,
-                &mut *(*samplesOut1_tmp.as_mut_ptr().offset(n as isize)).offset(2 as isize),
-                &mut nSamplesOutDec,
-                lostFlag,
-                condCoding_0,
-                arch,
-            );
+            {
+                let out_ptr = samplesOut1_tmp[n as usize].offset(2);
+                let frame_len = channel_state[n as usize].frame_length;
+                let out_slice = std::slice::from_raw_parts_mut(out_ptr, frame_len);
+                let (err, n_out) = silk_decode_frame(
+                    &mut channel_state[n as usize],
+                    psRangeDec,
+                    out_slice,
+                    lostFlag,
+                    condCoding_0,
+                    arch,
+                );
+                ret += err;
+                nSamplesOutDec = n_out;
+            }
         } else {
             let side_ptr = samplesOut1_tmp[n as usize].offset(2);
             std::slice::from_raw_parts_mut(side_ptr, nSamplesOutDec as usize).fill(0);
