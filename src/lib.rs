@@ -1,7 +1,6 @@
 extern crate core;
 
 pub mod api;
-pub mod externs;
 pub mod util;
 pub mod varargs;
 

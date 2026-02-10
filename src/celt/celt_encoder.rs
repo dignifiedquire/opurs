@@ -63,6 +63,7 @@ use crate::varargs::VarArgs;
 /// to store overlap memory, prefilter memory, and band energy arrays in a contiguous
 /// allocation. This Rust version uses fixed-size arrays sized for the maximum case
 /// (2 channels, overlap=120, nbEBands=21, COMBFILTER_MAXPERIOD=1024).
+#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusCustomEncoder {
     pub mode: &'static OpusCustomMode,

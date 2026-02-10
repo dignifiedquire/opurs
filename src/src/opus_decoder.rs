@@ -1,13 +1,8 @@
-use crate::externs::{free, malloc};
-
 pub mod arch_h {
     pub type opus_val16 = f32;
     pub type opus_val32 = f32;
 }
-pub mod stddef_h {
-    pub type size_t = u64;
-    pub const NULL: i32 = 0;
-}
+pub mod stddef_h {}
 pub mod stack_alloc_h {
     pub const ALLOC_NONE: i32 = 1;
     #[inline]
@@ -17,7 +12,7 @@ pub mod stack_alloc_h {
 }
 pub use self::arch_h::{opus_val16, opus_val32};
 pub use self::stack_alloc_h::{_opus_false, ALLOC_NONE};
-pub use self::stddef_h::{size_t, NULL};
+
 use crate::celt::celt::CELT_SET_SIGNALLING_REQUEST;
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
 use crate::celt::entcode::ec_tell;
@@ -30,13 +25,12 @@ use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
 use crate::silk::dec_API::{silk_Decode, silk_InitDecoder};
 use crate::src::opus::opus_packet_parse_impl;
 use crate::src::opus_defines::{
-    OPUS_ALLOC_FAIL, OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND,
-    OPUS_BANDWIDTH_NARROWBAND, OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND,
-    OPUS_BUFFER_TOO_SMALL, OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST,
-    OPUS_GET_GAIN_REQUEST, OPUS_GET_LAST_PACKET_DURATION_REQUEST,
-    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PITCH_REQUEST,
-    OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
-    OPUS_RESET_STATE, OPUS_SET_GAIN_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
+    OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BUFFER_TOO_SMALL,
+    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_GAIN_REQUEST,
+    OPUS_GET_LAST_PACKET_DURATION_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_GET_PITCH_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
+    OPUS_OK, OPUS_RESET_STATE, OPUS_SET_GAIN_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
     OPUS_UNIMPLEMENTED,
 };
 use crate::src::opus_private::{align, MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
@@ -149,33 +143,21 @@ pub unsafe fn opus_decoder_init(st: *mut OpusDecoder, Fs: i32, channels: i32) ->
     }
 }
 #[deprecated]
-#[allow(deprecated)]
 pub unsafe fn opus_decoder_create(Fs: i32, channels: i32, error: *mut i32) -> *mut OpusDecoder {
-    let mut st: *mut OpusDecoder = 0 as *mut OpusDecoder;
-    if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
-        || channels != 1 && channels != 2
-    {
-        if !error.is_null() {
-            *error = OPUS_BAD_ARG;
+    match OpusDecoder::new(Fs, channels as usize) {
+        Ok(dec) => {
+            if !error.is_null() {
+                *error = OPUS_OK;
+            }
+            Box::into_raw(Box::new(dec))
         }
-        return NULL as *mut OpusDecoder;
-    }
-    st = malloc(opus_decoder_get_size(channels) as size_t) as *mut OpusDecoder;
-    if st.is_null() {
-        if !error.is_null() {
-            *error = OPUS_ALLOC_FAIL;
+        Err(e) => {
+            if !error.is_null() {
+                *error = e;
+            }
+            std::ptr::null_mut()
         }
-        return NULL as *mut OpusDecoder;
     }
-    let ret = opus_decoder_init(st, Fs, channels);
-    if !error.is_null() {
-        *error = ret;
-    }
-    if ret != OPUS_OK {
-        free(st as *mut core::ffi::c_void);
-        st = NULL as *mut OpusDecoder;
-    }
-    return st;
 }
 fn smooth_fade(
     in1: &[opus_val16],
@@ -960,7 +942,7 @@ macro_rules! opus_decoder_ctl {
 }
 #[deprecated]
 pub unsafe fn opus_decoder_destroy(st: *mut OpusDecoder) {
-    free(st as *mut core::ffi::c_void);
+    drop(Box::from_raw(st));
 }
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
     let mut bandwidth: i32;

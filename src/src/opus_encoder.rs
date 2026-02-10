@@ -1,4 +1,3 @@
-use crate::externs::{free, malloc};
 use crate::src::repacketizer::FrameSource;
 
 pub mod arch_h {
@@ -9,10 +8,7 @@ pub mod arch_h {
     pub const EPSILON: f32 = 1e-15f32;
     pub const VERY_SMALL: f32 = 1e-30f32;
 }
-pub mod stddef_h {
-    pub type size_t = u64;
-    pub const NULL: i32 = 0;
-}
+pub mod stddef_h {}
 pub mod cpu_support_h {
     #[inline]
     pub fn opus_select_arch() -> i32 {
@@ -21,7 +17,6 @@ pub mod cpu_support_h {
 }
 use self::arch_h::{opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL};
 pub use self::cpu_support_h::opus_select_arch;
-pub use self::stddef_h::{size_t, NULL};
 use crate::celt::celt::{
     CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
     CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
@@ -29,7 +24,7 @@ use crate::celt::celt::{
     OPUS_SET_LFE_REQUEST,
 };
 use crate::celt::celt_encoder::{
-    celt_encode_with_ec, celt_encoder_get_size, celt_encoder_init, OpusCustomEncoder, SILKInfo,
+    celt_encode_with_ec, celt_encoder_init, OpusCustomEncoder, SILKInfo,
 };
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::ec_enc;
@@ -43,7 +38,7 @@ use crate::silk::define::{
     DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX, VAD_NO_DECISION,
 };
 use crate::silk::enc_API::silk_EncControlStruct;
-use crate::silk::enc_API::{silk_Encode, silk_Get_Encoder_Size, silk_InitEncoder};
+use crate::silk::enc_API::{silk_Encode, silk_InitEncoder};
 use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
@@ -53,15 +48,14 @@ use crate::src::analysis::{
     DownmixInput, TonalityAnalysisState,
 };
 use crate::src::opus_defines::{
-    OPUS_ALLOC_FAIL, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
-    OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND,
-    OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND, OPUS_BANDWIDTH_SUPERWIDEBAND,
-    OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_FRAMESIZE_100_MS,
-    OPUS_FRAMESIZE_10_MS, OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_20_MS, OPUS_FRAMESIZE_2_5_MS,
-    OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_5_MS, OPUS_FRAMESIZE_60_MS, OPUS_FRAMESIZE_80_MS,
-    OPUS_FRAMESIZE_ARG, OPUS_GET_APPLICATION_REQUEST, OPUS_GET_BANDWIDTH_REQUEST,
-    OPUS_GET_BITRATE_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
-    OPUS_GET_EXPERT_FRAME_DURATION_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST,
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
+    OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
+    OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
+    OPUS_FRAMESIZE_100_MS, OPUS_FRAMESIZE_10_MS, OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_20_MS,
+    OPUS_FRAMESIZE_2_5_MS, OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_5_MS, OPUS_FRAMESIZE_60_MS,
+    OPUS_FRAMESIZE_80_MS, OPUS_FRAMESIZE_ARG, OPUS_GET_APPLICATION_REQUEST,
+    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_BITRATE_REQUEST, OPUS_GET_COMPLEXITY_REQUEST,
+    OPUS_GET_DTX_REQUEST, OPUS_GET_EXPERT_FRAME_DURATION_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_IN_DTX_REQUEST,
     OPUS_GET_LOOKAHEAD_REQUEST, OPUS_GET_LSB_DEPTH_REQUEST, OPUS_GET_MAX_BANDWIDTH_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
@@ -76,7 +70,7 @@ use crate::src::opus_defines::{
     OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
 };
 use crate::src::opus_private::{
-    align, MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY, OPUS_GET_VOICE_RATIO_REQUEST,
+    MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY, OPUS_GET_VOICE_RATIO_REQUEST,
     OPUS_SET_FORCE_MODE_REQUEST, OPUS_SET_VOICE_RATIO_REQUEST,
 };
 use crate::varargs::VarArgs;
@@ -85,8 +79,8 @@ use crate::{opus_custom_encoder_ctl, opus_packet_pad, OpusRepacketizer};
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusEncoder {
-    pub(crate) celt_enc_offset: i32,
-    pub(crate) silk_enc_offset: i32,
+    pub(crate) silk_enc: silk_encoder,
+    pub(crate) celt_enc: OpusCustomEncoder,
     pub(crate) silk_mode: silk_EncControlStruct,
     pub(crate) application: i32,
     pub(crate) channels: i32,
@@ -153,22 +147,11 @@ static mut mode_thresholds: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
 static fec_thresholds: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
-pub unsafe fn opus_encoder_get_size(channels: i32) -> i32 {
-    let mut silkEncSizeBytes: i32 = 0;
-    let mut celtEncSizeBytes: i32 = 0;
-    let mut ret: i32 = 0;
+pub fn opus_encoder_get_size(channels: i32) -> i32 {
     if channels < 1 || channels > 2 {
         return 0;
     }
-    ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
-    if ret != 0 {
-        return 0;
-    }
-    silkEncSizeBytes = align(silkEncSizeBytes);
-    celtEncSizeBytes = celt_encoder_get_size(channels);
-    return align(::core::mem::size_of::<OpusEncoder>() as u64 as i32)
-        + silkEncSizeBytes
-        + celtEncSizeBytes;
+    ::core::mem::size_of::<OpusEncoder>() as i32
 }
 pub unsafe fn opus_encoder_init(
     st: *mut OpusEncoder,
@@ -176,85 +159,89 @@ pub unsafe fn opus_encoder_init(
     channels: i32,
     application: i32,
 ) -> i32 {
-    let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
-    let mut err: i32 = 0;
-    let mut ret: i32 = 0;
-    let mut silkEncSizeBytes: i32 = 0;
-    if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
-        || channels != 1 && channels != 2
-        || application != OPUS_APPLICATION_VOIP
-            && application != OPUS_APPLICATION_AUDIO
-            && application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
-    {
-        return OPUS_BAD_ARG;
+    let ret = OpusEncoder::init(&mut *st, Fs, channels, application);
+    match ret {
+        Ok(()) => OPUS_OK,
+        Err(e) => e,
     }
-    std::ptr::write_bytes(st as *mut u8, 0, opus_encoder_get_size(channels) as usize);
-    ret = silk_Get_Encoder_Size(&mut silkEncSizeBytes);
-    if ret != 0 {
-        return OPUS_BAD_ARG;
+}
+
+impl OpusEncoder {
+    fn init(&mut self, Fs: i32, channels: i32, application: i32) -> Result<(), i32> {
+        if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
+            || channels != 1 && channels != 2
+            || application != OPUS_APPLICATION_VOIP
+                && application != OPUS_APPLICATION_AUDIO
+                && application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
+        {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.silk_enc = silk_encoder::default();
+        self.channels = channels;
+        self.stream_channels = channels;
+        self.Fs = Fs;
+        self.arch = opus_select_arch();
+        let ret = silk_InitEncoder(&mut self.silk_enc, self.arch, &mut self.silk_mode);
+        if ret != 0 {
+            return Err(OPUS_INTERNAL_ERROR);
+        }
+        self.silk_mode.nChannelsAPI = channels;
+        self.silk_mode.nChannelsInternal = channels;
+        self.silk_mode.API_sampleRate = self.Fs;
+        self.silk_mode.maxInternalSampleRate = 16000;
+        self.silk_mode.minInternalSampleRate = 8000;
+        self.silk_mode.desiredInternalSampleRate = 16000;
+        self.silk_mode.payloadSize_ms = 20;
+        self.silk_mode.bitRate = 25000;
+        self.silk_mode.packetLossPercentage = 0;
+        self.silk_mode.complexity = 9;
+        self.silk_mode.useInBandFEC = 0;
+        self.silk_mode.useDTX = 0;
+        self.silk_mode.useCBR = 0;
+        self.silk_mode.reducedDependency = 0;
+        let err = celt_encoder_init(&mut self.celt_enc, Fs, channels, self.arch);
+        if err != OPUS_OK {
+            return Err(OPUS_INTERNAL_ERROR);
+        }
+        opus_custom_encoder_ctl!(&mut self.celt_enc, CELT_SET_SIGNALLING_REQUEST, 0);
+        opus_custom_encoder_ctl!(
+            &mut self.celt_enc,
+            OPUS_SET_COMPLEXITY_REQUEST,
+            self.silk_mode.complexity,
+        );
+        self.use_vbr = 1;
+        self.vbr_constraint = 1;
+        self.user_bitrate_bps = OPUS_AUTO;
+        self.bitrate_bps = 3000 + Fs * channels;
+        self.application = application;
+        self.signal_type = OPUS_AUTO;
+        self.user_bandwidth = OPUS_AUTO;
+        self.max_bandwidth = OPUS_BANDWIDTH_FULLBAND;
+        self.force_channels = OPUS_AUTO;
+        self.user_forced_mode = OPUS_AUTO;
+        self.voice_ratio = -1;
+        self.encoder_buffer = self.Fs / 100;
+        self.lsb_depth = 24;
+        self.variable_duration = OPUS_FRAMESIZE_ARG;
+        self.delay_compensation = self.Fs / 250;
+        self.hybrid_stereo_width_Q14 = ((1) << 14) as i16;
+        self.prev_HB_gain = Q15ONE;
+        self.variable_HP_smth2_Q15 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
+        self.first = 1;
+        self.mode = MODE_HYBRID;
+        self.bandwidth = OPUS_BANDWIDTH_FULLBAND;
+        tonality_analysis_init(&mut self.analysis, self.Fs);
+        self.analysis.application = self.application;
+        Ok(())
     }
-    silkEncSizeBytes = align(silkEncSizeBytes);
-    (*st).silk_enc_offset = align(::core::mem::size_of::<OpusEncoder>() as u64 as i32);
-    (*st).celt_enc_offset = (*st).silk_enc_offset + silkEncSizeBytes;
-    let silk_enc =
-        &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
-    celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
-    (*st).channels = channels;
-    (*st).stream_channels = (*st).channels;
-    (*st).Fs = Fs;
-    (*st).arch = opus_select_arch();
-    ret = silk_InitEncoder(silk_enc, (*st).arch, &mut (*st).silk_mode);
-    if ret != 0 {
-        return OPUS_INTERNAL_ERROR;
+
+    pub fn new(Fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
+        // Safety: OpusEncoder is Copy, so zeroed memory is a valid starting point
+        // before init() overwrites all fields.
+        let mut st: OpusEncoder = unsafe { std::mem::zeroed() };
+        st.init(Fs, channels, application)?;
+        Ok(st)
     }
-    (*st).silk_mode.nChannelsAPI = channels;
-    (*st).silk_mode.nChannelsInternal = channels;
-    (*st).silk_mode.API_sampleRate = (*st).Fs;
-    (*st).silk_mode.maxInternalSampleRate = 16000;
-    (*st).silk_mode.minInternalSampleRate = 8000;
-    (*st).silk_mode.desiredInternalSampleRate = 16000;
-    (*st).silk_mode.payloadSize_ms = 20;
-    (*st).silk_mode.bitRate = 25000;
-    (*st).silk_mode.packetLossPercentage = 0;
-    (*st).silk_mode.complexity = 9;
-    (*st).silk_mode.useInBandFEC = 0;
-    (*st).silk_mode.useDTX = 0;
-    (*st).silk_mode.useCBR = 0;
-    (*st).silk_mode.reducedDependency = 0;
-    err = celt_encoder_init(&mut *celt_enc, Fs, channels, (*st).arch);
-    if err != OPUS_OK {
-        return OPUS_INTERNAL_ERROR;
-    }
-    opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_SIGNALLING_REQUEST, 0);
-    opus_custom_encoder_ctl!(
-        &mut *celt_enc,
-        OPUS_SET_COMPLEXITY_REQUEST,
-        (*st).silk_mode.complexity,
-    );
-    (*st).use_vbr = 1;
-    (*st).vbr_constraint = 1;
-    (*st).user_bitrate_bps = OPUS_AUTO;
-    (*st).bitrate_bps = 3000 + Fs * channels;
-    (*st).application = application;
-    (*st).signal_type = OPUS_AUTO;
-    (*st).user_bandwidth = OPUS_AUTO;
-    (*st).max_bandwidth = OPUS_BANDWIDTH_FULLBAND;
-    (*st).force_channels = OPUS_AUTO;
-    (*st).user_forced_mode = OPUS_AUTO;
-    (*st).voice_ratio = -1;
-    (*st).encoder_buffer = (*st).Fs / 100;
-    (*st).lsb_depth = 24;
-    (*st).variable_duration = OPUS_FRAMESIZE_ARG;
-    (*st).delay_compensation = (*st).Fs / 250;
-    (*st).hybrid_stereo_width_Q14 = ((1) << 14) as i16;
-    (*st).prev_HB_gain = Q15ONE;
-    (*st).variable_HP_smth2_Q15 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
-    (*st).first = 1;
-    (*st).mode = MODE_HYBRID;
-    (*st).bandwidth = OPUS_BANDWIDTH_FULLBAND;
-    tonality_analysis_init(&mut (*st).analysis, (*st).Fs);
-    (*st).analysis.application = (*st).application;
-    return OPUS_OK;
 }
 /// Upstream C: src/opus_encoder.c:gen_toc
 fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
@@ -512,35 +499,20 @@ pub unsafe fn opus_encoder_create(
     application: i32,
     error: *mut i32,
 ) -> *mut OpusEncoder {
-    let mut ret: i32 = 0;
-    let mut st: *mut OpusEncoder = 0 as *mut OpusEncoder;
-    if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
-        || channels != 1 && channels != 2
-        || application != OPUS_APPLICATION_VOIP
-            && application != OPUS_APPLICATION_AUDIO
-            && application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
-    {
-        if !error.is_null() {
-            *error = OPUS_BAD_ARG;
+    match OpusEncoder::new(Fs, channels, application) {
+        Ok(enc) => {
+            if !error.is_null() {
+                *error = OPUS_OK;
+            }
+            Box::into_raw(Box::new(enc))
         }
-        return NULL as *mut OpusEncoder;
-    }
-    st = malloc(opus_encoder_get_size(channels) as size_t) as *mut OpusEncoder;
-    if st.is_null() {
-        if !error.is_null() {
-            *error = OPUS_ALLOC_FAIL;
+        Err(e) => {
+            if !error.is_null() {
+                *error = e;
+            }
+            std::ptr::null_mut()
         }
-        return NULL as *mut OpusEncoder;
     }
-    ret = opus_encoder_init(st, Fs, channels, application);
-    if !error.is_null() {
-        *error = ret;
-    }
-    if ret != OPUS_OK {
-        free(st as *mut core::ffi::c_void);
-        st = NULL as *mut OpusEncoder;
-    }
-    return st;
 }
 /// Upstream C: src/opus_encoder.c:user_bitrate_to_bitrate
 fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
@@ -1197,9 +1169,8 @@ pub unsafe fn opus_encode_native(
     if max_data_bytes == 1 && (*st).Fs == frame_size * 10 {
         return OPUS_BUFFER_TOO_SMALL;
     }
-    let silk_enc =
-        &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
-    celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
+    let silk_enc = &mut (*st).silk_enc;
+    celt_enc = &mut (*st).celt_enc;
     if (*st).application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
         delay_compensation = 0;
     } else {
@@ -2540,7 +2511,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
 
     let mut ap = args;
 
-    celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
+    celt_enc = &mut (*st).celt_enc;
     match request {
         OPUS_SET_APPLICATION_REQUEST => {
             let value: i32 = ap.arg::<i32>();
@@ -2890,8 +2861,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 signalType: 0,
                 offset: 0,
             };
-            let silk_enc =
-                &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
+            let silk_enc = &mut (*st).silk_enc;
             tonality_analysis_reset(&mut (*st).analysis);
             let start: *mut u8 = &mut (*st).stream_channels as *mut i32 as *mut u8;
             let start_offset = start.offset_from(st as *mut u8) as usize;
@@ -2940,8 +2910,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 && ((*st).prev_mode == MODE_SILK_ONLY || (*st).prev_mode == MODE_HYBRID)
             {
                 let mut n: i32 = 0;
-                let silk_enc_0 = &*((st as *mut i8).offset((*st).silk_enc_offset as isize)
-                    as *const silk_encoder);
+                let silk_enc_0 = &(*st).silk_enc;
                 *value_39 = 1;
                 n = 0;
                 while n < (*st).silk_mode.nChannelsInternal {
@@ -2985,5 +2954,5 @@ macro_rules! opus_encoder_ctl {
     };
 }
 pub unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {
-    free(st as *mut core::ffi::c_void);
+    drop(Box::from_raw(st));
 }
