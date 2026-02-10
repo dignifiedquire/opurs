@@ -132,6 +132,70 @@ impl OpusDecoder {
     ) -> i32 {
         opus_decode_float(self, data, pcm, frame_size, decode_fec as i32)
     }
+
+    // -- Type-safe CTL getters and setters --
+
+    pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
+        if gain < -32768 || gain > 32767 {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.decode_gain = gain;
+        Ok(())
+    }
+
+    pub fn gain(&self) -> i32 {
+        self.decode_gain
+    }
+
+    pub fn get_bandwidth(&self) -> i32 {
+        self.bandwidth
+    }
+
+    pub fn sample_rate(&self) -> i32 {
+        self.Fs
+    }
+
+    pub fn final_range(&self) -> u32 {
+        self.rangeFinal
+    }
+
+    pub fn pitch(&mut self) -> i32 {
+        if self.prev_mode == MODE_CELT_ONLY {
+            let mut pitch = 0;
+            opus_custom_decoder_ctl!(&mut self.celt_dec, OPUS_GET_PITCH_REQUEST, &mut pitch);
+            pitch
+        } else {
+            self.DecControl.prevPitchLag
+        }
+    }
+
+    pub fn last_packet_duration(&self) -> i32 {
+        self.last_packet_duration
+    }
+
+    pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
+        opus_custom_decoder_ctl!(
+            &mut self.celt_dec,
+            OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+            disabled as i32,
+        );
+    }
+
+    pub fn phase_inversion_disabled(&self) -> bool {
+        self.celt_dec.disable_inv != 0
+    }
+
+    pub fn reset(&mut self) {
+        self.stream_channels = self.channels;
+        self.bandwidth = 0;
+        self.mode = 0;
+        self.prev_mode = 0;
+        self.frame_size = self.Fs / 400;
+        self.prev_redundancy = 0;
+        self.last_packet_duration = 0;
+        self.softclip_mem = [0.0; 2];
+        self.rangeFinal = 0;
+    }
 }
 
 fn validate_opus_decoder(st: &OpusDecoder) {
