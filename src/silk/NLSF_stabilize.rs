@@ -93,50 +93,12 @@ pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
             max_center_Q15 -= NDeltaMin_Q15[I] as i32 >> 1;
 
             /* Move apart, sorted by value, keeping the same center frequency */
+            let avg_Q15 = (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
+                + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1);
             center_freq_Q15 = (if min_center_Q15 > max_center_Q15 {
-                if (if 1 == 1 {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                        + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
-                } else {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
-                }) > min_center_Q15
-                {
-                    min_center_Q15
-                } else if (if 1 == 1 {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                        + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
-                } else {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
-                }) < max_center_Q15
-                {
-                    max_center_Q15
-                } else if 1 == 1 {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                        + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
-                } else {
-                    (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
-                }
-            } else if (if 1 == 1 {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                    + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
+                avg_Q15.clamp(max_center_Q15, min_center_Q15)
             } else {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
-            }) > max_center_Q15
-            {
-                max_center_Q15
-            } else if (if 1 == 1 {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                    + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
-            } else {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
-            }) < min_center_Q15
-            {
-                min_center_Q15
-            } else if 1 == 1 {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                    + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1)
-            } else {
-                (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1 - 1) + 1 >> 1
+                avg_Q15.clamp(min_center_Q15, max_center_Q15)
             }) as i16;
             NLSF_Q15[I - 1] = (center_freq_Q15 as i32 - (NDeltaMin_Q15[I] as i32 >> 1)) as i16;
             NLSF_Q15[I] = (NLSF_Q15[I - 1] as i32 + NDeltaMin_Q15[I] as i32) as i16;

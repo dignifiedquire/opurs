@@ -119,11 +119,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
             ffrac = -(256);
             m = 0;
             while m < BIN_DIV_STEPS_A2NLSF_FIX {
-                xmid = if 1 == 1 {
-                    (xlo + xhi >> 1) + (xlo + xhi & 1)
-                } else {
-                    (xlo + xhi >> 1 - 1) + 1 >> 1
-                };
+                xmid = (xlo + xhi >> 1) + (xlo + xhi & 1);
                 ymid = silk_A2NLSF_eval_poly(if use_Q { &Q } else { &P }, xmid, dd);
                 if ylo <= 0 && ymid >= 0 || ylo >= 0 && ymid <= 0 {
                     xhi = xmid;

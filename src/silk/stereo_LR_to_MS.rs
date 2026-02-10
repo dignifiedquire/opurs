@@ -60,30 +60,8 @@ pub fn silk_stereo_LR_to_MS(
     while n < frame_length + 2 {
         sum = x1[n as usize] as i32 + x2[n as usize] as i32;
         diff = x1[n as usize] as i32 - x2[n as usize] as i32;
-        x1[n as usize] = (if 1 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 1 - 1) + 1 >> 1
-        }) as i16;
-        side[n as usize] = (if (if 1 == 1 {
-            (diff >> 1) + (diff & 1)
-        } else {
-            (diff >> 1 - 1) + 1 >> 1
-        }) > silk_int16_MAX
-        {
-            silk_int16_MAX
-        } else if (if 1 == 1 {
-            (diff >> 1) + (diff & 1)
-        } else {
-            (diff >> 1 - 1) + 1 >> 1
-        }) < silk_int16_MIN
-        {
-            silk_int16_MIN
-        } else if 1 == 1 {
-            (diff >> 1) + (diff & 1)
-        } else {
-            (diff >> 1 - 1) + 1 >> 1
-        }) as i16;
+        x1[n as usize] = ((sum >> 1) + (sum & 1)) as i16;
+        side[n as usize] = ((diff >> 1) + (diff & 1)).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         n += 1;
     }
 
@@ -107,23 +85,12 @@ pub fn silk_stereo_LR_to_MS(
     n = 0;
     while n < frame_length {
         // mid = x1
-        sum = if 2 == 1 {
-            (x1[n as usize] as i32
-                + x1[(n + 2) as usize] as i32
-                + ((x1[(n + 1) as usize] as u32) << 1) as i32
-                >> 1)
-                + (x1[n as usize] as i32
-                    + x1[(n + 2) as usize] as i32
-                    + ((x1[(n + 1) as usize] as u32) << 1) as i32
-                    & 1)
-        } else {
-            (x1[n as usize] as i32
-                + x1[(n + 2) as usize] as i32
-                + ((x1[(n + 1) as usize] as u32) << 1) as i32
-                >> 2 - 1)
-                + 1
-                >> 1
-        };
+        sum = (x1[n as usize] as i32
+            + x1[(n + 2) as usize] as i32
+            + ((x1[(n + 1) as usize] as u32) << 1) as i32
+            >> 2 - 1)
+            + 1
+            >> 1;
         LP_mid[n as usize] = sum as i16;
         HP_mid[n as usize] = (x1[(n + 1) as usize] as i32 - sum) as i16;
         n += 1;
@@ -134,23 +101,12 @@ pub fn silk_stereo_LR_to_MS(
     let mut HP_side: Vec<i16> = ::std::vec::from_elem(0, vla_3);
     n = 0;
     while n < frame_length {
-        sum = if 2 == 1 {
-            (side[n as usize] as i32
-                + side[(n + 2) as usize] as i32
-                + ((side[(n + 1) as usize] as u32) << 1) as i32
-                >> 1)
-                + (side[n as usize] as i32
-                    + side[(n + 2) as usize] as i32
-                    + ((side[(n + 1) as usize] as u32) << 1) as i32
-                    & 1)
-        } else {
-            (side[n as usize] as i32
-                + side[(n + 2) as usize] as i32
-                + ((side[(n + 1) as usize] as u32) << 1) as i32
-                >> 2 - 1)
-                + 1
-                >> 1
-        };
+        sum = (side[n as usize] as i32
+            + side[(n + 2) as usize] as i32
+            + ((side[(n + 1) as usize] as u32) << 1) as i32
+            >> 2 - 1)
+            + 1
+            >> 1;
         LP_side[n as usize] = sum as i16;
         HP_side[n as usize] = (side[(n + 1) as usize] as i32 - sum) as i16;
         n += 1;
@@ -295,34 +251,16 @@ pub fn silk_stereo_LR_to_MS(
     pred1_Q13 = -(state.pred_prev_Q13[1 as usize] as i32);
     w_Q24 = ((state.width_prev_Q14 as u32) << 10) as i32;
     denom_Q16 = ((1) << 16) / (8 * fs_kHz);
-    delta0_Q13 = -if 16 == 1 {
-        ((pred_Q13[0 as usize] - state.pred_prev_Q13[0 as usize] as i32) as i16 as i32
-            * denom_Q16 as i16 as i32
-            >> 1)
-            + ((pred_Q13[0 as usize] - state.pred_prev_Q13[0 as usize] as i32) as i16 as i32
-                * denom_Q16 as i16 as i32
-                & 1)
-    } else {
-        ((pred_Q13[0 as usize] - state.pred_prev_Q13[0 as usize] as i32) as i16 as i32
-            * denom_Q16 as i16 as i32
-            >> 16 - 1)
-            + 1
-            >> 1
-    };
-    delta1_Q13 = -if 16 == 1 {
-        ((pred_Q13[1 as usize] - state.pred_prev_Q13[1 as usize] as i32) as i16 as i32
-            * denom_Q16 as i16 as i32
-            >> 1)
-            + ((pred_Q13[1 as usize] - state.pred_prev_Q13[1 as usize] as i32) as i16 as i32
-                * denom_Q16 as i16 as i32
-                & 1)
-    } else {
-        ((pred_Q13[1 as usize] - state.pred_prev_Q13[1 as usize] as i32) as i16 as i32
-            * denom_Q16 as i16 as i32
-            >> 16 - 1)
-            + 1
-            >> 1
-    };
+    delta0_Q13 = -(((pred_Q13[0 as usize] - state.pred_prev_Q13[0 as usize] as i32) as i16 as i32
+        * denom_Q16 as i16 as i32
+        >> 16 - 1)
+        + 1
+        >> 1);
+    delta1_Q13 = -(((pred_Q13[1 as usize] - state.pred_prev_Q13[1 as usize] as i32) as i16 as i32
+        * denom_Q16 as i16 as i32
+        >> 16 - 1)
+        + 1
+        >> 1);
     deltaw_Q24 = ((((width_Q14 - state.width_prev_Q14 as i32) as i64 * denom_Q16 as i16 as i64
         >> 16) as i32 as u32)
         << 10) as i32;
@@ -369,25 +307,8 @@ pub fn silk_stereo_LR_to_MS(
         // for both x1 and x2, and adjust the x2 write index accordingly.
         // x2 output index: in C, x2.offset(n-1) = inputBuf[2 + n - 1] = inputBuf[n+1]
         // In our version with x2 starting at inputBuf[0]: x2[n+1]
-        x2[(n + 1) as usize] = (if (if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) > silk_int16_MAX
-        {
-            silk_int16_MAX
-        } else if (if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) < silk_int16_MIN
-        {
-            silk_int16_MIN
-        } else if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) as i16;
+        x2[(n + 1) as usize] =
+            ((sum >> 8 - 1) + 1 >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         n += 1;
     }
     pred0_Q13 = -pred_Q13[0 as usize];
@@ -405,25 +326,8 @@ pub fn silk_stereo_LR_to_MS(
             + (((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
                 * pred1_Q13 as i16 as i64
                 >> 16)) as i32;
-        x2[(n + 1) as usize] = (if (if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) > silk_int16_MAX
-        {
-            silk_int16_MAX
-        } else if (if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) < silk_int16_MIN
-        {
-            silk_int16_MIN
-        } else if 8 == 1 {
-            (sum >> 1) + (sum & 1)
-        } else {
-            (sum >> 8 - 1) + 1 >> 1
-        }) as i16;
+        x2[(n + 1) as usize] =
+            ((sum >> 8 - 1) + 1 >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         n += 1;
     }
     state.pred_prev_Q13[0 as usize] = pred_Q13[0 as usize] as i16;

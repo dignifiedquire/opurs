@@ -396,11 +396,7 @@ pub fn silk_pitch_analysis_core_FLP(
     *LTPCorr = CCmax / nb_subfr as f32;
     if Fs_kHz > 8 {
         if Fs_kHz == 12 {
-            lag = if 1 == 1 {
-                (lag as i16 as i32 * 3 >> 1) + (lag as i16 as i32 * 3 & 1)
-            } else {
-                (lag as i16 as i32 * 3 >> 1 - 1) + 1 >> 1
-            };
+            lag = (lag as i16 as i32 * 3 >> 1) + (lag as i16 as i32 * 3 & 1);
         } else {
             lag = ((lag as u32) << 1) as i32;
         }
