@@ -201,7 +201,7 @@ Many of these follow the same pattern: pointer+length → slice.
 
 - [x] Zero `unsafe fn` declarations in `src/silk/`
 - [~] Zero `unsafe {}` blocks in `src/silk/` — 2 remain in `enc_API.rs` (disjoint field borrows, unavoidable without API refactoring of `silk_stereo_LR_to_MS`)
-- [ ] Every function has `/// Upstream C:` comment
-- [x] All tests pass (cargo test + vector tests) — 92/92 tests, 228/228 vectors
-- [ ] Clippy clean, formatted
+- [x] Every function has `/// Upstream C:` comment — 107 functions across 45 files annotated (dig-safe: b8f1214)
+- [x] All tests pass (cargo test + vector tests) — 14/14 nextest, 228/228 vectors
+- [x] Clippy clean, formatted — zero clippy errors (dig-safe: 5d56486, 75b239d, d9a9cd9)
 - [x] `externs::{memcpy,memmove,memset}` no longer called from silk/
