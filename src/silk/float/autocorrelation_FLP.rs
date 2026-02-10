@@ -1,5 +1,7 @@
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 
+/// Upstream C: silk/float/autocorrelation_FLP.c:silk_autocorrelation_FLP
+///
 /// Compute autocorrelation
 ///
 /// ```text

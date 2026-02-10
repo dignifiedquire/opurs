@@ -17,6 +17,7 @@ pub struct ResamplerIirFirState {
     fir_state: [i16; RESAMPLER_ORDER_FIR_12],
 }
 
+/// Upstream C: silk/resampler_private_IIR_FIR.c:silk_resampler_private_IIR_FIR_INTERPOL
 #[inline]
 fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
     mut out: &'a mut [i16],
@@ -69,6 +70,7 @@ fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
     out
 }
 
+/// Upstream C: silk/resampler_private_IIR_FIR.c:silk_resampler_private_IIR_FIR
 /* Upsample using a combination of allpass-based 2x upsampling and FIR interpolation */
 pub(super) fn silk_resampler_private_IIR_FIR(
     resampler_params: &ResamplerParams,

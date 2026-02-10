@@ -7,6 +7,8 @@ use nalgebra::{Const, Dim, DimMul, DimProd, Dyn, VectorView};
 const LTP_ORDER: usize = crate::silk::define::LTP_ORDER as usize;
 type LTP_ORDER = Const<{ LTP_ORDER }>;
 
+/// Upstream C: silk/float/find_LTP_FLP.c:silk_find_LTP_FLP
+///
 /// LTP analysis
 ///
 /// ```text

@@ -13,13 +13,15 @@ use crate::silk::tables_other::{
 use crate::silk::tables_pitch_lag::{silk_pitch_delta_iCDF, silk_pitch_lag_iCDF};
 use crate::silk::NLSF_unpack::silk_NLSF_unpack;
 
+/// Upstream C: silk/decode_indices.c:silk_decode_indices
+///
 /// Decode side-information parameters from payload
 ///
 /// ```text
-/// psDec         I/O   State                                       
-/// psRangeDec    I/O   Compressor data structure                   
-/// FrameIndex    I     Frame number                                
-/// decode_LBRR   I     Flag indicating LBRR data is being decoded  
+/// psDec         I/O   State
+/// psRangeDec    I/O   Compressor data structure
+/// FrameIndex    I     Frame number
+/// decode_LBRR   I     Flag indicating LBRR data is being decoded
 /// condCoding    I     The type of conditional coding to use
 /// ```
 pub fn silk_decode_indices(

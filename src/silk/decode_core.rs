@@ -10,6 +10,8 @@ use crate::silk::SigProc_FIX::{
     silk_LSHIFT_SAT32, silk_RAND, silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST,
 };
 
+/// Upstream C: silk/decode_core.c:silk_decode_core
+///
 /// Core decoder. Performs inverse NSQ operation LTP + LPC
 ///
 /// ```text

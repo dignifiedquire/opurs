@@ -1,5 +1,6 @@
 use ndarray::{aview1, aview_mut1, azip};
 
+/// Upstream C: silk/interpolate.c:silk_interpolate
 // Interpolate two vectors
 pub fn silk_interpolate(
     xi: &mut [i16],

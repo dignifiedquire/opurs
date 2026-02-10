@@ -14,6 +14,8 @@ const SCALE_Q16: i32 =
 const INV_SCALE_Q16: i32 =
     (65536 * (((MAX_QGAIN_DB - MIN_QGAIN_DB) * 128) / 6)) / (N_LEVELS_QGAIN as i32 - 1);
 
+/// Upstream C: silk/gain_quant.c:silk_gains_quant
+///
 /// Gain scalar quantization with hysteresis, uniform on log scale
 ///
 /// ```text
@@ -78,6 +80,8 @@ pub fn silk_gains_quant(
     });
 }
 
+/// Upstream C: silk/gain_quant.c:silk_gains_dequant
+///
 /// Gains scalar dequantization, uniform on log scale
 ///
 /// ```text
@@ -114,6 +118,8 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
     });
 }
 
+/// Upstream C: silk/gain_quant.c:silk_gains_ID
+///
 /// Compute unique identifier of gain indices vector
 #[inline]
 pub fn silk_gains_ID(ind: &[i8]) -> i32 {

@@ -4,6 +4,8 @@ use nalgebra::{Dim, DimAdd, DimDiff, DimSub, DimSum, VectorView, U1};
 
 // Correlation matrix computations for LS estimate.
 
+/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrVector_FLP
+///
 /// Calculates correlation vector X'*t
 ///
 /// ```text
@@ -35,6 +37,8 @@ pub fn silk_corrVector_FLP<L, Order>(
     }
 }
 
+/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrMatrix_FLP
+///
 /// Calculates correlation matrix X'*X
 ///
 /// ```text

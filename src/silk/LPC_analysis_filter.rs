@@ -2,6 +2,8 @@ use ndarray::{aview1, azip, s};
 
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
 
+/// Upstream C: silk/LPC_analysis_filter.c:silk_LPC_analysis_filter
+///
 /// LPC analysis filter
 ///
 /// NB! State is kept internally and the

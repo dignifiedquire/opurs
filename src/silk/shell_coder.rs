@@ -10,6 +10,7 @@ use crate::silk::tables_pulses_per_block::{
     silk_shell_code_table_offsets,
 };
 
+/// Upstream C: silk/shell_coder.c:combine_pulses
 #[inline]
 fn combine_pulses(out: &mut [i32], in_: &[i32]) {
     assert_eq!(out.len() * 2, in_.len());
@@ -19,6 +20,7 @@ fn combine_pulses(out: &mut [i32], in_: &[i32]) {
     }
 }
 
+/// Upstream C: silk/shell_coder.c:encode_split
 #[inline]
 fn encode_split(psRangeEnc: &mut ec_enc, p_child1: i32, p: i32, shell_table: &[u8]) {
     if p > 0 {
@@ -31,6 +33,7 @@ fn encode_split(psRangeEnc: &mut ec_enc, p_child1: i32, p: i32, shell_table: &[u
     }
 }
 
+/// Upstream C: silk/shell_coder.c:decode_split
 #[inline]
 fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_table: &[u8]) {
     assert_eq!(p_child.len(), 2);
@@ -48,6 +51,8 @@ fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_tabl
     };
 }
 
+/// Upstream C: silk/shell_coder.c:silk_shell_encoder
+///
 /// Shell encoder, operates on one shell code frame of 16 pulses
 pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
     let mut pulses1: [i32; 8] = [0; 8];
@@ -79,6 +84,7 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
     encode_split(psRangeEnc, pulses0[14], pulses1[7], &silk_shell_code_table0);
 }
 
+/// Upstream C: silk/shell_coder.c:silk_shell_decoder
 pub fn silk_shell_decoder(pulses0: &mut [i16], psRangeDec: &mut ec_dec, pulses4: i32) {
     assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH as usize);
     assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);

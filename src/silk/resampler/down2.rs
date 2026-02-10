@@ -5,6 +5,7 @@ pub mod typedef_h {
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use super::rom::{silk_resampler_down2_0, silk_resampler_down2_1};
 
+/// Upstream C: silk/resampler_down2.c:silk_resampler_down2
 pub fn silk_resampler_down2(S: &mut [i32; 2], out: &mut [i16], in_0: &[i16]) {
     assert_eq!(out.len() * 2, in_0.len());
 

@@ -8,6 +8,8 @@ use ndarray::azip;
 
 pub const QA: i32 = 16;
 
+/// Upstream C: silk/NLSF2A.c:silk_NLSF2A_find_poly
+///
 /// helper function for NLSF2A(..)
 ///
 /// ```text
@@ -36,6 +38,8 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
     }
 }
 
+/// Upstream C: silk/NLSF2A.c:silk_NLSF2A
+///
 /// compute whitening filter coefficients from normalized line spectral frequencies
 ///
 /// ```text

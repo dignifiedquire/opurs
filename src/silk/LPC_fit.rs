@@ -2,6 +2,8 @@ use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
 use ndarray::azip;
 
+/// Upstream C: silk/LPC_fit.c:silk_LPC_fit
+///
 /// Convert int32 coefficients to int16 coefs and make sure there's no wrap-around
 ///
 /// ```text

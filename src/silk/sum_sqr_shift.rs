@@ -1,6 +1,7 @@
 use crate::silk::macros::{silk_CLZ32, silk_SMULBB};
 use crate::silk::SigProc_FIX::silk_max_32;
 
+/// Rust-specific helper: inner loop for silk_sum_sqr_shift
 fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {
     let len = x.len();
 
@@ -22,6 +23,8 @@ fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {
     nrg
 }
 
+/// Upstream C: silk/sum_sqr_shift.c:silk_sum_sqr_shift
+///
 /// Compute number of bits to right shift the sum of squares of a vector of int16s to make it fit in an int32
 ///
 /// ```text

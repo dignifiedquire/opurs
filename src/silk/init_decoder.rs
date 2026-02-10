@@ -4,6 +4,7 @@ use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
 use crate::silk::CNG::silk_CNG_Reset;
 use crate::silk::PLC::silk_PLC_Reset;
 
+/// Upstream C: silk/init_decoder.c:silk_init_decoder
 pub fn silk_init_decoder() -> silk_decoder_state {
     let mut dec = silk_decoder_state {
         prev_gain_Q16: 65536,

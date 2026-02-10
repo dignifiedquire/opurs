@@ -12,6 +12,7 @@ pub struct ResamplerUp2HqState {
     iir_state: [i32; 6],
 }
 
+/// Upstream C: silk/resampler_private_up2_HQ.c:silk_resampler_private_up2_HQ
 /* Upsample by a factor 2, high quality */
 /* Uses 2nd order allpass filters for the 2x upsampling, followed by a      */
 /* notch filter just above Nyquist.                                         */

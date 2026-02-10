@@ -36,6 +36,8 @@ static silk_TargetRate_WB_21: [u8; 191] = [
     243, 243, 244, 245, 246, 246, 247, 248, 249, 249, 250, 251, 252, 253, 255,
 ];
 
+/// Upstream C: silk/control_SNR.c:silk_control_SNR
+///
 /// Control SNR of residual quantizer
 ///
 /// psEncC         I/O  Pointer to Silk encoder state

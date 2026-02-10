@@ -30,6 +30,7 @@ impl Default for ResamplerDownFirState {
     }
 }
 
+/// Upstream C: silk/resampler_private_down_FIR.c:silk_resampler_private_down_FIR_INTERPOL
 #[inline]
 fn silk_resampler_private_down_FIR_INTERPOL<'a>(
     mut out: &'a mut [i16],
@@ -210,6 +211,7 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
     out
 }
 
+/// Upstream C: silk/resampler_private_down_FIR.c:silk_resampler_private_down_FIR
 pub(super) fn silk_resampler_private_down_FIR(
     resampler_params: &ResamplerParams,
     params: &ResamplerDownFirParams,

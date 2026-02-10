@@ -6,6 +6,8 @@ use crate::silk::pitch_est_tables::{
 use crate::silk::SigProc_FIX::silk_LIMIT;
 use ndarray::{azip, ArrayView2};
 
+/// Upstream C: silk/decode_pitch.c:silk_decode_pitch
+///
 /// Pitch analyzer function
 ///
 /// ```text

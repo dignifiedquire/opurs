@@ -6,6 +6,8 @@ use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 const NLSF_W_Q: i32 = 2;
 
+/// Upstream C: silk/NLSF_VQ_weights_laroia.c:silk_NLSF_VQ_weights_laroia
+///
 /// Laroia low complexity NLSF weights
 ///
 /// R. Laroia, N. Phamdo and N. Farvardin, "Robust and Efficient Quantization of Speech LSP

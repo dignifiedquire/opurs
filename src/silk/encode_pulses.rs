@@ -9,6 +9,7 @@ use crate::silk::tables_pulses_per_block::{
 };
 use itertools::izip;
 
+/// Upstream C: silk/encode_pulses.c:combine_and_check
 #[inline]
 fn combine_and_check(pulses_comb: &mut [i32], max_pulses: u8) -> Option<&mut [i32]> {
     let len = pulses_comb.len() / 2;
@@ -24,6 +25,8 @@ fn combine_and_check(pulses_comb: &mut [i32], max_pulses: u8) -> Option<&mut [i3
     Some(&mut pulses_comb[..len])
 }
 
+/// Upstream C: silk/encode_pulses.c:silk_encode_pulses
+///
 /// Encode quantization indices of excitation
 pub fn silk_encode_pulses(
     psRangeEnc: &mut ec_enc,

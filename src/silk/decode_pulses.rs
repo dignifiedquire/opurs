@@ -6,6 +6,8 @@ use crate::silk::tables_other::silk_lsb_iCDF;
 use crate::silk::tables_pulses_per_block::{silk_pulses_per_block_iCDF, silk_rate_levels_iCDF};
 use itertools::izip;
 
+/// Upstream C: silk/decode_pulses.c:silk_decode_pulses
+///
 /// Decode quantization indices of excitation
 ///
 /// NB: when operating on 10ms frame size @ 12 kHz, the `pulses` should be larger than the frame size (to make it contain a whole amount of shell frames)

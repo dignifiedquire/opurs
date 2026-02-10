@@ -1,5 +1,7 @@
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND;
 
+/// Upstream C: silk/bwexpander.c:silk_bwexpander
+///
 /// Chirp (bandwidth expand) LP AR filter
 ///
 /// `ar`:        I/O  AR filter to be expanded (without leading 1)

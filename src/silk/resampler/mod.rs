@@ -112,6 +112,7 @@ enum ResamplerMode {
     DownFir(ResamplerDownFirParams, ResamplerDownFirState),
 }
 
+/// Upstream C: silk/resampler.c:silk_resampler_init
 pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> ResamplerState {
     let inputDelay = if forEnc != 0 {
         if !matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000)
@@ -235,6 +236,7 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
 
 /* Resampler: convert from one sampling rate to another */
 /* Input and output sampling rate are at most 48000 Hz  */
+/// Upstream C: silk/resampler.c:silk_resampler
 pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> i32 {
     /* Need at least 1 ms of input data */
     assert!(in_0.len() >= S.params.fs_in_khz);

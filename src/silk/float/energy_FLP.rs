@@ -1,5 +1,7 @@
 use ndarray::aview1;
 
+/// Upstream C: silk/float/SigProc_FLP.h:silk_energy_FLP
+///
 /// Sum of squares of a float array, with result as a double
 pub fn silk_energy_FLP(data: &[f32]) -> f64 {
     let data_view = aview1(data);

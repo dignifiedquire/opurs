@@ -1,5 +1,7 @@
 use crate::silk::Inlines::silk_CLZ_FRAC;
 
+/// Upstream C: silk/lin2log.c:silk_lin2log
+///
 // Approximation of 128 * log2() (very close inverse of silk_log2lin())
 // Convert input to a log scale
 pub fn silk_lin2log(inLin: i32) -> i32 {

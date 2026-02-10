@@ -12,6 +12,8 @@ use crate::silk::resampler::RESAMPLER_MAX_BATCH_SIZE_IN;
 
 const ORDER_FIR: usize = 4;
 
+/// Upstream C: silk/resampler_down2_3.c:silk_resampler_down2_3
+///
 /// Downsample by a factor 2/3, low quality
 pub fn silk_resampler_down2_3(state: &mut [i32; 6], mut out: &mut [i16], mut in_0: &[i16]) {
     let mut nSamplesIn: usize = 0;

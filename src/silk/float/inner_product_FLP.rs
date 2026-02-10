@@ -2,6 +2,8 @@ use nalgebra::constraint::{DimEq, ShapeConstraint};
 use nalgebra::{Dim, Matrix, RawStorage, U1};
 use ndarray::{aview1, azip};
 
+/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
+///
 /// Inner product of two silk_float arrays, with result as double
 pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32]) -> f64 {
     let data1 = aview1(data1);
