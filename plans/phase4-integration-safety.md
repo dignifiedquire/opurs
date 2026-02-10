@@ -395,18 +395,18 @@ pub fn version() -> &'static str;
 
 | File | unsafe fn | unsafe {} | Key issues |
 |------|-----------|-----------|------------|
-| `opus_encoder.rs` | 13 | 2 | VarArgs CTL, encode_native, downmix |
-| `opus_decoder.rs` | 5 | 3 | C-style create/destroy, decode_frame |
+| `opus_encoder.rs` | 10 | 2 | VarArgs CTL, encode_native, downmix |
+| `opus_decoder.rs` | 5 | 3 | decode_frame, decode_native |
 | `opus.rs` | 0 | 1 | 1 residual unsafe block |
-| `analysis.rs` | 0 | 0 | **Safe** ✓ (1 legacy type alias with `unsafe fn` in signature) |
+| `analysis.rs` | 0 | 0 | **Safe** ✓ |
 | `repacketizer.rs` | 0 | 0 | **Already safe** — needs API wrapper only |
 | `mlp/` | 0 | 0 | **Already safe** |
 | `opus_defines.rs` | 0 | 0 | Constants only — replace with enums |
 | `opus_private.rs` | 0 | 0 | Safe |
-| `externs.rs` | 8 | 0 | malloc/free/memcpy/memmove/memset/memcmp — still used by silk/celt |
+| `externs.rs` | — | — | **Deleted** ✓ |
 | `varargs.rs` | 0 | 0 | VarArgs type — replace with typed methods |
 
-**Total remaining in src/src/**: 18 unsafe fn + 6 unsafe blocks = 24
+**Total remaining in src/src/**: 15 unsafe fn + 6 unsafe blocks = 21
 
 ---
 
@@ -441,24 +441,21 @@ marked `unsafe fn`. Convert to safe signatures and update all callers.
 - [x] Update callers in opus_encoder.rs
 - [x] **Commit**: `refactor: make analysis.rs function signatures safe`
 
-### Stage 4.3 — Eliminate externs.rs usage
+### Stage 4.3 — Eliminate externs.rs usage ✅
 
-Before removing `externs.rs`, all callers must be converted:
+All callers converted, `externs.rs` deleted:
 
-- [ ] Audit all callers of `externs::memcpy` → replace with `copy_from_slice`
-  or `clone_from_slice`
-- [ ] Audit all callers of `externs::memmove` → replace with `copy_within`
-- [ ] Audit all callers of `externs::memset` → replace with `fill(0)` or
-  `fill(value)`
-- [ ] Audit all callers of `externs::memcmp` → replace with slice `==`
-- [ ] Audit all callers of `externs::malloc/calloc/free/realloc`:
-  - Encoder state: `malloc` → `Box::new(OpusEncoder::default())`
-  - Decoder state: `malloc` → `Box::new(OpusDecoder::default())`
-  - Internal buffers: `malloc` → `Vec<T>`
-- [ ] Delete `src/externs.rs`
-- [ ] Remove `pub mod externs` from `lib.rs`
-- [ ] Update any test code that still uses `externs`
-- [ ] **Commit**: `refactor: eliminate externs.rs, use native Rust allocations`
+- [x] All `externs::memcpy/memmove/memset/memcmp` callers already eliminated
+  in Phases 2-3 (CELT and SILK safety refactoring)
+- [x] `externs::malloc/free` in `opus_encoder_create/destroy` → `Box::new/from_raw`
+- [x] `externs::malloc/free` in `opus_decoder_create/destroy` → `Box::new/from_raw`
+- [x] Embed `silk_encoder` and `OpusCustomEncoder` directly in `OpusEncoder` struct
+  (replaces C-style offset-into-fat-allocation pattern)
+- [x] Add `OpusEncoder::new()` safe constructor
+- [x] `opus_encoder_get_size` made safe (no longer `unsafe fn`)
+- [x] Delete `src/externs.rs`
+- [x] Remove `pub mod externs` from `lib.rs`
+- [x] **Commit**: `refactor: embed sub-encoders in OpusEncoder, eliminate externs.rs` (dig-safe: 0ca8a46)
 
 ### Stage 4.4 — Safe opus_decoder.rs
 
