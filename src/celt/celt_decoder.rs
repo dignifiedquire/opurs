@@ -387,26 +387,39 @@ fn celt_synthesis(
         }
     } else {
         // CC==C case (mono or stereo matching)
-        let channels: [&mut [celt_sig]; 2] = unsafe {
-            // SAFETY: out_syn_ch0 and out_syn_ch1 are non-overlapping slices from
-            // different regions of decode_mem (split_at_mut at the caller).
-            // We need the array to index by c in the loop.
-            let p0 = out_syn_ch0.as_mut_ptr();
-            let l0 = out_syn_ch0.len();
-            let p1 = out_syn_ch1.as_mut_ptr();
-            let l1 = out_syn_ch1.len();
-            [
-                std::slice::from_raw_parts_mut(p0, l0),
-                std::slice::from_raw_parts_mut(p1, l1),
-            ]
-        };
-        let mut c = 0;
-        loop {
+        // Process channel 0
+        denormalise_bands(
+            mode,
+            &X[..n],
+            &mut freq,
+            &oldBandE[..nbEBands as usize],
+            start,
+            effEnd,
+            M,
+            downsample,
+            silence,
+        );
+        b = 0;
+        while b < B {
+            let bu = b as usize;
+            mdct_backward(
+                &mode.mdct,
+                &freq[bu..bu + mdct_sub_len * B as usize],
+                &mut out_syn_ch0[NB as usize * bu..NB as usize * bu + mdct_sub_len + overlap_u],
+                mode.window,
+                overlap_u,
+                shift as usize,
+                B as usize,
+            );
+            b += 1;
+        }
+        // Process channel 1 (if stereo)
+        if CC >= 2 {
             denormalise_bands(
                 mode,
-                &X[(c as usize * n)..(c as usize * n + n)],
+                &X[n..2 * n],
                 &mut freq,
-                &oldBandE[(c * nbEBands) as usize..((c + 1) * nbEBands) as usize],
+                &oldBandE[nbEBands as usize..2 * nbEBands as usize],
                 start,
                 effEnd,
                 M,
@@ -419,18 +432,13 @@ fn celt_synthesis(
                 mdct_backward(
                     &mode.mdct,
                     &freq[bu..bu + mdct_sub_len * B as usize],
-                    &mut channels[c as usize]
-                        [NB as usize * bu..NB as usize * bu + mdct_sub_len + overlap_u],
+                    &mut out_syn_ch1[NB as usize * bu..NB as usize * bu + mdct_sub_len + overlap_u],
                     mode.window,
                     overlap_u,
                     shift as usize,
                     B as usize,
                 );
                 b += 1;
-            }
-            c += 1;
-            if !(c < CC) {
-                break;
             }
         }
     }
@@ -900,12 +908,10 @@ pub fn celt_decode_with_ec(
     // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
     let mut data_copy = data.unwrap().to_vec();
-    // ec_dec_init requires &mut [u8]. We create a separate mutable reference to
-    // data_copy with an erased lifetime to avoid the compiler unifying the local
-    // lifetime with the caller-provided dec's lifetime parameter.
+    // ec_dec_init requires &mut [u8]. We erase the lifetime to avoid the compiler
+    // unifying data_copy's local lifetime with the caller-provided dec's lifetime.
     // SAFETY: data_copy is live for the remainder of this function, and _dec is
-    // the only reference to it. The 'static lifetime is a lie that is safe because
-    // _dec never escapes this function.
+    // the only reference to it.
     let data_ref: &mut [u8] =
         unsafe { std::slice::from_raw_parts_mut(data_copy.as_mut_ptr(), data_copy.len()) };
     let mut _dec = ec_dec_init(data_ref);
