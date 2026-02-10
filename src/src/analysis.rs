@@ -5,7 +5,7 @@ pub mod arch_h {
     pub type opus_val64 = f32;
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct AnalysisInfo {
     pub valid: i32,
@@ -140,6 +140,44 @@ pub struct TonalityAnalysisState {
     pub rnn_state: [f32; 24],
     pub downmix_state: [opus_val32; 3],
     pub info: [AnalysisInfo; 100],
+}
+impl Default for TonalityAnalysisState {
+    fn default() -> Self {
+        Self {
+            arch: 0,
+            application: 0,
+            Fs: 0,
+            angle: [0.0; 240],
+            d_angle: [0.0; 240],
+            d2_angle: [0.0; 240],
+            inmem: [0.0; 720],
+            mem_fill: 0,
+            prev_band_tonality: [0.0; 18],
+            prev_tonality: 0.0,
+            prev_bandwidth: 0,
+            E: [[0.0; 18]; 8],
+            logE: [[0.0; 18]; 8],
+            lowE: [0.0; 18],
+            highE: [0.0; 18],
+            meanE: [0.0; 19],
+            mem: [0.0; 32],
+            cmean: [0.0; 8],
+            std: [0.0; 9],
+            Etracker: 0.0,
+            lowECount: 0.0,
+            E_count: 0,
+            count: 0,
+            analysis_offset: 0,
+            write_pos: 0,
+            read_pos: 0,
+            read_subframe: 0,
+            hp_ener_accum: 0.0,
+            initialized: 0,
+            rnn_state: [0.0; 24],
+            downmix_state: [0.0; 3],
+            info: [AnalysisInfo::default(); 100],
+        }
+    }
 }
 pub const ANALYSIS_BUF_SIZE: i32 = 720;
 pub const DETECT_SIZE: i32 = 100;
