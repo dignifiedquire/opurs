@@ -1,3 +1,4 @@
+use crate::api::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::src::repacketizer::FrameSource;
 
 pub mod arch_h {
@@ -310,6 +311,280 @@ impl OpusEncoder {
                 output.len() as i32,
             )
         }
+    }
+
+    // -- Type-safe CTL getters and setters --
+
+    pub fn set_application(&mut self, app: Application) -> Result<(), i32> {
+        if self.first == 0 && self.application != i32::from(app) {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.application = app.into();
+        self.analysis.application = app.into();
+        Ok(())
+    }
+
+    pub fn application(&self) -> Application {
+        Application::try_from(self.application).unwrap()
+    }
+
+    pub fn set_bitrate(&mut self, bitrate: Bitrate) {
+        let value: i32 = bitrate.into();
+        if value != OPUS_AUTO && value != OPUS_BITRATE_MAX {
+            let clamped = value.max(500).min(300000 * self.channels);
+            self.user_bitrate_bps = clamped;
+        } else {
+            self.user_bitrate_bps = value;
+        }
+    }
+
+    pub fn bitrate(&self) -> i32 {
+        user_bitrate_to_bitrate(self, self.prev_framesize, 1276)
+    }
+
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+        if complexity < 0 || complexity > 10 {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.silk_mode.complexity = complexity;
+        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_SET_COMPLEXITY_REQUEST, complexity);
+        Ok(())
+    }
+
+    pub fn complexity(&self) -> i32 {
+        self.silk_mode.complexity
+    }
+
+    pub fn set_signal(&mut self, signal: Option<Signal>) {
+        self.signal_type = match signal {
+            Some(s) => s.into(),
+            None => OPUS_AUTO,
+        };
+    }
+
+    pub fn signal(&self) -> Option<Signal> {
+        Signal::try_from(self.signal_type).ok()
+    }
+
+    pub fn set_bandwidth(&mut self, bw: Option<Bandwidth>) {
+        let raw = match bw {
+            Some(b) => {
+                let v: i32 = b.into();
+                match b {
+                    Bandwidth::Narrowband => self.silk_mode.maxInternalSampleRate = 8000,
+                    Bandwidth::Mediumband => self.silk_mode.maxInternalSampleRate = 12000,
+                    _ => self.silk_mode.maxInternalSampleRate = 16000,
+                }
+                v
+            }
+            None => OPUS_AUTO,
+        };
+        self.user_bandwidth = raw;
+    }
+
+    pub fn get_bandwidth(&self) -> i32 {
+        self.bandwidth
+    }
+
+    pub fn set_max_bandwidth(&mut self, bw: Bandwidth) {
+        self.max_bandwidth = bw.into();
+        match bw {
+            Bandwidth::Narrowband => self.silk_mode.maxInternalSampleRate = 8000,
+            Bandwidth::Mediumband => self.silk_mode.maxInternalSampleRate = 12000,
+            _ => self.silk_mode.maxInternalSampleRate = 16000,
+        }
+    }
+
+    pub fn max_bandwidth(&self) -> Bandwidth {
+        Bandwidth::try_from(self.max_bandwidth).unwrap()
+    }
+
+    pub fn set_vbr(&mut self, enabled: bool) {
+        self.use_vbr = enabled as i32;
+        self.silk_mode.useCBR = (!enabled) as i32;
+    }
+
+    pub fn vbr(&self) -> bool {
+        self.use_vbr != 0
+    }
+
+    pub fn set_vbr_constraint(&mut self, enabled: bool) {
+        self.vbr_constraint = enabled as i32;
+    }
+
+    pub fn vbr_constraint(&self) -> bool {
+        self.vbr_constraint != 0
+    }
+
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+        let raw = match channels {
+            Some(c) => {
+                let v: i32 = c.into();
+                if v > self.channels {
+                    return Err(OPUS_BAD_ARG);
+                }
+                v
+            }
+            None => OPUS_AUTO,
+        };
+        self.force_channels = raw;
+        Ok(())
+    }
+
+    pub fn force_channels(&self) -> Option<Channels> {
+        if self.force_channels == OPUS_AUTO {
+            None
+        } else {
+            Channels::try_from(self.force_channels).ok()
+        }
+    }
+
+    pub fn set_inband_fec(&mut self, enabled: bool) {
+        self.silk_mode.useInBandFEC = enabled as i32;
+    }
+
+    pub fn inband_fec(&self) -> bool {
+        self.silk_mode.useInBandFEC != 0
+    }
+
+    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
+        if pct < 0 || pct > 100 {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.silk_mode.packetLossPercentage = pct;
+        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_SET_PACKET_LOSS_PERC_REQUEST, pct);
+        Ok(())
+    }
+
+    pub fn packet_loss_perc(&self) -> i32 {
+        self.silk_mode.packetLossPercentage
+    }
+
+    pub fn set_dtx(&mut self, enabled: bool) {
+        self.use_dtx = enabled as i32;
+    }
+
+    pub fn dtx(&self) -> bool {
+        self.use_dtx != 0
+    }
+
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+        if depth < 8 || depth > 24 {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.lsb_depth = depth;
+        Ok(())
+    }
+
+    pub fn lsb_depth(&self) -> i32 {
+        self.lsb_depth
+    }
+
+    pub fn set_expert_frame_duration(&mut self, fs: FrameSize) {
+        self.variable_duration = fs.into();
+    }
+
+    pub fn expert_frame_duration(&self) -> FrameSize {
+        FrameSize::try_from(self.variable_duration).unwrap()
+    }
+
+    pub fn set_prediction_disabled(&mut self, disabled: bool) {
+        self.silk_mode.reducedDependency = disabled as i32;
+    }
+
+    pub fn prediction_disabled(&self) -> bool {
+        self.silk_mode.reducedDependency != 0
+    }
+
+    pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
+        opus_custom_encoder_ctl!(
+            &mut self.celt_enc,
+            OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+            disabled as i32,
+        );
+    }
+
+    pub fn phase_inversion_disabled(&self) -> bool {
+        self.celt_enc.disable_inv != 0
+    }
+
+    pub fn sample_rate(&self) -> i32 {
+        self.Fs
+    }
+
+    pub fn lookahead(&self) -> i32 {
+        let mut la = self.Fs / 400;
+        if self.application != OPUS_APPLICATION_RESTRICTED_LOWDELAY {
+            la += self.delay_compensation;
+        }
+        la
+    }
+
+    pub fn final_range(&self) -> u32 {
+        self.rangeFinal
+    }
+
+    pub fn in_dtx(&self) -> bool {
+        if self.silk_mode.useDTX != 0
+            && (self.prev_mode == MODE_SILK_ONLY || self.prev_mode == MODE_HYBRID)
+        {
+            let silk_enc = &self.silk_enc;
+            let mut all_dtx = true;
+            for n in 0..self.silk_mode.nChannelsInternal {
+                if silk_enc.state_Fxx[n as usize].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX
+                {
+                    all_dtx = false;
+                }
+            }
+            all_dtx
+        } else if self.use_dtx != 0 {
+            self.nb_no_activity_frames >= NB_SPEECH_FRAMES_BEFORE_DTX
+        } else {
+            false
+        }
+    }
+
+    pub fn reset(&mut self) {
+        let mut dummy = silk_EncControlStruct::default();
+        tonality_analysis_reset(&mut self.analysis);
+        // Zero from stream_channels to end of struct (matches C OPUS_RESET_STATE)
+        self.stream_channels = 0;
+        self.hybrid_stereo_width_Q14 = 0;
+        self.variable_HP_smth2_Q15 = 0;
+        self.prev_HB_gain = 0.0;
+        self.hp_mem = [0.0; 4];
+        self.mode = 0;
+        self.prev_mode = 0;
+        self.prev_channels = 0;
+        self.prev_framesize = 0;
+        self.bandwidth = 0;
+        self.auto_bandwidth = 0;
+        self.silk_bw_switch = 0;
+        self.first = 0;
+        self.energy_masking = std::ptr::null_mut();
+        self.width_mem = StereoWidthState {
+            XX: 0.0,
+            XY: 0.0,
+            YY: 0.0,
+            smoothed_width: 0.0,
+            max_follower: 0.0,
+        };
+        self.delay_buffer = [0.0; 960];
+        self.detected_bandwidth = 0;
+        self.nb_no_activity_frames = 0;
+        self.peak_signal_energy = 0.0;
+        self.nonfinal_frame = 0;
+        self.rangeFinal = 0;
+
+        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_RESET_STATE);
+        silk_InitEncoder(&mut self.silk_enc, self.arch, &mut dummy);
+        self.stream_channels = self.channels;
+        self.hybrid_stereo_width_Q14 = ((1) << 14) as i16;
+        self.prev_HB_gain = Q15ONE;
+        self.first = 1;
+        self.mode = MODE_HYBRID;
+        self.bandwidth = OPUS_BANDWIDTH_FULLBAND;
+        self.variable_HP_smth2_Q15 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
     }
 }
 /// Upstream C: src/opus_encoder.c:gen_toc
