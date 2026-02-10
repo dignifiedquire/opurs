@@ -81,7 +81,7 @@ use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
-use crate::silk::structs::{silk_encoder_state, silk_nsq_state, SideInfoIndices};
+use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
@@ -89,7 +89,7 @@ use crate::silk::SigProc_FIX::silk_RAND;
 
 /// Upstream C: silk/NSQ.c:silk_NSQ_c
 pub fn silk_NSQ_c(
-    psEncC: &silk_encoder_state,
+    psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
     x16: &[i16],
@@ -479,7 +479,7 @@ fn silk_noise_shape_quantizer(
 /// Upstream C: silk/NSQ.c:silk_nsq_scale_states
 #[inline]
 fn silk_nsq_scale_states(
-    psEncC: &silk_encoder_state,
+    psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     x16: &[i16],
     x_sc_Q10: &mut [i32],

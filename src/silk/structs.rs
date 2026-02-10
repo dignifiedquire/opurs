@@ -128,6 +128,22 @@ pub struct silk_decoder_control {
     pub LTP_scale_Q14: i32,
 }
 
+/// Read-only config fields needed by the NSQ quantization pipeline.
+/// Extracted from `silk_encoder_state` to avoid borrow conflicts when
+/// the caller also needs mutable access to `indices`, `sNSQ`, and `pulses`.
+#[derive(Copy, Clone)]
+pub struct NsqConfig {
+    pub nb_subfr: usize,
+    pub frame_length: usize,
+    pub subfr_length: usize,
+    pub ltp_mem_length: usize,
+    pub predictLPCOrder: i32,
+    pub shapingLPCOrder: i32,
+    pub nStatesDelayedDecision: i32,
+    pub warping_Q16: i32,
+    pub arch: i32,
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_nsq_state {
@@ -265,6 +281,23 @@ pub struct silk_encoder_state {
     pub LBRR_GainIncreases: i32,
     pub indices_LBRR: [SideInfoIndices; 3],
     pub pulses_LBRR: [[i8; 320]; 3],
+}
+
+impl silk_encoder_state {
+    /// Extract the read-only config fields needed by the NSQ pipeline.
+    pub fn nsq_config(&self) -> NsqConfig {
+        NsqConfig {
+            nb_subfr: self.nb_subfr,
+            frame_length: self.frame_length,
+            subfr_length: self.subfr_length,
+            ltp_mem_length: self.ltp_mem_length,
+            predictLPCOrder: self.predictLPCOrder,
+            shapingLPCOrder: self.shapingLPCOrder,
+            nStatesDelayedDecision: self.nStatesDelayedDecision,
+            warping_Q16: self.warping_Q16,
+            arch: self.arch,
+        }
+    }
 }
 
 impl Default for silk_encoder_state {
