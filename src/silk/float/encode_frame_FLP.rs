@@ -1,6 +1,5 @@
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::ec_enc;
-use crate::externs::{memcpy, memmove};
 use crate::silk::define::{
     CODE_CONDITIONALLY, LA_SHAPE_MS, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX,
     N_LEVELS_QGAIN, TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, VAD_NO_ACTIVITY,
@@ -16,37 +15,37 @@ use crate::silk::float::wrappers_FLP::silk_NSQ_wrapper_FLP;
 use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_ID, silk_gains_dequant, silk_gains_quant};
 use crate::silk::log2lin::silk_log2lin;
-use crate::silk::structs::{silk_nsq_state, SideInfoIndices};
+use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
 use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
 use crate::silk::SigProc_FIX::silk_min_int;
 use crate::silk::VAD::silk_VAD_GetSA_Q8_c;
 
+/// Upstream C: silk/float/encode_frame_FLP.c:silk_encode_do_VAD_FLP
 pub unsafe fn silk_encode_do_VAD_FLP(psEnc: *mut silk_encoder_state_FLP, activity: i32) {
     let psEnc = &mut *psEnc;
     let activity_threshold: i32 =
         ((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32;
     let vad_input: Vec<i16> = psEnc.sCmn.inputBuf[1..].to_vec();
     silk_VAD_GetSA_Q8_c(&mut psEnc.sCmn, &vad_input);
-    if activity == VAD_NO_ACTIVITY && (*psEnc).sCmn.speech_activity_Q8 >= activity_threshold {
-        (*psEnc).sCmn.speech_activity_Q8 = activity_threshold - 1;
+    if activity == VAD_NO_ACTIVITY && psEnc.sCmn.speech_activity_Q8 >= activity_threshold {
+        psEnc.sCmn.speech_activity_Q8 = activity_threshold - 1;
     }
-    if (*psEnc).sCmn.speech_activity_Q8 < activity_threshold {
-        (*psEnc).sCmn.indices.signalType = TYPE_NO_VOICE_ACTIVITY as i8;
-        (*psEnc).sCmn.noSpeechCounter += 1;
-        if (*psEnc).sCmn.noSpeechCounter <= NB_SPEECH_FRAMES_BEFORE_DTX {
-            (*psEnc).sCmn.inDTX = 0;
-        } else if (*psEnc).sCmn.noSpeechCounter > MAX_CONSECUTIVE_DTX + NB_SPEECH_FRAMES_BEFORE_DTX
-        {
-            (*psEnc).sCmn.noSpeechCounter = NB_SPEECH_FRAMES_BEFORE_DTX;
-            (*psEnc).sCmn.inDTX = 0;
+    if psEnc.sCmn.speech_activity_Q8 < activity_threshold {
+        psEnc.sCmn.indices.signalType = TYPE_NO_VOICE_ACTIVITY as i8;
+        psEnc.sCmn.noSpeechCounter += 1;
+        if psEnc.sCmn.noSpeechCounter <= NB_SPEECH_FRAMES_BEFORE_DTX {
+            psEnc.sCmn.inDTX = 0;
+        } else if psEnc.sCmn.noSpeechCounter > MAX_CONSECUTIVE_DTX + NB_SPEECH_FRAMES_BEFORE_DTX {
+            psEnc.sCmn.noSpeechCounter = NB_SPEECH_FRAMES_BEFORE_DTX;
+            psEnc.sCmn.inDTX = 0;
         }
-        (*psEnc).sCmn.VAD_flags[(*psEnc).sCmn.nFramesEncoded as usize] = 0;
+        psEnc.sCmn.VAD_flags[psEnc.sCmn.nFramesEncoded as usize] = 0;
     } else {
-        (*psEnc).sCmn.noSpeechCounter = 0;
-        (*psEnc).sCmn.inDTX = 0;
-        (*psEnc).sCmn.indices.signalType = TYPE_UNVOICED as i8;
-        (*psEnc).sCmn.VAD_flags[(*psEnc).sCmn.nFramesEncoded as usize] = 1;
+        psEnc.sCmn.noSpeechCounter = 0;
+        psEnc.sCmn.inDTX = 0;
+        psEnc.sCmn.indices.signalType = TYPE_UNVOICED as i8;
+        psEnc.sCmn.VAD_flags[psEnc.sCmn.nFramesEncoded as usize] = 1;
     };
 }
 pub unsafe fn silk_encode_frame_FLP(
@@ -83,8 +82,6 @@ pub unsafe fn silk_encode_frame_FLP(
     let mut found_upper: i32 = 0;
     let mut found_lower: i32 = 0;
     let ret: i32 = 0;
-    let mut x_frame: *mut f32 = 0 as *mut f32;
-    let mut res_pitch_frame: *mut f32 = 0 as *mut f32;
     let mut res_pitch: [f32; 672] = [0.; 672];
     let mut sRangeEnc_copy = ec_ctx_saved::default();
     let mut sRangeEnc_copy2 = ec_ctx_saved::default();
@@ -140,34 +137,30 @@ pub unsafe fn silk_encode_frame_FLP(
     nBits_lower = nBits_upper;
     LastGainIndex_copy2 = nBits_lower as i8;
     let fresh0 = (*psEnc).sCmn.frameCounter;
-    (*psEnc).sCmn.frameCounter = (*psEnc).sCmn.frameCounter + 1;
+    (*psEnc).sCmn.frameCounter = fresh0 + 1;
     (*psEnc).sCmn.indices.Seed = (fresh0 & 3) as i8;
-    x_frame = ((*psEnc).x_buf)
-        .as_mut_ptr()
-        .offset((*psEnc).sCmn.ltp_mem_length as isize);
-    res_pitch_frame = res_pitch
-        .as_mut_ptr()
-        .offset((*psEnc).sCmn.ltp_mem_length as isize);
+    let ltp_mem = (*psEnc).sCmn.ltp_mem_length;
+    let frame_length = (*psEnc).sCmn.frame_length;
+    let x_frame_off = ltp_mem;
     silk_LP_variable_cutoff(
         &mut (*psEnc).sCmn.sLP,
-        &mut (&mut (*psEnc).sCmn.inputBuf)[1..][..(*psEnc).sCmn.frame_length as usize],
+        &mut (&mut (*psEnc).sCmn.inputBuf)[1..][..frame_length],
     );
-    silk_short2float_array(
-        std::slice::from_raw_parts_mut(
-            x_frame.offset((LA_SHAPE_MS * (*psEnc).sCmn.fs_kHz) as isize),
-            (*psEnc).sCmn.frame_length as usize,
-        ),
-        std::slice::from_raw_parts(
-            ((*psEnc).sCmn.inputBuf).as_mut_ptr().offset(1 as isize),
-            (*psEnc).sCmn.frame_length as usize,
-        ),
-    );
+    {
+        let la_offset = (LA_SHAPE_MS * (*psEnc).sCmn.fs_kHz) as usize;
+        let dst_start = x_frame_off + la_offset;
+        let psEnc = &mut *psEnc;
+        silk_short2float_array(
+            &mut psEnc.x_buf[dst_start..dst_start + frame_length],
+            &psEnc.sCmn.inputBuf[1..1 + frame_length],
+        );
+    }
     i = 0;
     while i < 8 {
-        *x_frame.offset(
-            (LA_SHAPE_MS * (*psEnc).sCmn.fs_kHz + i * ((*psEnc).sCmn.frame_length as i32 >> 3))
-                as isize,
-        ) += (1 - (i & 2)) as f32 * 1e-6f32;
+        let idx = x_frame_off
+            + (LA_SHAPE_MS * (*psEnc).sCmn.fs_kHz) as usize
+            + i as usize * (frame_length >> 3);
+        (*psEnc).x_buf[idx] += (1 - (i & 2)) as f32 * 1e-6f32;
         i += 1;
     }
     if (*psEnc).sCmn.prefillFlag == 0 {
@@ -223,7 +216,12 @@ pub unsafe fn silk_encode_frame_FLP(
             );
         }
         silk_process_gains_FLP(&mut *psEnc, &mut sEncCtrl, condCoding);
-        silk_LBRR_encode_FLP(psEnc, &mut sEncCtrl, x_frame as *const f32, condCoding);
+        silk_LBRR_encode_FLP(
+            psEnc,
+            &mut sEncCtrl,
+            (*psEnc).x_buf.as_ptr().add(x_frame_off),
+            condCoding,
+        );
         maxIter = 6;
         gainMult_Q8 = ((1 * ((1) << 8)) as f64 + 0.5f64) as i32 as i16;
         found_lower = 0;
@@ -234,11 +232,7 @@ pub unsafe fn silk_encode_frame_FLP(
         gainsID_lower = -1;
         gainsID_upper = -1;
         sRangeEnc_copy = psRangeEnc.save();
-        memcpy(
-            &mut sNSQ_copy as *mut silk_nsq_state as *mut core::ffi::c_void,
-            &mut (*psEnc).sCmn.sNSQ as *mut silk_nsq_state as *const core::ffi::c_void,
-            ::core::mem::size_of::<silk_nsq_state>() as u64,
-        );
+        sNSQ_copy = (*psEnc).sCmn.sNSQ;
         seed_copy = (*psEnc).sCmn.indices.Seed as i32;
         ec_prevLagIndex_copy = (*psEnc).sCmn.ec_prevLagIndex;
         ec_prevSignalType_copy = (*psEnc).sCmn.ec_prevSignalType;
@@ -251,11 +245,7 @@ pub unsafe fn silk_encode_frame_FLP(
             } else {
                 if iter > 0 {
                     psRangeEnc.restore(sRangeEnc_copy);
-                    memcpy(
-                        &mut (*psEnc).sCmn.sNSQ as *mut silk_nsq_state as *mut core::ffi::c_void,
-                        &mut sNSQ_copy as *mut silk_nsq_state as *const core::ffi::c_void,
-                        ::core::mem::size_of::<silk_nsq_state>() as u64,
-                    );
+                    (*psEnc).sCmn.sNSQ = sNSQ_copy;
                     (*psEnc).sCmn.indices.Seed = seed_copy as i8;
                     (*psEnc).sCmn.ec_prevLagIndex = ec_prevLagIndex_copy;
                     (*psEnc).sCmn.ec_prevSignalType = ec_prevSignalType_copy;
@@ -266,7 +256,7 @@ pub unsafe fn silk_encode_frame_FLP(
                     &mut (*psEnc).sCmn.indices,
                     &mut (*psEnc).sCmn.sNSQ,
                     ((*psEnc).sCmn.pulses).as_mut_ptr(),
-                    x_frame as *const f32,
+                    (*psEnc).x_buf.as_ptr().add(x_frame_off),
                 );
                 if iter == maxIter && found_lower == 0 {
                     sRangeEnc_copy2 = psRangeEnc.save();
@@ -328,16 +318,9 @@ pub unsafe fn silk_encode_frame_FLP(
                 if found_lower != 0 && (gainsID == gainsID_lower || nBits > maxBits) {
                     psRangeEnc.restore(sRangeEnc_copy2);
                     assert!(sRangeEnc_copy2.offs <= 1275);
-                    memcpy(
-                        psRangeEnc.buf.as_mut_ptr() as *mut core::ffi::c_void,
-                        ec_buf_copy.as_mut_ptr() as *const core::ffi::c_void,
-                        sRangeEnc_copy2.offs as u64,
-                    );
-                    memcpy(
-                        &mut (*psEnc).sCmn.sNSQ as *mut silk_nsq_state as *mut core::ffi::c_void,
-                        &mut sNSQ_copy2 as *mut silk_nsq_state as *const core::ffi::c_void,
-                        ::core::mem::size_of::<silk_nsq_state>() as u64,
-                    );
+                    let offs = sRangeEnc_copy2.offs as usize;
+                    psRangeEnc.buf[..offs].copy_from_slice(&ec_buf_copy[..offs]);
+                    (*psEnc).sCmn.sNSQ = sNSQ_copy2;
                     (*psEnc).sShape.LastGainIndex = LastGainIndex_copy2;
                 }
                 break;
@@ -369,17 +352,9 @@ pub unsafe fn silk_encode_frame_FLP(
                         gainsID_lower = gainsID;
                         sRangeEnc_copy2 = psRangeEnc.save();
                         assert!(psRangeEnc.offs <= 1275);
-                        memcpy(
-                            ec_buf_copy.as_mut_ptr() as *mut core::ffi::c_void,
-                            psRangeEnc.buf.as_mut_ptr() as *const core::ffi::c_void,
-                            psRangeEnc.offs as u64,
-                        );
-                        memcpy(
-                            &mut sNSQ_copy2 as *mut silk_nsq_state as *mut core::ffi::c_void,
-                            &mut (*psEnc).sCmn.sNSQ as *mut silk_nsq_state
-                                as *const core::ffi::c_void,
-                            ::core::mem::size_of::<silk_nsq_state>() as u64,
-                        );
+                        let offs = psRangeEnc.offs as usize;
+                        ec_buf_copy[..offs].copy_from_slice(&psRangeEnc.buf[..offs]);
+                        sNSQ_copy2 = (*psEnc).sCmn.sNSQ;
                         LastGainIndex_copy2 = (*psEnc).sShape.LastGainIndex;
                     }
                 }
@@ -496,15 +471,12 @@ pub unsafe fn silk_encode_frame_FLP(
             }
         }
     }
-    memmove(
-        ((*psEnc).x_buf).as_mut_ptr() as *mut core::ffi::c_void,
-        &mut *((*psEnc).x_buf)
-            .as_mut_ptr()
-            .offset((*psEnc).sCmn.frame_length as isize) as *mut f32
-            as *const core::ffi::c_void,
-        (((*psEnc).sCmn.ltp_mem_length + 5 * (*psEnc).sCmn.fs_kHz as usize) as u64)
-            .wrapping_mul(::core::mem::size_of::<f32>() as u64),
-    );
+    {
+        let shift_len = ltp_mem + 5 * (*psEnc).sCmn.fs_kHz as usize;
+        (*psEnc)
+            .x_buf
+            .copy_within(frame_length..frame_length + shift_len, 0);
+    }
     if (*psEnc).sCmn.prefillFlag != 0 {
         *pnBytesOut = 0;
         return ret;
@@ -523,82 +495,47 @@ unsafe fn silk_LBRR_encode_FLP(
     xfw: *const f32,
     condCoding: i32,
 ) {
-    let mut k: i32 = 0;
+    let mut k: i32;
     let mut Gains_Q16: [i32; 4] = [0; 4];
-    let mut TempGains: [f32; 4] = [0.; 4];
-    let psIndices_LBRR: *mut SideInfoIndices = &mut *((*psEnc).sCmn.indices_LBRR)
-        .as_mut_ptr()
-        .offset((*psEnc).sCmn.nFramesEncoded as isize)
-        as *mut SideInfoIndices;
-    let mut sNSQ_LBRR: silk_nsq_state = silk_nsq_state {
-        xq: [0; 640],
-        sLTP_shp_Q14: [0; 640],
-        sLPC_Q14: [0; 96],
-        sAR2_Q14: [0; 24],
-        sLF_AR_shp_Q14: 0,
-        sDiff_shp_Q14: 0,
-        lagPrev: 0,
-        sLTP_buf_idx: 0,
-        sLTP_shp_buf_idx: 0,
-        rand_seed: 0,
-        prev_gain_Q16: 0,
-        rewhite_flag: 0,
-    };
+    let nb_subfr = (*psEnc).sCmn.nb_subfr as usize;
+    let nFramesEncoded = (*psEnc).sCmn.nFramesEncoded as usize;
+    let mut sNSQ_LBRR: silk_nsq_state = (*psEnc).sCmn.sNSQ;
     if (*psEnc).sCmn.LBRR_enabled != 0
         && (*psEnc).sCmn.speech_activity_Q8
             > ((LBRR_SPEECH_ACTIVITY_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32
     {
-        (*psEnc).sCmn.LBRR_flags[(*psEnc).sCmn.nFramesEncoded as usize] = 1;
-        memcpy(
-            &mut sNSQ_LBRR as *mut silk_nsq_state as *mut core::ffi::c_void,
-            &mut (*psEnc).sCmn.sNSQ as *mut silk_nsq_state as *const core::ffi::c_void,
-            ::core::mem::size_of::<silk_nsq_state>() as u64,
-        );
-        memcpy(
-            psIndices_LBRR as *mut core::ffi::c_void,
-            &mut (*psEnc).sCmn.indices as *mut SideInfoIndices as *const core::ffi::c_void,
-            ::core::mem::size_of::<SideInfoIndices>() as u64,
-        );
-        memcpy(
-            TempGains.as_mut_ptr() as *mut core::ffi::c_void,
-            ((*psEncCtrl).Gains).as_mut_ptr() as *const core::ffi::c_void,
-            ((*psEnc).sCmn.nb_subfr as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
-        );
-        if (*psEnc).sCmn.nFramesEncoded == 0
-            || (*psEnc).sCmn.LBRR_flags[((*psEnc).sCmn.nFramesEncoded - 1) as usize] == 0
-        {
+        (*psEnc).sCmn.LBRR_flags[nFramesEncoded] = 1;
+        (*psEnc).sCmn.indices_LBRR[nFramesEncoded] = (*psEnc).sCmn.indices;
+        let TempGains: [f32; 4] = (*psEncCtrl).Gains;
+        let psIndices_LBRR = &mut (*psEnc).sCmn.indices_LBRR[nFramesEncoded];
+        if (*psEnc).sCmn.nFramesEncoded == 0 || (*psEnc).sCmn.LBRR_flags[nFramesEncoded - 1] == 0 {
             (*psEnc).sCmn.LBRRprevLastGainIndex = (*psEnc).sShape.LastGainIndex;
-            (*psIndices_LBRR).GainsIndices[0 as usize] =
-                ((*psIndices_LBRR).GainsIndices[0 as usize] as i32
-                    + (*psEnc).sCmn.LBRR_GainIncreases) as i8;
-            (*psIndices_LBRR).GainsIndices[0 as usize] = silk_min_int(
-                (*psIndices_LBRR).GainsIndices[0 as usize] as i32,
+            psIndices_LBRR.GainsIndices[0] =
+                (psIndices_LBRR.GainsIndices[0] as i32 + (*psEnc).sCmn.LBRR_GainIncreases) as i8;
+            psIndices_LBRR.GainsIndices[0] = silk_min_int(
+                psIndices_LBRR.GainsIndices[0] as i32,
                 N_LEVELS_QGAIN as i32 - 1,
             ) as i8;
         }
         silk_gains_dequant(
-            &mut Gains_Q16[..(*psEnc).sCmn.nb_subfr as usize],
-            &(&(*psIndices_LBRR).GainsIndices)[..(*psEnc).sCmn.nb_subfr as usize],
+            &mut Gains_Q16[..nb_subfr],
+            &psIndices_LBRR.GainsIndices[..nb_subfr],
             &mut (*psEnc).sCmn.LBRRprevLastGainIndex,
             condCoding == CODE_CONDITIONALLY,
         );
         k = 0;
-        while k < (*psEnc).sCmn.nb_subfr as i32 {
+        while k < nb_subfr as i32 {
             (*psEncCtrl).Gains[k as usize] = Gains_Q16[k as usize] as f32 * (1.0f32 / 65536.0f32);
             k += 1;
         }
         silk_NSQ_wrapper_FLP(
             psEnc,
             psEncCtrl,
-            psIndices_LBRR,
+            &mut (*psEnc).sCmn.indices_LBRR[nFramesEncoded],
             &mut sNSQ_LBRR,
-            ((*psEnc).sCmn.pulses_LBRR[(*psEnc).sCmn.nFramesEncoded as usize]).as_mut_ptr(),
+            (*psEnc).sCmn.pulses_LBRR[nFramesEncoded].as_mut_ptr(),
             xfw,
         );
-        memcpy(
-            ((*psEncCtrl).Gains).as_mut_ptr() as *mut core::ffi::c_void,
-            TempGains.as_mut_ptr() as *const core::ffi::c_void,
-            ((*psEnc).sCmn.nb_subfr as u64).wrapping_mul(::core::mem::size_of::<f32>() as u64),
-        );
+        (&mut *psEncCtrl).Gains[..nb_subfr].copy_from_slice(&TempGains[..nb_subfr]);
     }
 }
