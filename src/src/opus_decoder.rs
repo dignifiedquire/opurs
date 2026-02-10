@@ -396,7 +396,7 @@ unsafe fn opus_decode_frame(
                 lost_flag,
                 first_frame,
                 &mut dec,
-                pcm_silk[pcm_ptr_off..].as_mut_ptr(),
+                &mut pcm_silk[pcm_ptr_off..],
                 &mut silk_frame_size,
                 0,
             );

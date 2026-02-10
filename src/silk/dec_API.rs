@@ -19,7 +19,6 @@ pub mod errors_h {
 }
 use self::errors_h::{SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR};
 use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_icdf};
-// memcpy/memset eliminated — using safe Rust equivalents
 use crate::silk::decode_frame::silk_decode_frame;
 use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_pulses::silk_decode_pulses;
@@ -53,29 +52,30 @@ pub fn silk_InitDecoder() -> silk_decoder {
         prev_decode_only_middle: false,
     }
 }
-pub unsafe fn silk_Decode(
+
+/// Upstream C: silk/dec_API.c:silk_Decode
+pub fn silk_Decode(
     decState: &mut silk_decoder,
     decControl: &mut silk_DecControlStruct,
     lostFlag: i32,
     newPacketFlag: i32,
     psRangeDec: &mut ec_dec,
-    samplesOut: *mut i16,
-    nSamplesOut: *mut i32,
+    samplesOut: &mut [i16],
+    nSamplesOut: &mut i32,
     arch: i32,
 ) -> i32 {
-    let mut i: i32 = 0;
-    let mut n: i32 = 0;
+    let mut i: i32;
+    let mut n: i32;
     let mut decode_only_middle: bool = false;
     let mut ret: i32 = SILK_NO_ERROR;
     let mut nSamplesOutDec: i32 = 0;
-    let mut LBRR_symbol: i32 = 0;
-    let mut samplesOut1_tmp: [*mut i16; 2] = [0 as *mut i16; 2];
+    let mut LBRR_symbol: i32;
     let mut MS_pred_Q13: [i32; 2] = [0, 0];
     let psDec = decState;
-    let channel_state = &mut (psDec.channel_state);
-    let mut has_side: i32 = 0;
-    let mut stereo_to_mono: i32 = 0;
-    let mut delay_stack_alloc: i32 = 0;
+    let channel_state = &mut psDec.channel_state;
+    let has_side: i32;
+    let stereo_to_mono: i32;
+
     assert!(decControl.nChannelsInternal == 1 || decControl.nChannelsInternal == 2);
     if newPacketFlag != 0 {
         n = 0;
@@ -94,9 +94,8 @@ pub unsafe fn silk_Decode(
     if (channel_state[0]).nFramesDecoded == 0 {
         n = 0;
         while n < decControl.nChannelsInternal {
-            let mut fs_kHz_dec: i32 = 0;
+            let fs_kHz_dec: i32;
             if decControl.payloadSize_ms == 0 {
-                /* Assuming packet loss, use 10 ms */
                 channel_state[n as usize].nFramesPerPacket = 1;
                 channel_state[n as usize].nb_subfr = 2;
             } else if decControl.payloadSize_ms == 10 {
@@ -114,12 +113,10 @@ pub unsafe fn silk_Decode(
             } else {
                 // see comments in `[unsafe_libopus::silk::check_control_input]`
                 panic!("libopus: assert(0) called");
-                // return SILK_DEC_INVALID_FRAME_SIZE;
             }
             fs_kHz_dec = (decControl.internalSampleRate >> 10) + 1;
             if fs_kHz_dec != 8 && fs_kHz_dec != 12 && fs_kHz_dec != 16 {
                 panic!("libopus: assert(0) called");
-                // return SILK_DEC_INVALID_SAMPLING_FREQUENCY;
             }
             ret += silk_decoder_set_fs(
                 &mut channel_state[n as usize],
@@ -159,7 +156,7 @@ pub unsafe fn silk_Decode(
             channel_state[n as usize].LBRR_flags.fill(0);
             if channel_state[n as usize].LBRR_flag != 0 {
                 if channel_state[n as usize].nFramesPerPacket == 1 {
-                    channel_state[n as usize].LBRR_flags[0 as usize] = 1;
+                    channel_state[n as usize].LBRR_flags[0] = 1;
                 } else {
                     LBRR_symbol = ec_dec_icdf(
                         psRangeDec,
@@ -183,7 +180,7 @@ pub unsafe fn silk_Decode(
                 while n < decControl.nChannelsInternal {
                     if channel_state[n as usize].LBRR_flags[i as usize] != 0 {
                         let mut pulses: [i16; 320] = [0; 320];
-                        let mut condCoding: i32 = 0;
+                        let condCoding: i32;
                         if decControl.nChannelsInternal == 2 && n == 0 {
                             silk_stereo_decode_pred(psRangeDec, &mut MS_pred_Q13);
                             if channel_state[1].LBRR_flags[i as usize] == 0 {
@@ -206,7 +203,7 @@ pub unsafe fn silk_Decode(
                         let frame_length = channel_state[n as usize].frame_length as usize;
                         let mut shell_frames = frame_length / SHELL_CODEC_FRAME_LENGTH;
                         if shell_frames * SHELL_CODEC_FRAME_LENGTH < frame_length {
-                            assert_eq!(frame_length, 12 * 10); /* Make sure only happens for 10 ms @ 12 kHz */
+                            assert_eq!(frame_length, 12 * 10);
                             shell_frames += 1;
                         }
                         let frame_buffer_length = shell_frames * SHELL_CODEC_FRAME_LENGTH;
@@ -258,27 +255,20 @@ pub unsafe fn silk_Decode(
         channel_state[1].prevSignalType = TYPE_NO_VOICE_ACTIVITY;
         channel_state[1].first_frame_after_reset = 1;
     }
-    delay_stack_alloc = (decControl.internalSampleRate * decControl.nChannelsInternal
-        < decControl.API_sampleRate * decControl.nChannelsAPI as i32)
-        as i32;
-    let vla = (if delay_stack_alloc != 0 {
-        1
-    } else {
-        decControl.nChannelsInternal * (channel_state[0].frame_length + 2) as i32
-    }) as usize;
-    let mut samplesOut1_tmp_storage1: Vec<i16> = ::std::vec::from_elem(0, vla);
-    if delay_stack_alloc != 0 {
-        samplesOut1_tmp[0 as usize] = samplesOut;
-        samplesOut1_tmp[1 as usize] = samplesOut
-            .offset(channel_state[0].frame_length as isize)
-            .offset(2 as isize);
-    } else {
-        samplesOut1_tmp[0 as usize] = samplesOut1_tmp_storage1.as_mut_ptr();
-        samplesOut1_tmp[1 as usize] = samplesOut1_tmp_storage1
-            .as_mut_ptr()
-            .offset(channel_state[0].frame_length as isize)
-            .offset(2 as isize);
-    }
+
+    // Temporary buffers for decoded samples. Each channel needs frame_length + 2 elements.
+    // The first 2 elements are stereo prediction state, decoded samples start at offset 2.
+    let frame_len = channel_state[0].frame_length;
+    let ch_buf_len = frame_len + 2;
+    let nChannelsInt = decControl.nChannelsInternal;
+
+    // Always allocate the temp storage (simplifies logic vs. the C "delay_stack_alloc" trick)
+    let mut samplesOut1_tmp_storage: Vec<i16> = vec![0; nChannelsInt as usize * ch_buf_len];
+
+    // Channel offsets into samplesOut1_tmp_storage
+    let ch0_off: usize = 0;
+    let ch1_off: usize = ch_buf_len;
+
     if lostFlag == FLAG_DECODE_NORMAL {
         has_side = (decode_only_middle == false) as i32;
     } else {
@@ -291,8 +281,8 @@ pub unsafe fn silk_Decode(
     n = 0;
     while n < decControl.nChannelsInternal {
         if n == 0 || has_side != 0 {
-            let mut FrameIndex: i32 = 0;
-            let mut condCoding_0: i32 = 0;
+            let FrameIndex: i32;
+            let condCoding_0: i32;
             FrameIndex = channel_state[0].nFramesDecoded - n;
             if FrameIndex <= 0 {
                 condCoding_0 = CODE_INDEPENDENTLY;
@@ -308,80 +298,57 @@ pub unsafe fn silk_Decode(
             } else {
                 condCoding_0 = CODE_CONDITIONALLY;
             }
-            {
-                let out_ptr = samplesOut1_tmp[n as usize].offset(2);
-                let frame_len = channel_state[n as usize].frame_length;
-                let out_slice = std::slice::from_raw_parts_mut(out_ptr, frame_len);
-                let (err, n_out) = silk_decode_frame(
-                    &mut channel_state[n as usize],
-                    psRangeDec,
-                    out_slice,
-                    lostFlag,
-                    condCoding_0,
-                    arch,
-                );
-                ret += err;
-                nSamplesOutDec = n_out;
-            }
+            let ch_off = if n == 0 { ch0_off } else { ch1_off };
+            let out_slice = &mut samplesOut1_tmp_storage[ch_off + 2..ch_off + 2 + frame_len];
+            let (err, n_out) = silk_decode_frame(
+                &mut channel_state[n as usize],
+                psRangeDec,
+                out_slice,
+                lostFlag,
+                condCoding_0,
+                arch,
+            );
+            ret += err;
+            nSamplesOutDec = n_out;
         } else {
-            let side_ptr = samplesOut1_tmp[n as usize].offset(2);
-            std::slice::from_raw_parts_mut(side_ptr, nSamplesOutDec as usize).fill(0);
+            let ch_off = if n == 0 { ch0_off } else { ch1_off };
+            samplesOut1_tmp_storage[ch_off + 2..ch_off + 2 + nSamplesOutDec as usize].fill(0);
         }
-        let ref mut fresh0 = channel_state[n as usize].nFramesDecoded;
-        *fresh0 += 1;
+        channel_state[n as usize].nFramesDecoded += 1;
         n += 1;
     }
+
     if decControl.nChannelsAPI == 2 && decControl.nChannelsInternal == 2 {
+        let (ch0_slice, ch1_slice) = samplesOut1_tmp_storage.split_at_mut(ch1_off);
         silk_stereo_MS_to_LR(
             &mut psDec.sStereo,
-            std::slice::from_raw_parts_mut(samplesOut1_tmp[0], nSamplesOutDec as usize + 2),
-            std::slice::from_raw_parts_mut(samplesOut1_tmp[1], nSamplesOutDec as usize + 2),
+            &mut ch0_slice[ch0_off..ch0_off + nSamplesOutDec as usize + 2],
+            &mut ch1_slice[..nSamplesOutDec as usize + 2],
             &MS_pred_Q13,
             channel_state[0].fs_kHz as usize,
             nSamplesOutDec,
         );
     } else {
-        // Copy sMid[0..2] to beginning of samplesOut1_tmp[0]
-        let tmp0 = std::slice::from_raw_parts_mut(samplesOut1_tmp[0], nSamplesOutDec as usize + 2);
-        tmp0[0] = psDec.sStereo.sMid[0];
-        tmp0[1] = psDec.sStereo.sMid[1];
+        // Copy sMid[0..2] to beginning of channel 0 buffer
+        samplesOut1_tmp_storage[ch0_off] = psDec.sStereo.sMid[0];
+        samplesOut1_tmp_storage[ch0_off + 1] = psDec.sStereo.sMid[1];
         // Save last 2 samples back to sMid
-        psDec.sStereo.sMid[0] = tmp0[nSamplesOutDec as usize];
-        psDec.sStereo.sMid[1] = tmp0[nSamplesOutDec as usize + 1];
+        psDec.sStereo.sMid[0] = samplesOut1_tmp_storage[ch0_off + nSamplesOutDec as usize];
+        psDec.sStereo.sMid[1] = samplesOut1_tmp_storage[ch0_off + nSamplesOutDec as usize + 1];
     }
+
     *nSamplesOut =
         nSamplesOutDec * decControl.API_sampleRate / (channel_state[0].fs_kHz as i16 as i32 * 1000);
 
-    let vla_0 = (if decControl.nChannelsAPI == 2 {
-        *nSamplesOut
-    } else {
-        1
-    }) as usize;
-    let mut samplesOut2_tmp: Vec<i16> = ::std::vec::from_elem(0, vla_0);
+    let mut samplesOut2_tmp: Vec<i16> = vec![
+        0;
+        if decControl.nChannelsAPI == 2 {
+            *nSamplesOut as usize
+        } else {
+            1
+        }
+    ];
 
-    let resample_out_ptr = if decControl.nChannelsAPI == 2 {
-        samplesOut2_tmp.as_mut_slice()
-    } else {
-        std::slice::from_raw_parts_mut(samplesOut, *nSamplesOut as usize)
-    };
-
-    let vla_1 = (if delay_stack_alloc != 0 {
-        decControl.nChannelsInternal * (channel_state[0].frame_length + 2) as i32
-    } else {
-        1
-    }) as usize;
-    let mut samplesOut1_tmp_storage2: Vec<i16> = ::std::vec::from_elem(0, vla_1);
-    if delay_stack_alloc != 0 {
-        let copy_len =
-            (decControl.nChannelsInternal * (channel_state[0].frame_length + 2) as i32) as usize;
-        let src = std::slice::from_raw_parts(samplesOut, copy_len);
-        samplesOut1_tmp_storage2[..copy_len].copy_from_slice(src);
-        samplesOut1_tmp[0 as usize] = samplesOut1_tmp_storage2.as_mut_ptr();
-        samplesOut1_tmp[1 as usize] = samplesOut1_tmp_storage2
-            .as_mut_ptr()
-            .offset(channel_state[0].frame_length as isize)
-            .offset(2 as isize);
-    }
     n = 0;
     while n
         < (if (decControl.nChannelsAPI as i32) < decControl.nChannelsInternal {
@@ -390,51 +357,55 @@ pub unsafe fn silk_Decode(
             decControl.nChannelsInternal
         })
     {
-        /* Resample decoded signal to API_sampleRate */
-        ret += silk_resampler(
-            &mut channel_state[n as usize].resampler_state,
-            resample_out_ptr,
-            std::slice::from_raw_parts(
-                &mut *samplesOut1_tmp[n as usize].offset(1 as isize) as *mut i16 as *const i16,
-                nSamplesOutDec as usize,
-            ),
-        );
+        let ch_off = if n == 0 { ch0_off } else { ch1_off };
+        let resample_input =
+            &samplesOut1_tmp_storage[ch_off + 1..ch_off + 1 + nSamplesOutDec as usize];
+
         if decControl.nChannelsAPI == 2 {
+            ret += silk_resampler(
+                &mut channel_state[n as usize].resampler_state,
+                &mut samplesOut2_tmp,
+                resample_input,
+            );
             i = 0;
             while i < *nSamplesOut {
-                *samplesOut.offset((n + 2 * i) as isize) = resample_out_ptr[i as usize];
+                samplesOut[(n + 2 * i) as usize] = samplesOut2_tmp[i as usize];
                 i += 1;
             }
+        } else {
+            ret += silk_resampler(
+                &mut channel_state[n as usize].resampler_state,
+                &mut samplesOut[..*nSamplesOut as usize],
+                resample_input,
+            );
         }
         n += 1;
     }
 
-    /* Create two channel output from mono stream */
+    // Create two channel output from mono stream
     if decControl.nChannelsAPI == 2 && decControl.nChannelsInternal == 1 {
         if stereo_to_mono != 0 {
-            /* Resample right channel for newly collapsed stereo just in case
-            we weren't doing collapsing when switching to mono */
+            let resample_input =
+                &samplesOut1_tmp_storage[ch0_off + 1..ch0_off + 1 + nSamplesOutDec as usize];
             ret += silk_resampler(
                 &mut channel_state[1].resampler_state,
-                resample_out_ptr,
-                std::slice::from_raw_parts(
-                    &mut *samplesOut1_tmp[0].offset(1 as isize) as *mut i16 as *const i16,
-                    nSamplesOutDec as usize,
-                ),
+                &mut samplesOut2_tmp,
+                resample_input,
             );
             i = 0;
             while i < *nSamplesOut {
-                *samplesOut.offset((1 + 2 * i) as isize) = resample_out_ptr[i as usize];
+                samplesOut[(1 + 2 * i) as usize] = samplesOut2_tmp[i as usize];
                 i += 1;
             }
         } else {
             i = 0;
             while i < *nSamplesOut {
-                *samplesOut.offset((1 + 2 * i) as isize) = *samplesOut.offset((0 + 2 * i) as isize);
+                samplesOut[(1 + 2 * i) as usize] = samplesOut[(0 + 2 * i) as usize];
                 i += 1;
             }
         }
     }
+
     if channel_state[0].prevSignalType == TYPE_VOICED {
         let mult_tab: [i32; 3] = [6, 4, 3];
         decControl.prevPitchLag =
@@ -442,6 +413,7 @@ pub unsafe fn silk_Decode(
     } else {
         decControl.prevPitchLag = 0;
     }
+
     if lostFlag == FLAG_PACKET_LOST {
         i = 0;
         while i < psDec.nChannelsInternal {
@@ -451,5 +423,5 @@ pub unsafe fn silk_Decode(
     } else {
         psDec.prev_decode_only_middle = decode_only_middle;
     }
-    return ret;
+    ret
 }
