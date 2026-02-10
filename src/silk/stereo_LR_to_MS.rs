@@ -19,8 +19,7 @@ pub fn silk_stereo_LR_to_MS(
     state: &mut stereo_enc_state,
     x1: &mut [i16],
     x2: &mut [i16],
-    ix: &mut [[i8; 3]],
-    mid_only_flag: &mut i8,
+    frame_idx: usize,
     mid_side_rates_bps: &mut [i32],
     mut total_rate_bps: i32,
     prev_speech_act_Q8: i32,
@@ -185,12 +184,12 @@ pub fn silk_stereo_LR_to_MS(
     state.smth_width_Q14 = (state.smth_width_Q14 as i64
         + ((width_Q14 - state.smth_width_Q14 as i32) as i64 * smooth_coef_Q16 as i16 as i64 >> 16))
         as i32 as i16;
-    *mid_only_flag = 0;
+    state.mid_only_flags[frame_idx] = 0;
     if toMono != 0 {
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
-        silk_stereo_quant_pred(&mut pred_Q13, ix);
+        silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
     } else if state.width_prev_Q14 as i32 == 0
         && (8 * total_rate_bps < 13 * min_mid_rate_bps
             || ((frac_Q16 as i64 * state.smth_width_Q14 as i64 >> 16) as i32)
@@ -200,13 +199,13 @@ pub fn silk_stereo_LR_to_MS(
             state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(&mut pred_Q13, ix);
+        silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
         mid_side_rates_bps[0] = total_rate_bps;
         mid_side_rates_bps[1] = 0;
-        *mid_only_flag = 1;
+        state.mid_only_flags[frame_idx] = 1;
     } else if state.width_prev_Q14 as i32 != 0
         && (8 * total_rate_bps < 11 * min_mid_rate_bps
             || ((frac_Q16 as i64 * state.smth_width_Q14 as i64 >> 16) as i32)
@@ -216,34 +215,34 @@ pub fn silk_stereo_LR_to_MS(
             state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(&mut pred_Q13, ix);
+        silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = 0;
         pred_Q13[0 as usize] = 0;
         pred_Q13[1 as usize] = 0;
     } else if state.smth_width_Q14 as i32 > (0.95f64 * ((1) << 14) as f64 + 0.5f64) as i32 {
-        silk_stereo_quant_pred(&mut pred_Q13, ix);
+        silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = ((1 * ((1) << 14)) as f64 + 0.5f64) as i32;
     } else {
         pred_Q13[0 as usize] =
             state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
         pred_Q13[1 as usize] =
             state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
-        silk_stereo_quant_pred(&mut pred_Q13, ix);
+        silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = state.smth_width_Q14 as i32;
     }
-    if *mid_only_flag as i32 == 1 {
+    if state.mid_only_flags[frame_idx] as i32 == 1 {
         state.silent_side_len = (state.silent_side_len as i32
             + (frame_length - STEREO_INTERP_LEN_MS as i32 * fs_kHz))
             as i16;
         if (state.silent_side_len as i32) < LA_SHAPE_MS * fs_kHz {
-            *mid_only_flag = 0;
+            state.mid_only_flags[frame_idx] = 0;
         } else {
             state.silent_side_len = 10000;
         }
     } else {
         state.silent_side_len = 0;
     }
-    if *mid_only_flag as i32 == 0 && mid_side_rates_bps[1] < 1 {
+    if state.mid_only_flags[frame_idx] as i32 == 0 && mid_side_rates_bps[1] < 1 {
         mid_side_rates_bps[1] = 1;
         mid_side_rates_bps[0] = silk_max_int(1, total_rate_bps - mid_side_rates_bps[1]);
     }

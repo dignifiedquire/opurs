@@ -481,19 +481,11 @@ pub fn silk_Encode(
                 let [s0, s1] = &mut psEnc.state_Fxx;
                 let x1 = &mut s0.sCmn.inputBuf[..frame_length + 2];
                 let x2 = &mut s1.sCmn.inputBuf[..frame_length + 2];
-                // SAFETY: predIx[nfe] and mid_only_flags[nfe] are disjoint from the
-                // other fields of sStereo that silk_stereo_LR_to_MS reads/writes.
-                // We need raw pointer dereferences to create mutable references to these
-                // array elements while simultaneously borrowing &mut psEnc.sStereo below.
-                let ix = unsafe { &mut *std::ptr::addr_of_mut!(psEnc.sStereo.predIx[nfe]) };
-                let mid_flag =
-                    unsafe { &mut *std::ptr::addr_of_mut!(psEnc.sStereo.mid_only_flags[nfe]) };
                 silk_stereo_LR_to_MS(
                     &mut psEnc.sStereo,
                     x1,
                     x2,
-                    ix.as_mut_slice(),
-                    mid_flag,
+                    nfe,
                     &mut MStargetRates_bps,
                     TargetRate_bps,
                     speech_activity,
