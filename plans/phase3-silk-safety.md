@@ -149,7 +149,7 @@ Decoder side:
 
 - [x] All resampler modules safe (`#![forbid(unsafe_code)]` on mod.rs, iir_fir.rs)
 
-### Stage 3.9 — Float Processing (src/silk/float/)
+### Stage 3.9 — Float Processing (src/silk/float/) ✅
 
 Many of these follow the same pattern: pointer+length → slice.
 
@@ -167,70 +167,41 @@ Many of these follow the same pattern: pointer+length → slice.
 - [x] `noise_shape_analysis_FLP.rs` ✓ — safe (dig-safe: 93ef28c)
 - [x] `pitch_analysis_core_FLP.rs` ✓ — safe (dig-safe: be723e4)
 - [x] `process_gains_FLP.rs` ✓ — safe
-- [ ] `inner_product_FLP.rs` — 9 unsafe blocks (`get_unchecked` for performance)
-  - Could convert to safe indexing but may impact performance
-- [ ] `wrappers_FLP.rs` (1 unsafe fn: silk_NSQ_wrapper_FLP)
-  - Upstream C: `silk/float/wrappers_FLP.c`
-  - Risk: Medium — bridges float/fixed-point, blocked by NSQ safety
-- [ ] `encode_frame_FLP.rs` (3 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP, silk_LBRR_encode_FLP)
-  - All memcpy/memmove eliminated (dig-safe: 8e98913)
-  - Remaining unsafe: raw pointer params from callers, NSQ_wrapper calls
-  - Blocked by: wrappers_FLP (NSQ), enc_API callers
-- [ ] **Remaining**: 3 files with unsafe (encode_frame_FLP, inner_product_FLP, wrappers_FLP)
+- [x] `inner_product_FLP.rs` ✓ — safe (dig-safe: b1d21a5, removed unsafe get_unchecked)
+- [x] `wrappers_FLP.rs` ✓ — safe (dig-safe: 19b1c2c)
+- [x] `encode_frame_FLP.rs` ✓ — safe (dig-safe: a408ae6, NsqConfig extraction)
 
-### Stage 3.10 — Core Quantizers
+### Stage 3.10 — Core Quantizers ✅
 
-- [ ] `NSQ.rs` (3 unsafe fn)
-  - Upstream C: `silk/NSQ.c`
-  - Risk: **Very High** — 572 lines, core noise shaping quantizer, heavy memcpy
-- [ ] `NSQ_del_dec.rs` (2 unsafe fn)
-  - Upstream C: `silk/NSQ_del_dec.c`
-  - Risk: **Very High** — 1065 lines, delayed-decision NSQ variant
-- [ ] **Commit**: `refactor: make silk::NSQ safe`
-- [ ] **Commit**: `refactor: make silk::NSQ_del_dec safe`
+- [x] `NSQ.rs` ✓ — safe (dig-safe: 0fbb745)
+- [x] `NSQ_del_dec.rs` ✓ — safe (dig-safe: c84e14d)
 
-### Stage 3.11 — Decoder Integration
+### Stage 3.11 — Decoder Integration ✅
 
-- [ ] `decode_frame.rs` (1 unsafe fn: silk_decode_frame)
-  - Upstream C: `silk/decode_frame.c`
-  - Partial cleanup done: memmove/memcpy replaced with copy_within/copy_from_slice
-  - Blocked by: PLC.rs conceal path
+- [x] `decode_frame.rs` ✓ — safe (dig-safe: cf6d7c9)
 - [x] `decode_core.rs` ✓ (safe from master)
 - [x] `decode_pitch.rs` ✓ — safe
-- [x] `PLC.rs` — public functions safe (silk_PLC, silk_PLC_glue_frames) ✓ (dig-safe: be723e4)
-  - 2 private unsafe fn remain: silk_PLC_energy, silk_PLC_conceal (untested code paths)
-  - 1 unsafe block wrapping silk_PLC_conceal call
+- [x] `PLC.rs` ✓ — fully safe (dig-safe: fd9ea78)
 - [x] `CNG.rs` ✓ (safe from master)
 - [x] `VAD.rs` ✓ — all 3 functions safe (dig-safe: silk_VAD_GetSA_Q8_c converted)
 - [x] `init_decoder.rs` ✓, [x] `decoder_set_fs.rs` ✓ (dig-safe: ab4dea9)
-- [ ] `dec_API.rs` (1 unsafe fn: silk_Decode)
-  - Upstream C: `silk/dec_API.c`
-  - All memcpy/memset eliminated (dig-safe: da15295)
-  - Remaining: raw pointer params from callers
-- [ ] **Remaining**: 3 files with unsafe (decode_frame, PLC internals, dec_API)
+- [x] `dec_API.rs` ✓ — safe (dig-safe: c1d46f4)
 
-### Stage 3.12 — Encoder Integration
+### Stage 3.12 — Encoder Integration ✅
 
-- [ ] `float/encode_frame_FLP.rs` (3 unsafe fn: silk_encode_do_VAD_FLP, silk_encode_frame_FLP, silk_LBRR_encode_FLP)
-  - Upstream C: `silk/float/encode_frame_FLP.c`
-  - All memcpy/memmove eliminated ✓ (dig-safe: 8e98913)
-  - All float analysis helpers now safe ✓
-  - Remaining: raw pointer params from enc_API callers, silk_NSQ_wrapper_FLP calls
-  - Blocked by: wrappers_FLP (NSQ), enc_API
+- [x] `float/encode_frame_FLP.rs` ✓ — safe (dig-safe: a408ae6)
 - [x] `init_encoder.rs` ✓ (dig-safe: ab4dea9) — uses Default::default()
-- [ ] `enc_API.rs` (4 unsafe fn: silk_Get_Encoder_Size, silk_InitEncoder, silk_QueryEncoder, silk_Encode)
-  - Upstream C: `silk/enc_API.c`
-  - Risk: **Very High** — 877 lines, encoder hub
-  - Blocked by: encode_frame_FLP, NSQ
-- [ ] **Remaining**: 2 files with unsafe (encode_frame_FLP, enc_API)
+- [x] `enc_API.rs` ✓ — all 4 public functions safe (dig-safe: a5c05ff, then final cleanup)
+  - 2 `unsafe` blocks remain: disjoint field borrows for `sStereo.predIx`/`mid_only_flags` via `addr_of_mut!`
+  - Zero `unsafe fn` declarations
 
 ---
 
 ## Definition of Done
 
-- [ ] Zero `unsafe fn` declarations in `src/silk/`
-- [ ] Zero `unsafe {}` blocks in `src/silk/`
+- [x] Zero `unsafe fn` declarations in `src/silk/`
+- [~] Zero `unsafe {}` blocks in `src/silk/` — 2 remain in `enc_API.rs` (disjoint field borrows, unavoidable without API refactoring of `silk_stereo_LR_to_MS`)
 - [ ] Every function has `/// Upstream C:` comment
-- [ ] All tests pass (cargo test + vector tests)
+- [x] All tests pass (cargo test + vector tests) — 92/92 tests, 228/228 vectors
 - [ ] Clippy clean, formatted
-- [ ] `externs::{memcpy,memmove,memset}` no longer called from silk/
+- [x] `externs::{memcpy,memmove,memset}` no longer called from silk/

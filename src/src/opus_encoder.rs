@@ -176,7 +176,6 @@ pub unsafe fn opus_encoder_init(
     channels: i32,
     application: i32,
 ) -> i32 {
-    let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
     let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
     let mut err: i32 = 0;
     let mut ret: i32 = 0;
@@ -197,7 +196,8 @@ pub unsafe fn opus_encoder_init(
     silkEncSizeBytes = align(silkEncSizeBytes);
     (*st).silk_enc_offset = align(::core::mem::size_of::<OpusEncoder>() as u64 as i32);
     (*st).celt_enc_offset = (*st).silk_enc_offset + silkEncSizeBytes;
-    silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
+    let silk_enc =
+        &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
     celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
     (*st).channels = channels;
     (*st).stream_channels = (*st).channels;
@@ -1127,7 +1127,6 @@ pub unsafe fn opus_encode_native(
     downmix: downmix_func,
     float_api: i32,
 ) -> i32 {
-    let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
     let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
     let mut i: i32 = 0;
     let mut ret: i32 = 0;
@@ -1197,7 +1196,8 @@ pub unsafe fn opus_encode_native(
     if max_data_bytes == 1 && (*st).Fs == frame_size * 10 {
         return OPUS_BUFFER_TOO_SMALL;
     }
-    silk_enc = (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
+    let silk_enc =
+        &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
     celt_enc = (st as *mut i8).offset((*st).celt_enc_offset as isize) as *mut OpusCustomEncoder;
     if (*st).application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
         delay_compensation = 0;
@@ -1748,9 +1748,7 @@ pub unsafe fn opus_encode_native(
     if (*st).mode == MODE_CELT_ONLY {
         hp_freq_smth1 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
     } else {
-        hp_freq_smth1 = (*(silk_enc as *mut silk_encoder)).state_Fxx[0 as usize]
-            .sCmn
-            .variable_HP_smth1_Q15;
+        hp_freq_smth1 = silk_enc.state_Fxx[0].sCmn.variable_HP_smth1_Q15;
     }
     (*st).variable_HP_smth2_Q15 = ((*st).variable_HP_smth2_Q15 as i64
         + ((hp_freq_smth1 - (*st).variable_HP_smth2_Q15) as i64
@@ -2864,8 +2862,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             current_block = 16167632229894708628;
         }
         OPUS_RESET_STATE => {
-            let mut silk_enc: *mut core::ffi::c_void = 0 as *mut core::ffi::c_void;
-            let mut dummy: silk_EncControlStruct = silk_EncControlStruct {
+            let mut dummy = silk_EncControlStruct {
                 nChannelsAPI: 0,
                 nChannelsInternal: 0,
                 API_sampleRate: 0,
@@ -2892,8 +2889,8 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 signalType: 0,
                 offset: 0,
             };
-            silk_enc =
-                (st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut core::ffi::c_void;
+            let silk_enc =
+                &mut *((st as *mut i8).offset((*st).silk_enc_offset as isize) as *mut silk_encoder);
             tonality_analysis_reset(&mut (*st).analysis);
             let start: *mut u8 = &mut (*st).stream_channels as *mut i32 as *mut u8;
             let start_offset = start.offset_from(st as *mut u8) as usize;
@@ -2942,16 +2939,13 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 && ((*st).prev_mode == MODE_SILK_ONLY || (*st).prev_mode == MODE_HYBRID)
             {
                 let mut n: i32 = 0;
-                let silk_enc_0: *mut core::ffi::c_void = (st as *mut i8)
-                    .offset((*st).silk_enc_offset as isize)
-                    as *mut core::ffi::c_void;
+                let silk_enc_0 = &*((st as *mut i8).offset((*st).silk_enc_offset as isize)
+                    as *const silk_encoder);
                 *value_39 = 1;
                 n = 0;
                 while n < (*st).silk_mode.nChannelsInternal {
                     *value_39 = (*value_39 != 0
-                        && (*(silk_enc_0 as *mut silk_encoder)).state_Fxx[n as usize]
-                            .sCmn
-                            .noSpeechCounter
+                        && silk_enc_0.state_Fxx[n as usize].sCmn.noSpeechCounter
                             >= NB_SPEECH_FRAMES_BEFORE_DTX) as i32;
                     n += 1;
                 }

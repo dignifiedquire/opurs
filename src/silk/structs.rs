@@ -384,7 +384,7 @@ impl Default for silk_encoder_state {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct stereo_enc_state {
     pub pred_prev_Q13: [i16; 2],

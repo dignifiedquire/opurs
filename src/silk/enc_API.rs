@@ -65,14 +65,13 @@ pub fn silk_Get_Encoder_Size(encSizeBytes: &mut i32) -> i32 {
     SILK_NO_ERROR
 }
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
-pub unsafe fn silk_InitEncoder(
-    encState: *mut core::ffi::c_void,
+pub fn silk_InitEncoder(
+    psEnc: &mut silk_encoder,
     arch: i32,
     encStatus: &mut silk_EncControlStruct,
 ) -> i32 {
-    let psEnc = &mut *(encState as *mut silk_encoder);
     // Zero-init the encoder state
-    std::ptr::write_bytes(encState as *mut u8, 0, std::mem::size_of::<silk_encoder>());
+    *psEnc = silk_encoder::default();
     let mut ret: i32 = SILK_NO_ERROR;
     for n in 0..ENCODER_NUM_CHANNELS as usize {
         ret += silk_init_encoder(&mut psEnc.state_Fxx[n], arch);
@@ -111,8 +110,8 @@ fn silk_QueryEncoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct
     SILK_NO_ERROR
 }
 /// Upstream C: silk/enc_API.c:silk_Encode
-pub unsafe fn silk_Encode(
-    encState: *mut core::ffi::c_void,
+pub fn silk_Encode(
+    psEnc: &mut silk_encoder,
     encControl: &mut silk_EncControlStruct,
     samplesIn: &[i16],
     nSamplesIn: i32,
@@ -121,7 +120,6 @@ pub unsafe fn silk_Encode(
     prefillFlag: i32,
     activity: i32,
 ) -> i32 {
-    let psEnc = &mut *(encState as *mut silk_encoder);
     let mut n: i32;
     let mut i: i32;
     let mut nBits: i32;
@@ -485,9 +483,12 @@ pub unsafe fn silk_Encode(
                 let x1 = &mut s0.sCmn.inputBuf[..frame_length + 2];
                 let x2 = &mut s1.sCmn.inputBuf[..frame_length + 2];
                 // SAFETY: predIx[nfe] and mid_only_flags[nfe] are disjoint from the
-                // other fields of sStereo that silk_stereo_LR_to_MS reads/writes
-                let ix = &mut *std::ptr::addr_of_mut!(psEnc.sStereo.predIx[nfe]);
-                let mid_flag = &mut *std::ptr::addr_of_mut!(psEnc.sStereo.mid_only_flags[nfe]);
+                // other fields of sStereo that silk_stereo_LR_to_MS reads/writes.
+                // We need raw pointer dereferences to create mutable references to these
+                // array elements while simultaneously borrowing &mut psEnc.sStereo below.
+                let ix = unsafe { &mut *std::ptr::addr_of_mut!(psEnc.sStereo.predIx[nfe]) };
+                let mid_flag =
+                    unsafe { &mut *std::ptr::addr_of_mut!(psEnc.sStereo.mid_only_flags[nfe]) };
                 silk_stereo_LR_to_MS(
                     &mut psEnc.sStereo,
                     x1,

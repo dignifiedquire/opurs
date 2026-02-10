@@ -1,6 +1,6 @@
 use crate::silk::structs::{silk_encoder_state, stereo_enc_state};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_encoder {
     pub state_Fxx: [silk_encoder_state_FLP; 2],
