@@ -1986,7 +1986,7 @@ pub unsafe fn opus_encode_native(
             silk_Encode(
                 silk_enc,
                 &mut (*st).silk_mode,
-                pcm_silk.as_mut_ptr(),
+                &pcm_silk,
                 (*st).encoder_buffer,
                 None,
                 &mut zero,
@@ -2007,7 +2007,7 @@ pub unsafe fn opus_encode_native(
         ret = silk_Encode(
             silk_enc,
             &mut (*st).silk_mode,
-            pcm_silk.as_mut_ptr(),
+            &pcm_silk,
             frame_size,
             Some(&mut enc),
             &mut nBytes,
