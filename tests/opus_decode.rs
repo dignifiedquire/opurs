@@ -5,15 +5,12 @@
 //! Split from the original monolithic `test_decoder_code0()` and `test_soft_clip()`.
 //! The fuzz sections that depend on chained RNG state remain in a single test
 //! to preserve the exact random sequence from the upstream C test.
-#![allow(deprecated)]
 
 mod test_common;
 
 use test_common::{debruijn2, TestRng};
 use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
-    opus_decoder_get_nb_samples, opus_decoder_get_size, opus_packet_get_nb_channels,
-    opus_pcm_soft_clip, OpusDecoder,
+    opus_decoder_get_nb_samples, opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder,
 };
 
 /// Sample rates used by the decoder tests (matching upstream fsv[]).
@@ -35,49 +32,33 @@ const MAX_FRAME: i32 = 5760;
 const TEST_SEED: u32 = 42;
 
 // ---------------------------------------------------------------------------
-// Helper: create all 10 decoders with copy-and-destroy verification
+// Helper: create all 10 decoders with clone-and-drop verification
 // ---------------------------------------------------------------------------
 
 /// Create 10 decoders (5 sample rates × {mono, stereo}), verifying each
-/// can be memcpy'd and the copy works after destroying the original.
+/// can be cloned and the clone works after dropping the original.
 ///
-/// Returns a Vec of boxed decoders and a boxed backup decoder (mono, for memcpy tests).
-unsafe fn create_test_decoders() -> (Vec<Box<[u8]>>, Box<[u8]>) {
-    let mut decoders: Vec<Box<[u8]>> = Vec::with_capacity(NUM_DECODERS);
+/// Returns a Vec of decoders and a backup decoder (mono, for FEC/PLC tests).
+fn create_test_decoders() -> (Vec<OpusDecoder>, OpusDecoder) {
+    let mut decoders: Vec<OpusDecoder> = Vec::with_capacity(NUM_DECODERS);
 
     for t in 0..NUM_DECODERS {
         let fs = SAMPLE_RATES[t >> 1];
         let c = (t as i32 & 1) + 1;
-        let mut err = -3;
-        let dec = opus_decoder_create(fs, c, &mut err);
-        assert_eq!(err, 0, "opus_decoder_create({fs}, {c}) failed: err={err}");
-        assert!(
-            !dec.is_null(),
-            "opus_decoder_create({fs}, {c}) returned null"
-        );
+        let dec = OpusDecoder::new(fs, c as usize)
+            .unwrap_or_else(|err| panic!("OpusDecoder::new({fs}, {c}) failed: err={err}"));
 
-        // Copy decoder via raw bytes, destroy original, use copy
-        let size = opus_decoder_get_size(c) as usize;
-        let mut copy = vec![0u8; size].into_boxed_slice();
-        std::ptr::copy_nonoverlapping(dec as *const u8, copy.as_mut_ptr(), size);
-
-        // Overwrite original to ensure copy is independent
-        std::ptr::write_bytes(dec as *mut u8, 0xFF, size);
-        opus_decoder_destroy(dec);
+        // Clone decoder, drop original, use clone
+        let copy = dec.clone();
+        drop(dec);
 
         decoders.push(copy);
     }
 
-    // Backup decoder (mono, for FEC/PLC memcpy tests)
-    let decsize = opus_decoder_get_size(1) as usize;
-    let decbak = vec![0u8; decsize].into_boxed_slice();
+    // Backup decoder (mono, for FEC/PLC tests)
+    let decbak = OpusDecoder::new(48000, 1).unwrap();
 
     (decoders, decbak)
-}
-
-/// Get a mutable reference to the OpusDecoder inside a byte buffer.
-unsafe fn dec_ref(buf: &mut [u8]) -> &mut OpusDecoder {
-    &mut *(buf.as_mut_ptr() as *mut OpusDecoder)
 }
 
 // ---------------------------------------------------------------------------
@@ -87,11 +68,9 @@ unsafe fn dec_ref(buf: &mut [u8]) -> &mut OpusDecoder {
 /// Upstream C: test_opus_decode.c:test_decoder_code0 (decoder creation section)
 #[test]
 fn test_decoder_creation_and_copy() {
-    unsafe {
-        let (decoders, _) = create_test_decoders();
-        assert_eq!(decoders.len(), NUM_DECODERS);
-        // Decoders are valid if creation succeeded (asserts inside create_test_decoders)
-    }
+    let (decoders, _) = create_test_decoders();
+    assert_eq!(decoders.len(), NUM_DECODERS);
+    // Decoders are valid if creation succeeded (asserts inside create_test_decoders)
 }
 
 // ---------------------------------------------------------------------------
@@ -101,94 +80,82 @@ fn test_decoder_creation_and_copy() {
 /// Upstream C: test_opus_decode.c:test_decoder_code0 (initial PLC section, lines 106–163)
 #[test]
 fn test_decoder_initial_plc() {
-    unsafe {
-        let (mut decoders, _) = create_test_decoders();
-        let mut outbuf_storage = vec![GUARD_VALUE; (MAX_FRAME as usize + 2 * GUARD_SAMPLES) * 2];
-        let outbuf = &mut outbuf_storage[GUARD_SAMPLES * 2..];
-        let packet = vec![0u8; 1500];
+    let (mut decoders, _) = create_test_decoders();
+    let mut outbuf_storage = vec![GUARD_VALUE; (MAX_FRAME as usize + 2 * GUARD_SAMPLES) * 2];
+    let outbuf = &mut outbuf_storage[GUARD_SAMPLES * 2..];
+    let packet = vec![0u8; 1500];
 
-        for t in 0..NUM_DECODERS {
-            let factor = 48000 / SAMPLE_RATES[t >> 1];
-            let dec = dec_ref(&mut decoders[t]);
+    for t in 0..NUM_DECODERS {
+        let factor = 48000 / SAMPLE_RATES[t >> 1];
+        let dec = &mut decoders[t];
 
-            for fec in 0..2 {
-                // PLC with minimum frame size
-                let out_samples = opus_decode(dec, &[], outbuf, 120 / factor, fec);
-                assert_eq!(
-                    out_samples,
-                    120 / factor,
-                    "dec[{t}] PLC fec={fec}: expected {}, got {out_samples}",
-                    120 / factor
-                );
+        for fec in 0..2 {
+            let fec_bool = fec != 0;
 
-                let mut dur = 0;
-                assert_eq!(
-                    opus_decoder_ctl!(dec, 4039, &mut dur),
-                    0,
-                    "dec[{t}] GET_LAST_PACKET_DURATION failed"
-                );
-                assert_eq!(dur, 120 / factor, "dec[{t}] duration mismatch after PLC");
+            // PLC with minimum frame size
+            let out_samples = dec.decode(&[], outbuf, 120 / factor, fec_bool);
+            assert_eq!(
+                out_samples,
+                120 / factor,
+                "dec[{t}] PLC fec={fec}: expected {}, got {out_samples}",
+                120 / factor
+            );
 
-                // Non-multiple-of-2.5ms should fail
-                let out_samples = opus_decode(dec, &[], outbuf, 120 / factor + 2, fec);
-                assert_eq!(
-                    out_samples, -1,
-                    "dec[{t}] non-2.5ms-multiple should fail, got {out_samples}"
-                );
+            let dur = dec.last_packet_duration();
+            assert_eq!(dur, 120 / factor, "dec[{t}] duration mismatch after PLC");
 
-                assert_eq!(
-                    opus_decoder_ctl!(dec, 4039, &mut dur),
-                    0,
-                    "dec[{t}] GET_LAST_PACKET_DURATION failed after bad frame size"
-                );
-                assert_eq!(
-                    dur,
-                    120 / factor,
-                    "dec[{t}] duration should be unchanged after bad frame size"
-                );
+            // Non-multiple-of-2.5ms should fail
+            let out_samples = dec.decode(&[], outbuf, 120 / factor + 2, fec_bool);
+            assert_eq!(
+                out_samples, -1,
+                "dec[{t}] non-2.5ms-multiple should fail, got {out_samples}"
+            );
 
-                // Empty packet slice
-                let out_samples = opus_decode(dec, &packet[..0], outbuf, 120 / factor, fec);
-                assert_eq!(
-                    out_samples,
-                    120 / factor,
-                    "dec[{t}] empty packet PLC: expected {}, got {out_samples}",
-                    120 / factor
-                );
+            let dur = dec.last_packet_duration();
+            assert_eq!(
+                dur,
+                120 / factor,
+                "dec[{t}] duration should be unchanged after bad frame size"
+            );
 
-                // Zero-length decode
-                outbuf[0] = GUARD_VALUE;
-                let out_samples = opus_decode(dec, &packet[..0], outbuf, 0, fec);
-                assert!(
-                    out_samples <= 0,
-                    "dec[{t}] zero-length decode should return <= 0, got {out_samples}"
-                );
+            // Empty packet slice
+            let out_samples = dec.decode(&packet[..0], outbuf, 120 / factor, fec_bool);
+            assert_eq!(
+                out_samples,
+                120 / factor,
+                "dec[{t}] empty packet PLC: expected {}, got {out_samples}",
+                120 / factor
+            );
 
-                // Null output with zero length
-                let out_samples = opus_decode(dec, &packet[..0], &mut [], 0, fec);
-                assert!(
-                    out_samples <= 0,
-                    "dec[{t}] null output zero-length should return <= 0, got {out_samples}"
-                );
-                assert_eq!(
-                    outbuf[0], GUARD_VALUE,
-                    "dec[{t}] output buffer was modified when it shouldn't have been"
-                );
+            // Zero-length decode
+            outbuf[0] = GUARD_VALUE;
+            let out_samples = dec.decode(&packet[..0], outbuf, 0, fec_bool);
+            assert!(
+                out_samples <= 0,
+                "dec[{t}] zero-length decode should return <= 0, got {out_samples}"
+            );
 
-                // Invalid FEC value
-                let invalid_fec = if fec != 0 { -1 } else { 2 };
-                let out_samples = opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
-                assert!(
-                    out_samples < 0,
-                    "dec[{t}] invalid fec={invalid_fec} should fail, got {out_samples}"
-                );
+            // Null output with zero length
+            let out_samples = dec.decode(&packet[..0], &mut [], 0, fec_bool);
+            assert!(
+                out_samples <= 0,
+                "dec[{t}] null output zero-length should return <= 0, got {out_samples}"
+            );
+            assert_eq!(
+                outbuf[0], GUARD_VALUE,
+                "dec[{t}] output buffer was modified when it shouldn't have been"
+            );
 
-                assert_eq!(
-                    opus_decoder_ctl!(dec, 4028),
-                    0,
-                    "dec[{t}] RESET_STATE failed"
-                );
-            }
+            // Invalid FEC value
+            let invalid_fec = if fec != 0 { -1 } else { 2 };
+            let out_samples =
+                unsafe_libopus::opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
+            assert!(
+                out_samples < 0,
+                "dec[{t}] invalid fec={invalid_fec} should fail, got {out_samples}"
+            );
+
+            dec.reset();
         }
     }
 }
@@ -200,106 +167,96 @@ fn test_decoder_initial_plc() {
 /// Upstream C: test_opus_decode.c:test_decoder_code0 (2-byte prefix section, lines 167–219)
 #[test]
 fn test_decoder_all_2byte_prefixes() {
-    unsafe {
-        let (mut decoders, _) = create_test_decoders();
-        let mut outbuf = vec![0i16; MAX_FRAME as usize * 2];
-        let mut packet = vec![0u8; 1500];
+    let (mut decoders, _) = create_test_decoders();
+    let mut outbuf = vec![0i16; MAX_FRAME as usize * 2];
+    let mut packet = vec![0u8; 1500];
 
-        for i in 0..64 {
-            let mut expected = [0i32; NUM_DECODERS];
-            packet[0] = (i << 2) as u8;
-            packet[1] = 255;
-            packet[2] = 255;
+    for i in 0..64 {
+        let mut expected = [0i32; NUM_DECODERS];
+        packet[0] = (i << 2) as u8;
+        packet[1] = 255;
+        packet[2] = 255;
 
-            // Verify channel count from packet header
-            let nb_channels = opus_packet_get_nb_channels(packet[0]);
-            assert_eq!(
-                nb_channels,
-                (i & 1) + 1,
-                "mode {i}: expected {} channels, got {nb_channels}",
-                (i & 1) + 1
+        // Verify channel count from packet header
+        let nb_channels = opus_packet_get_nb_channels(packet[0]);
+        assert_eq!(
+            nb_channels,
+            (i & 1) + 1,
+            "mode {i}: expected {} channels, got {nb_channels}",
+            (i & 1) + 1
+        );
+
+        // Get expected sample counts
+        for t in 0..NUM_DECODERS {
+            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..1]);
+            assert!(
+                expected[t] <= 2880,
+                "dec[{t}] mode {i}: nb_samples {} > 2880",
+                expected[t]
             );
+        }
 
-            // Get expected sample counts
+        // Test all 256 second-byte values
+        for j in 0..256u16 {
+            packet[1] = j as u8;
+            let mut dec_final_range2 = 0u32;
+
             for t in 0..NUM_DECODERS {
-                expected[t] = opus_decoder_get_nb_samples(dec_ref(&mut decoders[t]), &packet[..1]);
-                assert!(
-                    expected[t] <= 2880,
-                    "dec[{t}] mode {i}: nb_samples {} > 2880",
+                let dec = &mut decoders[t];
+                let out_samples = dec.decode(&packet[..3], &mut outbuf, MAX_FRAME, false);
+                assert_eq!(
+                    out_samples, expected[t],
+                    "dec[{t}] mode {i} byte {j}: expected {}, got {out_samples}",
                     expected[t]
                 );
-            }
 
-            // Test all 256 second-byte values
-            for j in 0..256u16 {
-                packet[1] = j as u8;
-                let mut dec_final_range2 = 0u32;
+                let dur = dec.last_packet_duration();
+                assert_eq!(dur, out_samples, "dec[{t}] duration != out_samples");
 
-                for t in 0..NUM_DECODERS {
-                    let dec = dec_ref(&mut decoders[t]);
-                    let out_samples = opus_decode(dec, &packet[..3], &mut outbuf, MAX_FRAME, 0);
+                let dec_final_range1 = dec.final_range();
+
+                if t == 0 {
+                    dec_final_range2 = dec_final_range1;
+                } else {
                     assert_eq!(
-                        out_samples, expected[t],
-                        "dec[{t}] mode {i} byte {j}: expected {}, got {out_samples}",
-                        expected[t]
+                        dec_final_range1, dec_final_range2,
+                        "dec[{t}] final range mismatch vs dec[0] for mode {i} byte {j}"
                     );
-
-                    let mut dur = 0;
-                    assert_eq!(
-                        opus_decoder_ctl!(dec, 4039, &mut dur),
-                        0,
-                        "dec[{t}] GET_LAST_PACKET_DURATION failed"
-                    );
-                    assert_eq!(dur, out_samples, "dec[{t}] duration != out_samples");
-
-                    let mut dec_final_range1 = 0u32;
-                    opus_decoder_ctl!(dec, 4031, &mut dec_final_range1);
-
-                    if t == 0 {
-                        dec_final_range2 = dec_final_range1;
-                    } else {
-                        assert_eq!(
-                            dec_final_range1, dec_final_range2,
-                            "dec[{t}] final range mismatch vs dec[0] for mode {i} byte {j}"
-                        );
-                    }
                 }
             }
+        }
 
-            // PLC recovery after decoding
-            for t in 0..NUM_DECODERS {
-                let factor = 48000 / SAMPLE_RATES[t >> 1];
-                let dec = dec_ref(&mut decoders[t]);
+        // PLC recovery after decoding
+        for t in 0..NUM_DECODERS {
+            let factor = 48000 / SAMPLE_RATES[t >> 1];
+            let dec = &mut decoders[t];
 
-                // 6 PLC frames at the expected size
-                for _ in 0..6 {
-                    let out_samples = opus_decode(dec, &[], &mut outbuf, expected[t], 0);
-                    assert_eq!(
-                        out_samples, expected[t],
-                        "dec[{t}] PLC recovery: expected {}, got {out_samples}",
-                        expected[t]
-                    );
-                    let mut dur = 0;
-                    assert_eq!(opus_decoder_ctl!(dec, 4039, &mut dur), 0);
-                    assert_eq!(dur, out_samples);
-                }
-
-                // Reset to minimum frame size if needed
-                if expected[t] != 120 / factor {
-                    let out_samples = opus_decode(dec, &[], &mut outbuf, 120 / factor, 0);
-                    assert_eq!(out_samples, 120 / factor);
-                    let mut dur = 0;
-                    assert_eq!(opus_decoder_ctl!(dec, 4039, &mut dur), 0);
-                    assert_eq!(dur, out_samples);
-                }
-
-                // Undersized buffer should fail
-                let out_samples = opus_decode(dec, &packet[..2], &mut outbuf, expected[t] - 1, 0);
-                assert!(
-                    out_samples <= 0,
-                    "dec[{t}] undersized buffer should fail, got {out_samples}"
+            // 6 PLC frames at the expected size
+            for _ in 0..6 {
+                let out_samples = dec.decode(&[], &mut outbuf, expected[t], false);
+                assert_eq!(
+                    out_samples, expected[t],
+                    "dec[{t}] PLC recovery: expected {}, got {out_samples}",
+                    expected[t]
                 );
+                let dur = dec.last_packet_duration();
+                assert_eq!(dur, out_samples);
             }
+
+            // Reset to minimum frame size if needed
+            if expected[t] != 120 / factor {
+                let out_samples = dec.decode(&[], &mut outbuf, 120 / factor, false);
+                assert_eq!(out_samples, 120 / factor);
+                let dur = dec.last_packet_duration();
+                assert_eq!(dur, out_samples);
+            }
+
+            // Undersized buffer should fail
+            let out_samples = dec.decode(&packet[..2], &mut outbuf, expected[t] - 1, false);
+            assert!(
+                out_samples <= 0,
+                "dec[{t}] undersized buffer should fail, got {out_samples}"
+            );
         }
     }
 }
@@ -326,291 +283,239 @@ fn test_decoder_fuzz() {
         return;
     }
 
-    unsafe {
-        let (mut decoders, mut decbak) = create_test_decoders();
-        let decsize = opus_decoder_get_size(1) as usize;
-        let mut rng = TestRng::from_iseed(TEST_SEED);
+    let (mut decoders, _) = create_test_decoders();
+    let mut decbak;
+    let mut rng = TestRng::from_iseed(TEST_SEED);
 
-        // Consume one RNG value to match upstream: fast_rand() % 65535 in the header print
-        let _ = rng.next_u32() % 65535;
+    // Consume one RNG value to match upstream: fast_rand() % 65535 in the header print
+    let _ = rng.next_u32() % 65535;
 
-        let mut outbuf_storage = vec![GUARD_VALUE; (MAX_FRAME as usize + 2 * GUARD_SAMPLES) * 2];
-        let outbuf = &mut outbuf_storage[GUARD_SAMPLES * 2..];
-        let mut packet = vec![0u8; 1500];
-        let mut modes = [0u8; 4096];
+    let mut outbuf_storage = vec![GUARD_VALUE; (MAX_FRAME as usize + 2 * GUARD_SAMPLES) * 2];
+    let outbuf = &mut outbuf_storage[GUARD_SAMPLES * 2..];
+    let mut packet = vec![0u8; 1500];
+    let mut modes = [0u8; 4096];
 
-        // --- CELT 3-byte prefix checksum test ---
-        let cmodes: [i32; 4] = [16, 20, 24, 28];
-        let cres: [u32; 4] = [116290185, 2172123586, 2172123586, 2172123586];
+    // --- CELT 3-byte prefix checksum test ---
+    let cmodes: [i32; 4] = [16, 20, 24, 28];
+    let cres: [u32; 4] = [116290185, 2172123586, 2172123586, 2172123586];
 
-        let mode = rng.next_u32().wrapping_rem(4) as usize;
-        packet[0] = (cmodes[mode] << 3) as u8;
-        let mut dec_final_acc: u32 = 0;
-        let t = rng.next_u32().wrapping_rem(10) as usize;
+    let mode = rng.next_u32().wrapping_rem(4) as usize;
+    packet[0] = (cmodes[mode] << 3) as u8;
+    let mut dec_final_acc: u32 = 0;
+    let t = rng.next_u32().wrapping_rem(10) as usize;
 
-        for i in 0..65536u32 {
-            let factor = 48000 / SAMPLE_RATES[t >> 1];
-            packet[1] = (i >> 8) as u8;
-            packet[2] = (i & 255) as u8;
-            packet[3] = 255;
-            let out_samples = opus_decode(
-                dec_ref(&mut decoders[t]),
-                &packet[..4],
-                outbuf,
-                MAX_FRAME,
-                0,
-            );
-            assert_eq!(
-                out_samples,
-                120 / factor,
-                "CELT 3-byte prefix: dec[{t}] i={i}: expected {}, got {out_samples}",
-                120 / factor
-            );
-            let mut dec_final_range = 0u32;
-            opus_decoder_ctl!(dec_ref(&mut decoders[t]), 4031, &mut dec_final_range);
-            dec_final_acc = dec_final_acc.wrapping_add(dec_final_range);
-        }
+    for i in 0..65536u32 {
+        let factor = 48000 / SAMPLE_RATES[t >> 1];
+        packet[1] = (i >> 8) as u8;
+        packet[2] = (i & 255) as u8;
+        packet[3] = 255;
+        let out_samples = decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false);
         assert_eq!(
-            dec_final_acc, cres[mode],
-            "CELT 3-byte prefix checksum: mode {} expected {}, got {dec_final_acc}",
-            cmodes[mode], cres[mode]
+            out_samples,
+            120 / factor,
+            "CELT 3-byte prefix: dec[{t}] i={i}: expected {}, got {out_samples}",
+            120 / factor
         );
+        let dec_final_range = decoders[t].final_range();
+        dec_final_acc = dec_final_acc.wrapping_add(dec_final_range);
+    }
+    assert_eq!(
+        dec_final_acc, cres[mode],
+        "CELT 3-byte prefix checksum: mode {} expected {}, got {dec_final_acc}",
+        cmodes[mode], cres[mode]
+    );
 
-        // --- Long-packet 3-byte prefix checksum test ---
-        let lmodes: [i32; 3] = [0, 4, 8];
-        let lres: [u32; 3] = [3285687739, 1481572662, 694350475];
+    // --- Long-packet 3-byte prefix checksum test ---
+    let lmodes: [i32; 3] = [0, 4, 8];
+    let lres: [u32; 3] = [3285687739, 1481572662, 694350475];
 
-        let mode = rng.next_u32().wrapping_rem(3) as usize;
-        packet[0] = (lmodes[mode] << 3) as u8;
-        dec_final_acc = 0;
-        let t = rng.next_u32().wrapping_rem(10) as usize;
+    let mode = rng.next_u32().wrapping_rem(3) as usize;
+    packet[0] = (lmodes[mode] << 3) as u8;
+    dec_final_acc = 0;
+    let t = rng.next_u32().wrapping_rem(10) as usize;
 
-        for i in 0..65536u32 {
-            let factor = 48000 / SAMPLE_RATES[t >> 1];
-            packet[1] = (i >> 8) as u8;
-            packet[2] = (i & 255) as u8;
-            packet[3] = 255;
-            let out_samples = opus_decode(
-                dec_ref(&mut decoders[t]),
-                &packet[..4],
-                outbuf,
-                MAX_FRAME,
-                0,
-            );
-            assert_eq!(
-                out_samples,
-                480 / factor,
-                "Long 3-byte prefix: dec[{t}] i={i}: expected {}, got {out_samples}",
-                480 / factor
-            );
-            let mut dec_final_range = 0u32;
-            opus_decoder_ctl!(dec_ref(&mut decoders[t]), 4031, &mut dec_final_range);
-            dec_final_acc = dec_final_acc.wrapping_add(dec_final_range);
-        }
+    for i in 0..65536u32 {
+        let factor = 48000 / SAMPLE_RATES[t >> 1];
+        packet[1] = (i >> 8) as u8;
+        packet[2] = (i & 255) as u8;
+        packet[3] = 255;
+        let out_samples = decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false);
         assert_eq!(
-            dec_final_acc, lres[mode],
-            "Long 3-byte prefix checksum: mode {} expected {}, got {dec_final_acc}",
-            lmodes[mode], lres[mode]
+            out_samples,
+            480 / factor,
+            "Long 3-byte prefix: dec[{t}] i={i}: expected {}, got {out_samples}",
+            480 / factor
         );
+        let dec_final_range = decoders[t].final_range();
+        dec_final_acc = dec_final_acc.wrapping_add(dec_final_range);
+    }
+    assert_eq!(
+        dec_final_acc, lres[mode],
+        "Long 3-byte prefix checksum: mode {} expected {}, got {dec_final_acc}",
+        lmodes[mode], lres[mode]
+    );
 
-        // --- Random packets, all 64 modes ---
-        let skip = rng.next_u32().wrapping_rem(7) as i32;
-        for i in 0..64 {
-            let mut expected = [0i32; NUM_DECODERS];
-            packet[0] = (i << 2) as u8;
+    // --- Random packets, all 64 modes ---
+    let skip = rng.next_u32().wrapping_rem(7) as i32;
+    for i in 0..64 {
+        let mut expected = [0i32; NUM_DECODERS];
+        packet[0] = (i << 2) as u8;
 
-            for t in 0..NUM_DECODERS {
-                expected[t] = opus_decoder_get_nb_samples(dec_ref(&mut decoders[t]), &packet[..1]);
-            }
-
-            let mut j = 2 + skip;
-            while j < 1275 {
-                for jj in 0..j {
-                    packet[(jj + 1) as usize] = (rng.next_u32() & 255) as u8;
-                }
-                let mut dec_final_range2 = 0u32;
-                for t in 0..NUM_DECODERS {
-                    let out_samples = opus_decode(
-                        dec_ref(&mut decoders[t]),
-                        &packet[..(j + 1) as usize],
-                        outbuf,
-                        MAX_FRAME,
-                        0,
-                    );
-                    assert_eq!(
-                        out_samples, expected[t],
-                        "Random packets: dec[{t}] mode {i} len {j}: expected {}, got {out_samples}",
-                        expected[t]
-                    );
-                    let mut dec_final_range1 = 0u32;
-                    opus_decoder_ctl!(dec_ref(&mut decoders[t]), 4031, &mut dec_final_range1);
-                    if t == 0 {
-                        dec_final_range2 = dec_final_range1;
-                    } else {
-                        assert_eq!(
-                            dec_final_range1, dec_final_range2,
-                            "Random packets: dec[{t}] final range mismatch vs dec[0]"
-                        );
-                    }
-                }
-                j += 4;
-            }
+        for t in 0..NUM_DECODERS {
+            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..1]);
         }
 
-        // --- De Bruijn mode pairs (4096) with FEC ---
-        debruijn2(64, &mut modes);
-
-        let plen = rng
-            .next_u32()
-            .wrapping_rem(18)
-            .wrapping_add(3)
-            .wrapping_mul(8)
-            .wrapping_add(skip as u32)
-            .wrapping_add(3) as i32;
-
-        for i in 0..4096 {
-            let mut expected = [0i32; NUM_DECODERS];
-            packet[0] = (modes[i] as i32 * 4) as u8;
-
+        let mut j = 2 + skip;
+        while j < 1275 {
+            for jj in 0..j {
+                packet[(jj + 1) as usize] = (rng.next_u32() & 255) as u8;
+            }
+            let mut dec_final_range2 = 0u32;
             for t in 0..NUM_DECODERS {
-                expected[t] = opus_decoder_get_nb_samples(
-                    dec_ref(&mut decoders[t]),
-                    &packet[..plen as usize],
+                let out_samples =
+                    decoders[t].decode(&packet[..(j + 1) as usize], outbuf, MAX_FRAME, false);
+                assert_eq!(
+                    out_samples, expected[t],
+                    "Random packets: dec[{t}] mode {i} len {j}: expected {}, got {out_samples}",
+                    expected[t]
                 );
+                let dec_final_range1 = decoders[t].final_range();
+                if t == 0 {
+                    dec_final_range2 = dec_final_range1;
+                } else {
+                    assert_eq!(
+                        dec_final_range1, dec_final_range2,
+                        "Random packets: dec[{t}] final range mismatch vs dec[0]"
+                    );
+                }
             }
+            j += 4;
+        }
+    }
 
+    // --- De Bruijn mode pairs (4096) with FEC ---
+    debruijn2(64, &mut modes);
+
+    let plen = rng
+        .next_u32()
+        .wrapping_rem(18)
+        .wrapping_add(3)
+        .wrapping_mul(8)
+        .wrapping_add(skip as u32)
+        .wrapping_add(3) as i32;
+
+    for i in 0..4096 {
+        let mut expected = [0i32; NUM_DECODERS];
+        packet[0] = (modes[i] as i32 * 4) as u8;
+
+        for t in 0..NUM_DECODERS {
+            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..plen as usize]);
+        }
+
+        for j in 0..plen {
+            packet[(j + 1) as usize] = ((rng.next_u32() | rng.next_u32()) & 255) as u8;
+        }
+
+        // FEC test with backup decoder
+        decbak = decoders[0].clone();
+        let out = decbak.decode(&packet[..(plen + 1) as usize], outbuf, expected[0], true);
+        assert_eq!(
+            out, expected[0],
+            "De Bruijn FEC decode: mode pair {i}: expected {}, got {out}",
+            expected[0]
+        );
+
+        // PLC with FEC=1
+        decbak = decoders[0].clone();
+        let out = decbak.decode(&[], outbuf, MAX_FRAME, true);
+        assert!(out >= 20, "De Bruijn PLC fec=1: got {out}");
+
+        // PLC with FEC=0
+        decbak = decoders[0].clone();
+        let out = decbak.decode(&[], outbuf, MAX_FRAME, false);
+        assert!(out >= 20, "De Bruijn PLC fec=0: got {out}");
+
+        // Normal decode on all decoders
+        for t in 0..NUM_DECODERS {
+            let out_samples =
+                decoders[t].decode(&packet[..(plen + 1) as usize], outbuf, MAX_FRAME, false);
+            assert_eq!(
+                out_samples, expected[t],
+                "De Bruijn decode: dec[{t}] mode pair {i}: expected {}, got {out_samples}",
+                expected[t]
+            );
+            let dur = decoders[t].last_packet_duration();
+            assert_eq!(dur, out_samples);
+        }
+    }
+
+    // --- De Bruijn mode pairs ×10, single decoder ---
+    let plen = rng
+        .next_u32()
+        .wrapping_rem(18)
+        .wrapping_add(3)
+        .wrapping_mul(8)
+        .wrapping_add(skip as u32)
+        .wrapping_add(3) as i32;
+
+    let t = {
+        let mut buf = [0u8];
+        getrandom::getrandom(&mut buf).unwrap();
+        buf[0] as usize & 0x3
+    };
+
+    for i in 0..4096 {
+        packet[0] = (modes[i] as i32 * 4) as u8;
+        let expected = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..plen as usize]);
+
+        for _ in 0..10 {
             for j in 0..plen {
                 packet[(j + 1) as usize] = ((rng.next_u32() | rng.next_u32()) & 255) as u8;
             }
-
-            // FEC test with backup decoder
-            decbak[..decsize].copy_from_slice(&decoders[0][..decsize]);
-            let out = opus_decode(
-                dec_ref(&mut decbak),
-                &packet[..(plen + 1) as usize],
-                outbuf,
-                expected[0],
-                1,
-            );
+            let out_samples =
+                decoders[t].decode(&packet[..(plen + 1) as usize], outbuf, MAX_FRAME, false);
             assert_eq!(
-                out, expected[0],
-                "De Bruijn FEC decode: mode pair {i}: expected {}, got {out}",
-                expected[0]
-            );
-
-            // PLC with FEC=1
-            decbak[..decsize].copy_from_slice(&decoders[0][..decsize]);
-            let out = opus_decode(dec_ref(&mut decbak), &[], outbuf, MAX_FRAME, 1);
-            assert!(out >= 20, "De Bruijn PLC fec=1: got {out}");
-
-            // PLC with FEC=0
-            decbak[..decsize].copy_from_slice(&decoders[0][..decsize]);
-            let out = opus_decode(dec_ref(&mut decbak), &[], outbuf, MAX_FRAME, 0);
-            assert!(out >= 20, "De Bruijn PLC fec=0: got {out}");
-
-            // Normal decode on all decoders
-            for t in 0..NUM_DECODERS {
-                let out_samples = opus_decode(
-                    dec_ref(&mut decoders[t]),
-                    &packet[..(plen + 1) as usize],
-                    outbuf,
-                    MAX_FRAME,
-                    0,
-                );
-                assert_eq!(
-                    out_samples, expected[t],
-                    "De Bruijn decode: dec[{t}] mode pair {i}: expected {}, got {out_samples}",
-                    expected[t]
-                );
-                let mut dur = 0;
-                assert_eq!(
-                    opus_decoder_ctl!(dec_ref(&mut decoders[t]), 4039, &mut dur),
-                    0
-                );
-                assert_eq!(dur, out_samples);
-            }
-        }
-
-        // --- De Bruijn mode pairs ×10, single decoder ---
-        let plen = rng
-            .next_u32()
-            .wrapping_rem(18)
-            .wrapping_add(3)
-            .wrapping_mul(8)
-            .wrapping_add(skip as u32)
-            .wrapping_add(3) as i32;
-
-        let t = {
-            let mut buf = [0u8];
-            getrandom::getrandom(&mut buf).unwrap();
-            buf[0] as usize & 0x3
-        };
-
-        for i in 0..4096 {
-            packet[0] = (modes[i] as i32 * 4) as u8;
-            let expected =
-                opus_decoder_get_nb_samples(dec_ref(&mut decoders[t]), &packet[..plen as usize]);
-
-            for _ in 0..10 {
-                for j in 0..plen {
-                    packet[(j + 1) as usize] = ((rng.next_u32() | rng.next_u32()) & 255) as u8;
-                }
-                let out_samples = opus_decode(
-                    dec_ref(&mut decoders[t]),
-                    &packet[..(plen + 1) as usize],
-                    outbuf,
-                    MAX_FRAME,
-                    0,
-                );
-                assert_eq!(
-                    out_samples, expected,
-                    "De Bruijn ×10: dec[{t}] mode pair {i}: expected {expected}, got {out_samples}"
-                );
-            }
-        }
-
-        // --- Pre-selected random packets ---
-        let tmodes: [i32; 1] = [25 << 2];
-        let tseeds: [u32; 1] = [140441];
-        let tlen: [i32; 1] = [157];
-        let tret: [i32; 1] = [480];
-
-        let t = (rng.next_u32() & 1) as usize;
-        for i in 0..1 {
-            packet[0] = tmodes[i] as u8;
-            // Re-seed RNG for this specific test vector
-            let mut local_rng = TestRng::from_iseed(tseeds[i]);
-            for j in 1..tlen[i] {
-                packet[j as usize] = (local_rng.next_u32() & 255) as u8;
-            }
-            let out_samples = opus_decode(
-                dec_ref(&mut decoders[t]),
-                &packet[..tlen[i] as usize],
-                outbuf,
-                MAX_FRAME,
-                0,
-            );
-            assert_eq!(
-                out_samples, tret[i],
-                "Pre-selected packet {i}: dec[{t}] expected {}, got {out_samples}",
-                tret[i]
+                out_samples, expected,
+                "De Bruijn ×10: dec[{t}] mode pair {i}: expected {expected}, got {out_samples}"
             );
         }
-
-        // --- Guard band check ---
-        let mut guard_err = false;
-        for i in 0..(GUARD_SAMPLES * 2) {
-            if outbuf_storage[i] != GUARD_VALUE {
-                guard_err = true;
-            }
-        }
-        for i in (MAX_FRAME as usize * 2)..(MAX_FRAME as usize + GUARD_SAMPLES) * 2 {
-            if outbuf_storage[GUARD_SAMPLES * 2 + i] != GUARD_VALUE {
-                guard_err = true;
-            }
-        }
-        assert!(!guard_err, "Output buffer guard bands were overwritten");
     }
+
+    // --- Pre-selected random packets ---
+    let tmodes: [i32; 1] = [25 << 2];
+    let tseeds: [u32; 1] = [140441];
+    let tlen: [i32; 1] = [157];
+    let tret: [i32; 1] = [480];
+
+    let t = (rng.next_u32() & 1) as usize;
+    for i in 0..1 {
+        packet[0] = tmodes[i] as u8;
+        // Re-seed RNG for this specific test vector
+        let mut local_rng = TestRng::from_iseed(tseeds[i]);
+        for j in 1..tlen[i] {
+            packet[j as usize] = (local_rng.next_u32() & 255) as u8;
+        }
+        let out_samples = decoders[t].decode(&packet[..tlen[i] as usize], outbuf, MAX_FRAME, false);
+        assert_eq!(
+            out_samples, tret[i],
+            "Pre-selected packet {i}: dec[{t}] expected {}, got {out_samples}",
+            tret[i]
+        );
+    }
+
+    // --- Guard band check ---
+    let mut guard_err = false;
+    for i in 0..(GUARD_SAMPLES * 2) {
+        if outbuf_storage[i] != GUARD_VALUE {
+            guard_err = true;
+        }
+    }
+    for i in (MAX_FRAME as usize * 2)..(MAX_FRAME as usize + GUARD_SAMPLES) * 2 {
+        if outbuf_storage[GUARD_SAMPLES * 2 + i] != GUARD_VALUE {
+            guard_err = true;
+        }
+    }
+    assert!(!guard_err, "Output buffer guard bands were overwritten");
 }
 
 // ---------------------------------------------------------------------------

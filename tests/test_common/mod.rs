@@ -6,7 +6,7 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use unsafe_libopus::{opus_decoder_create, opus_encoder_create, OpusDecoder, OpusEncoder, OPUS_OK};
+use unsafe_libopus::{OpusDecoder, OpusEncoder};
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG — Marsaglia MWC, matches upstream fast_rand() exactly
@@ -130,33 +130,17 @@ fn debruijn2_impl(t: &mut [u8], pos: &mut usize, output: &mut [u8], k: i32, x: i
 // ---------------------------------------------------------------------------
 
 /// Create an encoder, panicking on failure with context.
-///
-/// # Safety
-/// The returned pointer must be freed with `opus_encoder_destroy`.
-pub unsafe fn create_encoder(sample_rate: i32, channels: i32, app: i32) -> *mut OpusEncoder {
-    let mut err = 0;
-    let enc = opus_encoder_create(sample_rate, channels, app, &mut err);
-    assert_eq!(
-        err, OPUS_OK,
-        "opus_encoder_create failed: sr={sample_rate}, ch={channels}, app={app}, err={err}"
-    );
-    assert!(!enc.is_null(), "opus_encoder_create returned null");
-    enc
+pub fn create_encoder(sample_rate: i32, channels: i32, app: i32) -> OpusEncoder {
+    OpusEncoder::new(sample_rate, channels, app).unwrap_or_else(|err| {
+        panic!("OpusEncoder::new failed: sr={sample_rate}, ch={channels}, app={app}, err={err}")
+    })
 }
 
 /// Create a decoder, panicking on failure with context.
-///
-/// # Safety
-/// The returned pointer must be freed with `opus_decoder_destroy`.
-pub unsafe fn create_decoder(sample_rate: i32, channels: i32) -> *mut OpusDecoder {
-    let mut err = 0;
-    let dec = opus_decoder_create(sample_rate, channels, &mut err);
-    assert_eq!(
-        err, OPUS_OK,
-        "opus_decoder_create failed: sr={sample_rate}, ch={channels}, err={err}"
-    );
-    assert!(!dec.is_null(), "opus_decoder_create returned null");
-    dec
+pub fn create_decoder(sample_rate: i32, channels: i32) -> OpusDecoder {
+    OpusDecoder::new(sample_rate, channels as usize).unwrap_or_else(|err| {
+        panic!("OpusDecoder::new failed: sr={sample_rate}, ch={channels}, err={err}")
+    })
 }
 
 // ---------------------------------------------------------------------------

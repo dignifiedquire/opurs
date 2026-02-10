@@ -7,12 +7,10 @@
 //!
 //! Run with: cargo +nightly fuzz run decode_fuzzer
 #![no_main]
-#![allow(deprecated)]
 
 use libfuzzer_sys::fuzz_target;
 use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy,
-    opus_packet_get_bandwidth, opus_packet_get_nb_channels, OPUS_BANDWIDTH_NARROWBAND,
+    opus_packet_get_bandwidth, opus_packet_get_nb_channels, OpusDecoder, OPUS_BANDWIDTH_NARROWBAND,
 };
 
 const MAX_FRAME_SAMP: i32 = 5760;
@@ -38,11 +36,10 @@ fuzz_target!(|data: &[u8]| {
     let fs = SAMP_FREQS[bw_idx as usize];
     let channels = opus_packet_get_nb_channels(toc);
 
-    let mut err = 0;
-    let dec = unsafe { opus_decoder_create(fs, channels, &mut err) };
-    if err != 0 || dec.is_null() {
-        return;
-    }
+    let mut dec = match OpusDecoder::new(fs, channels as usize) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
 
     let mut pcm = vec![0i16; MAX_FRAME_SAMP as usize * channels as usize];
 
@@ -63,29 +60,27 @@ fuzz_target!(|data: &[u8]| {
         let len = len as usize;
 
         // Byte 4 is repurposed: bit 0 determines if FEC is used
-        let fec = (data[i + 4] & 1) as i32;
+        let fec = data[i + 4] & 1 != 0;
 
         if len == 0 {
             // Lost packet — use PLC
-            let mut frame_size: i32 = 0;
-            unsafe {
-                let _ = opus_decoder_ctl!(&mut *dec, 4039, &mut frame_size);
-                let _ = opus_decode(&mut *dec, &[], pcm.as_mut_ptr(), frame_size, fec);
+            let frame_size = dec.last_packet_duration();
+            if frame_size > 0 {
+                let _ = dec.decode(
+                    &[],
+                    &mut pcm[..frame_size as usize * channels as usize],
+                    frame_size,
+                    fec,
+                );
             }
         } else {
             if i + SETUP_BYTE_COUNT + len > data.len() {
                 break;
             }
             let packet = &data[i + SETUP_BYTE_COUNT..i + SETUP_BYTE_COUNT + len];
-            unsafe {
-                let _ = opus_decode(&mut *dec, packet, pcm.as_mut_ptr(), MAX_FRAME_SAMP, fec);
-            }
+            let _ = dec.decode(packet, &mut pcm, MAX_FRAME_SAMP, fec);
         }
 
         i += SETUP_BYTE_COUNT + len;
-    }
-
-    unsafe {
-        opus_decoder_destroy(dec);
     }
 });

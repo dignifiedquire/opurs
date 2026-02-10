@@ -1,12 +1,8 @@
 //! Tests for Opus packet padding overflow handling.
 //!
 //! Upstream C: tests/test_opus_padding.c
-#![allow(deprecated)]
 
-use unsafe_libopus::{
-    opus_decode, opus_decoder_create, opus_decoder_destroy, opus_get_version_string,
-    OPUS_INVALID_PACKET,
-};
+use unsafe_libopus::{opus_get_version_string, OpusDecoder, OPUS_INVALID_PACKET};
 
 /// Test that a crafted large padding packet returns OPUS_INVALID_PACKET
 /// rather than causing a buffer overflow.
@@ -27,13 +23,9 @@ fn test_padding_overflow() {
 
     let mut out = vec![0i16; 5760 * 2];
 
-    let mut error = 0;
-    let decoder = unsafe { opus_decoder_create(48000, 2, &mut error) };
-    assert!(!decoder.is_null(), "Failed to create decoder");
+    let mut decoder = OpusDecoder::new(48000, 2).expect("Failed to create decoder");
 
-    let result = unsafe { opus_decode(&mut *decoder, &packet, &mut out, 5760, 0) };
-
-    unsafe { opus_decoder_destroy(decoder) };
+    let result = decoder.decode(&packet, &mut out, 5760, false);
 
     assert_eq!(
         result, OPUS_INVALID_PACKET,
