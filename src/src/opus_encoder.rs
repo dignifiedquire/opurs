@@ -317,8 +317,10 @@ fn hp_cutoff(
     let mut Fc_Q19: i32 = 0;
     let mut r_Q28: i32 = 0;
     let mut r_Q22: i32 = 0;
-    Fc_Q19 = (1.5f64 * std::f64::consts::PI / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32
-        as i16 as i32
+    #[allow(clippy::approx_constant)]
+    // Intentional: C reference uses 3.14159, not exact PI
+    let pi_approx = 3.14159f64;
+    Fc_Q19 = (1.5f64 * pi_approx / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16 as i32
         * cutoff_Hz as i16 as i32
         / (Fs / 1000);
     r_Q28 = (1.0f64 * ((1) << 28) as f64 + 0.5f64) as i32

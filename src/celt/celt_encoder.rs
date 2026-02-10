@@ -1033,7 +1033,10 @@ fn stereo_analysis(m: &OpusCustomMode, X: &[celt_norm], LM: i32, N0: i32) -> i32
         }
         i += 1;
     }
-    sumMS = std::f32::consts::FRAC_1_SQRT_2 * sumMS;
+    #[allow(clippy::approx_constant)]
+    // Intentional: C reference uses 0.707107, not exact 1/sqrt(2)
+    let frac_1_sqrt_2 = 0.707107f32;
+    sumMS = frac_1_sqrt_2 * sumMS;
     thetas = 13;
     if LM <= 1 {
         thetas -= 8;
