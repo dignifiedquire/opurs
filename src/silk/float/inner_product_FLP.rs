@@ -61,29 +61,14 @@ where
         acc7 = 0.0;
 
         while lhs.nrows() - i >= 8 {
-            acc0 +=
-                unsafe { *lhs.get_unchecked((i, j)) as f64 * *rhs.get_unchecked((i, j)) as f64 };
-            acc1 += unsafe {
-                *lhs.get_unchecked((i + 1, j)) as f64 * *rhs.get_unchecked((i + 1, j)) as f64
-            };
-            acc2 += unsafe {
-                *lhs.get_unchecked((i + 2, j)) as f64 * *rhs.get_unchecked((i + 2, j)) as f64
-            };
-            acc3 += unsafe {
-                *lhs.get_unchecked((i + 3, j)) as f64 * *rhs.get_unchecked((i + 3, j)) as f64
-            };
-            acc4 += unsafe {
-                *lhs.get_unchecked((i + 4, j)) as f64 * *rhs.get_unchecked((i + 4, j)) as f64
-            };
-            acc5 += unsafe {
-                *lhs.get_unchecked((i + 5, j)) as f64 * *rhs.get_unchecked((i + 5, j)) as f64
-            };
-            acc6 += unsafe {
-                *lhs.get_unchecked((i + 6, j)) as f64 * *rhs.get_unchecked((i + 6, j)) as f64
-            };
-            acc7 += unsafe {
-                *lhs.get_unchecked((i + 7, j)) as f64 * *rhs.get_unchecked((i + 7, j)) as f64
-            };
+            acc0 += lhs[(i, j)] as f64 * rhs[(i, j)] as f64;
+            acc1 += lhs[(i + 1, j)] as f64 * rhs[(i + 1, j)] as f64;
+            acc2 += lhs[(i + 2, j)] as f64 * rhs[(i + 2, j)] as f64;
+            acc3 += lhs[(i + 3, j)] as f64 * rhs[(i + 3, j)] as f64;
+            acc4 += lhs[(i + 4, j)] as f64 * rhs[(i + 4, j)] as f64;
+            acc5 += lhs[(i + 5, j)] as f64 * rhs[(i + 5, j)] as f64;
+            acc6 += lhs[(i + 6, j)] as f64 * rhs[(i + 6, j)] as f64;
+            acc7 += lhs[(i + 7, j)] as f64 * rhs[(i + 7, j)] as f64;
             i += 8;
         }
 
@@ -93,7 +78,7 @@ where
         res += acc3 + acc7;
 
         for k in i..lhs.nrows() {
-            res += unsafe { *lhs.get_unchecked((k, j)) as f64 * *rhs.get_unchecked((k, j)) as f64 }
+            res += lhs[(k, j)] as f64 * rhs[(k, j)] as f64;
         }
     }
 
