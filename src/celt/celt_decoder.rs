@@ -979,11 +979,7 @@ fn celt_decode_body(
     let mut i: i32;
     let mut spread_decision: i32;
     let mut bits: i32;
-    let shortBlocks: i32;
-    let isTransient: i32;
-    let intra_ener: i32;
-    let codedBands: i32;
-    let alloc_trim: i32;
+
     let mut postfilter_pitch: i32;
     let mut postfilter_gain: opus_val16;
     let mut intensity: i32 = 0;
@@ -993,9 +989,7 @@ fn celt_decode_body(
     let mut tell: i32;
     let mut dynalloc_logp: i32;
     let mut postfilter_tapset: i32;
-    let anti_collapse_rsv: i32;
     let mut anti_collapse_on: i32 = 0;
-    let silence: i32;
     if C == 1 {
         i = 0;
         let nb = nbEBands as usize;
@@ -1010,13 +1004,13 @@ fn celt_decode_body(
     }
     total_bits = len * 8;
     tell = ec_tell(dec);
-    if tell >= total_bits {
-        silence = 1;
+    let silence: i32 = if tell >= total_bits {
+        1
     } else if tell == 1 {
-        silence = ec_dec_bit_logp(dec, 15);
+        ec_dec_bit_logp(dec, 15)
     } else {
-        silence = 0;
-    }
+        0
+    };
     if silence != 0 {
         tell = len * 8;
         dec.nbits_total += tell - ec_tell(dec);
@@ -1040,18 +1034,15 @@ fn celt_decode_body(
         }
         tell = ec_tell(dec);
     }
-    if LM > 0 && tell + 3 <= total_bits {
-        isTransient = ec_dec_bit_logp(dec, 3);
+    let isTransient: i32 = if LM > 0 && tell + 3 <= total_bits {
+        let v = ec_dec_bit_logp(dec, 3);
         tell = ec_tell(dec);
+        v
     } else {
-        isTransient = 0;
-    }
-    if isTransient != 0 {
-        shortBlocks = M;
-    } else {
-        shortBlocks = 0;
-    }
-    intra_ener = if tell + 3 <= total_bits {
+        0
+    };
+    let shortBlocks: i32 = if isTransient != 0 { M } else { 0 };
+    let intra_ener: i32 = if tell + 3 <= total_bits {
         ec_dec_bit_logp(dec, 3)
     } else {
         0
@@ -1121,7 +1112,7 @@ fn celt_decode_body(
     }
     let vla_2 = nbEBands as usize;
     let mut fine_quant: Vec<i32> = ::std::vec::from_elem(0, vla_2);
-    alloc_trim = if tell + ((6) << BITRES) <= total_bits {
+    let alloc_trim: i32 = if tell + ((6) << BITRES) <= total_bits {
         ec_dec_icdf(dec, &trim_icdf, 7)
     } else {
         5
@@ -1129,7 +1120,7 @@ fn celt_decode_body(
     bits = (((len * 8) << BITRES) as u32)
         .wrapping_sub(ec_tell_frac(dec))
         .wrapping_sub(1) as i32;
-    anti_collapse_rsv = if isTransient != 0 && LM >= 2 && bits >= (LM + 2) << BITRES {
+    let anti_collapse_rsv: i32 = if isTransient != 0 && LM >= 2 && bits >= (LM + 2) << BITRES {
         (1) << BITRES
     } else {
         0
@@ -1139,7 +1130,7 @@ fn celt_decode_body(
     let mut pulses: Vec<i32> = ::std::vec::from_elem(0, vla_3);
     let vla_4 = nbEBands as usize;
     let mut fine_priority: Vec<i32> = ::std::vec::from_elem(0, vla_4);
-    codedBands = clt_compute_allocation(
+    let codedBands: i32 = clt_compute_allocation(
         mode,
         start,
         end,

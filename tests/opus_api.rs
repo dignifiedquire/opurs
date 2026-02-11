@@ -1507,7 +1507,7 @@ fn test_repacketizer_api_0() {
         for i in 1..=maxi {
             packet[0] = (((j << 1) + (j & 1)) << 2) as u8;
             if i > 1 {
-                packet[0] = (packet[0] + if i == 2 { 1 } else { 3 }) as u8;
+                packet[0] += if i == 2 { 1 } else { 3 };
             }
             packet[1] = (if i > 2 { i } else { 0 }) as u8;
             let maxp = 960 / (i * opus_packet_get_samples_per_frame(packet[0], 8000));

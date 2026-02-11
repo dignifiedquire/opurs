@@ -2454,6 +2454,7 @@ pub fn opus_encode_native(
     // Save enc state and drop it so we can write to data[] directly.
     let enc_rng = enc.rng;
     let enc_tell = ec_tell(&enc);
+    #[allow(clippy::drop_non_drop)] // intentional: ends mutable borrow on data[1..]
     drop(enc);
     // Write redundancy data into the output buffer now that enc's borrow is released.
     if redundancy_copy_off > 0 {

@@ -1,0 +1,26 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # daily at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - decode_fuzzer
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+      - name: Run fuzzer
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=300
