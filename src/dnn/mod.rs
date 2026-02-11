@@ -17,6 +17,8 @@
 #![allow(clippy::wildcard_in_or_patterns)]
 
 pub mod burg;
+#[cfg(feature = "dred")]
+pub mod dred;
 pub mod fargan;
 pub mod freq;
 pub mod lpcnet;
