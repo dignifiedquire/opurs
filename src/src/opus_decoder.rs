@@ -242,7 +242,7 @@ fn opus_packet_get_mode(data: &[u8]) -> i32 {
         MODE_SILK_ONLY
     }
 }
-unsafe fn opus_decode_frame(
+fn opus_decode_frame(
     st: &mut OpusDecoder,
     data: Option<&[u8]>,
     pcm: &mut [opus_val16],
@@ -252,6 +252,9 @@ unsafe fn opus_decode_frame(
     let mut i: i32;
     let mut silk_ret: i32;
     let mut celt_ret: i32 = 0;
+    // data_copy must be declared before dec so it outlives the borrow.
+    // ec_dec_init requires &mut [u8]; decoder only reads from it.
+    let mut data_copy: Vec<u8> = data.map_or_else(Vec::new, |d| d.to_vec());
     let mut dec: ec_dec = ec_dec {
         buf: &mut [],
         storage: 0,
@@ -307,12 +310,11 @@ unsafe fn opus_decode_frame(
             st.frame_size
         };
     }
-    if let Some(d) = data {
+    if data.is_some() {
         audiosize = st.frame_size;
         mode = st.mode;
         bandwidth = st.bandwidth;
-        dec =
-            ec_dec_init(unsafe { std::slice::from_raw_parts_mut(d.as_ptr() as *mut u8, d.len()) });
+        dec = ec_dec_init(&mut data_copy);
     } else {
         audiosize = frame_size;
         mode = st.prev_mode;
@@ -695,7 +697,7 @@ unsafe fn opus_decode_frame(
     }
     return if celt_ret < 0 { celt_ret } else { audiosize };
 }
-pub unsafe fn opus_decode_native(
+pub fn opus_decode_native(
     st: &mut OpusDecoder,
     data: &[u8],
     pcm: &mut [opus_val16],
@@ -871,8 +873,7 @@ pub fn opus_decode(
     assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret =
-        unsafe { opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1) };
+    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
     if ret > 0 {
         for j in 0..(ret * st.channels) as usize {
             pcm[j] = FLOAT2INT16(out[j]);
@@ -891,7 +892,7 @@ pub fn opus_decode_float(
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    return unsafe { opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0) };
+    return opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0);
 }
 
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
