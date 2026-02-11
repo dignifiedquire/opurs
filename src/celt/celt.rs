@@ -2,8 +2,6 @@ use crate::celt::modes::OpusCustomMode;
 
 pub mod arch_h {
     pub type opus_val16 = f32;
-    #[allow(dead_code)]
-    pub type opus_val32 = f32;
 }
 
 pub use self::arch_h::opus_val16;

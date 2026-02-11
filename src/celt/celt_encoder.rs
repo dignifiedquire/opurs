@@ -42,7 +42,7 @@ use crate::celt::rate::clt_compute_allocation;
 
 use crate::silk::macros::EC_CLZ0;
 use crate::src::analysis::AnalysisInfo;
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR, OPUS_OK};
+use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 
 /// Upstream C: celt/celt_encoder.c:OpusCustomEncoder
 ///
@@ -113,95 +113,6 @@ pub struct OpusCustomEncoder {
     pub energyError: [opus_val16; 2 * 21],
 }
 
-/// Upstream C: celt/celt_encoder.c:celt_encoder_get_size
-#[allow(dead_code)]
-pub fn celt_encoder_get_size(_channels: i32) -> i32 {
-    ::core::mem::size_of::<OpusCustomEncoder>() as i32
-}
-/// Upstream C: celt/celt_encoder.c:opus_custom_encoder_init_arch
-#[allow(dead_code)]
-fn opus_custom_encoder_init_arch(
-    st: &mut OpusCustomEncoder,
-    mode: &'static OpusCustomMode,
-    channels: i32,
-    arch: i32,
-) -> i32 {
-    if !(0..=2).contains(&channels) {
-        return OPUS_BAD_ARG;
-    }
-    // Write the entire struct with zeroed arrays and proper defaults.
-    // This replaces the C pattern of memset(st, 0, size) + field assignments.
-    *st = OpusCustomEncoder {
-        mode,
-        channels,
-        stream_channels: channels,
-        force_intra: 0,
-        clip: 1,
-        disable_pf: 0,
-        complexity: 5,
-        upsample: 1,
-        start: 0,
-        end: mode.effEBands,
-        bitrate: OPUS_BITRATE_MAX,
-        vbr: 0,
-        signalling: 1,
-        constrained_vbr: 1,
-        loss_rate: 0,
-        lsb_depth: 24,
-        lfe: 0,
-        disable_inv: 0,
-        arch,
-        rng: 0,
-        spread_decision: 0,
-        delayedIntra: 0.0,
-        tonal_average: 0,
-        lastCodedBands: 0,
-        hf_average: 0,
-        tapset_decision: 0,
-        prefilter_period: 0,
-        prefilter_gain: 0.0,
-        prefilter_tapset: 0,
-        consec_transient: 0,
-        analysis: AnalysisInfo {
-            valid: 0,
-            tonality: 0.0,
-            tonality_slope: 0.0,
-            noisiness: 0.0,
-            activity: 0.0,
-            music_prob: 0.0,
-            music_prob_min: 0.0,
-            music_prob_max: 0.0,
-            bandwidth: 0,
-            activity_probability: 0.0,
-            max_pitch_ratio: 0.0,
-            leak_boost: [0; 19],
-        },
-        silk_info: SILKInfo {
-            signalType: 0,
-            offset: 0,
-        },
-        preemph_memE: [0.0; 2],
-        preemph_memD: [0.0; 2],
-        vbr_reservoir: 0,
-        vbr_drift: 0,
-        vbr_offset: 0,
-        vbr_count: 0,
-        overlap_max: 0.0,
-        stereo_saving: 0.0,
-        intensity: 0,
-        energy_mask: [0.0; 2 * 21],
-        energy_mask_len: 0,
-        spec_avg: 0.0,
-        in_mem: [0.0; 2 * 120],
-        prefilter_mem: [0.0; 2 * COMBFILTER_MAXPERIOD as usize],
-        oldBandE: [0.0; 2 * 21],
-        oldLogE: [0.0; 2 * 21],
-        oldLogE2: [0.0; 2 * 21],
-        energyError: [0.0; 2 * 21],
-    };
-    st.reset();
-    OPUS_OK
-}
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
     pub fn new(sampling_rate: i32, channels: i32, arch: i32) -> Result<Self, i32> {
@@ -335,26 +246,6 @@ impl OpusCustomEncoder {
     }
 }
 
-/// Upstream C: celt/celt_encoder.c:celt_encoder_init
-#[allow(dead_code)]
-pub fn celt_encoder_init(
-    st: &mut OpusCustomEncoder,
-    sampling_rate: i32,
-    channels: i32,
-    arch: i32,
-) -> i32 {
-    let ret = opus_custom_encoder_init_arch(
-        st,
-        opus_custom_mode_create(48000, 960, None).unwrap(),
-        channels,
-        arch,
-    );
-    if ret != OPUS_OK {
-        return ret;
-    }
-    st.upsample = resampling_factor(sampling_rate);
-    OPUS_OK
-}
 /// Upstream C: celt/celt_encoder.c:transient_analysis
 fn transient_analysis(
     in_0: &[opus_val32],

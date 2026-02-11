@@ -59,12 +59,6 @@ use crate::silk::tuning_parameters::{
 };
 use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
 
-/// Upstream C: silk/enc_API.c:silk_Get_Encoder_Size
-#[allow(dead_code)]
-pub fn silk_Get_Encoder_Size(encSizeBytes: &mut i32) -> i32 {
-    *encSizeBytes = ::core::mem::size_of::<silk_encoder>() as i32;
-    SILK_NO_ERROR
-}
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
 pub fn silk_InitEncoder(
     psEnc: &mut silk_encoder,
