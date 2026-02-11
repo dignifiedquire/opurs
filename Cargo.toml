@@ -62,6 +62,12 @@ ent-dump = ["hex"]
 # testing and comparison tools (enables examples that depend on upstream C libopus)
 tools = ["dep:libopus-sys", "dep:byteorder", "dep:clap", "dep:rayon", "dep:indicatif"]
 
+# DNN features (neural audio processing)
+deep-plc = []          # Deep PLC: nnet + freq + burg + pitchdnn + fargan + lpcnet
+dred = ["deep-plc"]    # DRED: deep-plc + rdovae + extensions + dred enc/dec
+osce = ["deep-plc"]    # OSCE: deep-plc + nndsp + lace/nolace
+dnn = ["deep-plc", "dred", "osce"]  # All DNN features
+
 [[example]]
 name = "run_vectors2"
 required-features = ["tools"]

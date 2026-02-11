@@ -15,6 +15,9 @@ mod silk;
 
 mod opus;
 
+#[cfg(feature = "deep-plc")]
+pub mod dnn;
+
 // TODO: copy over the docs
 // =====
 // opus.h
