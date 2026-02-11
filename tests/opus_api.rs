@@ -1290,11 +1290,21 @@ fn test_enc_api_inner() {
     cfgs += 6;
 
     // OPUS_SET_INBAND_FEC / OPUS_GET_INBAND_FEC
-    // With the safe bool API, invalid integer values don't apply.
-    enc.set_inband_fec(true);
-    assert!(enc.inband_fec());
-    enc.set_inband_fec(false);
-    assert!(!enc.inband_fec());
+    assert!(
+        enc.set_inband_fec(-1).is_err(),
+        "set_inband_fec(-1) should fail"
+    );
+    assert!(
+        enc.set_inband_fec(3).is_err(),
+        "set_inband_fec(3) should fail"
+    );
+    enc.set_inband_fec(1).unwrap();
+    assert_eq!(enc.inband_fec(), 1);
+    enc.set_inband_fec(0).unwrap();
+    assert_eq!(enc.inband_fec(), 0);
+    enc.set_inband_fec(2).unwrap();
+    assert_eq!(enc.inband_fec(), 2);
+    enc.set_inband_fec(0).unwrap();
     println!("    OPUS_SET_INBAND_FEC .......................... OK.");
     println!("    OPUS_GET_INBAND_FEC .......................... OK.");
     cfgs += 6;

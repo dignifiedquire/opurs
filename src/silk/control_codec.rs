@@ -325,9 +325,9 @@ fn silk_setup_LBRR(psEncC: &mut silk_encoder_state, encControl: &silk_EncControl
         } else {
             psEncC.LBRR_GainIncreases = silk_max_int(
                 7 - ((psEncC.PacketLoss_perc as i64
-                    * (0.4f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64)
+                    * (0.2f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64)
                     >> 16) as i32,
-                2,
+                3,
             );
         }
     }

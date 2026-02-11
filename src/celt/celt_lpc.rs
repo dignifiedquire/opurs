@@ -16,7 +16,7 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
     let p = lpc.len();
     assert!(ac.len() > p);
     lpc.fill(0.0);
-    if ac[0] != 0.0 {
+    if ac[0] > 1e-10f32 {
         let mut error = ac[0];
         for i in 0..p {
             let mut rr = 0.0f32;
@@ -33,7 +33,7 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
                 lpc[i - 1 - j] = tmp2 + r * tmp1;
             }
             error -= r * r * error;
-            if error < 0.001f32 * ac[0] {
+            if error <= 0.001f32 * ac[0] {
                 break;
             }
         }

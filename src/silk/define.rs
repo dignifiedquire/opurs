@@ -72,5 +72,7 @@ pub const DTX_ACTIVITY_THRESHOLD: f32 = 0.1f32;
 pub const CNG_BUF_MASK_MAX: i32 = 255;
 /// 0.25^(1/4)
 pub const CNG_GAIN_SMTH_Q16: i32 = 4634;
+/// Threshold for fast gain adaptation in CNG
+pub const CNG_GAIN_SMTH_THRESHOLD_Q16: i32 = 46396;
 /// 0.25
 pub const CNG_NLSF_SMTH_Q16: i32 = 16348;

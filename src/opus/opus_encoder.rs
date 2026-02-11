@@ -78,6 +78,7 @@ pub struct OpusEncoder {
     pub(crate) lfe: i32,
     pub(crate) arch: i32,
     pub(crate) use_dtx: i32,
+    pub(crate) fec_config: i32,
     pub(crate) analysis: TonalityAnalysisState,
     pub(crate) stream_channels: i32,
     pub(crate) hybrid_stereo_width_Q14: i16,
@@ -99,7 +100,7 @@ pub struct OpusEncoder {
     pub(crate) width_mem: StereoWidthState,
     pub(crate) delay_buffer: [opus_val16; 960],
     pub(crate) detected_bandwidth: i32,
-    pub(crate) nb_no_activity_frames: i32,
+    pub(crate) nb_no_activity_ms_Q1: i32,
     pub(crate) peak_signal_energy: opus_val32,
     pub(crate) nonfinal_frame: i32,
     pub(crate) rangeFinal: u32,
@@ -194,6 +195,7 @@ impl OpusEncoder {
             lfe: 0,
             arch,
             use_dtx: 0,
+            fec_config: 0,
             analysis,
             stream_channels: channels,
             hybrid_stereo_width_Q14: ((1) << 14) as i16,
@@ -219,7 +221,7 @@ impl OpusEncoder {
             },
             delay_buffer: [0.0; 960],
             detected_bandwidth: 0,
-            nb_no_activity_frames: 0,
+            nb_no_activity_ms_Q1: 0,
             peak_signal_energy: 0.0,
             nonfinal_frame: 0,
             rangeFinal: 0,
@@ -380,12 +382,17 @@ impl OpusEncoder {
         }
     }
 
-    pub fn set_inband_fec(&mut self, enabled: bool) {
-        self.silk_mode.useInBandFEC = enabled as i32;
+    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
+        if !(0..=2).contains(&value) {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.fec_config = value;
+        self.silk_mode.useInBandFEC = (value != 0) as i32;
+        Ok(())
     }
 
-    pub fn inband_fec(&self) -> bool {
-        self.silk_mode.useInBandFEC != 0
+    pub fn inband_fec(&self) -> i32 {
+        self.fec_config
     }
 
     pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
@@ -478,16 +485,18 @@ impl OpusEncoder {
             && (self.prev_mode == MODE_SILK_ONLY || self.prev_mode == MODE_HYBRID)
         {
             let silk_enc = &self.silk_enc;
-            let mut all_dtx = true;
-            for n in 0..self.silk_mode.nChannelsInternal {
-                if silk_enc.state_Fxx[n as usize].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX
-                {
-                    all_dtx = false;
-                }
+            if silk_enc.state_Fxx[0].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX {
+                return false;
             }
-            all_dtx
+            if self.silk_mode.nChannelsInternal == 2
+                && silk_enc.prev_decode_only_middle == 0
+                && silk_enc.state_Fxx[1].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX
+            {
+                return false;
+            }
+            true
         } else if self.use_dtx != 0 {
-            self.nb_no_activity_frames >= NB_SPEECH_FRAMES_BEFORE_DTX
+            self.nb_no_activity_ms_Q1 >= NB_SPEECH_FRAMES_BEFORE_DTX * 20 * 2
         } else {
             false
         }
@@ -521,7 +530,7 @@ impl OpusEncoder {
         };
         self.delay_buffer = [0.0; 960];
         self.detected_bandwidth = 0;
-        self.nb_no_activity_frames = 0;
+        self.nb_no_activity_ms_Q1 = 0;
         self.peak_signal_energy = 0.0;
         self.nonfinal_frame = 0;
         self.rangeFinal = 0;
@@ -1097,32 +1106,19 @@ fn compute_frame_energy(
     celt_inner_prod(s, s, len) / len as f32
 }
 /// Upstream C: src/opus_encoder.c:decide_dtx_mode
-fn decide_dtx_mode(
-    activity_probability: f32,
-    nb_no_activity_frames: &mut i32,
-    peak_signal_energy: opus_val32,
-    pcm: &[opus_val16],
-    frame_size: i32,
-    channels: i32,
-    mut is_silence: i32,
-    arch: i32,
-) -> i32 {
-    let mut noise_energy: opus_val32 = 0.;
-    if is_silence == 0 && activity_probability < DTX_ACTIVITY_THRESHOLD {
-        noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
-        is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
-    }
-    if is_silence != 0 {
-        *nb_no_activity_frames += 1;
-        if *nb_no_activity_frames > NB_SPEECH_FRAMES_BEFORE_DTX {
-            if *nb_no_activity_frames <= NB_SPEECH_FRAMES_BEFORE_DTX + MAX_CONSECUTIVE_DTX {
+fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_Q1: i32) -> i32 {
+    if activity == 0 {
+        *nb_no_activity_ms_Q1 += frame_size_ms_Q1;
+        if *nb_no_activity_ms_Q1 > NB_SPEECH_FRAMES_BEFORE_DTX * 20 * 2 {
+            if *nb_no_activity_ms_Q1 <= (NB_SPEECH_FRAMES_BEFORE_DTX + MAX_CONSECUTIVE_DTX) * 20 * 2
+            {
                 return 1;
             } else {
-                *nb_no_activity_frames = NB_SPEECH_FRAMES_BEFORE_DTX;
+                *nb_no_activity_ms_Q1 = NB_SPEECH_FRAMES_BEFORE_DTX * 20 * 2;
             }
         }
     } else {
-        *nb_no_activity_frames = 0;
+        *nb_no_activity_ms_Q1 = 0;
     }
     0
 }
@@ -1405,6 +1401,16 @@ pub fn opus_encode_native(
     if is_silence == 0 {
         st.voice_ratio = -1;
     }
+    let mut activity: i32 = VAD_NO_DECISION;
+    if is_silence != 0 {
+        activity = (is_silence == 0) as i32;
+    } else if analysis_info.valid != 0 {
+        activity = (analysis_info.activity_probability >= DTX_ACTIVITY_THRESHOLD) as i32;
+        if activity == 0 {
+            let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
+            activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
+        }
+    }
     st.detected_bandwidth = 0;
     if analysis_info.valid != 0 {
         let mut analysis_bandwidth: i32 = 0;
@@ -1592,6 +1598,7 @@ pub fn opus_encode_native(
         };
         if st.silk_mode.useInBandFEC != 0
             && st.silk_mode.packetLossPercentage > (128 - voice_est) >> 4
+            && (st.fec_config != 2 || voice_est > 25)
         {
             st.mode = MODE_SILK_ONLY;
         }
@@ -1931,13 +1938,8 @@ pub fn opus_encode_native(
     if st.mode != MODE_CELT_ONLY {
         let mut total_bitRate: i32 = 0;
         let mut celt_rate: i32 = 0;
-        let mut activity: i32 = 0;
         let vla_0 = (st.channels * frame_size) as usize;
         let mut pcm_silk: Vec<i16> = ::std::vec::from_elem(0, vla_0);
-        activity = VAD_NO_DECISION;
-        if analysis_info.valid != 0 {
-            activity = (analysis_info.activity_probability >= DTX_ACTIVITY_THRESHOLD) as i32;
-        }
         total_bitRate = 8 * bytes_target * frame_rate;
         if st.mode == MODE_HYBRID {
             st.silk_mode.bitRate = compute_silk_rate_for_hybrid(
@@ -2482,14 +2484,9 @@ pub fn opus_encode_native(
     st.first = 0;
     if st.use_dtx != 0 && (analysis_info.valid != 0 || is_silence != 0) {
         if decide_dtx_mode(
-            analysis_info.activity_probability,
-            &mut st.nb_no_activity_frames,
-            st.peak_signal_energy,
-            &pcm[..(frame_size * st.channels) as usize],
-            frame_size,
-            st.channels,
-            is_silence,
-            st.arch,
+            activity,
+            &mut st.nb_no_activity_ms_Q1,
+            2 * 1000 * frame_size / st.Fs,
         ) != 0
         {
             st.rangeFinal = 0;
@@ -2502,7 +2499,7 @@ pub fn opus_encode_native(
             return 1;
         }
     } else {
-        st.nb_no_activity_frames = 0;
+        st.nb_no_activity_ms_Q1 = 0;
     }
     if enc_tell > (max_data_bytes - 1) * 8 {
         if max_data_bytes < 2 {

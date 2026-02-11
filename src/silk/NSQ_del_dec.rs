@@ -455,7 +455,8 @@ fn silk_noise_shape_quantizer_del_dec(
 
         // Harmonic noise shaping (shared)
         if lag > 0 {
-            n_LTP_Q14 = (((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2])
+            n_LTP_Q14 = (((NSQ.sLTP_shp_Q14[shp_lag_idx]
+                .saturating_add(NSQ.sLTP_shp_Q14[shp_lag_idx - 2]))
                 as i64
                 * HarmShapeFIRPacked_Q14 as i16 as i64)
                 >> 16) as i32;
@@ -529,9 +530,9 @@ fn silk_noise_shape_quantizer_del_dec(
                 as i32;
             n_LF_Q14 = ((n_LF_Q14 as u32) << 2) as i32;
 
-            tmp1 = n_AR_Q14 + n_LF_Q14;
+            tmp1 = n_AR_Q14.saturating_add(n_LF_Q14);
             tmp2 = n_LTP_Q14 + LPC_pred_Q14;
-            tmp1 = tmp2 - tmp1;
+            tmp1 = tmp2.saturating_sub(tmp1);
             tmp1 = if 4 == 1 {
                 (tmp1 >> 1) + (tmp1 & 1)
             } else {
@@ -622,7 +623,7 @@ fn silk_noise_shape_quantizer_del_dec(
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
             psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
             sLF_AR_shp_Q14 = psSampleState[k][0].Diff_Q14 - n_AR_Q14;
-            psSampleState[k][0].sLTP_shp_Q14 = sLF_AR_shp_Q14 - n_LF_Q14;
+            psSampleState[k][0].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][0].LF_AR_Q14 = sLF_AR_shp_Q14;
             psSampleState[k][0].LPC_exc_Q14 = LPC_exc_Q14;
             psSampleState[k][0].xq_Q14 = xq_Q14;
@@ -635,7 +636,7 @@ fn silk_noise_shape_quantizer_del_dec(
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
             psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
             sLF_AR_shp_Q14 = psSampleState[k][1].Diff_Q14 - n_AR_Q14;
-            psSampleState[k][1].sLTP_shp_Q14 = sLF_AR_shp_Q14 - n_LF_Q14;
+            psSampleState[k][1].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][1].LF_AR_Q14 = sLF_AR_shp_Q14;
             psSampleState[k][1].LPC_exc_Q14 = LPC_exc_Q14;
             psSampleState[k][1].xq_Q14 = xq_Q14;

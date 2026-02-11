@@ -175,7 +175,7 @@ fn test_regression_ec_enc_shrink_assert() {
     enc.set_signal(Some(Signal::Voice));
     enc.set_prediction_disabled(true);
     enc.set_bandwidth(Some(Bandwidth::Superwideband));
-    enc.set_inband_fec(true);
+    enc.set_inband_fec(1).unwrap();
     enc.set_bitrate(Bitrate::Bits(15600));
     let data_len = enc.encode(&pcm2, &mut data[..122]);
     assert!(data_len > 0, "ec_enc_shrink_assert: second encode failed");
@@ -321,7 +321,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         enc.set_vbr(rc < 2);
         enc.set_vbr_constraint(rc == 1);
         enc.set_vbr_constraint(rc == 1);
-        enc.set_inband_fec(rc == 0);
+        enc.set_inband_fec((rc == 0) as i32).unwrap();
 
         let modes: [i32; 13] = [0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2];
         let rates: [i32; 13] = [
@@ -370,7 +370,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 if rng.next_u32().wrapping_rem(50) == 0 {
                     dec.reset();
                 }
-                enc.set_inband_fec(rc == 0);
+                enc.set_inband_fec((rc == 0) as i32).unwrap();
                 // SET_FORCE_MODE: 1000 + modes[j]
                 enc.set_force_mode(1000 + modes[j]).unwrap();
                 rng.next_u32();
@@ -487,7 +487,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     // SET_FORCE_MODE with OPUS_AUTO
     enc.set_force_mode(OPUS_AUTO).unwrap();
     enc.set_force_channels(None).unwrap();
-    enc.set_inband_fec(false);
+    enc.set_inband_fec(0).unwrap();
     enc.set_dtx(false);
 
     let mut bitrate_bps: i32 = 512000;
@@ -671,7 +671,7 @@ fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32, rng: &mut 
             } else {
                 Some(Signal::try_from(sig).unwrap())
             });
-            enc.set_inband_fec(inband_fec != 0);
+            enc.set_inband_fec(inband_fec).unwrap();
             enc.set_packet_loss_perc(pkt_loss).unwrap();
             enc.set_lsb_depth(lsb_depth).unwrap();
             enc.set_prediction_disabled(pred_disabled != 0);

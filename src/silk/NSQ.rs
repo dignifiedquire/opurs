@@ -328,7 +328,8 @@ fn silk_noise_shape_quantizer(
         tmp1 = ((LPC_pred_Q10 as u32) << 2) as i32 - n_AR_Q12;
         tmp1 -= n_LF_Q12;
         if lag > 0 {
-            n_LTP_Q13 = (((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2])
+            n_LTP_Q13 = (((NSQ.sLTP_shp_Q14[shp_lag_idx]
+                .saturating_add(NSQ.sLTP_shp_Q14[shp_lag_idx - 2]))
                 as i64
                 * HarmShapeFIRPacked_Q14 as i16 as i64)
                 >> 16) as i32;

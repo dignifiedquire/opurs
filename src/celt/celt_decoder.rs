@@ -58,7 +58,7 @@ pub struct OpusCustomDecoder {
     pub rng: u32,
     pub error: i32,
     pub last_pitch_index: i32,
-    pub loss_count: i32,
+    pub loss_duration: i32,
     pub skip_plc: i32,
     pub postfilter_period: i32,
     pub postfilter_period_old: i32,
@@ -134,7 +134,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         rng: 0,
         error: 0,
         last_pitch_index: 0,
-        loss_count: 0,
+        loss_duration: 0,
         skip_plc: 0,
         postfilter_period: 0,
         postfilter_period_old: 0,
@@ -167,7 +167,7 @@ impl OpusCustomDecoder {
         self.rng = 0;
         self.error = 0;
         self.last_pitch_index = 0;
-        self.loss_count = 0;
+        self.loss_duration = 0;
         self.skip_plc = 1;
         self.postfilter_period = 0;
         self.postfilter_period_old = 0;
@@ -539,9 +539,9 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     let chan_stride = DECODE_BUFFER_SIZE + overlap_u;
     let n = N as usize;
 
-    let loss_count = st.loss_count;
+    let loss_duration = st.loss_duration;
     let start = st.start;
-    let noise_based = (loss_count >= 5 || start != 0 || st.skip_plc != 0) as i32;
+    let noise_based = (loss_duration >= 40 || start != 0 || st.skip_plc != 0) as i32;
     if noise_based != 0 {
         let end = st.end;
         let effEnd = if start
@@ -557,8 +557,20 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             mode.effEBands
         };
         let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., (C * N) as usize);
-        let decay: opus_val16 = if loss_count == 0 { 1.5f32 } else { 0.5f32 };
+        // Shift decode_mem for each channel (before energy decay)
         let mut c = 0;
+        loop {
+            let ch_off = c as usize * chan_stride;
+            let shift_len = 2048 - n + (overlap_u >> 1);
+            st.decode_mem
+                .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
+            c += 1;
+            if c >= C {
+                break;
+            }
+        }
+        let decay: opus_val16 = if loss_duration == 0 { 1.5f32 } else { 0.5f32 };
+        c = 0;
         loop {
             let mut i = start;
             while i < end {
@@ -595,18 +607,6 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             c += 1;
         }
         st.rng = seed;
-        // Shift decode_mem for each channel
-        c = 0;
-        loop {
-            let ch_off = c as usize * chan_stride;
-            let shift_len = 2048 - n + (overlap_u >> 1);
-            st.decode_mem
-                .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
-            c += 1;
-            if c >= C {
-                break;
-            }
-        }
         {
             let out_syn_off = DECODE_BUFFER_SIZE - n;
             let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
@@ -634,7 +634,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     } else {
         let mut fade: opus_val16 = Q15ONE;
         let pitch_index: i32;
-        if loss_count == 0 {
+        if loss_duration == 0 {
             let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
             pitch_index = celt_plc_pitch_search(
                 &ch0[..DECODE_BUFFER_SIZE],
@@ -672,7 +672,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     i += 1;
                 }
             }
-            if loss_count == 0 {
+            if loss_duration == 0 {
                 let mut ac: [opus_val32; 25] = [0.; 25];
                 _celt_autocorr(
                     &_exc[exc_off..exc_off + MAX_PERIOD as usize],
@@ -830,7 +830,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             }
         }
     }
-    st.loss_count = loss_count + 1;
+    st.loss_duration = 10000_i32.min(loss_duration + (1 << LM));
 }
 /// Upstream C: celt/celt_decoder.c:celt_decode_with_ec
 pub fn celt_decode_with_ec(
@@ -897,7 +897,7 @@ pub fn celt_decode_with_ec(
         }
         return frame_size / st.downsample;
     }
-    st.skip_plc = (st.loss_count != 0) as i32;
+    st.skip_plc = (st.loss_duration != 0) as i32;
     // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
     let mut data_copy = data.unwrap().to_vec();
@@ -1363,27 +1363,9 @@ fn celt_decode_body(
         st.oldEBands.copy_within(0..nb, nb);
     }
     if isTransient == 0 {
-        let mut max_background_increase: opus_val16 = 0.;
         let nb2 = (2 * nbEBands) as usize;
         st.oldLogE2[..nb2].copy_from_slice(&st.oldLogE[..nb2]);
         st.oldLogE[..nb2].copy_from_slice(&st.oldEBands[..nb2]);
-        if st.loss_count < 10 {
-            max_background_increase = M as f32 * 0.001f32;
-        } else {
-            max_background_increase = 1.0f32;
-        }
-        i = 0;
-        while i < 2 * nbEBands {
-            st.backgroundLogE[i as usize] = if st.backgroundLogE[i as usize]
-                + max_background_increase
-                < st.oldEBands[i as usize]
-            {
-                st.backgroundLogE[i as usize] + max_background_increase
-            } else {
-                st.oldEBands[i as usize]
-            };
-            i += 1;
-        }
     } else {
         i = 0;
         while i < 2 * nbEBands {
@@ -1394,6 +1376,17 @@ fn celt_decode_body(
             };
             i += 1;
         }
+    }
+    let max_background_increase: opus_val16 = (160_i32.min(st.loss_duration + M) as f32) * 0.001f32;
+    i = 0;
+    while i < 2 * nbEBands {
+        st.backgroundLogE[i as usize] =
+            if st.backgroundLogE[i as usize] + max_background_increase < st.oldEBands[i as usize] {
+                st.backgroundLogE[i as usize] + max_background_increase
+            } else {
+                st.oldEBands[i as usize]
+            };
+        i += 1;
     }
     c = 0;
     loop {
@@ -1435,7 +1428,7 @@ fn celt_decode_body(
             accum,
         );
     }
-    st.loss_count = 0;
+    st.loss_duration = 0;
     if ec_tell(dec) > 8 * len {
         return OPUS_INTERNAL_ERROR;
     }

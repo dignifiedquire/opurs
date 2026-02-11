@@ -17,7 +17,7 @@ pub mod typedef_h {
 }
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::bwexpander::silk_bwexpander;
-use crate::silk::define::{LTP_ORDER, MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED};
+use crate::silk::define::{LTP_ORDER, MAX_LPC_ORDER, TYPE_VOICED};
 use crate::silk::macros::{silk_CLZ32, silk_SMLAWB, silk_SMULBB, silk_SMULWW};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
@@ -301,10 +301,8 @@ fn silk_PLC_conceal(
         for b in B_Q14[..LTP_ORDER].iter_mut() {
             *b = ((harm_Gain_Q15 as i16 as i32 * *b as i32) >> 15) as i16;
         }
-        if psDec.indices.signalType as i32 != TYPE_NO_VOICE_ACTIVITY {
-            /* Gradually reduce excitation gain */
-            rand_scale_Q14 = ((rand_scale_Q14 as i32 * rand_Gain_Q15 as i16 as i32) >> 15) as i16;
-        }
+        /* Gradually reduce excitation gain */
+        rand_scale_Q14 = ((rand_scale_Q14 as i32 * rand_Gain_Q15 as i16 as i32) >> 15) as i16;
 
         /* Slowly increase pitch lag */
         psDec.sPLC.pitchL_Q8 = silk_SMLAWB(psDec.sPLC.pitchL_Q8, psDec.sPLC.pitchL_Q8, 655);

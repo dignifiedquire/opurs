@@ -254,6 +254,7 @@ pub fn silk_Encode(
         / (psEnc.state_Fxx[0].sCmn.fs_kHz * 1000);
     let mut buf: Vec<i16> = vec![0; nSamplesFromInputMax as usize];
     loop {
+        let mut curr_nBitsUsedLBRR: i32 = 0;
         nSamplesToBuffer =
             psEnc.state_Fxx[0].sCmn.frame_length as i32 - psEnc.state_Fxx[0].sCmn.inputBufIx;
         nSamplesToBuffer = nSamplesToBuffer.min(nSamplesToBufferMax);
@@ -374,6 +375,7 @@ pub fn silk_Encode(
                     >> ((psEnc.state_Fxx[0].sCmn.nFramesPerPacket + 1)
                         * encControl.nChannelsInternal))) as u8;
             ec_enc_icdf(psRangeEnc, 0, &iCDF, 8);
+            curr_nBitsUsedLBRR = ec_tell(psRangeEnc);
             n = 0;
             while n < encControl.nChannelsInternal {
                 LBRR_symbol = 0;
@@ -444,11 +446,21 @@ pub fn silk_Encode(
                 psEnc.state_Fxx[n as usize].sCmn.LBRR_flags = [0; 3];
                 n += 1;
             }
-            psEnc.nBitsUsedLBRR = ec_tell(psRangeEnc);
+            curr_nBitsUsedLBRR = ec_tell(psRangeEnc) - curr_nBitsUsedLBRR;
         }
         silk_HP_variable_cutoff(&mut psEnc.state_Fxx);
         nBits = encControl.bitRate * encControl.payloadSize_ms / 1000;
         if prefillFlag == 0 {
+            // psEnc.nBitsUsedLBRR is an exponential moving average of the LBRR usage,
+            // except that for the first LBRR frame it does no averaging and for the first
+            // frame after LBRR, it goes back to zero immediately.
+            if curr_nBitsUsedLBRR < 10 {
+                psEnc.nBitsUsedLBRR = 0;
+            } else if psEnc.nBitsUsedLBRR < 10 {
+                psEnc.nBitsUsedLBRR = curr_nBitsUsedLBRR;
+            } else {
+                psEnc.nBitsUsedLBRR = (psEnc.nBitsUsedLBRR + curr_nBitsUsedLBRR) / 2;
+            }
             nBits -= psEnc.nBitsUsedLBRR;
         }
         nBits /= psEnc.state_Fxx[0].sCmn.nFramesPerPacket;

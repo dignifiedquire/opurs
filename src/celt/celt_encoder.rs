@@ -1978,7 +1978,7 @@ pub fn celt_encode_with_ec<'b>(
         }
         effectiveBytes = nbCompressedBytes - nbFilledBytes;
     }
-    equiv_rate = ((nbCompressedBytes * 8 * 50) >> (3 - LM)) - (40 * C + 20) * ((400 >> LM) - 50);
+    equiv_rate = ((nbCompressedBytes * 8 * 50) << (3 - LM)) - (40 * C + 20) * ((400 >> LM) - 50);
     if st.bitrate != OPUS_BITRATE_MAX {
         equiv_rate = if equiv_rate < st.bitrate - (40 * C + 20) * ((400 >> LM) - 50) {
             equiv_rate
@@ -2179,10 +2179,14 @@ pub fn celt_encode_with_ec<'b>(
         compute_mdcts(mode, 0, &mut in_0, &mut freq, C, CC, LM, st.upsample);
         compute_band_energies(mode, &freq, &mut bandE, effEnd, C, LM, st.arch);
         amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE2, C);
-        i = 0;
-        while i < C * nbEBands {
-            bandLogE2[i as usize] += 0.5f32 * LM as f32;
-            i += 1;
+        c = 0;
+        while c < C {
+            i = 0;
+            while i < end {
+                bandLogE2[(nbEBands * c + i) as usize] += 0.5f32 * LM as f32;
+                i += 1;
+            }
+            c += 1;
         }
     }
     compute_mdcts(
@@ -2408,10 +2412,14 @@ pub fn celt_encode_with_ec<'b>(
         );
         compute_band_energies(mode, &freq, &mut bandE, effEnd, C, LM, st.arch);
         amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
-        i = 0;
-        while i < C * nbEBands {
-            bandLogE2[i as usize] += 0.5f32 * LM as f32;
-            i += 1;
+        c = 0;
+        while c < C {
+            i = 0;
+            while i < end {
+                bandLogE2[(nbEBands * c + i) as usize] += 0.5f32 * LM as f32;
+                i += 1;
+            }
+            c += 1;
         }
         tf_estimate = 0.2f32;
     }

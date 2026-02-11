@@ -3,7 +3,8 @@
 //! Upstream C: `silk/CNG.c`
 
 use crate::silk::define::{
-    CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_NLSF_SMTH_Q16, MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
+    CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16, CNG_NLSF_SMTH_Q16,
+    MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
 };
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_CNG_struct, silk_decoder_control, silk_decoder_state};
@@ -106,6 +107,11 @@ pub fn silk_CNG(
                 psDecCtrl.Gains_Q16[i] - psCNG.CNG_smth_Gain_Q16,
                 CNG_GAIN_SMTH_Q16,
             );
+            if silk_SMULWW(psCNG.CNG_smth_Gain_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16)
+                > psDecCtrl.Gains_Q16[i]
+            {
+                psCNG.CNG_smth_Gain_Q16 = psDecCtrl.Gains_Q16[i];
+            }
         }
     }
 

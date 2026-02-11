@@ -318,7 +318,11 @@ fn opus_decode_frame(
         dec = ec_dec_init(&mut data_copy);
     } else {
         audiosize = frame_size;
-        mode = st.prev_mode;
+        mode = if st.prev_redundancy != 0 {
+            MODE_CELT_ONLY
+        } else {
+            st.prev_mode
+        };
         bandwidth = 0;
         if mode == 0 {
             for sample in pcm[..(audiosize * st.channels) as usize].iter_mut() {
@@ -455,7 +459,7 @@ fn opus_decode_frame(
     if decode_fec == 0
         && mode != MODE_CELT_ONLY
         && data.is_some()
-        && ec_tell(&dec) + 17 + 20 * (st.mode == MODE_HYBRID) as i32 <= 8 * len
+        && ec_tell(&dec) + 17 + 20 * (mode == MODE_HYBRID) as i32 <= 8 * len
     {
         if mode == MODE_HYBRID {
             redundancy = ec_dec_bit_logp(&mut dec, 12);
@@ -615,7 +619,10 @@ fn opus_decode_frame(
             st.Fs,
         );
     }
-    if redundancy != 0 && celt_to_silk != 0 {
+    if redundancy != 0
+        && celt_to_silk != 0
+        && (st.prev_mode != MODE_SILK_ONLY || st.prev_redundancy != 0)
+    {
         c = 0;
         while c < st.channels {
             i = 0;
