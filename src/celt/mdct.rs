@@ -38,7 +38,11 @@ mod ndutil {
         let forward = array.slice_axis(axis, Slice::new(0, None, 2)).raw_view();
         let backward = array.slice_axis(axis, Slice::new(0, None, -2)).raw_view();
 
-        // SAFETY: trust me bro, the lifetimes are fine
+        // SAFETY: The two views are disjoint — `forward` contains even indices [0, 2, 4, ...]
+        // and `backward` contains odd indices [5, 3, 1] (reversed). Since even and odd indices
+        // never overlap, the views access completely separate memory. The raw_view +
+        // deref_into_view round-trip is needed because ndarray's safe API can't express
+        // two borrowed views from the same array with non-overlapping strided indexing.
         unsafe { (forward.deref_into_view(), backward.deref_into_view()) }
     }
 
@@ -61,7 +65,12 @@ mod ndutil {
             .slice_axis_mut(axis, Slice::new(0, None, -2))
             .raw_view_mut();
 
-        // SAFETY: trust me bro, those views are disjoint
+        // SAFETY: The two mutable views are disjoint — `forward` contains even indices
+        // [0, 2, 4, ...] and `backward` contains odd indices [5, 3, 1] (reversed). Since
+        // even and odd indices never overlap, the views access completely separate memory.
+        // The raw_view_mut + deref_into_view_mut round-trip is needed because ndarray's
+        // safe API can't express two mutable views from the same array with non-overlapping
+        // strided indexing.
         unsafe {
             (
                 forward.deref_into_view_mut(),
