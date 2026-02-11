@@ -25,7 +25,7 @@ pub use input::{
     EncoderOptions, FrameSize, SampleRate,
 };
 
-use ::unsafe_libopus::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
+use ::opurs::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 

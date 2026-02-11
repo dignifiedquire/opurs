@@ -9,8 +9,8 @@
 /// Upstream C: celt/tests/test_unit_mdct.c
 mod test_common;
 
+use opurs::internals::{mdct_backward, mdct_forward};
 use test_common::TestRng;
-use unsafe_libopus::internals::{mdct_backward, mdct_forward};
 
 /// Reference forward MDCT check: compare actual output with DCT-IV formula.
 #[allow(clippy::needless_range_loop)]
@@ -63,8 +63,7 @@ fn check_inverse(input: &[f32], output: &[f32], nfft: usize) -> f64 {
 }
 
 fn test_mdct_forward(nfft: usize) {
-    let mode =
-        unsafe_libopus::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
 
     let shift = match nfft {
         1920 => 0,
@@ -98,8 +97,7 @@ fn test_mdct_forward(nfft: usize) {
 }
 
 fn test_mdct_inverse(nfft: usize) {
-    let mode =
-        unsafe_libopus::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
 
     let shift = match nfft {
         1920 => 0,

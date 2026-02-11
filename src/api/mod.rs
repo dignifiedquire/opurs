@@ -1,4 +1,4 @@
-//! Public API types for unsafe-libopus.
+//! Public API types for opurs.
 //!
 //! This module provides typed enums and error types that replace the raw `i32`
 //! constants used in the C API. These types are used by the safe Rust API

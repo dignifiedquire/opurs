@@ -118,7 +118,7 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
         if !matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000)
             || !matches!(Fs_Hz_out, 8000 | 12000 | 16000)
         {
-            // see comments in `[unsafe_libopus::silk::check_control_input]`
+            // see comments in `[opurs::silk::check_control_input]`
             // TODO: we should probably make this function return a Result..
             panic!("libopus: assert(0) called");
             // return -1;
@@ -129,7 +129,7 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
         if !matches!(Fs_Hz_in, 8000 | 12000 | 16000)
             || !matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000)
         {
-            // see comments in `[unsafe_libopus::silk::check_control_input]`
+            // see comments in `[opurs::silk::check_control_input]`
             // TODO: we should probably make this function return a Result..
             panic!("libopus: assert(0) called");
             // return -1;

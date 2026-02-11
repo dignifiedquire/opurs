@@ -1,6 +1,6 @@
 #![allow(unused_assignments)]
 
-use unsafe_libopus::{
+use opurs::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
     opus_packet_get_nb_frames, opus_packet_get_nb_samples, opus_packet_get_samples_per_frame,
     opus_packet_pad, opus_packet_parse, opus_packet_unpad, Application, Bandwidth, Bitrate,

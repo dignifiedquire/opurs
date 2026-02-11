@@ -1,18 +1,18 @@
 [package]
-name = "unsafe-libopus"
-authors = ["DCNick3"]
-version = "0.2.0"
+name = "opurs"
+authors = ["DCNick3", "Friedel Ziegelmayer"]
+version = "0.3.0"
 edition = "2021"
 
-repository = "https://github.com/DCNick3/unsafe-libopus"
-description = "libopus transpiled to rust by c2rust"
+repository = "https://github.com/dignifiedquire/opurs"
+description = "Pure Rust Opus codec, bit-exact with libopus 1.3.1"
 
 license = "BSD-3-Clause"
 
 [workspace]
 members = [
     "upstream-libopus",
-    "unsafe-libopus-tools",
+    "tools",
 ]
 
 [profile.release]

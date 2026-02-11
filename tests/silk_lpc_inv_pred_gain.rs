@@ -7,8 +7,8 @@
 /// Upstream C: silk/tests/test_unit_LPC_inv_pred_gain.c
 mod test_common;
 
+use opurs::internals::{silk_LPC_inverse_pred_gain_c, SILK_MAX_ORDER_LPC};
 use test_common::TestRng;
-use unsafe_libopus::internals::{silk_LPC_inverse_pred_gain_c, SILK_MAX_ORDER_LPC};
 
 /// Check filter stability via impulse response simulation.
 ///

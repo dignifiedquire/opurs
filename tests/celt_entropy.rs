@@ -6,12 +6,12 @@
 /// Upstream C: celt/tests/test_unit_entropy.c
 mod test_common;
 
-use test_common::TestRng;
-use unsafe_libopus::internals::{
+use opurs::internals::{
     ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint, ec_dec_update, ec_decode,
     ec_decode_bin, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init,
     ec_enc_patch_initial_bits, ec_enc_uint, ec_encode, ec_encode_bin, ec_tell, ec_tell_frac,
 };
+use test_common::TestRng;
 
 const DATA_SIZE: usize = 10_000_000;
 const DATA_SIZE2: usize = 10_000;

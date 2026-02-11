@@ -7,7 +7,7 @@
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 
-use unsafe_libopus::{opus_strerror, OpusRepacketizer};
+use opurs::{opus_strerror, OpusRepacketizer};
 fn usage(argv0: &str) {
     eprintln!("usage: {} [options] input_file output_file", argv0);
 }

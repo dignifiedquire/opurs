@@ -5,7 +5,7 @@
 /// inverses for all supported (N, K) combinations.
 ///
 /// Upstream C: celt/tests/test_unit_cwrs32.c
-use unsafe_libopus::internals::{cwrsi, get_pulses, icwrs, pvq_v};
+use opurs::internals::{cwrsi, get_pulses, icwrs, pvq_v};
 
 const NMAX: usize = 240;
 

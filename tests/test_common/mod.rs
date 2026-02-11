@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-//! Shared test infrastructure for unsafe-libopus tests.
+//! Shared test infrastructure for opurs tests.
 //!
 //! Replaces the C `test_opus_common.h` with idiomatic Rust equivalents.
 //! Provides deterministic RNG, seed management, and De Bruijn sequences.

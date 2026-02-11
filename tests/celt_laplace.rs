@@ -7,11 +7,11 @@
 /// Upstream C: celt/tests/test_unit_laplace.c
 mod test_common;
 
-use test_common::TestRng;
-use unsafe_libopus::internals::{
+use opurs::internals::{
     ec_dec_init, ec_enc_done, ec_enc_init, ec_laplace_decode, ec_laplace_encode, LAPLACE_MINP,
     LAPLACE_NMIN,
 };
+use test_common::TestRng;
 
 const DATA_SIZE: usize = 40_000;
 

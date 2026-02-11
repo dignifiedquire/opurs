@@ -1,6 +1,6 @@
 //! A betterrer version of the `run_vectors.sh` test from the upstream repo.
 //!
-//! Unlike the original, it uses the `unsafe-libopus` as a library, instead of calling the `opus_demo` binary.
+//! Unlike the original, it uses `opurs` as a library, instead of calling the `opus_demo` binary.
 //!
 //! Also, instead of testing encoder-decoder roundtrip quality, it tests the encoded/decoded results against those of the upstream library.
 //! This is a much stricter test, which prevents divergence of behavior from the upstream instead of testing that the encoder-decoder pair works "somehow".
@@ -10,16 +10,16 @@ use itertools::iproduct;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use indicatif::ParallelProgressIterator;
+use opurs_tools::demo::{
+    opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, EncodeArgs, OpusBackend,
+    SampleRate,
+};
+use opurs_tools::CompareResult;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use unsafe_libopus_tools::demo::{
-    opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, EncodeArgs, OpusBackend,
-    SampleRate,
-};
-use unsafe_libopus_tools::CompareResult;
 
 #[derive(Parser)]
 struct Cli {

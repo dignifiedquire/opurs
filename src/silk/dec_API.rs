@@ -105,7 +105,7 @@ pub fn silk_Decode(
                 channel_state[n as usize].nFramesPerPacket = 3;
                 channel_state[n as usize].nb_subfr = 4;
             } else {
-                // see comments in `[unsafe_libopus::silk::check_control_input]`
+                // see comments in `[opurs::silk::check_control_input]`
                 panic!("libopus: assert(0) called");
             }
             let fs_kHz_dec: i32 = (decControl.internalSampleRate >> 10) + 1;

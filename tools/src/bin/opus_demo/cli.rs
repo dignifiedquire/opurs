@@ -3,13 +3,13 @@
 // - single-hyphen options (not supported https://github.com/clap-rs/clap/issues/2468)
 // so, yay, hand-writing CLI parsers yet again
 
+use opurs_tools::demo::{
+    CommonOptions, DecodeArgs, EncodeArgs, EncoderOptions, OpusBackend, MAX_PACKET,
+};
 use std::fmt::Debug;
 use std::iter::Peekable;
 use std::path::PathBuf;
 use std::str::FromStr;
-use unsafe_libopus_tools::demo::{
-    CommonOptions, DecodeArgs, EncodeArgs, EncoderOptions, OpusBackend, MAX_PACKET,
-};
 
 #[rustfmt::skip]
 fn usage(argv0: &str) {

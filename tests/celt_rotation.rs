@@ -7,8 +7,8 @@
 /// Upstream C: celt/tests/test_unit_rotation.c
 mod test_common;
 
+use opurs::internals::{exp_rotation, SPREAD_NORMAL};
 use test_common::TestRng;
-use unsafe_libopus::internals::{exp_rotation, SPREAD_NORMAL};
 
 /// Test rotation for given (N, K) parameters.
 ///

@@ -10,8 +10,8 @@
 mod test_common;
 
 use num_complex::Complex32;
+use opurs::internals::{opus_fft_c, opus_fft_impl};
 use test_common::TestRng;
-use unsafe_libopus::internals::{opus_fft_c, opus_fft_impl};
 
 /// Compute reference DFT and compare with FFT output, returning SNR in dB.
 #[allow(clippy::needless_range_loop)]
@@ -50,11 +50,7 @@ fn check_fft(input: &[Complex32], output: &[Complex32], nfft: usize, isinverse: 
 }
 
 /// Inline implementation of opus_ifft_c (conjugate → FFT → conjugate).
-fn opus_ifft_c(
-    st: &unsafe_libopus::internals::kiss_fft_state,
-    fin: &[Complex32],
-    fout: &mut [Complex32],
-) {
+fn opus_ifft_c(st: &opurs::internals::kiss_fft_state, fin: &[Complex32], fout: &mut [Complex32]) {
     // Bit-reverse copy from input
     for (&x, &br) in fin.iter().zip(st.bitrev.iter()) {
         fout[br as usize] = x;
@@ -72,8 +68,7 @@ fn opus_ifft_c(
 
 fn test_fft(nfft: usize, isinverse: bool) {
     // Get FFT state from mode
-    let mode =
-        unsafe_libopus::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
 
     let shift = match nfft {
         480 => 0,

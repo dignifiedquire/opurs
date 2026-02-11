@@ -1,11 +1,11 @@
 [package]
-name = "unsafe-libopus-tools"
+name = "opurs-tools"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [dependencies]
-unsafe-libopus = { path = ".." }
+opurs = { path = ".." }
 upstream-libopus = { path = "../upstream-libopus" }
 
 byteorder = { version = "1.4.3" }
@@ -18,7 +18,7 @@ indicatif = { version = "0.17.6", features = ["rayon"] }
 
 [features]
 default = []
-ent-dump = ["unsafe-libopus/ent-dump"]
+ent-dump = ["opurs/ent-dump"]
 
 [[bin]]
 name = "opus_compare"

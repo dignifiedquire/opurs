@@ -8,10 +8,10 @@
 
 mod test_common;
 
-use test_common::{debruijn2, TestRng};
-use unsafe_libopus::{
+use opurs::{
     opus_decoder_get_nb_samples, opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder,
 };
+use test_common::{debruijn2, TestRng};
 
 /// Sample rates used by the decoder tests (matching upstream fsv[]).
 const SAMPLE_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
@@ -147,8 +147,7 @@ fn test_decoder_initial_plc() {
 
             // Invalid FEC value
             let invalid_fec = if fec != 0 { -1 } else { 2 };
-            let out_samples =
-                unsafe_libopus::opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
+            let out_samples = opurs::opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
             assert!(
                 out_samples < 0,
                 "dec[{t}] invalid fec={invalid_fec} should fail, got {out_samples}"

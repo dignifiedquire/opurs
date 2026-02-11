@@ -34,8 +34,8 @@ pub(crate) trait OpusBackendTrait {
     fn opus_decoder_destroy(st: Self::Decoder);
 }
 
-mod unsafe_libopus {
-    use unsafe_libopus::{Bitrate, OpusDecoder, OpusEncoder};
+mod opurs {
+    use opurs::{Bitrate, OpusDecoder, OpusEncoder};
 
     pub struct RustLibopusBackend;
 
@@ -55,7 +55,7 @@ mod unsafe_libopus {
             st.set_bitrate(Bitrate::from(val));
         }
         fn enc_set_bandwidth(st: &mut Box<OpusEncoder>, val: i32) {
-            let bw = if val == ::unsafe_libopus::OPUS_AUTO {
+            let bw = if val == ::opurs::OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -72,7 +72,7 @@ mod unsafe_libopus {
             st.set_complexity(val).unwrap();
         }
         fn enc_set_force_channels(st: &mut Box<OpusEncoder>, val: i32) {
-            let ch = if val == ::unsafe_libopus::OPUS_AUTO {
+            let ch = if val == ::opurs::OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -127,7 +127,7 @@ mod unsafe_libopus {
         fn opus_decoder_destroy(_st: Box<OpusDecoder>) {}
     }
 }
-pub(crate) use unsafe_libopus::RustLibopusBackend;
+pub(crate) use opurs::RustLibopusBackend;
 
 mod libopus {
     use upstream_libopus::{
@@ -136,7 +136,7 @@ mod libopus {
     };
     use upstream_libopus::{OpusDecoder, OpusEncoder};
 
-    use ::unsafe_libopus::{
+    use ::opurs::{
         OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,
         OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
         OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,

@@ -9,11 +9,11 @@
 
 mod test_common;
 
-use test_common::{debruijn2, TestRng};
-use unsafe_libopus::{
+use opurs::{
     opus_packet_pad, opus_packet_parse, opus_packet_unpad, Bandwidth, Bitrate, Channels, FrameSize,
     OpusDecoder, OpusEncoder, Signal, OPUS_AUTO,
 };
+use test_common::{debruijn2, TestRng};
 
 /// Fixed seed matching upstream test (argv[1] = 42).
 const TEST_SEED: u32 = 42;

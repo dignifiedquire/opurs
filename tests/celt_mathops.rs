@@ -5,7 +5,7 @@
 /// this Rust port uses f32 throughout.
 ///
 /// Upstream C: celt/tests/test_unit_mathops.c
-use unsafe_libopus::internals::{bitexact_cos, bitexact_log2tan, celt_exp2, celt_log2, celt_sqrt};
+use opurs::internals::{bitexact_cos, bitexact_log2tan, celt_exp2, celt_log2, celt_sqrt};
 
 /// Upstream C: testbitexactcos()
 ///

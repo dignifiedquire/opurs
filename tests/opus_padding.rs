@@ -2,7 +2,7 @@
 //!
 //! Upstream C: tests/test_opus_padding.c
 
-use unsafe_libopus::{opus_get_version_string, OpusDecoder, OPUS_INVALID_PACKET};
+use opurs::{opus_get_version_string, OpusDecoder, OPUS_INVALID_PACKET};
 
 /// Test that a crafted large padding packet returns OPUS_INVALID_PACKET
 /// rather than causing a buffer overflow.

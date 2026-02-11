@@ -7,10 +7,8 @@
 mod cli;
 
 use crate::cli::{Cli, Mode};
-use unsafe_libopus::opus_get_version_string;
-use unsafe_libopus_tools::demo::{
-    opus_demo_adjust_length, opus_demo_decode, opus_demo_encode, DecodeArgs,
-};
+use opurs::opus_get_version_string;
+use opurs_tools::demo::{opus_demo_adjust_length, opus_demo_decode, opus_demo_encode, DecodeArgs};
 
 pub fn main() {
     let cli = Cli::parse();
