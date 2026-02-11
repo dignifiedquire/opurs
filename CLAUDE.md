@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A pure Rust implementation of [libopus 1.4](https://github.com/xiph/opus), originally created via c2rust transpilation, now nearly fully safe idiomatic Rust. The codebase is **bit-exact** with the C reference and **nearly unsafe-free** (2 documented `unsafe` blocks remain).
+A pure Rust implementation of [libopus 1.5.2](https://github.com/xiph/opus), originally created via c2rust transpilation, now nearly fully safe idiomatic Rust. The codebase is **bit-exact** with the C reference and **nearly unsafe-free** (2 documented `unsafe` blocks remain).
 
 ## Repository Layout
 
@@ -50,7 +50,7 @@ opurs/                   # Main crate (pure Rust, no C compilation)
 │   ├── opus_decode.rs   # Decoder tests
 │   ├── opus_encode/     # Encoder tests + regressions
 │   └── opus_padding.rs  # Packet padding tests
-└── libopus-sys/         # C reference implementation (libopus 1.4)
+└── libopus-sys/         # C reference implementation (libopus 1.5.2)
     ├── opus/            # Original C source
     └── build.rs         # Compiles C code via `cc` crate
 ```

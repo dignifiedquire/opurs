@@ -1,4 +1,4 @@
-//! Pure Rust implementation of the Opus audio codec, bit-exact with libopus 1.4.
+//! Pure Rust implementation of the Opus audio codec, bit-exact with libopus 1.5.2.
 
 extern crate core;
 

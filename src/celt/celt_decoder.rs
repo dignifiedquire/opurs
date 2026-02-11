@@ -54,6 +54,7 @@ pub struct OpusCustomDecoder {
     pub end: i32,
     pub signalling: i32,
     pub disable_inv: i32,
+    pub complexity: i32,
     pub arch: i32,
     pub rng: u32,
     pub error: i32,
@@ -66,6 +67,7 @@ pub struct OpusCustomDecoder {
     pub postfilter_gain_old: f32,
     pub postfilter_tapset: i32,
     pub postfilter_tapset_old: i32,
+    pub prefilter_and_fold: i32,
     pub preemph_memD: [celt_sig; 2],
 
     pub decode_mem: [f32; 2 * (DECODE_BUFFER_SIZE + 120)], /* Size = channels*(DECODE_BUFFER_SIZE+mode->overlap) */
@@ -129,6 +131,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         end: mode.effEBands,
         signalling: 1,
         disable_inv: (channels == 1) as i32,
+        complexity: 0,
         arch: 0,
 
         rng: 0,
@@ -142,6 +145,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         postfilter_gain_old: 0.0,
         postfilter_tapset: 0,
         postfilter_tapset_old: 0,
+        prefilter_and_fold: 0,
         preemph_memD: [0.0; 2],
 
         decode_mem: [0.0; 2 * (DECODE_BUFFER_SIZE + 120)],
@@ -175,6 +179,7 @@ impl OpusCustomDecoder {
         self.postfilter_gain_old = 0.0;
         self.postfilter_tapset = 0;
         self.postfilter_tapset_old = 0;
+        self.prefilter_and_fold = 0;
         self.preemph_memD = [0.0; 2];
         self.decode_mem.fill(0.0);
         self.lpc.fill(0.0);
@@ -528,6 +533,53 @@ fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: i32)
     pitch_index = PLC_PITCH_LAG_MAX - pitch_index;
     pitch_index
 }
+/// Upstream C: celt/celt_decoder.c:prefilter_and_fold
+fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
+    let CC = st.channels as i32;
+    let mode = st.mode;
+    let overlap = mode.overlap as i32;
+    let overlap_u = overlap as usize;
+    let chan_stride = DECODE_BUFFER_SIZE + overlap_u;
+    let n = N as usize;
+
+    let mut c = 0;
+    loop {
+        let ch_off = c as usize * chan_stride;
+        let mut etmp: Vec<opus_val32> = vec![0.0; overlap_u];
+
+        // Apply the pre-filter to the MDCT overlap for the next frame because
+        // the post-filter will be re-applied in the decoder after the MDCT overlap.
+        comb_filter(
+            &mut etmp,
+            0,
+            &st.decode_mem[ch_off..ch_off + chan_stride],
+            DECODE_BUFFER_SIZE - n,
+            st.postfilter_period_old,
+            st.postfilter_period,
+            overlap,
+            -st.postfilter_gain_old,
+            -st.postfilter_gain,
+            st.postfilter_tapset_old,
+            st.postfilter_tapset,
+            &[],
+            0,
+            st.arch,
+        );
+
+        // Simulate TDAC on the concealed audio so that it blends with the
+        // MDCT of the next frame.
+        for i in 0..overlap_u / 2 {
+            st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i] =
+                mode.window[i] * etmp[overlap_u - 1 - i] + mode.window[overlap_u - i - 1] * etmp[i];
+        }
+
+        c += 1;
+        if c >= CC {
+            break;
+        }
+    }
+}
+
 /// Upstream C: celt/celt_decoder.c:celt_decode_lost
 fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     let C: i32 = st.channels as i32;
@@ -561,7 +613,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
         let mut c = 0;
         loop {
             let ch_off = c as usize * chan_stride;
-            let shift_len = 2048 - n + (overlap_u >> 1);
+            let shift_len = 2048 - n + overlap_u;
             st.decode_mem
                 .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
             c += 1;
@@ -569,6 +621,11 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 break;
             }
         }
+
+        if st.prefilter_and_fold != 0 {
+            prefilter_and_fold(st, N);
+        }
+
         let decay: opus_val16 = if loss_duration == 0 { 1.5f32 } else { 0.5f32 };
         c = 0;
         loop {
@@ -631,6 +688,9 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 st.arch,
             );
         }
+        st.prefilter_and_fold = 0;
+        // Skip regular PLC until we get two consecutive packets.
+        st.skip_plc = 1;
     } else {
         let mut fade: opus_val16 = Q15ONE;
         let pitch_index: i32;
@@ -655,7 +715,6 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
         } else {
             1024
         };
-        let mut etmp: Vec<opus_val32> = ::std::vec::from_elem(0., overlap_u);
         let mut _exc: [opus_val16; 1048] = [0.; 1048];
         let mut fir_tmp: Vec<opus_val16> = ::std::vec::from_elem(0., exc_length as usize);
         // exc = _exc[LPC_ORDER..], so exc[i] = _exc[LPC_ORDER + i]
@@ -796,39 +855,12 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     i += 1;
                 }
             }
-            {
-                comb_filter(
-                    &mut etmp,
-                    0,
-                    &st.decode_mem[ch_off..ch_off + chan_stride],
-                    DECODE_BUFFER_SIZE,
-                    st.postfilter_period,
-                    st.postfilter_period,
-                    overlap,
-                    -st.postfilter_gain,
-                    -st.postfilter_gain,
-                    st.postfilter_tapset,
-                    st.postfilter_tapset,
-                    &[],
-                    0,
-                    st.arch,
-                );
-            }
-            {
-                let mut i = 0;
-                while i < overlap / 2 {
-                    let iu = i as usize;
-                    st.decode_mem[ch_off + DECODE_BUFFER_SIZE + iu] = window[iu]
-                        * etmp[(overlap - 1 - i) as usize]
-                        + window[(overlap - i - 1) as usize] * etmp[iu];
-                    i += 1;
-                }
-            }
             c += 1;
             if c >= C {
                 break;
             }
         }
+        st.prefilter_and_fold = 1;
     }
     st.loss_duration = 10000_i32.min(loss_duration + (1 << LM));
 }
@@ -897,7 +929,9 @@ pub fn celt_decode_with_ec(
         }
         return frame_size / st.downsample;
     }
-    st.skip_plc = (st.loss_duration != 0) as i32;
+    if st.loss_duration == 0 {
+        st.skip_plc = 0;
+    }
     // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
     let mut data_copy = data.unwrap().to_vec();
@@ -1051,6 +1085,60 @@ fn celt_decode_body(
     } else {
         0
     };
+    // If recovering from packet loss, make sure we make the energy prediction safe to reduce the
+    // risk of getting loud artifacts.
+    if intra_ener == 0 && st.loss_duration != 0 {
+        c = 0;
+        loop {
+            let safety: opus_val16 = if LM == 0 {
+                1.5f32
+            } else if LM == 1 {
+                0.5f32
+            } else {
+                0.0f32
+            };
+            let missing = 10i32.min(st.loss_duration >> LM);
+            i = start;
+            while i < end {
+                let idx = (c * nbEBands + i) as usize;
+                if st.oldEBands[idx]
+                    < if st.oldLogE[idx] > st.oldLogE2[idx] {
+                        st.oldLogE[idx]
+                    } else {
+                        st.oldLogE2[idx]
+                    }
+                {
+                    // If energy is going down already, continue the trend.
+                    let e0 = st.oldEBands[idx];
+                    let e1 = st.oldLogE[idx];
+                    let e2 = st.oldLogE2[idx];
+                    let slope = if e1 - e0 > 0.5f32 * (e2 - e0) {
+                        e1 - e0
+                    } else {
+                        0.5f32 * (e2 - e0)
+                    };
+                    let new_e = e0
+                        - (if 0.0f32 > (1 + missing) as f32 * slope {
+                            0.0f32
+                        } else {
+                            (1 + missing) as f32 * slope
+                        });
+                    st.oldEBands[idx] = if -20.0f32 > new_e { -20.0f32 } else { new_e };
+                } else {
+                    // Otherwise take the min of the last frames.
+                    st.oldEBands[idx] =
+                        st.oldEBands[idx].min(st.oldLogE[idx]).min(st.oldLogE2[idx]);
+                }
+                // Shorter frames have more natural fluctuations -- play it safe.
+                st.oldEBands[idx] -= safety;
+                i += 1;
+            }
+            c += 1;
+            if c >= 2 {
+                break;
+            }
+        }
+    }
     unquant_coarse_energy(
         mode,
         start,
@@ -1167,7 +1255,7 @@ fn celt_decode_body(
     c = 0;
     loop {
         let ch_off = c as usize * chan_stride;
-        let shift_len = (2048 - N + overlap / 2) as usize;
+        let shift_len = (2048 - N + overlap) as usize;
         st.decode_mem
             .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
         c += 1;
@@ -1271,6 +1359,9 @@ fn celt_decode_body(
             st.oldEBands[i as usize] = -28.0f32;
             i += 1;
         }
+    }
+    if st.prefilter_and_fold != 0 {
+        prefilter_and_fold(st, N);
     }
     {
         let out_syn_len = n + overlap as usize;
@@ -1429,6 +1520,7 @@ fn celt_decode_body(
         );
     }
     st.loss_duration = 0;
+    st.prefilter_and_fold = 0;
     if ec_tell(dec) > 8 * len {
         return OPUS_INTERNAL_ERROR;
     }

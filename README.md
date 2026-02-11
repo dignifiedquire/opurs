@@ -4,12 +4,12 @@
 [![Rust 1.65+](https://img.shields.io/badge/rust-1.65+-blue.svg)](https://www.rust-lang.org)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.4.
+A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.5.2.
 
 ## Features
 
 - **Pure Rust** -- no C compiler required, no FFI
-- **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.4, verified across 228 IETF test vectors
+- **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.5.2, verified across 228 IETF test vectors
 - **Nearly unsafe-free** -- only 2 documented `unsafe` blocks remain (ndarray interleaved view splitting in the MDCT)
 - **Cross-platform** -- tested on Linux, macOS, and Windows (x86, x86_64, ARM64)
 - **Full codec support** -- SILK (speech), CELT (music), and hybrid modes at all standard sample rates (8/12/16/24/48 kHz)

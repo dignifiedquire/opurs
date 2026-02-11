@@ -325,8 +325,8 @@ fn silk_noise_shape_quantizer(
 
         assert!(lag > 0 || signalType != 2);
 
-        tmp1 = ((LPC_pred_Q10 as u32) << 2) as i32 - n_AR_Q12;
-        tmp1 -= n_LF_Q12;
+        tmp1 = (((LPC_pred_Q10 as u32) << 2) as i32).wrapping_sub(n_AR_Q12);
+        tmp1 = tmp1.wrapping_sub(n_LF_Q12);
         if lag > 0 {
             n_LTP_Q13 = (((NSQ.sLTP_shp_Q14[shp_lag_idx]
                 .saturating_add(NSQ.sLTP_shp_Q14[shp_lag_idx - 2]))
@@ -340,7 +340,7 @@ fn silk_noise_shape_quantizer(
             n_LTP_Q13 = ((n_LTP_Q13 as u32) << 1) as i32;
             shp_lag_idx += 1;
             tmp2 = LTP_pred_Q13 - n_LTP_Q13;
-            tmp1 = tmp2 + ((tmp1 as u32) << 1) as i32;
+            tmp1 = tmp2.wrapping_add(((tmp1 as u32) << 1) as i32);
             tmp1 = if 3 == 1 {
                 (tmp1 >> 1) + (tmp1 & 1)
             } else {
@@ -434,7 +434,7 @@ fn silk_noise_shape_quantizer(
             exc_Q14 = -exc_Q14;
         }
         LPC_exc_Q14 = exc_Q14 + ((LTP_pred_Q13 as u32) << 1) as i32;
-        xq_Q14 = LPC_exc_Q14 + ((LPC_pred_Q10 as u32) << 4) as i32;
+        xq_Q14 = LPC_exc_Q14.wrapping_add(((LPC_pred_Q10 as u32) << 4) as i32);
 
         NSQ.xq[xq_off + i] = (if (if 8 == 1 {
             (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
@@ -464,11 +464,13 @@ fn silk_noise_shape_quantizer(
         NSQ.sLPC_Q14[lpc_idx] = xq_Q14;
 
         NSQ.sDiff_shp_Q14 = xq_Q14 - ((x_sc_Q10[i] as u32) << 4) as i32;
-        sLF_AR_shp_Q14 = NSQ.sDiff_shp_Q14 - ((n_AR_Q12 as u32) << 2) as i32;
+        sLF_AR_shp_Q14 = NSQ
+            .sDiff_shp_Q14
+            .wrapping_sub(((n_AR_Q12 as u32) << 2) as i32);
         NSQ.sLF_AR_shp_Q14 = sLF_AR_shp_Q14;
 
         NSQ.sLTP_shp_Q14[NSQ.sLTP_shp_buf_idx as usize] =
-            sLF_AR_shp_Q14 - ((n_LF_Q12 as u32) << 2) as i32;
+            sLF_AR_shp_Q14.wrapping_sub(((n_LF_Q12 as u32) << 2) as i32);
         sLTP_Q15[NSQ.sLTP_buf_idx as usize] = ((LPC_exc_Q14 as u32) << 1) as i32;
         NSQ.sLTP_shp_buf_idx += 1;
         NSQ.sLTP_buf_idx += 1;

@@ -18,7 +18,6 @@ use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_sta
 use crate::silk::float::wrappers_FLP::silk_NSQ_wrapper_FLP;
 use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_ID, silk_gains_dequant, silk_gains_quant};
-use crate::silk::log2lin::silk_log2lin;
 use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
 use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
@@ -135,6 +134,8 @@ pub fn silk_encode_frame_FLP(
     let mut gain_lock: [i32; 4] = [0, 0, 0, 0];
     let mut best_gain_mult: [i16; 4] = [0; 4];
     let mut best_sum: [i32; 4] = [0; 4];
+    // For CBR, 5 bits below budget is close enough. For VBR, allow up to 25% below the cap.
+    let bits_margin: i32 = if useCBR != 0 { 5 } else { maxBits / 4 };
     gainMult_upper = 0;
     gainMult_lower = gainMult_upper;
     nBits_upper = gainMult_lower;
@@ -343,7 +344,7 @@ pub fn silk_encode_frame_FLP(
                         gainsID_upper = gainsID;
                     }
                 } else {
-                    if nBits >= maxBits - 5 {
+                    if nBits >= maxBits - bits_margin {
                         break;
                     }
                     found_lower = 1;
@@ -380,20 +381,9 @@ pub fn silk_encode_frame_FLP(
                 }
                 if found_lower & found_upper == 0 {
                     if nBits > maxBits {
-                        if (gainMult_Q8 as i32) < 16384 {
-                            gainMult_Q8 = (gainMult_Q8 as i32 * 2) as i16;
-                        } else {
-                            gainMult_Q8 = 32767;
-                        }
+                        gainMult_Q8 = 1024i32.min(gainMult_Q8 as i32 * 3 / 2) as i16;
                     } else {
-                        let mut gain_factor_Q16: i32 = 0;
-                        gain_factor_Q16 = silk_log2lin(
-                            (((nBits - maxBits) as u32) << 7) as i32
-                                / psEnc.sCmn.frame_length as i32
-                                + ((16 * ((1) << 7)) as f64 + 0.5f64) as i32,
-                        );
-                        gainMult_Q8 =
-                            ((gain_factor_Q16 as i64 * gainMult_Q8 as i64) >> 16) as i32 as i16;
+                        gainMult_Q8 = 64i32.max(gainMult_Q8 as i32 * 4 / 5) as i16;
                     }
                 } else {
                     gainMult_Q8 = (gainMult_lower

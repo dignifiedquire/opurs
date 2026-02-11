@@ -265,5 +265,5 @@ pub fn opus_strerror(error: i32) -> &'static str {
 }
 
 pub fn opus_get_version_string() -> &'static str {
-    "opurs (rust port) 1.4"
+    "opurs (rust port) 1.5.2"
 }

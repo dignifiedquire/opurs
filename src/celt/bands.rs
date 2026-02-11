@@ -1529,7 +1529,7 @@ pub fn quant_all_bands(
     let mut _norm_save2 = vec![0.0f32; resynth_alloc as usize];
 
     // In decode-only mode, lowband_scratch comes from the end of X_
-    let decode_scratch_off = (M * eBands[m.nbEBands - 1] as i32) as usize;
+    let decode_scratch_off = (M * eBands[m.effEBands as usize - 1] as i32) as usize;
     let use_alloc_scratch = encode != 0 && resynth != 0;
 
     let has_y = Y_.is_some();

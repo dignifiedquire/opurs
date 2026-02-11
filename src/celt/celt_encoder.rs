@@ -297,8 +297,10 @@ fn transient_analysis(
             let mut y: opus_val32 = 0.;
             x = in_0[(i + c * len) as usize];
             y = mem0 + x;
-            mem0 = mem1 + y - 2_f32 * x;
-            mem1 = x - 0.5f32 * y;
+            /* Modified code to shorten dependency chains: */
+            let mem00: f32 = mem0;
+            mem0 = mem0 - x + 0.5f32 * mem1;
+            mem1 = x - mem00;
             tmp[i as usize] = y;
             i += 1;
         }
@@ -310,17 +312,21 @@ fn transient_analysis(
             let x2: opus_val16 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
                 + tmp[(2 * i + 1) as usize] * tmp[(2 * i + 1) as usize];
             mean += x2;
-            tmp[i as usize] = mem0 + forward_decay * (x2 - mem0);
-            mem0 = tmp[i as usize];
+            mem0 = x2 + (1.0f32 - forward_decay) * mem0;
+            tmp[i as usize] = forward_decay * mem0;
             i += 1;
         }
         mem0 = 0 as opus_val32;
         maxE = 0 as opus_val16;
         i = len2 - 1;
         while i >= 0 {
-            tmp[i as usize] = mem0 + 0.125f32 * (tmp[i as usize] - mem0);
-            mem0 = tmp[i as usize];
-            maxE = if maxE > mem0 { maxE } else { mem0 };
+            mem0 = tmp[i as usize] + 0.875f32 * mem0;
+            tmp[i as usize] = 0.125f32 * mem0;
+            maxE = if maxE > 0.125f32 * mem0 {
+                maxE
+            } else {
+                0.125f32 * mem0
+            };
             i -= 1;
         }
         mean = celt_sqrt((mean * maxE) * 0.5f32 * len2 as f32);
@@ -1127,6 +1133,7 @@ fn median_of_3(x: &[opus_val16]) -> opus_val16 {
 fn dynalloc_analysis(
     bandLogE: &[opus_val16],
     bandLogE2: &[opus_val16],
+    oldBandE: &[opus_val16],
     nbEBands: i32,
     start: i32,
     end: i32,
@@ -1254,56 +1261,64 @@ fn dynalloc_analysis(
         spread_weight[i as usize] = 32 >> shift;
         i += 1;
     }
-    if effectiveBytes > 50 && LM >= 1 && lfe == 0 {
+    let mut bandLogE3: Vec<opus_val16> = vec![0.0; nbEBands as usize];
+    if effectiveBytes >= (30 + 5 * LM) && lfe == 0 {
         let mut last: i32 = 0;
         c = 0;
         loop {
             let mut offset: opus_val16 = 0.;
             let mut tmp: opus_val16 = 0.;
             let fb = (c * nbEBands) as usize;
-            follower[fb] = bandLogE2[(c * nbEBands) as usize];
+            bandLogE3[..end as usize].copy_from_slice(&bandLogE2[fb..fb + end as usize]);
+            if LM == 0 {
+                // For 2.5 ms frames, the first 8 bands have just one bin, so the
+                // energy is highly unreliable (high variance). For that reason,
+                // we take the max with the previous energy so that at least 2 bins
+                // are getting used.
+                for i in 0..std::cmp::min(8, end as usize) {
+                    bandLogE3[i] = if bandLogE2[(c * nbEBands) as usize + i]
+                        > oldBandE[(c * nbEBands) as usize + i]
+                    {
+                        bandLogE2[(c * nbEBands) as usize + i]
+                    } else {
+                        oldBandE[(c * nbEBands) as usize + i]
+                    };
+                }
+            }
+            follower[fb] = bandLogE3[0];
             i = 1;
             while i < end {
-                if bandLogE2[(c * nbEBands + i) as usize]
-                    > bandLogE2[(c * nbEBands + i - 1) as usize] + 0.5f32
-                {
+                if bandLogE3[i as usize] > bandLogE3[(i - 1) as usize] + 0.5f32 {
                     last = i;
                 }
-                follower[fb + i as usize] = if follower[fb + (i - 1) as usize] + 1.5f32
-                    < bandLogE2[(c * nbEBands + i) as usize]
-                {
-                    follower[fb + (i - 1) as usize] + 1.5f32
-                } else {
-                    bandLogE2[(c * nbEBands + i) as usize]
-                };
+                follower[fb + i as usize] =
+                    if follower[fb + (i - 1) as usize] + 1.5f32 < bandLogE3[i as usize] {
+                        follower[fb + (i - 1) as usize] + 1.5f32
+                    } else {
+                        bandLogE3[i as usize]
+                    };
                 i += 1;
             }
             i = last - 1;
             while i >= 0 {
                 follower[fb + i as usize] = if follower[fb + i as usize]
-                    < (if follower[fb + (i + 1) as usize] + 2.0f32
-                        < bandLogE2[(c * nbEBands + i) as usize]
-                    {
+                    < (if follower[fb + (i + 1) as usize] + 2.0f32 < bandLogE3[i as usize] {
                         follower[fb + (i + 1) as usize] + 2.0f32
                     } else {
-                        bandLogE2[(c * nbEBands + i) as usize]
+                        bandLogE3[i as usize]
                     }) {
                     follower[fb + i as usize]
-                } else if follower[fb + (i + 1) as usize] + 2.0f32
-                    < bandLogE2[(c * nbEBands + i) as usize]
-                {
+                } else if follower[fb + (i + 1) as usize] + 2.0f32 < bandLogE3[i as usize] {
                     follower[fb + (i + 1) as usize] + 2.0f32
                 } else {
-                    bandLogE2[(c * nbEBands + i) as usize]
+                    bandLogE3[i as usize]
                 };
                 i -= 1;
             }
             offset = 1.0f32;
             i = 2;
             while i < end - 2 {
-                let med = median_of_5(
-                    &bandLogE2[(c * nbEBands + i - 2) as usize..(c * nbEBands + i + 3) as usize],
-                ) - offset;
+                let med = median_of_5(&bandLogE3[(i - 2) as usize..(i + 3) as usize]) - offset;
                 follower[fb + i as usize] = if follower[fb + i as usize] > med {
                     follower[fb + i as usize]
                 } else {
@@ -1311,8 +1326,7 @@ fn dynalloc_analysis(
                 };
                 i += 1;
             }
-            tmp = median_of_3(&bandLogE2[(c * nbEBands) as usize..(c * nbEBands + 3) as usize])
-                - offset;
+            tmp = median_of_3(&bandLogE3[0..3]) - offset;
             follower[fb] = if follower[fb] > tmp {
                 follower[fb]
             } else {
@@ -1323,9 +1337,7 @@ fn dynalloc_analysis(
             } else {
                 tmp
             };
-            tmp = median_of_3(
-                &bandLogE2[(c * nbEBands + end - 3) as usize..(c * nbEBands + end) as usize],
-            ) - offset;
+            tmp = median_of_3(&bandLogE3[(end - 3) as usize..end as usize]) - offset;
             follower[fb + (end - 2) as usize] = if follower[fb + (end - 2) as usize] > tmp {
                 follower[fb + (end - 2) as usize]
             } else {
@@ -1956,7 +1968,7 @@ pub fn celt_encode_with_ec<'b>(
         vbr_rate = 0;
         tmp = st.bitrate * frame_size;
         if tell > 1 {
-            tmp += tell;
+            tmp += tell * mode.Fs;
         }
         if st.bitrate != OPUS_BITRATE_MAX {
             nbCompressedBytes = if 2
@@ -1975,6 +1987,9 @@ pub fn celt_encode_with_ec<'b>(
             } else {
                 (tmp + 4 * mode.Fs) / (8 * mode.Fs) - (st.signalling != 0) as i32
             };
+            if let Some(enc) = enc.as_mut() {
+                ec_enc_shrink(enc, nbCompressedBytes as u32);
+            }
         }
         effectiveBytes = nbCompressedBytes - nbFilledBytes;
     }
@@ -2440,6 +2455,7 @@ pub fn celt_encode_with_ec<'b>(
     maxDepth = dynalloc_analysis(
         &bandLogE,
         &bandLogE2,
+        &st.oldBandE,
         nbEBands,
         start,
         end,

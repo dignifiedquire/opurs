@@ -490,8 +490,8 @@ fn silk_noise_shape_quantizer_del_dec(
                 + ((psDD.sAR2_Q14[0] as i64 * warping_Q16 as i16 as i64) >> 16))
                 as i32;
             tmp1 = (psDD.sAR2_Q14[0] as i64
-                + (((psDD.sAR2_Q14[1] - tmp2) as i64 * warping_Q16 as i16 as i64) >> 16))
-                as i32;
+                + (((psDD.sAR2_Q14[1].wrapping_sub(tmp2)) as i64 * warping_Q16 as i16 as i64)
+                    >> 16)) as i32;
             psDD.sAR2_Q14[0] = tmp2;
             n_AR_Q14 = shapingLPCOrder >> 1;
             n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[0] as i64) >> 16)) as i32;
@@ -499,14 +499,15 @@ fn silk_noise_shape_quantizer_del_dec(
             let mut j = 2;
             while j < shapingLPCOrder {
                 tmp2 = (psDD.sAR2_Q14[(j - 1) as usize] as i64
-                    + (((psDD.sAR2_Q14[j as usize] - tmp1) as i64 * warping_Q16 as i16 as i64)
+                    + (((psDD.sAR2_Q14[j as usize].wrapping_sub(tmp1)) as i64
+                        * warping_Q16 as i16 as i64)
                         >> 16)) as i32;
                 psDD.sAR2_Q14[(j - 1) as usize] = tmp1;
                 n_AR_Q14 = (n_AR_Q14 as i64
                     + ((tmp1 as i64 * AR_shp_Q13[(j - 1) as usize] as i64) >> 16))
                     as i32;
                 tmp1 = (psDD.sAR2_Q14[j as usize] as i64
-                    + (((psDD.sAR2_Q14[(j + 1) as usize] - tmp2) as i64
+                    + (((psDD.sAR2_Q14[(j + 1) as usize].wrapping_sub(tmp2)) as i64
                         * warping_Q16 as i16 as i64)
                         >> 16)) as i32;
                 psDD.sAR2_Q14[j as usize] = tmp2;

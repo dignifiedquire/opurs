@@ -65,6 +65,16 @@ pub fn silk_decode_frame(
             &mut pOut_slice[..psDec.frame_length],
             &pulses[..psDec.frame_length],
         );
+
+        // Update output buffer
+        assert!(psDec.ltp_mem_length >= psDec.frame_length);
+        let mv_len = psDec.ltp_mem_length - psDec.frame_length;
+        psDec
+            .outBuf
+            .copy_within(psDec.frame_length..psDec.ltp_mem_length, 0);
+        psDec.outBuf[mv_len..mv_len + psDec.frame_length]
+            .copy_from_slice(&pOut_slice[..psDec.frame_length]);
+
         silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 0, arch);
         psDec.lossCnt = 0;
         psDec.prevSignalType = psDec.indices.signalType as i32;
@@ -73,14 +83,16 @@ pub fn silk_decode_frame(
     } else {
         psDec.indices.signalType = psDec.prevSignalType as i8;
         silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 1, arch);
+
+        // Update output buffer
+        assert!(psDec.ltp_mem_length >= psDec.frame_length);
+        let mv_len = psDec.ltp_mem_length - psDec.frame_length;
+        psDec
+            .outBuf
+            .copy_within(psDec.frame_length..psDec.ltp_mem_length, 0);
+        psDec.outBuf[mv_len..mv_len + psDec.frame_length]
+            .copy_from_slice(&pOut_slice[..psDec.frame_length]);
     }
-    assert!(psDec.ltp_mem_length >= psDec.frame_length);
-    let mv_len = psDec.ltp_mem_length - psDec.frame_length;
-    psDec
-        .outBuf
-        .copy_within(psDec.frame_length..psDec.ltp_mem_length, 0);
-    psDec.outBuf[mv_len..mv_len + psDec.frame_length]
-        .copy_from_slice(&pOut_slice[..psDec.frame_length]);
     silk_CNG(psDec, &mut psDecCtrl, pOut_slice);
     silk_PLC_glue_frames(psDec, pOut_slice, L);
     psDec.lagPrev = psDecCtrl.pitchL[psDec.nb_subfr - 1];

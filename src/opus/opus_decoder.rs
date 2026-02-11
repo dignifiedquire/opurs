@@ -31,7 +31,7 @@ use crate::opus::opus_defines::{
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::opus::packet::opus_packet_parse_impl;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
-use crate::silk::dec_API::{silk_Decode, silk_InitDecoder};
+use crate::silk::dec_API::{silk_Decode, silk_InitDecoder, silk_ResetDecoder};
 use crate::{opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
 
 #[derive(Clone)]
@@ -43,6 +43,7 @@ pub struct OpusDecoder {
     pub(crate) Fs: i32,
     pub(crate) DecControl: silk_DecControlStruct,
     pub(crate) decode_gain: i32,
+    pub(crate) complexity: i32,
     pub(crate) stream_channels: i32,
     pub(crate) bandwidth: i32,
     pub(crate) mode: i32,
@@ -78,6 +79,7 @@ impl OpusDecoder {
                 prevPitchLag: 0,
             },
             decode_gain: 0,
+            complexity: 0,
             stream_channels: channels as i32,
             bandwidth: 0,
             mode: 0,
@@ -176,7 +178,22 @@ impl OpusDecoder {
         self.celt_dec.disable_inv != 0
     }
 
+    pub fn set_complexity(&mut self, value: i32) -> Result<(), i32> {
+        if !(0..=10).contains(&value) {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.complexity = value;
+        self.celt_dec.complexity = value;
+        Ok(())
+    }
+
+    pub fn complexity(&self) -> i32 {
+        self.complexity
+    }
+
     pub fn reset(&mut self) {
+        self.celt_dec.reset();
+        silk_ResetDecoder(&mut self.silk_dec);
         self.stream_channels = self.channels;
         self.bandwidth = 0;
         self.mode = 0;
@@ -400,7 +417,7 @@ fn opus_decode_frame(
         let mut decoded_samples: i32;
         let mut pcm_ptr_off: usize = 0;
         if st.prev_mode == MODE_CELT_ONLY {
-            st.silk_dec = silk_InitDecoder();
+            silk_ResetDecoder(&mut st.silk_dec);
         }
         st.DecControl.payloadSize_ms = if 10 > 1000 * audiosize / st.Fs {
             10
@@ -424,7 +441,11 @@ fn opus_decode_frame(
                 st.DecControl.internalSampleRate = 16000;
             }
         }
-        let lost_flag: i32 = if data.is_none() { 1 } else { 2 * decode_fec };
+        let lost_flag: i32 = if data.is_none() {
+            1
+        } else {
+            2 * (decode_fec != 0) as i32
+        };
         decoded_samples = 0;
         loop {
             let first_frame: i32 = (decoded_samples == 0) as i32;

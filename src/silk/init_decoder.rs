@@ -8,10 +8,52 @@ use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
 use crate::silk::CNG::silk_CNG_Reset;
 use crate::silk::PLC::silk_PLC_Reset;
 
+/// Reset decoder state, preserving model data (OSCE, etc.).
+///
+/// Upstream C: silk/init_decoder.c:silk_reset_decoder
+pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
+    // Clear everything from prev_gain_Q16 onward (SILK_DECODER_STATE_RESET_START)
+    dec.prev_gain_Q16 = 65536;
+    dec.exc_Q14 = [0; 320];
+    dec.sLPC_Q14_buf = [0; 16];
+    dec.outBuf = [0; 480];
+    dec.lagPrev = 0;
+    dec.LastGainIndex = 0;
+    dec.fs_kHz = 0;
+    dec.fs_API_hz = 0;
+    dec.nb_subfr = 0;
+    dec.frame_length = 0;
+    dec.subfr_length = 0;
+    dec.ltp_mem_length = 0;
+    dec.LPC_order = 0;
+    dec.prevNLSF_Q15 = [0; 16];
+    dec.first_frame_after_reset = 1;
+    dec.pitch_lag_low_bits_iCDF = &[];
+    dec.pitch_contour_iCDF = &[];
+    dec.nFramesDecoded = 0;
+    dec.nFramesPerPacket = 0;
+    dec.ec_prevSignalType = 0;
+    dec.ec_prevLagIndex = 0;
+    dec.VAD_flags = [0; 3];
+    dec.LBRR_flag = 0;
+    dec.LBRR_flags = [0; 3];
+    dec.resampler_state = ResamplerState::default();
+    dec.psNLSF_CB = &silk_NLSF_CB_WB;
+    dec.indices = SideInfoIndices::default();
+    dec.sCNG = silk_CNG_struct::default();
+    dec.lossCnt = 0;
+    dec.prevSignalType = 0;
+    dec.arch = 0;
+    dec.sPLC = silk_PLC_struct::default();
+
+    silk_CNG_Reset(dec);
+    silk_PLC_Reset(dec);
+}
+
 /// Upstream C: silk/init_decoder.c:silk_init_decoder
 pub fn silk_init_decoder() -> silk_decoder_state {
     let mut dec = silk_decoder_state {
-        prev_gain_Q16: 65536,
+        prev_gain_Q16: 0,
         exc_Q14: [0; 320],
         sLPC_Q14_buf: [0; 16],
         outBuf: [0; 480],
@@ -25,7 +67,7 @@ pub fn silk_init_decoder() -> silk_decoder_state {
         ltp_mem_length: 0,
         LPC_order: 0,
         prevNLSF_Q15: [0; 16],
-        first_frame_after_reset: 1,
+        first_frame_after_reset: 0,
         pitch_lag_low_bits_iCDF: &[],
         pitch_contour_iCDF: &[],
         nFramesDecoded: 0,
@@ -45,8 +87,8 @@ pub fn silk_init_decoder() -> silk_decoder_state {
         sPLC: silk_PLC_struct::default(),
     };
 
-    silk_CNG_Reset(&mut dec);
-    silk_PLC_Reset(&mut dec);
+    // Full init zeroes everything, then reset sets the proper initial values
+    silk_reset_decoder(&mut dec);
 
     dec
 }

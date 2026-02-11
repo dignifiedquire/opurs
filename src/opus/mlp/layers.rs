@@ -23,13 +23,13 @@ pub enum ActivationFunction {
     Sigmoid,
 }
 
-pub struct DenseLayer {
+pub struct AnalysisDenseLayer {
     pub bias: &'static [i8],
     pub input_weights: &'static [i8],
     pub activation: ActivationFunction,
 }
 
-impl DenseLayer {
+impl AnalysisDenseLayer {
     pub fn nb_inputs(&self) -> usize {
         self.input_weights.len() / self.nb_neurons()
     }
@@ -80,14 +80,14 @@ impl DenseLayer {
     }
 }
 
-pub struct GRULayer {
+pub struct AnalysisGRULayer {
     // `bias`, `input_weights` and `recurrent_weights` are three concatenated matrices for update, reset and output components
     pub bias: &'static [i8],
     pub input_weights: &'static [i8],
     pub recurrent_weights: &'static [i8],
 }
 
-impl GRULayer {
+impl AnalysisGRULayer {
     pub fn nb_inputs(&self) -> usize {
         self.input_weights.len() / self.nb_neurons() / 3
     }

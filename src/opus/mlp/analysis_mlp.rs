@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/mlp_data.c`
 
-use super::layers::{ActivationFunction, DenseLayer, GRULayer};
+use super::layers::{ActivationFunction, AnalysisDenseLayer, AnalysisGRULayer};
 
 static LAYER0_WEIGHTS: [i8; 800] = [
     -30, -9, 2, -12, 5, -1, 8, 9, 9, 8, -13, 18, -17, -34, -5, 17, -11, 0, -4, 10, 2, 10, 15, -8,
@@ -248,17 +248,17 @@ static LAYER2_WEIGHTS: [i8; 48] = [
     -117, -91, -127, -68, -1, -89, -80, 32, 106, 7,
 ];
 static LAYER2_BIAS: [i8; 2] = [14, 117];
-static LAYER0: DenseLayer = DenseLayer {
+static LAYER0: AnalysisDenseLayer = AnalysisDenseLayer {
     bias: &LAYER0_BIAS,
     input_weights: &LAYER0_WEIGHTS,
     activation: ActivationFunction::Tansig,
 };
-static LAYER1: GRULayer = GRULayer {
+static LAYER1: AnalysisGRULayer = AnalysisGRULayer {
     bias: &LAYER1_BIAS,
     input_weights: &LAYER1_WEIGHTS,
     recurrent_weights: &LAYER1_RECUR_WEIGHTS,
 };
-static LAYER2: DenseLayer = DenseLayer {
+static LAYER2: AnalysisDenseLayer = AnalysisDenseLayer {
     bias: &LAYER2_BIAS,
     input_weights: &LAYER2_WEIGHTS,
     activation: ActivationFunction::Sigmoid,
