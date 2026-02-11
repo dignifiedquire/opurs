@@ -206,7 +206,7 @@ fn opus_custom_encoder_init_arch(
         oldLogE2: [0.0; 2 * 21],
         energyError: [0.0; 2 * 21],
     };
-    opus_custom_encoder_ctl!(st, OPUS_RESET_STATE);
+    st.reset();
     return OPUS_OK;
 }
 impl OpusCustomEncoder {
@@ -280,8 +280,64 @@ impl OpusCustomEncoder {
             oldLogE2: [0.0; 2 * 21],
             energyError: [0.0; 2 * 21],
         };
-        opus_custom_encoder_ctl!(&mut st, OPUS_RESET_STATE);
+        st.reset();
         Ok(st)
+    }
+
+    /// Reset the encoder state to initial defaults.
+    ///
+    /// Zeros all transient state fields (rng, prefilter memory, band energies,
+    /// VBR state, etc.) while preserving configuration fields (mode, channels,
+    /// complexity, bitrate, etc.).
+    pub fn reset(&mut self) {
+        let nbEBands = self.mode.nbEBands as usize;
+        let cc = self.channels as usize;
+        let overlap = self.mode.overlap;
+        self.rng = 0;
+        self.spread_decision = SPREAD_NORMAL;
+        self.delayedIntra = 1 as opus_val32;
+        self.tonal_average = 256;
+        self.lastCodedBands = 0;
+        self.hf_average = 0;
+        self.tapset_decision = 0;
+        self.prefilter_period = 0;
+        self.prefilter_gain = 0.0;
+        self.prefilter_tapset = 0;
+        self.consec_transient = 0;
+        self.analysis = AnalysisInfo {
+            valid: 0,
+            tonality: 0.0,
+            tonality_slope: 0.0,
+            noisiness: 0.0,
+            activity: 0.0,
+            music_prob: 0.0,
+            music_prob_min: 0.0,
+            music_prob_max: 0.0,
+            bandwidth: 0,
+            activity_probability: 0.0,
+            max_pitch_ratio: 0.0,
+            leak_boost: [0; 19],
+        };
+        self.silk_info = SILKInfo {
+            signalType: 0,
+            offset: 0,
+        };
+        self.preemph_memE = [0.0; 2];
+        self.preemph_memD = [0.0; 2];
+        self.vbr_reservoir = 0;
+        self.vbr_drift = 0;
+        self.vbr_offset = 0;
+        self.vbr_count = 0;
+        self.overlap_max = 0.0;
+        self.stereo_saving = 0.0;
+        self.intensity = 0;
+        self.spec_avg = 0.0;
+        (&mut self.in_mem)[..cc * overlap].fill(0.0);
+        (&mut self.prefilter_mem)[..cc * COMBFILTER_MAXPERIOD as usize].fill(0.0);
+        (&mut self.oldBandE)[..cc * nbEBands].fill(0.0);
+        (&mut self.oldLogE)[..cc * nbEBands].fill(-28.0);
+        (&mut self.oldLogE2)[..cc * nbEBands].fill(-28.0);
+        (&mut self.energyError)[..cc * nbEBands].fill(0.0);
     }
 }
 

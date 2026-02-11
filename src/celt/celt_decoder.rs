@@ -162,10 +162,39 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         backgroundLogE: [0.0; 2 * 21],
     };
 
-    opus_custom_decoder_ctl!(&mut st, OPUS_RESET_STATE);
+    st.reset();
 
     st
 }
+
+impl OpusCustomDecoder {
+    /// Reset the decoder state to initial defaults.
+    ///
+    /// Zeros all transient state fields (rng, error, postfilter, decode memory,
+    /// LPC, band energies, etc.) while preserving configuration fields (mode,
+    /// channels, overlap, downsample, start, end, signalling, disable_inv, arch).
+    pub fn reset(&mut self) {
+        self.rng = 0;
+        self.error = 0;
+        self.last_pitch_index = 0;
+        self.loss_count = 0;
+        self.skip_plc = 1;
+        self.postfilter_period = 0;
+        self.postfilter_period_old = 0;
+        self.postfilter_gain = 0.0;
+        self.postfilter_gain_old = 0.0;
+        self.postfilter_tapset = 0;
+        self.postfilter_tapset_old = 0;
+        self.preemph_memD = [0.0; 2];
+        self.decode_mem.fill(0.0);
+        self.lpc.fill(0.0);
+        self.oldEBands.fill(0.0);
+        self.oldLogE.fill(-28.0);
+        self.oldLogE2.fill(-28.0);
+        self.backgroundLogE.fill(0.0);
+    }
+}
+
 /// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
 fn deemphasis_stereo_simple(
     ch0: &[celt_sig],
