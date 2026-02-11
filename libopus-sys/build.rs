@@ -12,7 +12,7 @@ use std::{env, fs};
 fn parse_mk_file(path: &Path) -> HashMap<String, Vec<String>> {
     let text = fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
-    let text = text.replace("\\\n", " ");
+    let text = text.replace("\\\r\n", " ").replace("\\\n", " ");
     text.lines()
         .filter(|l| l.contains('='))
         .map(|l| {
