@@ -13,14 +13,12 @@ pub mod stack_alloc_h {
 pub use self::arch_h::{opus_val16, opus_val32};
 pub use self::stack_alloc_h::{_opus_false, ALLOC_NONE};
 
-use crate::celt::celt::CELT_SET_SIGNALLING_REQUEST;
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
 use crate::celt::entcode::ec_tell;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
 use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::celt_exp2;
-use crate::celt::modes::OpusCustomMode;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
 use crate::silk::dec_API::{silk_Decode, silk_InitDecoder};
 use crate::src::opus::opus_packet_parse_impl;
@@ -35,7 +33,7 @@ use crate::src::opus_defines::{
 };
 use crate::src::opus_private::{align, MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::varargs::VarArgs;
-use crate::{opus_custom_decoder_ctl, opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
+use crate::{opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
 
 #[derive(Clone)]
 #[repr(C)]
@@ -92,7 +90,7 @@ impl OpusDecoder {
             rangeFinal: 0,
         };
 
-        opus_custom_decoder_ctl!(&mut st.celt_dec, CELT_SET_SIGNALLING_REQUEST, 0);
+        st.celt_dec.signalling = 0;
 
         Ok(st)
     }
@@ -161,9 +159,7 @@ impl OpusDecoder {
 
     pub fn pitch(&mut self) -> i32 {
         if self.prev_mode == MODE_CELT_ONLY {
-            let mut pitch = 0;
-            opus_custom_decoder_ctl!(&mut self.celt_dec, OPUS_GET_PITCH_REQUEST, &mut pitch);
-            pitch
+            self.celt_dec.postfilter_period
         } else {
             self.DecControl.prevPitchLag
         }
@@ -174,11 +170,7 @@ impl OpusDecoder {
     }
 
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
-        opus_custom_decoder_ctl!(
-            &mut self.celt_dec,
-            OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-            disabled as i32,
-        );
+        self.celt_dec.disable_inv = disabled as i32;
     }
 
     pub fn phase_inversion_disabled(&self) -> bool {
@@ -531,9 +523,9 @@ unsafe fn opus_decode_frame(
                 panic!("libopus: assert(0) called");
             }
         }
-        assert!(opus_custom_decoder_ctl!(celt_dec, 10012, endband) == 0);
+        celt_dec.end = endband;
     }
-    assert!(opus_custom_decoder_ctl!(celt_dec, 10008, st.stream_channels) == 0);
+    celt_dec.stream_channels = st.stream_channels as usize;
     redundant_audio_size = if redundancy != 0 {
         F5 * st.channels
     } else {
@@ -542,7 +534,7 @@ unsafe fn opus_decode_frame(
     let vla_2 = redundant_audio_size as usize;
     let mut redundant_audio: Vec<opus_val16> = ::std::vec::from_elem(0., vla_2);
     if redundancy != 0 && celt_to_silk != 0 {
-        assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
+        celt_dec.start = 0;
         celt_decode_with_ec(
             celt_dec,
             Some(&data.unwrap()[len as usize..len as usize + redundancy_bytes as usize]),
@@ -551,13 +543,13 @@ unsafe fn opus_decode_frame(
             None,
             0,
         );
-        assert!(opus_custom_decoder_ctl!(celt_dec, 4031, &mut redundant_rng) == 0);
+        redundant_rng = celt_dec.rng;
     }
-    assert!(opus_custom_decoder_ctl!(celt_dec, 10010, start_band) == 0);
+    celt_dec.start = start_band;
     if mode != MODE_SILK_ONLY {
         let celt_frame_size: i32 = if F20 < frame_size { F20 } else { frame_size };
         if mode != st.prev_mode && st.prev_mode > 0 && st.prev_redundancy == 0 {
-            assert!(opus_custom_decoder_ctl!(celt_dec, 4028) == 0);
+            celt_dec.reset();
         }
         celt_ret = celt_decode_with_ec(
             celt_dec,
@@ -581,7 +573,7 @@ unsafe fn opus_decode_frame(
         if st.prev_mode == MODE_HYBRID
             && !(redundancy != 0 && celt_to_silk != 0 && st.prev_redundancy != 0)
         {
-            assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
+            celt_dec.start = 0;
             celt_decode_with_ec(
                 celt_dec,
                 Some(&silence[..2]),
@@ -600,12 +592,11 @@ unsafe fn opus_decode_frame(
             i += 1;
         }
     }
-    let mut celt_mode: *const OpusCustomMode = 0 as *const OpusCustomMode;
-    assert!(opus_custom_decoder_ctl!(celt_dec, 10015, &mut celt_mode) == 0);
-    let window = &(*celt_mode).window;
+    let celt_mode = celt_dec.mode;
+    let window = &celt_mode.window;
     if redundancy != 0 && celt_to_silk == 0 {
-        assert!(opus_custom_decoder_ctl!(celt_dec, 4028) == 0);
-        assert!(opus_custom_decoder_ctl!(celt_dec, 10010, 0) == 0);
+        celt_dec.reset();
+        celt_dec.start = 0;
         celt_decode_with_ec(
             celt_dec,
             Some(&data.unwrap()[len as usize..len as usize + redundancy_bytes as usize]),
@@ -614,7 +605,7 @@ unsafe fn opus_decode_frame(
             None,
             0,
         );
-        assert!(opus_custom_decoder_ctl!(celt_dec, 4031, &mut redundant_rng) == 0);
+        redundant_rng = celt_dec.rng;
         let fade_off = (st.channels * (frame_size - F2_5)) as usize;
         let red_off = (st.channels * F2_5) as usize;
         // Need a temporary copy for the in1 argument since pcm is also out
@@ -945,11 +936,11 @@ pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) 
         OPUS_GET_PITCH_REQUEST => {
             let value_2 = ap.arg::<&mut i32>();
             if st.prev_mode == MODE_CELT_ONLY {
-                opus_custom_decoder_ctl!(celt_dec, OPUS_GET_PITCH_REQUEST, value_2,)
+                *value_2 = celt_dec.postfilter_period;
             } else {
                 *value_2 = st.DecControl.prevPitchLag;
-                OPUS_OK
             }
+            OPUS_OK
         }
         OPUS_GET_GAIN_REQUEST => {
             let value_3 = ap.arg::<&mut i32>();
@@ -975,16 +966,14 @@ pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) 
             if value_6 < 0 || value_6 > 1 {
                 OPUS_BAD_ARG
             } else {
-                opus_custom_decoder_ctl!(
-                    celt_dec,
-                    OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-                    value_6
-                )
+                celt_dec.disable_inv = value_6;
+                OPUS_OK
             }
         }
         OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
             let value_7 = ap.arg::<&mut i32>();
-            opus_custom_decoder_ctl!(celt_dec, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, value_7)
+            *value_7 = celt_dec.disable_inv;
+            OPUS_OK
         }
         _ => OPUS_UNIMPLEMENTED,
     }
