@@ -524,9 +524,9 @@ fn build_opus() {
     std::fs::write(opus_build_src_dir.join("config.h"), CONFIG_H)
         .expect("Could not write config.h");
 
-    cc::Build::new()
+    let mut build = cc::Build::new();
+    build
         .std("c11")
-        .compiler("clang")
         .includes(
             OPUS_INCLUDES
                 .iter()
@@ -538,11 +538,35 @@ fn build_opus() {
                 .map(|source| opus_build_src_dir.join(source)),
         )
         .define("HAVE_CONFIG_H", "1")
-        // this disables FMA fusion and other trickery that rust doesn't do
-        // it's important to get reproducible bitcode on FMA-capable CPUs (like Arm64)
-        .flag("-ffp-model=strict")
-        .out_dir(&opus_build_dir)
-        .compile("opus");
+        .out_dir(&opus_build_dir);
+
+    // Disable FMA fusion and other FP trickery that Rust doesn't do.
+    // Important for reproducible bit-exact output on FMA-capable CPUs (like Arm64).
+    let compiler = build.get_compiler();
+    if compiler.is_like_clang() || compiler.is_like_gnu() {
+        // -ffp-contract=off works on both clang and gcc
+        build.flag("-ffp-contract=off");
+    }
+    if compiler.is_like_clang() {
+        // clang-specific: also disable other FP optimizations
+        build.flag("-ffp-model=strict");
+    }
+    if compiler.is_like_msvc() {
+        build.flag("/fp:strict");
+    }
+
+    // On 32-bit x86, the default C compiler uses x87 FPU (80-bit extended precision)
+    // while Rust uses SSE2 (strict 32/64-bit precision). This mismatch causes
+    // different float results. Force SSE2 math to match Rust's behavior.
+    let target = env::var("TARGET").unwrap_or_default();
+    if (target.starts_with("i686") || target.starts_with("i586"))
+        && (compiler.is_like_clang() || compiler.is_like_gnu())
+    {
+        build.flag("-msse2");
+        build.flag("-mfpmath=sse");
+    }
+
+    build.compile("opus");
 
     link_opus(&opus_build_dir);
 

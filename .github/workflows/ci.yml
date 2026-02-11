@@ -107,9 +107,6 @@ jobs:
             os: ubuntu-latest
             target: i686-unknown-linux-gnu
             packages: gcc-multilib
-            # Known issue: 32-bit Linux produces different results due to
-            # usize/pointer-width dependent arithmetic in the C reference.
-            allow-failure: true
           - name: macos-arm64
             os: macos-15
             target: aarch64-apple-darwin
@@ -123,7 +120,6 @@ jobs:
             os: windows-latest
             target: i686-pc-windows-msvc
       fail-fast: false
-    continue-on-error: ${{ matrix.allow-failure || false }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
