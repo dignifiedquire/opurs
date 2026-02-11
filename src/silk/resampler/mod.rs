@@ -1,3 +1,7 @@
+//! Audio resampler.
+//!
+//! Upstream C: `silk/resampler.c`
+
 #![forbid(unsafe_code)]
 
 mod ar2;

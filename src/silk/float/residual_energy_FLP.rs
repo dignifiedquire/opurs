@@ -1,3 +1,7 @@
+//! Floating-point residual energy computation.
+//!
+//! Upstream C: `silk/float/residual_energy_FLP.c`
+
 use crate::silk::define::MAX_NB_SUBFR;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
 use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;

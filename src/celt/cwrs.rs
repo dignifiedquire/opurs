@@ -1,3 +1,7 @@
+//! Combinatorial pulse coding (Pyramid Vector Quantization).
+//!
+//! Upstream C: `celt/cwrs.c`
+
 use crate::celt::entdec::{ec_dec, ec_dec_uint};
 use crate::celt::entenc::{ec_enc, ec_enc_uint};
 

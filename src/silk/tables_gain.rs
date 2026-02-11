@@ -1,3 +1,7 @@
+//! Gain quantization tables.
+//!
+//! Upstream C: `silk/tables_gain.c`
+
 pub static silk_gain_iCDF: [[u8; 8]; 3] = [
     [224, 112, 44, 15, 3, 2, 1, 0],
     [254, 237, 192, 132, 70, 23, 4, 0],

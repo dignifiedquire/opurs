@@ -1,3 +1,7 @@
+//! Floating-point gain processing.
+//!
+//! Upstream C: `silk/float/process_gains_FLP.c`
+
 use crate::celt::mathops::celt_sqrt;
 use crate::silk::define::{CODE_CONDITIONALLY, TYPE_VOICED};
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};

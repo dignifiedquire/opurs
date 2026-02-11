@@ -1,3 +1,7 @@
+//! Pitch analysis and cross-correlation.
+//!
+//! Upstream C: `celt/pitch.c`
+
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;

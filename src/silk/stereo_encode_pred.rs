@@ -1,3 +1,7 @@
+//! Stereo predictor encoding.
+//!
+//! Upstream C: `silk/stereo_encode_pred.c`
+
 use crate::celt::entenc::{ec_enc, ec_enc_icdf};
 use crate::silk::tables_other::{
     silk_stereo_only_code_mid_iCDF, silk_stereo_pred_joint_iCDF, silk_uniform3_iCDF,

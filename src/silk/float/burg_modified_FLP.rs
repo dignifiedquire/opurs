@@ -1,3 +1,7 @@
+//! Floating-point modified Burg algorithm.
+//!
+//! Upstream C: `silk/float/burg_modified_FLP.c`
+
 use crate::silk::float::energy_FLP::silk_energy_FLP;
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 use crate::silk::tuning_parameters::FIND_LPC_COND_FAC;

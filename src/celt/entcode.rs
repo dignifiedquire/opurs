@@ -1,3 +1,7 @@
+//! Range coder shared state and utilities.
+//!
+//! Upstream C: `celt/entcode.c`, `celt/entcode.h`
+
 #![forbid(unsafe_code)]
 
 use crate::silk::macros::EC_CLZ0;

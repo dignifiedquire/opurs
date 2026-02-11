@@ -1,3 +1,7 @@
+//! Static mode tables for floating-point operation.
+//!
+//! Upstream C: `celt/static_modes_float.h`
+
 #[rustfmt::skip]
 pub static window120: [f32; 120] = [
     6.7286966e-05, 0.00060551348, 0.001_681_597, 0.0032947962, 0.0054439943,

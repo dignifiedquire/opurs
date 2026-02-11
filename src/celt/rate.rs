@@ -1,3 +1,7 @@
+//! Bit allocation.
+//!
+//! Upstream C: `celt/rate.c`
+
 use crate::celt::entcode::{celt_udiv, ec_ctx, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_uint};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_uint};

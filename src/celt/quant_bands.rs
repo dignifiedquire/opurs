@@ -1,3 +1,7 @@
+//! Band energy quantization.
+//!
+//! Upstream C: `celt/quant_bands.c`
+
 use crate::celt::entcode::{ec_tell, ec_tell_frac};
 use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf};
 use crate::celt::entenc::{ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_icdf};

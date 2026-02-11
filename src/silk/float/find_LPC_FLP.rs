@@ -1,3 +1,7 @@
+//! Floating-point LPC coefficient search.
+//!
+//! Upstream C: `silk/float/find_LPC_FLP.c`
+
 pub mod float_h {
     pub const FLT_MAX: f32 = __FLT_MAX__;
     use super::internal::__FLT_MAX__;

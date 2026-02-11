@@ -1,3 +1,7 @@
+//! Decoder initialization.
+//!
+//! Upstream C: `silk/init_decoder.c`
+
 use crate::silk::resampler::ResamplerState;
 use crate::silk::structs::{silk_CNG_struct, silk_PLC_struct, silk_decoder_state, SideInfoIndices};
 use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;

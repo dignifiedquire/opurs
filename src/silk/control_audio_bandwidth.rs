@@ -1,3 +1,7 @@
+//! Audio bandwidth control.
+//!
+//! Upstream C: `silk/control_audio_bandwidth.c`
+
 use crate::silk::define::TRANSITION_FRAMES;
 use crate::silk::enc_API::silk_EncControlStruct;
 use crate::silk::structs::silk_encoder_state;

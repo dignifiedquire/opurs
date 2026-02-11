@@ -1,3 +1,7 @@
+//! Modified Discrete Cosine Transform.
+//!
+//! Upstream C: `celt/mdct.c`
+
 #![forbid(
     non_camel_case_types,
     non_snake_case,

@@ -1,3 +1,7 @@
+//! High-pass filter with variable cutoff.
+//!
+//! Upstream C: `silk/HP_variable_cutoff.c`
+
 use crate::silk::lin2log::silk_lin2log;
 
 use crate::silk::define::TYPE_VOICED;

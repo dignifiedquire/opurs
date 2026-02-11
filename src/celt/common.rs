@@ -1,3 +1,7 @@
+//! Shared CELT constants, type aliases, comb filter, and utility functions.
+//!
+//! Upstream C: `celt/celt.c`, `celt/celt.h`
+
 use crate::celt::modes::OpusCustomMode;
 
 pub mod arch_h {

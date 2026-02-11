@@ -1,3 +1,7 @@
+//! Neural network analysis (MLP).
+//!
+//! Upstream C: `src/mlp.c`
+
 #![forbid(
     unsafe_code,
     non_camel_case_types,

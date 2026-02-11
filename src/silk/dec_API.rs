@@ -1,3 +1,7 @@
+//! SILK decoder API.
+//!
+//! Upstream C: `silk/dec_API.c`
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_DecControlStruct {

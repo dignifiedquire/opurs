@@ -1,3 +1,7 @@
+//! Floating-point sorting utilities.
+//!
+//! Upstream C: `silk/float/sort_FLP.c`
+
 /// Upstream C: silk/float/sort_FLP.c:silk_insertion_sort_decreasing_FLP
 pub fn silk_insertion_sort_decreasing_FLP(a: &mut [f32], idx: &mut [i32], L: i32, K: i32) {
     let mut value: f32 = 0.;

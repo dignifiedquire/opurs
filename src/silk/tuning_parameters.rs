@@ -1,3 +1,7 @@
+//! Encoder tuning parameters.
+//!
+//! Upstream C: `silk/tuning_parameters.h`
+
 /// Decay time for bitreservoir
 pub const BITRESERVOIR_DECAY_TIME_MS: i32 = 500;
 

@@ -1,3 +1,7 @@
+//! NLSF delayed-decision quantization.
+//!
+//! Upstream C: `silk/NLSF_del_dec_quant.c`
+
 pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }

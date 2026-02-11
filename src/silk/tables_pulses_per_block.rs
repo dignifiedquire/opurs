@@ -1,3 +1,7 @@
+//! Pulses-per-block rate tables.
+//!
+//! Upstream C: `silk/tables_pulses_per_block.c`
+
 use crate::silk::define::{N_RATE_LEVELS, SILK_MAX_PULSES};
 
 pub static silk_max_pulses_table: [u8; 4] = [8, 10, 12, 16];

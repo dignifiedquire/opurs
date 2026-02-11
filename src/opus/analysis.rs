@@ -1,3 +1,7 @@
+//! Tonality and music/speech detection analysis.
+//!
+//! Upstream C: `src/analysis.c`
+
 use num_traits::Zero;
 
 pub mod arch_h {
@@ -195,8 +199,8 @@ use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
 use crate::celt::mathops::{celt_log, celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
 
-use crate::src::mlp::analysis_mlp::run_analysis_mlp;
-use crate::src::opus_encoder::is_digital_silence;
+use crate::opus::mlp::analysis_mlp::run_analysis_mlp;
+use crate::opus::opus_encoder::is_digital_silence;
 
 static dct_table: [f32; 128] = [
     0.250000f32,

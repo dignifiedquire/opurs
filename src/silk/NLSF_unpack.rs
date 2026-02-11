@@ -1,3 +1,7 @@
+//! NLSF codebook unpacking.
+//!
+//! Upstream C: `silk/NLSF_unpack.c`
+
 use crate::silk::structs::silk_NLSF_CB_struct;
 
 /// Upstream C: silk/NLSF_unpack.c:silk_NLSF_unpack

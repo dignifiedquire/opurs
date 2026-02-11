@@ -1,3 +1,7 @@
+//! Voice activity detection.
+//!
+//! Upstream C: `silk/VAD.c`
+
 pub mod typedef_h {
     pub const silk_uint8_MAX: i32 = 0xff;
     pub const silk_int32_MAX: i32 = i32::MAX;

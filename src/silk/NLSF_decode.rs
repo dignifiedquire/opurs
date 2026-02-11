@@ -1,3 +1,7 @@
+//! NLSF codebook decoding.
+//!
+//! Upstream C: `silk/NLSF_decode.c`
+
 use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
 use crate::silk::NLSF_unpack::silk_NLSF_unpack;
 

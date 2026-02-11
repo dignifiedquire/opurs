@@ -1,3 +1,5 @@
+//! Nalgebra row-major view helpers.
+
 use nalgebra::{Dim, Matrix, Scalar, ViewStorage, ViewStorageMut, U1};
 
 // provide type-aliases for row-major views and functions for their construction

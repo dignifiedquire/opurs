@@ -1,3 +1,7 @@
+//! Float/int conversion constants.
+//!
+//! Upstream C: `celt/float_cast.h`
+
 /// Upstream C: celt/float_cast.h:CELT_SIG_SCALE
 pub const CELT_SIG_SCALE: f32 = 32768.0f32;
 

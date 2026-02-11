@@ -1,3 +1,7 @@
+//! SILK encoder API.
+//!
+//! Upstream C: `silk/enc_API.c`
+
 #[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_EncControlStruct {

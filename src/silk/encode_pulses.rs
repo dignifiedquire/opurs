@@ -1,3 +1,7 @@
+//! Excitation pulse encoding.
+//!
+//! Upstream C: `silk/encode_pulses.c`
+
 use crate::celt::entenc::{ec_enc, ec_enc_icdf};
 use crate::silk::code_signs::silk_encode_signs;
 use crate::silk::define::{N_RATE_LEVELS, SHELL_CODEC_FRAME_LENGTH, SILK_MAX_PULSES};

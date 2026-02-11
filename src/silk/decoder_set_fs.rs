@@ -1,3 +1,7 @@
+//! Decoder sample rate configuration.
+//!
+//! Upstream C: `silk/decoder_set_fs.c`
+
 use crate::silk::define::{MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY};
 use crate::silk::resampler::silk_resampler_init;
 use crate::silk::structs::silk_decoder_state;

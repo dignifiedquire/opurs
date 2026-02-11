@@ -1,3 +1,7 @@
+//! LPC coefficient stabilization.
+//!
+//! Upstream C: `silk/LPC_fit.c`
+
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
 use ndarray::azip;

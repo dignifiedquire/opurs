@@ -1,3 +1,7 @@
+//! Shell coder for pulse distribution.
+//!
+//! Upstream C: `silk/shell_coder.c`
+
 #![forbid(unsafe_code)]
 
 //! shell coder; pulse-subframe length is hardcoded

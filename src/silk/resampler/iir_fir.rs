@@ -1,3 +1,7 @@
+//! Combined IIR/FIR resampler.
+//!
+//! Upstream C: `silk/resampler_private_IIR_FIR.c`
+
 #![forbid(unsafe_code)]
 
 pub mod typedef_h {

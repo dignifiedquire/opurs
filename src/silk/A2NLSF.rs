@@ -1,3 +1,7 @@
+//! Conversion from LPC to LSF coefficients.
+//!
+//! Upstream C: `silk/A2NLSF.c`
+
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::SigProc_FIX::silk_min_32;
 

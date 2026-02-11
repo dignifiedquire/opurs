@@ -1,3 +1,7 @@
+//! Range decoder.
+//!
+//! Upstream C: `celt/entdec.c`
+
 #![forbid(unsafe_code)]
 
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};

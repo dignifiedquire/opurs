@@ -1,3 +1,7 @@
+//! Floating-point LTP analysis filter.
+//!
+//! Upstream C: `silk/float/LTP_analysis_filter_FLP.c`
+
 use crate::silk::define::LTP_ORDER;
 /// Upstream C: silk/float/LTP_analysis_filter_FLP.c:silk_LTP_analysis_filter_FLP
 ///

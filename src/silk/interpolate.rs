@@ -1,3 +1,7 @@
+//! Parameter interpolation.
+//!
+//! Upstream C: `silk/interpolate.c`
+
 use ndarray::{aview1, aview_mut1, azip};
 
 /// Upstream C: silk/interpolate.c:silk_interpolate

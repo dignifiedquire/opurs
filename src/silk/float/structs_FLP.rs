@@ -1,3 +1,7 @@
+//! Floating-point SILK data structures.
+//!
+//! Upstream C: `silk/float/structs_FLP.h`
+
 use crate::silk::structs::{silk_encoder_state, stereo_enc_state};
 
 #[derive(Copy, Clone, Default)]

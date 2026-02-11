@@ -7,8 +7,8 @@
 //!
 //! See: <https://opus-codec.org/docs/opus_api-1.3.1/group__opus__ctlvalues.html>
 
-use super::error::ErrorCode;
-use crate::src::opus_defines::*;
+use crate::error::ErrorCode;
+use crate::opus::opus_defines::*;
 
 /// Intended application profile for the Opus encoder.
 ///

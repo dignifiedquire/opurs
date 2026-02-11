@@ -1,3 +1,7 @@
+//! Laplace-distributed entropy coding.
+//!
+//! Upstream C: `celt/laplace.c`
+
 use crate::celt::entdec::{ec_dec, ec_dec_update, ec_decode_bin};
 use crate::celt::entenc::{ec_enc, ec_encode_bin};
 

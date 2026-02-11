@@ -1,3 +1,7 @@
+//! Weighted matrix vector quantization with entropy coding.
+//!
+//! Upstream C: `silk/VQ_WMat_EC.c`
+
 use crate::silk::lin2log::silk_lin2log;
 
 pub mod typedef_h {

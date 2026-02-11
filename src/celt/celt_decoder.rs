@@ -1,11 +1,15 @@
+//! CELT decoder.
+//!
+//! Upstream C: `celt/celt_decoder.c`
+
 use crate::celt::bands::{
     anti_collapse, celt_lcg_rand, denormalise_bands, quant_all_bands, SPREAD_NORMAL,
 };
-use crate::celt::celt::{
+use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc, celt_fir_c, celt_iir, LPC_ORDER};
+use crate::celt::common::{
     comb_filter, comb_filter_inplace, init_caps, resampling_factor, spread_icdf, tapset_icdf,
     tf_select_table, trim_icdf,
 };
-use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc, celt_fir_c, celt_iir, LPC_ORDER};
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entdec::{
     ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint,
@@ -20,7 +24,7 @@ use crate::celt::quant_bands::{
 use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
 
 pub use self::arch_h::{
     celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,

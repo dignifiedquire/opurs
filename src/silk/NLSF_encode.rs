@@ -1,3 +1,7 @@
+//! NLSF codebook encoding.
+//!
+//! Upstream C: `silk/NLSF_encode.c`
+
 use crate::silk::define::MAX_LPC_ORDER;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sort::silk_insertion_sort_increasing;

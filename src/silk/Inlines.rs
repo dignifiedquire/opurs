@@ -1,3 +1,7 @@
+//! Inline function equivalents.
+//!
+//! Upstream C: `silk/Inlines.h`
+
 use crate::silk::macros::silk_CLZ32;
 use crate::silk::SigProc_FIX::silk_ROR32;
 

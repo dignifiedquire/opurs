@@ -1,3 +1,7 @@
+//! Comfort noise generation.
+//!
+//! Upstream C: `silk/CNG.c`
+
 use crate::silk::define::{
     CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_NLSF_SMTH_Q16, MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
 };

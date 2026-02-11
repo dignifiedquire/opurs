@@ -1,3 +1,7 @@
+//! Log to linear scale conversion.
+//!
+//! Upstream C: `silk/log2lin.c`
+
 pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }

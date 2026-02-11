@@ -1,3 +1,7 @@
+//! Floating-point pitch analysis core.
+//!
+//! Upstream C: `silk/float/pitch_analysis_core_FLP.c`
+
 pub mod arch_h {
     pub type opus_val32 = f32;
 }

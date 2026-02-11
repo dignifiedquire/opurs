@@ -1,3 +1,7 @@
+//! Vector quantization and PVQ rotation.
+//!
+//! Upstream C: `celt/vq.c`
+
 use crate::celt::bands::SPREAD_NONE;
 use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;

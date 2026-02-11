@@ -1,3 +1,7 @@
+//! Floating-point prediction coefficient search.
+//!
+//! Upstream C: `silk/float/find_pred_coefs_FLP.c`
+
 use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_PREDICTION_POWER_GAIN,
     MAX_PREDICTION_POWER_GAIN_AFTER_RESET, TYPE_VOICED,

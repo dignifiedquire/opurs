@@ -1,3 +1,7 @@
+//! Floating-point pitch lag search.
+//!
+//! Upstream C: `silk/float/find_pitch_lags_FLP.c`
+
 use crate::silk::define::{TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, TYPE_VOICED};
 use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
 use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;

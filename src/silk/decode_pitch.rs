@@ -1,3 +1,7 @@
+//! Pitch lag decoding.
+//!
+//! Upstream C: `silk/decode_pitch.c`
+
 use crate::silk::pitch_est_tables::{
     silk_CB_lags_stage2, silk_CB_lags_stage2_10_ms, silk_CB_lags_stage3, silk_CB_lags_stage3_10_ms,
     PE_MAX_LAG_MS, PE_MAX_NB_SUBFR, PE_MAX_NB_SUBFR_OVER_2, PE_MIN_LAG_MS, PE_NB_CBKS_STAGE2_10MS,

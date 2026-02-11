@@ -1,3 +1,7 @@
+//! Private structs, codec mode constants, and alignment utilities.
+//!
+//! Upstream C: `src/opus_private.h`
+
 pub const MODE_SILK_ONLY: i32 = 1000;
 pub const MODE_HYBRID: i32 = 1001;
 pub const MODE_CELT_ONLY: i32 = 1002;

@@ -1,3 +1,7 @@
+//! Floating-point noise shaping analysis.
+//!
+//! Upstream C: `silk/float/noise_shape_analysis_FLP.c`
+
 use crate::celt::mathops::celt_sqrt;
 use crate::silk::define::{MAX_SHAPE_LPC_ORDER, MIN_QGAIN_DB, TYPE_VOICED, USE_HARM_SHAPING};
 use crate::silk::float::structs_FLP::{

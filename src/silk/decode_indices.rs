@@ -1,3 +1,7 @@
+//! Decoding of side-information indices.
+//!
+//! Upstream C: `silk/decode_indices.c`
+
 use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, MAX_NB_SUBFR, NLSF_QUANT_MAX_AMPLITUDE, TYPE_VOICED,

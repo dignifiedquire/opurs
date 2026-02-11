@@ -1,3 +1,7 @@
+//! Second-order AR filter for resampling.
+//!
+//! Upstream C: `silk/resampler_private_AR2.c`
+
 /* Second order AR filter with single delay elements */
 /// Upstream C: silk/resampler_private_AR2.c:silk_resampler_private_AR2
 pub fn silk_resampler_private_AR2(

@@ -1,3 +1,7 @@
+//! Macro equivalents for fixed-point arithmetic.
+//!
+//! Upstream C: `silk/macros.h`
+
 pub const EC_CLZ0: i32 = 32;
 
 /// Upstream C: silk/macros.h:silk_CLZ32

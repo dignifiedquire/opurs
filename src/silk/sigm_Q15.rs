@@ -1,3 +1,7 @@
+//! Sigmoid function approximation (Q15).
+//!
+//! Upstream C: `silk/sigm_Q15.c`
+
 static sigm_LUT_slope_Q10: [i32; 6] = [237, 153, 73, 30, 12, 7];
 static sigm_LUT_pos_Q15: [i32; 6] = [16384, 23955, 28861, 31213, 32178, 32548];
 static sigm_LUT_neg_Q15: [i32; 6] = [16384, 8812, 3906, 1554, 589, 219];

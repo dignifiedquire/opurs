@@ -1,3 +1,7 @@
+//! Codec control and mode switching.
+//!
+//! Upstream C: `silk/control_codec.c`
+
 pub mod errors_h {
     pub const SILK_ENC_PACKET_SIZE_NOT_SUPPORTED: i32 = -(103);
     pub const SILK_NO_ERROR: i32 = 0;

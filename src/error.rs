@@ -2,7 +2,7 @@
 //!
 //! See: <https://opus-codec.org/docs/opus_api-1.3.1/group__opus__errorcodes.html>
 
-use crate::src::opus_defines::{
+use crate::opus::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
     OPUS_INVALID_STATE, OPUS_UNIMPLEMENTED,
 };

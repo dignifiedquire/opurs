@@ -1,3 +1,7 @@
+//! 2x downsampler.
+//!
+//! Upstream C: `silk/resampler_down2.c`
+
 pub mod typedef_h {
     pub const silk_int16_MIN: i32 = i16::MIN as i32;
     pub const silk_int16_MAX: i32 = i16::MAX as i32;

@@ -1,3 +1,7 @@
+//! Input validation for encoder control.
+//!
+//! Upstream C: `silk/check_control_input.c`
+
 #[allow(unused)]
 pub mod errors_h {
     pub const SILK_NO_ERROR: i32 = 0;

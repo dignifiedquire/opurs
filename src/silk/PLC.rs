@@ -1,3 +1,7 @@
+//! Packet loss concealment.
+//!
+//! Upstream C: `silk/PLC.c`
+
 // const BWE_COEF: f64 = 0.99;
 
 /// 0.7 in Q14

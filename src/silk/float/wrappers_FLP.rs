@@ -1,3 +1,7 @@
+//! Floating-point wrappers for fixed-point SILK functions.
+//!
+//! Upstream C: `silk/float/wrappers_FLP.c`
+
 use crate::silk::A2NLSF::silk_A2NLSF;
 use crate::silk::NLSF2A::silk_NLSF2A;
 

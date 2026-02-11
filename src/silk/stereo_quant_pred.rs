@@ -1,3 +1,7 @@
+//! Stereo predictor quantization.
+//!
+//! Upstream C: `silk/stereo_quant_pred.c`
+
 pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }

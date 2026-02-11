@@ -1,3 +1,7 @@
+//! Fixed-point and floating-point math operations.
+//!
+//! Upstream C: `celt/mathops.c`
+
 use crate::silk::macros::EC_CLZ0;
 
 use std::f32::consts::PI;

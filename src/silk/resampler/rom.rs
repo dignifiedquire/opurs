@@ -1,3 +1,7 @@
+//! Resampler filter coefficient tables.
+//!
+//! Upstream C: `silk/resampler_rom.c`, `silk/resampler_rom.h`
+
 pub const RESAMPLER_DOWN_ORDER_FIR2: usize = 36;
 pub const RESAMPLER_DOWN_ORDER_FIR1: usize = 24;
 pub const RESAMPLER_DOWN_ORDER_FIR0: usize = 18;

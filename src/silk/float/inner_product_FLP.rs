@@ -1,3 +1,7 @@
+//! Floating-point inner product.
+//!
+//! Upstream C: `silk/float/inner_product_FLP.c`
+
 use nalgebra::constraint::{DimEq, ShapeConstraint};
 use nalgebra::{Dim, Matrix, RawStorage, U1};
 use ndarray::{aview1, azip};

@@ -1,3 +1,7 @@
+//! CELT encoder.
+//!
+//! Upstream C: `celt/celt_encoder.c`
+
 use crate::celt::bands::{
     compute_band_energies, haar1, hysteresis_decision, normalise_bands, quant_all_bands,
     spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
@@ -22,10 +26,10 @@ pub struct SILKInfo {
 pub use self::arch_h::{
     celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON,
 };
-use crate::celt::celt::{
+use crate::celt::common::{
     comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
 };
-use crate::celt::celt::{COMBFILTER_MAXPERIOD, COMBFILTER_MINPERIOD};
+use crate::celt::common::{COMBFILTER_MAXPERIOD, COMBFILTER_MINPERIOD};
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
@@ -40,9 +44,9 @@ use crate::celt::quant_bands::{
 };
 use crate::celt::rate::clt_compute_allocation;
 
+use crate::opus::analysis::AnalysisInfo;
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 use crate::silk::macros::EC_CLZ0;
-use crate::src::analysis::AnalysisInfo;
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 
 /// Upstream C: celt/celt_encoder.c:OpusCustomEncoder
 ///

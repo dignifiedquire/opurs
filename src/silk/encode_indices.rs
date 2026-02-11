@@ -1,3 +1,7 @@
+//! Encoding of side-information indices.
+//!
+//! Upstream C: `silk/encode_indices.c`
+
 use crate::celt::entenc::{ec_enc, ec_enc_icdf};
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, MAX_NB_SUBFR, NLSF_QUANT_MAX_AMPLITUDE, TYPE_VOICED,

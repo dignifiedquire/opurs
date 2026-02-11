@@ -1,3 +1,7 @@
+//! Split-radix FFT implementation.
+//!
+//! Upstream C: `celt/kiss_fft.c`
+
 #![forbid(unsafe_code)]
 
 use num_traits::Zero;

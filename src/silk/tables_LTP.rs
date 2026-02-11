@@ -1,3 +1,7 @@
+//! LTP coefficient tables.
+//!
+//! Upstream C: `silk/tables_LTP.c`
+
 pub static silk_LTP_per_index_iCDF: [u8; 3] = [179, 99, 0];
 static silk_LTP_gain_iCDF_0: [u8; 8] = [71, 56, 43, 30, 21, 12, 6, 0];
 static silk_LTP_gain_iCDF_1: [u8; 16] = [

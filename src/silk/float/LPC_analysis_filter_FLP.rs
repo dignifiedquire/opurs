@@ -1,3 +1,7 @@
+//! Floating-point LPC analysis filter.
+//!
+//! Upstream C: `silk/float/LPC_analysis_filter_FLP.c`
+
 #[inline]
 fn silk_LPC_analysis_filter16_FLP(r_LPC: &mut [f32], PredCoef: &[f32], s: &[f32], length: i32) {
     let mut ix: i32 = 16;

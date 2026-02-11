@@ -1,3 +1,7 @@
+//! Noise shaping quantizer with delayed decision.
+//!
+//! Upstream C: `silk/NSQ_del_dec.c`
+
 pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
     pub const silk_int16_MIN: i32 = i16::MIN as i32;

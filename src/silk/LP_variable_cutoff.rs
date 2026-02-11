@@ -1,3 +1,7 @@
+//! Low-pass filter with variable cutoff.
+//!
+//! Upstream C: `silk/LP_variable_cutoff.c`
+
 use crate::silk::biquad_alt::silk_biquad_alt_stride1;
 use crate::silk::define::{TRANSITION_FRAMES, TRANSITION_INT_NUM, TRANSITION_NA, TRANSITION_NB};
 use crate::silk::macros::silk_SMLAWB;

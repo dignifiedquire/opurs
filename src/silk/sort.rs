@@ -1,3 +1,7 @@
+//! Sorting utilities.
+//!
+//! Upstream C: `silk/sort.c`
+
 /// Upstream C: silk/sort.c:silk_insertion_sort_increasing
 pub fn silk_insertion_sort_increasing(a: &mut [i32], idx: &mut [i32], L: i32, K: i32) {
     let mut value: i32 = 0;

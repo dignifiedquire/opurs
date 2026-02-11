@@ -1,3 +1,7 @@
+//! Opus decoder.
+//!
+//! Upstream C: `src/opus_decoder.c`
+
 pub mod arch_h {
     pub type opus_val16 = f32;
     pub type opus_val32 = f32;
@@ -19,15 +23,15 @@ use crate::celt::entdec::ec_dec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
 use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::celt_exp2;
-use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
-use crate::silk::dec_API::{silk_Decode, silk_InitDecoder};
-use crate::src::opus::opus_packet_parse_impl;
-use crate::src::opus_defines::{
+use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BUFFER_TOO_SMALL,
     OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
-use crate::src::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
+use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
+use crate::opus::packet::opus_packet_parse_impl;
+use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
+use crate::silk::dec_API::{silk_Decode, silk_InitDecoder};
 use crate::{opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
 
 #[derive(Clone)]

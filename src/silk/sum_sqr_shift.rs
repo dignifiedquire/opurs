@@ -1,3 +1,7 @@
+//! Sum of squared values with bit shifting.
+//!
+//! Upstream C: `silk/sum_sqr_shift.c`
+
 use crate::silk::macros::{silk_CLZ32, silk_SMULBB};
 use crate::silk::SigProc_FIX::silk_max_32;
 

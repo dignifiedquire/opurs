@@ -1,3 +1,7 @@
+//! Floating-point energy computation.
+//!
+//! Upstream C: `silk/float/energy_FLP.c`
+
 use ndarray::aview1;
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_energy_FLP

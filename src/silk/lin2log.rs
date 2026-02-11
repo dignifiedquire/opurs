@@ -1,3 +1,7 @@
+//! Linear to log scale conversion.
+//!
+//! Upstream C: `silk/lin2log.c`
+
 use crate::silk::Inlines::silk_CLZ_FRAC;
 
 /// Upstream C: silk/lin2log.c:silk_lin2log

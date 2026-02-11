@@ -1,3 +1,7 @@
+//! Pretrained neural network weights.
+//!
+//! Upstream C: `src/mlp_data.c`
+
 use super::layers::{ActivationFunction, DenseLayer, GRULayer};
 
 static LAYER0_WEIGHTS: [i8; 800] = [

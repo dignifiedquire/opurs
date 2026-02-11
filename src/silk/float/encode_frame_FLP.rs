@@ -1,3 +1,7 @@
+//! Floating-point SILK frame encoding.
+//!
+//! Upstream C: `silk/float/encode_frame_FLP.c`
+
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::ec_enc;
 use crate::silk::define::{

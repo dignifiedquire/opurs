@@ -1,3 +1,7 @@
+//! Linear prediction coefficient computation.
+//!
+//! Upstream C: `celt/celt_lpc.c`
+
 use crate::celt::pitch::{celt_pitch_xcorr, xcorr_kernel};
 
 pub const LPC_ORDER: usize = 24;

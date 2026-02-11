@@ -1,3 +1,7 @@
+//! Floating-point signal processing utilities.
+//!
+//! Upstream C: `silk/float/SigProc_FLP.h`
+
 use crate::celt::float_cast::float2int;
 use crate::silk::SigProc_FIX::silk_SAT16;
 

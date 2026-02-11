@@ -1,3 +1,7 @@
+//! SILK frame decoding.
+//!
+//! Upstream C: `silk/decode_frame.c`
+
 use crate::celt::entdec::ec_dec;
 
 use crate::silk::dec_API::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};

@@ -1,3 +1,7 @@
+//! Core SILK decoder.
+//!
+//! Upstream C: `silk/decode_core.c`
+
 use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };

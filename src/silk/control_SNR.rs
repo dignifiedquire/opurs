@@ -1,3 +1,7 @@
+//! SNR-based bitrate control.
+//!
+//! Upstream C: `silk/control_SNR.c`
+
 use crate::silk::structs::silk_encoder_state;
 
 /* These tables hold SNR values divided by 21 (so they fit in 8 bits)

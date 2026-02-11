@@ -1,3 +1,7 @@
+//! Bandwidth expansion (chirp filtering).
+//!
+//! Upstream C: `silk/bwexpander.c`
+
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND;
 
 /// Upstream C: silk/bwexpander.c:silk_bwexpander

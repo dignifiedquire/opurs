@@ -1,3 +1,7 @@
+//! High-quality 2x upsampler.
+//!
+//! Upstream C: `silk/resampler_private_up2_HQ.c`
+
 use super::rom::{silk_resampler_up2_hq_0, silk_resampler_up2_hq_1};
 
 pub mod typedef_h {

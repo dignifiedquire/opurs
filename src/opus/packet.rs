@@ -1,4 +1,8 @@
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
+//! Opus packet parsing and signal processing utilities.
+//!
+//! Upstream C: `src/opus.c`
+
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
 /// Applies soft-clipping to bring a float signal within the [-1,1] range. If
 /// the signal is already in that range, nothing is done. If there are values

@@ -1,3 +1,7 @@
+//! Stereo predictor decoding.
+//!
+//! Upstream C: `silk/stereo_decode_pred.c`
+
 use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::STEREO_QUANT_SUB_STEPS;
 use crate::silk::macros::silk_SMULWB;

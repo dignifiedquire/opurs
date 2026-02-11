@@ -1,3 +1,7 @@
+//! Mid/side to left/right conversion.
+//!
+//! Upstream C: `silk/stereo_MS_to_LR.c`
+
 use crate::silk::define::STEREO_INTERP_LEN_MS;
 
 use crate::silk::structs::stereo_dec_state;

@@ -1,3 +1,7 @@
+//! Gain quantization.
+//!
+//! Upstream C: `silk/gain_quant.c`
+
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::SigProc_FIX::silk_LIMIT;

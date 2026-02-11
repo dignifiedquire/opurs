@@ -1,3 +1,7 @@
+//! Codec mode configuration and static mode tables.
+//!
+//! Upstream C: `celt/modes.c`, `celt/modes.h`
+
 /// Upstream C: celt/modes.h:OpusCustomMode
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OpusCustomMode {
@@ -31,7 +35,7 @@ pub mod static_modes_float_h;
 
 pub use self::static_modes_float_h::static_mode_list;
 use crate::celt::mdct::MdctLookup;
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
 
 static eband5ms: [i16; 22] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100,

@@ -1,3 +1,7 @@
+//! Opus API constants and error codes.
+//!
+//! Upstream C: `include/opus_defines.h`
+
 pub const OPUS_OK: i32 = 0;
 pub const OPUS_BAD_ARG: i32 = -1;
 pub const OPUS_BUFFER_TOO_SMALL: i32 = -2;

@@ -1,3 +1,7 @@
+//! SILK data structures.
+//!
+//! Upstream C: `silk/structs.h`
+
 use crate::silk::define::{LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR};
 use crate::silk::resampler::ResamplerState;
 use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;

@@ -1,3 +1,7 @@
+//! Activation function lookup tables.
+//!
+//! Upstream C: `src/tansig_table.h`
+
 static TANSIG_TABLE: [f32; 201] = [
     0.000000f32,
     0.039979f32,

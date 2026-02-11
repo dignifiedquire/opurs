@@ -1,3 +1,7 @@
+//! Encoder initialization.
+//!
+//! Upstream C: `silk/init_encoder.c`
+
 use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::tuning_parameters::VARIABLE_HP_MIN_CUTOFF_HZ;

@@ -1,4 +1,8 @@
-use crate::src::mlp::tansig::{sigmoid_approx, tansig_approx};
+//! MLP layer implementations.
+//!
+//! Upstream C: `src/mlp.c`
+
+use crate::opus::mlp::tansig::{sigmoid_approx, tansig_approx};
 use ndarray::{
     aview1, aview_mut1, azip, ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _,
 };

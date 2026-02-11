@@ -1,3 +1,7 @@
+//! Fixed-point signal processing constants and utilities.
+//!
+//! Upstream C: `silk/SigProc_FIX.h`
+
 /// max order of the LPC analysis in schur() and k2a()
 pub const SILK_MAX_ORDER_LPC: usize = 24;
 

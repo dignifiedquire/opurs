@@ -1,3 +1,7 @@
+//! Conversion from LSF to LPC coefficients.
+//!
+//! Upstream C: `silk/NLSF2A.c`
+
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
 use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;

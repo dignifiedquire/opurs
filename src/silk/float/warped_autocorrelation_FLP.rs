@@ -1,3 +1,7 @@
+//! Floating-point warped autocorrelation.
+//!
+//! Upstream C: `silk/float/warped_autocorrelation_FLP.c`
+
 /// Upstream C: silk/float/warped_autocorrelation_FLP.c:silk_warped_autocorrelation_FLP
 pub fn silk_warped_autocorrelation_FLP(
     corr: &mut [f32],

@@ -1,3 +1,7 @@
+//! NLSF processing and interpolation.
+//!
+//! Upstream C: `silk/process_NLSFs.c`
+
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::NLSF_VQ_weights_laroia::silk_NLSF_VQ_weights_laroia;

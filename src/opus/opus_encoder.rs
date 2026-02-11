@@ -1,5 +1,9 @@
-use crate::api::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
-use crate::src::repacketizer::FrameSource;
+//! Opus encoder.
+//!
+//! Upstream C: `src/opus_encoder.c`
+
+use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::opus::repacketizer::FrameSource;
 
 pub mod arch_h {
     pub type opus_val16 = f32;
@@ -25,6 +29,18 @@ use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
 
+use crate::opus::analysis::{
+    run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo, DownmixInput,
+    TonalityAnalysisState,
+};
+use crate::opus::opus_defines::{
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
+    OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
+    OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
+    OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_2_5_MS, OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_ARG,
+    OPUS_INTERNAL_ERROR, OPUS_OK, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE,
+};
+use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::silk::define::{
     DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX, VAD_NO_DECISION,
 };
@@ -34,18 +50,6 @@ use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
-use crate::src::analysis::{
-    run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo, DownmixInput,
-    TonalityAnalysisState,
-};
-use crate::src::opus_defines::{
-    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
-    OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
-    OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
-    OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_2_5_MS, OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_ARG,
-    OPUS_INTERNAL_ERROR, OPUS_OK, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE,
-};
-use crate::src::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::{opus_packet_pad, OpusRepacketizer};
 
 #[derive(Copy, Clone)]

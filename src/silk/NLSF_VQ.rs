@@ -1,3 +1,7 @@
+//! NLSF vector quantization.
+//!
+//! Upstream C: `silk/NLSF_VQ.c`
+
 /// Upstream C: silk/NLSF_VQ.c:silk_NLSF_VQ
 ///
 /// Compute quantization errors for an LPC_order element input vector for a VQ codebook

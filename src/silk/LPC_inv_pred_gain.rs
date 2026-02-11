@@ -1,3 +1,7 @@
+//! LPC inverse prediction gain computation.
+//!
+//! Upstream C: `silk/LPC_inv_pred_gain.c`
+
 use crate::silk::define::MAX_PREDICTION_POWER_GAIN;
 use crate::silk::macros::silk_CLZ32;
 use crate::silk::Inlines::silk_INVERSE32_varQ;

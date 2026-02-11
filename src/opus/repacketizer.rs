@@ -1,5 +1,11 @@
-use crate::src::opus::{encode_size, opus_packet_parse_impl};
-use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK};
+//! Opus packet merging and splitting.
+//!
+//! Upstream C: `src/repacketizer.c`
+
+use crate::opus::opus_defines::{
+    OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK,
+};
+use crate::opus::packet::{encode_size, opus_packet_parse_impl};
 use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
 
 /// The repacketizer can be used to merge multiple Opus packets into a single

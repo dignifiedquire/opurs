@@ -1,3 +1,7 @@
+//! Aligned inner product computation.
+//!
+//! Upstream C: `silk/inner_prod_aligned.c`
+
 /// Upstream C: silk/inner_prod_aligned.c:silk_inner_prod_aligned_scale
 pub fn silk_inner_prod_aligned_scale(inVec1: &[i16], inVec2: &[i16], scale: i32, len: i32) -> i32 {
     let mut i: i32 = 0;

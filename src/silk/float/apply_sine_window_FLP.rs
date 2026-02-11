@@ -1,3 +1,7 @@
+//! Floating-point sine window application.
+//!
+//! Upstream C: `silk/float/apply_sine_window_FLP.c`
+
 /// Upstream C: silk/float/apply_sine_window_FLP.c:silk_apply_sine_window_FLP
 pub fn silk_apply_sine_window_FLP(px_win: &mut [f32], px: &[f32], win_type: i32, length: i32) {
     let mut k: i32 = 0;

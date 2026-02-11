@@ -1,3 +1,7 @@
+//! Second-order biquad filter.
+//!
+//! Upstream C: `silk/biquad_alt.c`
+
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB};
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
 use ndarray::azip;

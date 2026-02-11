@@ -1,3 +1,7 @@
+//! Decoding of quantized parameters.
+//!
+//! Upstream C: `silk/decode_parameters.c`
+
 use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::decode_pitch::silk_decode_pitch;
 use crate::silk::define::{BWE_AFTER_LOSS_Q16, CODE_CONDITIONALLY, LTP_ORDER, TYPE_VOICED};

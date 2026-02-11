@@ -1,3 +1,7 @@
+//! Bandwidth expansion (32-bit precision).
+//!
+//! Upstream C: `silk/bwexpander_32.c`
+
 use crate::silk::macros::silk_SMULWW;
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND;
 
