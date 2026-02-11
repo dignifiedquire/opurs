@@ -17,7 +17,10 @@
 #![allow(clippy::wildcard_in_or_patterns)]
 
 pub mod burg;
+pub mod fargan;
 pub mod freq;
+pub mod lpcnet;
 pub mod lpcnet_tables;
 pub mod nnet;
+pub mod pitchdnn;
 pub mod vec;
