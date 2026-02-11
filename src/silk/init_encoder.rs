@@ -15,5 +15,5 @@ pub fn silk_init_encoder(psEnc: &mut silk_encoder_state_FLP, arch: i32) -> i32 {
     psEnc.sCmn.variable_HP_smth2_Q15 = psEnc.sCmn.variable_HP_smth1_Q15;
     psEnc.sCmn.first_frame_after_reset = 1;
     ret += silk_VAD_Init(&mut psEnc.sCmn.sVAD);
-    return ret;
+    ret
 }

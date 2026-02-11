@@ -70,5 +70,5 @@ pub fn opus_custom_mode_create(
     if let Some(error) = error {
         *error = OPUS_BAD_ARG;
     }
-    return None;
+    None
 }

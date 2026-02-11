@@ -18,7 +18,7 @@ pub fn silk_apply_sine_window_FLP(px_win: &mut [f32], px: &[f32], win_type: i32,
     }
     k = 0;
     while k < length {
-        px_win[(k + 0) as usize] = px[(k + 0) as usize] * 0.5f32 * (S0 + S1);
+        px_win[k as usize] = px[k as usize] * 0.5f32 * (S0 + S1);
         px_win[(k + 1) as usize] = px[(k + 1) as usize] * S1;
         S0 = c * S1 - S0;
         px_win[(k + 2) as usize] = px[(k + 2) as usize] * 0.5f32 * (S1 + S0);

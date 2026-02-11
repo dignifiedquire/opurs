@@ -146,7 +146,7 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
         t = s;
         ret += 1;
         s = r.wrapping_mul(icdf[ret as usize] as u32);
-        if !(d < s) {
+        if d >= s {
             break;
         }
     }
@@ -196,7 +196,7 @@ pub fn ec_dec_bits(mut _this: &mut ec_dec, mut _bits: u32) -> u32 {
         loop {
             window |= (ec_read_byte_from_end(_this) as ec_window) << available;
             available += EC_SYM_BITS;
-            if !(available <= EC_WINDOW_SIZE - EC_SYM_BITS) {
+            if available > EC_WINDOW_SIZE - EC_SYM_BITS {
                 break;
             }
         }

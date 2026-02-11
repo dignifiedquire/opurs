@@ -32,7 +32,7 @@ fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
         gain = lambda * gain + coefs[i as usize];
         i -= 1;
     }
-    return 1.0f32 / (1.0f32 - lambda * gain);
+    1.0f32 / (1.0f32 - lambda * gain)
 }
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_true2monic_coefs
 #[inline]
@@ -138,21 +138,19 @@ pub fn silk_noise_shape_analysis_FLP(
 ) {
     let psShapeSt: &mut silk_shape_state_FLP = &mut psEnc.sShape;
     let mut k: i32;
-    let mut nSamples: i32;
-    let mut nSegs: i32;
+    let nSamples: i32;
+    let nSegs: i32;
     let mut SNR_adj_dB: f32;
     let mut HarmShapeGain: f32;
-    let mut Tilt: f32;
+    let Tilt: f32;
     let mut nrg: f32;
     let mut log_energy: f32;
     let mut log_energy_prev: f32;
     let mut energy_variation: f32;
-    let mut BWExp: f32;
-    let mut gain_mult: f32;
-    let mut gain_add: f32;
+
     let mut strength: f32;
     let mut b: f32;
-    let mut warping: f32;
+
     let mut x_windowed: [f32; 240] = [0.; 240];
     let mut auto_corr: [f32; 25] = [0.; 25];
     let mut rc: [f32; 25] = [0.; 25];
@@ -160,10 +158,10 @@ pub fn silk_noise_shape_analysis_FLP(
     let mut pitch_res_off: usize = 0;
 
     // x starts at -la_shape offset relative to frame data
-    SNR_adj_dB = psEnc.sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32);
+    SNR_adj_dB = psEnc.sCmn.SNR_dB_Q7 as f32 * (1_f32 / 128.0f32);
     psEncCtrl.input_quality = 0.5f32
-        * (psEnc.sCmn.input_quality_bands_Q15[0 as usize]
-            + psEnc.sCmn.input_quality_bands_Q15[1 as usize]) as f32
+        * (psEnc.sCmn.input_quality_bands_Q15[0_usize]
+            + psEnc.sCmn.input_quality_bands_Q15[1_usize]) as f32
         * (1.0f32 / 32768.0f32);
     psEncCtrl.coding_quality = silk_sigmoid(0.25f32 * (SNR_adj_dB - 20.0f32));
     if psEnc.sCmn.useCBR == 0 {
@@ -177,7 +175,7 @@ pub fn silk_noise_shape_analysis_FLP(
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         SNR_adj_dB += HARM_SNR_INCR_dB * psEnc.LTPCorr;
     } else {
-        SNR_adj_dB += (-0.4f32 * psEnc.sCmn.SNR_dB_Q7 as f32 * (1 as f32 / 128.0f32) + 6.0f32)
+        SNR_adj_dB += (-0.4f32 * psEnc.sCmn.SNR_dB_Q7 as f32 * (1_f32 / 128.0f32) + 6.0f32)
             * (1.0f32 - psEncCtrl.input_quality);
     }
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
@@ -207,15 +205,15 @@ pub fn silk_noise_shape_analysis_FLP(
         }
     }
     strength = FIND_PITCH_WHITE_NOISE_FRACTION * psEncCtrl.predGain;
-    BWExp = BANDWIDTH_EXPANSION / (1.0f32 + strength * strength);
-    warping = psEnc.sCmn.warping_Q16 as f32 / 65536.0f32 + 0.01f32 * psEncCtrl.coding_quality;
+    let BWExp: f32 = BANDWIDTH_EXPANSION / (1.0f32 + strength * strength);
+    let warping: f32 =
+        psEnc.sCmn.warping_Q16 as f32 / 65536.0f32 + 0.01f32 * psEncCtrl.coding_quality;
     k = 0;
     while k < psEnc.sCmn.nb_subfr as i32 {
         let mut shift: i32;
-        let mut slope_part: i32;
-        let mut flat_part: i32;
-        flat_part = psEnc.sCmn.fs_kHz * 3;
-        slope_part = (psEnc.sCmn.shapeWinLength - flat_part) / 2;
+
+        let flat_part: i32 = psEnc.sCmn.fs_kHz * 3;
+        let slope_part: i32 = (psEnc.sCmn.shapeWinLength - flat_part) / 2;
         silk_apply_sine_window_FLP(
             &mut x_windowed[..slope_part as usize],
             &x[x_off..x_off + slope_part as usize],
@@ -233,7 +231,7 @@ pub fn silk_noise_shape_analysis_FLP(
             2,
             slope_part,
         );
-        x_off += psEnc.sCmn.subfr_length as usize;
+        x_off += psEnc.sCmn.subfr_length;
         if psEnc.sCmn.warping_Q16 > 0 {
             silk_warped_autocorrelation_FLP(
                 &mut auto_corr,
@@ -248,7 +246,7 @@ pub fn silk_noise_shape_analysis_FLP(
                 &x_windowed[..psEnc.sCmn.shapeWinLength as usize],
             );
         }
-        auto_corr[0 as usize] += auto_corr[0 as usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;
+        auto_corr[0_usize] += auto_corr[0_usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;
         nrg = silk_schur_FLP(&mut rc, &auto_corr, psEnc.sCmn.shapingLPCOrder);
         silk_k2a_FLP(
             &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
@@ -284,8 +282,8 @@ pub fn silk_noise_shape_analysis_FLP(
         }
         k += 1;
     }
-    gain_mult = silk_exp2(-0.16f32 * SNR_adj_dB);
-    gain_add = silk_exp2(0.16f32 * MIN_QGAIN_DB as f32);
+    let gain_mult: f32 = silk_exp2(-0.16f32 * SNR_adj_dB);
+    let gain_add: f32 = silk_exp2(0.16f32 * MIN_QGAIN_DB as f32);
     k = 0;
     while k < psEnc.sCmn.nb_subfr as i32 {
         psEncCtrl.Gains[k as usize] *= gain_mult;
@@ -295,7 +293,7 @@ pub fn silk_noise_shape_analysis_FLP(
     strength = LOW_FREQ_SHAPING
         * (1.0f32
             + LOW_QUALITY_LOW_FREQ_SHAPING_DECR
-                * (psEnc.sCmn.input_quality_bands_Q15[0 as usize] as f32 * (1.0f32 / 32768.0f32)
+                * (psEnc.sCmn.input_quality_bands_Q15[0_usize] as f32 * (1.0f32 / 32768.0f32)
                     - 1.0f32));
     strength *= psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
@@ -307,18 +305,18 @@ pub fn silk_noise_shape_analysis_FLP(
             k += 1;
         }
         Tilt = -HP_NOISE_COEF
-            - (1 as f32 - HP_NOISE_COEF)
+            - (1_f32 - HP_NOISE_COEF)
                 * HARM_HP_NOISE_COEF
                 * psEnc.sCmn.speech_activity_Q8 as f32
                 * (1.0f32 / 256.0f32);
     } else {
         b = 1.3f32 / psEnc.sCmn.fs_kHz as f32;
-        psEncCtrl.LF_MA_shp[0 as usize] = -1.0f32 + b;
-        psEncCtrl.LF_AR_shp[0 as usize] = 1.0f32 - b - b * strength * 0.6f32;
+        psEncCtrl.LF_MA_shp[0_usize] = -1.0f32 + b;
+        psEncCtrl.LF_AR_shp[0_usize] = 1.0f32 - b - b * strength * 0.6f32;
         k = 1;
         while k < psEnc.sCmn.nb_subfr as i32 {
-            psEncCtrl.LF_MA_shp[k as usize] = psEncCtrl.LF_MA_shp[0 as usize];
-            psEncCtrl.LF_AR_shp[k as usize] = psEncCtrl.LF_AR_shp[0 as usize];
+            psEncCtrl.LF_MA_shp[k as usize] = psEncCtrl.LF_MA_shp[0_usize];
+            psEncCtrl.LF_AR_shp[k as usize] = psEncCtrl.LF_AR_shp[0_usize];
             k += 1;
         }
         Tilt = -HP_NOISE_COEF;

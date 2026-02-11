@@ -36,10 +36,6 @@ pub mod arch_h {
     pub const CELT_SIG_SCALE: f32 = 32768.0f32;
 }
 
-pub mod stddef_h {
-    pub const NULL: i32 = 0;
-}
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusCustomDecoder {
@@ -109,7 +105,7 @@ pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> OpusCustomDecod
         panic!("Unsupported sampling rate: {}", sampling_rate);
     }
 
-    return st;
+    st
 }
 #[inline]
 fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> OpusCustomDecoder {
@@ -203,8 +199,8 @@ fn deemphasis_stereo_simple(
         let tmp1: celt_sig = ch1[ju] + VERY_SMALL + m1;
         m0 = coef0 * tmp0;
         m1 = coef0 * tmp1;
-        pcm[2 * ju] = tmp0 * (1 as f32 / CELT_SIG_SCALE);
-        pcm[2 * ju + 1] = tmp1 * (1 as f32 / CELT_SIG_SCALE);
+        pcm[2 * ju] = tmp0 * (1_f32 / CELT_SIG_SCALE);
+        pcm[2 * ju + 1] = tmp1 * (1_f32 / CELT_SIG_SCALE);
         j += 1;
     }
     mem[0] = m0;
@@ -257,7 +253,7 @@ fn deemphasis(
             while j < N {
                 let tmp_0: celt_sig = x[j as usize] + VERY_SMALL + m;
                 m = coef0 * tmp_0;
-                pcm[(c + j * C) as usize] = tmp_0 * (1 as f32 / CELT_SIG_SCALE);
+                pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
             }
         }
@@ -266,12 +262,12 @@ fn deemphasis(
             j = 0;
             while j < Nd {
                 pcm[(c + j * C) as usize] =
-                    scratch[(j * downsample) as usize] * (1 as f32 / CELT_SIG_SCALE);
+                    scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
             }
         }
         c += 1;
-        if !(c < C) {
+        if c >= C {
             break;
         }
     }
@@ -497,7 +493,7 @@ fn tf_decode(
     }
     tf_select = 0;
     if tf_select_rsv != 0
-        && tf_select_table[LM as usize][(4 * isTransient + 0 + tf_changed) as usize] as i32
+        && tf_select_table[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
             != tf_select_table[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
     {
         tf_select = ec_dec_bit_logp(dec, 1);
@@ -571,7 +567,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 i += 1;
             }
             c += 1;
-            if !(c < C) {
+            if c >= C {
                 break;
             }
         }
@@ -603,7 +599,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             st.decode_mem
                 .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
             c += 1;
-            if !(c < C) {
+            if c >= C {
                 break;
             }
         }
@@ -714,9 +710,9 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             {
                 let mut i = 0;
                 while i < decay_length {
-                    let e = _exc[exc_off + (MAX_PERIOD as i32 - decay_length + i) as usize];
+                    let e = _exc[exc_off + (MAX_PERIOD - decay_length + i) as usize];
                     E1 += e * e;
-                    let e = _exc[exc_off + (MAX_PERIOD as i32 - 2 * decay_length + i) as usize];
+                    let e = _exc[exc_off + (MAX_PERIOD - 2 * decay_length + i) as usize];
                     E2 += e * e;
                     i += 1;
                 }
@@ -725,7 +721,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             let decay_0: opus_val16 = celt_sqrt(E1 / E2);
             // Shift decode_mem: memmove(buf, buf+N, (2048-N)*sizeof)
             st.decode_mem.copy_within(ch_off + n..ch_off + 2048, ch_off);
-            let extrapolation_offset = MAX_PERIOD as i32 - pitch_index;
+            let extrapolation_offset = MAX_PERIOD - pitch_index;
             let extrapolation_len = N + overlap;
             let mut attenuation: opus_val16 = fade * decay_0;
             let mut j_0 = 0i32;
@@ -734,7 +730,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
             while i < extrapolation_len {
                 if j_0 >= pitch_index {
                     j_0 -= pitch_index;
-                    attenuation = attenuation * decay_0;
+                    attenuation *= decay_0;
                 }
                 st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i as usize] =
                     attenuation * _exc[exc_off + (extrapolation_offset + j_0) as usize];
@@ -773,6 +769,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                     i += 1;
                 }
             }
+            #[allow(clippy::neg_cmp_op_on_partial_ord)]
             if !(S1 > 0.2f32 * S2) {
                 let mut i = 0;
                 while i < extrapolation_len {
@@ -824,7 +821,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
                 }
             }
             c += 1;
-            if !(c < C) {
+            if c >= C {
                 break;
             }
         }
@@ -891,7 +888,7 @@ pub fn celt_decode_with_ec(
         return OPUS_BAD_ARG;
     }
     M = (1) << LM;
-    if len < 0 || len > 1275 {
+    if !(0..=1275).contains(&len) {
         return OPUS_BAD_ARG;
     }
     N = M * mode.shortMdctSize;
@@ -1027,7 +1024,7 @@ pub fn celt_decode_with_ec(
         let mut quanta: i32 = 0;
         let mut dynalloc_loop_logp: i32 = 0;
         let mut boost: i32 = 0;
-        width = C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) << LM;
+        width = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
         quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
@@ -1115,7 +1112,7 @@ pub fn celt_decode_with_ec(
         st.decode_mem
             .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
         c += 1;
-        if !(c < CC) {
+        if c >= CC {
             break;
         }
     }
@@ -1287,7 +1284,7 @@ pub fn celt_decode_with_ec(
             }
         }
         c += 1;
-        if !(c < CC) {
+        if c >= CC {
             break;
         }
     }
@@ -1356,7 +1353,7 @@ pub fn celt_decode_with_ec(
             i += 1;
         }
         c += 1;
-        if !(c < 2) {
+        if c >= 2 {
             break;
         }
     }
@@ -1386,5 +1383,5 @@ pub fn celt_decode_with_ec(
     if ec_get_error(dec) != 0 {
         st.error = 1;
     }
-    return frame_size / st.downsample;
+    frame_size / st.downsample
 }

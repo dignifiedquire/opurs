@@ -34,7 +34,7 @@ pub fn silk_encode_indices(
         psEncC.indices
     };
     typeOffset = 2 * psIndices.signalType as i32 + psIndices.quantOffsetType as i32;
-    assert!(typeOffset >= 0 && typeOffset < 6);
+    assert!((0..6).contains(&typeOffset));
     assert!(encode_LBRR == 0 || typeOffset >= 2);
     if encode_LBRR != 0 || typeOffset >= 2 {
         ec_enc_icdf(psRangeEnc, typeOffset - 2, &silk_type_offset_VAD_iCDF, 8);
@@ -44,20 +44,20 @@ pub fn silk_encode_indices(
     if condCoding == CODE_CONDITIONALLY {
         ec_enc_icdf(
             psRangeEnc,
-            psIndices.GainsIndices[0 as usize] as i32,
+            psIndices.GainsIndices[0_usize] as i32,
             &silk_delta_gain_iCDF,
             8,
         );
     } else {
         ec_enc_icdf(
             psRangeEnc,
-            psIndices.GainsIndices[0 as usize] as i32 >> 3,
+            psIndices.GainsIndices[0_usize] as i32 >> 3,
             &silk_gain_iCDF[psIndices.signalType as usize],
             8,
         );
         ec_enc_icdf(
             psRangeEnc,
-            psIndices.GainsIndices[0 as usize] as i32 & 7,
+            psIndices.GainsIndices[0_usize] as i32 & 7,
             &silk_uniform8_iCDF,
             8,
         );
@@ -74,7 +74,7 @@ pub fn silk_encode_indices(
     }
     ec_enc_icdf(
         psRangeEnc,
-        psIndices.NLSFIndices[0 as usize] as i32,
+        psIndices.NLSFIndices[0_usize] as i32,
         &psEncC.psNLSF_CB.CB1_iCDF
             [((psIndices.signalType as i32 >> 1) * psEncC.psNLSF_CB.nVectors as i32) as usize..],
         8,
@@ -83,7 +83,7 @@ pub fn silk_encode_indices(
         &mut ec_ix,
         &mut pred_Q8,
         psEncC.psNLSF_CB,
-        psIndices.NLSFIndices[0 as usize] as i32,
+        psIndices.NLSFIndices[0_usize] as i32,
     );
     assert!(psEncC.psNLSF_CB.order as i32 == psEncC.predictLPCOrder);
     i = 0;
@@ -136,10 +136,10 @@ pub fn silk_encode_indices(
         encode_absolute_lagIndex = 1;
         if condCoding == CODE_CONDITIONALLY && psEncC.ec_prevSignalType == TYPE_VOICED {
             delta_lagIndex = psIndices.lagIndex as i32 - psEncC.ec_prevLagIndex as i32;
-            if delta_lagIndex < -(8) || delta_lagIndex > 11 {
+            if !(-(8)..=11).contains(&delta_lagIndex) {
                 delta_lagIndex = 0;
             } else {
-                delta_lagIndex = delta_lagIndex + 9;
+                delta_lagIndex += 9;
                 encode_absolute_lagIndex = 0;
             }
             ec_enc_icdf(psRangeEnc, delta_lagIndex, &silk_pitch_delta_iCDF, 8);

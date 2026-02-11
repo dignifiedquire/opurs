@@ -205,10 +205,12 @@ static TANSIG_TABLE: [f32; 201] = [
 #[inline]
 pub fn tansig_approx(mut x: f32) -> f32 {
     let mut sign: f32 = 1.0;
-    /* Tests are reversed to catch NaNs */
+    // Tests are reversed to catch NaNs
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(x < 8.0) {
         return 1.0;
     }
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(x > -8.0) {
         return -1.0;
     }

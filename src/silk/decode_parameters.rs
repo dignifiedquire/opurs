@@ -23,19 +23,19 @@ pub fn silk_decode_parameters(
     condCoding: i32,
 ) {
     let [PredCoef_Q12_0, PredCoef_Q12_1] = &mut psDecCtrl.PredCoef_Q12;
-    let PredCoef_Q12_0 = &mut PredCoef_Q12_0[..psDec.LPC_order as usize];
-    let PredCoef_Q12_1 = &mut PredCoef_Q12_1[..psDec.LPC_order as usize];
+    let PredCoef_Q12_0 = &mut PredCoef_Q12_0[..psDec.LPC_order];
+    let PredCoef_Q12_1 = &mut PredCoef_Q12_1[..psDec.LPC_order];
 
-    let Gains_Q16 = &mut psDecCtrl.Gains_Q16[..psDec.nb_subfr as usize];
-    let GainsIndices = &psDec.indices.GainsIndices[..psDec.nb_subfr as usize];
+    let Gains_Q16 = &mut psDecCtrl.Gains_Q16[..psDec.nb_subfr];
+    let GainsIndices = &psDec.indices.GainsIndices[..psDec.nb_subfr];
 
     let NLSFIndices = &psDec.indices.NLSFIndices[..psDec.psNLSF_CB.order as usize + 1];
 
-    let prevNLSF_Q15 = &mut psDec.prevNLSF_Q15[..psDec.LPC_order as usize];
+    let prevNLSF_Q15 = &mut psDec.prevNLSF_Q15[..psDec.LPC_order];
 
-    let pitchL = &mut psDecCtrl.pitchL[..psDec.nb_subfr as usize];
+    let pitchL = &mut psDecCtrl.pitchL[..psDec.nb_subfr];
 
-    let LTPCoef_Q14 = &mut psDecCtrl.LTPCoef_Q14[..psDec.nb_subfr as usize * LTP_ORDER as usize];
+    let LTPCoef_Q14 = &mut psDecCtrl.LTPCoef_Q14[..psDec.nb_subfr * LTP_ORDER];
 
     /* Dequant Gains */
     silk_gains_dequant(
@@ -49,7 +49,7 @@ pub fn silk_decode_parameters(
     /* Decode NLSFs */
     /****************/
     let mut pNLSF_Q15: [i16; 16] = [0; 16];
-    let pNLSF_Q15 = &mut pNLSF_Q15[..psDec.LPC_order as usize];
+    let pNLSF_Q15 = &mut pNLSF_Q15[..psDec.LPC_order];
     silk_NLSF_decode(pNLSF_Q15, NLSFIndices, psDec.psNLSF_CB);
 
     /* Convert NLSF parameters to AR prediction filter coefficients */
@@ -64,9 +64,9 @@ pub fn silk_decode_parameters(
         /* Calculation of the interpolated NLSF0 vector from the interpolation factor, */
         /* the previous NLSF1, and the current NLSF1                                   */
         let mut pNLSF0_Q15: [i16; 16] = [0; 16];
-        let pNLSF0_Q15 = &mut pNLSF0_Q15[..psDec.LPC_order as usize];
+        let pNLSF0_Q15 = &mut pNLSF0_Q15[..psDec.LPC_order];
 
-        for i in 0..psDec.LPC_order as usize {
+        for i in 0..psDec.LPC_order {
             pNLSF0_Q15[i] = (prevNLSF_Q15[i] as i32
                 + ((psDec.indices.NLSFInterpCoef_Q2 as i32
                     * (pNLSF_Q15[i] as i32 - prevNLSF_Q15[i] as i32))
@@ -80,8 +80,7 @@ pub fn silk_decode_parameters(
         PredCoef_Q12_0.copy_from_slice(PredCoef_Q12_1);
     }
 
-    prevNLSF_Q15[..psDec.LPC_order as usize]
-        .copy_from_slice(&pNLSF_Q15[..psDec.LPC_order as usize]);
+    prevNLSF_Q15[..psDec.LPC_order].copy_from_slice(&pNLSF_Q15[..psDec.LPC_order]);
 
     /* After a packet loss do BWE of LPC coefs */
     if psDec.lossCnt != 0 {
@@ -105,13 +104,13 @@ pub fn silk_decode_parameters(
         /* Decode Codebook Index */
         let cbk_ptr_Q7 = silk_LTP_vq_ptrs_Q7[psDec.indices.PERIndex as usize];
 
-        for k in 0..psDec.nb_subfr as usize {
+        for k in 0..psDec.nb_subfr {
             let Ix = psDec.indices.LTPIndex[k] as usize;
-            for i in 0..LTP_ORDER as usize {
+            for i in 0..LTP_ORDER {
                 // ugh, I tried making it into a 2D array, but stuff broke
                 // no idea why
                 // LTPCoef_Q14[k * LTP_ORDER as usize + i] = (cbk_ptr_Q7[Ix][i] as i16) << 7;
-                LTPCoef_Q14[k * LTP_ORDER as usize + i] = (cbk_ptr_Q7[Ix][i] as i16) << 7;
+                LTPCoef_Q14[k * LTP_ORDER + i] = (cbk_ptr_Q7[Ix][i] as i16) << 7;
             }
         }
 

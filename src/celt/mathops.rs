@@ -3,9 +3,9 @@ use crate::silk::macros::EC_CLZ0;
 use std::f32::consts::PI;
 
 pub const cA: f32 = 0.43157974f32;
-pub const cB: f32 = 0.67848403f32;
+pub const cB: f32 = 0.678_484_f32;
 pub const cC: f32 = 0.08595542f32;
-pub const cE: f32 = PI / 2 as f32;
+pub const cE: f32 = PI / 2_f32;
 
 /// Upstream C: celt/mathops.h:isqrt32
 pub fn isqrt32(mut _val: u32) -> u32 {

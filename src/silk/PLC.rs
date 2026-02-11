@@ -147,7 +147,7 @@ fn silk_PLC_energy(
     for k in 0..2 {
         let exc_off = (k + nb_subfr - 2) * subfr_length;
         for i in 0..subfr_length {
-            let val = (exc_Q14[i + exc_off] as i64 * prevGain_Q10[k] as i64 >> 16) as i32 >> 8;
+            let val = ((exc_Q14[i + exc_off] as i64 * prevGain_Q10[k] as i64) >> 16) as i32 >> 8;
             exc_buf[k * subfr_length + i] = val.clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         }
     }
@@ -227,8 +227,8 @@ fn silk_PLC_conceal(
 
         if psDec.prevSignalType == TYPE_VOICED {
             /* Reduce random noise Gain for voiced frames */
-            for i in 0..LTP_ORDER {
-                rand_scale_Q14 = (rand_scale_Q14 as i32 - B_Q14[i] as i32) as i16;
+            for b in &B_Q14[..LTP_ORDER] {
+                rand_scale_Q14 = (rand_scale_Q14 as i32 - *b as i32) as i16;
             }
             rand_scale_Q14 = silk_max_16(3277, rand_scale_Q14); /* 0.2 */
             rand_scale_Q14 =
@@ -242,7 +242,7 @@ fn silk_PLC_conceal(
             down_scale_Q30 = silk_max_32((1i32) << 30 >> 8, down_scale_Q30);
             down_scale_Q30 = ((down_scale_Q30 as u32) << 3) as i32;
             rand_Gain_Q15 =
-                (down_scale_Q30 as i64 * rand_Gain_Q15 as i16 as i64 >> 16) as i32 >> 14;
+                ((down_scale_Q30 as i64 * rand_Gain_Q15 as i16 as i64) >> 16) as i32 >> 14;
         }
     }
 
@@ -264,7 +264,7 @@ fn silk_PLC_conceal(
     let mut inv_gain_Q30 = silk_INVERSE32_varQ(psDec.sPLC.prevGain_Q16[1], 46);
     inv_gain_Q30 = inv_gain_Q30.min(0x7fffffff >> 1);
     for i in (idx + psDec.LPC_order)..psDec.ltp_mem_length {
-        sLTP_Q14[i] = (inv_gain_Q30 as i64 * sLTP[i] as i64 >> 16) as i32;
+        sLTP_Q14[i] = ((inv_gain_Q30 as i64 * sLTP[i] as i64) >> 16) as i32;
     }
 
     /***************************/
@@ -287,19 +287,19 @@ fn silk_PLC_conceal(
             let ridx = (rand_seed >> 25 & RAND_BUF_MASK) as usize;
             let rand_val = psDec.exc_Q14[rand_off + ridx];
             sLTP_Q14[sLTP_buf_idx + i] = (((LTP_pred_Q12 as i64
-                + (rand_val as i64 * rand_scale_Q14 as i64 >> 16))
+                + ((rand_val as i64 * rand_scale_Q14 as i64) >> 16))
                 as i32 as u32)
                 << 2) as i32;
         }
         sLTP_buf_idx += psDec.subfr_length;
 
         /* Gradually reduce LTP gain */
-        for j in 0..LTP_ORDER {
-            B_Q14[j] = (harm_Gain_Q15 as i16 as i32 * B_Q14[j] as i32 >> 15) as i16;
+        for b in B_Q14[..LTP_ORDER].iter_mut() {
+            *b = ((harm_Gain_Q15 as i16 as i32 * *b as i32) >> 15) as i16;
         }
         if psDec.indices.signalType as i32 != TYPE_NO_VOICE_ACTIVITY {
             /* Gradually reduce excitation gain */
-            rand_scale_Q14 = (rand_scale_Q14 as i32 * rand_Gain_Q15 as i16 as i32 >> 15) as i16;
+            rand_scale_Q14 = ((rand_scale_Q14 as i32 * rand_Gain_Q15 as i16 as i32) >> 15) as i16;
         }
 
         /* Slowly increase pitch lag */
@@ -321,6 +321,7 @@ fn silk_PLC_conceal(
         .copy_from_slice(&psDec.sLPC_Q14_buf[..MAX_LPC_ORDER]);
 
     assert!(psDec.LPC_order >= 10); /* check that unrolling works */
+    #[allow(clippy::needless_range_loop)]
     for i in 0..psDec.frame_length {
         /* Partly unrolled LPC prediction */
         let s = sLPC_off + MAX_LPC_ORDER + i;
@@ -379,16 +380,16 @@ pub fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], l
         if psPLC.last_frame_lost != 0 {
             silk_sum_sqr_shift(&mut energy, &mut energy_shift, &frame[..length as usize]);
             if energy_shift > psPLC.conc_energy_shift {
-                psPLC.conc_energy = psPLC.conc_energy >> energy_shift - psPLC.conc_energy_shift;
+                psPLC.conc_energy >>= energy_shift - psPLC.conc_energy_shift;
             } else if energy_shift < psPLC.conc_energy_shift {
-                energy = energy >> psPLC.conc_energy_shift - energy_shift;
+                energy >>= psPLC.conc_energy_shift - energy_shift;
             }
             if energy > psPLC.conc_energy {
                 let mut gain_Q16: i32;
                 let mut slope_Q16: i32;
                 let LZ = silk_CLZ32(psPLC.conc_energy) - 1;
                 psPLC.conc_energy = ((psPLC.conc_energy as u32) << LZ) as i32;
-                energy = energy >> silk_max_32(24 - LZ, 0);
+                energy >>= silk_max_32(24 - LZ, 0);
                 let frac_Q24 = psPLC.conc_energy / (if energy > 1 { energy } else { 1 });
                 gain_Q16 = ((silk_SQRT_APPROX(frac_Q24) as u32) << 4) as i32;
                 slope_Q16 = (((1) << 16) - gain_Q16) / length;
@@ -396,7 +397,7 @@ pub fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], l
                 i = 0;
                 while i < length {
                     frame[i as usize] =
-                        (gain_Q16 as i64 * frame[i as usize] as i64 >> 16) as i32 as i16;
+                        ((gain_Q16 as i64 * frame[i as usize] as i64) >> 16) as i32 as i16;
                     gain_Q16 += slope_Q16;
                     if gain_Q16 > (1) << 16 {
                         break;

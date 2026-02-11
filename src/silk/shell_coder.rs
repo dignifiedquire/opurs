@@ -60,7 +60,7 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
     let mut pulses3: [i32; 2] = [0; 2];
     let mut pulses4: [i32; 1] = [0; 1];
 
-    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH as usize);
+    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
     assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
 
     combine_pulses(&mut pulses1, pulses0);
@@ -86,7 +86,7 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
 
 /// Upstream C: silk/shell_coder.c:silk_shell_decoder
 pub fn silk_shell_decoder(pulses0: &mut [i16], psRangeDec: &mut ec_dec, pulses4: i32) {
-    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH as usize);
+    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
     assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
 
     let mut pulses3: [i16; 2] = [0; 2];

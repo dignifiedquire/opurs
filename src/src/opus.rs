@@ -23,8 +23,8 @@ pub fn opus_pcm_soft_clip(
     // non-linearity can handle. At the point where the signal reaches +/-2,
     // the derivative will be zero anyway, so this doesn't introduce any
     // discontinuity in the derivative.
-    for i in 0..frame_size * channels {
-        pcm[i] = (-2.0f32).max((2.0f32).min(pcm[i]));
+    for sample in pcm[..frame_size * channels].iter_mut() {
+        *sample = (-2.0f32).max((2.0f32).min(*sample));
     }
 
     for c in 0..channels {
@@ -115,13 +115,13 @@ pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
         1
     } else {
         data[0] = (252 + (size & 0x3)) as u8;
-        data[1] = (size - data[0] as i32 >> 2) as u8;
+        data[1] = ((size - data[0] as i32) >> 2) as u8;
         2
     }
 }
 
 fn parse_size(data: &[u8], size: &mut i16) -> i32 {
-    if data.len() < 1 {
+    if data.is_empty() {
         *size = -1;
         -1
     } else if data[0] < 252 {
@@ -141,6 +141,7 @@ fn parse_size(data: &[u8], size: &mut i16) -> i32 {
 /// - `data`: The first byte of an opus packet.
 /// - `fs`: Sampling rate in Hz.
 ///   This must be a multiple of 400, or inaccurate results will be returned.
+///
 /// Returns the number of samples per frame.
 pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
     if data & 0x80 != 0 {
@@ -184,7 +185,7 @@ pub fn opus_packet_parse_impl(
         data.len()
     );
 
-    if data.len() == 0 || len == 0 {
+    if data.is_empty() || len == 0 {
         return OPUS_INVALID_PACKET;
     }
 

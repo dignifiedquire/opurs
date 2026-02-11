@@ -23,7 +23,7 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
         let mut s: i32 = 0;
         let mut i: i32 = 0;
         s = -((val < 0) as i32);
-        val = val + s ^ s;
+        val = (val + s) ^ s;
         fl = fs;
         fs = ec_laplace_get_freq1(fs, decay);
         i = 1;
@@ -41,7 +41,7 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
                 .wrapping_add(LAPLACE_MINP as u32)
                 .wrapping_sub(1)
                 >> LAPLACE_LOG_MINP) as i32;
-            ndi_max = ndi_max - s >> 1;
+            ndi_max = (ndi_max - s) >> 1;
             di = if val - i < ndi_max - 1 {
                 val - i
             } else {
@@ -53,7 +53,7 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
             } else {
                 32768_u32.wrapping_sub(fl)
             };
-            *value = i + di + s ^ s;
+            *value = (i + di + s) ^ s;
         } else {
             fs = fs.wrapping_add(LAPLACE_MINP as u32);
             fl = fl.wrapping_add(fs & !s as u32);
@@ -87,7 +87,7 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
         }
         if fs <= LAPLACE_MINP as u32 {
             let mut di: i32 = 0;
-            di = (fm.wrapping_sub(fl) >> LAPLACE_LOG_MINP + 1) as i32;
+            di = (fm.wrapping_sub(fl) >> (LAPLACE_LOG_MINP + 1)) as i32;
             val += di;
             fl = fl.wrapping_add((2 * di * LAPLACE_MINP) as u32);
         }
@@ -111,5 +111,5 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
         },
         32768,
     );
-    return val;
+    val
 }

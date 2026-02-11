@@ -61,7 +61,7 @@ pub fn silk_decode_indices(
     }
 
     /* Remaining subframes */
-    for i in 1..psDec.nb_subfr as usize {
+    for i in 1..psDec.nb_subfr {
         psDec.indices.GainsIndices[i] = ec_dec_icdf(psRangeDec, &silk_delta_gain_iCDF, 8) as i8;
     }
 
@@ -139,7 +139,7 @@ pub fn silk_decode_indices(
         /********************/
         /* Decode PERIndex value */
         psDec.indices.PERIndex = ec_dec_icdf(psRangeDec, &silk_LTP_per_index_iCDF, 8) as i8;
-        for k in 0..psDec.nb_subfr as usize {
+        for k in 0..psDec.nb_subfr {
             psDec.indices.LTPIndex[k] = ec_dec_icdf(
                 psRangeDec,
                 silk_LTP_gain_iCDF_ptrs[psDec.indices.PERIndex as usize],

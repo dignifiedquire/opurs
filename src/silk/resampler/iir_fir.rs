@@ -30,7 +30,7 @@ fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
     /* Interpolate upsampled signal and store in output array */
     let mut index_Q16 = 0;
     while index_Q16 < max_index_Q16 {
-        let table_index = ((index_Q16 & 0xffff) as i64 * 12 as i64 >> 16) as usize;
+        let table_index = (((index_Q16 & 0xffff) as i64 * 12_i64) >> 16) as usize;
         let buf_ptr = &buf[(index_Q16 >> 16) as usize..][..8];
 
         res_Q15 = buf_ptr[0] as i32 * silk_resampler_frac_FIR_12[table_index][0] as i32;
@@ -45,21 +45,21 @@ fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
         out[0] = (if (if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {
-            (res_Q15 >> 15 - 1) + 1 >> 1
+            ((res_Q15 >> (15 - 1)) + 1) >> 1
         }) > silk_int16_MAX
         {
             silk_int16_MAX
         } else if (if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {
-            (res_Q15 >> 15 - 1) + 1 >> 1
+            ((res_Q15 >> (15 - 1)) + 1) >> 1
         }) < silk_int16_MIN
         {
             silk_int16_MIN
         } else if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {
-            (res_Q15 >> 15 - 1) + 1 >> 1
+            ((res_Q15 >> (15 - 1)) + 1) >> 1
         }) as i16;
 
         out = &mut out[1..];

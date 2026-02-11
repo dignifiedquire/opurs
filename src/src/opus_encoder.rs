@@ -12,7 +12,7 @@ pub mod stddef_h {}
 pub mod cpu_support_h {
     #[inline]
     pub fn opus_select_arch() -> i32 {
-        return 0;
+        0
     }
 }
 use self::arch_h::{opus_val16, opus_val32, EPSILON, Q15ONE, VERY_SMALL};
@@ -280,7 +280,7 @@ impl OpusEncoder {
     }
 
     pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
-        if complexity < 0 || complexity > 10 {
+        if !(0..=10).contains(&complexity) {
             return Err(OPUS_BAD_ARG);
         }
         self.silk_mode.complexity = complexity;
@@ -385,7 +385,7 @@ impl OpusEncoder {
     }
 
     pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
-        if pct < 0 || pct > 100 {
+        if !(0..=100).contains(&pct) {
             return Err(OPUS_BAD_ARG);
         }
         self.silk_mode.packetLossPercentage = pct;
@@ -406,7 +406,7 @@ impl OpusEncoder {
     }
 
     pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
-        if depth < 8 || depth > 24 {
+        if !(8..=24).contains(&depth) {
             return Err(OPUS_BAD_ARG);
         }
         self.lsb_depth = depth;
@@ -442,7 +442,7 @@ impl OpusEncoder {
     }
 
     pub fn set_force_mode(&mut self, mode: i32) -> Result<(), i32> {
-        if (mode < MODE_SILK_ONLY || mode > MODE_CELT_ONLY) && mode != OPUS_AUTO {
+        if !(MODE_SILK_ONLY..=MODE_CELT_ONLY).contains(&mode) && mode != OPUS_AUTO {
             return Err(OPUS_BAD_ARG);
         }
         self.user_forced_mode = mode;
@@ -543,7 +543,7 @@ fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
         period += 1;
     }
     if mode == MODE_SILK_ONLY {
-        toc = (bandwidth - OPUS_BANDWIDTH_NARROWBAND << 5) as u8;
+        toc = ((bandwidth - OPUS_BANDWIDTH_NARROWBAND) << 5) as u8;
         toc = (toc as i32 | (period - 2) << 3) as u8;
     } else if mode == MODE_CELT_ONLY {
         let mut tmp: i32 = bandwidth - OPUS_BANDWIDTH_MEDIUMBAND;
@@ -555,11 +555,11 @@ fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
         toc = (toc as i32 | period << 3) as u8;
     } else {
         toc = 0x60;
-        toc = (toc as i32 | bandwidth - OPUS_BANDWIDTH_SUPERWIDEBAND << 4) as u8;
+        toc = (toc as i32 | (bandwidth - OPUS_BANDWIDTH_SUPERWIDEBAND) << 4) as u8;
         toc = (toc as i32 | (period - 2) << 3) as u8;
     }
     toc = (toc as i32 | ((channels == 2) as i32) << 2) as u8;
-    return toc;
+    toc
 }
 /// Upstream C: src/opus_encoder.c:silk_biquad_float
 fn silk_biquad_float(
@@ -576,17 +576,17 @@ fn silk_biquad_float(
     let mut inval: opus_val32 = 0.;
     let mut A: [opus_val32; 2] = [0.; 2];
     let mut B: [opus_val32; 3] = [0.; 3];
-    A[0 as usize] = A_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
-    A[1 as usize] = A_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[0 as usize] = B_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[1 as usize] = B_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
-    B[2 as usize] = B_Q28[2] as f32 * (1.0f32 / ((1) << 28) as f32);
+    A[0_usize] = A_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
+    A[1_usize] = A_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[0_usize] = B_Q28[0] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[1_usize] = B_Q28[1] as f32 * (1.0f32 / ((1) << 28) as f32);
+    B[2_usize] = B_Q28[2] as f32 * (1.0f32 / ((1) << 28) as f32);
     k = 0;
     while k < len {
         inval = in_0[(k * stride) as usize];
-        vout = S[0] + B[0 as usize] * inval;
-        S[0] = S[1] - vout * A[0 as usize] + B[1 as usize] * inval;
-        S[1] = -vout * A[1 as usize] + B[2 as usize] * inval + VERY_SMALL;
+        vout = S[0] + B[0_usize] * inval;
+        S[0] = S[1] - vout * A[0_usize] + B[1_usize] * inval;
+        S[1] = -vout * A[1_usize] + B[2_usize] * inval + VERY_SMALL;
         out[(k * stride) as usize] = vout;
         k += 1;
     }
@@ -610,20 +610,20 @@ fn hp_cutoff(
     #[allow(clippy::approx_constant)]
     // Intentional: C reference uses 3.14159, not exact PI
     let pi_approx = 3.14159f64;
-    Fc_Q19 = (1.5f64 * pi_approx / 1000 as f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16 as i32
+    Fc_Q19 = (1.5f64 * pi_approx / 1000_f64 * ((1) << 19) as f64 + 0.5f64) as i32 as i16 as i32
         * cutoff_Hz as i16 as i32
         / (Fs / 1000);
     r_Q28 = (1.0f64 * ((1) << 28) as f64 + 0.5f64) as i32
         - (0.92f64 * ((1) << 9) as f64 + 0.5f64) as i32 * Fc_Q19;
-    B_Q28[0 as usize] = r_Q28;
-    B_Q28[1 as usize] = ((-r_Q28 as u32) << 1) as i32;
-    B_Q28[2 as usize] = r_Q28;
+    B_Q28[0_usize] = r_Q28;
+    B_Q28[1_usize] = ((-r_Q28 as u32) << 1) as i32;
+    B_Q28[2_usize] = r_Q28;
     r_Q22 = r_Q28 >> 6;
-    A_Q28[0 as usize] = (r_Q22 as i64
-        * ((Fc_Q19 as i64 * Fc_Q19 as i64 >> 16) as i32
-            - (2.0f64 * ((1) << 22) as f64 + 0.5f64) as i32) as i64
+    A_Q28[0_usize] = ((r_Q22 as i64
+        * (((Fc_Q19 as i64 * Fc_Q19 as i64) >> 16) as i32
+            - (2.0f64 * ((1) << 22) as f64 + 0.5f64) as i32) as i64)
         >> 16) as i32;
-    A_Q28[1 as usize] = (r_Q22 as i64 * r_Q22 as i64 >> 16) as i32;
+    A_Q28[1_usize] = ((r_Q22 as i64 * r_Q22 as i64) >> 16) as i32;
     silk_biquad_float(in_0, &B_Q28, &A_Q28, hp_mem, out, len, channels);
     if channels == 2 {
         silk_biquad_float(
@@ -651,7 +651,7 @@ fn dc_reject(
     let mut coef: f32 = 0.;
     let mut coef2: f32 = 0.;
     coef = 6.3f32 * cutoff_Hz as f32 / Fs as f32;
-    coef2 = 1 as f32 - coef;
+    coef2 = 1_f32 - coef;
     if channels == 2 {
         let mut m0: f32 = 0.;
         let mut m2: f32 = 0.;
@@ -663,13 +663,13 @@ fn dc_reject(
             let mut x1: opus_val32 = 0.;
             let mut out0: opus_val32 = 0.;
             let mut out1: opus_val32 = 0.;
-            x0 = in_0[(2 * i + 0) as usize];
+            x0 = in_0[(2 * i) as usize];
             x1 = in_0[(2 * i + 1) as usize];
             out0 = x0 - m0;
             out1 = x1 - m2;
             m0 = coef * x0 + VERY_SMALL + coef2 * m0;
             m2 = coef * x1 + VERY_SMALL + coef2 * m2;
-            out[(2 * i + 0) as usize] = out0;
+            out[(2 * i) as usize] = out0;
             out[(2 * i + 1) as usize] = out1;
             i += 1;
         }
@@ -718,17 +718,17 @@ fn stereo_fade(
         w = window[(i * inc) as usize] * window[(i * inc) as usize];
         g = w * g2 + (1.0f32 - w) * g1;
         diff = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
-        diff = g * diff;
-        out[(i * channels) as usize] = out[(i * channels) as usize] - diff;
-        out[(i * channels + 1) as usize] = out[(i * channels + 1) as usize] + diff;
+        diff *= g;
+        out[(i * channels) as usize] -= diff;
+        out[(i * channels + 1) as usize] += diff;
         i += 1;
     }
     while i < frame_size {
         let mut diff_0: opus_val32 = 0.;
         diff_0 = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
-        diff_0 = g2 * diff_0;
-        out[(i * channels) as usize] = out[(i * channels) as usize] - diff_0;
-        out[(i * channels + 1) as usize] = out[(i * channels + 1) as usize] + diff_0;
+        diff_0 *= g2;
+        out[(i * channels) as usize] -= diff_0;
+        out[(i * channels + 1) as usize] += diff_0;
         i += 1;
     }
 }
@@ -780,7 +780,7 @@ fn gain_fade(
             i += 1;
         }
         c += 1;
-        if !(c < channels) {
+        if c >= channels {
             break;
         }
     }
@@ -792,12 +792,12 @@ fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes
         frame_size = st.Fs / 400;
     }
     if st.user_bitrate_bps == OPUS_AUTO {
-        return 60 * st.Fs / frame_size + st.Fs * st.channels;
+        60 * st.Fs / frame_size + st.Fs * st.channels
     } else if st.user_bitrate_bps == OPUS_BITRATE_MAX {
-        return max_data_bytes * 8 * st.Fs / frame_size;
+        max_data_bytes * 8 * st.Fs / frame_size
     } else {
-        return st.user_bitrate_bps;
-    };
+        st.user_bitrate_bps
+    }
 }
 
 /// Upstream C: src/opus_encoder.c:frame_size_select
@@ -808,11 +808,9 @@ pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i3
     }
     if variable_duration == OPUS_FRAMESIZE_ARG {
         new_size = frame_size;
-    } else if variable_duration >= OPUS_FRAMESIZE_2_5_MS
-        && variable_duration <= OPUS_FRAMESIZE_120_MS
-    {
+    } else if (OPUS_FRAMESIZE_2_5_MS..=OPUS_FRAMESIZE_120_MS).contains(&variable_duration) {
         if variable_duration <= OPUS_FRAMESIZE_40_MS {
-            new_size = (Fs / 400) << variable_duration - OPUS_FRAMESIZE_2_5_MS;
+            new_size = (Fs / 400) << (variable_duration - OPUS_FRAMESIZE_2_5_MS);
         } else {
             new_size = (variable_duration - OPUS_FRAMESIZE_2_5_MS - 2) * Fs / 50;
         }
@@ -834,7 +832,7 @@ pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i3
     {
         return -1;
     }
-    return new_size;
+    new_size
 }
 /// Upstream C: src/opus_encoder.c:compute_stereo_width
 pub fn compute_stereo_width(
@@ -891,6 +889,7 @@ pub fn compute_stereo_width(
         yy += pyy;
         i += 4;
     }
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(xx < 1e9f32) || xx.is_nan() || !(yy < 1e9f32) || yy.is_nan() {
         yy = 0 as opus_val32;
         xx = yy;
@@ -925,11 +924,11 @@ pub fn compute_stereo_width(
             mem.smoothed_width
         };
     }
-    return if 1.0f32 < 20 as opus_val32 * mem.max_follower {
+    if 1.0f32 < 20 as opus_val32 * mem.max_follower {
         1.0f32
     } else {
         20 as opus_val32 * mem.max_follower
-    };
+    }
 }
 /// Upstream C: src/opus_encoder.c:decide_fec
 fn decide_fec(
@@ -957,28 +956,28 @@ fn decide_fec(
         if last_fec == 0 {
             LBRR_rate_thres_bps += hysteresis;
         }
-        LBRR_rate_thres_bps = ((LBRR_rate_thres_bps
+        LBRR_rate_thres_bps = (((LBRR_rate_thres_bps
             * (125
                 - (if PacketLoss_perc < 25 {
                     PacketLoss_perc
                 } else {
                     25
                 }))) as i64
-            * (0.01f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64
+            * (0.01f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64)
             >> 16) as i32;
         if rate > LBRR_rate_thres_bps {
             return 1;
         } else if PacketLoss_perc <= 5 {
             return 0;
         } else {
-            if !(*bandwidth > OPUS_BANDWIDTH_NARROWBAND) {
+            if *bandwidth <= OPUS_BANDWIDTH_NARROWBAND {
                 break;
             }
             *bandwidth -= 1;
         }
     }
     *bandwidth = orig_bandwidth;
-    return 0;
+    0
 }
 /// Upstream C: src/opus_encoder.c:compute_silk_rate_for_hybrid
 fn compute_silk_rate_for_hybrid(
@@ -1008,14 +1007,14 @@ fn compute_silk_rate_for_hybrid(
         .wrapping_div(::core::mem::size_of::<[i32; 5]>() as u64) as i32;
     i = 1;
     while i < N {
-        if rate_table[i as usize][0 as usize] > rate {
+        if rate_table[i as usize][0_usize] > rate {
             break;
         }
         i += 1;
     }
     if i == N {
         silk_rate = rate_table[(i - 1) as usize][entry as usize];
-        silk_rate += (rate - rate_table[(i - 1) as usize][0 as usize]) / 2;
+        silk_rate += (rate - rate_table[(i - 1) as usize][0_usize]) / 2;
     } else {
         let mut lo: i32 = 0;
         let mut hi: i32 = 0;
@@ -1023,8 +1022,8 @@ fn compute_silk_rate_for_hybrid(
         let mut x1: i32 = 0;
         lo = rate_table[(i - 1) as usize][entry as usize];
         hi = rate_table[i as usize][entry as usize];
-        x0 = rate_table[(i - 1) as usize][0 as usize];
-        x1 = rate_table[i as usize][0 as usize];
+        x0 = rate_table[(i - 1) as usize][0_usize];
+        x1 = rate_table[i as usize][0_usize];
         silk_rate = (lo * (x1 - rate) + hi * (rate - x0)) / (x1 - x0);
     }
     if vbr == 0 {
@@ -1037,7 +1036,7 @@ fn compute_silk_rate_for_hybrid(
     if channels == 2 && rate >= 12000 {
         silk_rate -= 1000;
     }
-    return silk_rate;
+    silk_rate
 }
 /// Upstream C: src/opus_encoder.c:compute_equiv_rate
 fn compute_equiv_rate(
@@ -1070,7 +1069,7 @@ fn compute_equiv_rate(
     } else {
         equiv -= equiv * loss / (12 * loss + 20);
     }
-    return equiv;
+    equiv
 }
 /// Upstream C: src/analysis.c:is_digital_silence
 pub fn is_digital_silence(
@@ -1105,11 +1104,9 @@ fn decide_dtx_mode(
     arch: i32,
 ) -> i32 {
     let mut noise_energy: opus_val32 = 0.;
-    if is_silence == 0 {
-        if activity_probability < DTX_ACTIVITY_THRESHOLD {
-            noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
-            is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
-        }
+    if is_silence == 0 && activity_probability < DTX_ACTIVITY_THRESHOLD {
+        noise_energy = compute_frame_energy(pcm, frame_size, channels, arch);
+        is_silence = (peak_signal_energy >= PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
     }
     if is_silence != 0 {
         *nb_no_activity_frames += 1;
@@ -1123,7 +1120,7 @@ fn decide_dtx_mode(
     } else {
         *nb_no_activity_frames = 0;
     }
-    return 0;
+    0
 }
 /// Upstream C: src/opus_encoder.c:encode_multiframe_packet
 fn encode_multiframe_packet(
@@ -1147,17 +1144,16 @@ fn encode_multiframe_packet(
     } else {
         2 + (nb_frames - 1) * 2
     };
-    let repacketize_len;
-    if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
-        repacketize_len = out_data_bytes;
+    let repacketize_len = if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
+        out_data_bytes
     } else {
         let cbr_bytes = 3 * st.bitrate_bps / (3 * 8 * st.Fs / (frame_size * nb_frames));
-        repacketize_len = if cbr_bytes < out_data_bytes {
+        if cbr_bytes < out_data_bytes {
             cbr_bytes
         } else {
             out_data_bytes
-        };
-    }
+        }
+    };
     let bytes_per_frame = if 1276 < 1 + (repacketize_len - max_header_bytes) / nb_frames {
         1276
     } else {
@@ -1272,7 +1268,7 @@ fn compute_redundancy_bytes(
     } else {
         redundancy_bytes = 0;
     }
-    return redundancy_bytes;
+    redundancy_bytes
 }
 pub fn opus_encode_native(
     st: &mut OpusEncoder,
@@ -1532,7 +1528,7 @@ pub fn opus_encode_native(
     } else if st.signal_type == OPUS_SIGNAL_MUSIC {
         voice_est = 0;
     } else if st.voice_ratio >= 0 {
-        voice_est = st.voice_ratio * 327 >> 8;
+        voice_est = (st.voice_ratio * 327) >> 8;
         if st.application == OPUS_APPLICATION_AUDIO {
             voice_est = if voice_est < 115 { voice_est } else { 115 };
         }
@@ -1547,7 +1543,9 @@ pub fn opus_encode_native(
         let mut stereo_threshold: i32 = 0;
         // SAFETY: these are mutable statics from c2rust, only mutated during init
         stereo_threshold = unsafe { stereo_music_threshold }
-            + (voice_est * voice_est * unsafe { stereo_voice_threshold - stereo_music_threshold }
+            + ((voice_est
+                * voice_est
+                * unsafe { stereo_voice_threshold - stereo_music_threshold })
                 >> 14);
         if st.stream_channels == 2 {
             stereo_threshold -= 1000;
@@ -1577,14 +1575,14 @@ pub fn opus_encode_native(
         let mut threshold: i32 = 0;
         // SAFETY: mode_thresholds is a mutable static from c2rust, only mutated during init
         mode_voice = unsafe {
-            ((1.0f32 - stereo_width) * mode_thresholds[0 as usize][0 as usize] as f32
-                + stereo_width * mode_thresholds[1 as usize][0 as usize] as f32) as i32
+            ((1.0f32 - stereo_width) * mode_thresholds[0_usize][0_usize] as f32
+                + stereo_width * mode_thresholds[1_usize][0_usize] as f32) as i32
         };
         mode_music = unsafe {
-            ((1.0f32 - stereo_width) * mode_thresholds[1 as usize][1 as usize] as f32
-                + stereo_width * mode_thresholds[1 as usize][1 as usize] as f32) as i32
+            ((1.0f32 - stereo_width) * mode_thresholds[1_usize][1_usize] as f32
+                + stereo_width * mode_thresholds[1_usize][1_usize] as f32) as i32
         };
-        threshold = mode_music + (voice_est * voice_est * (mode_voice - mode_music) >> 14);
+        threshold = mode_music + ((voice_est * voice_est * (mode_voice - mode_music)) >> 14);
         if st.application == OPUS_APPLICATION_VOIP {
             threshold += 8000;
         }
@@ -1599,7 +1597,7 @@ pub fn opus_encode_native(
             MODE_SILK_ONLY
         };
         if st.silk_mode.useInBandFEC != 0
-            && st.silk_mode.packetLossPercentage > 128 - voice_est >> 4
+            && st.silk_mode.packetLossPercentage > (128 - voice_est) >> 4
         {
             st.mode = MODE_SILK_ONLY;
         }
@@ -1699,10 +1697,10 @@ pub fn opus_encode_native(
         i = 0;
         while i < 8 {
             bandwidth_thresholds[i as usize] = music_bandwidth_thresholds[i as usize]
-                + (voice_est
+                + ((voice_est
                     * voice_est
                     * (voice_bandwidth_thresholds[i as usize]
-                        - music_bandwidth_thresholds[i as usize])
+                        - music_bandwidth_thresholds[i as usize]))
                     >> 14);
             i += 1;
         }
@@ -1724,7 +1722,7 @@ pub fn opus_encode_native(
                 break;
             }
             bandwidth -= 1;
-            if !(bandwidth > OPUS_BANDWIDTH_NARROWBAND) {
+            if bandwidth <= OPUS_BANDWIDTH_NARROWBAND {
                 break;
             }
         }
@@ -1888,8 +1886,9 @@ pub fn opus_encode_native(
         hp_freq_smth1 = st.silk_enc.state_Fxx[0].sCmn.variable_HP_smth1_Q15;
     }
     st.variable_HP_smth2_Q15 = (st.variable_HP_smth2_Q15 as i64
-        + ((hp_freq_smth1 - st.variable_HP_smth2_Q15) as i64
-            * ((VARIABLE_HP_SMTH_COEF2 * ((1) << 16) as f32) as f64 + 0.5f64) as i32 as i16 as i64
+        + (((hp_freq_smth1 - st.variable_HP_smth2_Q15) as i64
+            * ((VARIABLE_HP_SMTH_COEF2 * ((1) << 16) as f32) as f64 + 0.5f64) as i32 as i16
+                as i64)
             >> 16)) as i32;
     cutoff_Hz = silk_log2lin(st.variable_HP_smth2_Q15 >> 8);
     {
@@ -1925,16 +1924,17 @@ pub fn opus_encode_native(
             let n = (frame_size * st.channels) as usize;
             sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n);
         }
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
         if !(sum < 1e9f32) || sum.is_nan() {
             {
                 let off = (total_buffer * st.channels) as usize;
                 let len = (frame_size * st.channels) as usize;
                 pcm_buf[off..off + len].fill(0.0);
             }
-            st.hp_mem[3 as usize] = 0 as opus_val32;
-            st.hp_mem[2 as usize] = st.hp_mem[3 as usize];
-            st.hp_mem[1 as usize] = st.hp_mem[2 as usize];
-            st.hp_mem[0 as usize] = st.hp_mem[1 as usize];
+            st.hp_mem[3_usize] = 0 as opus_val32;
+            st.hp_mem[2_usize] = st.hp_mem[3_usize];
+            st.hp_mem[1_usize] = st.hp_mem[2_usize];
+            st.hp_mem[0_usize] = st.hp_mem[1_usize];
         }
     }
     HB_gain = Q15ONE;
@@ -1995,7 +1995,7 @@ pub fn opus_encode_native(
                         -2.0f32
                     };
                     if mask > 0 as f32 {
-                        mask = 0.5f32 * mask;
+                        mask *= 0.5f32;
                     }
                     mask_sum += mask;
                     i += 1;
@@ -2269,35 +2269,35 @@ pub fn opus_encode_native(
                 16384 - 2048 * (32000 - equiv_rate) / (equiv_rate - 14000);
         }
     }
-    if st.energy_masking_len == 0 && st.channels == 2 {
-        if (st.hybrid_stereo_width_Q14 as i32) < (1) << 14
-            || st.silk_mode.stereoWidth_Q14 < (1) << 14
+    if st.energy_masking_len == 0
+        && st.channels == 2
+        && ((st.hybrid_stereo_width_Q14 as i32) < (1) << 14
+            || st.silk_mode.stereoWidth_Q14 < (1) << 14)
+    {
+        let mut g1: opus_val16 = 0.;
+        let mut g2: opus_val16 = 0.;
+        g1 = st.hybrid_stereo_width_Q14 as opus_val16;
+        g2 = st.silk_mode.stereoWidth_Q14 as opus_val16;
+        g1 *= 1.0f32 / 16384_f32;
+        g2 *= 1.0f32 / 16384_f32;
         {
-            let mut g1: opus_val16 = 0.;
-            let mut g2: opus_val16 = 0.;
-            g1 = st.hybrid_stereo_width_Q14 as opus_val16;
-            g2 = st.silk_mode.stereoWidth_Q14 as opus_val16;
-            g1 *= 1.0f32 / 16384 as f32;
-            g2 *= 1.0f32 / 16384 as f32;
-            {
-                let tmp: Vec<opus_val16> = pcm_buf.clone();
-                stereo_fade(
-                    &tmp,
-                    &mut pcm_buf,
-                    g1,
-                    g2,
-                    celt_mode.overlap as i32,
-                    frame_size,
-                    st.channels,
-                    celt_mode.window,
-                    st.Fs,
-                );
-            }
-            st.hybrid_stereo_width_Q14 = st.silk_mode.stereoWidth_Q14 as i16;
+            let tmp: Vec<opus_val16> = pcm_buf.clone();
+            stereo_fade(
+                &tmp,
+                &mut pcm_buf,
+                g1,
+                g2,
+                celt_mode.overlap as i32,
+                frame_size,
+                st.channels,
+                celt_mode.window,
+                st.Fs,
+            );
         }
+        st.hybrid_stereo_width_Q14 = st.silk_mode.stereoWidth_Q14 as i16;
     }
     if st.mode != MODE_CELT_ONLY
-        && ec_tell(&mut enc) + 17 + 20 * (st.mode == MODE_HYBRID) as i32 <= 8 * (max_data_bytes - 1)
+        && ec_tell(&enc) + 17 + 20 * (st.mode == MODE_HYBRID) as i32 <= 8 * (max_data_bytes - 1)
     {
         if st.mode == MODE_HYBRID {
             ec_enc_bit_logp(&mut enc, redundancy, 12);
@@ -2306,9 +2306,9 @@ pub fn opus_encode_native(
             let mut max_redundancy: i32 = 0;
             ec_enc_bit_logp(&mut enc, celt_to_silk, 1);
             if st.mode == MODE_HYBRID {
-                max_redundancy = max_data_bytes - 1 - (ec_tell(&mut enc) + 8 + 3 + 7 >> 3);
+                max_redundancy = max_data_bytes - 1 - ((ec_tell(&enc) + 8 + 3 + 7) >> 3);
             } else {
-                max_redundancy = max_data_bytes - 1 - (ec_tell(&mut enc) + 7 >> 3);
+                max_redundancy = max_data_bytes - 1 - ((ec_tell(&enc) + 7) >> 3);
             }
             redundancy_bytes = if max_redundancy < redundancy_bytes {
                 max_redundancy
@@ -2342,7 +2342,7 @@ pub fn opus_encode_native(
         start_band = 17;
     }
     if st.mode == MODE_SILK_ONLY {
-        ret = ec_tell(&mut enc) + 7 >> 3;
+        ret = (ec_tell(&enc) + 7) >> 3;
         ec_enc_done(&mut enc);
         nb_compr_bytes = ret;
     } else {
@@ -2404,7 +2404,7 @@ pub fn opus_encode_native(
             st.celt_enc.disable_pf = 1;
             st.celt_enc.force_intra = 1;
         }
-        if ec_tell(&mut enc) <= 8 * nb_compr_bytes {
+        if ec_tell(&enc) <= 8 * nb_compr_bytes {
             if redundancy != 0 && celt_to_silk != 0 && st.mode == MODE_HYBRID && st.use_vbr != 0 {
                 st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bitRate;
             }
@@ -2432,7 +2432,7 @@ pub fn opus_encode_native(
                         redundancy_bytes as usize,
                     );
                 }
-                nb_compr_bytes = nb_compr_bytes + redundancy_bytes;
+                nb_compr_bytes += redundancy_bytes;
             }
         }
     }
@@ -2525,7 +2525,7 @@ pub fn opus_encode_native(
     } else {
         st.nb_no_activity_frames = 0;
     }
-    if ec_tell(&mut enc) > (max_data_bytes - 1) * 8 {
+    if ec_tell(&enc) > (max_data_bytes - 1) * 8 {
         if max_data_bytes < 2 {
             return OPUS_BUFFER_TOO_SMALL;
         }
@@ -2547,7 +2547,7 @@ pub fn opus_encode_native(
         }
         ret = max_data_bytes;
     }
-    return ret;
+    ret
 }
 /// Upstream C: src/opus_encoder.c:opus_encode
 fn opus_encode(

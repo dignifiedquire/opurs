@@ -64,7 +64,7 @@ pub fn silk_control_encoder(
     psEnc.sCmn.PacketLoss_perc = encControl.packetLossPercentage;
     ret += silk_setup_LBRR(&mut psEnc.sCmn, encControl);
     psEnc.sCmn.controlled_since_last_payload = 1;
-    return ret;
+    ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_resamplers
 fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32 {
@@ -124,7 +124,7 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
         }
     }
     psEnc.sCmn.prev_API_fs_Hz = psEnc.sCmn.API_fs_Hz;
-    return ret;
+    ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_fs
 fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms: i32) -> i32 {
@@ -216,12 +216,12 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
         }
     }
     assert!(psEnc.sCmn.subfr_length * psEnc.sCmn.nb_subfr == psEnc.sCmn.frame_length);
-    return ret;
+    ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_complexity
 fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i32 {
     let ret: i32 = 0;
-    assert!(Complexity >= 0 && Complexity <= 10);
+    assert!((0..=10).contains(&Complexity));
     if Complexity < 1 {
         psEncC.pitchEstimationComplexity = SILK_PE_MIN_COMPLEX;
         psEncC.pitchEstimationThreshold_Q16 = (0.8f64 * ((1) << 16) as f64 + 0.5f64) as i32;
@@ -306,7 +306,7 @@ fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i3
     assert!(psEncC.warping_Q16 <= 32767);
     assert!(psEncC.la_shape <= 5 * 16);
     assert!(psEncC.shapeWinLength <= 15 * 16);
-    return ret;
+    ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_LBRR
 #[inline]
@@ -320,12 +320,12 @@ fn silk_setup_LBRR(psEncC: &mut silk_encoder_state, encControl: &silk_EncControl
             psEncC.LBRR_GainIncreases = 7;
         } else {
             psEncC.LBRR_GainIncreases = silk_max_int(
-                7 - (psEncC.PacketLoss_perc as i64
-                    * (0.4f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64
+                7 - ((psEncC.PacketLoss_perc as i64
+                    * (0.4f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64)
                     >> 16) as i32,
                 2,
             );
         }
     }
-    return ret;
+    ret
 }

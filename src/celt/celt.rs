@@ -2,6 +2,7 @@ use crate::celt::modes::OpusCustomMode;
 
 pub mod arch_h {
     pub type opus_val16 = f32;
+    #[allow(dead_code)]
     pub type opus_val32 = f32;
 }
 
@@ -21,9 +22,9 @@ pub const COMBFILTER_MAXPERIOD: i32 = 1024;
 pub const COMBFILTER_MINPERIOD: i32 = 15;
 
 const GAINS: [[opus_val16; 3]; 3] = [
-    [0.3066406250f32, 0.2170410156f32, 0.1296386719f32],
-    [0.4638671875f32, 0.2680664062f32, 0.0f32],
-    [0.7998046875f32, 0.1000976562f32, 0.0f32],
+    [0.306_640_63_f32, 0.217_041_02_f32, 0.129_638_67_f32],
+    [0.463_867_2_f32, 0.268_066_4_f32, 0.0f32],
+    [0.799_804_7_f32, 0.100_097_656_f32, 0.0f32],
 ];
 
 pub fn resampling_factor(rate: i32) -> i32 {
@@ -233,13 +234,12 @@ pub fn comb_filter_inplace(
 
 /// Upstream C: celt/celt.c:init_caps
 pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
-    for i in 0..m.nbEBands as usize {
+    #[allow(clippy::needless_range_loop)]
+    for i in 0..m.nbEBands {
         let N = (m.eBands[i + 1] as i32 - m.eBands[i] as i32) << LM;
-        cap[i] = (m.cache.caps[m.nbEBands as usize * (2 * LM as usize + C as usize - 1) + i]
-            as i32
-            + 64)
+        cap[i] = ((m.cache.caps[m.nbEBands * (2 * LM as usize + C as usize - 1) + i] as i32 + 64)
             * C
-            * N
+            * N)
             >> 2;
     }
 }
@@ -255,7 +255,7 @@ pub fn opus_strerror(error: i32) -> &'static str {
         "invalid state (-6)",
         "memory allocation failed (-7)",
     ];
-    if error > 0 || error < -7 {
+    if !(-7..=0).contains(&error) {
         "unknown error"
     } else {
         error_strings[-error as usize]

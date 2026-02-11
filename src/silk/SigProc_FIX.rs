@@ -13,12 +13,12 @@ pub fn silk_ROR32(a32: i32, rot: i32) -> i32 {
     let r: u32 = rot as u32;
     let m: u32 = -rot as u32;
     if rot == 0 {
-        return a32;
+        a32
     } else if rot < 0 {
-        return (x << m | x >> (32u32).wrapping_sub(m)) as i32;
+        (x << m | x >> (32u32).wrapping_sub(m)) as i32
     } else {
-        return (x << (32u32).wrapping_sub(r) | x >> r) as i32;
-    };
+        (x << (32u32).wrapping_sub(r) | x >> r) as i32
+    }
 }
 
 /// Upstream C: silk/SigProc_FIX.h:silk_SMULTT

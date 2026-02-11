@@ -62,5 +62,5 @@ pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_H
     }
     assert!(psDec.frame_length > 0 && psDec.frame_length <= 5 * 4 * 16);
 
-    return 0;
+    0
 }

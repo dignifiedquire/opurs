@@ -132,8 +132,8 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
     let mut best_num: [f32; 2] = [-1.0, -1.0];
     let mut best_den: [f32; 2] = [0.0, 0.0];
     let mut best_pitch: [i32; 2] = [0, 1];
-    for j in 0..len {
-        Syy += y[j] * y[j];
+    for yj in &y[..len] {
+        Syy += yj * yj;
     }
     for i in 0..max_pitch {
         if xcorr[i] > 0.0 {
@@ -174,8 +174,8 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
     let mut mem2: f32 = 0.0;
     let mut mem3: f32 = 0.0;
     let mut mem4: f32 = 0.0;
-    for i in 0..x.len() {
-        let mut sum = x[i];
+    for xi in x.iter_mut() {
+        let mut sum = *xi;
         sum += num0 * mem0;
         sum += num1 * mem1;
         sum += num2 * mem2;
@@ -185,8 +185,8 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
         mem3 = mem2;
         mem2 = mem1;
         mem1 = mem0;
-        mem0 = x[i];
-        x[i] = sum;
+        mem0 = *xi;
+        *xi = sum;
     }
 }
 
@@ -223,13 +223,14 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize) {
     _celt_autocorr(&x_lp[..half], &mut ac, None, 0, 4);
 
     ac[0] *= 1.0001f32;
+    #[allow(clippy::needless_range_loop)]
     for i in 1..=4 {
         ac[i] -= ac[i] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
     }
     _celt_lpc(&mut lpc, &ac);
-    for i in 0..4 {
-        tmp = 0.9f32 * tmp;
-        lpc[i] *= tmp;
+    for lpc_val in lpc.iter_mut() {
+        tmp *= 0.9f32;
+        *lpc_val *= tmp;
     }
     lpc2[0] = lpc[0] + 0.8f32;
     lpc2[1] = lpc[1] + c1 * lpc[0];
@@ -355,12 +356,12 @@ pub fn remove_doubling(
     prev_gain: f32,
 ) -> f32 {
     let mut T: i32;
-    let T0: i32;
+
     let mut g: f32;
-    let g0: f32;
+
     let mut pg: f32;
     let mut xy: f32;
-    let xx: f32;
+
     let mut yy: f32;
     let mut xcorr: [f32; 3] = [0.0; 3];
     let mut best_xy: f32;
@@ -377,7 +378,7 @@ pub fn remove_doubling(
     if *T0_ >= maxperiod {
         *T0_ = maxperiod - 1;
     }
-    T0 = *T0_;
+    let T0: i32 = *T0_;
     T = T0;
     let mut yy_lookup: Vec<f32> = vec![0.0; (maxperiod + 1) as usize];
     let (xx_val, xy_val) = dual_inner_prod(
@@ -386,7 +387,7 @@ pub fn remove_doubling(
         &x[x_off - T0 as usize..],
         N as usize,
     );
-    xx = xx_val;
+    let xx: f32 = xx_val;
     xy = xy_val;
     yy_lookup[0] = xx;
     yy = xx;
@@ -397,7 +398,7 @@ pub fn remove_doubling(
     yy = yy_lookup[T0 as usize];
     best_xy = xy;
     best_yy = yy;
-    g0 = compute_pitch_gain(xy, xx, yy);
+    let g0: f32 = compute_pitch_gain(xy, xx, yy);
     g = g0;
     for k in 2..=15 {
         let T1 = celt_udiv((2 * T0 + k) as u32, (2 * k) as u32) as i32;

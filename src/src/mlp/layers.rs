@@ -92,6 +92,7 @@ impl GRULayer {
         self.bias.len() / 3
     }
 
+    #[allow(clippy::type_complexity)]
     fn as_arrays(
         &self,
     ) -> (

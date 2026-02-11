@@ -73,8 +73,6 @@ pub fn silk_Decode(
     let mut MS_pred_Q13: [i32; 2] = [0, 0];
     let psDec = decState;
     let channel_state = &mut psDec.channel_state;
-    let has_side: i32;
-    let stereo_to_mono: i32;
 
     assert!(decControl.nChannelsInternal == 1 || decControl.nChannelsInternal == 2);
     if newPacketFlag != 0 {
@@ -87,18 +85,14 @@ pub fn silk_Decode(
     if decControl.nChannelsInternal > psDec.nChannelsInternal {
         channel_state[1] = silk_init_decoder();
     }
-    stereo_to_mono = (decControl.nChannelsInternal == 1
+    let stereo_to_mono: i32 = (decControl.nChannelsInternal == 1
         && psDec.nChannelsInternal == 2
         && decControl.internalSampleRate == 1000 * (channel_state[0]).fs_kHz)
         as i32;
     if (channel_state[0]).nFramesDecoded == 0 {
         n = 0;
         while n < decControl.nChannelsInternal {
-            let fs_kHz_dec: i32;
-            if decControl.payloadSize_ms == 0 {
-                channel_state[n as usize].nFramesPerPacket = 1;
-                channel_state[n as usize].nb_subfr = 2;
-            } else if decControl.payloadSize_ms == 10 {
+            if decControl.payloadSize_ms == 0 || decControl.payloadSize_ms == 10 {
                 channel_state[n as usize].nFramesPerPacket = 1;
                 channel_state[n as usize].nb_subfr = 2;
             } else if decControl.payloadSize_ms == 20 {
@@ -114,7 +108,7 @@ pub fn silk_Decode(
                 // see comments in `[unsafe_libopus::silk::check_control_input]`
                 panic!("libopus: assert(0) called");
             }
-            fs_kHz_dec = (decControl.internalSampleRate >> 10) + 1;
+            let fs_kHz_dec: i32 = (decControl.internalSampleRate >> 10) + 1;
             if fs_kHz_dec != 8 && fs_kHz_dec != 12 && fs_kHz_dec != 16 {
                 panic!("libopus: assert(0) called");
             }
@@ -180,18 +174,19 @@ pub fn silk_Decode(
                 while n < decControl.nChannelsInternal {
                     if channel_state[n as usize].LBRR_flags[i as usize] != 0 {
                         let mut pulses: [i16; 320] = [0; 320];
-                        let condCoding: i32;
                         if decControl.nChannelsInternal == 2 && n == 0 {
                             silk_stereo_decode_pred(psRangeDec, &mut MS_pred_Q13);
                             if channel_state[1].LBRR_flags[i as usize] == 0 {
                                 silk_stereo_decode_mid_only(psRangeDec, &mut decode_only_middle);
                             }
                         }
-                        if i > 0 && channel_state[n as usize].LBRR_flags[(i - 1) as usize] != 0 {
-                            condCoding = CODE_CONDITIONALLY;
+                        let condCoding: i32 = if i > 0
+                            && channel_state[n as usize].LBRR_flags[(i - 1) as usize] != 0
+                        {
+                            CODE_CONDITIONALLY
                         } else {
-                            condCoding = CODE_INDEPENDENTLY;
-                        }
+                            CODE_INDEPENDENTLY
+                        };
                         silk_decode_indices(
                             &mut channel_state[n as usize],
                             psRangeDec,
@@ -200,7 +195,7 @@ pub fn silk_Decode(
                             condCoding,
                         );
 
-                        let frame_length = channel_state[n as usize].frame_length as usize;
+                        let frame_length = channel_state[n as usize].frame_length;
                         let mut shell_frames = frame_length / SHELL_CODEC_FRAME_LENGTH;
                         if shell_frames * SHELL_CODEC_FRAME_LENGTH < frame_length {
                             assert_eq!(frame_length, 12 * 10);
@@ -244,10 +239,7 @@ pub fn silk_Decode(
             }
         }
     }
-    if decControl.nChannelsInternal == 2
-        && decode_only_middle == false
-        && psDec.prev_decode_only_middle == true
-    {
+    if decControl.nChannelsInternal == 2 && !decode_only_middle && psDec.prev_decode_only_middle {
         channel_state[1].outBuf.fill(0);
         channel_state[1].sLPC_Q14_buf.fill(0);
         channel_state[1].lagPrev = 100;
@@ -269,21 +261,20 @@ pub fn silk_Decode(
     let ch0_off: usize = 0;
     let ch1_off: usize = ch_buf_len;
 
-    if lostFlag == FLAG_DECODE_NORMAL {
-        has_side = (decode_only_middle == false) as i32;
+    let has_side: i32 = if lostFlag == FLAG_DECODE_NORMAL {
+        (!decode_only_middle) as i32
     } else {
-        has_side = (psDec.prev_decode_only_middle == false
+        (!psDec.prev_decode_only_middle
             || decControl.nChannelsInternal == 2
                 && lostFlag == FLAG_DECODE_LBRR
                 && channel_state[1].LBRR_flags[channel_state[1].nFramesDecoded as usize] == 1)
-            as i32;
-    }
+            as i32
+    };
     n = 0;
     while n < decControl.nChannelsInternal {
         if n == 0 || has_side != 0 {
-            let FrameIndex: i32;
             let condCoding_0: i32;
-            FrameIndex = channel_state[0].nFramesDecoded - n;
+            let FrameIndex: i32 = channel_state[0].nFramesDecoded - n;
             if FrameIndex <= 0 {
                 condCoding_0 = CODE_INDEPENDENTLY;
             } else if lostFlag == FLAG_DECODE_LBRR {
@@ -293,7 +284,7 @@ pub fn silk_Decode(
                     } else {
                         CODE_INDEPENDENTLY
                     };
-            } else if n > 0 && psDec.prev_decode_only_middle != false {
+            } else if n > 0 && psDec.prev_decode_only_middle {
                 condCoding_0 = CODE_INDEPENDENTLY_NO_LTP_SCALING;
             } else {
                 condCoding_0 = CODE_CONDITIONALLY;
@@ -400,7 +391,7 @@ pub fn silk_Decode(
         } else {
             i = 0;
             while i < *nSamplesOut {
-                samplesOut[(1 + 2 * i) as usize] = samplesOut[(0 + 2 * i) as usize];
+                samplesOut[(1 + 2 * i) as usize] = samplesOut[(2 * i) as usize];
                 i += 1;
             }
         }
@@ -409,7 +400,7 @@ pub fn silk_Decode(
     if channel_state[0].prevSignalType == TYPE_VOICED {
         let mult_tab: [i32; 3] = [6, 4, 3];
         decControl.prevPitchLag =
-            channel_state[0].lagPrev * mult_tab[(channel_state[0].fs_kHz - 8 >> 2) as usize];
+            channel_state[0].lagPrev * mult_tab[((channel_state[0].fs_kHz - 8) >> 2) as usize];
     } else {
         decControl.prevPitchLag = 0;
     }

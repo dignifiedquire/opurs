@@ -35,7 +35,7 @@ pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
         psSilk_VAD.NrgRatioSmth_Q8[b as usize] = 100 * 256;
         b += 1;
     }
-    return ret;
+    ret
 }
 static TILT_WEIGHTS: [i32; 4] = [30000, 6000, -(12000), -(12000)];
 /// Upstream C: silk/VAD.c:silk_VAD_GetSA_Q8_c
@@ -68,17 +68,17 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     decimated_framelength1 = psEncC.frame_length as i32 / 2;
     decimated_framelength2 = psEncC.frame_length as i32 / 4;
     decimated_framelength = psEncC.frame_length as i32 / 8;
-    X_offset[0 as usize] = 0;
-    X_offset[1 as usize] = decimated_framelength + decimated_framelength2;
-    X_offset[2 as usize] = X_offset[1 as usize] + decimated_framelength;
-    X_offset[3 as usize] = X_offset[2 as usize] + decimated_framelength2;
-    let vla = (X_offset[3 as usize] + decimated_framelength1) as usize;
+    X_offset[0_usize] = 0;
+    X_offset[1_usize] = decimated_framelength + decimated_framelength2;
+    X_offset[2_usize] = X_offset[1_usize] + decimated_framelength;
+    X_offset[3_usize] = X_offset[2_usize] + decimated_framelength2;
+    let vla = (X_offset[3_usize] + decimated_framelength1) as usize;
     let mut X: Vec<i16> = ::std::vec::from_elem(0, vla);
     // First call: pIn -> X[0..] and X[X_offset[3]..] — no aliasing with input
     {
         let (outL, rest) = X.split_at_mut(X_offset[3] as usize);
         silk_ana_filt_bank_1(
-            &pIn[..psEncC.frame_length as usize],
+            &pIn[..psEncC.frame_length],
             &mut psSilk_VAD.AnaState,
             outL,
             rest,
@@ -135,12 +135,12 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
             i = 0;
             while i < dec_subframe_length {
                 x_tmp = X[(X_offset[b as usize] + i + dec_subframe_offset) as usize] as i32 >> 3;
-                sumSquared = sumSquared + x_tmp as i16 as i32 * x_tmp as i16 as i32;
+                sumSquared += x_tmp as i16 as i32 * x_tmp as i16 as i32;
                 i += 1;
             }
             if s < VAD_INTERNAL_SUBFRAMES - 1 {
                 Xnrg[b as usize] = if (Xnrg[b as usize] as u32).wrapping_add(sumSquared as u32)
-                    & 0x80000000 as u32
+                    & 0x80000000_u32
                     != 0
                 {
                     silk_int32_MAX
@@ -150,7 +150,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
             } else {
                 Xnrg[b as usize] = if (Xnrg[b as usize] as u32)
                     .wrapping_add((sumSquared >> 1) as u32)
-                    & 0x80000000 as u32
+                    & 0x80000000_u32
                     != 0
                 {
                     silk_int32_MAX
@@ -171,7 +171,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     while b < VAD_N_BANDS {
         speech_nrg = Xnrg[b as usize] - psSilk_VAD.NL[b as usize];
         if speech_nrg > 0 {
-            if Xnrg[b as usize] as u32 & 0xff800000 as u32 == 0 {
+            if Xnrg[b as usize] as u32 & 0xff800000_u32 == 0 {
                 NrgToNoiseRatio_Q8[b as usize] =
                     ((Xnrg[b as usize] as u32) << 8) as i32 / (psSilk_VAD.NL[b as usize] + 1);
             } else {
@@ -179,58 +179,58 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
                     Xnrg[b as usize] / ((psSilk_VAD.NL[b as usize] >> 8) + 1);
             }
             SNR_Q7 = silk_lin2log(NrgToNoiseRatio_Q8[b as usize]) - 8 * 128;
-            sumSquared = sumSquared + SNR_Q7 as i16 as i32 * SNR_Q7 as i16 as i32;
+            sumSquared += SNR_Q7 as i16 as i32 * SNR_Q7 as i16 as i32;
             if speech_nrg < (1) << 20 {
-                SNR_Q7 = (((silk_SQRT_APPROX(speech_nrg) as u32) << 6) as i32 as i64
-                    * SNR_Q7 as i16 as i64
+                SNR_Q7 = ((((silk_SQRT_APPROX(speech_nrg) as u32) << 6) as i32 as i64
+                    * SNR_Q7 as i16 as i64)
                     >> 16) as i32;
             }
             input_tilt = (input_tilt as i64
-                + (TILT_WEIGHTS[b as usize] as i64 * SNR_Q7 as i16 as i64 >> 16))
+                + ((TILT_WEIGHTS[b as usize] as i64 * SNR_Q7 as i16 as i64) >> 16))
                 as i32;
         } else {
             NrgToNoiseRatio_Q8[b as usize] = 256;
         }
         b += 1;
     }
-    sumSquared = sumSquared / 4;
+    sumSquared /= 4;
     pSNR_dB_Q7 = (3 * silk_SQRT_APPROX(sumSquared)) as i16 as i32;
     SA_Q15 =
-        silk_sigm_Q15((45000 * pSNR_dB_Q7 as i16 as i64 >> 16) as i32 - VAD_NEGATIVE_OFFSET_Q5);
+        silk_sigm_Q15(((45000 * pSNR_dB_Q7 as i16 as i64) >> 16) as i32 - VAD_NEGATIVE_OFFSET_Q5);
     psEncC.input_tilt_Q15 = (((silk_sigm_Q15(input_tilt) - 16384) as u32) << 1) as i32;
     speech_nrg = 0;
     b = 0;
     while b < VAD_N_BANDS {
-        speech_nrg += (b + 1) * (Xnrg[b as usize] - psSilk_VAD.NL[b as usize] >> 4);
+        speech_nrg += (b + 1) * ((Xnrg[b as usize] - psSilk_VAD.NL[b as usize]) >> 4);
         b += 1;
     }
     if psEncC.frame_length as i32 == 20 * psEncC.fs_kHz {
-        speech_nrg = speech_nrg >> 1;
+        speech_nrg >>= 1;
     }
     if speech_nrg <= 0 {
-        SA_Q15 = SA_Q15 >> 1;
+        SA_Q15 >>= 1;
     } else if speech_nrg < 16384 {
         speech_nrg = ((speech_nrg as u32) << 16) as i32;
         speech_nrg = silk_SQRT_APPROX(speech_nrg);
-        SA_Q15 = ((32768 + speech_nrg) as i64 * SA_Q15 as i16 as i64 >> 16) as i32;
+        SA_Q15 = (((32768 + speech_nrg) as i64 * SA_Q15 as i16 as i64) >> 16) as i32;
     }
     psEncC.speech_activity_Q8 = silk_min_int(SA_Q15 >> 7, silk_uint8_MAX);
     smooth_coef_Q16 =
-        (4096 * (SA_Q15 as i64 * SA_Q15 as i16 as i64 >> 16) as i32 as i16 as i64 >> 16) as i32;
+        ((4096 * ((SA_Q15 as i64 * SA_Q15 as i16 as i64) >> 16) as i32 as i16 as i64) >> 16) as i32;
     if psEncC.frame_length as i32 == 10 * psEncC.fs_kHz {
         smooth_coef_Q16 >>= 1;
     }
     b = 0;
     while b < VAD_N_BANDS {
         psSilk_VAD.NrgRatioSmth_Q8[b as usize] = (psSilk_VAD.NrgRatioSmth_Q8[b as usize] as i64
-            + ((NrgToNoiseRatio_Q8[b as usize] - psSilk_VAD.NrgRatioSmth_Q8[b as usize]) as i64
-                * smooth_coef_Q16 as i16 as i64
+            + (((NrgToNoiseRatio_Q8[b as usize] - psSilk_VAD.NrgRatioSmth_Q8[b as usize]) as i64
+                * smooth_coef_Q16 as i16 as i64)
                 >> 16)) as i32;
         SNR_Q7 = 3 * (silk_lin2log(psSilk_VAD.NrgRatioSmth_Q8[b as usize]) - 8 * 128);
-        psEncC.input_quality_bands_Q15[b as usize] = silk_sigm_Q15(SNR_Q7 - 16 * 128 >> 4);
+        psEncC.input_quality_bands_Q15[b as usize] = silk_sigm_Q15((SNR_Q7 - 16 * 128) >> 4);
         b += 1;
     }
-    return ret;
+    ret
 }
 /// Upstream C: silk/VAD.c:silk_VAD_GetNoiseLevels
 #[inline]
@@ -251,7 +251,7 @@ fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
     while k < VAD_N_BANDS {
         nl = psSilk_VAD.NL[k as usize];
         nrg = if (pX[k as usize] as u32).wrapping_add(psSilk_VAD.NoiseLevelBias[k as usize] as u32)
-            & 0x80000000 as u32
+            & 0x80000000_u32
             != 0
         {
             silk_int32_MAX
@@ -264,12 +264,13 @@ fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
         } else if nrg < nl {
             coef = VAD_NOISE_LEVEL_SMOOTH_COEF_Q16;
         } else {
-            coef = ((inv_nrg as i64 * nl as i64 >> 16) as i32 as i64 * ((1024) << 1) as i16 as i64
+            coef = ((((inv_nrg as i64 * nl as i64) >> 16) as i32 as i64
+                * ((1024) << 1) as i16 as i64)
                 >> 16) as i32;
         }
         coef = silk_max_int(coef, min_coef);
         psSilk_VAD.inv_NL[k as usize] = (psSilk_VAD.inv_NL[k as usize] as i64
-            + ((inv_nrg - psSilk_VAD.inv_NL[k as usize]) as i64 * coef as i16 as i64 >> 16))
+            + (((inv_nrg - psSilk_VAD.inv_NL[k as usize]) as i64 * coef as i16 as i64) >> 16))
             as i32;
         nl = 0x7fffffff / psSilk_VAD.inv_NL[k as usize];
         nl = if nl < 0xffffff { nl } else { 0xffffff };

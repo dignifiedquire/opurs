@@ -22,8 +22,8 @@ pub fn silk_stereo_quant_pred(pred_Q13: &mut [i32], ix: &mut [[i8; 3]]) {
         i = 0;
         's_18: while i < STEREO_QUANT_TAB_SIZE - 1 {
             low_Q13 = silk_stereo_pred_quant_Q13[i as usize] as i32;
-            step_Q13 = ((silk_stereo_pred_quant_Q13[(i + 1) as usize] as i32 - low_Q13) as i64
-                * (0.5f64 / 5 as f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64
+            step_Q13 = (((silk_stereo_pred_quant_Q13[(i + 1) as usize] as i32 - low_Q13) as i64
+                * (0.5f64 / 5_f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16 as i64)
                 >> 16) as i32;
             j = 0;
             while j < STEREO_QUANT_SUB_STEPS {
@@ -33,20 +33,20 @@ pub fn silk_stereo_quant_pred(pred_Q13: &mut [i32], ix: &mut [[i8; 3]]) {
                 } else {
                     -(pred_Q13[n as usize] - lvl_Q13)
                 };
-                if !(err_Q13 < err_min_Q13) {
+                if err_Q13 >= err_min_Q13 {
                     break 's_18;
                 }
                 err_min_Q13 = err_Q13;
                 quant_pred_Q13 = lvl_Q13;
-                ix[n as usize][0 as usize] = i as i8;
-                ix[n as usize][1 as usize] = j as i8;
+                ix[n as usize][0_usize] = i as i8;
+                ix[n as usize][1_usize] = j as i8;
                 j += 1;
             }
             i += 1;
         }
-        ix[n as usize][2 as usize] = (ix[n as usize][0 as usize] as i32 / 3) as i8;
-        ix[n as usize][0 as usize] =
-            (ix[n as usize][0 as usize] as i32 - ix[n as usize][2 as usize] as i32 * 3) as i8;
+        ix[n as usize][2_usize] = (ix[n as usize][0_usize] as i32 / 3) as i8;
+        ix[n as usize][0_usize] =
+            (ix[n as usize][0_usize] as i32 - ix[n as usize][2_usize] as i32 * 3) as i8;
         pred_Q13[n as usize] = quant_pred_Q13;
         n += 1;
     }

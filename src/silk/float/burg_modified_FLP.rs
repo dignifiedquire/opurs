@@ -47,8 +47,8 @@ pub fn silk_burg_modified_FLP(
         s += 1;
     }
     C_last_row.copy_from_slice(&C_first_row);
-    CAf[0 as usize] = C0 + FIND_LPC_COND_FAC as f64 * C0 + 1e-9f32 as f64;
-    CAb[0 as usize] = CAf[0 as usize];
+    CAf[0_usize] = C0 + FIND_LPC_COND_FAC as f64 * C0 + 1e-9f32 as f64;
+    CAb[0_usize] = CAf[0_usize];
     invGain = 1.0f32 as f64;
     reached_max_gain = 0;
     n = 0;
@@ -90,8 +90,8 @@ pub fn silk_burg_modified_FLP(
         CAf[(n + 1) as usize] = tmp1;
         CAb[(n + 1) as usize] = tmp2;
         num = CAb[(n + 1) as usize];
-        nrg_b = CAb[0 as usize];
-        nrg_f = CAf[0 as usize];
+        nrg_b = CAb[0_usize];
+        nrg_f = CAf[0_usize];
         k = 0;
         while k < n {
             Atmp = Af[k as usize];
@@ -113,7 +113,7 @@ pub fn silk_burg_modified_FLP(
             invGain = tmp1;
         }
         k = 0;
-        while k < n + 1 >> 1 {
+        while k < (n + 1) >> 1 {
             tmp1 = Af[k as usize];
             tmp2 = Af[(n - k - 1) as usize];
             Af[k as usize] = tmp1 + rc * tmp2;
@@ -153,7 +153,7 @@ pub fn silk_burg_modified_FLP(
         }
         nrg_f = C0 * invGain;
     } else {
-        nrg_f = CAf[0 as usize];
+        nrg_f = CAf[0_usize];
         tmp1 = 1.0f64;
         k = 0;
         while k < D {
@@ -165,5 +165,5 @@ pub fn silk_burg_modified_FLP(
         }
         nrg_f -= FIND_LPC_COND_FAC as f64 * C0 * tmp1;
     }
-    return nrg_f as f32;
+    nrg_f as f32
 }

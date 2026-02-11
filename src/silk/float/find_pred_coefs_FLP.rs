@@ -37,12 +37,12 @@ pub fn silk_find_pred_coefs_FLP(
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         assert!(
             psEnc.sCmn.ltp_mem_length as i32 - psEnc.sCmn.predictLPCOrder
-                >= psEncCtrl.pitchL[0 as usize] + 5 / 2
+                >= psEncCtrl.pitchL[0_usize] + 5 / 2
         );
-        let nb_subfr = psEnc.sCmn.nb_subfr as usize;
-        let subfr_length = psEnc.sCmn.subfr_length as usize;
+        let nb_subfr = psEnc.sCmn.nb_subfr;
+        let subfr_length = psEnc.sCmn.subfr_length;
 
-        const LTP_ORDER: usize = crate::silk::define::LTP_ORDER as usize;
+        const LTP_ORDER: usize = crate::silk::define::LTP_ORDER;
 
         let mut XXLTP_mat = make_viewr_mut_generic(
             &mut XXLTP,
@@ -53,7 +53,7 @@ pub fn silk_find_pred_coefs_FLP(
         let mut xXLTP_mat =
             make_viewr_mut_generic(&mut xXLTP, Dyn(nb_subfr), Const::<{ LTP_ORDER }>);
 
-        let r_ptr = psEnc.sCmn.ltp_mem_length as usize;
+        let r_ptr = psEnc.sCmn.ltp_mem_length;
         // res_pitch is passed already offset to start at -ltp_mem_length
         let lag = VectorView::<i32, Dyn>::from_slice(&(&psEncCtrl.pitchL)[..nb_subfr], nb_subfr);
 
@@ -79,10 +79,10 @@ pub fn silk_find_pred_coefs_FLP(
         );
         silk_LTP_scale_ctrl_FLP(psEnc, psEncCtrl, condCoding);
         {
-            let ltp_mem = psEnc.sCmn.ltp_mem_length as usize;
+            let ltp_mem = psEnc.sCmn.ltp_mem_length;
             let pred_order = psEnc.sCmn.predictLPCOrder as usize;
-            let nb = psEnc.sCmn.nb_subfr as usize;
-            let subfr_len = psEnc.sCmn.subfr_length as usize;
+            let nb = psEnc.sCmn.nb_subfr;
+            let subfr_len = psEnc.sCmn.subfr_length;
             // x starts at -ltp_mem_length, total_len = ltp_mem + nb * subfr_len
             let x_offset = ltp_mem - pred_order;
             silk_LTP_analysis_filter_FLP(
@@ -98,9 +98,9 @@ pub fn silk_find_pred_coefs_FLP(
             );
         }
     } else {
-        let ltp_mem = psEnc.sCmn.ltp_mem_length as usize;
+        let ltp_mem = psEnc.sCmn.ltp_mem_length;
         let pred_order = psEnc.sCmn.predictLPCOrder as usize;
-        let subfr_len = psEnc.sCmn.subfr_length as usize;
+        let subfr_len = psEnc.sCmn.subfr_length;
         let copy_len = subfr_len + pred_order;
         // x starts at offset 0 of x_buf; frame data starts at ltp_mem.
         // Each subframe needs pred_order samples before it, so base = ltp_mem - pred_order.
@@ -117,7 +117,7 @@ pub fn silk_find_pred_coefs_FLP(
             );
             i += 1;
         }
-        (&mut psEncCtrl.LTPCoef)[..(psEnc.sCmn.nb_subfr as usize * 5)].fill(0.0);
+        (&mut psEncCtrl.LTPCoef)[..(psEnc.sCmn.nb_subfr * 5)].fill(0.0);
         psEncCtrl.LTPredCodGain = 0.0f32;
         psEnc.sCmn.sum_log_gain_Q7 = 0;
     }

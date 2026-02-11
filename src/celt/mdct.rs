@@ -45,7 +45,7 @@ mod ndutil {
     /// Split an evenly sized dimension into two interleaving views going in different directions
     ///
     /// For example, if the input view is `[a, b, c, d, e, f]`, the output views are `([a, c, e], [f, d, b])`.
-    pub fn split_interleaving_opposite_mut<'a, A, D>(
+    pub fn split_interleaving_opposite_mut<A, D>(
         mut array: ArrayViewMut<A, D>,
         axis: Axis,
     ) -> (ArrayViewMut<A, D>, ArrayViewMut<A, D>)
@@ -266,7 +266,7 @@ pub fn mdct_backward(
     assert_eq!(outmid.len(), n4);
     assert_eq!(trig_real.len(), n4);
     assert_eq!(trig_imag.len(), n4);
-    for i in 0..(n4 + 1) / 2 {
+    for i in 0..n4.div_ceil(2) {
         // NB: unlike the loops in ctl_mdct_forward_c, the yp0 and yp1 "pointers" are NOT disjoint because they are stepped only by 1
         // so yp0 and yp1 can alias, especially when N4 is odd
         let yp0 = i;

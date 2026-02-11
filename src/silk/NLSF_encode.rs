@@ -66,9 +66,9 @@ pub fn silk_NLSF_encode(
         while i < psNLSF_CB.order as i32 {
             NLSF_tmp_Q15[i as usize] = ((pCB_element[i as usize] as i16 as u16 as i32) << 7) as i16;
             W_tmp_Q9 = pCB_Wght_Q9[i as usize] as i32;
-            res_Q10[i as usize] = ((pNLSF_Q15[i as usize] as i32 - NLSF_tmp_Q15[i as usize] as i32)
+            res_Q10[i as usize] = (((pNLSF_Q15[i as usize] as i32 - NLSF_tmp_Q15[i as usize] as i32)
                 as i16 as i32
-                * W_tmp_Q9 as i16 as i32
+                * W_tmp_Q9 as i16 as i32)
                 >> 14) as i16;
             W_adj_Q5[i as usize] = silk_DIV32_varQ(
                 pW_Q2[i as usize] as i32,
@@ -117,5 +117,5 @@ pub fn silk_NLSF_encode(
         psNLSF_CB,
     );
     ret = RD_Q25[0];
-    return ret;
+    ret
 }

@@ -74,5 +74,5 @@ pub fn silk_control_audio_bandwidth(
             }
         }
     }
-    return fs_kHz;
+    fs_kHz
 }

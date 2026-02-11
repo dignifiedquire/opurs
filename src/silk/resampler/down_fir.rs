@@ -74,27 +74,27 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                 res_Q6 += ((buf_ptr[12] as i64 * interpol_ptr[5] as i64) >> 16) as i32;
                 res_Q6 += ((buf_ptr[11] as i64 * interpol_ptr[6] as i64) >> 16) as i32;
                 res_Q6 += ((buf_ptr[10] as i64 * interpol_ptr[7] as i64) >> 16) as i32;
-                res_Q6 += (buf_ptr[9] as i64 * interpol_ptr[8] as i64 >> 16) as i32;
+                res_Q6 += ((buf_ptr[9] as i64 * interpol_ptr[8] as i64) >> 16) as i32;
 
                 /* Scale down, saturate and store in output array */
                 out[0] = (if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) > silk_int16_MAX
                 {
                     silk_int16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) < silk_int16_MIN
                 {
                     silk_int16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) as i16;
                 out = &mut out[1..];
 
@@ -126,21 +126,21 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                 out[0] = (if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) > silk_int16_MAX
                 {
                     silk_int16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) < silk_int16_MIN
                 {
                     silk_int16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) as i16;
                 out = &mut out[1..];
 
@@ -184,21 +184,21 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                 out[0] = (if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) > silk_int16_MAX
                 {
                     silk_int16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) < silk_int16_MIN
                 {
                     silk_int16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
-                    (res_Q6 >> 6 - 1) + 1 >> 1
+                    ((res_Q6 >> (6 - 1)) + 1) >> 1
                 }) as i16;
                 out = &mut out[1..];
 

@@ -52,21 +52,21 @@ pub fn silk_resampler_private_up2_HQ(
         out[2 * k] = (if (if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) > silk_int16_MAX
         {
             silk_int16_MAX
         } else if (if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) < silk_int16_MIN
         {
             silk_int16_MIN
         } else if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) as i16;
 
         /* First all-pass section for odd output sample */
@@ -91,21 +91,21 @@ pub fn silk_resampler_private_up2_HQ(
         out[2 * k + 1] = (if (if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) > silk_int16_MAX
         {
             silk_int16_MAX
         } else if (if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) < silk_int16_MIN
         {
             silk_int16_MIN
         } else if 10 == 1 {
             (out32_1 >> 1) + (out32_1 & 1)
         } else {
-            (out32_1 >> 10 - 1) + 1 >> 1
+            ((out32_1 >> (10 - 1)) + 1) >> 1
         }) as i16;
     }
 }

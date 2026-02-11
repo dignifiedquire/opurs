@@ -112,13 +112,13 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32
     xy = 0.0;
     let mut pulsesLeft = K;
     if K > N >> 1 {
-        for j in 0..N as usize {
-            sum += X[j];
+        for xj in X[..N as usize].iter() {
+            sum += xj;
         }
         if !(sum > EPSILON && sum < 64.0) {
             X[0] = 1.0;
-            for j in 1..N as usize {
-                X[j] = 0.0;
+            for xj in X[1..N as usize].iter_mut() {
+                *xj = 0.0;
             }
             sum = 1.0;
         }
@@ -217,8 +217,8 @@ pub fn alg_unquant(
 pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
     let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize);
     let g = celt_rsqrt_norm(E) * gain;
-    for i in 0..N as usize {
-        X[i] = g * X[i];
+    for xi in X[..N as usize].iter_mut() {
+        *xi *= g;
     }
 }
 

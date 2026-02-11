@@ -338,7 +338,7 @@ pub fn icwrs(n: usize, y: &[i32]) -> u32 {
         if y[j] < 0 {
             i = i.wrapping_add(pvq_u(n as u32 - j as u32, k + 1));
         }
-        if !(j > 0) {
+        if j == 0 {
             break;
         }
     }
@@ -376,7 +376,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 loop {
                     k -= 1;
                     p = PVQ_U_DATA2[k as usize][n];
-                    if !(p > i) {
+                    if p <= i {
                         break;
                     }
                 }
@@ -388,10 +388,10 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 }
             }
             i = i.wrapping_sub(p);
-            val = (k0 - k + s ^ s) as i16;
+            val = ((k0 - k + s) ^ s) as i16;
             y[yi] = val as i32;
             yi += 1;
-            yy = yy + val as f32 * val as f32;
+            yy += val as f32 * val as f32;
         } else {
             p = PVQ_U_DATA2[k as usize][n];
             q = PVQ_U_DATA2[k as usize + 1][n];
@@ -406,15 +406,15 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 loop {
                     k -= 1;
                     p = PVQ_U_DATA2[k as usize][n];
-                    if !(p > i) {
+                    if p <= i {
                         break;
                     }
                 }
                 i = i.wrapping_sub(p);
-                val = (k0 - k + s ^ s) as i16;
+                val = ((k0 - k + s) ^ s) as i16;
                 y[yi] = val as i32;
                 yi += 1;
-                yy = yy + val as f32 * val as f32;
+                yy += val as f32 * val as f32;
             }
         }
         n -= 1;
@@ -427,14 +427,14 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
     if k != 0 {
         i = i.wrapping_sub((2 * k - 1) as u32);
     }
-    val = (k0 - k + s ^ s) as i16;
+    val = ((k0 - k + s) ^ s) as i16;
     y[yi] = val as i32;
     yi += 1;
-    yy = yy + val as f32 * val as f32;
+    yy += val as f32 * val as f32;
     s = -(i as i32);
-    val = (k + s ^ s) as i16;
+    val = ((k + s) ^ s) as i16;
     y[yi] = val as i32;
-    yy = yy + val as f32 * val as f32;
+    yy += val as f32 * val as f32;
     yy
 }
 

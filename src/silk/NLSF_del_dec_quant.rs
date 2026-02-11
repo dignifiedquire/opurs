@@ -47,7 +47,7 @@ pub fn silk_NLSF_del_dec_quant(
     let mut out0_Q10_table: [i32; 20] = [0; 20];
     let mut out1_Q10_table: [i32; 20] = [0; 20];
     i = -NLSF_QUANT_MAX_AMPLITUDE_EXT;
-    while i <= NLSF_QUANT_MAX_AMPLITUDE_EXT - 1 {
+    while i < NLSF_QUANT_MAX_AMPLITUDE_EXT {
         out0_Q10 = ((i as u32) << 10) as i32 as i16;
         out1_Q10 = (out0_Q10 as i32 + 1024) as i16;
         if i > 0 {
@@ -62,14 +62,14 @@ pub fn silk_NLSF_del_dec_quant(
             out1_Q10 = (out1_Q10 as i32 + (0.1f64 * ((1) << 10) as f64 + 0.5f64) as i32) as i16;
         }
         out0_Q10_table[(i + NLSF_QUANT_MAX_AMPLITUDE_EXT) as usize] =
-            out0_Q10 as i32 * quant_step_size_Q16 as i16 as i32 >> 16;
+            (out0_Q10 as i32 * quant_step_size_Q16 as i16 as i32) >> 16;
         out1_Q10_table[(i + NLSF_QUANT_MAX_AMPLITUDE_EXT) as usize] =
-            out1_Q10 as i32 * quant_step_size_Q16 as i16 as i32 >> 16;
+            (out1_Q10 as i32 * quant_step_size_Q16 as i16 as i32) >> 16;
         i += 1;
     }
     nStates = 1;
-    RD_Q25[0 as usize] = 0;
-    prev_out_Q10[0 as usize] = 0;
+    RD_Q25[0_usize] = 0;
+    prev_out_Q10[0_usize] = 0;
     i = order as i32 - 1;
     while i >= 0 {
         let rates_Q5 = &ec_rates_Q5[ec_ix[i as usize] as usize..];
@@ -77,9 +77,9 @@ pub fn silk_NLSF_del_dec_quant(
         j = 0;
         while j < nStates {
             pred_Q10 =
-                pred_coef_Q8[i as usize] as i16 as i32 * prev_out_Q10[j as usize] as i32 >> 8;
+                (pred_coef_Q8[i as usize] as i16 as i32 * prev_out_Q10[j as usize] as i32) >> 8;
             res_Q10 = in_Q10 - pred_Q10;
-            ind_tmp = inv_quant_step_size_Q6 as i32 * res_Q10 as i16 as i32 >> 16;
+            ind_tmp = (inv_quant_step_size_Q6 as i32 * res_Q10 as i16 as i32) >> 16;
             ind_tmp = if -(10) > 10 - 1 {
                 if ind_tmp > -(10) {
                     -(10)
@@ -115,7 +115,7 @@ pub fn silk_NLSF_del_dec_quant(
                     rate0_Q5 = 280;
                     rate1_Q5 = rates_Q5[(ind_tmp + 1 + NLSF_QUANT_MAX_AMPLITUDE) as usize] as i32;
                 } else {
-                    rate0_Q5 = 280 - 43 * 4 + -(43) as i16 as i32 * ind_tmp as i16 as i32;
+                    rate0_Q5 = 280 - 43 * 4 + -43_i16 as i32 * ind_tmp as i16 as i32;
                     rate1_Q5 = rate0_Q5 - 43;
                 }
             } else {
@@ -218,9 +218,9 @@ pub fn silk_NLSF_del_dec_quant(
     }
     j = 0;
     while j < order as i32 {
-        indices[j as usize] = ind[(ind_tmp & NLSF_QUANT_DEL_DEC_STATES - 1) as usize][j as usize];
+        indices[j as usize] = ind[(ind_tmp & (NLSF_QUANT_DEL_DEC_STATES - 1)) as usize][j as usize];
         j += 1;
     }
     indices[0] = (indices[0] as i32 + (ind_tmp >> 2)) as i8;
-    return min_Q25;
+    min_Q25
 }

@@ -3,7 +3,7 @@
 //!  - Moves NLSFs further apart if they are too close
 //!  - Moves NLSFs away from borders if they are too close
 //!  - High effort to achieve a modification with minimum
-//!      Euclidean distance to input vector
+//!    Euclidean distance to input vector
 //!  - Output are sorted NLSF coefficients
 //!
 
@@ -95,8 +95,8 @@ pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
             max_center_Q15 -= NDeltaMin_Q15[I] as i32 >> 1;
 
             /* Move apart, sorted by value, keeping the same center frequency */
-            let avg_Q15 = (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 >> 1)
-                + (NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32 & 1);
+            let avg_Q15 = ((NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32) >> 1)
+                + ((NLSF_Q15[I - 1] as i32 + NLSF_Q15[I] as i32) & 1);
             center_freq_Q15 = (if min_center_Q15 > max_center_Q15 {
                 avg_Q15.clamp(max_center_Q15, min_center_Q15)
             } else {
@@ -116,7 +116,7 @@ pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
         silk_insertion_sort_increasing_all_values_int16(NLSF_Q15);
 
         /* First NLSF should be no less than NDeltaMin[0] */
-        NLSF_Q15[0] = silk_max_int(NLSF_Q15[0] as i32, NDeltaMin_Q15[0 as usize] as i32) as i16;
+        NLSF_Q15[0] = silk_max_int(NLSF_Q15[0] as i32, NDeltaMin_Q15[0_usize] as i32) as i16;
 
         /* Keep delta_min distance between the NLSFs */
         i = 1;

@@ -92,5 +92,5 @@ pub fn check_control_input(encControl: &silk_EncControlStruct) -> i32 {
         panic!("libopus: assert(0) called");
         // return SILK_ENC_INVALID_COMPLEXITY_SETTING;
     }
-    return SILK_NO_ERROR;
+    SILK_NO_ERROR
 }

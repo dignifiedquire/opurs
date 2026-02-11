@@ -7,6 +7,8 @@ pub mod util;
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 #[allow(unused_assignments)]
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::module_inception)]
 mod celt {
     pub mod bands;
     pub mod celt;
@@ -34,6 +36,7 @@ mod celt {
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 #[allow(unused_assignments)]
+#[allow(clippy::too_many_arguments)]
 mod silk {
     pub mod A2NLSF;
     pub mod CNG;
@@ -149,6 +152,7 @@ mod silk {
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 #[allow(unused_assignments)]
+#[allow(clippy::too_many_arguments)]
 mod src {
     pub mod analysis;
     pub mod mlp;

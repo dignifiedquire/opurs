@@ -18,18 +18,18 @@ pub fn silk_HP_variable_cutoff(state_Fxx: &mut [silk_encoder_state_FLP]) {
     if psEncC1.prevSignalType as i32 == TYPE_VOICED {
         pitch_freq_Hz_Q16 = (((psEncC1.fs_kHz * 1000) as u32) << 16) as i32 / psEncC1.prevLag;
         pitch_freq_log_Q7 = silk_lin2log(pitch_freq_Hz_Q16) - ((16) << 7);
-        quality_Q15 = psEncC1.input_quality_bands_Q15[0 as usize];
+        quality_Q15 = psEncC1.input_quality_bands_Q15[0_usize];
         pitch_freq_log_Q7 = (pitch_freq_log_Q7 as i64
-            + ((((-quality_Q15 as u32) << 2) as i32 as i64 * quality_Q15 as i16 as i64 >> 16) as i32
-                as i64
+            + ((((((-quality_Q15 as u32) << 2) as i32 as i64 * quality_Q15 as i16 as i64) >> 16)
+                as i32 as i64
                 * (pitch_freq_log_Q7
                     - (silk_lin2log(
                         ((VARIABLE_HP_MIN_CUTOFF_HZ * ((1) << 16)) as f64 + 0.5f64) as i32,
-                    ) - ((16) << 7))) as i16 as i64
+                    ) - ((16) << 7))) as i16 as i64)
                 >> 16)) as i32;
         delta_freq_Q7 = pitch_freq_log_Q7 - (psEncC1.variable_HP_smth1_Q15 >> 8);
         if delta_freq_Q7 < 0 {
-            delta_freq_Q7 = delta_freq_Q7 * 3;
+            delta_freq_Q7 *= 3;
         }
         delta_freq_Q7 = if -(((VARIABLE_HP_MAX_DELTA_FREQ * ((1) << 7) as f32) as f64 + 0.5f64)
             as i32)
@@ -58,9 +58,9 @@ pub fn silk_HP_variable_cutoff(state_Fxx: &mut [silk_encoder_state_FLP]) {
             delta_freq_Q7
         };
         psEncC1.variable_HP_smth1_Q15 = (psEncC1.variable_HP_smth1_Q15 as i64
-            + ((psEncC1.speech_activity_Q8 as i16 as i32 * delta_freq_Q7 as i16 as i32) as i64
+            + (((psEncC1.speech_activity_Q8 as i16 as i32 * delta_freq_Q7 as i16 as i32) as i64
                 * ((VARIABLE_HP_SMTH_COEF1 * ((1) << 16) as f32) as f64 + 0.5f64) as i32 as i16
-                    as i64
+                    as i64)
                 >> 16)) as i32;
         psEncC1.variable_HP_smth1_Q15 = if ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8)
             as i32

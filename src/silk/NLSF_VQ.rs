@@ -29,7 +29,7 @@ pub fn silk_NLSF_VQ(
     let mut cb_Q8_ptr = pCB_Q8;
     let mut w_Q9_ptr = pWght_Q9;
 
-    for i in 0..K {
+    for err in err_Q24.iter_mut() {
         sum_error_Q24 = 0;
         pred_Q24 = 0;
 
@@ -43,7 +43,7 @@ pub fn silk_NLSF_VQ(
             sum_error_Q24 += (diffw_Q24 - (pred_Q24 >> 1)).abs();
             pred_Q24 = diffw_Q24;
         }
-        err_Q24[i] = sum_error_Q24;
+        *err = sum_error_Q24;
         cb_Q8_ptr = &cb_Q8_ptr[LPC_order..];
         w_Q9_ptr = &w_Q9_ptr[LPC_order..];
     }

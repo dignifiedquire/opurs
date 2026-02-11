@@ -19,14 +19,13 @@ pub fn silk_find_pitch_lags_FLP(
     x: &[f32],
     arch: i32,
 ) {
-    let mut buf_len: i32;
     let mut thrhld: f32;
-    let mut res_nrg: f32;
+
     let mut auto_corr: [f32; 17] = [0.; 17];
     let mut A: [f32; 16] = [0.; 16];
     let mut refl_coef: [f32; 16] = [0.; 16];
     let mut Wsig: [f32; 384] = [0.; 384];
-    buf_len =
+    let buf_len: i32 =
         psEnc.sCmn.la_pitch + psEnc.sCmn.frame_length as i32 + psEnc.sCmn.ltp_mem_length as i32;
     assert!(buf_len >= psEnc.sCmn.pitch_LPC_win_length);
     // x starts at offset 0, covers ltp_mem_length + frame_length + la_pitch = buf_len
@@ -56,13 +55,13 @@ pub fn silk_find_pitch_lags_FLP(
         &mut auto_corr[..(psEnc.sCmn.pitchEstimationLPCOrder + 1) as usize],
         &Wsig[..psEnc.sCmn.pitch_LPC_win_length as usize],
     );
-    auto_corr[0 as usize] += auto_corr[0 as usize] * FIND_PITCH_WHITE_NOISE_FRACTION + 1 as f32;
-    res_nrg = silk_schur_FLP(
+    auto_corr[0_usize] += auto_corr[0_usize] * FIND_PITCH_WHITE_NOISE_FRACTION + 1_f32;
+    let res_nrg: f32 = silk_schur_FLP(
         &mut refl_coef,
         &auto_corr,
         psEnc.sCmn.pitchEstimationLPCOrder,
     );
-    psEncCtrl.predGain = auto_corr[0 as usize] / (if res_nrg > 1.0f32 { res_nrg } else { 1.0f32 });
+    psEncCtrl.predGain = auto_corr[0_usize] / (if res_nrg > 1.0f32 { res_nrg } else { 1.0f32 });
     silk_k2a_FLP(&mut A, &refl_coef, psEnc.sCmn.pitchEstimationLPCOrder);
     silk_bwexpander_FLP(
         &mut A,

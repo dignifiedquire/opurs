@@ -28,10 +28,7 @@ pub fn silk_stereo_LR_to_MS(
     frame_length: i32,
 ) {
     let mut n: i32;
-    let mut is10msFrame: i32;
-    let mut denom_Q16: i32;
-    let mut delta0_Q13: i32;
-    let mut delta1_Q13: i32;
+
     let mut sum: i32;
     let mut diff: i32;
     let mut smooth_coef_Q16: i32;
@@ -41,11 +38,9 @@ pub fn silk_stereo_LR_to_MS(
     let mut LP_ratio_Q14: i32 = 0;
     let mut HP_ratio_Q14: i32 = 0;
     let mut frac_Q16: i32;
-    let mut frac_3_Q16: i32;
-    let mut min_mid_rate_bps: i32;
+
     let mut width_Q14: i32;
     let mut w_Q24: i32;
-    let mut deltaw_Q24: i32;
 
     // x1[0..frame_length+2] — mid is written in-place into x1
     // side is a separate buffer
@@ -84,11 +79,11 @@ pub fn silk_stereo_LR_to_MS(
     n = 0;
     while n < frame_length {
         // mid = x1
-        sum = (x1[n as usize] as i32
+        sum = (((x1[n as usize] as i32
             + x1[(n + 2) as usize] as i32
-            + ((x1[(n + 1) as usize] as u32) << 1) as i32
-            >> 2 - 1)
-            + 1
+            + ((x1[(n + 1) as usize] as u32) << 1) as i32)
+            >> (2 - 1))
+            + 1)
             >> 1;
         LP_mid[n as usize] = sum as i16;
         HP_mid[n as usize] = (x1[(n + 1) as usize] as i32 - sum) as i16;
@@ -100,26 +95,27 @@ pub fn silk_stereo_LR_to_MS(
     let mut HP_side: Vec<i16> = ::std::vec::from_elem(0, vla_3);
     n = 0;
     while n < frame_length {
-        sum = (side[n as usize] as i32
+        sum = (((side[n as usize] as i32
             + side[(n + 2) as usize] as i32
-            + ((side[(n + 1) as usize] as u32) << 1) as i32
-            >> 2 - 1)
-            + 1
+            + ((side[(n + 1) as usize] as u32) << 1) as i32)
+            >> (2 - 1))
+            + 1)
             >> 1;
         LP_side[n as usize] = sum as i16;
         HP_side[n as usize] = (side[(n + 1) as usize] as i32 - sum) as i16;
         n += 1;
     }
-    is10msFrame = (frame_length == 10 * fs_kHz) as i32;
+    let is10msFrame: i32 = (frame_length == 10 * fs_kHz) as i32;
     smooth_coef_Q16 = if is10msFrame != 0 {
-        (0.01f64 / 2 as f64 * ((1) << 16) as f64 + 0.5f64) as i32
+        (0.01f64 / 2_f64 * ((1) << 16) as f64 + 0.5f64) as i32
     } else {
         (0.01f64 * ((1) << 16) as f64 + 0.5f64) as i32
     };
-    smooth_coef_Q16 = ((prev_speech_act_Q8 as i16 as i32 * prev_speech_act_Q8 as i16 as i32) as i64
-        * smooth_coef_Q16 as i16 as i64
+    smooth_coef_Q16 = (((prev_speech_act_Q8 as i16 as i32 * prev_speech_act_Q8 as i16 as i32)
+        as i64
+        * smooth_coef_Q16 as i16 as i64)
         >> 16) as i32;
-    pred_Q13[0 as usize] = silk_stereo_find_predictor(
+    pred_Q13[0_usize] = silk_stereo_find_predictor(
         &mut LP_ratio_Q14,
         &LP_mid,
         &LP_side,
@@ -127,7 +123,7 @@ pub fn silk_stereo_LR_to_MS(
         frame_length,
         smooth_coef_Q16,
     );
-    pred_Q13[1 as usize] = silk_stereo_find_predictor(
+    pred_Q13[1_usize] = silk_stereo_find_predictor(
         &mut HP_ratio_Q14,
         &HP_mid,
         &HP_side,
@@ -136,17 +132,17 @@ pub fn silk_stereo_LR_to_MS(
         smooth_coef_Q16,
     );
     frac_Q16 = HP_ratio_Q14 + LP_ratio_Q14 as i16 as i32 * 3;
-    frac_Q16 = if frac_Q16 < ((1 * ((1) << 16)) as f64 + 0.5f64) as i32 {
+    frac_Q16 = if frac_Q16 < (((1) << 16) as f64 + 0.5f64) as i32 {
         frac_Q16
     } else {
-        ((1 * ((1) << 16)) as f64 + 0.5f64) as i32
+        (((1) << 16) as f64 + 0.5f64) as i32
     };
     total_rate_bps -= if is10msFrame != 0 { 1200 } else { 600 };
     if total_rate_bps < 1 {
         total_rate_bps = 1;
     }
-    min_mid_rate_bps = 2000 + fs_kHz as i16 as i32 * 600;
-    frac_3_Q16 = 3 * frac_Q16;
+    let min_mid_rate_bps: i32 = 2000 + fs_kHz as i16 as i32 * 600;
+    let frac_3_Q16: i32 = 3 * frac_Q16;
     mid_side_rates_bps[0] = silk_DIV32_varQ(
         total_rate_bps,
         (((8 + 5) as i64 * ((1) << 16)) as f64 + 0.5f64) as i32 + frac_3_Q16,
@@ -157,21 +153,21 @@ pub fn silk_stereo_LR_to_MS(
         mid_side_rates_bps[1] = total_rate_bps - mid_side_rates_bps[0];
         width_Q14 = silk_DIV32_varQ(
             ((mid_side_rates_bps[1] as u32) << 1) as i32 - min_mid_rate_bps,
-            ((((1 * ((1) << 16)) as f64 + 0.5f64) as i32 + frac_3_Q16) as i64
-                * min_mid_rate_bps as i16 as i64
+            ((((((1) << 16) as f64 + 0.5f64) as i32 + frac_3_Q16) as i64
+                * min_mid_rate_bps as i16 as i64)
                 >> 16) as i32,
             14 + 2,
         );
-        width_Q14 = if 0 > ((1 * ((1) << 14)) as f64 + 0.5f64) as i32 {
+        width_Q14 = if 0 > (((1) << 14) as f64 + 0.5f64) as i32 {
             if width_Q14 > 0 {
                 0
-            } else if width_Q14 < ((1 * ((1) << 14)) as f64 + 0.5f64) as i32 {
-                ((1 * ((1) << 14)) as f64 + 0.5f64) as i32
+            } else if width_Q14 < (((1) << 14) as f64 + 0.5f64) as i32 {
+                (((1) << 14) as f64 + 0.5f64) as i32
             } else {
                 width_Q14
             }
-        } else if width_Q14 > ((1 * ((1) << 14)) as f64 + 0.5f64) as i32 {
-            ((1 * ((1) << 14)) as f64 + 0.5f64) as i32
+        } else if width_Q14 > (((1) << 14) as f64 + 0.5f64) as i32 {
+            (((1) << 14) as f64 + 0.5f64) as i32
         } else if width_Q14 < 0 {
             0
         } else {
@@ -179,54 +175,48 @@ pub fn silk_stereo_LR_to_MS(
         };
     } else {
         mid_side_rates_bps[1] = total_rate_bps - mid_side_rates_bps[0];
-        width_Q14 = ((1 * ((1) << 14)) as f64 + 0.5f64) as i32;
+        width_Q14 = (((1) << 14) as f64 + 0.5f64) as i32;
     }
     state.smth_width_Q14 = (state.smth_width_Q14 as i64
-        + ((width_Q14 - state.smth_width_Q14 as i32) as i64 * smooth_coef_Q16 as i16 as i64 >> 16))
-        as i32 as i16;
+        + (((width_Q14 - state.smth_width_Q14 as i32) as i64 * smooth_coef_Q16 as i16 as i64)
+            >> 16)) as i32 as i16;
     state.mid_only_flags[frame_idx] = 0;
     if toMono != 0 {
         width_Q14 = 0;
-        pred_Q13[0 as usize] = 0;
-        pred_Q13[1 as usize] = 0;
+        pred_Q13[0_usize] = 0;
+        pred_Q13[1_usize] = 0;
         silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
     } else if state.width_prev_Q14 as i32 == 0
         && (8 * total_rate_bps < 13 * min_mid_rate_bps
-            || ((frac_Q16 as i64 * state.smth_width_Q14 as i64 >> 16) as i32)
+            || (((frac_Q16 as i64 * state.smth_width_Q14 as i64) >> 16) as i32)
                 < (0.05f64 * ((1) << 14) as f64 + 0.5f64) as i32)
     {
-        pred_Q13[0 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
-        pred_Q13[1 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
+        pred_Q13[0_usize] = (state.smth_width_Q14 as i32 * pred_Q13[0_usize] as i16 as i32) >> 14;
+        pred_Q13[1_usize] = (state.smth_width_Q14 as i32 * pred_Q13[1_usize] as i16 as i32) >> 14;
         silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = 0;
-        pred_Q13[0 as usize] = 0;
-        pred_Q13[1 as usize] = 0;
+        pred_Q13[0_usize] = 0;
+        pred_Q13[1_usize] = 0;
         mid_side_rates_bps[0] = total_rate_bps;
         mid_side_rates_bps[1] = 0;
         state.mid_only_flags[frame_idx] = 1;
     } else if state.width_prev_Q14 as i32 != 0
         && (8 * total_rate_bps < 11 * min_mid_rate_bps
-            || ((frac_Q16 as i64 * state.smth_width_Q14 as i64 >> 16) as i32)
+            || (((frac_Q16 as i64 * state.smth_width_Q14 as i64) >> 16) as i32)
                 < (0.02f64 * ((1) << 14) as f64 + 0.5f64) as i32)
     {
-        pred_Q13[0 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
-        pred_Q13[1 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
+        pred_Q13[0_usize] = (state.smth_width_Q14 as i32 * pred_Q13[0_usize] as i16 as i32) >> 14;
+        pred_Q13[1_usize] = (state.smth_width_Q14 as i32 * pred_Q13[1_usize] as i16 as i32) >> 14;
         silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = 0;
-        pred_Q13[0 as usize] = 0;
-        pred_Q13[1 as usize] = 0;
+        pred_Q13[0_usize] = 0;
+        pred_Q13[1_usize] = 0;
     } else if state.smth_width_Q14 as i32 > (0.95f64 * ((1) << 14) as f64 + 0.5f64) as i32 {
         silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
-        width_Q14 = ((1 * ((1) << 14)) as f64 + 0.5f64) as i32;
+        width_Q14 = (((1) << 14) as f64 + 0.5f64) as i32;
     } else {
-        pred_Q13[0 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[0 as usize] as i16 as i32 >> 14;
-        pred_Q13[1 as usize] =
-            state.smth_width_Q14 as i32 * pred_Q13[1 as usize] as i16 as i32 >> 14;
+        pred_Q13[0_usize] = (state.smth_width_Q14 as i32 * pred_Q13[0_usize] as i16 as i32) >> 14;
+        pred_Q13[1_usize] = (state.smth_width_Q14 as i32 * pred_Q13[1_usize] as i16 as i32) >> 14;
         silk_stereo_quant_pred(&mut pred_Q13, &mut state.predIx[frame_idx]);
         width_Q14 = state.smth_width_Q14 as i32;
     }
@@ -246,21 +236,24 @@ pub fn silk_stereo_LR_to_MS(
         mid_side_rates_bps[1] = 1;
         mid_side_rates_bps[0] = silk_max_int(1, total_rate_bps - mid_side_rates_bps[1]);
     }
-    pred0_Q13 = -(state.pred_prev_Q13[0 as usize] as i32);
-    pred1_Q13 = -(state.pred_prev_Q13[1 as usize] as i32);
+    pred0_Q13 = -(state.pred_prev_Q13[0_usize] as i32);
+    pred1_Q13 = -(state.pred_prev_Q13[1_usize] as i32);
     w_Q24 = ((state.width_prev_Q14 as u32) << 10) as i32;
-    denom_Q16 = ((1) << 16) / (8 * fs_kHz);
-    delta0_Q13 = -(((pred_Q13[0 as usize] - state.pred_prev_Q13[0 as usize] as i32) as i16 as i32
-        * denom_Q16 as i16 as i32
-        >> 16 - 1)
-        + 1
+    let denom_Q16: i32 = ((1) << 16) / (8 * fs_kHz);
+    let delta0_Q13: i32 = -(((((pred_Q13[0_usize] - state.pred_prev_Q13[0_usize] as i32) as i16
+        as i32
+        * denom_Q16 as i16 as i32)
+        >> (16 - 1))
+        + 1)
         >> 1);
-    delta1_Q13 = -(((pred_Q13[1 as usize] - state.pred_prev_Q13[1 as usize] as i32) as i16 as i32
-        * denom_Q16 as i16 as i32
-        >> 16 - 1)
-        + 1
+    let delta1_Q13: i32 = -(((((pred_Q13[1_usize] - state.pred_prev_Q13[1_usize] as i32) as i16
+        as i32
+        * denom_Q16 as i16 as i32)
+        >> (16 - 1))
+        + 1)
         >> 1);
-    deltaw_Q24 = ((((width_Q14 - state.width_prev_Q14 as i32) as i64 * denom_Q16 as i16 as i64
+    let deltaw_Q24: i32 = (((((width_Q14 - state.width_prev_Q14 as i32) as i64
+        * denom_Q16 as i16 as i64)
         >> 16) as i32 as u32)
         << 10) as i32;
 
@@ -275,11 +268,11 @@ pub fn silk_stereo_LR_to_MS(
             + x1[(n + 2) as usize] as i32
             + ((x1[(n + 1) as usize] as u32) << 1) as i32) as u32)
             << 9) as i32;
-        sum = ((w_Q24 as i64 * side[(n + 1) as usize] as i64 >> 16) as i32 as i64
-            + (sum as i64 * pred0_Q13 as i16 as i64 >> 16)) as i32;
+        sum = (((w_Q24 as i64 * side[(n + 1) as usize] as i64) >> 16) as i32 as i64
+            + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
         sum = (sum as i64
-            + (((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
-                * pred1_Q13 as i16 as i64
+            + ((((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
+                * pred1_Q13 as i16 as i64)
                 >> 16)) as i32;
         // x2 output is at offset n-1 relative to mid; but since our slices start 2 before frame,
         // x2[n-1] in the original code with mid=x1-2 corresponds to x2[n-1] here
@@ -307,11 +300,11 @@ pub fn silk_stereo_LR_to_MS(
         // x2 output index: in C, x2.offset(n-1) = inputBuf[2 + n - 1] = inputBuf[n+1]
         // In our version with x2 starting at inputBuf[0]: x2[n+1]
         x2[(n + 1) as usize] =
-            ((sum >> 8 - 1) + 1 >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         n += 1;
     }
-    pred0_Q13 = -pred_Q13[0 as usize];
-    pred1_Q13 = -pred_Q13[1 as usize];
+    pred0_Q13 = -pred_Q13[0_usize];
+    pred1_Q13 = -pred_Q13[1_usize];
     w_Q24 = ((width_Q14 as u32) << 10) as i32;
     n = STEREO_INTERP_LEN_MS as i32 * fs_kHz;
     while n < frame_length {
@@ -319,17 +312,17 @@ pub fn silk_stereo_LR_to_MS(
             + x1[(n + 2) as usize] as i32
             + ((x1[(n + 1) as usize] as u32) << 1) as i32) as u32)
             << 9) as i32;
-        sum = ((w_Q24 as i64 * side[(n + 1) as usize] as i64 >> 16) as i32 as i64
-            + (sum as i64 * pred0_Q13 as i16 as i64 >> 16)) as i32;
+        sum = (((w_Q24 as i64 * side[(n + 1) as usize] as i64) >> 16) as i32 as i64
+            + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
         sum = (sum as i64
-            + (((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
-                * pred1_Q13 as i16 as i64
+            + ((((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
+                * pred1_Q13 as i16 as i64)
                 >> 16)) as i32;
         x2[(n + 1) as usize] =
-            ((sum >> 8 - 1) + 1 >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
         n += 1;
     }
-    state.pred_prev_Q13[0 as usize] = pred_Q13[0 as usize] as i16;
-    state.pred_prev_Q13[1 as usize] = pred_Q13[1 as usize] as i16;
+    state.pred_prev_Q13[0_usize] = pred_Q13[0_usize] as i16;
+    state.pred_prev_Q13[1_usize] = pred_Q13[1_usize] as i16;
     state.width_prev_Q14 = width_Q14 as i16;
 }

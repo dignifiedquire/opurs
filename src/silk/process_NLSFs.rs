@@ -22,8 +22,8 @@ pub fn silk_process_NLSFs(
         psEncC.useInterpolatedNLSFs == 1 || psEncC.indices.NLSFInterpCoef_Q2 as i32 == (1) << 2
     );
     NLSF_mu_Q20 = ((0.003f64 * ((1) << 20) as f64 + 0.5f64) as i32 as i64
-        + ((-0.001f64 * ((1) << 28) as f64 + 0.5f64) as i32 as i64
-            * psEncC.speech_activity_Q8 as i16 as i64
+        + (((-0.001f64 * ((1) << 28) as f64 + 0.5f64) as i32 as i64
+            * psEncC.speech_activity_Q8 as i16 as i64)
             >> 16)) as i32;
     if psEncC.nb_subfr == 2 {
         NLSF_mu_Q20 = NLSF_mu_Q20 + (NLSF_mu_Q20 >> 1);
@@ -52,7 +52,7 @@ pub fn silk_process_NLSFs(
         i = 0;
         while i < psEncC.predictLPCOrder {
             pNLSFW_QW[i as usize] = ((pNLSFW_QW[i as usize] as i32 >> 1)
-                + (pNLSFW0_temp_QW[i as usize] as i32 * i_sqr_Q15 as i32 >> 16))
+                + ((pNLSFW0_temp_QW[i as usize] as i32 * i_sqr_Q15 as i32) >> 16))
                 as i16;
             i += 1;
         }

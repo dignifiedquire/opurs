@@ -7,17 +7,17 @@ pub fn silk_sigm_Q15(mut in_Q5: i32) -> i32 {
     if in_Q5 < 0 {
         in_Q5 = -in_Q5;
         if in_Q5 >= 6 * 32 {
-            return 0;
+            0
         } else {
             ind = in_Q5 >> 5;
-            return sigm_LUT_neg_Q15[ind as usize]
-                - sigm_LUT_slope_Q10[ind as usize] as i16 as i32 * (in_Q5 & 0x1f) as i16 as i32;
+            sigm_LUT_neg_Q15[ind as usize]
+                - sigm_LUT_slope_Q10[ind as usize] as i16 as i32 * (in_Q5 & 0x1f) as i16 as i32
         }
     } else if in_Q5 >= 6 * 32 {
-        return 32767;
+        32767
     } else {
         ind = in_Q5 >> 5;
-        return sigm_LUT_pos_Q15[ind as usize]
-            + sigm_LUT_slope_Q10[ind as usize] as i16 as i32 * (in_Q5 & 0x1f) as i16 as i32;
-    };
+        sigm_LUT_pos_Q15[ind as usize]
+            + sigm_LUT_slope_Q10[ind as usize] as i16 as i32 * (in_Q5 & 0x1f) as i16 as i32
+    }
 }

@@ -370,10 +370,8 @@ pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> i32 {
     }
     if len == new_len {
         return OPUS_OK;
-    } else {
-        if len > new_len {
-            return OPUS_BAD_ARG;
-        }
+    } else if len > new_len {
+        return OPUS_BAD_ARG;
     }
     // Moving payload to the end of the packet so we can do in-place padding
     let offset = (new_len - len) as usize;

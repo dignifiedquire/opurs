@@ -26,14 +26,14 @@ pub fn silk_warped_autocorrelation_FLP(
         while i < order {
             tmp2 = state[i as usize] + warping as f64 * (state[(i + 1) as usize] - tmp1);
             state[i as usize] = tmp1;
-            C[i as usize] += state[0 as usize] * tmp1;
+            C[i as usize] += state[0_usize] * tmp1;
             tmp1 = state[(i + 1) as usize] + warping as f64 * (state[(i + 2) as usize] - tmp2);
             state[(i + 1) as usize] = tmp2;
-            C[(i + 1) as usize] += state[0 as usize] * tmp2;
+            C[(i + 1) as usize] += state[0_usize] * tmp2;
             i += 2;
         }
         state[order as usize] = tmp1;
-        C[order as usize] += state[0 as usize] * tmp1;
+        C[order as usize] += state[0_usize] * tmp1;
         n += 1;
     }
     i = 0;

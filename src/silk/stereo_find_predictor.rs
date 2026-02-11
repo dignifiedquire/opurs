@@ -25,8 +25,8 @@ pub fn silk_stereo_find_predictor(
     silk_sum_sqr_shift(&mut nrgy, &mut scale2, &y[..length as usize]);
     scale = silk_max_int(scale1, scale2);
     scale = scale + (scale & 1);
-    nrgy = nrgy >> scale - scale2;
-    nrgx = nrgx >> scale - scale1;
+    nrgy >>= scale - scale2;
+    nrgx >>= scale - scale1;
     nrgx = silk_max_int(nrgx, 1);
     corr =
         silk_inner_prod_aligned_scale(&x[..length as usize], &y[..length as usize], scale, length);
@@ -46,21 +46,21 @@ pub fn silk_stereo_find_predictor(
     } else {
         pred_Q13
     };
-    pred2_Q10 = (pred_Q13 as i64 * pred_Q13 as i16 as i64 >> 16) as i32;
+    pred2_Q10 = ((pred_Q13 as i64 * pred_Q13 as i16 as i64) >> 16) as i32;
     smooth_coef_Q16 = silk_max_int(
         smooth_coef_Q16,
         if pred2_Q10 > 0 { pred2_Q10 } else { -pred2_Q10 },
     );
-    scale = scale >> 1;
+    scale >>= 1;
     mid_res_amp_Q0[0] = (mid_res_amp_Q0[0] as i64
-        + ((((silk_SQRT_APPROX(nrgx) as u32) << scale) as i32 - mid_res_amp_Q0[0]) as i64
-            * smooth_coef_Q16 as i16 as i64
+        + (((((silk_SQRT_APPROX(nrgx) as u32) << scale) as i32 - mid_res_amp_Q0[0]) as i64
+            * smooth_coef_Q16 as i16 as i64)
             >> 16)) as i32;
-    nrgy = nrgy - (((corr as i64 * pred_Q13 as i16 as i64 >> 16) as i32 as u32) << 3 + 1) as i32;
-    nrgy = nrgy + (((nrgx as i64 * pred2_Q10 as i16 as i64 >> 16) as i32 as u32) << 6) as i32;
+    nrgy -= ((((corr as i64 * pred_Q13 as i16 as i64) >> 16) as i32 as u32) << (3 + 1)) as i32;
+    nrgy += ((((nrgx as i64 * pred2_Q10 as i16 as i64) >> 16) as i32 as u32) << 6) as i32;
     mid_res_amp_Q0[1] = (mid_res_amp_Q0[1] as i64
-        + ((((silk_SQRT_APPROX(nrgy) as u32) << scale) as i32 - mid_res_amp_Q0[1]) as i64
-            * smooth_coef_Q16 as i16 as i64
+        + (((((silk_SQRT_APPROX(nrgy) as u32) << scale) as i32 - mid_res_amp_Q0[1]) as i64
+            * smooth_coef_Q16 as i16 as i64)
             >> 16)) as i32;
     *ratio_Q14 = silk_DIV32_varQ(
         mid_res_amp_Q0[1],
@@ -71,20 +71,6 @@ pub fn silk_stereo_find_predictor(
         },
         14,
     );
-    *ratio_Q14 = if 0 > 32767 {
-        if *ratio_Q14 > 0 {
-            0
-        } else if *ratio_Q14 < 32767 {
-            32767
-        } else {
-            *ratio_Q14
-        }
-    } else if *ratio_Q14 > 32767 {
-        32767
-    } else if *ratio_Q14 < 0 {
-        0
-    } else {
-        *ratio_Q14
-    };
-    return pred_Q13;
+    *ratio_Q14 = (*ratio_Q14).clamp(0, 32767);
+    pred_Q13
 }

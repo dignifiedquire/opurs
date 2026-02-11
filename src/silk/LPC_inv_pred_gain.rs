@@ -55,7 +55,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
 
         /* Update AR coefficient */
         let mut n = 0;
-        while n < (k + 1) / 2 {
+        while n < k.div_ceil(2) {
             let tmp1 = A_QA[n];
             let tmp2 = A_QA[k - n - 1];
             let tmp64 = silk_RSHIFT_ROUND64(
@@ -130,5 +130,5 @@ pub fn silk_LPC_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
     if DC_resp >= 4096 {
         return 0;
     }
-    return LPC_inverse_pred_gain_QA_c(Atmp_QA);
+    LPC_inverse_pred_gain_QA_c(Atmp_QA)
 }

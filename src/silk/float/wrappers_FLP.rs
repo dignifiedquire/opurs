@@ -77,10 +77,9 @@ pub fn silk_NSQ_wrapper_FLP(
     let mut Gains_Q16: [i32; 4] = [0; 4];
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
     let mut LTPCoef_Q14: [i16; 20] = [0; 20];
-    let mut LTP_scale_Q14: i32;
     let mut AR_Q13: [i16; 96] = [0; 96];
     let mut LF_shp_Q14: [i32; 4] = [0; 4];
-    let mut Lambda_Q10: i32;
+
     let mut Tilt_Q14: [i32; 4] = [0; 4];
     let mut HarmShapeGain_Q14: [i32; 4] = [0; 4];
     i = 0;
@@ -104,7 +103,7 @@ pub fn silk_NSQ_wrapper_FLP(
             silk_float2int(psEncCtrl.HarmShapeGain[i as usize] * 16384.0f32);
         i += 1;
     }
-    Lambda_Q10 = silk_float2int(psEncCtrl.Lambda * 1024.0f32);
+    let Lambda_Q10: i32 = silk_float2int(psEncCtrl.Lambda * 1024.0f32);
     i = 0;
     while i < psEncC.nb_subfr as i32 * LTP_ORDER as i32 {
         LTPCoef_Q14[i as usize] = silk_float2int(psEncCtrl.LTPCoef[i as usize] * 16384.0f32) as i16;
@@ -125,11 +124,11 @@ pub fn silk_NSQ_wrapper_FLP(
         Gains_Q16[i as usize] = silk_float2int(psEncCtrl.Gains[i as usize] * 65536.0f32);
         i += 1;
     }
-    if psIndices.signalType as i32 == TYPE_VOICED {
-        LTP_scale_Q14 = silk_LTPScales_table_Q14[psIndices.LTP_scaleIndex as usize] as i32;
+    let LTP_scale_Q14: i32 = if psIndices.signalType as i32 == TYPE_VOICED {
+        silk_LTPScales_table_Q14[psIndices.LTP_scaleIndex as usize] as i32
     } else {
-        LTP_scale_Q14 = 0;
-    }
+        0
+    };
     let frame_length = psEncC.frame_length;
     i = 0;
     while i < frame_length as i32 {

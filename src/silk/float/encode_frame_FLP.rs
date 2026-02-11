@@ -171,7 +171,7 @@ pub fn silk_encode_frame_FLP(
         {
             let psEnc = &mut *psEnc;
             let ltp_mem = psEnc.sCmn.ltp_mem_length;
-            let frame_len = psEnc.sCmn.frame_length as usize;
+            let frame_len = psEnc.sCmn.frame_length;
             let la_pitch = psEnc.sCmn.la_pitch as usize;
             let buf_len = la_pitch + frame_len + ltp_mem;
             silk_find_pitch_lags_FLP(
@@ -187,8 +187,8 @@ pub fn silk_encode_frame_FLP(
             let ltp_mem = psEnc.sCmn.ltp_mem_length;
             let la_shape = (LA_SHAPE_MS * psEnc.sCmn.fs_kHz) as usize;
             let x_start = ltp_mem - la_shape;
-            let nb_subfr = psEnc.sCmn.nb_subfr as usize;
-            let subfr_len = psEnc.sCmn.subfr_length as usize;
+            let nb_subfr = psEnc.sCmn.nb_subfr;
+            let subfr_len = psEnc.sCmn.subfr_length;
             // x range: from x_start, the function reads shapeWinLength per subframe,
             // advancing by subfr_length each iteration
             let x_len = (nb_subfr - 1) * subfr_len + psEnc.sCmn.shapeWinLength as usize;
@@ -202,8 +202,8 @@ pub fn silk_encode_frame_FLP(
         {
             let psEnc = &mut *psEnc;
             let ltp_mem = psEnc.sCmn.ltp_mem_length;
-            let nb_subfr = psEnc.sCmn.nb_subfr as usize;
-            let subfr_len = psEnc.sCmn.subfr_length as usize;
+            let nb_subfr = psEnc.sCmn.nb_subfr;
+            let subfr_len = psEnc.sCmn.subfr_length;
             let res_total = ltp_mem + nb_subfr * subfr_len + crate::silk::define::LTP_ORDER;
             let x_total = ltp_mem + nb_subfr * subfr_len;
             silk_find_pred_coefs_FLP(
@@ -217,11 +217,10 @@ pub fn silk_encode_frame_FLP(
         silk_process_gains_FLP(&mut *psEnc, &mut sEncCtrl, condCoding);
         silk_LBRR_encode_FLP(psEnc, &mut sEncCtrl, x_frame_off, condCoding);
         maxIter = 6;
-        gainMult_Q8 = ((1 * ((1) << 8)) as f64 + 0.5f64) as i32 as i16;
+        gainMult_Q8 = (((1) << 8) as f64 + 0.5f64) as i32 as i16;
         found_lower = 0;
         found_upper = 0;
-        gainsID =
-            silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr as usize]);
+        gainsID = silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
         gainsID_lower = -1;
         gainsID_upper = -1;
         sRangeEnc_copy = psRangeEnc.save();
@@ -244,7 +243,7 @@ pub fn silk_encode_frame_FLP(
                     psEnc.sCmn.ec_prevSignalType = ec_prevSignalType_copy;
                 }
                 {
-                    let total_len = psEnc.sCmn.nb_subfr as usize * psEnc.sCmn.subfr_length;
+                    let total_len = psEnc.sCmn.nb_subfr * psEnc.sCmn.subfr_length;
                     let frame_len = psEnc.sCmn.frame_length;
                     let cfg = psEnc.sCmn.nsq_config();
                     silk_NSQ_wrapper_FLP(
@@ -268,7 +267,7 @@ pub fn silk_encode_frame_FLP(
                     psEnc.sCmn.indices.signalType as i32,
                     psEnc.sCmn.indices.quantOffsetType as i32,
                     &mut psEnc.sCmn.pulses,
-                    psEnc.sCmn.frame_length as usize,
+                    psEnc.sCmn.frame_length,
                 );
                 nBits = ec_tell(psRangeEnc);
                 if iter == maxIter && found_lower == 0 && nBits > maxBits {
@@ -280,7 +279,7 @@ pub fn silk_encode_frame_FLP(
                         i += 1;
                     }
                     if condCoding != CODE_CONDITIONALLY {
-                        psEnc.sCmn.indices.GainsIndices[0 as usize] = sEncCtrl.lastGainIndexPrev;
+                        psEnc.sCmn.indices.GainsIndices[0_usize] = sEncCtrl.lastGainIndexPrev;
                     }
                     psEnc.sCmn.ec_prevLagIndex = ec_prevLagIndex_copy;
                     psEnc.sCmn.ec_prevSignalType = ec_prevSignalType_copy;
@@ -304,7 +303,7 @@ pub fn silk_encode_frame_FLP(
                         psEnc.sCmn.indices.signalType as i32,
                         psEnc.sCmn.indices.quantOffsetType as i32,
                         &mut psEnc.sCmn.pulses,
-                        psEnc.sCmn.frame_length as usize,
+                        psEnc.sCmn.frame_length,
                     );
                     nBits = ec_tell(psRangeEnc);
                 }
@@ -340,7 +339,7 @@ pub fn silk_encode_frame_FLP(
                         gainsID_upper = gainsID;
                     }
                 } else {
-                    if !(nBits < maxBits - 5) {
+                    if nBits >= maxBits - 5 {
                         break;
                     }
                     found_lower = 1;
@@ -390,21 +389,22 @@ pub fn silk_encode_frame_FLP(
                                 + ((16 * ((1) << 7)) as f64 + 0.5f64) as i32,
                         );
                         gainMult_Q8 =
-                            (gain_factor_Q16 as i64 * gainMult_Q8 as i64 >> 16) as i32 as i16;
+                            ((gain_factor_Q16 as i64 * gainMult_Q8 as i64) >> 16) as i32 as i16;
                     }
                 } else {
                     gainMult_Q8 = (gainMult_lower
                         + (gainMult_upper - gainMult_lower) * (maxBits - nBits_lower)
                             / (nBits_upper - nBits_lower)) as i16;
-                    if gainMult_Q8 as i32 > gainMult_lower + (gainMult_upper - gainMult_lower >> 2)
+                    if gainMult_Q8 as i32
+                        > gainMult_lower + ((gainMult_upper - gainMult_lower) >> 2)
                     {
                         gainMult_Q8 =
-                            (gainMult_lower + (gainMult_upper - gainMult_lower >> 2)) as i16;
+                            (gainMult_lower + ((gainMult_upper - gainMult_lower) >> 2)) as i16;
                     } else if (gainMult_Q8 as i32)
-                        < gainMult_upper - (gainMult_upper - gainMult_lower >> 2)
+                        < gainMult_upper - ((gainMult_upper - gainMult_lower) >> 2)
                     {
                         gainMult_Q8 =
-                            (gainMult_upper - (gainMult_upper - gainMult_lower >> 2)) as i16;
+                            (gainMult_upper - ((gainMult_upper - gainMult_lower) >> 2)) as i16;
                     }
                 }
                 i = 0;
@@ -415,50 +415,42 @@ pub fn silk_encode_frame_FLP(
                     } else {
                         tmp = gainMult_Q8;
                     }
-                    pGains_Q16[i as usize] = (((if 0x80000000 as u32 as i32 >> 8 > 0x7fffffff >> 8 {
-                        if (sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16) as i32
-                            > 0x80000000 as u32 as i32 >> 8
+                    pGains_Q16[i as usize] = (((if 0x80000000_u32 as i32 >> 8 > 0x7fffffff >> 8 {
+                        if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
+                            > 0x80000000_u32 as i32 >> 8
                         {
-                            0x80000000 as u32 as i32 >> 8
-                        } else {
-                            if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16)
-                                as i32)
-                                < 0x7fffffff >> 8
-                            {
-                                0x7fffffff >> 8
-                            } else {
-                                (sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16) as i32
-                            }
-                        }
-                    } else {
-                        if (sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16) as i32
-                            > 0x7fffffff >> 8
+                            0x80000000_u32 as i32 >> 8
+                        } else if (((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16)
+                            as i32)
+                            < 0x7fffffff >> 8
                         {
                             0x7fffffff >> 8
                         } else {
-                            if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16)
-                                as i32)
-                                < 0x80000000 as u32 as i32 >> 8
-                            {
-                                0x80000000 as u32 as i32 >> 8
-                            } else {
-                                (sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64 >> 16) as i32
-                            }
+                            ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
                         }
+                    } else if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
+                        > 0x7fffffff >> 8
+                    {
+                        0x7fffffff >> 8
+                    } else if (((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16)
+                        as i32)
+                        < 0x80000000_u32 as i32 >> 8
+                    {
+                        0x80000000_u32 as i32 >> 8
+                    } else {
+                        ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
                     }) as u32)
                         << 8) as i32;
                     i += 1;
                 }
                 psEnc.sShape.LastGainIndex = sEncCtrl.lastGainIndexPrev;
                 silk_gains_quant(
-                    &mut (&mut psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr as usize],
-                    &mut pGains_Q16[..psEnc.sCmn.nb_subfr as usize],
+                    &mut (&mut psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr],
+                    &mut pGains_Q16[..psEnc.sCmn.nb_subfr],
                     &mut psEnc.sShape.LastGainIndex,
                     condCoding == CODE_CONDITIONALLY,
                 );
-                gainsID = silk_gains_ID(
-                    &(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr as usize],
-                );
+                gainsID = silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
                 i = 0;
                 while i < psEnc.sCmn.nb_subfr as i32 {
                     sEncCtrl.Gains[i as usize] = pGains_Q16[i as usize] as f32 / 65536.0f32;
@@ -478,7 +470,7 @@ pub fn silk_encode_frame_FLP(
         *pnBytesOut = 0;
         return ret;
     }
-    psEnc.sCmn.prevLag = sEncCtrl.pitchL[(psEnc.sCmn.nb_subfr - 1) as usize];
+    psEnc.sCmn.prevLag = sEncCtrl.pitchL[psEnc.sCmn.nb_subfr - 1];
     psEnc.sCmn.prevSignalType = psEnc.sCmn.indices.signalType;
     psEnc.sCmn.first_frame_after_reset = 0;
     *pnBytesOut = (ec_tell(psRangeEnc.unwrap()) + 7) >> 3;
@@ -495,7 +487,7 @@ fn silk_LBRR_encode_FLP(
 ) {
     let mut k: i32;
     let mut Gains_Q16: [i32; 4] = [0; 4];
-    let nb_subfr = psEnc.sCmn.nb_subfr as usize;
+    let nb_subfr = psEnc.sCmn.nb_subfr;
     let nFramesEncoded = psEnc.sCmn.nFramesEncoded as usize;
     let mut sNSQ_LBRR: silk_nsq_state = psEnc.sCmn.sNSQ;
     if psEnc.sCmn.LBRR_enabled != 0
@@ -527,7 +519,7 @@ fn silk_LBRR_encode_FLP(
             k += 1;
         }
         {
-            let total_len = psEnc.sCmn.nb_subfr as usize * psEnc.sCmn.subfr_length;
+            let total_len = psEnc.sCmn.nb_subfr * psEnc.sCmn.subfr_length;
             let frame_len = psEnc.sCmn.frame_length;
             let cfg = psEnc.sCmn.nsq_config();
             silk_NSQ_wrapper_FLP(

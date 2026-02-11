@@ -89,8 +89,8 @@ pub fn silk_decode_core(
             let gain_adj_Q16 = silk_DIV32_varQ(psDec.prev_gain_Q16, psDecCtrl.Gains_Q16[k], 16);
 
             /* Scale short term state */
-            for i in 0..MAX_LPC_ORDER {
-                sLPC_Q14[i] = silk_SMULWW(gain_adj_Q16, sLPC_Q14[i]);
+            for val in sLPC_Q14[..MAX_LPC_ORDER].iter_mut() {
+                *val = silk_SMULWW(gain_adj_Q16, *val);
             }
 
             gain_adj_Q16
@@ -169,8 +169,7 @@ pub fn silk_decode_core(
                 /* Unrolled loop */
                 /* Avoids introducing a bias because silk_SMLAWB() always rounds to -inf */
                 let mut LTP_pred_Q13 = 2;
-                LTP_pred_Q13 =
-                    silk_SMLAWB(LTP_pred_Q13, sLTP_Q15[pred_lag_ptr + 0], B_Q14[0] as i32);
+                LTP_pred_Q13 = silk_SMLAWB(LTP_pred_Q13, sLTP_Q15[pred_lag_ptr], B_Q14[0] as i32);
                 LTP_pred_Q13 =
                     silk_SMLAWB(LTP_pred_Q13, sLTP_Q15[pred_lag_ptr - 1], B_Q14[1] as i32);
                 LTP_pred_Q13 =

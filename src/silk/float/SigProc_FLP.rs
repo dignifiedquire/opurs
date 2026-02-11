@@ -32,11 +32,11 @@ pub fn silk_short2float_array(out: &mut [f32], input: &[i16]) {
 /// Upstream C: silk/float/SigProc_FLP.h:silk_log2
 #[inline]
 pub fn silk_log2(x: f64) -> f32 {
-    return (std::f64::consts::LOG2_10 * x.log10()) as f32;
+    (std::f64::consts::LOG2_10 * x.log10()) as f32
 }
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_sigmoid
 #[inline]
 pub fn silk_sigmoid(x: f32) -> f32 {
-    return (1.0f64 / (1.0f64 + (-x as f64).exp())) as f32;
+    (1.0f64 / (1.0f64 + (-x as f64).exp())) as f32
 }

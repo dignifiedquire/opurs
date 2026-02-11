@@ -7,48 +7,48 @@ use crate::celt::modes::OpusCustomMode;
 use crate::celt::rate::MAX_FINE_BITS;
 
 pub static eMeans: [f32; 25] = [
-    6.437500f32,
-    6.250000f32,
-    5.750000f32,
-    5.312500f32,
-    5.062500f32,
-    4.812500f32,
-    4.500000f32,
-    4.375000f32,
-    4.875000f32,
-    4.687500f32,
-    4.562500f32,
-    4.437500f32,
-    4.875000f32,
-    4.625000f32,
-    4.312500f32,
-    4.500000f32,
-    4.375000f32,
-    4.625000f32,
-    4.750000f32,
-    4.437500f32,
-    3.750000f32,
-    3.750000f32,
-    3.750000f32,
-    3.750000f32,
-    3.750000f32,
+    6.437_5_f32,
+    6.25_f32,
+    5.75_f32,
+    5.312_5_f32,
+    5.062_5_f32,
+    4.812_5_f32,
+    4.5_f32,
+    4.375_f32,
+    4.875_f32,
+    4.687_5_f32,
+    4.562_5_f32,
+    4.437_5_f32,
+    4.875_f32,
+    4.625_f32,
+    4.312_5_f32,
+    4.5_f32,
+    4.375_f32,
+    4.625_f32,
+    4.75_f32,
+    4.437_5_f32,
+    3.75_f32,
+    3.75_f32,
+    3.75_f32,
+    3.75_f32,
+    3.75_f32,
 ];
 
 const PRED_COEF: [f32; 4] = [
-    (29440 as f64 / 32768.0f64) as f32,
-    (26112 as f64 / 32768.0f64) as f32,
-    (21248 as f64 / 32768.0f64) as f32,
-    (16384 as f64 / 32768.0f64) as f32,
+    (29440_f64 / 32768.0f64) as f32,
+    (26112_f64 / 32768.0f64) as f32,
+    (21248_f64 / 32768.0f64) as f32,
+    (16384_f64 / 32768.0f64) as f32,
 ];
 
 const BETA_COEF: [f32; 4] = [
-    (30147 as f64 / 32768.0f64) as f32,
-    (22282 as f64 / 32768.0f64) as f32,
-    (12124 as f64 / 32768.0f64) as f32,
-    (6554 as f64 / 32768.0f64) as f32,
+    (30147_f64 / 32768.0f64) as f32,
+    (22282_f64 / 32768.0f64) as f32,
+    (12124_f64 / 32768.0f64) as f32,
+    (6554_f64 / 32768.0f64) as f32,
 ];
 
-const BETA_INTRA: f32 = (4915 as f64 / 32768.0f64) as f32;
+const BETA_INTRA: f32 = (4915_f64 / 32768.0f64) as f32;
 
 const E_PROB_MODEL: [[[u8; 42]; 2]; 4] = [
     [
@@ -120,7 +120,7 @@ fn loss_distortion(
             dist += d * d;
         }
         c += 1;
-        if !(c < C) {
+        if c >= C {
             break;
         }
     }
@@ -198,7 +198,7 @@ fn quant_coarse_energy_impl(
                 );
             } else if budget - tell >= 2 {
                 qi = (-1).max(qi.min(1));
-                ec_enc_icdf(enc, 2 * qi ^ -((qi < 0) as i32), &SMALL_ENERGY_ICDF, 2);
+                ec_enc_icdf(enc, (2 * qi) ^ -((qi < 0) as i32), &SMALL_ENERGY_ICDF, 2);
             } else if budget - tell >= 1 {
                 qi = 0.min(qi);
                 ec_enc_bit_logp(enc, -qi, 1);
@@ -212,7 +212,7 @@ fn quant_coarse_energy_impl(
             oldEBands[(i + c * nbEBands) as usize] = tmp;
             prev[c as usize] = prev[c as usize] + q - beta * q;
             c += 1;
-            if !(c < C) {
+            if c >= C {
                 break;
             }
         }
@@ -373,13 +373,13 @@ pub fn quant_fine_energy(
                 }
                 ec_enc_bits(enc, q2 as u32, fine_quant[i as usize] as u32);
                 let offset = (q2 as f32 + 0.5f32)
-                    * ((1) << 14 - fine_quant[i as usize]) as f32
+                    * ((1) << (14 - fine_quant[i as usize])) as f32
                     * (1.0f32 / 16384.0)
                     - 0.5f32;
                 oldEBands[(i + c * nbEBands) as usize] += offset;
                 error[(i + c * nbEBands) as usize] -= offset;
                 c += 1;
-                if !(c < C) {
+                if c >= C {
                     break;
                 }
             }
@@ -415,13 +415,13 @@ pub fn quant_energy_finalise(
                     };
                     ec_enc_bits(enc, q2 as u32, 1);
                     let offset = (q2 as f32 - 0.5f32)
-                        * ((1) << 14 - fine_quant[i as usize] - 1) as f32
+                        * ((1) << (14 - fine_quant[i as usize] - 1)) as f32
                         * (1.0f32 / 16384.0);
                     oldEBands[(i + c * nbEBands) as usize] += offset;
                     error[(i + c * nbEBands) as usize] -= offset;
                     bits_left -= 1;
                     c += 1;
-                    if !(c < C) {
+                    if c >= C {
                         break;
                     }
                 }
@@ -483,7 +483,7 @@ pub fn unquant_coarse_energy(
             oldEBands[(i + c * nbEBands) as usize] = tmp;
             prev[c as usize] = prev[c as usize] + q - beta * q;
             c += 1;
-            if !(c < C) {
+            if c >= C {
                 break;
             }
         }
@@ -507,12 +507,12 @@ pub fn unquant_fine_energy(
             loop {
                 let q2 = ec_dec_bits(dec, fine_quant[i as usize] as u32) as i32;
                 let offset = (q2 as f32 + 0.5f32)
-                    * ((1) << 14 - fine_quant[i as usize]) as f32
+                    * ((1) << (14 - fine_quant[i as usize])) as f32
                     * (1.0f32 / 16384.0)
                     - 0.5f32;
                 oldEBands[(i + c * nbEBands) as usize] += offset;
                 c += 1;
-                if !(c < C) {
+                if c >= C {
                     break;
                 }
             }
@@ -542,12 +542,12 @@ pub fn unquant_energy_finalise(
                 loop {
                     let q2 = ec_dec_bits(dec, 1) as i32;
                     let offset = (q2 as f32 - 0.5f32)
-                        * ((1) << 14 - fine_quant[i as usize] - 1) as f32
+                        * ((1) << (14 - fine_quant[i as usize] - 1)) as f32
                         * (1.0f32 / 16384.0);
                     oldEBands[(i + c * nbEBands) as usize] += offset;
                     bits_left -= 1;
                     c += 1;
-                    if !(c < C) {
+                    if c >= C {
                         break;
                     }
                 }
@@ -578,7 +578,7 @@ pub fn amp2Log2(
             bandLogE[(c * nbEBands + i) as usize] = -14.0f32;
         }
         c += 1;
-        if !(c < C) {
+        if c >= C {
             break;
         }
     }

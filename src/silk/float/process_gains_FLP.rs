@@ -44,7 +44,7 @@ pub fn silk_process_gains_FLP(
         pGains_Q16[k as usize] = (psEncCtrl.Gains[k as usize] * 65536.0f32) as i32;
         k += 1;
     }
-    let nb = psEnc.sCmn.nb_subfr as usize;
+    let nb = psEnc.sCmn.nb_subfr;
     psEncCtrl.GainsUnq_Q16[..nb].copy_from_slice(&pGains_Q16[..nb]);
     psEncCtrl.lastGainIndexPrev = psEnc.sShape.LastGainIndex;
     silk_gains_quant(

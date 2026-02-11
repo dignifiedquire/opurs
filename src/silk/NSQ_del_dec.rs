@@ -75,6 +75,7 @@ fn copy_del_dec_state_partial(dst: &mut NSQ_del_dec_struct, src: &NSQ_del_dec_st
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[derive(Default)]
 pub struct NSQ_sample_struct {
     pub Q_Q10: i32,
     pub RD_Q10: i32,
@@ -85,20 +86,6 @@ pub struct NSQ_sample_struct {
     pub LPC_exc_Q14: i32,
 }
 
-impl Default for NSQ_sample_struct {
-    fn default() -> Self {
-        Self {
-            Q_Q10: 0,
-            RD_Q10: 0,
-            xq_Q14: 0,
-            LF_AR_Q14: 0,
-            Diff_Q14: 0,
-            sLTP_shp_Q14: 0,
-            LPC_exc_Q14: 0,
-        }
-    }
-}
-
 pub type NSQ_sample_pair = [NSQ_sample_struct; 2];
 
 /// Helper: saturating round-shift for xq output: silk_RSHIFT_ROUND + silk_SAT16
@@ -107,7 +94,7 @@ fn rshift_round_sat16(val: i32, shift: i32) -> i16 {
     let rounded = if shift == 1 {
         (val >> 1) + (val & 1)
     } else {
-        (val >> (shift - 1)) + 1 >> 1
+        ((val >> (shift - 1)) + 1) >> 1
     };
     if rounded > silk_int16_MAX {
         silk_int16_MAX as i16
@@ -138,7 +125,6 @@ pub fn silk_NSQ_del_dec_c(
 ) {
     let mut lag: i32;
     let mut start_idx: i32;
-    let LSF_interpolation_flag: i32;
     let mut Winner_ind: i32;
     let mut subfr: i32;
     let mut last_smple_idx: i32;
@@ -157,6 +143,7 @@ pub fn silk_NSQ_del_dec_c(
     let mut psDelDec: Vec<NSQ_del_dec_struct> =
         vec![NSQ_del_dec_struct::default(); nStates as usize];
 
+    #[allow(clippy::needless_range_loop)]
     for k in 0..nStates as usize {
         psDelDec[k].Seed = (k as i32 + psIndices.Seed as i32) & 3;
         psDelDec[k].SeedInit = psDelDec[k].Seed;
@@ -181,11 +168,11 @@ pub fn silk_NSQ_del_dec_c(
     } else if lag > 0 {
         decisionDelay = silk_min_int(decisionDelay, lag - LTP_ORDER as i32 / 2 - 1);
     }
-    if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
-        LSF_interpolation_flag = 0;
+    let LSF_interpolation_flag: i32 = if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
+        0
     } else {
-        LSF_interpolation_flag = 1;
-    }
+        1
+    };
 
     let mut sLTP_Q15: Vec<i32> = vec![0; ltp_mem_len + frame_len];
     let mut sLTP: Vec<i16> = vec![0; ltp_mem_len + frame_len];
@@ -200,7 +187,7 @@ pub fn silk_NSQ_del_dec_c(
     let mut pulses_off: usize = 0;
 
     for k in 0..psEncC.nb_subfr as i32 {
-        let a_Q12_off = ((k >> 1 | 1 - LSF_interpolation_flag) * MAX_LPC_ORDER as i32) as usize;
+        let a_Q12_off = (((k >> 1) | (1 - LSF_interpolation_flag)) * MAX_LPC_ORDER as i32) as usize;
         let a_Q12 = &PredCoef_Q12[a_Q12_off..a_Q12_off + psEncC.predictLPCOrder as usize];
         let b_Q14_off = (k * LTP_ORDER as i32) as usize;
         let b_Q14 = &LTPCoef_Q14[b_Q14_off..b_Q14_off + LTP_ORDER];
@@ -213,11 +200,12 @@ pub fn silk_NSQ_del_dec_c(
         NSQ.rewhite_flag = 0;
         if psIndices.signalType as i32 == TYPE_VOICED {
             lag = pitchL[k as usize];
-            if k & 3 - ((LSF_interpolation_flag as u32) << 1) as i32 == 0 {
+            if k & (3 - ((LSF_interpolation_flag as u32) << 1) as i32) == 0 {
                 if k == 2 {
                     // Find winner among delayed decision states
                     RDmin_Q10 = psDelDec[0].RD_Q10;
                     Winner_ind = 0;
+                    #[allow(clippy::needless_range_loop)]
                     for i in 1..nStates as usize {
                         if psDelDec[i].RD_Q10 < RDmin_Q10 {
                             RDmin_Q10 = psDelDec[i].RD_Q10;
@@ -225,6 +213,7 @@ pub fn silk_NSQ_del_dec_c(
                         }
                     }
                     // Penalize non-winners
+                    #[allow(clippy::needless_range_loop)]
                     for i in 0..nStates as usize {
                         if i as i32 != Winner_ind {
                             psDelDec[i].RD_Q10 += silk_int32_MAX >> 4;
@@ -243,10 +232,11 @@ pub fn silk_NSQ_del_dec_c(
                             (psDD.Q_Q10[last_smple_idx as usize] >> 1)
                                 + (psDD.Q_Q10[last_smple_idx as usize] & 1)
                         } else {
-                            (psDD.Q_Q10[last_smple_idx as usize] >> 10 - 1) + 1 >> 1
+                            ((psDD.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
                         }) as i8;
-                        let xq_val =
-                            psDD.Xq_Q14[last_smple_idx as usize] as i64 * Gains_Q16[1] as i64 >> 16;
+                        let xq_val = (psDD.Xq_Q14[last_smple_idx as usize] as i64
+                            * Gains_Q16[1] as i64)
+                            >> 16;
                         let xq_idx = (pxq_off as isize + (i - decisionDelay) as isize) as usize;
                         NSQ.xq[xq_idx] = rshift_round_sat16(xq_val as i32, 14);
                         NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize] =
@@ -323,6 +313,7 @@ pub fn silk_NSQ_del_dec_c(
     // Find final winner
     RDmin_Q10 = psDelDec[0].RD_Q10;
     Winner_ind = 0;
+    #[allow(clippy::needless_range_loop)]
     for k in 1..nStates as usize {
         if psDelDec[k].RD_Q10 < RDmin_Q10 {
             RDmin_Q10 = psDelDec[k].RD_Q10;
@@ -342,9 +333,9 @@ pub fn silk_NSQ_del_dec_c(
         pulses[p_idx] = (if 10 == 1 {
             (psDD.Q_Q10[last_smple_idx as usize] >> 1) + (psDD.Q_Q10[last_smple_idx as usize] & 1)
         } else {
-            (psDD.Q_Q10[last_smple_idx as usize] >> 10 - 1) + 1 >> 1
+            ((psDD.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
         }) as i8;
-        let xq_val = psDD.Xq_Q14[last_smple_idx as usize] as i64 * Gain_Q10 as i64 >> 16;
+        let xq_val = (psDD.Xq_Q14[last_smple_idx as usize] as i64 * Gain_Q10 as i64) >> 16;
         let xq_idx = (pxq_off as isize + (i - decisionDelay) as isize) as usize;
         NSQ.xq[xq_idx] = rshift_round_sat16(xq_val as i32, 8);
         NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize] =
@@ -432,24 +423,25 @@ fn silk_noise_shape_quantizer_del_dec(
     let mut pred_lag_idx = (NSQ.sLTP_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;
     let Gain_Q10: i32 = Gain_Q16 >> 6;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..length as usize {
         // LTP prediction (shared across all states)
         if signalType == TYPE_VOICED {
             LTP_pred_Q14 = 2;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + (sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64) >> 16))
                 as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + (sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64) >> 16))
                 as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + (sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64) >> 16))
                 as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + (sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64) >> 16))
                 as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + (sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64) >> 16))
                 as i32;
             LTP_pred_Q14 = ((LTP_pred_Q14 as u32) << 1) as i32;
             pred_lag_idx += 1;
@@ -459,12 +451,13 @@ fn silk_noise_shape_quantizer_del_dec(
 
         // Harmonic noise shaping (shared)
         if lag > 0 {
-            n_LTP_Q14 = ((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2]) as i64
-                * HarmShapeFIRPacked_Q14 as i16 as i64
+            n_LTP_Q14 = (((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2])
+                as i64
+                * HarmShapeFIRPacked_Q14 as i16 as i64)
                 >> 16) as i32;
             n_LTP_Q14 = (n_LTP_Q14 as i64
-                + (NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
-                    * (HarmShapeFIRPacked_Q14 as i64 >> 16)
+                + ((NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
+                    * (HarmShapeFIRPacked_Q14 as i64 >> 16))
                     >> 16)) as i32;
             n_LTP_Q14 = LTP_pred_Q14 - ((n_LTP_Q14 as u32) << 2) as i32;
             shp_lag_idx += 1;
@@ -489,44 +482,46 @@ fn silk_noise_shape_quantizer_del_dec(
             // Noise shaping with warping
             assert!(shapingLPCOrder & 1 == 0);
             tmp2 = (psDD.Diff_Q14 as i64
-                + (psDD.sAR2_Q14[0] as i64 * warping_Q16 as i16 as i64 >> 16))
+                + ((psDD.sAR2_Q14[0] as i64 * warping_Q16 as i16 as i64) >> 16))
                 as i32;
             tmp1 = (psDD.sAR2_Q14[0] as i64
-                + ((psDD.sAR2_Q14[1] - tmp2) as i64 * warping_Q16 as i16 as i64 >> 16))
+                + (((psDD.sAR2_Q14[1] - tmp2) as i64 * warping_Q16 as i16 as i64) >> 16))
                 as i32;
             psDD.sAR2_Q14[0] = tmp2;
             n_AR_Q14 = shapingLPCOrder >> 1;
-            n_AR_Q14 = (n_AR_Q14 as i64 + (tmp2 as i64 * AR_shp_Q13[0] as i64 >> 16)) as i32;
+            n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[0] as i64) >> 16)) as i32;
 
             let mut j = 2;
             while j < shapingLPCOrder {
                 tmp2 = (psDD.sAR2_Q14[(j - 1) as usize] as i64
-                    + ((psDD.sAR2_Q14[j as usize] - tmp1) as i64 * warping_Q16 as i16 as i64 >> 16))
-                    as i32;
+                    + (((psDD.sAR2_Q14[j as usize] - tmp1) as i64 * warping_Q16 as i16 as i64)
+                        >> 16)) as i32;
                 psDD.sAR2_Q14[(j - 1) as usize] = tmp1;
                 n_AR_Q14 = (n_AR_Q14 as i64
-                    + (tmp1 as i64 * AR_shp_Q13[(j - 1) as usize] as i64 >> 16))
+                    + ((tmp1 as i64 * AR_shp_Q13[(j - 1) as usize] as i64) >> 16))
                     as i32;
                 tmp1 = (psDD.sAR2_Q14[j as usize] as i64
-                    + ((psDD.sAR2_Q14[(j + 1) as usize] - tmp2) as i64 * warping_Q16 as i16 as i64
+                    + (((psDD.sAR2_Q14[(j + 1) as usize] - tmp2) as i64
+                        * warping_Q16 as i16 as i64)
                         >> 16)) as i32;
                 psDD.sAR2_Q14[j as usize] = tmp2;
-                n_AR_Q14 =
-                    (n_AR_Q14 as i64 + (tmp2 as i64 * AR_shp_Q13[j as usize] as i64 >> 16)) as i32;
+                n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[j as usize] as i64) >> 16))
+                    as i32;
                 j += 2;
             }
             psDD.sAR2_Q14[(shapingLPCOrder - 1) as usize] = tmp1;
             n_AR_Q14 = (n_AR_Q14 as i64
-                + (tmp1 as i64 * AR_shp_Q13[(shapingLPCOrder - 1) as usize] as i64 >> 16))
+                + ((tmp1 as i64 * AR_shp_Q13[(shapingLPCOrder - 1) as usize] as i64) >> 16))
                 as i32;
             n_AR_Q14 = ((n_AR_Q14 as u32) << 1) as i32;
             n_AR_Q14 =
-                (n_AR_Q14 as i64 + (psDD.LF_AR_Q14 as i64 * Tilt_Q14 as i16 as i64 >> 16)) as i32;
+                (n_AR_Q14 as i64 + ((psDD.LF_AR_Q14 as i64 * Tilt_Q14 as i16 as i64) >> 16)) as i32;
             n_AR_Q14 = ((n_AR_Q14 as u32) << 2) as i32;
 
-            n_LF_Q14 = (psDD.Shape_Q14[*smpl_buf_idx as usize] as i64 * LF_shp_Q14 as i16 as i64
+            n_LF_Q14 = ((psDD.Shape_Q14[*smpl_buf_idx as usize] as i64 * LF_shp_Q14 as i16 as i64)
                 >> 16) as i32;
-            n_LF_Q14 = (n_LF_Q14 as i64 + (psDD.LF_AR_Q14 as i64 * (LF_shp_Q14 as i64 >> 16) >> 16))
+            n_LF_Q14 = (n_LF_Q14 as i64
+                + ((psDD.LF_AR_Q14 as i64 * (LF_shp_Q14 as i64 >> 16)) >> 16))
                 as i32;
             n_LF_Q14 = ((n_LF_Q14 as u32) << 2) as i32;
 
@@ -536,7 +531,7 @@ fn silk_noise_shape_quantizer_del_dec(
             tmp1 = if 4 == 1 {
                 (tmp1 >> 1) + (tmp1 & 1)
             } else {
-                (tmp1 >> 4 - 1) + 1 >> 1
+                ((tmp1 >> (4 - 1)) + 1) >> 1
             };
 
             r_Q10 = x_Q10[i] - tmp1;
@@ -565,9 +560,9 @@ fn silk_noise_shape_quantizer_del_dec(
             if Lambda_Q10 > 2048 {
                 let rdo_offset: i32 = Lambda_Q10 / 2 - 512;
                 if q1_Q10 > rdo_offset {
-                    q1_Q0 = q1_Q10 - rdo_offset >> 10;
+                    q1_Q0 = (q1_Q10 - rdo_offset) >> 10;
                 } else if q1_Q10 < -rdo_offset {
-                    q1_Q0 = q1_Q10 + rdo_offset >> 10;
+                    q1_Q0 = (q1_Q10 + rdo_offset) >> 10;
                 } else if q1_Q10 < 0 {
                     q1_Q0 = -1;
                 } else {
@@ -576,7 +571,7 @@ fn silk_noise_shape_quantizer_del_dec(
             }
             if q1_Q0 > 0 {
                 q1_Q10 = ((q1_Q0 as u32) << 10) as i32 - 80;
-                q1_Q10 = q1_Q10 + offset_Q10;
+                q1_Q10 += offset_Q10;
                 q2_Q10 = q1_Q10 + 1024;
                 rd1_Q10 = q1_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
                 rd2_Q10 = q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
@@ -592,15 +587,15 @@ fn silk_noise_shape_quantizer_del_dec(
                 rd2_Q10 = q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
             } else {
                 q1_Q10 = ((q1_Q0 as u32) << 10) as i32 + 80;
-                q1_Q10 = q1_Q10 + offset_Q10;
+                q1_Q10 += offset_Q10;
                 q2_Q10 = q1_Q10 + 1024;
                 rd1_Q10 = -q1_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
                 rd2_Q10 = -q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
             }
             rr_Q10 = r_Q10 - q1_Q10;
-            rd1_Q10 = rd1_Q10 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32 >> 10;
+            rd1_Q10 = (rd1_Q10 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32) >> 10;
             rr_Q10 = r_Q10 - q2_Q10;
-            rd2_Q10 = rd2_Q10 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32 >> 10;
+            rd2_Q10 = (rd2_Q10 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32) >> 10;
 
             if rd1_Q10 < rd2_Q10 {
                 psSampleState[k][0].RD_Q10 = psDD.RD_Q10 + rd1_Q10;
@@ -652,6 +647,7 @@ fn silk_noise_shape_quantizer_del_dec(
         // Find winner among best candidates
         RDmin_Q10 = psSampleState[0][0].RD_Q10;
         Winner_ind = 0;
+        #[allow(clippy::needless_range_loop)]
         for k in 1..nStates {
             if psSampleState[k][0].RD_Q10 < RDmin_Q10 {
                 RDmin_Q10 = psSampleState[k][0].RD_Q10;
@@ -673,6 +669,7 @@ fn silk_noise_shape_quantizer_del_dec(
         RDmin_Q10 = psSampleState[0][1].RD_Q10;
         RDmax_ind = 0;
         RDmin_ind = 0;
+        #[allow(clippy::needless_range_loop)]
         for k in 1..nStates {
             if psSampleState[k][0].RD_Q10 > RDmax_Q10 {
                 RDmax_Q10 = psSampleState[k][0].RD_Q10;
@@ -709,10 +706,10 @@ fn silk_noise_shape_quantizer_del_dec(
                 (psDD_w.Q_Q10[last_smple_idx as usize] >> 1)
                     + (psDD_w.Q_Q10[last_smple_idx as usize] & 1)
             } else {
-                (psDD_w.Q_Q10[last_smple_idx as usize] >> 10 - 1) + 1 >> 1
+                ((psDD_w.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
             }) as i8;
-            let xq_val = psDD_w.Xq_Q14[last_smple_idx as usize] as i64
-                * delayedGain_Q10[last_smple_idx as usize] as i64
+            let xq_val = (psDD_w.Xq_Q14[last_smple_idx as usize] as i64
+                * delayedGain_Q10[last_smple_idx as usize] as i64)
                 >> 16;
             NSQ.xq[xq_off + i - decisionDelay as usize] = rshift_round_sat16(xq_val as i32, 8);
             NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay) as usize] =
@@ -738,7 +735,7 @@ fn silk_noise_shape_quantizer_del_dec(
                 (if 10 == 1 {
                     (psSS.Q_Q10 >> 1) + (psSS.Q_Q10 & 1)
                 } else {
-                    (psSS.Q_Q10 >> 10 - 1) + 1 >> 1
+                    ((psSS.Q_Q10 >> (10 - 1)) + 1) >> 1
                 }) as u32,
             ) as i32;
             psDD.RandState[*smpl_buf_idx as usize] = psDD.Seed;
@@ -748,9 +745,8 @@ fn silk_noise_shape_quantizer_del_dec(
     }
 
     // Copy LPC state for next subframe
-    for k in 0..nStates {
-        psDelDec[k]
-            .sLPC_Q14
+    for dd in psDelDec[..nStates].iter_mut() {
+        dd.sLPC_Q14
             .copy_within(length as usize..length as usize + NSQ_LPC_BUF_LENGTH, 0);
     }
 }
@@ -785,23 +781,23 @@ fn silk_nsq_del_dec_scale_states(
     let inv_gain_Q26 = if 5 == 1 {
         (inv_gain_Q31 >> 1) + (inv_gain_Q31 & 1)
     } else {
-        (inv_gain_Q31 >> 5 - 1) + 1 >> 1
+        ((inv_gain_Q31 >> (5 - 1)) + 1) >> 1
     };
 
     for i in 0..psEncC.subfr_length {
-        x_sc_Q10[i] = (x16[i] as i64 * inv_gain_Q26 as i64 >> 16) as i32;
+        x_sc_Q10[i] = ((x16[i] as i64 * inv_gain_Q26 as i64) >> 16) as i32;
     }
 
     if NSQ.rewhite_flag != 0 {
         if subfr == 0 {
-            inv_gain_Q31 = (((inv_gain_Q31 as i64 * LTP_scale_Q14 as i16 as i64 >> 16) as i32
+            inv_gain_Q31 = ((((inv_gain_Q31 as i64 * LTP_scale_Q14 as i16 as i64) >> 16) as i32
                 as u32)
                 << 2) as i32;
         }
         let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let end = NSQ.sLTP_buf_idx as usize;
         for i in start..end {
-            sLTP_Q15[i] = (inv_gain_Q31 as i64 * sLTP[i] as i64 >> 16) as i32;
+            sLTP_Q15[i] = ((inv_gain_Q31 as i64 * sLTP[i] as i64) >> 16) as i32;
         }
     }
 
@@ -811,30 +807,29 @@ fn silk_nsq_del_dec_scale_states(
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;
         for i in shp_start..shp_end {
-            NSQ.sLTP_shp_Q14[i] = (gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64 >> 16) as i32;
+            NSQ.sLTP_shp_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64) >> 16) as i32;
         }
 
         if signal_type == TYPE_VOICED && NSQ.rewhite_flag == 0 {
             let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
             let end = (NSQ.sLTP_buf_idx - decisionDelay) as usize;
-            for i in start..end {
-                sLTP_Q15[i] = (gain_adj_Q16 as i64 * sLTP_Q15[i] as i64 >> 16) as i32;
+            for val in sLTP_Q15[start..end].iter_mut() {
+                *val = ((gain_adj_Q16 as i64 * *val as i64) >> 16) as i32;
             }
         }
 
-        for k in 0..nStatesDelayedDecision as usize {
-            let psDD = &mut psDelDec[k];
-            psDD.LF_AR_Q14 = (gain_adj_Q16 as i64 * psDD.LF_AR_Q14 as i64 >> 16) as i32;
-            psDD.Diff_Q14 = (gain_adj_Q16 as i64 * psDD.Diff_Q14 as i64 >> 16) as i32;
+        for psDD in psDelDec[..nStatesDelayedDecision as usize].iter_mut() {
+            psDD.LF_AR_Q14 = ((gain_adj_Q16 as i64 * psDD.LF_AR_Q14 as i64) >> 16) as i32;
+            psDD.Diff_Q14 = ((gain_adj_Q16 as i64 * psDD.Diff_Q14 as i64) >> 16) as i32;
             for j in 0..NSQ_LPC_BUF_LENGTH {
-                psDD.sLPC_Q14[j] = (gain_adj_Q16 as i64 * psDD.sLPC_Q14[j] as i64 >> 16) as i32;
+                psDD.sLPC_Q14[j] = ((gain_adj_Q16 as i64 * psDD.sLPC_Q14[j] as i64) >> 16) as i32;
             }
             for j in 0..MAX_SHAPE_LPC_ORDER as usize {
-                psDD.sAR2_Q14[j] = (gain_adj_Q16 as i64 * psDD.sAR2_Q14[j] as i64 >> 16) as i32;
+                psDD.sAR2_Q14[j] = ((gain_adj_Q16 as i64 * psDD.sAR2_Q14[j] as i64) >> 16) as i32;
             }
             for j in 0..DECISION_DELAY as usize {
-                psDD.Pred_Q15[j] = (gain_adj_Q16 as i64 * psDD.Pred_Q15[j] as i64 >> 16) as i32;
-                psDD.Shape_Q14[j] = (gain_adj_Q16 as i64 * psDD.Shape_Q14[j] as i64 >> 16) as i32;
+                psDD.Pred_Q15[j] = ((gain_adj_Q16 as i64 * psDD.Pred_Q15[j] as i64) >> 16) as i32;
+                psDD.Shape_Q14[j] = ((gain_adj_Q16 as i64 * psDD.Shape_Q14[j] as i64) >> 16) as i32;
             }
         }
 

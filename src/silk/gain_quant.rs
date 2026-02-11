@@ -130,5 +130,5 @@ pub fn silk_gains_ID(ind: &[i8]) -> i32 {
         gainsID = ind as i32 | (gainsID << 8);
     }
 
-    return gainsID;
+    gainsID
 }

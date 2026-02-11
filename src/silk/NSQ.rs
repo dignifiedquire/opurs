@@ -18,23 +18,23 @@ pub mod NSQ_h {
         // buf32 is indexed backwards from the end: buf32[len-1] = pos, buf32[len-2] = pos-1, etc.
         let b = buf32.len();
         let mut out: i32 = order >> 1;
-        out = (out as i64 + (buf32[b - 1] as i64 * coef16[0] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 2] as i64 * coef16[1] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 3] as i64 * coef16[2] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 4] as i64 * coef16[3] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 5] as i64 * coef16[4] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 6] as i64 * coef16[5] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 7] as i64 * coef16[6] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 8] as i64 * coef16[7] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 9] as i64 * coef16[8] as i64 >> 16)) as i32;
-        out = (out as i64 + (buf32[b - 10] as i64 * coef16[9] as i64 >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 1] as i64 * coef16[0] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 2] as i64 * coef16[1] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 3] as i64 * coef16[2] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 4] as i64 * coef16[3] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 5] as i64 * coef16[4] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 6] as i64 * coef16[5] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 7] as i64 * coef16[6] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 8] as i64 * coef16[7] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 9] as i64 * coef16[8] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf32[b - 10] as i64 * coef16[9] as i64) >> 16)) as i32;
         if order == 16 {
-            out = (out as i64 + (buf32[b - 11] as i64 * coef16[10] as i64 >> 16)) as i32;
-            out = (out as i64 + (buf32[b - 12] as i64 * coef16[11] as i64 >> 16)) as i32;
-            out = (out as i64 + (buf32[b - 13] as i64 * coef16[12] as i64 >> 16)) as i32;
-            out = (out as i64 + (buf32[b - 14] as i64 * coef16[13] as i64 >> 16)) as i32;
-            out = (out as i64 + (buf32[b - 15] as i64 * coef16[14] as i64 >> 16)) as i32;
-            out = (out as i64 + (buf32[b - 16] as i64 * coef16[15] as i64 >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 11] as i64 * coef16[10] as i64) >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 12] as i64 * coef16[11] as i64) >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 13] as i64 * coef16[12] as i64) >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 14] as i64 * coef16[13] as i64) >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 15] as i64 * coef16[14] as i64) >> 16)) as i32;
+            out = (out as i64 + ((buf32[b - 16] as i64 * coef16[15] as i64) >> 16)) as i32;
         }
         out
     }
@@ -55,19 +55,19 @@ pub mod NSQ_h {
         let mut tmp1 = data1[0];
         data1[0] = tmp2;
         let mut out: i32 = order >> 1;
-        out = (out as i64 + (tmp2 as i64 * coef[0] as i64 >> 16)) as i32;
+        out = (out as i64 + ((tmp2 as i64 * coef[0] as i64) >> 16)) as i32;
         let mut j = 2;
         while j < order {
             tmp2 = data1[(j - 1) as usize];
             data1[(j - 1) as usize] = tmp1;
-            out = (out as i64 + (tmp1 as i64 * coef[(j - 1) as usize] as i64 >> 16)) as i32;
+            out = (out as i64 + ((tmp1 as i64 * coef[(j - 1) as usize] as i64) >> 16)) as i32;
             tmp1 = data1[j as usize];
             data1[j as usize] = tmp2;
-            out = (out as i64 + (tmp2 as i64 * coef[j as usize] as i64 >> 16)) as i32;
+            out = (out as i64 + ((tmp2 as i64 * coef[j as usize] as i64) >> 16)) as i32;
             j += 2;
         }
         data1[(order - 1) as usize] = tmp1;
-        out = (out as i64 + (tmp1 as i64 * coef[(order - 1) as usize] as i64 >> 16)) as i32;
+        out = (out as i64 + ((tmp1 as i64 * coef[(order - 1) as usize] as i64) >> 16)) as i32;
         out = ((out as u32) << 1) as i32;
         out
     }
@@ -107,18 +107,17 @@ pub fn silk_NSQ_c(
 ) {
     let mut lag: i32;
     let mut start_idx: i32;
-    let LSF_interpolation_flag: i32;
     let mut HarmShapeFIRPacked_Q14: i32;
 
     NSQ.rand_seed = psIndices.Seed as i32;
     lag = NSQ.lagPrev;
     let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
-    if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
-        LSF_interpolation_flag = 0;
+    let LSF_interpolation_flag: i32 = if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
+        0
     } else {
-        LSF_interpolation_flag = 1;
-    }
+        1
+    };
     let ltp_mem_len = psEncC.ltp_mem_length;
     let frame_len = psEncC.frame_length;
     let subfr_len = psEncC.subfr_length;
@@ -134,7 +133,7 @@ pub fn silk_NSQ_c(
     let mut pulses_off: usize = 0;
 
     for k in 0..psEncC.nb_subfr as i32 {
-        let a_Q12_off = ((k >> 1 | 1 - LSF_interpolation_flag) * MAX_LPC_ORDER as i32) as usize;
+        let a_Q12_off = (((k >> 1) | (1 - LSF_interpolation_flag)) * MAX_LPC_ORDER as i32) as usize;
         let a_Q12 = &PredCoef_Q12[a_Q12_off..a_Q12_off + psEncC.predictLPCOrder as usize];
         let b_Q14_off = (k * LTP_ORDER as i32) as usize;
         let b_Q14 = &LTPCoef_Q14[b_Q14_off..b_Q14_off + LTP_ORDER];
@@ -147,7 +146,7 @@ pub fn silk_NSQ_c(
         NSQ.rewhite_flag = 0;
         if psIndices.signalType as i32 == TYPE_VOICED {
             lag = pitchL[k as usize];
-            if k & 3 - ((LSF_interpolation_flag as u32) << 1) as i32 == 0 {
+            if k & (3 - ((LSF_interpolation_flag as u32) << 1) as i32) == 0 {
                 start_idx =
                     ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
                 assert!(start_idx > 0);
@@ -200,7 +199,7 @@ pub fn silk_NSQ_c(
         pulses_off += subfr_len;
         pxq_off += subfr_len;
     }
-    NSQ.lagPrev = pitchL[(psEncC.nb_subfr - 1) as usize];
+    NSQ.lagPrev = pitchL[psEncC.nb_subfr - 1];
     NSQ.xq.copy_within(frame_len..frame_len + ltp_mem_len, 0);
     NSQ.sLTP_shp_Q14
         .copy_within(frame_len..frame_len + ltp_mem_len, 0);
@@ -282,19 +281,19 @@ fn silk_noise_shape_quantizer(
         if signalType == TYPE_VOICED {
             LTP_pred_Q13 = 2;
             LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + (sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64) >> 16))
                 as i32;
             LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + (sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64) >> 16))
                 as i32;
             LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + (sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64) >> 16))
                 as i32;
             LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + (sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64) >> 16))
                 as i32;
             LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + (sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64 >> 16))
+                + ((sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64) >> 16))
                 as i32;
             pred_lag_idx += 1;
         } else {
@@ -311,25 +310,27 @@ fn silk_noise_shape_quantizer(
         );
 
         n_AR_Q12 =
-            (n_AR_Q12 as i64 + (NSQ.sLF_AR_shp_Q14 as i64 * Tilt_Q14 as i16 as i64 >> 16)) as i32;
+            (n_AR_Q12 as i64 + ((NSQ.sLF_AR_shp_Q14 as i64 * Tilt_Q14 as i16 as i64) >> 16)) as i32;
 
-        n_LF_Q12 = (NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - 1) as usize] as i64
-            * LF_shp_Q14 as i16 as i64
+        n_LF_Q12 = ((NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - 1) as usize] as i64
+            * LF_shp_Q14 as i16 as i64)
             >> 16) as i32;
-        n_LF_Q12 = (n_LF_Q12 as i64 + (NSQ.sLF_AR_shp_Q14 as i64 * (LF_shp_Q14 as i64 >> 16) >> 16))
+        n_LF_Q12 = (n_LF_Q12 as i64
+            + ((NSQ.sLF_AR_shp_Q14 as i64 * (LF_shp_Q14 as i64 >> 16)) >> 16))
             as i32;
 
         assert!(lag > 0 || signalType != 2);
 
         tmp1 = ((LPC_pred_Q10 as u32) << 2) as i32 - n_AR_Q12;
-        tmp1 = tmp1 - n_LF_Q12;
+        tmp1 -= n_LF_Q12;
         if lag > 0 {
-            n_LTP_Q13 = ((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2]) as i64
-                * HarmShapeFIRPacked_Q14 as i16 as i64
+            n_LTP_Q13 = (((NSQ.sLTP_shp_Q14[shp_lag_idx] + NSQ.sLTP_shp_Q14[shp_lag_idx - 2])
+                as i64
+                * HarmShapeFIRPacked_Q14 as i16 as i64)
                 >> 16) as i32;
             n_LTP_Q13 = (n_LTP_Q13 as i64
-                + (NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
-                    * (HarmShapeFIRPacked_Q14 as i64 >> 16)
+                + ((NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
+                    * (HarmShapeFIRPacked_Q14 as i64 >> 16))
                     >> 16)) as i32;
             n_LTP_Q13 = ((n_LTP_Q13 as u32) << 1) as i32;
             shp_lag_idx += 1;
@@ -338,13 +339,13 @@ fn silk_noise_shape_quantizer(
             tmp1 = if 3 == 1 {
                 (tmp1 >> 1) + (tmp1 & 1)
             } else {
-                (tmp1 >> 3 - 1) + 1 >> 1
+                ((tmp1 >> (3 - 1)) + 1) >> 1
             };
         } else {
             tmp1 = if 2 == 1 {
                 (tmp1 >> 1) + (tmp1 & 1)
             } else {
-                (tmp1 >> 2 - 1) + 1 >> 1
+                ((tmp1 >> (2 - 1)) + 1) >> 1
             };
         }
 
@@ -374,9 +375,9 @@ fn silk_noise_shape_quantizer(
         if Lambda_Q10 > 2048 {
             let rdo_offset: i32 = Lambda_Q10 / 2 - 512;
             if q1_Q10 > rdo_offset {
-                q1_Q0 = q1_Q10 - rdo_offset >> 10;
+                q1_Q0 = (q1_Q10 - rdo_offset) >> 10;
             } else if q1_Q10 < -rdo_offset {
-                q1_Q0 = q1_Q10 + rdo_offset >> 10;
+                q1_Q0 = (q1_Q10 + rdo_offset) >> 10;
             } else if q1_Q10 < 0 {
                 q1_Q0 = -1;
             } else {
@@ -387,7 +388,7 @@ fn silk_noise_shape_quantizer(
         // RD selection
         if q1_Q0 > 0 {
             q1_Q10 = ((q1_Q0 as u32) << 10) as i32 - 80;
-            q1_Q10 = q1_Q10 + offset_Q10;
+            q1_Q10 += offset_Q10;
             q2_Q10 = q1_Q10 + 1024;
             rd1_Q20 = q1_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
             rd2_Q20 = q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
@@ -403,15 +404,15 @@ fn silk_noise_shape_quantizer(
             rd2_Q20 = q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
         } else {
             q1_Q10 = ((q1_Q0 as u32) << 10) as i32 + 80;
-            q1_Q10 = q1_Q10 + offset_Q10;
+            q1_Q10 += offset_Q10;
             q2_Q10 = q1_Q10 + 1024;
             rd1_Q20 = -q1_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
             rd2_Q20 = -q2_Q10 as i16 as i32 * Lambda_Q10 as i16 as i32;
         }
         rr_Q10 = r_Q10 - q1_Q10;
-        rd1_Q20 = rd1_Q20 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32;
+        rd1_Q20 += rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32;
         rr_Q10 = r_Q10 - q2_Q10;
-        rd2_Q20 = rd2_Q20 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32;
+        rd2_Q20 += rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32;
         if rd2_Q20 < rd1_Q20 {
             q1_Q10 = q2_Q10;
         }
@@ -419,7 +420,7 @@ fn silk_noise_shape_quantizer(
         pulses[i] = (if 10 == 1 {
             (q1_Q10 >> 1) + (q1_Q10 & 1)
         } else {
-            (q1_Q10 >> 10 - 1) + 1 >> 1
+            ((q1_Q10 >> (10 - 1)) + 1) >> 1
         }) as i8;
 
         // Excitation
@@ -431,26 +432,26 @@ fn silk_noise_shape_quantizer(
         xq_Q14 = LPC_exc_Q14 + ((LPC_pred_Q10 as u32) << 4) as i32;
 
         NSQ.xq[xq_off + i] = (if (if 8 == 1 {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 1)
-                + ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 & 1)
+            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
         } else {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 8 - 1) + 1 >> 1
+            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
         }) > silk_int16_MAX
         {
             silk_int16_MAX
         } else if (if 8 == 1 {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 1)
-                + ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 & 1)
+            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
         } else {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 8 - 1) + 1 >> 1
+            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
         }) < silk_int16_MIN
         {
             silk_int16_MIN
         } else if 8 == 1 {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 1)
-                + ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 & 1)
+            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
         } else {
-            ((xq_Q14 as i64 * Gain_Q10 as i64 >> 16) as i32 >> 8 - 1) + 1 >> 1
+            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
         }) as i16;
 
         // Update state
@@ -503,23 +504,23 @@ fn silk_nsq_scale_states(
     let inv_gain_Q26 = if 5 == 1 {
         (inv_gain_Q31 >> 1) + (inv_gain_Q31 & 1)
     } else {
-        (inv_gain_Q31 >> 5 - 1) + 1 >> 1
+        ((inv_gain_Q31 >> (5 - 1)) + 1) >> 1
     };
 
     for i in 0..psEncC.subfr_length {
-        x_sc_Q10[i] = (x16[i] as i64 * inv_gain_Q26 as i64 >> 16) as i32;
+        x_sc_Q10[i] = ((x16[i] as i64 * inv_gain_Q26 as i64) >> 16) as i32;
     }
 
     if NSQ.rewhite_flag != 0 {
         if subfr == 0 {
-            inv_gain_Q31 = (((inv_gain_Q31 as i64 * LTP_scale_Q14 as i16 as i64 >> 16) as i32
+            inv_gain_Q31 = ((((inv_gain_Q31 as i64 * LTP_scale_Q14 as i16 as i64) >> 16) as i32
                 as u32)
                 << 2) as i32;
         }
         let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let end = NSQ.sLTP_buf_idx as usize;
         for i in start..end {
-            sLTP_Q15[i] = (inv_gain_Q31 as i64 * sLTP[i] as i64 >> 16) as i32;
+            sLTP_Q15[i] = ((inv_gain_Q31 as i64 * sLTP[i] as i64) >> 16) as i32;
         }
     }
 
@@ -529,25 +530,25 @@ fn silk_nsq_scale_states(
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;
         for i in shp_start..shp_end {
-            NSQ.sLTP_shp_Q14[i] = (gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64 >> 16) as i32;
+            NSQ.sLTP_shp_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64) >> 16) as i32;
         }
 
         if signal_type == TYPE_VOICED && NSQ.rewhite_flag == 0 {
             let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
             let end = NSQ.sLTP_buf_idx as usize;
-            for i in start..end {
-                sLTP_Q15[i] = (gain_adj_Q16 as i64 * sLTP_Q15[i] as i64 >> 16) as i32;
+            for val in sLTP_Q15[start..end].iter_mut() {
+                *val = ((gain_adj_Q16 as i64 * *val as i64) >> 16) as i32;
             }
         }
 
-        NSQ.sLF_AR_shp_Q14 = (gain_adj_Q16 as i64 * NSQ.sLF_AR_shp_Q14 as i64 >> 16) as i32;
-        NSQ.sDiff_shp_Q14 = (gain_adj_Q16 as i64 * NSQ.sDiff_shp_Q14 as i64 >> 16) as i32;
+        NSQ.sLF_AR_shp_Q14 = ((gain_adj_Q16 as i64 * NSQ.sLF_AR_shp_Q14 as i64) >> 16) as i32;
+        NSQ.sDiff_shp_Q14 = ((gain_adj_Q16 as i64 * NSQ.sDiff_shp_Q14 as i64) >> 16) as i32;
 
         for i in 0..NSQ_LPC_BUF_LENGTH {
-            NSQ.sLPC_Q14[i] = (gain_adj_Q16 as i64 * NSQ.sLPC_Q14[i] as i64 >> 16) as i32;
+            NSQ.sLPC_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLPC_Q14[i] as i64) >> 16) as i32;
         }
         for i in 0..MAX_SHAPE_LPC_ORDER as usize {
-            NSQ.sAR2_Q14[i] = (gain_adj_Q16 as i64 * NSQ.sAR2_Q14[i] as i64 >> 16) as i32;
+            NSQ.sAR2_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sAR2_Q14[i] as i64) >> 16) as i32;
         }
 
         NSQ.prev_gain_Q16 = Gains_Q16[subfr as usize];

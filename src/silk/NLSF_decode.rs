@@ -25,7 +25,7 @@ fn silk_NLSF_residual_dequant(
         .zip(indices.iter().zip(pred_coef_Q8.iter()))
         .rev()
     {
-        let pred_Q10 = out_Q10 as i16 as i32 * pref_coef_Q8 as i16 as i32 >> 8;
+        let pred_Q10 = (out_Q10 as i16 as i32 * pref_coef_Q8 as i16 as i32) >> 8;
         out_Q10 = ((index as u32) << 10) as i32;
         if out_Q10 > 0 {
             out_Q10 -= (0.1f64 * ((1) << 10) as f64 + 0.5f64) as i32;
@@ -33,7 +33,7 @@ fn silk_NLSF_residual_dequant(
             out_Q10 += (0.1f64 * ((1) << 10) as f64 + 0.5f64) as i32;
         }
         out_Q10 =
-            (pred_Q10 as i64 + (out_Q10 as i64 * quant_step_size_Q16 as i16 as i64 >> 16)) as i32;
+            (pred_Q10 as i64 + ((out_Q10 as i64 * quant_step_size_Q16 as i16 as i64) >> 16)) as i32;
         *x_Q10 = out_Q10 as i16;
     }
 }
@@ -76,21 +76,7 @@ pub fn silk_NLSF_decode(
     {
         NLSF_Q15_tmp = ((res_Q10 as i32 as u32) << 14) as i32 / pCB_Wght_Q9 as i32
             + ((pCB_element as i16 as u32) << 7) as i32;
-        *out = (if 0 > 32767 {
-            if NLSF_Q15_tmp > 0 {
-                0
-            } else if NLSF_Q15_tmp < 32767 {
-                32767
-            } else {
-                NLSF_Q15_tmp
-            }
-        } else if NLSF_Q15_tmp > 32767 {
-            32767
-        } else if NLSF_Q15_tmp < 0 {
-            0
-        } else {
-            NLSF_Q15_tmp
-        }) as i16;
+        *out = NLSF_Q15_tmp.clamp(0, 32767) as i16;
     }
     silk_NLSF_stabilize(pNLSF_Q15, psNLSF_CB.deltaMin_Q15);
 }

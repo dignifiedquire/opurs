@@ -209,7 +209,7 @@ pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
             this.error |= ec_write_byte_at_end(this, window & EC_SYM_MAX);
             window >>= EC_SYM_BITS;
             used -= EC_SYM_BITS;
-            if !(used >= EC_SYM_BITS) {
+            if used < EC_SYM_BITS {
                 break;
             }
         }

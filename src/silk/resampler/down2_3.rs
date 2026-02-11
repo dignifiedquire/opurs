@@ -36,67 +36,67 @@ pub fn silk_resampler_down2_3(state: &mut [i32; 6], mut out: &mut [i16], mut in_
         let mut buf_ptr = buf.as_mut_slice();
         let mut counter = nSamplesIn;
         while counter > 2 {
-            res_Q6 = (buf_ptr[0] as i64 * silk_Resampler_2_3_COEFS_LQ[2] as i64 >> 16) as i32;
+            res_Q6 = ((buf_ptr[0] as i64 * silk_Resampler_2_3_COEFS_LQ[2] as i64) >> 16) as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[1] as i64 * silk_Resampler_2_3_COEFS_LQ[3] as i64 >> 16))
+                + ((buf_ptr[1] as i64 * silk_Resampler_2_3_COEFS_LQ[3] as i64) >> 16))
                 as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[2] as i64 * silk_Resampler_2_3_COEFS_LQ[5] as i64 >> 16))
+                + ((buf_ptr[2] as i64 * silk_Resampler_2_3_COEFS_LQ[5] as i64) >> 16))
                 as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[3] as i64 * silk_Resampler_2_3_COEFS_LQ[4] as i64 >> 16))
+                + ((buf_ptr[3] as i64 * silk_Resampler_2_3_COEFS_LQ[4] as i64) >> 16))
                 as i32;
 
             out[0] = (if (if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) > silk_int16_MAX
             {
                 silk_int16_MAX
             } else if (if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) < silk_int16_MIN
             {
                 silk_int16_MIN
             } else if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) as i16;
             out = &mut out[1..];
 
-            res_Q6 = (buf_ptr[1] as i64 * silk_Resampler_2_3_COEFS_LQ[4] as i64 >> 16) as i32;
+            res_Q6 = ((buf_ptr[1] as i64 * silk_Resampler_2_3_COEFS_LQ[4] as i64) >> 16) as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[2] as i64 * silk_Resampler_2_3_COEFS_LQ[5] as i64 >> 16))
+                + ((buf_ptr[2] as i64 * silk_Resampler_2_3_COEFS_LQ[5] as i64) >> 16))
                 as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[3] as i64 * silk_Resampler_2_3_COEFS_LQ[3] as i64 >> 16))
+                + ((buf_ptr[3] as i64 * silk_Resampler_2_3_COEFS_LQ[3] as i64) >> 16))
                 as i32;
             res_Q6 = (res_Q6 as i64
-                + (buf_ptr[4] as i64 * silk_Resampler_2_3_COEFS_LQ[2] as i64 >> 16))
+                + ((buf_ptr[4] as i64 * silk_Resampler_2_3_COEFS_LQ[2] as i64) >> 16))
                 as i32;
 
             out[0] = (if (if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) > silk_int16_MAX
             {
                 silk_int16_MAX
             } else if (if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) < silk_int16_MIN
             {
                 silk_int16_MIN
             } else if 6 == 1 {
                 (res_Q6 >> 1) + (res_Q6 & 1)
             } else {
-                (res_Q6 >> 6 - 1) + 1 >> 1
+                ((res_Q6 >> (6 - 1)) + 1) >> 1
             }) as i16;
             out = &mut out[1..];
 

@@ -73,7 +73,7 @@ pub fn silk_quant_LTP_gains(
                 cbk_size,
             );
             res_nrg_Q15 = if (res_nrg_Q15 as u32).wrapping_add(res_nrg_Q15_subfr as u32)
-                & 0x80000000 as u32
+                & 0x80000000_u32
                 != 0
             {
                 silk_int32_MAX
@@ -81,7 +81,7 @@ pub fn silk_quant_LTP_gains(
                 res_nrg_Q15 + res_nrg_Q15_subfr
             };
             rate_dist_Q7 = if (rate_dist_Q7 as u32).wrapping_add(rate_dist_Q7_subfr as u32)
-                & 0x80000000 as u32
+                & 0x80000000_u32
                 != 0
             {
                 silk_int32_MAX
@@ -120,10 +120,10 @@ pub fn silk_quant_LTP_gains(
         j += 1;
     }
     if nb_subfr == 2 {
-        res_nrg_Q15 = res_nrg_Q15 >> 1;
+        res_nrg_Q15 >>= 1;
     } else {
-        res_nrg_Q15 = res_nrg_Q15 >> 2;
+        res_nrg_Q15 >>= 2;
     }
     *sum_log_gain_Q7 = best_sum_log_gain_Q7;
-    *pred_gain_dB_Q7 = -(3) as i16 as i32 * (silk_lin2log(res_nrg_Q15) - ((15) << 7)) as i16 as i32;
+    *pred_gain_dB_Q7 = -3_i16 as i32 * (silk_lin2log(res_nrg_Q15) - ((15) << 7)) as i16 as i32;
 }

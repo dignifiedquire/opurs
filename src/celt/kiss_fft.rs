@@ -178,7 +178,7 @@ fn kf_bfly5(
         for u in 0..m {
             scratch[0] = chunk0[0];
 
-            scratch[1] = chunk1[0] * tw[1 * u * fstride];
+            scratch[1] = chunk1[0] * tw[u * fstride];
             scratch[2] = chunk2[0] * tw[2 * u * fstride];
             scratch[3] = chunk3[0] * tw[3 * u * fstride];
             scratch[4] = chunk4[0] * tw[4 * u * fstride];
