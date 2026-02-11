@@ -32,7 +32,7 @@ with safe code makes performance optimization easier to reason about.
   - Inner products (`celt_inner_prod`, `dual_inner_prod`)
   - SILK noise shaping quantizer (NSQ)
   - Band energy computation
-- [ ] Benchmark against upstream C via `unsafe-libopus-tools` timing
+- [ ] Benchmark against upstream C via `opurs-tools` timing
 - [ ] Document baseline numbers in this file
 - [ ] **Commit**: `perf: add criterion benchmark suite`
 

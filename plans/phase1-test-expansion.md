@@ -71,7 +71,7 @@ fix these patterns:
 | `static mut Rz/Rw` globals | opus_decode, opus_encode | `struct TestRng` passed by `&mut` |
 | `extern "C" { fn rand(); }` | Unit tests | Deterministic `TestRng` from test_common |
 | `extern "C" { fn fprintf(); }` | Unit tests | Remove entirely — use `assert!`/`eprintln!` |
-| Private copies of library fns | Unit tests | `use unsafe_libopus::...` imports |
+| Private copies of library fns | Unit tests | `use opurs::...` imports |
 | One 500-line mega-test | opus_encode, opus_decode | Multiple focused `#[test]` fns |
 | `b"path\0" as *const i8` file refs | All tests | `file!()` and `line!()` macros |
 | Magic numbers `960, 2880, 48000` | All tests | Named constants with comments |
