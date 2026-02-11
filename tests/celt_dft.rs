@@ -12,9 +12,9 @@ mod test_common;
 use num_complex::Complex32;
 use test_common::TestRng;
 use unsafe_libopus::internals::{opus_fft_c, opus_fft_impl};
-use unsafe_libopus::OpusCustomMode;
 
 /// Compute reference DFT and compare with FFT output, returning SNR in dB.
+#[allow(clippy::needless_range_loop)]
 fn check_fft(input: &[Complex32], output: &[Complex32], nfft: usize, isinverse: bool) -> f64 {
     let mut errpow = 0.0f64;
     let mut sigpow = 0.0f64;
@@ -56,9 +56,6 @@ fn opus_ifft_c(
     fout: &mut [Complex32],
 ) {
     // Bit-reverse copy from input
-    for (i, &x) in fin.iter().enumerate() {
-        let _ = i;
-    }
     for (&x, &br) in fin.iter().zip(st.bitrev.iter()) {
         fout[br as usize] = x;
     }
@@ -92,22 +89,22 @@ fn test_fft(nfft: usize, isinverse: bool) {
     let mut output = vec![Complex32::new(0.0, 0.0); nfft];
 
     // Generate random input
-    for k in 0..nfft {
-        input[k].re = (rng.next_u32() % 32767) as f32 - 16384.0;
-        input[k].im = (rng.next_u32() % 32767) as f32 - 16384.0;
+    for elem in input.iter_mut() {
+        elem.re = (rng.next_u32() % 32767) as f32 - 16384.0;
+        elem.im = (rng.next_u32() % 32767) as f32 - 16384.0;
     }
 
     // Scale by 32768
-    for k in 0..nfft {
-        input[k].re *= 32768.0;
-        input[k].im *= 32768.0;
+    for elem in input.iter_mut() {
+        elem.re *= 32768.0;
+        elem.im *= 32768.0;
     }
 
     // For inverse: divide by nfft
     if isinverse {
-        for k in 0..nfft {
-            input[k].re /= nfft as f32;
-            input[k].im /= nfft as f32;
+        for elem in input.iter_mut() {
+            elem.re /= nfft as f32;
+            elem.im /= nfft as f32;
         }
     }
 

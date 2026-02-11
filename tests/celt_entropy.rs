@@ -33,13 +33,13 @@ fn crand(rng: &mut TestRng) -> u32 {
 #[test]
 fn test_entropy_raw_encoding_decoding() {
     let mut buf = vec![0u8; DATA_SIZE];
-    let mut entropy: f64 = 0.0;
+    let mut _entropy: f64 = 0.0;
 
     // Encode: frequency tables
     let mut enc = ec_enc_init(&mut buf);
     for ft in 2..1024 {
         for i in 0..ft {
-            entropy += (ft as f64).ln() * M_LOG2E;
+            _entropy += (ft as f64).ln() * M_LOG2E;
             ec_enc_uint(&mut enc, i, ft);
         }
     }
@@ -47,7 +47,7 @@ fn test_entropy_raw_encoding_decoding() {
     // Encode: raw bits
     for ftb in 1u32..16 {
         for i in 0..(1u32 << ftb) {
-            entropy += ftb as f64;
+            _entropy += ftb as f64;
             let nbits = ec_tell(&enc);
             ec_enc_bits(&mut enc, i, ftb);
             let nbits2 = ec_tell(&enc);
@@ -150,7 +150,7 @@ fn test_entropy_random_streams() {
         let mut tell = vec![0u32; sz + 1];
 
         let mut enc = ec_enc_init(&mut buf);
-        let zeros = crand(&mut rng) % 13 == 0;
+        let zeros = crand(&mut rng).is_multiple_of(13);
         tell[0] = ec_tell_frac(&enc);
 
         for j in 0..sz {
@@ -163,7 +163,7 @@ fn test_entropy_random_streams() {
             tell[j + 1] = ec_tell_frac(&enc);
         }
 
-        if crand(&mut rng) % 2 == 0 {
+        if crand(&mut rng).is_multiple_of(2) {
             while ec_tell(&enc) % 8 != 0 {
                 ec_enc_uint(&mut enc, crand(&mut rng) % 2, 2);
             }
@@ -182,9 +182,9 @@ fn test_entropy_random_streams() {
 
         let range_bytes = enc.offs;
         assert!(
-            (tell_bits + 7) / 8 >= range_bytes,
+            tell_bits.div_ceil(8) >= range_bytes,
             "ec_tell() lied, there's {range_bytes} bytes instead of {} (seed: {seed}, iter: {i})",
-            (tell_bits + 7) / 8,
+            tell_bits.div_ceil(8),
         );
 
         let mut dec = ec_dec_init(&mut buf);
@@ -264,9 +264,9 @@ fn test_entropy_cross_method_compatibility() {
         let range_bytes = enc.offs;
         let tell_bits = ec_tell(&enc) as u32;
         assert!(
-            (tell_bits + 7) / 8 >= range_bytes,
+            tell_bits.div_ceil(8) >= range_bytes,
             "tell() lied, there's {range_bytes} bytes instead of {} (seed: {seed}, iter: {i})",
-            (tell_bits + 7) / 8,
+            tell_bits.div_ceil(8),
         );
 
         let mut dec = ec_dec_init(&mut buf);

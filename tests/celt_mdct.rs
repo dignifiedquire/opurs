@@ -13,6 +13,7 @@ use test_common::TestRng;
 use unsafe_libopus::internals::{mdct_backward, mdct_forward};
 
 /// Reference forward MDCT check: compare actual output with DCT-IV formula.
+#[allow(clippy::needless_range_loop)]
 fn check_forward(input: &[f32], output: &[f32], nfft: usize) -> f64 {
     let mut errpow = 0.0f64;
     let mut sigpow = 0.0f64;
@@ -37,6 +38,7 @@ fn check_forward(input: &[f32], output: &[f32], nfft: usize) -> f64 {
 }
 
 /// Reference inverse MDCT check: reconstruct time-domain from MDCT coefficients.
+#[allow(clippy::needless_range_loop)]
 fn check_inverse(input: &[f32], output: &[f32], nfft: usize) -> f64 {
     let mut errpow = 0.0f64;
     let mut sigpow = 0.0f64;
@@ -82,8 +84,8 @@ fn test_mdct_forward(nfft: usize) {
     let mut output = vec![0.0f32; n2];
     let window = vec![1.0f32; overlap]; // Q15ONE = 1.0 in float
 
-    for k in 0..nfft {
-        input[k] = ((rng.next_u32() % 32768) as f32 - 16384.0) * 32768.0;
+    for elem in input.iter_mut() {
+        *elem = ((rng.next_u32() % 32768) as f32 - 16384.0) * 32768.0;
     }
 
     let input_copy = input.clone();
@@ -113,8 +115,8 @@ fn test_mdct_inverse(nfft: usize) {
 
     // For inverse: input is n2 MDCT coefficients
     let mut input = vec![0.0f32; nfft];
-    for k in 0..nfft {
-        input[k] = ((rng.next_u32() % 32768) as f32 - 16384.0) * 32768.0 / nfft as f32;
+    for elem in input.iter_mut() {
+        *elem = ((rng.next_u32() % 32768) as f32 - 16384.0) * 32768.0 / nfft as f32;
     }
 
     // mdct_backward: input.len() == n2, out.len() == n2 + overlap = nfft

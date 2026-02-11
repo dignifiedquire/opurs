@@ -20,6 +20,7 @@ fn read_pcm16(raw_data: &[u8], nchannels: usize) -> (Vec<f32>, usize) {
     (samples, len / nchannels)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn band_energy(
     mut out: Option<&mut [f32]>,
     ps: &mut [f32],
@@ -38,14 +39,17 @@ fn band_energy(
 
     let ps_sz = window_size / 2;
 
+    #[allow(clippy::needless_range_loop)]
     for xj in 0..window_size {
         window[xj] = 0.5 - 0.5 * ((2.0 * PI / (window_size - 1) as f32) * xj as f32).cos();
     }
 
+    #[allow(clippy::needless_range_loop)]
     for xj in 0..window_size {
         c[xj] = (2.0 * PI / window_size as f32 * xj as f32).cos();
     }
 
+    #[allow(clippy::needless_range_loop)]
     for xj in 0..window_size {
         s[xj] = (2.0 * PI / window_size as f32 * xj as f32).sin();
     }
@@ -238,9 +242,9 @@ pub fn opus_compare(params: CompareParams, true_file: &[u8], tested_file: &[u8])
         // Allowing some cross-talk
         if nchannels == 2 {
             for bi in 0..NBANDS {
-                let l = xb[(xi * NBANDS + bi) * nchannels + 0];
+                let l = xb[(xi * NBANDS + bi) * nchannels];
                 let r = xb[(xi * NBANDS + bi) * nchannels + 1];
-                xb[(xi * NBANDS + bi) * nchannels + 0] += 0.01f32 * r;
+                xb[(xi * NBANDS + bi) * nchannels] += 0.01f32 * r;
                 xb[(xi * NBANDS + bi) * nchannels + 1] += 0.01f32 * l;
             }
         }
@@ -300,7 +304,7 @@ pub fn opus_compare(params: CompareParams, true_file: &[u8], tested_file: &[u8])
 
                     // Make comparison less sensitive around the SILK/CELT cross-over to
                     //             allow for mode freedom in the filters
-                    if xj >= 79 && xj <= 81 {
+                    if (79..=81).contains(&xj) {
                         im *= 0.1f32;
                     }
                     if xj == 80 {

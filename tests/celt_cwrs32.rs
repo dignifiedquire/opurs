@@ -27,7 +27,7 @@ fn test_cwrs_encode_decode_roundtrip() {
         let n = PN[t];
 
         for pseudo in 1..41 {
-            let k = unsafe { get_pulses(pseudo) };
+            let k = get_pulses(pseudo);
             if k > PKMAX[t] {
                 break;
             }

@@ -71,7 +71,7 @@ fn test_dec_api() {
     // GET_PITCH has different execution paths depending on the previously decoded frame.
     let i = dec.pitch();
     assert!(
-        i <= 0 && i >= -1,
+        (-1..=0).contains(&i),
         "OPUS_GET_PITCH initial check failed: {i}"
     );
     cfgs += 1;
@@ -88,7 +88,7 @@ fn test_dec_api() {
 
     let i = dec.pitch();
     assert!(
-        i <= 0 && i >= -1,
+        (-1..=0).contains(&i),
         "OPUS_GET_PITCH after CELT decode failed: {i}"
     );
     cfgs += 1;
@@ -103,7 +103,7 @@ fn test_dec_api() {
 
     let i = dec.pitch();
     assert!(
-        i <= 0 && i >= -1,
+        (-1..=0).contains(&i),
         "OPUS_GET_PITCH after SILK decode failed: {i}"
     );
     cfgs += 1;
@@ -418,7 +418,7 @@ fn test_parse_code_2_inner() {
             let mut toc = u8::MAX;
             let mut payload_offset = -1;
             let ret = opus_packet_parse(
-                &packet[..(j + (if j < 252 { 2 } else { 3 }) - 1 as usize)],
+                &packet[..(j + (if j < 252 { 2 } else { 3 }) - 1_usize)],
                 Some(&mut toc),
                 Some(&mut frames),
                 &mut size,
@@ -436,7 +436,7 @@ fn test_parse_code_2_inner() {
 
             let packet_len = j + (if j < 252 { 2 } else { 3 }) + 1276;
             // this makes no sense anymore
-            if packet_len as usize > packet.len() {
+            if packet_len > packet.len() {
                 continue;
             }
 
@@ -459,7 +459,7 @@ fn test_parse_code_2_inner() {
 
             let packet_len = j + (if j < 252 { 2 } else { 3 });
             // this makes no sense anymore
-            if packet_len as usize > packet.len() {
+            if packet_len > packet.len() {
                 continue;
             }
 
@@ -492,12 +492,12 @@ fn test_parse_code_2_inner() {
             let packet_len = (j << 1) + 4;
 
             // this makes no sense anymore
-            if packet_len as usize > packet.len() {
+            if packet_len > packet.len() {
                 continue;
             }
 
             let ret = opus_packet_parse(
-                &packet[..packet_len as usize],
+                &packet[..packet_len],
                 Some(&mut toc),
                 Some(&mut frames),
                 &mut size,
@@ -564,7 +564,7 @@ fn test_parse_code_3_m_0_49_64_inner() {
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
         for jj in 49..=64 {
-            packet[1] = (0 + (jj & 63)) as u8;
+            packet[1] = (jj & 63) as u8;
             frames[0] = 0;
             frames[1] = 0;
 
@@ -686,7 +686,7 @@ fn test_parse_code_3_m_1_48_cbr_inner() {
 
     for i in 0..64 {
         let mut frame_samp: i32 = 0;
-        packet[0] = ((i << 2) + 3) as u8;
+        packet[0] = (i << 2) + 3;
         frame_samp = opus_packet_get_samples_per_frame(packet[0], 48000);
         for j in 2..49 {
             packet[1] = j as u8;
@@ -697,7 +697,7 @@ fn test_parse_code_3_m_1_48_cbr_inner() {
                 let mut payload_offset = -1;
 
                 // this makes no sense anymore
-                if sz as usize > packet.len() {
+                if sz > packet.len() {
                     continue;
                 }
 
@@ -812,7 +812,7 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
             let mut toc = u8::MAX;
             let mut payload_offset = -1;
             let ret = opus_packet_parse(
-                &packet[..2 + j as usize - 2],
+                &packet[..2 + j - 2],
                 Some(&mut toc),
                 Some(&mut frames),
                 &mut size,
@@ -822,10 +822,8 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
                 panic!("assertion failed at upstream test_opus_api.c:934");
             }
             packet[2] = 252;
-            packet[3 as usize] = 0;
-            for jj in 4..2 + j {
-                packet[jj as usize] = 0;
-            }
+            packet[3] = 0;
+            packet[4..2 + j].fill(0);
             frames[0] = 0;
             frames[1] = 0;
             let mut toc = u8::MAX;
@@ -840,9 +838,7 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
             if ret != OPUS_INVALID_PACKET {
                 panic!("assertion failed at upstream test_opus_api.c:941");
             }
-            for jj in 2..2 + j {
-                packet[jj as usize] = 0;
-            }
+            packet[2..2 + j].fill(0);
             frames[0] = 0;
             frames[1] = 0;
             let mut toc = u8::MAX;
@@ -859,9 +855,7 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
             }
             packet[2] = 252;
             packet[3] = 0;
-            for jj in 4..2 + j {
-                packet[jj as usize] = 0;
-            }
+            packet[4..2 + j].fill(0);
             frames[0] = 0;
             frames[1] = 0;
             let mut toc = u8::MAX;
@@ -877,9 +871,7 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
             if ret != OPUS_INVALID_PACKET {
                 panic!("assertion failed at upstream test_opus_api.c:955");
             }
-            for jj in 2..2 + j {
-                packet[jj as usize] = 0;
-            }
+            packet[2..2 + j].fill(0);
             frames[0] = 0;
             frames[1] = 0;
             let mut toc = u8::MAX;
@@ -896,10 +888,8 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
                 if ret != j as i32 {
                     panic!("assertion failed at upstream test_opus_api.c:962");
                 }
-                for jj in 0..j {
-                    if size[jj as usize] as i32 != 0 {
-                        panic!("assertion failed at upstream test_opus_api.c:963");
-                    }
+                if size[..j].iter().any(|s| *s as i32 != 0) {
+                    panic!("assertion failed at upstream test_opus_api.c:963");
                 }
                 if toc >> 2 != i as _ {
                     panic!("assertion failed at upstream test_opus_api.c:964");
@@ -947,13 +937,10 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
                     if ret != j as i32 {
                         panic!("assertion failed at upstream test_opus_api.c:981");
                     }
-                    for jj in 0..j - 1 {
-                        if size[jj as usize] as i32 != as_0 {
-                            panic!("assertion failed at upstream test_opus_api.c:982");
-                        }
+                    if size[..j - 1].iter().any(|s| *s as i32 != as_0) {
+                        panic!("assertion failed at upstream test_opus_api.c:982");
                     }
-                    if size[(j - 1) as usize] as i32
-                        != tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1)
+                    if size[j - 1] as i32 != tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1)
                     {
                         panic!("assertion failed at upstream test_opus_api.c:983");
                     }
@@ -1126,7 +1113,7 @@ fn test_enc_api_inner() {
             OpusEncoder::new(48000, 2, 2051).expect("failed to create encoder with LOW_DELAY");
         let i = enc.lookahead();
         assert!(
-            i >= 0 && i <= 32766,
+            (0..=32766).contains(&i),
             "OPUS_GET_LOOKAHEAD for LOW_DELAY returned {i}"
         );
         cfgs += 2;
@@ -1137,7 +1124,7 @@ fn test_enc_api_inner() {
         let enc = OpusEncoder::new(48000, 2, 2049).expect("failed to create encoder with AUDIO");
         let i = enc.lookahead();
         assert!(
-            i >= 0 && i <= 32766,
+            (0..=32766).contains(&i),
             "OPUS_GET_LOOKAHEAD for AUDIO returned {i}"
         );
         cfgs += 2;
@@ -1150,7 +1137,7 @@ fn test_enc_api_inner() {
     println!("    opus_encoder_init() .......................... OK.");
 
     let i = enc.lookahead();
-    assert!(i >= 0 && i <= 32766, "OPUS_GET_LOOKAHEAD returned {i}");
+    assert!((0..=32766).contains(&i), "OPUS_GET_LOOKAHEAD returned {i}");
     cfgs += 1;
     println!("    OPUS_GET_LOOKAHEAD ........................... OK.");
 
@@ -1192,7 +1179,7 @@ fn test_enc_api_inner() {
     cfgs += 1;
     let i = enc.bitrate();
     assert!(
-        i <= 700000 && i >= 256000,
+        (256000..=700000).contains(&i),
         "bitrate after setting huge value = {i}, expected [256000, 700000]"
     );
     cfgs += 1;
@@ -1437,14 +1424,14 @@ fn test_enc_api_inner() {
     // opus_encode()
     sbuf.fill(0);
     let i = enc.encode(&sbuf[..960 * 2], &mut packet[..1276]);
-    assert!(i >= 1 && i <= 1276, "opus_encode returned {i}");
+    assert!((1..=1276).contains(&i), "opus_encode returned {i}");
     cfgs += 1;
     println!("    opus_encode() ................................ OK.");
 
     // opus_encode_float()
     fbuf.fill(0.0);
     let i = enc.encode_float(&fbuf[..960 * 2], &mut packet[..1276]);
-    assert!(i >= 1 && i <= 1276, "opus_encode_float returned {i}");
+    assert!((1..=1276).contains(&i), "opus_encode_float returned {i}");
     cfgs += 1;
     println!("    opus_encode_float() .......................... OK.");
 
@@ -1589,10 +1576,8 @@ fn test_repacketizer_api_0() {
                             if rp.out(&mut po[..len as usize - 1]) != OPUS_BUFFER_TOO_SMALL {
                                 panic!("assertion failed at upstream test_opus_api.c:1576");
                             }
-                            if len > 1 {
-                                if rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
-                                    panic!("assertion failed at upstream test_opus_api.c:1580");
-                                }
+                            if len > 1 && rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
+                                panic!("assertion failed at upstream test_opus_api.c:1580");
                             }
                             if rp.out(&mut po[..0]) != OPUS_BUFFER_TOO_SMALL {
                                 panic!("assertion failed at upstream test_opus_api.c:1583");
@@ -1746,10 +1731,8 @@ fn test_repacketizer_api_1() {
             if rp.out(&mut po[..len_0 as usize - 1]) != OPUS_BUFFER_TOO_SMALL {
                 panic!("assertion failed at upstream test_opus_api.c:1691");
             }
-            if len_0 > 1 {
-                if rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
-                    panic!("assertion failed at upstream test_opus_api.c:1695");
-                }
+            if len_0 > 1 && rp.out(&mut po[..1]) != OPUS_BUFFER_TOO_SMALL {
+                panic!("assertion failed at upstream test_opus_api.c:1695");
             }
             if rp.out(&mut po[..0]) != OPUS_BUFFER_TOO_SMALL {
                 panic!("assertion failed at upstream test_opus_api.c:1698");
@@ -1757,8 +1740,8 @@ fn test_repacketizer_api_1() {
         }
     }
 
-    po[0] = 'O' as u8;
-    po[1] = 'p' as u8;
+    po[0] = b'O';
+    po[1] = b'p';
 
     if opus_packet_pad(&mut po[..4], 4, 4) != 0 {
         panic!("assertion failed at upstream test_opus_api.c:1705");

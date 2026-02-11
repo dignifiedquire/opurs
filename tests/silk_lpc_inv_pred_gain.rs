@@ -17,9 +17,9 @@ use unsafe_libopus::internals::{silk_LPC_inverse_pred_gain_c, SILK_MAX_ORDER_LPC
 fn check_stability(a_q12: &[i16], order: usize) -> bool {
     let mut sum_a: i32 = 0;
     let mut sum_abs_a: i32 = 0;
-    for j in 0..order {
-        sum_a += a_q12[j] as i32;
-        sum_abs_a += (a_q12[j] as i32).abs();
+    for coeff in &a_q12[..order] {
+        sum_a += *coeff as i32;
+        sum_abs_a += (*coeff as i32).abs();
     }
 
     // Check DC stability
@@ -76,8 +76,8 @@ fn test_lpc_inverse_pred_gain() {
         for order in (2..=SILK_MAX_ORDER_LPC).step_by(2) {
             for shift in 0..16u32 {
                 let mut a_q12 = [0i16; SILK_MAX_ORDER_LPC];
-                for i in 0..SILK_MAX_ORDER_LPC {
-                    a_q12[i] = (rng.next_i32() as i16) >> shift;
+                for coeff in a_q12.iter_mut() {
+                    *coeff = (rng.next_i32() as i16) >> shift;
                 }
 
                 let gain = silk_LPC_inverse_pred_gain_c(&a_q12[..order]);

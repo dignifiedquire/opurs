@@ -289,42 +289,6 @@ pub fn pvq_v(n: u32, k: u32) -> u32 {
     pvq_u(n, k) + pvq_u(n, k + 1)
 }
 
-#[cfg(test)]
-mod test {
-    use std::fmt::Write;
-
-    #[test]
-    fn pvq_u_table() {
-        let nk = [
-            0..=176,
-            0..=176,
-            0..=176,
-            0..=176,
-            0..=176,
-            0..=176,
-            0..=96,
-            0..=54,
-            0..=37,
-            0..=28,
-            0..=24,
-            0..=19,
-            0..=18,
-            0..=16,
-            0..=14,
-        ];
-
-        let mut table = String::new();
-        for (n, kk) in nk.iter().enumerate() {
-            let n = n as u32;
-            for k in kk.clone() {
-                writeln!(table, "({}, {}) = {},", n, k, super::pvq_u(n, k)).unwrap();
-            }
-        }
-
-        insta::assert_snapshot!("pvq_u_table", table);
-    }
-}
-
 /// Upstream C: celt/cwrs.c:icwrs
 pub fn icwrs(n: usize, y: &[i32]) -> u32 {
     assert!(n >= 2);
@@ -442,4 +406,40 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
 pub fn decode_pulses(y: &mut [i32], k: i32, dec: &mut ec_dec) -> f32 {
     let n = y.len();
     cwrsi(n, k, ec_dec_uint(dec, pvq_v(n as u32, k as u32)), y)
+}
+
+#[cfg(test)]
+mod test {
+    use std::fmt::Write;
+
+    #[test]
+    fn pvq_u_table() {
+        let nk = [
+            0..=176,
+            0..=176,
+            0..=176,
+            0..=176,
+            0..=176,
+            0..=176,
+            0..=96,
+            0..=54,
+            0..=37,
+            0..=28,
+            0..=24,
+            0..=19,
+            0..=18,
+            0..=16,
+            0..=14,
+        ];
+
+        let mut table = String::new();
+        for (n, kk) in nk.iter().enumerate() {
+            let n = n as u32;
+            for k in kk.clone() {
+                writeln!(table, "({}, {}) = {},", n, k, super::pvq_u(n, k)).unwrap();
+            }
+        }
+
+        insta::assert_snapshot!("pvq_u_table", table);
+    }
 }

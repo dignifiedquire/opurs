@@ -111,7 +111,7 @@ fn test_encode(
         let pcm_start = (samp_count * channels) as usize;
         let pcm_end = pcm_start + (frame_size * channels) as usize;
         let len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
-        if len < 0 || len > 1500 {
+        if !(0..=1500).contains(&len) {
             eprintln!("opus_encode() returned {len}");
             return -1;
         }
@@ -280,24 +280,22 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     let mut dec = OpusDecoder::new(48000, 2).unwrap();
 
     // Create error decoders
-    let mut dec_err: Vec<OpusDecoder> = Vec::with_capacity(10);
-
-    // dec_err[0] = copy of dec
-    dec_err.push(dec.clone());
-
-    dec_err.push(OpusDecoder::new(48000, 1).unwrap());
-    dec_err.push(OpusDecoder::new(24000, 2).unwrap());
-    dec_err.push(OpusDecoder::new(24000, 1).unwrap());
-    dec_err.push(OpusDecoder::new(16000, 2).unwrap());
-    dec_err.push(OpusDecoder::new(16000, 1).unwrap());
-    dec_err.push(OpusDecoder::new(12000, 2).unwrap());
-    dec_err.push(OpusDecoder::new(12000, 1).unwrap());
-    dec_err.push(OpusDecoder::new(8000, 2).unwrap());
-    dec_err.push(OpusDecoder::new(8000, 1).unwrap());
+    let mut dec_err: Vec<OpusDecoder> = vec![
+        dec.clone(), // dec_err[0] = copy of dec
+        OpusDecoder::new(48000, 1).unwrap(),
+        OpusDecoder::new(24000, 2).unwrap(),
+        OpusDecoder::new(24000, 1).unwrap(),
+        OpusDecoder::new(16000, 2).unwrap(),
+        OpusDecoder::new(16000, 1).unwrap(),
+        OpusDecoder::new(12000, 2).unwrap(),
+        OpusDecoder::new(12000, 1).unwrap(),
+        OpusDecoder::new(8000, 2).unwrap(),
+        OpusDecoder::new(8000, 1).unwrap(),
+    ];
 
     // Copy encoder and verify copy works
     let mut enc = {
-        let enccpy = enc.clone();
+        let enccpy = enc;
         // Overwrite original to make sure we're using the copy
         // (matches upstream: memset(enc, 0xFF, ...) + destroy)
         let _ = enc;
@@ -406,7 +404,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 let pcm_start = (i << 1) as usize;
                 let pcm_end = pcm_start + (frame_size * 2) as usize; // 2 channels
                 let mut len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
-                assert!(len >= 0 && len <= 1500, "opus_encode returned {len}");
+                assert!((0..=1500).contains(&len), "opus_encode returned {len}");
                 enc_final_range = enc.final_range();
 
                 if rng.next_u32() & 3 == 0 {
@@ -504,7 +502,6 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         let mut frames = [0usize; 48];
         let mut size = [0i16; 48];
         let mut payload_offset: i32 = 0;
-        let dec_final_range2: u32;
         let frame_size_1 = fsizes[db62[fsize as usize] as usize];
         let offset = i % (48000 * 30 - 5760);
 
@@ -512,7 +509,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         let pcm_start = (offset << 1) as usize;
         let pcm_end = pcm_start + (frame_size_1 * 2) as usize; // 2 channels
         let mut len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
-        assert!(len >= 0 && len <= 1500, "encode failed: {len}");
+        assert!((0..=1500).contains(&len), "encode failed: {len}");
         count += 1;
         enc_final_range = enc.final_range();
 
@@ -552,7 +549,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
 
         let out_samples = dec_err[0].decode(&packet[..len as usize], &mut out2buf, 5760, false);
         assert!(
-            out_samples >= 0 && out_samples <= 5760,
+            (0..=5760).contains(&out_samples),
             "err decode out of range: {out_samples}"
         );
         if len > 0 {
@@ -562,8 +559,8 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
 
         let dec2 = rng.next_u32().wrapping_rem(9).wrapping_add(1) as usize;
         let out_samples = dec_err[dec2].decode(&packet[..len as usize], &mut out2buf, 5760, false);
-        assert!(out_samples >= 0 && out_samples <= 5760);
-        dec_final_range2 = dec_err[dec2].final_range();
+        assert!((0..=5760).contains(&out_samples));
+        let dec_final_range2 = dec_err[dec2].final_range();
         if len > 0 {
             assert_eq!(dec_final_range, dec_final_range2);
         }

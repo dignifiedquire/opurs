@@ -13,7 +13,7 @@ fn usage(argv0: &str) {
 }
 
 fn is_eof(file: &mut File) -> bool {
-    let position = file.seek(std::io::SeekFrom::Current(0)).expect("seeking");
+    let position = file.stream_position().expect("seeking");
     let end = file.seek(std::io::SeekFrom::End(0)).expect("seeking");
     file.seek(std::io::SeekFrom::Start(position))
         .expect("seeking");
@@ -72,7 +72,7 @@ unsafe fn main_0() -> i32 {
         let mut err: i32 = 0;
         let mut nb_packets: usize = merge;
         rp.init();
-        let mut i = 0 as usize;
+        let mut i: usize = 0;
         while i < nb_packets {
             let mut ch: [u8; 4] = [0; 4];
             fin.read_exact(&mut ch).unwrap();
@@ -93,7 +93,7 @@ unsafe fn main_0() -> i32 {
                     eof = true;
                     break;
                 } else {
-                    err = rp.cat(&(packets[i as usize])[..len[i as usize] as usize]);
+                    err = rp.cat(&(packets[i])[..len[i] as usize]);
                     if err != 0 {
                         eprintln!("opus_repacketizer_cat() failed: {}", opus_strerror(err));
                         break;

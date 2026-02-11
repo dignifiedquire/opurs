@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Shared test infrastructure for unsafe-libopus tests.
 //!
 //! Replaces the C `test_opus_common.h` with idiomatic Rust equivalents.

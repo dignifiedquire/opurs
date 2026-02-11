@@ -106,17 +106,17 @@ fn load_test_vectors(vector_dir: &Path) -> Vec<TestVector> {
 #[derive(Debug, Copy, Clone)]
 enum TestResult {
     #[allow(unused)]
-    FreqCompare(CompareResult),
-    BitstreamCompare(bool),
-    DecodedCompare(bool),
+    Freq(CompareResult),
+    Bitstream(bool),
+    Decoded(bool),
 }
 
 impl TestResult {
     pub fn is_success(&self) -> bool {
         match self {
-            TestResult::FreqCompare(freq) => freq.is_success(),
-            &TestResult::BitstreamCompare(result) => result,
-            &TestResult::DecodedCompare(result) => result,
+            TestResult::Freq(freq) => freq.is_success(),
+            &TestResult::Bitstream(result) => result,
+            &TestResult::Decoded(result) => result,
         }
     }
 }
@@ -124,17 +124,17 @@ impl TestResult {
 impl Display for TestResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestResult::FreqCompare(compare) => Display::fmt(compare, f),
-            TestResult::BitstreamCompare(true) => {
+            TestResult::Freq(compare) => Display::fmt(compare, f),
+            TestResult::Bitstream(true) => {
                 write!(f, "PASS: exact bitstream")
             }
-            TestResult::BitstreamCompare(false) => {
+            TestResult::Bitstream(false) => {
                 write!(f, "FAIL: different bitstream")
             }
-            TestResult::DecodedCompare(true) => {
+            TestResult::Decoded(true) => {
                 write!(f, "PASS: exact decoded audio")
             }
-            TestResult::DecodedCompare(false) => {
+            TestResult::Decoded(false) => {
                 write!(f, "FAIL: different decoded audio")
             }
         }
@@ -185,7 +185,7 @@ fn run_test(
                 .unwrap();
             }
 
-            TestResult::DecodedCompare(upstream_decoded == rust_decoded)
+            TestResult::Decoded(upstream_decoded == rust_decoded)
         }
         TestKind::RustEncode { bitrate } => {
             let true_decoded = &test_vector.decoded_stereo;
@@ -206,9 +206,9 @@ fn run_test(
             };
 
             let (upstream_encoded, pre_skip) =
-                opus_demo_encode(OpusBackend::Upstream, &true_decoded, encode_args);
+                opus_demo_encode(OpusBackend::Upstream, true_decoded, encode_args);
             let (rust_encoded, rust_pre_skip) =
-                opus_demo_encode(OpusBackend::Rust, &true_decoded, encode_args);
+                opus_demo_encode(OpusBackend::Rust, true_decoded, encode_args);
             assert_eq!(rust_pre_skip, pre_skip);
 
             if let Some(dump_directory) = dump_directory {
@@ -244,7 +244,7 @@ fn run_test(
                 .unwrap();
             }
 
-            TestResult::BitstreamCompare(upstream_encoded == rust_encoded)
+            TestResult::Bitstream(upstream_encoded == rust_encoded)
         }
     }
 }

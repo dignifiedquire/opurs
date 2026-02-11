@@ -48,9 +48,8 @@ fn create_test_decoders() -> (Vec<OpusDecoder>, OpusDecoder) {
         let dec = OpusDecoder::new(fs, c as usize)
             .unwrap_or_else(|err| panic!("OpusDecoder::new({fs}, {c}) failed: err={err}"));
 
-        // Clone decoder, drop original, use clone
+        // Clone decoder, use clone (original dropped at end of iteration)
         let copy = dec.clone();
-        drop(dec);
 
         decoders.push(copy);
     }
@@ -277,6 +276,7 @@ fn test_decoder_all_2byte_prefixes() {
 /// - De Bruijn mode pairs ×10
 /// - Pre-selected random packets
 #[test]
+#[allow(clippy::needless_range_loop)]
 fn test_decoder_fuzz() {
     if std::env::var("TEST_OPUS_NOFUZZ").is_ok() {
         eprintln!("Skipping decoder fuzz tests (TEST_OPUS_NOFUZZ is set)");
@@ -505,13 +505,15 @@ fn test_decoder_fuzz() {
 
     // --- Guard band check ---
     let mut guard_err = false;
-    for i in 0..(GUARD_SAMPLES * 2) {
-        if outbuf_storage[i] != GUARD_VALUE {
+    for val in &outbuf_storage[..(GUARD_SAMPLES * 2)] {
+        if *val != GUARD_VALUE {
             guard_err = true;
         }
     }
-    for i in (MAX_FRAME as usize * 2)..(MAX_FRAME as usize + GUARD_SAMPLES) * 2 {
-        if outbuf_storage[GUARD_SAMPLES * 2 + i] != GUARD_VALUE {
+    for val in &outbuf_storage[(GUARD_SAMPLES * 2 + MAX_FRAME as usize * 2)
+        ..(GUARD_SAMPLES * 2 + (MAX_FRAME as usize + GUARD_SAMPLES) * 2)]
+    {
+        if *val != GUARD_VALUE {
             guard_err = true;
         }
     }
@@ -524,6 +526,7 @@ fn test_decoder_fuzz() {
 
 /// Upstream C: test_opus_decode.c:test_soft_clip
 #[test]
+#[allow(clippy::needless_range_loop)]
 fn test_soft_clip() {
     let mut x = [0f32; 1024];
     let mut s = [0f32; 8];

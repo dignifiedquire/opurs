@@ -67,7 +67,7 @@ fn test_bitexact_log2tan() {
         let d = last - q;
 
         // Symmetry: log2tan(mid, side) == -log2tan(side, mid)
-        if q != -1 * bitexact_log2tan(side, mid) {
+        if q != -bitexact_log2tan(side, mid) {
             fail = true;
         }
 
@@ -131,7 +131,7 @@ fn test_celt_sqrt() {
 fn test_celt_log2() {
     let mut x: f32 = 0.001;
     while x < 1_677_700.0 {
-        let expected = (1.442695040888963387 * (x as f64).ln()) as f32;
+        let expected = (std::f64::consts::LOG2_E * (x as f64).ln()) as f32;
         let actual = celt_log2(x);
         let error = (expected - actual).abs();
         assert!(
@@ -150,7 +150,7 @@ fn test_celt_exp2() {
     let mut x: f32 = -11.0;
     while x < 24.0 {
         let result = celt_exp2(x);
-        let error = (x as f64 - 1.442695040888963387 * (result as f64).ln()).abs();
+        let error = (x as f64 - std::f64::consts::LOG2_E * (result as f64).ln()).abs();
         assert!(
             error <= 0.0002,
             "celt_exp2({x}) = {result}, roundtrip error = {error}"
