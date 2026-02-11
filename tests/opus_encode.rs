@@ -11,8 +11,8 @@ mod test_common;
 
 use test_common::{debruijn2, TestRng};
 use unsafe_libopus::{
-    opus_encoder_ctl_impl, opus_packet_pad, opus_packet_parse, opus_packet_unpad, opus_private,
-    Bandwidth, Bitrate, Channels, FrameSize, OpusDecoder, OpusEncoder, Signal,
+    opus_packet_pad, opus_packet_parse, opus_packet_unpad, Bandwidth, Bitrate, Channels, FrameSize,
+    OpusDecoder, OpusEncoder, Signal, OPUS_AUTO,
 };
 
 /// Fixed seed matching upstream test (argv[1] = 42).
@@ -313,17 +313,8 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
 
     // Test invalid settings
     enc.set_bandwidth(None);
-    // 11002 with -2 is an invalid force mode value; it should return -1 (BAD_ARG)
-    assert_eq!(
-        unsafe {
-            opus_encoder_ctl_impl(
-                &mut enc as *mut OpusEncoder,
-                opus_private::OPUS_SET_FORCE_MODE_REQUEST,
-                unsafe_libopus::varargs!(-2i32),
-            )
-        },
-        -1
-    );
+    // -2 is an invalid force mode value; it should return Err(BAD_ARG)
+    assert!(enc.set_force_mode(-2).is_err());
     // Invalid frame size (500 samples) should return -1
     assert_eq!(enc.encode(&inbuf[..500 * 2], &mut packet[..1500]), -1);
 
@@ -383,16 +374,7 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 }
                 enc.set_inband_fec(rc == 0);
                 // SET_FORCE_MODE: 1000 + modes[j]
-                assert_eq!(
-                    unsafe {
-                        opus_encoder_ctl_impl(
-                            &mut enc as *mut OpusEncoder,
-                            opus_private::OPUS_SET_FORCE_MODE_REQUEST,
-                            unsafe_libopus::varargs!(1000 + modes[j]),
-                        )
-                    },
-                    0
-                );
+                enc.set_force_mode(1000 + modes[j]).unwrap();
                 rng.next_u32();
                 enc.set_dtx(rng.next_u32() & 1 != 0);
                 enc.set_bitrate(Bitrate::Bits(rate));
@@ -504,17 +486,8 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     }
 
     // Frame size switching test
-    // SET_FORCE_MODE with OPUS_AUTO (-1000)
-    assert_eq!(
-        unsafe {
-            opus_encoder_ctl_impl(
-                &mut enc as *mut OpusEncoder,
-                opus_private::OPUS_SET_FORCE_MODE_REQUEST,
-                unsafe_libopus::varargs!(-1000i32),
-            )
-        },
-        0
-    );
+    // SET_FORCE_MODE with OPUS_AUTO
+    enc.set_force_mode(OPUS_AUTO).unwrap();
     enc.set_force_channels(None).unwrap();
     enc.set_inband_fec(false);
     enc.set_dtx(false);

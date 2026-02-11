@@ -477,6 +477,18 @@ impl OpusEncoder {
         self.celt_enc.disable_inv != 0
     }
 
+    pub fn set_force_mode(&mut self, mode: i32) -> Result<(), i32> {
+        if (mode < MODE_SILK_ONLY || mode > MODE_CELT_ONLY) && mode != OPUS_AUTO {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.user_forced_mode = mode;
+        Ok(())
+    }
+
+    pub fn channels(&self) -> i32 {
+        self.channels
+    }
+
     pub fn sample_rate(&self) -> i32 {
         self.Fs
     }

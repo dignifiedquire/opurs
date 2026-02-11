@@ -25,56 +25,12 @@ pub use input::{
     EncoderOptions, FrameSize, SampleRate,
 };
 
-use ::unsafe_libopus::{
-    opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG, OPUS_GET_FINAL_RANGE_REQUEST,
-    OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST, OPUS_SET_BITRATE_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_EXPERT_FRAME_DURATION_REQUEST,
-    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
-    OPUS_SET_VBR_REQUEST,
-};
+use ::unsafe_libopus::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 
 pub const MAX_PACKET: usize = 1500;
 const MAX_FRAME_SIZE: usize = 48000 * 2;
-
-fn handle_opus_error(err: i32, call: &str) -> u32 {
-    if err < 0 {
-        panic!("{} failed: {}", call, opus_strerror(err));
-    }
-
-    err as u32
-}
-
-macro_rules! checked_opus_encoder_ctl {
-    ($B:ident, $st:expr, $request:expr, $($arg:expr),*) => {
-        {
-            let ret = $B::opus_encoder_ctl_impl(
-                $st,
-                $request,
-                unsafe_libopus::varargs!($($arg),*)
-            );
-
-            handle_opus_error(ret, stringify!(opus_encoder_ctl!($st:expr, $request:expr, $($arg:expr),*)));
-            ret
-        }
-    }
-}
-
-macro_rules! checked_opus_decoder_ctl {
-    ($B:ident, $st:expr, $request:expr, $($arg:expr),*) => {
-        {
-            let ret = $B::opus_decoder_ctl_impl(
-                $st,
-                $request,
-                unsafe_libopus::varargs!($($arg),*)
-            );
-
-            handle_opus_error(ret, stringify!(opus_decoder_ctl!($st:expr, $request:expr, $($arg:expr),*)));
-            ret
-        }
-    }
-}
 
 /// Encode an opus stream, like `opus_demo -e`
 ///
@@ -103,16 +59,12 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         samples.push(i16::from_le_bytes(data.try_into().unwrap()));
     }
 
-    let mut enc = unsafe {
-        B::opus_encoder_create(
-            usize::from(sampling_rate) as i32,
-            channels as i32,
-            application.into_opus(),
-        )
-    }
+    let mut enc = B::opus_encoder_create(
+        usize::from(sampling_rate) as i32,
+        channels as i32,
+        application.into_opus(),
+    )
     .expect("opus_encoder_create failed");
-
-    let mut skip: i32 = 0;
 
     if options.common.inbandfec {
         panic!("inbandfec not supported")
@@ -121,43 +73,19 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         panic!("packet loss simulation not supported")
     }
 
-    unsafe {
-        checked_opus_encoder_ctl!(B, &mut enc, OPUS_SET_BITRATE_REQUEST, bitrate as i32);
-        checked_opus_encoder_ctl!(
-            B,
-            &mut enc,
-            OPUS_SET_BANDWIDTH_REQUEST,
-            options.bandwidth.map_or(OPUS_AUTO, |v| v.into_opus())
-        );
-        checked_opus_encoder_ctl!(B, &mut enc, OPUS_SET_VBR_REQUEST, !options.cbr as i32);
-        checked_opus_encoder_ctl!(
-            B,
-            &mut enc,
-            OPUS_SET_VBR_CONSTRAINT_REQUEST,
-            options.cvbr as i32
-        );
-        checked_opus_encoder_ctl!(
-            B,
-            &mut enc,
-            OPUS_SET_COMPLEXITY_REQUEST,
-            i32::from(options.complexity)
-        );
-        checked_opus_encoder_ctl!(
-            B,
-            &mut enc,
-            OPUS_SET_FORCE_CHANNELS_REQUEST,
-            if options.forcemono { 1 } else { OPUS_AUTO }
-        );
-        checked_opus_encoder_ctl!(B, &mut enc, OPUS_SET_DTX_REQUEST, options.dtx as i32);
-        checked_opus_encoder_ctl!(B, &mut enc, OPUS_GET_LOOKAHEAD_REQUEST, &mut skip);
-        checked_opus_encoder_ctl!(B, &mut enc, OPUS_SET_LSB_DEPTH_REQUEST, 16);
-        checked_opus_encoder_ctl!(
-            B,
-            &mut enc,
-            OPUS_SET_EXPERT_FRAME_DURATION_REQUEST,
-            OPUS_FRAMESIZE_ARG
-        );
-    }
+    B::enc_set_bitrate(&mut enc, bitrate as i32);
+    B::enc_set_bandwidth(
+        &mut enc,
+        options.bandwidth.map_or(OPUS_AUTO, |v| v.into_opus()),
+    );
+    B::enc_set_vbr(&mut enc, !options.cbr as i32);
+    B::enc_set_vbr_constraint(&mut enc, options.cvbr as i32);
+    B::enc_set_complexity(&mut enc, i32::from(options.complexity));
+    B::enc_set_force_channels(&mut enc, if options.forcemono { 1 } else { OPUS_AUTO });
+    B::enc_set_dtx(&mut enc, options.dtx as i32);
+    let skip = B::enc_get_lookahead(&mut enc);
+    B::enc_set_lsb_depth(&mut enc, 16);
+    B::enc_set_expert_frame_duration(&mut enc, OPUS_FRAMESIZE_ARG);
 
     let frame_size: usize = options.framesize.samples_for_rate(sampling_rate);
 
@@ -175,30 +103,13 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         #[cfg(feature = "ent-dump")]
         eprintln!("START encoding packet @ 0x{:x}", fpos);
 
-        let res = handle_opus_error(
-            unsafe {
-                B::opus_encode(
-                    &mut enc,
-                    frame.as_ptr(),
-                    // it's not the length of the frame slice!
-                    frame_size as i32,
-                    buffer.as_mut_ptr(),
-                    buffer.len() as i32,
-                )
-            },
-            "opus_encode",
-        );
+        let res = B::opus_encode(&mut enc, frame, frame_size as i32, &mut buffer);
+        if res < 0 {
+            panic!("opus_encode failed: {}", opus_strerror(res));
+        }
         let data = &buffer[..res as usize];
 
-        let mut enc_final_range: u32 = 0;
-        unsafe {
-            checked_opus_encoder_ctl!(
-                B,
-                &mut enc,
-                OPUS_GET_FINAL_RANGE_REQUEST,
-                &mut enc_final_range
-            );
-        };
+        let enc_final_range = B::enc_get_final_range(&mut enc);
         #[cfg(feature = "ent-dump")]
         eprintln!("END encoding packet @ 0x{:x}", fpos);
 
@@ -207,11 +118,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         output.write_all(data).unwrap();
     }
 
-    unsafe {
-        // yes we leak the encoder on panics
-        // so what?
-        B::opus_encoder_destroy(enc);
-    }
+    B::opus_encoder_destroy(enc);
 
     (output, skip as usize)
 }
@@ -239,9 +146,8 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
 
     let channels: usize = channels.into();
 
-    let mut dec =
-        unsafe { B::opus_decoder_create(usize::from(sample_rate) as i32, channels as i32) }
-            .expect("opus_decoder_create failed");
+    let mut dec = B::opus_decoder_create(usize::from(sample_rate) as i32, channels as i32)
+        .expect("opus_decoder_create failed");
 
     if options.inbandfec {
         panic!("inbandfec not supported")
@@ -263,33 +169,13 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
         let data = &mut data[..data_bytes as usize];
         cursor.read_exact(data).unwrap();
 
-        let output_samples = handle_opus_error(
-            unsafe {
-                B::opus_decode(
-                    &mut dec,
-                    data.as_ptr(),
-                    data.len() as i32,
-                    samples.as_mut_ptr(),
-                    MAX_FRAME_SIZE as i32,
-                    0,
-                )
-            },
-            "opus_decode",
-        );
+        let output_samples = B::opus_decode(&mut dec, data, &mut samples, MAX_FRAME_SIZE as i32, 0);
+        if output_samples < 0 {
+            panic!("opus_decode failed: {}", opus_strerror(output_samples));
+        }
         let samples = &samples[..output_samples as usize * channels];
 
-        let dec_final_range = {
-            let mut dec_final_range: u32 = 0;
-            unsafe {
-                checked_opus_decoder_ctl!(
-                    B,
-                    &mut dec,
-                    OPUS_GET_FINAL_RANGE_REQUEST,
-                    &mut dec_final_range
-                );
-            };
-            dec_final_range
-        };
+        let dec_final_range = B::dec_get_final_range(&mut dec);
 
         assert_eq!(
             enc_final_range, dec_final_range,
@@ -304,7 +190,7 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
         frame_idx += 1;
     }
 
-    unsafe { B::opus_decoder_destroy(dec) };
+    B::opus_decoder_destroy(dec);
 
     output
 }

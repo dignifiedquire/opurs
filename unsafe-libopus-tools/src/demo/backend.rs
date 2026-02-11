@@ -1,50 +1,41 @@
 #![allow(non_snake_case)]
 #![allow(clippy::missing_safety_doc)]
 
-use ::unsafe_libopus::varargs::VarArgs;
 use std::str::FromStr;
 
 pub(crate) trait OpusBackendTrait {
     type Encoder;
     type Decoder;
 
-    unsafe fn opus_encoder_create(
-        Fs: i32,
-        channels: i32,
-        application: i32,
-    ) -> Result<Self::Encoder, i32>;
-    unsafe fn opus_encoder_ctl_impl(st: &mut Self::Encoder, request: i32, args: VarArgs) -> i32;
-    unsafe fn opus_encode(
-        st: &mut Self::Encoder,
-        pcm: *const i16,
-        analysis_frame_size: i32,
-        data: *mut u8,
-        max_data_bytes: i32,
-    ) -> i32;
-    unsafe fn opus_encoder_destroy(st: Self::Encoder);
+    fn opus_encoder_create(Fs: i32, channels: i32, application: i32) -> Result<Self::Encoder, i32>;
+    fn enc_set_bitrate(st: &mut Self::Encoder, val: i32);
+    fn enc_set_bandwidth(st: &mut Self::Encoder, val: i32);
+    fn enc_set_vbr(st: &mut Self::Encoder, val: i32);
+    fn enc_set_vbr_constraint(st: &mut Self::Encoder, val: i32);
+    fn enc_set_complexity(st: &mut Self::Encoder, val: i32);
+    fn enc_set_force_channels(st: &mut Self::Encoder, val: i32);
+    fn enc_set_dtx(st: &mut Self::Encoder, val: i32);
+    fn enc_set_lsb_depth(st: &mut Self::Encoder, val: i32);
+    fn enc_set_expert_frame_duration(st: &mut Self::Encoder, val: i32);
+    fn enc_get_lookahead(st: &mut Self::Encoder) -> i32;
+    fn enc_get_final_range(st: &mut Self::Encoder) -> u32;
+    fn opus_encode(st: &mut Self::Encoder, pcm: &[i16], frame_size: i32, data: &mut [u8]) -> i32;
+    fn opus_encoder_destroy(st: Self::Encoder);
 
-    unsafe fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Self::Decoder, i32>;
-    unsafe fn opus_decode(
+    fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Self::Decoder, i32>;
+    fn opus_decode(
         st: &mut Self::Decoder,
-        data: *const u8,
-        len: i32,
-        pcm: *mut i16,
+        data: &[u8],
+        pcm: &mut [i16],
         frame_size: i32,
         decode_fec: i32,
     ) -> i32;
-    unsafe fn opus_decoder_ctl_impl(st: &mut Self::Decoder, request: i32, args: VarArgs) -> i32;
-    unsafe fn opus_decoder_destroy(st: Self::Decoder);
+    fn dec_get_final_range(st: &mut Self::Decoder) -> u32;
+    fn opus_decoder_destroy(st: Self::Decoder);
 }
 
 mod unsafe_libopus {
-    use unsafe_libopus::varargs::{VarArg, VarArgs};
-    use unsafe_libopus::{
-        opus_encode, Bitrate, OpusDecoder, OpusEncoder, OPUS_GET_FINAL_RANGE_REQUEST,
-        OPUS_GET_LOOKAHEAD_REQUEST, OPUS_RESET_STATE, OPUS_SET_BANDWIDTH_REQUEST,
-        OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
-        OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-        OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
-    };
+    use unsafe_libopus::{Bitrate, OpusDecoder, OpusEncoder};
 
     pub struct RustLibopusBackend;
 
@@ -52,7 +43,7 @@ mod unsafe_libopus {
         type Encoder = Box<OpusEncoder>;
         type Decoder = Box<OpusDecoder>;
 
-        unsafe fn opus_encoder_create(
+        fn opus_encoder_create(
             Fs: i32,
             channels: i32,
             application: i32,
@@ -60,198 +51,97 @@ mod unsafe_libopus {
             OpusEncoder::new(Fs, channels, application).map(Box::new)
         }
 
-        unsafe fn opus_encoder_ctl_impl(
+        fn enc_set_bitrate(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_bitrate(Bitrate::from(val));
+        }
+        fn enc_set_bandwidth(st: &mut Box<OpusEncoder>, val: i32) {
+            let bw = if val == -1 {
+                None
+            } else {
+                Some(val.try_into().unwrap())
+            };
+            st.set_bandwidth(bw);
+        }
+        fn enc_set_vbr(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_vbr(val != 0);
+        }
+        fn enc_set_vbr_constraint(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_vbr_constraint(val != 0);
+        }
+        fn enc_set_complexity(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_complexity(val).unwrap();
+        }
+        fn enc_set_force_channels(st: &mut Box<OpusEncoder>, val: i32) {
+            let ch = if val == -1 {
+                None
+            } else {
+                Some(val.try_into().unwrap())
+            };
+            st.set_force_channels(ch).unwrap();
+        }
+        fn enc_set_dtx(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_dtx(val != 0);
+        }
+        fn enc_set_lsb_depth(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_lsb_depth(val).unwrap();
+        }
+        fn enc_set_expert_frame_duration(st: &mut Box<OpusEncoder>, val: i32) {
+            st.set_expert_frame_duration(val.try_into().unwrap());
+        }
+        fn enc_get_lookahead(st: &mut Box<OpusEncoder>) -> i32 {
+            st.lookahead()
+        }
+        fn enc_get_final_range(st: &mut Box<OpusEncoder>) -> u32 {
+            st.final_range()
+        }
+
+        fn opus_encode(
             st: &mut Box<OpusEncoder>,
-            request: i32,
-            mut args: VarArgs,
+            pcm: &[i16],
+            frame_size: i32,
+            data: &mut [u8],
         ) -> i32 {
-            // Dispatch known CTL requests to safe typed methods.
-            // The trait requires VarArgs for compatibility with the upstream C backend,
-            // but the Rust backend can use safe methods directly.
-            match request {
-                OPUS_SET_BITRATE_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_bitrate(Bitrate::from(*val));
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_BANDWIDTH_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        let bw = if *val == -1 {
-                            None
-                        } else {
-                            Some((*val).try_into().map_err(|_| -1i32).unwrap())
-                        };
-                        st.set_bandwidth(bw);
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_VBR_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_vbr(*val != 0);
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_VBR_CONSTRAINT_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_vbr_constraint(*val != 0);
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_COMPLEXITY_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_complexity(*val).map_or_else(|e| e, |_| 0)
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_FORCE_CHANNELS_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        let ch = if *val == -1 {
-                            None
-                        } else {
-                            Some((*val).try_into().map_err(|_| -1i32).unwrap())
-                        };
-                        st.set_force_channels(ch).map_or_else(|e| e, |_| 0)
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_DTX_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_dtx(*val != 0);
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_LSB_DEPTH_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        st.set_lsb_depth(*val).map_or_else(|e| e, |_| 0)
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_SET_EXPERT_FRAME_DURATION_REQUEST => {
-                    if let [VarArg::I32(val)] = &args.0[..] {
-                        let fs = (*val).try_into().map_err(|_| -1i32).unwrap();
-                        st.set_expert_frame_duration(fs);
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_GET_LOOKAHEAD_REQUEST => {
-                    if let [VarArg::I32Out(ptr)] = &mut args.0[..] {
-                        **ptr = st.lookahead();
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_GET_FINAL_RANGE_REQUEST => {
-                    if let [VarArg::U32Out(ptr)] = &mut args.0[..] {
-                        **ptr = st.final_range();
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_RESET_STATE => {
-                    st.reset();
-                    0
-                }
-                // Fall back to the unsafe impl for unknown requests
-                other => ::unsafe_libopus::opus_encoder_ctl_impl(
-                    &mut **st as *mut OpusEncoder,
-                    other,
-                    args,
-                ),
-            }
+            st.encode(&pcm[..(frame_size as usize * st.channels() as usize)], data)
         }
 
-        unsafe fn opus_encode(
-            st: &mut Box<OpusEncoder>,
-            pcm: *const i16,
-            analysis_frame_size: i32,
-            data: *mut u8,
-            max_data_bytes: i32,
-        ) -> i32 {
-            opus_encode(
-                &mut **st as *mut OpusEncoder,
-                pcm,
-                analysis_frame_size,
-                data,
-                max_data_bytes,
-            )
-        }
+        fn opus_encoder_destroy(_st: Box<OpusEncoder>) {}
 
-        unsafe fn opus_encoder_destroy(st: Box<OpusEncoder>) {
-            drop(st)
-        }
-
-        unsafe fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
+        fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
             OpusDecoder::new(Fs, channels as usize).map(Box::new)
         }
 
-        unsafe fn opus_decode(
+        fn opus_decode(
             st: &mut Box<OpusDecoder>,
-            data: *const u8,
-            len: i32,
-            pcm: *mut i16,
+            data: &[u8],
+            pcm: &mut [i16],
             frame_size: i32,
             decode_fec: i32,
         ) -> i32 {
-            let data = std::slice::from_raw_parts(data, len as usize);
-            let pcm = std::slice::from_raw_parts_mut(pcm, (frame_size * st.channels()) as usize);
             st.decode(data, pcm, frame_size, decode_fec != 0)
         }
 
-        unsafe fn opus_decoder_ctl_impl(
-            st: &mut Box<OpusDecoder>,
-            request: i32,
-            mut args: VarArgs,
-        ) -> i32 {
-            match request {
-                OPUS_GET_FINAL_RANGE_REQUEST => {
-                    if let [VarArg::U32Out(ptr)] = &mut args.0[..] {
-                        **ptr = st.final_range();
-                        0
-                    } else {
-                        -1
-                    }
-                }
-                OPUS_RESET_STATE => {
-                    st.reset();
-                    0
-                }
-                // Fall back to the unsafe impl for unknown requests
-                other => ::unsafe_libopus::opus_decoder_ctl_impl(st, other, args),
-            }
+        fn dec_get_final_range(st: &mut Box<OpusDecoder>) -> u32 {
+            st.final_range()
         }
 
-        unsafe fn opus_decoder_destroy(st: Box<OpusDecoder>) {
-            drop(st)
-        }
+        fn opus_decoder_destroy(_st: Box<OpusDecoder>) {}
     }
 }
 pub(crate) use unsafe_libopus::RustLibopusBackend;
 
 mod libopus {
-    use unsafe_libopus::varargs::{VarArg, VarArgs};
     use upstream_libopus::{
         opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy, opus_encode,
         opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
     };
     use upstream_libopus::{OpusDecoder, OpusEncoder};
+
+    use ::unsafe_libopus::{
+        OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,
+        OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
+        OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
+        OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    };
 
     pub struct UpstreamLibopusBackend;
 
@@ -259,14 +149,13 @@ mod libopus {
         type Encoder = *mut OpusEncoder;
         type Decoder = *mut OpusDecoder;
 
-        unsafe fn opus_encoder_create(
+        fn opus_encoder_create(
             Fs: i32,
             channels: i32,
             application: i32,
         ) -> Result<*mut OpusEncoder, i32> {
             let mut error = 0;
-
-            let res = opus_encoder_create(Fs, channels, application, &mut error);
+            let res = unsafe { opus_encoder_create(Fs, channels, application, &mut error) };
             if res.is_null() {
                 Err(error)
             } else {
@@ -274,37 +163,68 @@ mod libopus {
             }
         }
 
-        unsafe fn opus_encoder_ctl_impl(
-            &mut st: &mut *mut OpusEncoder,
-            request: i32,
-            mut args: VarArgs,
+        fn enc_set_bitrate(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_BITRATE_REQUEST, val) };
+        }
+        fn enc_set_bandwidth(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_BANDWIDTH_REQUEST, val) };
+        }
+        fn enc_set_vbr(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_VBR_REQUEST, val) };
+        }
+        fn enc_set_vbr_constraint(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_VBR_CONSTRAINT_REQUEST, val) };
+        }
+        fn enc_set_complexity(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_COMPLEXITY_REQUEST, val) };
+        }
+        fn enc_set_force_channels(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_FORCE_CHANNELS_REQUEST, val) };
+        }
+        fn enc_set_dtx(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_DTX_REQUEST, val) };
+        }
+        fn enc_set_lsb_depth(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_LSB_DEPTH_REQUEST, val) };
+        }
+        fn enc_set_expert_frame_duration(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, val) };
+        }
+        fn enc_get_lookahead(st: &mut *mut OpusEncoder) -> i32 {
+            let mut val: i32 = 0;
+            unsafe { opus_encoder_ctl(*st, OPUS_GET_LOOKAHEAD_REQUEST, &mut val as *mut _) };
+            val
+        }
+        fn enc_get_final_range(st: &mut *mut OpusEncoder) -> u32 {
+            let mut val: u32 = 0;
+            unsafe { opus_encoder_ctl(*st, OPUS_GET_FINAL_RANGE_REQUEST, &mut val as *mut _) };
+            val
+        }
+
+        fn opus_encode(
+            st: &mut *mut OpusEncoder,
+            pcm: &[i16],
+            frame_size: i32,
+            data: &mut [u8],
         ) -> i32 {
-            match &mut args.0[..] {
-                [VarArg::I32(arg)] => opus_encoder_ctl(st, request, *arg),
-                [VarArg::I32Out(arg)] => opus_encoder_ctl(st, request, *arg as *mut _),
-                [VarArg::U32Out(arg)] => opus_encoder_ctl(st, request, *arg as *mut _),
-                // manually match over all required signatures
-                _ => todo!("opus_decoder_ctl signature not implemented"),
+            unsafe {
+                opus_encode(
+                    *st,
+                    pcm.as_ptr(),
+                    frame_size,
+                    data.as_mut_ptr(),
+                    data.len() as i32,
+                )
             }
         }
 
-        unsafe fn opus_encode(
-            &mut st: &mut *mut OpusEncoder,
-            pcm: *const i16,
-            analysis_frame_size: i32,
-            data: *mut u8,
-            max_data_bytes: i32,
-        ) -> i32 {
-            opus_encode(st, pcm, analysis_frame_size, data, max_data_bytes)
+        fn opus_encoder_destroy(st: *mut OpusEncoder) {
+            unsafe { opus_encoder_destroy(st) }
         }
 
-        unsafe fn opus_encoder_destroy(st: *mut OpusEncoder) {
-            opus_encoder_destroy(st)
-        }
-
-        unsafe fn opus_decoder_create(Fs: i32, channels: i32) -> Result<*mut OpusDecoder, i32> {
+        fn opus_decoder_create(Fs: i32, channels: i32) -> Result<*mut OpusDecoder, i32> {
             let mut error = 0;
-            let res = opus_decoder_create(Fs, channels, &mut error);
+            let res = unsafe { opus_decoder_create(Fs, channels, &mut error) };
             if res.is_null() {
                 Err(error)
             } else {
@@ -312,31 +232,33 @@ mod libopus {
             }
         }
 
-        unsafe fn opus_decode(
-            &mut st: &mut *mut OpusDecoder,
-            data: *const u8,
-            len: i32,
-            pcm: *mut i16,
+        fn opus_decode(
+            st: &mut *mut OpusDecoder,
+            data: &[u8],
+            pcm: &mut [i16],
             frame_size: i32,
             decode_fec: i32,
         ) -> i32 {
-            opus_decode(st, data, len, pcm, frame_size, decode_fec)
-        }
-
-        unsafe fn opus_decoder_ctl_impl(
-            &mut st: &mut *mut OpusDecoder,
-            request: i32,
-            mut args: VarArgs,
-        ) -> i32 {
-            match &mut args.0[..] {
-                // manually match over all required signatures
-                [VarArg::U32Out(ptr)] => opus_decoder_ctl(st, request, *ptr as *mut _),
-                _ => todo!("opus_decoder_ctl signature not implemented"),
+            unsafe {
+                opus_decode(
+                    *st,
+                    data.as_ptr(),
+                    data.len() as i32,
+                    pcm.as_mut_ptr(),
+                    frame_size,
+                    decode_fec,
+                )
             }
         }
 
-        unsafe fn opus_decoder_destroy(st: *mut OpusDecoder) {
-            opus_decoder_destroy(st)
+        fn dec_get_final_range(st: &mut *mut OpusDecoder) -> u32 {
+            let mut val: u32 = 0;
+            unsafe { opus_decoder_ctl(*st, OPUS_GET_FINAL_RANGE_REQUEST, &mut val as *mut _) };
+            val
+        }
+
+        fn opus_decoder_destroy(st: *mut OpusDecoder) {
+            unsafe { opus_decoder_destroy(st) }
         }
     }
 }
