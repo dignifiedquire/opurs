@@ -23,6 +23,10 @@ pub mod fargan;
 pub mod freq;
 pub mod lpcnet;
 pub mod lpcnet_tables;
+#[cfg(feature = "osce")]
+pub mod nndsp;
 pub mod nnet;
+#[cfg(feature = "osce")]
+pub mod osce;
 pub mod pitchdnn;
 pub mod vec;
