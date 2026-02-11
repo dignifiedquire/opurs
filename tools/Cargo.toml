@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 opurs = { path = ".." }
-upstream-libopus = { path = "../upstream-libopus" }
+libopus-sys = { path = "../libopus-sys" }
 
 byteorder = { version = "1.4.3" }
 

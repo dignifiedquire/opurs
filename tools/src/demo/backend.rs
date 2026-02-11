@@ -130,11 +130,11 @@ mod opurs {
 pub(crate) use opurs::RustLibopusBackend;
 
 mod libopus {
-    use upstream_libopus::{
+    use libopus_sys::{
         opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy, opus_encode,
         opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
     };
-    use upstream_libopus::{OpusDecoder, OpusEncoder};
+    use libopus_sys::{OpusDecoder, OpusEncoder};
 
     use ::opurs::{
         OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,

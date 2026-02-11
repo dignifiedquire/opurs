@@ -11,7 +11,7 @@ license = "BSD-3-Clause"
 
 [workspace]
 members = [
-    "upstream-libopus",
+    "libopus-sys",
     "tools",
 ]
 
