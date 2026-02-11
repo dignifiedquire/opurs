@@ -19,10 +19,7 @@ pub mod cpu_support_h {
 use self::arch_h::{opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL};
 pub use self::cpu_support_h::opus_select_arch;
 use crate::celt::celt::{
-    CELT_GET_MODE_REQUEST, CELT_SET_ANALYSIS_REQUEST, CELT_SET_CHANNELS_REQUEST,
-    CELT_SET_END_BAND_REQUEST, CELT_SET_PREDICTION_REQUEST, CELT_SET_SIGNALLING_REQUEST,
-    CELT_SET_SILK_INFO_REQUEST, CELT_SET_START_BAND_REQUEST, OPUS_SET_ENERGY_MASK_REQUEST,
-    OPUS_SET_LFE_REQUEST,
+    CELT_GET_MODE_REQUEST, OPUS_SET_ENERGY_MASK_REQUEST, OPUS_SET_LFE_REQUEST,
 };
 use crate::celt::celt_encoder::{celt_encode_with_ec, OpusCustomEncoder, SILKInfo};
 use crate::celt::entcode::ec_tell;
@@ -73,7 +70,7 @@ use crate::src::opus_private::{
     OPUS_SET_FORCE_MODE_REQUEST, OPUS_SET_VOICE_RATIO_REQUEST,
 };
 use crate::varargs::VarArgs;
-use crate::{opus_custom_encoder_ctl, opus_packet_pad, OpusRepacketizer};
+use crate::{opus_packet_pad, OpusRepacketizer};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -182,12 +179,8 @@ impl OpusEncoder {
 
         // Build CELT encoder state
         let mut celt_enc = OpusCustomEncoder::new(Fs, channels, arch)?;
-        opus_custom_encoder_ctl!(&mut celt_enc, CELT_SET_SIGNALLING_REQUEST, 0);
-        opus_custom_encoder_ctl!(
-            &mut celt_enc,
-            OPUS_SET_COMPLEXITY_REQUEST,
-            silk_mode.complexity,
-        );
+        celt_enc.signalling = 0;
+        celt_enc.complexity = silk_mode.complexity;
 
         // Build analysis state
         let mut analysis = TonalityAnalysisState::default();
@@ -327,7 +320,7 @@ impl OpusEncoder {
             return Err(OPUS_BAD_ARG);
         }
         self.silk_mode.complexity = complexity;
-        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_SET_COMPLEXITY_REQUEST, complexity);
+        self.celt_enc.complexity = complexity;
         Ok(())
     }
 
@@ -432,7 +425,7 @@ impl OpusEncoder {
             return Err(OPUS_BAD_ARG);
         }
         self.silk_mode.packetLossPercentage = pct;
-        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_SET_PACKET_LOSS_PERC_REQUEST, pct);
+        self.celt_enc.loss_rate = pct;
         Ok(())
     }
 
@@ -477,11 +470,7 @@ impl OpusEncoder {
     }
 
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
-        opus_custom_encoder_ctl!(
-            &mut self.celt_enc,
-            OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-            disabled as i32,
-        );
+        self.celt_enc.disable_inv = disabled as i32;
     }
 
     pub fn phase_inversion_disabled(&self) -> bool {
@@ -556,7 +545,7 @@ impl OpusEncoder {
         self.nonfinal_frame = 0;
         self.rangeFinal = 0;
 
-        opus_custom_encoder_ctl!(&mut self.celt_enc, OPUS_RESET_STATE);
+        self.celt_enc.reset();
         silk_InitEncoder(&mut self.silk_enc, self.arch, &mut dummy);
         self.stream_channels = self.channels;
         self.hybrid_stereo_width_Q14 = ((1) << 14) as i16;
@@ -1487,7 +1476,7 @@ pub unsafe fn opus_encode_native(
     } else {
         (*st).lsb_depth
     };
-    opus_custom_encoder_ctl!(&mut *celt_enc, CELT_GET_MODE_REQUEST, &mut celt_mode);
+    celt_mode = (*celt_enc).mode;
     analysis_info.valid = 0;
     if (*st).silk_mode.complexity >= 7 && (*st).Fs >= 16000 {
         is_silence = is_digital_silence(
@@ -1938,7 +1927,7 @@ pub unsafe fn opus_encode_native(
         &mut (*st).bandwidth,
         equiv_rate,
     );
-    opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_LSB_DEPTH_REQUEST, lsb_depth);
+    (*celt_enc).lsb_depth = lsb_depth;
     if (*st).mode == MODE_CELT_ONLY && (*st).bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
         (*st).bandwidth = OPUS_BANDWIDTH_WIDEBAND;
     }
@@ -2344,41 +2333,27 @@ pub unsafe fn opus_encode_native(
         }
         _ => {}
     }
-    opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_END_BAND_REQUEST, endband);
-    opus_custom_encoder_ctl!(
-        &mut *celt_enc,
-        CELT_SET_CHANNELS_REQUEST,
-        (*st).stream_channels
-    );
-    opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
+    (*celt_enc).end = endband;
+    (*celt_enc).stream_channels = (*st).stream_channels;
+    (*celt_enc).bitrate = -1;
     if (*st).mode != MODE_SILK_ONLY {
         let mut celt_pred: opus_val32 = 2 as opus_val32;
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, 0);
+        (*celt_enc).vbr = 0;
         if (*st).silk_mode.reducedDependency != 0 {
             celt_pred = 0 as opus_val32;
         }
-        opus_custom_encoder_ctl!(
-            &mut *celt_enc,
-            CELT_SET_PREDICTION_REQUEST,
-            celt_pred as i32
-        );
+        let celt_pred_i = celt_pred as i32;
+        (*celt_enc).disable_pf = (celt_pred_i <= 1) as i32;
+        (*celt_enc).force_intra = (celt_pred_i == 0) as i32;
         if (*st).mode == MODE_HYBRID {
             if (*st).use_vbr != 0 {
-                opus_custom_encoder_ctl!(
-                    &mut *celt_enc,
-                    OPUS_SET_BITRATE_REQUEST,
-                    (*st).bitrate_bps - (*st).silk_mode.bitRate,
-                );
-                opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_CONSTRAINT_REQUEST, 0,);
+                (*celt_enc).bitrate = (*st).bitrate_bps - (*st).silk_mode.bitRate;
+                (*celt_enc).constrained_vbr = 0;
             }
         } else if (*st).use_vbr != 0 {
-            opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, 1);
-            opus_custom_encoder_ctl!(
-                &mut *celt_enc,
-                OPUS_SET_VBR_CONSTRAINT_REQUEST,
-                (*st).vbr_constraint,
-            );
-            opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_BITRATE_REQUEST, (*st).bitrate_bps);
+            (*celt_enc).vbr = 1;
+            (*celt_enc).constrained_vbr = (*st).vbr_constraint;
+            (*celt_enc).bitrate = (*st).bitrate_bps;
         }
     }
     let vla_1 = ((*st).channels * (*st).Fs / 400) as usize;
@@ -2519,11 +2494,7 @@ pub unsafe fn opus_encode_native(
         ec_enc_shrink(&mut enc, nb_compr_bytes as u32);
     }
     if redundancy != 0 || (*st).mode != MODE_SILK_ONLY {
-        opus_custom_encoder_ctl!(
-            &mut *celt_enc,
-            CELT_SET_ANALYSIS_REQUEST,
-            &mut analysis_info
-        );
+        (*celt_enc).analysis = analysis_info;
     }
     if (*st).mode == MODE_HYBRID {
         let mut info: SILKInfo = SILKInfo {
@@ -2532,13 +2503,13 @@ pub unsafe fn opus_encode_native(
         };
         info.signalType = (*st).silk_mode.signalType;
         info.offset = (*st).silk_mode.offset;
-        opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_SILK_INFO_REQUEST, &mut info);
+        (*celt_enc).silk_info = info;
     }
     if redundancy != 0 && celt_to_silk != 0 {
         let mut err: i32 = 0;
-        opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_START_BAND_REQUEST, 0);
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, 0);
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
+        (*celt_enc).start = 0;
+        (*celt_enc).vbr = 0;
+        (*celt_enc).bitrate = -1;
         err = celt_encode_with_ec(
             &mut *celt_enc,
             &pcm_buf,
@@ -2555,18 +2526,14 @@ pub unsafe fn opus_encode_native(
         if err < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        opus_custom_encoder_ctl!(
-            &mut *celt_enc,
-            OPUS_GET_FINAL_RANGE_REQUEST,
-            &mut redundant_rng
-        );
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
+        redundant_rng = (*celt_enc).rng;
+        (*celt_enc).reset();
     }
-    opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_START_BAND_REQUEST, start_band);
+    (*celt_enc).start = start_band;
     if (*st).mode != MODE_SILK_ONLY {
         if (*st).mode != (*st).prev_mode && (*st).prev_mode > 0 {
             let mut dummy_0: [u8; 2] = [0; 2];
-            opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
+            (*celt_enc).reset();
             celt_encode_with_ec(
                 &mut *celt_enc,
                 &tmp_prefill,
@@ -2575,7 +2542,8 @@ pub unsafe fn opus_encode_native(
                 2,
                 None,
             );
-            opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_PREDICTION_REQUEST, 0);
+            (*celt_enc).disable_pf = 1;
+            (*celt_enc).force_intra = 1;
         }
         if ec_tell(&mut enc) <= 8 * nb_compr_bytes {
             if redundancy != 0
@@ -2583,13 +2551,9 @@ pub unsafe fn opus_encode_native(
                 && (*st).mode == MODE_HYBRID
                 && (*st).use_vbr != 0
             {
-                opus_custom_encoder_ctl!(
-                    &mut *celt_enc,
-                    OPUS_SET_BITRATE_REQUEST,
-                    (*st).bitrate_bps - (*st).silk_mode.bitRate,
-                );
+                (*celt_enc).bitrate = (*st).bitrate_bps - (*st).silk_mode.bitRate;
             }
-            opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, (*st).use_vbr);
+            (*celt_enc).vbr = (*st).use_vbr;
             ret = celt_encode_with_ec(
                 &mut *celt_enc,
                 &pcm_buf,
@@ -2622,11 +2586,12 @@ pub unsafe fn opus_encode_native(
         let mut N4: i32 = 0;
         N2 = (*st).Fs / 200;
         N4 = (*st).Fs / 400;
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
-        opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_START_BAND_REQUEST, 0);
-        opus_custom_encoder_ctl!(&mut *celt_enc, CELT_SET_PREDICTION_REQUEST, 0);
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_VBR_REQUEST, 0);
-        opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_BITRATE_REQUEST, -1);
+        (*celt_enc).reset();
+        (*celt_enc).start = 0;
+        (*celt_enc).disable_pf = 1;
+        (*celt_enc).force_intra = 1;
+        (*celt_enc).vbr = 0;
+        (*celt_enc).bitrate = -1;
         if (*st).mode == MODE_HYBRID {
             nb_compr_bytes = ret;
             ec_enc_shrink(&mut enc, nb_compr_bytes as u32);
@@ -2655,11 +2620,7 @@ pub unsafe fn opus_encode_native(
         if err_0 < 0 {
             return OPUS_INTERNAL_ERROR;
         }
-        opus_custom_encoder_ctl!(
-            &mut *celt_enc,
-            OPUS_GET_FINAL_RANGE_REQUEST,
-            &mut redundant_rng
-        );
+        redundant_rng = (*celt_enc).rng;
     }
     data = data.offset(-1);
     *data.offset(0 as isize) = gen_toc(
@@ -2945,7 +2906,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 current_block = 12343738388509029619;
             } else {
                 (*st).silk_mode.complexity = value_11;
-                opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_COMPLEXITY_REQUEST, value_11);
+                (*celt_enc).complexity = value_11;
                 current_block = 16167632229894708628;
             }
         }
@@ -2974,11 +2935,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
                 current_block = 12343738388509029619;
             } else {
                 (*st).silk_mode.packetLossPercentage = value_15;
-                opus_custom_encoder_ctl!(
-                    &mut *celt_enc,
-                    OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-                    value_15
-                );
+                (*celt_enc).loss_rate = value_15;
                 current_block = 16167632229894708628;
             }
         }
@@ -3122,21 +3079,13 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             if value_34 < 0 || value_34 > 1 {
                 current_block = 12343738388509029619;
             } else {
-                opus_custom_encoder_ctl!(
-                    &mut *celt_enc,
-                    OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-                    value_34,
-                );
+                (*celt_enc).disable_inv = value_34;
                 current_block = 16167632229894708628;
             }
         }
         OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
             let value_35 = ap.arg::<&mut i32>();
-            opus_custom_encoder_ctl!(
-                &mut *celt_enc,
-                OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
-                value_35
-            );
+            *value_35 = (*celt_enc).disable_inv;
             current_block = 16167632229894708628;
         }
         OPUS_RESET_STATE => {
@@ -3173,7 +3122,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
             let start_offset = start.offset_from(st as *mut u8) as usize;
             let total_size = ::core::mem::size_of::<OpusEncoder>();
             std::ptr::write_bytes(start, 0, total_size - start_offset);
-            opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_RESET_STATE);
+            (*celt_enc).reset();
             silk_InitEncoder(silk_enc, (*st).arch, &mut dummy);
             (*st).stream_channels = (*st).channels;
             (*st).hybrid_stereo_width_Q14 = ((1) << 14) as i16;
@@ -3197,17 +3146,13 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
         OPUS_SET_LFE_REQUEST => {
             let value_37: i32 = ap.arg::<i32>();
             (*st).lfe = value_37;
-            ret = opus_custom_encoder_ctl!(&mut *celt_enc, OPUS_SET_LFE_REQUEST, value_37);
+            (*celt_enc).lfe = value_37;
             current_block = 16167632229894708628;
         }
         OPUS_SET_ENERGY_MASK_REQUEST => {
             let value_38: *mut opus_val16 = ap.arg::<*mut opus_val16>();
             (*st).energy_masking = value_38;
-            ret = opus_custom_encoder_ctl!(
-                &mut *celt_enc,
-                OPUS_SET_ENERGY_MASK_REQUEST,
-                value_38.offset(value_38.offset_from(value_38) as i64 as isize),
-            );
+            (*celt_enc).energy_mask = value_38 as *const opus_val16;
             current_block = 16167632229894708628;
         }
         OPUS_GET_IN_DTX_REQUEST => {
@@ -3234,7 +3179,7 @@ pub unsafe fn opus_encoder_ctl_impl(st: *mut OpusEncoder, request: i32, args: Va
         }
         CELT_GET_MODE_REQUEST => {
             let value_40: &mut *const OpusCustomMode = ap.arg::<&mut *const OpusCustomMode>();
-            ret = opus_custom_encoder_ctl!(&mut *celt_enc, CELT_GET_MODE_REQUEST, value_40);
+            *value_40 = (*celt_enc).mode;
             current_block = 16167632229894708628;
         }
         _ => {
