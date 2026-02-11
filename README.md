@@ -1,97 +1,71 @@
-# unsafe-libopus
+# opurs
 
-This library is [libopus](https://github.com/xiph/opus) 1.3.1 translated from C to unsafe Rust with the assistance
-of [c2rust](https://github.com/immunant/c2rust).
+[![CI](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml/badge.svg)](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml)
+[![Rust 1.65+](https://img.shields.io/badge/rust-1.65+-blue.svg)](https://www.rust-lang.org)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-It is called "unsafe" libopus, because it still pretty much has the same shape as the C code and is full of "unsafe".
+A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.3.1.
 
-This translation still allows you to get rid of C compiler toolchain and use the library in a pure rust environment,
-without linker hackery & dynamic linking issues.
+## Features
 
-It also may potentially be a starting point for a more idiomatic rust implementation of libopus, though I am not sure if
-it is worth the effort.
+- **Pure Rust** -- no C compiler required, no FFI
+- **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.3.1, verified across 228 IETF test vectors
+- **Nearly unsafe-free** -- only 2 documented `unsafe` blocks remain (ndarray interleaved view splitting in the MDCT)
+- **Cross-platform** -- tested on Linux, macOS, and Windows (x86, x86_64, ARM64)
+- **Full codec support** -- SILK (speech), CELT (music), and hybrid modes at all standard sample rates (8/12/16/24/48 kHz)
 
 ## Usage
 
-You can leverate this library by using a fork of `opus` crate
-from [this PR](https://github.com/SpaceManiac/opus-rs/pull/20):
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-opus = { git = "https://github.com/DCNick3/opus-rs.git", branch = "unsafe-libopus", default-features = false, features = ["unsafe-libopus-backend"] }
+opurs = "0.3"
 ```
 
-Maybe, this library will have the safe APIs in the future, but for now, it is a (mostly) drop-in replacement for
-the `audiopus_sys` crate.
+### Encoding
 
-## Translation technique
+```rust
+use opurs::{OpusEncoder, Application};
 
-Firstly, the [libopus 1.3.1](https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz) was compiled with the following
-commands:
+let mut encoder = OpusEncoder::new(48000, 2, Application::Audio).unwrap();
+let input: Vec<i16> = vec![0i16; 960]; // 20ms at 48kHz
+let mut output = vec![0u8; 4000];
+
+let len = encoder.encode(&input, &mut output).unwrap();
+println!("Encoded {} bytes", len);
+```
+
+### Decoding
+
+```rust
+use opurs::OpusDecoder;
+
+let mut decoder = OpusDecoder::new(48000, 2).unwrap();
+let mut output = vec![0i16; 960 * 2]; // stereo
+
+let samples = decoder.decode(Some(encoded_packet), &mut output, false).unwrap();
+println!("Decoded {} samples per channel", samples);
+```
+
+## Testing
 
 ```bash
-CC=clang ./configure --disable-shared --disable-stack-protector --enable-extra-programs --disable-doc --disable-asm --disable-rtcd --disable-intrinsics --disable-dependency-tracking--disable-maintainer-mode --enable-hardening
-CC=clang compiledb make -j
+# Unit and integration tests
+cargo test --all
+
+# Bit-exact vector tests (requires IETF test vectors)
+curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+tar -xzf vectors.tar.gz
+cargo run --release -p opurs-tools --bin run_vectors2 -- opus_newvectors
 ```
 
-Then, using the resulting `compile_commands.json` file, the C code was transpiled to rust with:
+The vector test suite runs the encoder at 9 bitrates and the decoder at 10 configurations across all IETF test vectors, comparing output against the C reference implementation compiled from source in `upstream-libopus/`.
 
-```bash
-c2rust transpile compile_commands.json -o . --overwrite-existing --reorganize-definitions --emit-modules --translate-const-macros --emit-build-files
-```
+## Origin
 
-The resulting code was then manually reorganized, to remove all duplication of structures & eradicate the use
-of `#[no_mangle] extern "C"` functions: they are all linked with rust now and do not have to exported.
-
-Some other refactorings include:
-
-- separation of the test binaries from the library as "examples"
-- removal of dependencies of libc functions in the library by defining their variants in the library (idea
-  from [unsafe-libyaml](https://github.com/dtolnay/unsafe-libyaml))
-- removal of dependency on the libc crate by replacing the libc types with concrete rust types (`libc::c_int` -> `i32`,
-  etc)
-- removal of C varargs by replacing them with a custom VarArgs struct, as C variadics are not yet stable in rust. This
-  turns the `opus_*_ctl` family of functions into macros
-
-## Performance
-
-The library was translated without the use of inline assembly, processor intrinsics and runtime CPU detection, so it is
-not as fast as the original code right now. The C version with those features is about 20% faster than the rust version
-on my machine.
-
-## Correctness
-
-This library is tested using (most of) the original tests from the C codebase. They are present in form of rust
-integration tests in the `tests` directory. Still not translated are a bunch of unit tests from the C codebase.
-
-The crux of the testing happens in the `unsafe-libopus-tools/src/bin/run_vectors2.rs` though.
-It tests both the decoder and encoder using IETF-published test vectors,
-comparing the results with the C implementation of opus 1.3.1 located in `upstream-libopus`.
-It does have a small number of patches to make the results more portable.
-
-The decoder is tested by decoding the test vectors and comparing the results with the C implementation at a
-number of output sample rates.
-They are checked to match exactly.
-
-The same is done to the encoder,
-running at a number of different bitrates and comparing the encoded results with the C implementation.
-Aside from bitrate, no other parameters are changed, which currently is a weak point of the testing.
-
-Strictly speaking, same encoded results are not required for this to be a valid implementation: the encoder is free to
-do a lot of choices, leaving to different quality results.
-However, making a codec that is _better_ than the original opus is a non-goal. Therefore, by requiring the exact same
-results, we prevent any divergence in the behavior of the encoder.
-
-## Safety
-
-Currently, most of the code is unsafe, as it is a direct transpilation of the C code.
-
-I am currently in the process of slowly refactoring the code to make certain parts of it safe. Previously maintaining
-validity was a challenge, but now that there are tests checking the implementation against the C code, it should become
-easier.
-
-![](https://unsafe-track.dcnick3.me/github/DCNick3/unsafe-libopus?x_coord=Index&y_coord=Functions&path_filter=^/src/(celt/([^/]*\.rs|modes/[^/]*\.rs)|silk/([^/]*\.rs|float/[^/]*\.rs|resampler/[^/]*\.rs)|src/.*\.rs)$)
+This project started as a [c2rust](https://github.com/immunant/c2rust) transpilation of libopus 1.3.1 by [DCNick3](https://github.com/DCNick3/unsafe-libopus), then incrementally refactored toward safe, idiomatic Rust. The original transpilation eliminated the need for a C toolchain; the subsequent refactoring has brought the codebase to near-complete memory safety while maintaining bit-exact compatibility.
 
 ## License
 
-Same as the original libopus, `unsafe-libopus` is licensed under the BSD 3-clause license.
+BSD 3-Clause, same as libopus. See [LICENSE](LICENSE) for details.
