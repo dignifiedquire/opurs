@@ -54,10 +54,10 @@ const CONFIG_H: &str = r##"
 #define OPUS_BUILD
 #define PACKAGE_BUGREPORT "opus@xiph.org"
 #define PACKAGE_NAME "opus"
-#define PACKAGE_STRING "opus 1.3.1"
+#define PACKAGE_STRING "opus 1.4"
 #define PACKAGE_TARNAME "opus"
 #define PACKAGE_URL ""
-#define PACKAGE_VERSION "1.3.1"
+#define PACKAGE_VERSION "1.4"
 #define STDC_HEADERS 1
 #define VAR_ARRAYS 1
 
