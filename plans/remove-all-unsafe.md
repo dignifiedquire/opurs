@@ -1,25 +1,26 @@
 # Plan: Remove All Remaining Unsafe Code
 
-**Goal**: Eliminate all 47 remaining `unsafe` occurrences (15 `unsafe fn` + 32 `unsafe` blocks)
-across 9 files, reaching `#![forbid(unsafe_code)]`.
+**Goal**: Eliminate all remaining `unsafe` occurrences, reaching `#![forbid(unsafe_code)]`.
 
-**Current state**: 47 unsafe occurrences in 9 files.
+**Current state (2026-02-11)**: 35 unsafe occurrences (8 `unsafe fn` + 27 `unsafe` blocks)
+across 6 files. Down from 47/9 at plan creation — opus.rs, enc_API.rs, and
+util/nalgebra.rs are now fully safe.
 
 ---
 
-## Inventory
+## Inventory (updated 2026-02-11)
 
-| File | unsafe fn | unsafe {} | Total | Category |
-|------|-----------|-----------|-------|----------|
-| `src/src/opus_encoder.rs` | 10 | 3 | 13 | Encoder API + internals |
-| `src/src/opus_decoder.rs` | 5 | 3 | 8 | Decoder API + internals |
-| `src/celt/bands.rs` | 0 | 16 | 16 | Band processing sub-slicing |
-| `src/celt/celt_decoder.rs` | 0 | 2 | 2 | Channel view splitting |
-| `src/celt/celt_encoder.rs` | 0 | 1 | 1 | energy_mask raw pointer |
-| `src/celt/mdct.rs` | 0 | 2 | 2 | ndarray view casting |
-| `src/silk/enc_API.rs` | 0 | 2 | 2 | addr_of_mut disjoint borrows |
-| `src/util/nalgebra.rs` | 0 | 2 | 2 | nalgebra ViewStorage |
-| `src/src/opus.rs` | 0 | 1 | 1 | pointer offset_from |
+| File | unsafe fn | unsafe {} | Total | Category | Status |
+|------|-----------|-----------|-------|----------|--------|
+| `src/celt/bands.rs` | 0 | 16 | 16 | Band processing sub-slicing | Open |
+| `src/src/opus_encoder.rs` | 6 | 4 | 10 | Encode path + downmix | Open |
+| `src/src/opus_decoder.rs` | 2 | 3 | 5 | Decode path | Open |
+| `src/celt/mdct.rs` | 0 | 2 | 2 | ndarray view casting | Open |
+| `src/celt/celt_encoder.rs` | 0 | 1 | 1 | energy_mask raw pointer | Open |
+| `src/celt/celt_decoder.rs` | 0 | 1 | 1 | Channel view splitting | Open |
+| ~~`src/silk/enc_API.rs`~~ | ~~0~~ | ~~2~~ | ~~0~~ | ~~addr_of_mut~~ | **Done** ✓ |
+| ~~`src/util/nalgebra.rs`~~ | ~~0~~ | ~~2~~ | ~~0~~ | ~~nalgebra ViewStorage~~ | **Done** ✓ |
+| ~~`src/src/opus.rs`~~ | ~~0~~ | ~~1~~ | ~~0~~ | ~~pointer offset_from~~ | **Done** ✓ |
 
 ---
 
@@ -134,73 +135,37 @@ forward, odd indices backward) guarantees disjointness.
 
 ---
 
-### Stage 5: silk/enc_API.rs — Safe disjoint array borrows (2 unsafe blocks)
+### Stage 5: silk/enc_API.rs — ✅ DONE
 
-**Problem**: `silk_Encode` needs `&mut psEnc.sStereo` for `silk_stereo_LR_to_MS`
-while simultaneously borrowing `&mut psEnc.sStereo.predIx[nfe]` and
-`&mut psEnc.sStereo.mid_only_flags[nfe]`. Uses `addr_of_mut!` to work
-around the borrow checker.
-
-**Strategy**: Restructure `silk_stereo_LR_to_MS` to take `predIx` and
-`mid_only_flags` outputs as separate parameters instead of reading/writing
-them through the `&mut stereo_state` reference. This eliminates the
-overlapping borrow entirely.
-
-Alternative: Extract `predIx` and `mid_only_flags` from `sStereo` into
-separate fields on the parent struct, so they can be borrowed independently.
-
-**Risk**: Low — straightforward parameter refactoring.
+Resolved. Zero unsafe blocks remain in enc_API.rs.
 
 ---
 
-### Stage 6: util/nalgebra.rs — Safe matrix view construction (2 unsafe blocks)
+### Stage 6: util/nalgebra.rs — ✅ DONE
 
-**Problem**: `ViewStorageMut::from_raw_parts` and `ViewStorage::from_raw_parts`
-require unsafe because nalgebra's API doesn't provide a safe constructor
-for row-major views from slices.
-
-**Strategy**: Check if nalgebra provides `MatrixSlice::from_slice` or
-similar safe constructors. If so, use those. If not:
-- Use `nalgebra::DMatrix::from_row_slice` for owned matrices
-- Or use `MatrixView::from_slice_generic` which is safe in recent nalgebra
-  versions (check the version we depend on)
-- Or wrap the unsafe in a clearly-documented helper with bounds assertions
-  (already has `assert!` checks) and accept this as "safe enough" until
-  nalgebra provides better APIs
-
-**Risk**: Low — bounds are already checked via assert.
+Resolved. Zero unsafe blocks remain in util/nalgebra.rs.
 
 ---
 
-### Stage 7: opus.rs — Replace pointer offset_from (1 unsafe block)
+### Stage 7: opus.rs — ✅ DONE
 
-**Problem**: `opus_packet_parse_impl` uses `fp.offset_from(dp)` to calculate
-the byte offset of a frame pointer within the packet data slice.
-
-**Strategy**: Replace with index tracking. Instead of computing pointer
-differences, track the current parse position as a `usize` index into the
-slice and compute frame offsets as `current_index - start_index`.
-
-**Risk**: Low — straightforward index arithmetic replacement.
+Resolved. Zero unsafe blocks remain in opus.rs.
 
 ---
 
-### Stage 8: opus_decoder.rs — Safe decode path (5 unsafe fn + 3 unsafe blocks)
+### Stage 8: opus_decoder.rs — Safe decode path (2 unsafe fn + 3 unsafe blocks)
 
-**Problem**: The main decode path uses `unsafe fn` for `opus_decode_frame`,
-`opus_decode_native`, and the legacy C API functions.
+**Problem**: The main decode path uses `unsafe fn` for `opus_decode_frame`
+and `opus_decode_native`. Legacy C API functions have been deleted.
 
 **Unsafe fn declarations**:
-1. `opus_decoder_init` — deprecated, raw pointer deref → already delegates to `OpusDecoder::new()`
-2. `opus_decoder_create` — deprecated, `Box::into_raw` → keep as deprecated unsafe
-3. `opus_decoder_destroy` — deprecated, `Box::from_raw` → keep as deprecated unsafe
-4. `opus_decode_frame` — internal, takes `&mut OpusDecoder` + `Option<&[u8]>` + `&mut [opus_val16]`
-5. `opus_decode_native` — internal, orchestrates multi-frame decode
+1. `opus_decode_frame` — internal, takes `&mut OpusDecoder` + `Option<&[u8]>` + `&mut [opus_val16]`
+2. `opus_decode_native` — internal, orchestrates multi-frame decode
 
 **Unsafe blocks**:
 1. `from_raw_parts_mut` on `data.as_ptr() as *mut u8` for ec_dec init (line ~263)
-2. `opus_decode_native()` call from `opus_decode` (line ~824)
-3. `opus_decode_native()` call from `opus_decode_float` (line ~843)
+2. `opus_decode_native()` call from `opus_decode` (line ~875)
+3. Slice construction in decode internals
 
 **Strategy**:
 1. Make `opus_decode_frame` safe:
@@ -210,16 +175,16 @@ slice and compute frame offsets as `current_index - start_index`.
    `&mut OpusDecoder`, `&mut [opus_val16]`, etc.
 3. Remove `unsafe` from `opus_decode` and `opus_decode_float` once
    `opus_decode_native` is safe
-4. Keep deprecated functions (`opus_decoder_init/create/destroy`) as `unsafe`
-   — they exist only for backward compat and will be removed in Stage 11
+4. ~~Keep deprecated functions~~ — **Done** ✓ (all deleted in dig-safe)
 
 **Risk**: Medium — decode path is complex but already mostly uses safe types.
 
 ---
 
-### Stage 9: opus_encoder.rs — Safe encode path (10 unsafe fn + 3 unsafe blocks)
+### Stage 9: opus_encoder.rs — Safe encode path (6 unsafe fn + 4 unsafe blocks)
 
-This is the largest and most complex stage.
+This is the largest and most complex stage. Significant progress already
+made — CTL dispatch deleted, C-style API deleted, leaf functions safe.
 
 **Unsafe fn declarations**:
 1. `downmix_float` — raw pointer arithmetic on `*const c_void`
@@ -228,17 +193,10 @@ This is the largest and most complex stage.
 4. `opus_encode_native` — main encode function (~1300 lines), raw pointer params
 5. `opus_encode` — public i16 API, calls `opus_encode_native`
 6. `opus_encode_float` — public f32 API, calls `opus_encode_native`
-7. `opus_encoder_ctl_impl` — VarArgs dispatch, dereferences `*mut OpusEncoder`
-8. `opus_encoder_init` — deprecated, dereferences raw pointer
-9. `opus_encoder_create` — deprecated, `Box::into_raw`
-10. `opus_encoder_destroy` — deprecated, `Box::from_raw`
 
-**Unsafe blocks** (inside `opus_encode_native`):
-1. `std::mem::zeroed()` in `OpusEncoder::new()` (line ~241)
-2. `from_raw_parts_mut` for redundancy data (line ~2240)
-3. `from_raw_parts_mut` for redundancy data (line ~2340)
-4. `std::ptr::copy` for data relocation (line ~2317)
-5. `offset_from` for reset state (line ~2867)
+**Unsafe blocks** (4 total):
+1. `std::mem::zeroed()` in `OpusEncoder::new()`
+2-4. `from_raw_parts_mut` / `std::ptr::copy` inside `opus_encode_native`
 
 **Strategy — bottom-up**:
 
@@ -275,14 +233,9 @@ This is the largest and most complex stage.
 - Change signatures to take `&mut OpusEncoder`, slices
 - Delegate to safe `opus_encode_native`
 
-**Step 9e: Safe opus_encoder_ctl_impl**
-- Change `*mut OpusEncoder` → `&mut OpusEncoder`
-- Replace VarArgs with typed method dispatch (or at minimum, remove the
-  raw pointer deref)
-- The `OPUS_RESET_STATE` handler uses `ptr::write_bytes` to zero a range
-  of the struct — replace with field-by-field reset
-- The `OPUS_SET_ENERGY_MASK_REQUEST` handler passes a raw pointer — fix
-  after Stage 3 changes the field type
+**Step 9e: opus_encoder_ctl_impl — ✅ DONE**
+- Deleted entirely. Replaced by typed methods on `OpusEncoder` + direct
+  field access on `OpusCustomEncoder`. (dig-safe: fe517bb)
 
 **Step 9f: Replace mem::zeroed in OpusEncoder::new**
 - Implement `Default` for `OpusEncoder` (all fields are primitive/Copy)
@@ -308,9 +261,8 @@ about providing the final public API.
 
 ### Stage 11: Final cleanup
 
-1. Remove deprecated `unsafe fn` C-API functions (opus_encoder_create/init/destroy,
-   opus_decoder_create/init/destroy)
-2. Remove `varargs.rs` (no longer needed after CTL methods are typed)
+1. ~~Remove deprecated `unsafe fn` C-API functions~~ — **Done** ✓ (all deleted)
+2. ~~Remove `varargs.rs`~~ — **Done** ✓ (deleted in dig-safe: fe517bb)
 3. Add `#![forbid(unsafe_code)]` to `lib.rs`
 4. Verify: `cargo build`, `cargo test --all`, `cargo clippy`, vector tests
 
@@ -322,16 +274,16 @@ about providing the final public API.
 
 ```
 Stage 1 (bands.rs)          ──┐
-Stage 2 (celt_decoder.rs)   ──┤
-Stage 3 (celt_encoder.rs)   ──┤── All independent, can be done in any order
-Stage 4 (mdct.rs)            ──┤
-Stage 5 (enc_API.rs)         ──┤
-Stage 6 (nalgebra.rs)        ──┤
-Stage 7 (opus.rs)            ──┘
+Stage 2 (celt_decoder.rs)   ──┤── All independent, can be done in any order
+Stage 3 (celt_encoder.rs)   ──┤
+Stage 4 (mdct.rs)            ──┘
+Stage 5 (enc_API.rs)         ── ✅ DONE
+Stage 6 (nalgebra.rs)        ── ✅ DONE
+Stage 7 (opus.rs)            ── ✅ DONE
                                │
 Stage 8 (opus_decoder.rs)   ───┤── Depends on Stage 2 (celt_decoder changes)
                                │
-Stage 9 (opus_encoder.rs)   ───┤── Depends on Stages 1, 3, 5 (callee changes)
+Stage 9 (opus_encoder.rs)   ───┤── Depends on Stages 1, 3 (callee changes)
                                │
 Stage 10 (public API)        ──┤── Depends on Stages 8, 9
                                │
@@ -340,7 +292,7 @@ Stage 11 (forbid unsafe)    ───┘── Depends on all above
 
 ---
 
-## Estimated Commit Count
+## Estimated Remaining Commit Count
 
 | Stage | Commits | Description |
 |-------|---------|-------------|
@@ -348,14 +300,14 @@ Stage 11 (forbid unsafe)    ───┘── Depends on all above
 | 2 | 1 | celt_decoder channel views |
 | 3 | 1 | energy_mask pointer → slice |
 | 4 | 1 | mdct view splitting |
-| 5 | 1 | enc_API disjoint borrows |
-| 6 | 1 | nalgebra view construction |
-| 7 | 1 | opus.rs offset_from |
+| ~~5~~ | ~~0~~ | ~~enc_API — done~~ |
+| ~~6~~ | ~~0~~ | ~~nalgebra — done~~ |
+| ~~7~~ | ~~0~~ | ~~opus.rs — done~~ |
 | 8 | 2 | decoder safe path |
-| 9 | 4-6 | encoder safe path (largest) |
+| 9 | 3-5 | encoder safe path (largest, partially done) |
 | 10 | 2-3 | public API wrappers |
 | 11 | 1 | forbid(unsafe_code) |
-| **Total** | **~18-21** | |
+| **Total** | **~13-17** | |
 
 ---
 

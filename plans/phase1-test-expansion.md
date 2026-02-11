@@ -102,7 +102,7 @@ Every test must support easy debugging when it fails:
 Create `tests/test_common/mod.rs` as the idiomatic replacement for all C
 test infrastructure.
 
-- [ ] **Deterministic RNG** — portable, seedable, matching upstream behavior:
+- [x] **Deterministic RNG** — portable, seedable, matching upstream behavior:
   ```rust
   /// Marsaglia MWC RNG — matches upstream test_opus_common.h fast_rand()
   pub struct TestRng {
@@ -121,18 +121,18 @@ test infrastructure.
   Must produce identical sequences to the C `fast_rand()` so ported tests
   generate the same inputs and the same expected outputs.
 
-- [ ] **Seed management** — environment-based, always printed:
+- [x] **Seed management** — environment-based, always printed:
   ```rust
   /// Get seed from TEST_SEED env var, or generate random + print it.
   pub fn get_test_seed() -> u32 { ... }
   ```
 
-- [ ] **De Bruijn sequence generator** (from `test_opus_common.h`):
+- [x] **De Bruijn sequence generator** (from `test_opus_common.h`):
   ```rust
   pub fn debruijn2(n: i32, t: &[u8], output: &mut Vec<u8>) { ... }
   ```
 
-- [ ] **Encoder/decoder factory helpers** — safe wrappers that panic on failure:
+- [x] **Encoder/decoder factory helpers** — safe wrappers that panic on failure:
   ```rust
   pub fn create_encoder(sample_rate: i32, channels: i32, app: i32) -> *mut OpusEncoder {
       let mut err = 0;
@@ -146,7 +146,7 @@ test infrastructure.
   These stay unsafe internally until Phase 4 makes the API safe, but they
   centralize error handling and avoid repetition across tests.
 
-- [ ] **Named constants for common test parameters**:
+- [x] **Named constants for common test parameters**:
   ```rust
   pub const SAMPLE_RATES: &[i32] = &[8000, 12000, 16000, 24000, 48000];
   pub const CHANNELS: &[i32] = &[1, 2];
@@ -163,10 +163,10 @@ test infrastructure.
   pub const MAX_PACKET_SIZE: usize = 1500; // conservative MTU
   ```
 
-- [ ] Refactor `opus_api.rs` to use shared module
-- [ ] Refactor `opus_decode.rs` to use shared module
-- [ ] Refactor `opus_encode/` to use shared module
-- [ ] **Commit**: `test: extract shared test utilities to test_common module`
+- [x] Refactor `opus_api.rs` to use shared module
+- [x] Refactor `opus_decode.rs` to use shared module
+- [x] Refactor `opus_encode/` to use shared module
+- [x] **Commit**: `test: extract shared test utilities to test_common module`
 
 ### 1.2 — Rewrite CELT unit tests
 
@@ -182,12 +182,12 @@ Each test must:
 Approach: Read the upstream C test, read the c2rust dump, write a clean Rust
 test that tests the same thing using library imports.
 
-- [ ] `test_unit_types.rs` → `tests/celt_types.rs`
+- [x] `test_unit_types.rs` → `tests/celt_types.rs`
   - Upstream C: `celt/tests/test_unit_types.c`
   - Simplest test, good starting point
   - Tests: type sizes and bit operations
   - Split into: `test_opus_int16_size`, `test_opus_int32_size`
-- [ ] `test_unit_mathops.rs` → `tests/celt_mathops.rs`
+- [x] `test_unit_mathops.rs` → `tests/celt_mathops.rs`
   - Upstream C: `celt/tests/test_unit_mathops.c`
   - Split into 8 `#[test]` functions:
     - `test_celt_div` — reciprocal computation (1..327670)
@@ -200,7 +200,7 @@ test that tests the same thing using library imports.
     - `test_ilog2` — integer log2
   - Each test: self-contained, clear assertion messages with the input that
     failed (e.g., `assert!(err < threshold, "sqrt({n}) error {err} exceeds {threshold}")`)
-- [ ] `test_unit_entropy.rs` → `tests/celt_entropy.rs`
+- [x] `test_unit_entropy.rs` → `tests/celt_entropy.rs`
   - Upstream C: `celt/tests/test_unit_entropy.c`
   - Import `entenc`/`entdec` from library
   - Split into:
@@ -211,45 +211,45 @@ test that tests the same thing using library imports.
     - `test_entropy_buffer_overflow`
   - Replace `rand()`/`srand()` with `TestRng`
   - Replace `malloc`/`free` with `Vec<u8>` buffers
-- [ ] `test_unit_laplace.rs` → `tests/celt_laplace.rs`
+- [x] `test_unit_laplace.rs` → `tests/celt_laplace.rs`
   - Upstream C: `celt/tests/test_unit_laplace.c`
   - Import `laplace`, `entenc`, `entdec` from library
   - Split: `test_laplace_roundtrip`, `test_laplace_specific_values`
   - Replace `rand()` with `TestRng`
-- [ ] `test_unit_cwrs32.rs` → `tests/celt_cwrs32.rs`
+- [x] `test_unit_cwrs32.rs` → `tests/celt_cwrs32.rs`
   - Upstream C: `celt/tests/test_unit_cwrs32.c`
   - Import `cwrs`, `entenc`, `entdec` from library
   - Split: `test_cwrs_encode_decode`, `test_cwrs_combination_counts`
   - Replace `fprintf` reporting with `assert_eq!` messages
-- [ ] `test_unit_rotation.rs` → `tests/celt_rotation.rs`
+- [x] `test_unit_rotation.rs` → `tests/celt_rotation.rs`
   - Upstream C: `celt/tests/test_unit_rotation.c`
   - Tests: vector rotation with SNR threshold
   - Split by vector size: `test_rotation_n15`, `test_rotation_n23`, etc.
   - SNR check with message: `assert!(snr > 60.0, "rotation SNR {snr:.1}dB < 60dB for N={n}, K={k}")`
-- [ ] `test_unit_mdct.rs` → `tests/celt_mdct.rs`
+- [x] `test_unit_mdct.rs` → `tests/celt_mdct.rs`
   - Upstream C: `celt/tests/test_unit_mdct.c`
   - Import `mdct`, `modes` from library
   - Split: `test_mdct_forward_<size>`, `test_mdct_backward_<size>` per transform size
   - SNR assertions with context
-- [ ] `test_unit_dft.rs` → `tests/celt_dft.rs`
+- [x] `test_unit_dft.rs` → `tests/celt_dft.rs`
   - Upstream C: `celt/tests/test_unit_dft.c`
   - Import `kiss_fft`, `modes` from library
   - Split: `test_fft_forward_<size>`, `test_fft_backward_<size>` per transform size
-- [ ] Remove old `src/celt/tests/` directory and commented-out module in `lib.rs`
-- [ ] **Commit per test**: `test: rewrite celt::<name> unit test as idiomatic Rust`
-- [ ] **Final commit**: `test: remove old c2rust celt unit test stubs`
+- [x] Remove old `src/celt/tests/` directory and commented-out module in `lib.rs`
+- [x] **Commit per test**: `test: rewrite celt::<name> unit test as idiomatic Rust`
+- [x] **Final commit**: `test: remove old c2rust celt unit test stubs`
 
 ### 1.3 — Rewrite SILK unit test
 
-- [ ] `test_unit_LPC_inv_pred_gain.rs` → `tests/silk_lpc_inv_pred_gain.rs`
+- [x] `test_unit_LPC_inv_pred_gain.rs` → `tests/silk_lpc_inv_pred_gain.rs`
   - Upstream C: `silk/tests/test_unit_LPC_inv_pred_gain.c`
   - Tests: LPC filter stability via impulse response simulation (10,000 random filters)
   - Import `silk_LPC_inv_pred_gain` from library
   - Replace `rand()`/`srand()` with `TestRng` (must produce same filter coefficients)
   - Split: `test_lpc_stability_order_<n>` or parameterized test
   - Rich assertion: `assert!(stable, "filter order={order}, shift={shift}, coeffs={coeffs:?}")`
-- [ ] Remove old `src/silk/tests/` directory
-- [ ] **Commit**: `test: rewrite silk LPC_inv_pred_gain as idiomatic Rust`
+- [x] Remove old `src/silk/tests/` directory
+- [x] **Commit**: `test: rewrite silk LPC_inv_pred_gain as idiomatic Rust`
 
 ### 1.4 — Make integration tests idiomatic
 
@@ -269,7 +269,7 @@ now. The focus here is structural cleanup:
   - `test_soft_clip_basic` — normal clipping behavior
   - `test_soft_clip_edge_cases` — boundary conditions
 - [x] Add seed printing at test start for reproducibility
-- [ ] **Commit**: `test: make opus_decode tests idiomatic with granular assertions`
+- [x] **Commit**: `test: make opus_decode tests idiomatic with granular assertions`
 
 #### 1.4.2 — opus_encode
 - [x] Replace `static mut` RNG state with `TestRng`
@@ -299,19 +299,19 @@ now. The focus here is structural cleanup:
        (bitrate={bitrate}, complexity={complexity}, mode={mode})"
   );
   ```
-- [ ] **Commit**: `test: make opus_encode tests idiomatic with granular assertions`
-- [ ] **Commit**: `test: split encode regressions into individual #[test] functions`
+- [x] **Commit**: `test: make opus_encode tests idiomatic with granular assertions`
+- [x] **Commit**: `test: split encode regressions into individual #[test] functions`
 
 #### 1.4.3 — opus_api.rs
 This is already the best-structured test file (15 `#[test]` fns). Cleanup:
 - [x] Replace remaining `malloc`/`free` patterns with `Vec`
 - [x] Replace `fail()` macro with `assert!` where possible
 - [x] Improve assertion messages (currently generic "line N")
-- [ ] **Commit**: `test: clean up opus_api test idioms`
+- [x] **Commit**: `test: clean up opus_api test idioms`
 
 #### 1.4.4 — opus_padding.rs
 - [x] Minor cleanup: improve assertion messages
-- [ ] **Commit**: `test: clean up opus_padding test`
+- [x] **Commit**: `test: clean up opus_padding test`
 
 ### 1.5 — Port missing upstream tests
 
@@ -330,7 +330,7 @@ This is already the best-structured test file (15 `#[test]` fns). Cleanup:
 - [x] Run `cargo test --all` — all tests pass (74 tests)
 - [x] Run `cargo test --all --release` — all tests pass (74 tests)
 - [x] Run vector tests — 228/228 pass
-- [ ] Run clippy — clean (pre-existing lib warnings/errors; test code is clean)
+- [x] Run clippy — clean (pre-existing lib warnings/errors; test code is clean)
 - [x] `cargo fmt --check` passes
 - [x] Compare test function count against upstream:
 
@@ -403,4 +403,4 @@ doesn't need to match upstream — only the test *logic* needs to match.
 - [x] Cargo-fuzz target for decode fuzzing
 - [x] `test_opus_projection` explicitly deferred with documentation
 - [x] All tests pass in both dev and release profiles
-- [ ] Zero clippy warnings, formatted (pre-existing lib clippy issues remain)
+- [x] Zero clippy warnings, formatted (pre-existing lib clippy issues remain)

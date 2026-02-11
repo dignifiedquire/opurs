@@ -391,22 +391,22 @@ pub fn version() -> &'static str;
 
 ---
 
-## Current State (updated 2026-02-10)
+## Current State (updated 2026-02-11)
 
 | File | unsafe fn | unsafe {} | Key issues |
 |------|-----------|-----------|------------|
-| `opus_encoder.rs` | 10 | 2 | VarArgs CTL, encode_native, downmix |
-| `opus_decoder.rs` | 5 | 3 | decode_frame, decode_native |
-| `opus.rs` | 0 | 1 | 1 residual unsafe block |
-| `analysis.rs` | 0 | 0 | **Safe** ✓ |
+| `opus_encoder.rs` | 6 | 4 | encode_native, downmix, encode/encode_float |
+| `opus_decoder.rs` | 2 | 3 | decode_frame, decode_native |
+| `opus.rs` | 0 | 0 | **Safe** ✓ |
+| `analysis.rs` | 0 | 0 | **Safe** ✓ (legacy downmix_func type alias remains) |
 | `repacketizer.rs` | 0 | 0 | **Already safe** — needs API wrapper only |
 | `mlp/` | 0 | 0 | **Already safe** |
 | `opus_defines.rs` | 0 | 0 | Constants only — replace with enums |
 | `opus_private.rs` | 0 | 0 | Safe |
 | `externs.rs` | — | — | **Deleted** ✓ |
-| `varargs.rs` | 0 | 0 | VarArgs type — replace with typed methods |
+| `varargs.rs` | — | — | **Deleted** ✓ |
 
-**Total remaining in src/src/**: 15 unsafe fn + 6 unsafe blocks = 21
+**Total remaining in src/src/**: 8 unsafe fn + 7 unsafe blocks = 15
 
 ---
 
@@ -460,40 +460,47 @@ All callers converted, `externs.rs` deleted:
 ### Stage 4.4 — Safe opus_decoder.rs
 
 - [x] Convert `OpusDecoder` from malloc'd blob to proper Rust struct
-  - Named fields, embedded `CeltDecoder` and SILK state (already done)
+  - Named fields, embedded `CeltDecoder` and SILK state
 - [x] Make leaf functions safe (validate, smooth_fade, get_mode, get_bandwidth, get_nb_channels)
 - [x] Make opus_decode_frame use safe types (Option<&[u8]>, &mut [opus_val16])
 - [x] Make opus_decode take &mut [i16] instead of *mut i16
 - [x] Make OpusDecoder::new safe (no unsafe needed)
 - [x] Add OpusDecoder::channels() public accessor
-- [x] Deprecate old C-style free functions (`opus_decoder_create`, etc.)
-- [ ] Implement `Decoder` wrapper struct (public API)
-  - `Decoder::new(sample_rate, channels)` — validates args, creates inner state
-  - `Decoder::decode(input, output, fec)` — delegates to safe internals
-  - `Decoder::decode_float(input, output, fec)`
-  - `Decoder::get_nb_samples(packet)`
-  - All CTL methods as typed methods (no more VarArgs for public use)
-- [ ] Implement `Drop` for `Decoder` (replaces `opus_decoder_destroy`)
+- [x] Add typed CTL methods: `set_gain`, `gain`, `last_packet_duration`, `pitch`,
+  `set_phase_inversion_disabled`, `phase_inversion_disabled`, `final_range`,
+  `bandwidth`, `sample_rate`, `reset`, `in_dtx`, `lookahead`
+- [x] Delete C-style free functions (`opus_decoder_create`, `opus_decoder_init`, `opus_decoder_destroy`)
+- [x] Delete `opus_decoder_ctl_impl` VarArgs dispatch (~80 lines)
+- [x] Replace all `opus_custom_decoder_ctl!` calls with direct field access
+
+**Remaining unsafe (2 fn + 3 blocks):**
+- `unsafe fn opus_decode_frame` — internal, ~400 lines
+- `unsafe fn opus_decode_native` — internal, ~170 lines, orchestrates multi-frame decode
+- 3 unsafe blocks (1 calling opus_decode_native, 2 in decode internals)
+
+- [ ] Make `opus_decode_frame` safe (eliminate raw pointer usage)
+- [ ] Make `opus_decode_native` safe
+- [ ] Remove remaining 3 unsafe blocks
+- [ ] Implement `Decoder` wrapper struct (public API) — or use `OpusDecoder` directly
 - [ ] **Commit**: `refactor: safe Decoder with idiomatic Rust API`
 
 ### Stage 4.5 — Safe opus_encoder.rs
 
-The single hardest file (3034 lines, 30 unsafe fn).
+Substantial progress — struct conversion done, typed API done, VarArgs
+eliminated. Remaining work is the encode path itself.
 
-- [ ] Convert `OpusEncoder` from malloc'd blob to proper Rust struct
-  - Named fields: SILK state, CELT state, analysis state
-- [ ] Implement `Encoder` wrapper struct (public API)
-  - `Encoder::new(sample_rate, channels, application)`
-  - `Encoder::encode(input, output)` / `encode_float`
-  - `Encoder::encode_vec(input, max_size)` / `encode_vec_float`
-  - All CTL methods as typed methods:
-    - `set_bitrate(Bitrate)` / `get_bitrate() -> Bitrate`
-    - `set_complexity(i32)` / `get_complexity() -> i32`
-    - `set_vbr(bool)` / `get_vbr() -> bool`
-    - `set_bandwidth(Bandwidth)` / `get_bandwidth() -> Bandwidth`
-    - etc. (full list in Target API section above)
-- [ ] Implement `Drop` for `Encoder` (replaces `opus_encoder_destroy`)
-- [ ] Deprecate old C-style free functions
+- [x] Convert `OpusEncoder` from malloc'd blob to proper Rust struct
+  - Named fields: SILK state, CELT state, analysis state (dig-safe: 0ca8a46)
+- [x] Add `OpusEncoder::new()` safe constructor
+- [x] Add typed CTL methods: `set_complexity`, `set_bitrate`, `set_vbr`,
+  `set_vbr_constraint`, `set_bandwidth`, `set_max_bandwidth`, `set_signal`,
+  `set_application`, `set_force_channels`, `set_dtx`, `set_inband_fec`,
+  `set_packet_loss_perc`, `set_lsb_depth`, `set_expert_frame_duration`,
+  `set_prediction_disabled`, `set_phase_inversion_disabled`, `set_force_mode`,
+  `channels`, and all corresponding getters
+- [x] Delete C-style free functions (`opus_encoder_create`, `opus_encoder_init`, `opus_encoder_destroy`)
+- [x] Delete `opus_encoder_ctl_impl` VarArgs dispatch (~420 lines)
+- [x] Replace all `opus_custom_encoder_ctl!` calls with direct field access
 - [x] Refactor internal leaf/helper functions to safe:
   - [x] `gen_toc`, `frame_size_select`, `compute_silk_rate_for_hybrid`,
         `compute_equiv_rate`, `compute_redundancy_bytes`, `opus_select_arch`
@@ -501,14 +508,22 @@ The single hardest file (3034 lines, 30 unsafe fn).
   - [x] `silk_biquad_float`, `hp_cutoff`, `dc_reject`
   - [x] `stereo_fade`, `gain_fade`, `compute_stereo_width`
   - [x] `decide_fec`, `decide_dtx_mode`
-  - [ ] `downmix_float`, `downmix_int` (blocked on function pointer plumbing)
-- [ ] Refactor remaining unsafe functions:
-  - `opus_encode_native` — main encode path (1300+ lines)
-  - `encode_multiframe_packet`
-  - `opus_encode`, `opus_encode_float` (public API, block on opus_encode_native)
-  - `opus_encoder_init`, `opus_encoder_create`, `opus_encoder_destroy`
-  - `opus_encoder_get_size` (blocked on silk_Get_Encoder_Size)
-  - `opus_encoder_ctl_impl` (complex varargs/CTL dispatch)
+
+**Remaining unsafe (6 fn + 4 blocks):**
+- `unsafe fn downmix_float` — raw pointer arithmetic on `*const c_void`
+- `unsafe fn downmix_int` — raw pointer arithmetic on `*const c_void`
+- `unsafe fn opus_encode_native` — main encode path (~1300 lines)
+- `unsafe fn encode_multiframe_packet` — calls opus_encode_native
+- `unsafe fn opus_encode` — public i16 API, calls opus_encode_native
+- `unsafe fn opus_encode_float` — public f32 API, calls opus_encode_native
+- 4 unsafe blocks (mem::zeroed in new, from_raw_parts in encode_native)
+
+- [ ] Make `downmix_float`/`downmix_int` safe (replace `*const c_void` with slices)
+- [ ] Make `opus_encode_native` safe (~1300 lines of pointer-heavy code)
+- [ ] Make `encode_multiframe_packet` safe (depends on opus_encode_native)
+- [ ] Make `opus_encode`/`opus_encode_float` safe (depends on opus_encode_native)
+- [ ] Replace `mem::zeroed()` in `OpusEncoder::new()` with field-by-field init
+- [ ] Implement `Encoder` wrapper struct (public API) — or use `OpusEncoder` directly
 - [ ] **Commit(s)**: `refactor: safe Encoder with idiomatic Rust API`
   (likely 3-5 commits)
 
@@ -547,20 +562,24 @@ Stateless packet inspection — most functions are already safe or nearly so.
 - [ ] Remove unsafe alignment utilities
 - [ ] **Commit**: `refactor: make opus.rs and opus_private.rs fully safe`
 
-### Stage 4.9 — Replace VarArgs internally
+### Stage 4.9 — Replace VarArgs internally ✅
 
-After stages 4.4-4.5 provide the public typed API, the internal VarArgs
-usage can be cleaned up.
+All VarArgs usage has been eliminated. Direct field access replaces CTL
+macro dispatch everywhere.
 
-- [ ] Convert internal `opus_encoder_ctl_impl` dispatching to direct method
-  calls
-- [ ] Convert internal `opus_decoder_ctl_impl` dispatching to direct method
-  calls
-- [ ] Keep `opus_encoder_ctl!()` / `opus_decoder_ctl!()` macros as
-  backward-compat wrappers (delegating to new typed methods), mark
-  `#[deprecated]`
-- [ ] Remove `src/varargs.rs` when no longer used anywhere
-- [ ] **Commit**: `refactor: replace VarArgs with typed method dispatch`
+- [x] Convert internal `opus_encoder_ctl_impl` dispatching to direct method
+  calls — **deleted entirely** (dig-safe: fe517bb)
+- [x] Convert internal `opus_decoder_ctl_impl` dispatching to direct method
+  calls — **deleted entirely** (dig-safe: fe517bb)
+- [x] Convert `opus_custom_encoder_ctl_impl` to direct field access — **deleted** (dig-safe: fe517bb)
+- [x] Convert `opus_custom_decoder_ctl_impl` to direct field access — **deleted** (dig-safe: fe517bb)
+- [x] Add `reset()` methods to `OpusCustomEncoder` / `OpusCustomDecoder` (dig-safe: cbcaeb5)
+- [x] Replace 43 encoder CTL macro calls with direct field access (dig-safe: 1713bc9)
+- [x] Replace 19 decoder CTL macro calls with direct field access (dig-safe: 59f9f0b)
+- [x] Migrate tools and tests off VarArgs (dig-safe: c9be18a)
+- [x] Delete `src/varargs.rs` — **deleted entirely** (dig-safe: fe517bb)
+- [x] Delete all CELT CTL request constants (dig-safe: fe517bb)
+- [x] **Commits**: 5 commits from cbcaeb5 through fe517bb
 
 ### Stage 4.10 — Final API cleanup
 
