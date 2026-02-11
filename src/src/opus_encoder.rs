@@ -90,7 +90,10 @@ pub struct OpusEncoder {
     pub(crate) auto_bandwidth: i32,
     pub(crate) silk_bw_switch: i32,
     pub(crate) first: i32,
-    pub(crate) energy_masking: *mut opus_val16,
+    /// Energy mask for surround encoding (set by multistream encoder).
+    /// `energy_masking_len == 0` means no mask is active.
+    pub(crate) energy_masking: [opus_val16; 2 * 21],
+    pub(crate) energy_masking_len: usize,
     pub(crate) width_mem: StereoWidthState,
     pub(crate) delay_buffer: [opus_val16; 960],
     pub(crate) detected_bandwidth: i32,
@@ -203,7 +206,8 @@ impl OpusEncoder {
             auto_bandwidth: 0,
             silk_bw_switch: 0,
             first: 1,
-            energy_masking: std::ptr::null_mut(),
+            energy_masking: [0.0; 2 * 21],
+            energy_masking_len: 0,
             width_mem: StereoWidthState {
                 XX: 0.0,
                 XY: 0.0,
@@ -520,7 +524,8 @@ impl OpusEncoder {
         self.auto_bandwidth = 0;
         self.silk_bw_switch = 0;
         self.first = 0;
-        self.energy_masking = std::ptr::null_mut();
+        self.energy_masking = [0.0; 2 * 21];
+        self.energy_masking_len = 0;
         self.width_mem = StereoWidthState {
             XX: 0.0,
             XY: 0.0,
@@ -2078,14 +2083,14 @@ pub unsafe fn opus_encode_native(
                 (*st).silk_mode.LBRR_coded,
                 (*st).stream_channels,
             );
-            if ((*st).energy_masking).is_null() {
+            if (*st).energy_masking_len == 0 {
                 celt_rate = total_bitRate - (*st).silk_mode.bitRate;
                 HB_gain = Q15ONE - celt_exp2(-celt_rate as f32 * (1.0f32 / 1024f32));
             }
         } else {
             (*st).silk_mode.bitRate = total_bitRate;
         }
-        if !((*st).energy_masking).is_null() && (*st).use_vbr != 0 && (*st).lfe == 0 {
+        if (*st).energy_masking_len > 0 && (*st).use_vbr != 0 && (*st).lfe == 0 {
             let mut mask_sum: opus_val32 = 0 as opus_val32;
             let mut masking_depth: opus_val16 = 0.;
             let mut rate_offset: i32 = 0;
@@ -2104,14 +2109,10 @@ pub unsafe fn opus_encode_native(
                 i = 0;
                 while i < end {
                     let mut mask: opus_val16 = 0.;
-                    mask = if (if *((*st).energy_masking).offset((21 * c + i) as isize) < 0.5f32 {
-                        *((*st).energy_masking).offset((21 * c + i) as isize)
-                    } else {
-                        0.5f32
-                    }) > -2.0f32
-                    {
-                        if *((*st).energy_masking).offset((21 * c + i) as isize) < 0.5f32 {
-                            *((*st).energy_masking).offset((21 * c + i) as isize)
+                    let em_val = (*st).energy_masking[(21 * c + i) as usize];
+                    mask = if (if em_val < 0.5f32 { em_val } else { 0.5f32 }) > -2.0f32 {
+                        if em_val < 0.5f32 {
+                            em_val
                         } else {
                             0.5f32
                         }
@@ -2402,7 +2403,7 @@ pub unsafe fn opus_encode_native(
                 16384 - 2048 * (32000 - equiv_rate) / (equiv_rate - 14000);
         }
     }
-    if ((*st).energy_masking).is_null() && (*st).channels == 2 {
+    if (*st).energy_masking_len == 0 && (*st).channels == 2 {
         if ((*st).hybrid_stereo_width_Q14 as i32) < (1) << 14
             || (*st).silk_mode.stereoWidth_Q14 < (1) << 14
         {

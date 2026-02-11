@@ -94,7 +94,10 @@ pub struct OpusCustomEncoder {
     pub overlap_max: opus_val32,
     pub stereo_saving: opus_val16,
     pub intensity: i32,
-    pub energy_mask: *const opus_val16,
+    /// Energy mask for surround encoding (set by multistream encoder).
+    /// `energy_mask_len == 0` means no mask is active.
+    pub energy_mask: [opus_val16; 2 * 21],
+    pub energy_mask_len: usize,
     pub spec_avg: opus_val16,
     /// Overlap memory, size = channels * overlap (max 2*120 = 240)
     pub in_mem: [celt_sig; 2 * 120],
@@ -184,7 +187,8 @@ fn opus_custom_encoder_init_arch(
         overlap_max: 0.0,
         stereo_saving: 0.0,
         intensity: 0,
-        energy_mask: std::ptr::null(),
+        energy_mask: [0.0; 2 * 21],
+        energy_mask_len: 0,
         spec_avg: 0.0,
         in_mem: [0.0; 2 * 120],
         prefilter_mem: [0.0; 2 * COMBFILTER_MAXPERIOD as usize],
@@ -258,7 +262,8 @@ impl OpusCustomEncoder {
             overlap_max: 0.0,
             stereo_saving: 0.0,
             intensity: 0,
-            energy_mask: std::ptr::null(),
+            energy_mask: [0.0; 2 * 21],
+            energy_mask_len: 0,
             spec_avg: 0.0,
             in_mem: [0.0; 2 * 120],
             prefilter_mem: [0.0; 2 * COMBFILTER_MAXPERIOD as usize],
@@ -2327,12 +2332,10 @@ pub fn celt_encode_with_ec<'b>(
     let vla_4 = (C * nbEBands) as usize;
     let mut surround_dynalloc: Vec<opus_val16> = ::std::vec::from_elem(0., vla_4);
     surround_dynalloc[..end as usize].fill(0.0);
-    // energy_mask is an externally-owned pointer set via CTL from opus_encoder.
-    // We extract it once here to avoid reborrowing st through the helper method.
-    let energy_mask: Option<&[opus_val16]> = if st.energy_mask.is_null() {
+    let energy_mask: Option<&[opus_val16]> = if st.energy_mask_len == 0 {
         None
     } else {
-        Some(unsafe { std::slice::from_raw_parts(st.energy_mask, (CC * nbEBands) as usize) })
+        Some(&st.energy_mask[..(CC * nbEBands) as usize])
     };
     if hybrid == 0 && energy_mask.is_some() && st.lfe == 0 {
         let energy_mask = energy_mask.unwrap();
