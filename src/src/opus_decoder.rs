@@ -25,14 +25,9 @@ use crate::src::opus::opus_packet_parse_impl;
 use crate::src::opus_defines::{
     OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BUFFER_TOO_SMALL,
-    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_GAIN_REQUEST,
-    OPUS_GET_LAST_PACKET_DURATION_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
-    OPUS_GET_PITCH_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
-    OPUS_OK, OPUS_RESET_STATE, OPUS_SET_GAIN_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-    OPUS_UNIMPLEMENTED,
+    OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
-use crate::src::opus_private::{align, MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
-use crate::varargs::VarArgs;
+use crate::src::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::{opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
 
 #[derive(Clone)]
@@ -897,86 +892,6 @@ pub fn opus_decode_float(
         return OPUS_BAD_ARG;
     }
     return unsafe { opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0) };
-}
-/// Upstream C: src/opus_decoder.c:opus_decoder_ctl
-pub fn opus_decoder_ctl_impl(st: &mut OpusDecoder, request: i32, args: VarArgs) -> i32 {
-    let celt_dec = &mut st.celt_dec;
-
-    let mut ap = args;
-
-    match request {
-        OPUS_GET_BANDWIDTH_REQUEST => {
-            let value = ap.arg::<&mut i32>();
-            *value = st.bandwidth;
-            OPUS_OK
-        }
-        OPUS_GET_FINAL_RANGE_REQUEST => {
-            let value_0 = ap.arg::<&mut u32>();
-            *value_0 = st.rangeFinal;
-            OPUS_OK
-        }
-        OPUS_RESET_STATE => {
-            st.stream_channels = st.channels;
-            st.bandwidth = 0;
-            st.mode = 0;
-            st.prev_mode = 0;
-            st.frame_size = st.Fs / 400;
-            st.prev_redundancy = 0;
-            st.last_packet_duration = 0;
-            st.softclip_mem = [0.0; 2];
-            st.rangeFinal = 0;
-
-            OPUS_OK
-        }
-        OPUS_GET_SAMPLE_RATE_REQUEST => {
-            let value_1 = ap.arg::<&mut i32>();
-            *value_1 = st.Fs;
-            OPUS_OK
-        }
-        OPUS_GET_PITCH_REQUEST => {
-            let value_2 = ap.arg::<&mut i32>();
-            if st.prev_mode == MODE_CELT_ONLY {
-                *value_2 = celt_dec.postfilter_period;
-            } else {
-                *value_2 = st.DecControl.prevPitchLag;
-            }
-            OPUS_OK
-        }
-        OPUS_GET_GAIN_REQUEST => {
-            let value_3 = ap.arg::<&mut i32>();
-            *value_3 = st.decode_gain;
-            OPUS_OK
-        }
-        OPUS_SET_GAIN_REQUEST => {
-            let value_4: i32 = ap.arg::<i32>();
-            if value_4 < -(32768) || value_4 > 32767 {
-                OPUS_BAD_ARG
-            } else {
-                st.decode_gain = value_4;
-                OPUS_OK
-            }
-        }
-        OPUS_GET_LAST_PACKET_DURATION_REQUEST => {
-            let value_5 = ap.arg::<&mut i32>();
-            *value_5 = st.last_packet_duration;
-            OPUS_OK
-        }
-        OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST => {
-            let value_6: i32 = ap.arg::<i32>();
-            if value_6 < 0 || value_6 > 1 {
-                OPUS_BAD_ARG
-            } else {
-                celt_dec.disable_inv = value_6;
-                OPUS_OK
-            }
-        }
-        OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
-            let value_7 = ap.arg::<&mut i32>();
-            *value_7 = celt_dec.disable_inv;
-            OPUS_OK
-        }
-        _ => OPUS_UNIMPLEMENTED,
-    }
 }
 
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {

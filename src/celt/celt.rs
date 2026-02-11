@@ -5,7 +5,7 @@ pub mod arch_h {
     pub type opus_val32 = f32;
 }
 
-pub use self::arch_h::{opus_val16, opus_val32};
+pub use self::arch_h::opus_val16;
 
 pub static trim_icdf: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
 pub static spread_icdf: [u8; 4] = [25, 23, 2, 0];
@@ -16,18 +16,6 @@ pub static tf_select_table: [[i8; 8]; 4] = [
     [0, -2, 0, -3, 2, 0, 1, -1],
     [0, -2, 0, -3, 3, 0, 1, -1],
 ];
-
-pub const OPUS_SET_ENERGY_MASK_REQUEST: i32 = 10026;
-pub const CELT_GET_MODE_REQUEST: i32 = 10015;
-pub const CELT_SET_SILK_INFO_REQUEST: i32 = 10028;
-pub const CELT_SET_ANALYSIS_REQUEST: i32 = 10022;
-pub const CELT_SET_SIGNALLING_REQUEST: i32 = 10016;
-pub const OPUS_SET_LFE_REQUEST: i32 = 10024;
-pub const CELT_SET_START_BAND_REQUEST: i32 = 10010;
-pub const CELT_SET_CHANNELS_REQUEST: i32 = 10008;
-pub const CELT_SET_END_BAND_REQUEST: i32 = 10012;
-pub const CELT_SET_PREDICTION_REQUEST: i32 = 10002;
-pub const CELT_GET_AND_CLEAR_ERROR_REQUEST: i32 = 10007;
 
 pub const COMBFILTER_MAXPERIOD: i32 = 1024;
 pub const COMBFILTER_MINPERIOD: i32 = 15;

@@ -55,7 +55,7 @@ mod unsafe_libopus {
             st.set_bitrate(Bitrate::from(val));
         }
         fn enc_set_bandwidth(st: &mut Box<OpusEncoder>, val: i32) {
-            let bw = if val == -1 {
+            let bw = if val == ::unsafe_libopus::OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -72,7 +72,7 @@ mod unsafe_libopus {
             st.set_complexity(val).unwrap();
         }
         fn enc_set_force_channels(st: &mut Box<OpusEncoder>, val: i32) {
-            let ch = if val == -1 {
+            let ch = if val == ::unsafe_libopus::OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())

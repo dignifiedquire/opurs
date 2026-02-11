@@ -2,7 +2,6 @@ extern crate core;
 
 pub mod api;
 pub mod util;
-pub mod varargs;
 
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
@@ -168,12 +167,12 @@ mod src {
 // =====
 
 // opus_encoder
-pub use crate::src::opus_encoder::{opus_encode, opus_encoder_ctl_impl, OpusEncoder};
+pub use crate::src::opus_encoder::OpusEncoder;
 // opus_decoder
 pub use crate::src::opus_decoder::{
-    opus_decode, opus_decode_float, opus_decoder_ctl_impl, opus_decoder_get_nb_samples,
-    opus_packet_get_bandwidth, opus_packet_get_nb_channels, opus_packet_get_nb_frames,
-    opus_packet_get_nb_samples, OpusDecoder,
+    opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
+    opus_packet_get_nb_channels, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
+    OpusDecoder,
 };
 
 pub use crate::src::opus::{
@@ -222,8 +221,8 @@ pub use crate::celt::celt::{opus_get_version_string, opus_strerror};
 // =====
 // opus_custom.h
 // =====
-pub use crate::celt::celt_decoder::{opus_custom_decoder_ctl_impl, OpusCustomDecoder};
-pub use crate::celt::celt_encoder::{opus_custom_encoder_ctl_impl, OpusCustomEncoder};
+pub use crate::celt::celt_decoder::OpusCustomDecoder;
+pub use crate::celt::celt_encoder::OpusCustomEncoder;
 // NOTE: we don't support opus custom modes, so no opus_custom_destroy here
 pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 

@@ -5,10 +5,6 @@ use crate::celt::celt::{
     comb_filter, comb_filter_inplace, init_caps, resampling_factor, spread_icdf, tapset_icdf,
     tf_select_table, trim_icdf,
 };
-use crate::celt::celt::{
-    CELT_GET_AND_CLEAR_ERROR_REQUEST, CELT_GET_MODE_REQUEST, CELT_SET_CHANNELS_REQUEST,
-    CELT_SET_END_BAND_REQUEST, CELT_SET_SIGNALLING_REQUEST, CELT_SET_START_BAND_REQUEST,
-};
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc, celt_fir_c, celt_iir, LPC_ORDER};
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entdec::{
@@ -24,13 +20,7 @@ use crate::celt::quant_bands::{
 use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
-use crate::opus_custom_decoder_ctl;
-use crate::src::opus_defines::{
-    OPUS_BAD_ARG, OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST,
-    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PITCH_REQUEST, OPUS_INTERNAL_ERROR,
-    OPUS_OK, OPUS_RESET_STATE, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_UNIMPLEMENTED,
-};
-use crate::varargs::VarArgs;
+use crate::src::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
 
 pub use self::arch_h::{
     celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
@@ -1397,128 +1387,4 @@ pub fn celt_decode_with_ec(
         st.error = 1;
     }
     return frame_size / st.downsample;
-}
-/// Upstream C: celt/celt_decoder.c:opus_custom_decoder_ctl
-pub fn opus_custom_decoder_ctl_impl(
-    st: &mut OpusCustomDecoder,
-    request: i32,
-    args: VarArgs,
-) -> i32 {
-    let current_block: u64;
-    let mut ap = args;
-    match request {
-        CELT_SET_START_BAND_REQUEST => {
-            let value: i32 = ap.arg::<i32>();
-            if value < 0 || value >= st.mode.nbEBands as i32 {
-                current_block = 7990025728955927862;
-            } else {
-                st.start = value;
-                current_block = 3689906465960840878;
-            }
-        }
-        CELT_SET_END_BAND_REQUEST => {
-            let value_0: i32 = ap.arg::<i32>();
-            if value_0 < 1 || value_0 > st.mode.nbEBands as i32 {
-                current_block = 7990025728955927862;
-            } else {
-                st.end = value_0;
-                current_block = 3689906465960840878;
-            }
-        }
-        CELT_SET_CHANNELS_REQUEST => {
-            let value_1: i32 = ap.arg::<i32>();
-            if value_1 < 1 || value_1 > 2 {
-                current_block = 7990025728955927862;
-            } else {
-                st.stream_channels = value_1 as usize;
-                current_block = 3689906465960840878;
-            }
-        }
-        CELT_GET_AND_CLEAR_ERROR_REQUEST => {
-            let value_2: &mut i32 = ap.arg::<&mut i32>();
-            *value_2 = st.error;
-            st.error = 0;
-            current_block = 3689906465960840878;
-        }
-        OPUS_GET_LOOKAHEAD_REQUEST => {
-            let value_3 = ap.arg::<&mut i32>();
-            *value_3 = st.overlap as i32 / st.downsample;
-            current_block = 3689906465960840878;
-        }
-        OPUS_RESET_STATE => {
-            let st = &mut *st;
-
-            st.rng = 0;
-            st.error = 0;
-            st.last_pitch_index = 0;
-            st.loss_count = 0;
-            st.skip_plc = 1;
-            st.postfilter_period = 0;
-            st.postfilter_period_old = 0;
-            st.postfilter_gain = 0.0;
-            st.postfilter_gain_old = 0.0;
-            st.postfilter_tapset = 0;
-            st.postfilter_tapset_old = 0;
-            st.preemph_memD = [0.0; 2];
-            st.decode_mem.fill(0.0);
-            st.lpc.fill(0.0);
-            st.oldEBands.fill(0.0);
-            st.oldLogE.fill(-28.0);
-            st.oldLogE2.fill(-28.0);
-            st.backgroundLogE.fill(0.0);
-
-            current_block = 3689906465960840878;
-        }
-        OPUS_GET_PITCH_REQUEST => {
-            let value_4 = ap.arg::<&mut i32>();
-            *value_4 = st.postfilter_period;
-            current_block = 3689906465960840878;
-        }
-        CELT_GET_MODE_REQUEST => {
-            let value_5 = ap.arg::<&mut *const OpusCustomMode>();
-            *value_5 = st.mode;
-            current_block = 3689906465960840878;
-        }
-        CELT_SET_SIGNALLING_REQUEST => {
-            let value_6: i32 = ap.arg::<i32>();
-            st.signalling = value_6;
-            current_block = 3689906465960840878;
-        }
-        OPUS_GET_FINAL_RANGE_REQUEST => {
-            let value_7 = ap.arg::<&mut u32>();
-            *value_7 = st.rng;
-            current_block = 3689906465960840878;
-        }
-        OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST => {
-            let value_8: i32 = ap.arg::<i32>();
-            if value_8 < 0 || value_8 > 1 {
-                current_block = 7990025728955927862;
-            } else {
-                st.disable_inv = value_8;
-                current_block = 3689906465960840878;
-            }
-        }
-        OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST => {
-            let value_9 = ap.arg::<&mut i32>();
-            *value_9 = st.disable_inv;
-            current_block = 3689906465960840878;
-        }
-        _ => return OPUS_UNIMPLEMENTED,
-    }
-    match current_block {
-        3689906465960840878 => return OPUS_OK,
-        _ => return OPUS_BAD_ARG,
-    };
-}
-#[macro_export]
-macro_rules! opus_custom_decoder_ctl {
-    ($st:expr, $request:expr, $($arg:expr),*) => {
-        $crate::opus_custom_decoder_ctl_impl($st, $request, $crate::varargs!($($arg),*))
-    };
-    ($st:expr, $request:expr) => {
-        opus_custom_decoder_ctl!($st, $request,)
-    };
-    ($st:expr, $request:expr, $($arg:expr),*,) => {
-        opus_custom_decoder_ctl!($st, $request, $($arg),*)
-    };
 }
