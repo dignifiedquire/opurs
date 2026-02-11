@@ -116,9 +116,9 @@ static stereo_voice_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
 static stereo_music_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
-static mut stereo_voice_threshold: i32 = 19000;
-static mut stereo_music_threshold: i32 = 17000;
-static mut mode_thresholds: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
+const STEREO_VOICE_THRESHOLD: i32 = 19000;
+const STEREO_MUSIC_THRESHOLD: i32 = 17000;
+const MODE_THRESHOLDS: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
 static fec_thresholds: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
@@ -1540,13 +1540,8 @@ pub fn opus_encode_native(
     if st.force_channels != OPUS_AUTO && st.channels == 2 {
         st.stream_channels = st.force_channels;
     } else if st.channels == 2 {
-        let mut stereo_threshold: i32 = 0;
-        // SAFETY: these are mutable statics from c2rust, only mutated during init
-        stereo_threshold = unsafe { stereo_music_threshold }
-            + ((voice_est
-                * voice_est
-                * unsafe { stereo_voice_threshold - stereo_music_threshold })
-                >> 14);
+        let mut stereo_threshold: i32 = STEREO_MUSIC_THRESHOLD
+            + ((voice_est * voice_est * (STEREO_VOICE_THRESHOLD - STEREO_MUSIC_THRESHOLD)) >> 14);
         if st.stream_channels == 2 {
             stereo_threshold -= 1000;
         } else {
@@ -1573,15 +1568,10 @@ pub fn opus_encode_native(
         let mut mode_voice: i32 = 0;
         let mut mode_music: i32 = 0;
         let mut threshold: i32 = 0;
-        // SAFETY: mode_thresholds is a mutable static from c2rust, only mutated during init
-        mode_voice = unsafe {
-            ((1.0f32 - stereo_width) * mode_thresholds[0_usize][0_usize] as f32
-                + stereo_width * mode_thresholds[1_usize][0_usize] as f32) as i32
-        };
-        mode_music = unsafe {
-            ((1.0f32 - stereo_width) * mode_thresholds[1_usize][1_usize] as f32
-                + stereo_width * mode_thresholds[1_usize][1_usize] as f32) as i32
-        };
+        mode_voice = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[0][0] as f32
+            + stereo_width * MODE_THRESHOLDS[1][0] as f32) as i32;
+        mode_music = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[1][1] as f32
+            + stereo_width * MODE_THRESHOLDS[1][1] as f32) as i32;
         threshold = mode_music + ((voice_est * voice_est * (mode_voice - mode_music)) >> 14);
         if st.application == OPUS_APPLICATION_VOIP {
             threshold += 8000;
@@ -1868,10 +1858,6 @@ pub fn opus_encode_native(
     } else {
         st.bitrate_bps * frame_size / (st.Fs * 8)
     }) - 1;
-    // Save raw pointer before ec_enc_init borrows data[1..].
-    // This pointer is used later for writes to data[0] (TOC byte) and
-    // data[1+nb_compr_bytes..] (redundancy region), which don't overlap with enc's buffer.
-    let data_ptr = data.as_mut_ptr();
     enc = ec_enc_init(&mut data[1..max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
@@ -2361,24 +2347,20 @@ pub fn opus_encode_native(
         info.offset = st.silk_mode.offset;
         st.celt_enc.silk_info = info;
     }
+    // Temporary buffer for redundancy data, written back into data[] after enc is dropped.
+    let mut redundancy_tmp = vec![0u8; redundancy_bytes.max(0) as usize];
+    // Where to copy redundancy_tmp into data[] (offset from data start). 0 = no copy needed.
+    let mut redundancy_copy_off: usize = 0;
     if redundancy != 0 && celt_to_silk != 0 {
         let mut err: i32 = 0;
         st.celt_enc.start = 0;
         st.celt_enc.vbr = 0;
         st.celt_enc.bitrate = -1;
-        // SAFETY: the redundancy region data[1+nb_compr_bytes..] does not overlap
-        // with the region actively used by enc (the compressed body).
-        let redundancy_buf = unsafe {
-            std::slice::from_raw_parts_mut(
-                data_ptr.add(1 + nb_compr_bytes as usize),
-                redundancy_bytes as usize,
-            )
-        };
         err = celt_encode_with_ec(
             &mut st.celt_enc,
             &pcm_buf,
             st.Fs / 200,
-            redundancy_buf,
+            &mut redundancy_tmp,
             redundancy_bytes,
             None,
         );
@@ -2387,6 +2369,8 @@ pub fn opus_encode_native(
         }
         redundant_rng = st.celt_enc.rng;
         st.celt_enc.reset();
+        // Default destination; may be overridden below for VBR hybrid.
+        redundancy_copy_off = 1 + nb_compr_bytes as usize;
     }
     st.celt_enc.start = start_band;
     if st.mode != MODE_SILK_ONLY {
@@ -2421,17 +2405,9 @@ pub fn opus_encode_native(
                 return OPUS_INTERNAL_ERROR;
             }
             if redundancy != 0 && celt_to_silk != 0 && st.mode == MODE_HYBRID && st.use_vbr != 0 {
-                // Copy redundancy data from nb_compr_bytes+1 to ret+1
-                // (both relative to original data buffer, offset by 1 for TOC byte)
-                // SAFETY: this region does not overlap with enc's active buffer;
-                // enc has finished writing at this point (after celt_encode_with_ec).
-                unsafe {
-                    std::ptr::copy(
-                        data_ptr.add(1 + nb_compr_bytes as usize) as *const u8,
-                        data_ptr.add(1 + ret as usize),
-                        redundancy_bytes as usize,
-                    );
-                }
+                // Redundancy data will be copied from redundancy_tmp to data[1+ret..]
+                // after enc is dropped.
+                redundancy_copy_off = 1 + ret as usize;
                 nb_compr_bytes += redundancy_bytes;
             }
         }
@@ -2461,19 +2437,11 @@ pub fn opus_encode_native(
             2,
             None,
         );
-        // SAFETY: the redundancy region data[1+nb_compr_bytes..] does not overlap
-        // with the region actively used by enc (the compressed body).
-        let redundancy_buf = unsafe {
-            std::slice::from_raw_parts_mut(
-                data_ptr.add(1 + nb_compr_bytes as usize),
-                redundancy_bytes as usize,
-            )
-        };
         err_0 = celt_encode_with_ec(
             &mut st.celt_enc,
             &pcm_buf[(st.channels * (frame_size - N2)) as usize..],
             N2,
-            redundancy_buf,
+            &mut redundancy_tmp,
             redundancy_bytes,
             None,
         );
@@ -2481,18 +2449,24 @@ pub fn opus_encode_native(
             return OPUS_INTERNAL_ERROR;
         }
         redundant_rng = st.celt_enc.rng;
+        redundancy_copy_off = 1 + nb_compr_bytes as usize;
     }
-    // SAFETY: data[0] (TOC byte) does not overlap with enc's buffer (data[1..]).
-    // enc.rng is read below but enc no longer writes to the buffer.
-    unsafe {
-        *data_ptr = gen_toc(
-            st.mode,
-            st.Fs / frame_size,
-            curr_bandwidth,
-            st.stream_channels,
-        );
+    // Save enc state and drop it so we can write to data[] directly.
+    let enc_rng = enc.rng;
+    let enc_tell = ec_tell(&enc);
+    drop(enc);
+    // Write redundancy data into the output buffer now that enc's borrow is released.
+    if redundancy_copy_off > 0 {
+        let rb = redundancy_bytes as usize;
+        data[redundancy_copy_off..redundancy_copy_off + rb].copy_from_slice(&redundancy_tmp[..rb]);
     }
-    st.rangeFinal = enc.rng ^ redundant_rng;
+    data[0] = gen_toc(
+        st.mode,
+        st.Fs / frame_size,
+        curr_bandwidth,
+        st.stream_channels,
+    );
+    st.rangeFinal = enc_rng ^ redundant_rng;
     if to_celt != 0 {
         st.prev_mode = MODE_CELT_ONLY;
     } else {
@@ -2525,7 +2499,7 @@ pub fn opus_encode_native(
     } else {
         st.nb_no_activity_frames = 0;
     }
-    if ec_tell(&enc) > (max_data_bytes - 1) * 8 {
+    if enc_tell > (max_data_bytes - 1) * 8 {
         if max_data_bytes < 2 {
             return OPUS_BUFFER_TOO_SMALL;
         }
