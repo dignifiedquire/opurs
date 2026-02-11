@@ -94,6 +94,10 @@ fn build_opus() {
     let opus_build_src_dir = out_dir.join("opus_src");
     let opus_source_path = Path::new("opus");
 
+    let deep_plc = cfg!(feature = "deep-plc");
+    let dred = cfg!(feature = "dred");
+    let osce = cfg!(feature = "osce");
+
     // Parse upstream .mk files for source and header lists
     let opus_sources_mk = parse_mk_file(&opus_source_path.join("opus_sources.mk"));
     let celt_sources_mk = parse_mk_file(&opus_source_path.join("celt_sources.mk"));
@@ -115,6 +119,24 @@ fn build_opus() {
     headers.extend(get_sources(&opus_headers_mk, "OPUS_HEAD"));
     headers.extend(get_sources(&celt_headers_mk, "CELT_HEAD"));
     headers.extend(get_sources(&silk_headers_mk, "SILK_HEAD"));
+
+    // DNN sources and headers (feature-gated)
+    if deep_plc {
+        let lpcnet_sources_mk = parse_mk_file(&opus_source_path.join("lpcnet_sources.mk"));
+        let lpcnet_headers_mk = parse_mk_file(&opus_source_path.join("lpcnet_headers.mk"));
+
+        sources.extend(get_sources(&lpcnet_sources_mk, "DEEP_PLC_SOURCES"));
+        headers.extend(get_sources(&lpcnet_headers_mk, "DEEP_PLC_HEAD"));
+
+        if dred {
+            sources.extend(get_sources(&lpcnet_sources_mk, "DRED_SOURCES"));
+            headers.extend(get_sources(&lpcnet_headers_mk, "DRED_HEAD"));
+        }
+        if osce {
+            sources.extend(get_sources(&lpcnet_sources_mk, "OSCE_SOURCES"));
+            headers.extend(get_sources(&lpcnet_headers_mk, "OSCE_HEAD"));
+        }
+    }
 
     // Clean build directories
     if opus_build_src_dir.exists() {
@@ -144,8 +166,18 @@ fn build_opus() {
         // only needed when compiling with those platform intrinsics enabled.
     }
 
-    // Write config.h
-    fs::write(opus_build_src_dir.join("config.h"), CONFIG_H).expect("Could not write config.h");
+    // Write config.h with optional DNN defines
+    let mut config = CONFIG_H.to_string();
+    if deep_plc {
+        config.push_str("#define ENABLE_DEEP_PLC 1\n");
+    }
+    if dred {
+        config.push_str("#define ENABLE_DRED 1\n");
+    }
+    if osce {
+        config.push_str("#define ENABLE_OSCE 1\n");
+    }
+    fs::write(opus_build_src_dir.join("config.h"), config).expect("Could not write config.h");
 
     let mut build = cc::Build::new();
     build
@@ -206,6 +238,8 @@ fn build_opus() {
         "celt_headers.mk",
         "silk_sources.mk",
         "silk_headers.mk",
+        "lpcnet_sources.mk",
+        "lpcnet_headers.mk",
     ] {
         println!(
             "cargo:rerun-if-changed={}",
