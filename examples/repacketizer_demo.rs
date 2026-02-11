@@ -1,15 +1,27 @@
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-#![allow(unused_assignments)]
-#![allow(unused_mut)]
+#![forbid(unsafe_code)]
 
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 
+use clap::Parser;
 use opurs::{opus_strerror, OpusRepacketizer};
-fn usage(argv0: &str) {
-    eprintln!("usage: {} [options] input_file output_file", argv0);
+
+#[derive(Parser)]
+#[command(about = "Opus repacketizer demo")]
+struct Args {
+    /// Number of packets to merge (1-48)
+    #[arg(long = "merge", default_value_t = 1)]
+    merge: usize,
+
+    /// Split packets into individual frames
+    #[arg(long = "split")]
+    split: bool,
+
+    /// Input file
+    input: std::path::PathBuf,
+
+    /// Output file
+    output: std::path::PathBuf,
 }
 
 fn is_eof(file: &mut File) -> bool {
@@ -20,57 +32,28 @@ fn is_eof(file: &mut File) -> bool {
     position == end
 }
 
-unsafe fn main_0() -> i32 {
+fn main() {
+    let args = Args::parse();
+
+    assert!(
+        (1..=48).contains(&args.merge),
+        "-merge parameter must be between 1 and 48"
+    );
+
     let mut packets: [[u8; 1500]; 48] = [[0; 1500]; 48];
     let mut len: [i32; 48] = [0; 48];
     let mut rng: [i32; 48] = [0; 48];
     let mut output_packet: [u8; 32000] = [0; 32000];
 
-    let mut merge: usize = 1;
-    let mut split: bool = false;
-
-    let mut args = std::env::args();
-    let argc = args.len();
-    let argv0 = args.next().unwrap();
-
-    if argc < 3 {
-        usage(&argv0);
-        return 1;
-    }
-
-    while let Some(arg) = args.next() {
-        if arg == "-merge" {
-            let merge_str = args.next().expect("-merge requires a parameter");
-            merge = merge_str
-                .parse()
-                .expect("-merge parameter must be an integer");
-            if merge < 1 {
-                eprintln!("-merge parameter must be at least 1.");
-                return 1;
-            }
-            if merge > 48 {
-                eprintln!("-merge parameter must be less than 48.");
-                return 1;
-            }
-        } else if arg == "-split" {
-            split = true;
-        } else {
-            eprintln!("Unknown option: {}", arg);
-            usage(&argv0);
-            return 1;
-        }
-    }
-
-    let mut fin =
-        File::open(args.next().expect("input file argument")).expect("opening input file");
-    let mut fout =
-        File::create(args.next().expect("output file argument")).expect("opening output file");
+    let mut fin = File::open(&args.input).expect("opening input file");
+    let mut fout = File::create(&args.output).expect("opening output file");
 
     let mut rp = OpusRepacketizer::default();
     let mut eof = false;
     while !eof {
+        #[allow(unused_assignments)]
         let mut err: i32 = 0;
-        let mut nb_packets: usize = merge;
+        let mut nb_packets: usize = args.merge;
         rp.init();
         let mut i: usize = 0;
         while i < nb_packets {
@@ -82,7 +65,7 @@ unsafe fn main_0() -> i32 {
                     eof = true;
                 } else {
                     eprintln!("Invalid payload length");
-                    return 1;
+                    std::process::exit(1);
                 }
                 break;
             } else {
@@ -93,7 +76,7 @@ unsafe fn main_0() -> i32 {
                     eof = true;
                     break;
                 } else {
-                    err = rp.cat(&(packets[i])[..len[i] as usize]);
+                    err = rp.cat(&packets[i][..len[i] as usize]);
                     if err != 0 {
                         eprintln!("opus_repacketizer_cat() failed: {}", opus_strerror(err));
                         break;
@@ -107,13 +90,13 @@ unsafe fn main_0() -> i32 {
         if eof {
             break;
         }
-        if !split {
+        if !args.split {
             err = rp.out(&mut output_packet);
             if err > 0 {
-                let mut int_field: [u8; 4] = err.to_be_bytes();
+                let int_field: [u8; 4] = err.to_be_bytes();
                 fout.write_all(&int_field).unwrap();
 
-                int_field = rng[nb_packets - 1].to_be_bytes();
+                let int_field = rng[nb_packets - 1].to_be_bytes();
                 fout.write_all(&int_field).unwrap();
 
                 fout.write_all(&output_packet[..err as usize]).unwrap();
@@ -121,19 +104,19 @@ unsafe fn main_0() -> i32 {
                 eprintln!("opus_repacketizer_out() failed: {}", opus_strerror(err));
             }
         } else {
-            let mut nb_frames = rp.get_nb_frames();
+            let nb_frames = rp.get_nb_frames();
             let mut i = 0;
             while i < nb_frames {
                 err = rp.out_range(i, i + 1, &mut output_packet);
                 if err > 0 {
-                    let mut int_field_0: [u8; 4] = err.to_be_bytes();
-                    fout.write_all(&int_field_0).unwrap();
-                    int_field_0 = if i == nb_frames - 1 {
+                    let int_field: [u8; 4] = err.to_be_bytes();
+                    fout.write_all(&int_field).unwrap();
+                    let int_field = if i == nb_frames - 1 {
                         rng[nb_packets - 1].to_be_bytes()
                     } else {
                         0i32.to_be_bytes()
                     };
-                    fout.write_all(&int_field_0).unwrap();
+                    fout.write_all(&int_field).unwrap();
 
                     fout.write_all(&output_packet[..err as usize]).unwrap();
                 } else {
@@ -146,10 +129,4 @@ unsafe fn main_0() -> i32 {
             }
         }
     }
-
-    0
-}
-
-pub fn main() {
-    unsafe { std::process::exit(main_0()) }
 }

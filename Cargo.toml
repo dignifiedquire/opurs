@@ -12,7 +12,6 @@ license = "BSD-3-Clause"
 [workspace]
 members = [
     "libopus-sys",
-    "tools",
 ]
 
 [profile.release]
@@ -44,6 +43,13 @@ thiserror = "2"
 # for dumping data in ent-dump
 hex = { version = "0.4.3", optional = true }
 
+# tools feature dependencies (optional)
+libopus-sys = { path = "libopus-sys", optional = true }
+byteorder = { version = "1.4", optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
+rayon = { version = "1.7", optional = true }
+indicatif = { version = "0.17", features = ["rayon"], optional = true }
+
 [dev-dependencies]
 getrandom = "0.2.15"
 insta = "1.29.0"
@@ -51,6 +57,23 @@ insta = "1.29.0"
 [features]
 # dumps calls to entropy coder to console for easier upstream divergence debugging
 # (it's not _only_ entropy coder actually, there are some additional prints where it was found necessary)
-ent-dump = [
-    "hex"
-]
+ent-dump = ["hex"]
+
+# testing and comparison tools (enables examples that depend on upstream C libopus)
+tools = ["dep:libopus-sys", "dep:byteorder", "dep:clap", "dep:rayon", "dep:indicatif"]
+
+[[example]]
+name = "run_vectors2"
+required-features = ["tools"]
+
+[[example]]
+name = "opus_demo"
+required-features = ["tools"]
+
+[[example]]
+name = "opus_compare"
+required-features = ["tools"]
+
+[[example]]
+name = "repacketizer_demo"
+required-features = ["tools"]

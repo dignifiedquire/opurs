@@ -27,29 +27,32 @@ opurs/                   # Main crate (pure Rust, no C compilation)
 │   │   ├── float/       # Floating-point variants (28 modules)
 │   │   ├── resampler/   # Audio resampling
 │   │   └── tests/       # Unit tests
-│   └── src/             # High-level integration layer
-│       ├── opus_encoder.rs   # 3034 lines — encoder state & logic
-│       ├── opus_decoder.rs   # 1033 lines — decoder state & logic
-│       ├── opus.rs           # Packet handling, core API
-│       ├── analysis.rs       # Audio analysis (tonality, music detection)
-│       ├── repacketizer.rs   # Packet merging/splitting
-│       ├── mlp/              # Neural network analysis
-│       ├── opus_defines.rs   # Constants & error codes
-│       └── opus_private.rs   # Private structs, alignment utilities
+│   ├── src/             # High-level integration layer
+│   │   ├── opus_encoder.rs   # 3034 lines — encoder state & logic
+│   │   ├── opus_decoder.rs   # 1033 lines — decoder state & logic
+│   │   ├── opus.rs           # Packet handling, core API
+│   │   ├── analysis.rs       # Audio analysis (tonality, music detection)
+│   │   ├── repacketizer.rs   # Packet merging/splitting
+│   │   ├── mlp/              # Neural network analysis
+│   │   ├── opus_defines.rs   # Constants & error codes
+│   │   └── opus_private.rs   # Private structs, alignment utilities
+│   └── tools/           # Testing & comparison utilities (feature-gated)
+│       ├── mod.rs            # Module root, re-exports
+│       ├── compare.rs        # Audio comparison logic
+│       └── demo/             # Shared encode/decode/backend infrastructure
+├── examples/            # CLI tools (require `--features tools` unless noted)
+│   ├── run_vectors2.rs      # PRIMARY: bit-exact comparison against C
+│   ├── opus_demo/           # CLI encode/decode tool (clap)
+│   ├── opus_compare.rs      # Audio comparison utility
+│   └── repacketizer_demo.rs # Repacketizer demo (clap)
 ├── tests/               # Integration tests (ported from C test suite)
 │   ├── opus_api.rs      # Comprehensive API tests
 │   ├── opus_decode.rs   # Decoder tests
 │   ├── opus_encode/     # Encoder tests + regressions
 │   └── opus_padding.rs  # Packet padding tests
-├── upstream-libopus/    # C reference implementation (libopus 1.3.1)
-│   ├── opus/            # Original C source
-│   └── build.rs         # Compiles C code via `cc` crate
-└── tools/               # Testing & comparison utilities
-    └── src/bin/
-        ├── run_vectors2.rs      # PRIMARY: bit-exact comparison against C
-        ├── opus_demo/           # CLI encode/decode tool
-        ├── opus_compare.rs      # Audio comparison utility
-        └── repacketizer_demo.rs # Repacketizer demo
+└── libopus-sys/         # C reference implementation (libopus 1.3.1)
+    ├── opus/            # Original C source
+    └── build.rs         # Compiles C code via `cc` crate
 ```
 
 ## Build & Test Commands
@@ -58,18 +61,19 @@ opurs/                   # Main crate (pure Rust, no C compilation)
 # Build
 cargo build
 cargo build --release
+cargo build --features tools          # includes tools module + examples
 
 # Run unit + integration tests
-cargo test --all
-cargo test --all --release
+cargo nextest run -p opurs
+cargo nextest run -p opurs --cargo-profile=release
 
 # Run bit-exact vector tests (requires test vectors)
 curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
 tar -xzf vectors.tar.gz
-cargo run --release -p opurs-tools --bin run_vectors2 -- opus_newvectors
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors
 
 # With dump directory for debugging mismatches:
-cargo run --release -p opurs-tools --bin run_vectors2 -- opus_newvectors --dump-dir dump/
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors --dump-dir dump/
 
 # Debug entropy coder divergence
 cargo test --features ent-dump
@@ -126,12 +130,14 @@ GitHub Actions runs on Ubuntu, macOS (x86 + ARM), Windows (x86 + x86_64):
 
 **Runtime**: num-traits, num-complex, bytemuck, arrayref, const-chunks, ndarray, nalgebra, itertools
 **Dev**: getrandom, insta (snapshot testing)
-**Features**: `ent-dump` — enables hex dumps of entropy coder calls for debugging divergence from C
+**Features**:
+- `ent-dump` — enables hex dumps of entropy coder calls for debugging divergence from C
+- `tools` — enables `src/tools/` module and examples (adds libopus-sys, byteorder, clap, rayon, indicatif)
 
 ## Commit Conventions
 
 - Prefixes: `test:`, `refactor:`, `fix:`, `perf:`, `chore:`, `docs:`
-- Must pass: `cargo build`, `cargo test --all`, `cargo clippy --all --all-targets -- -D warnings`, `cargo fmt --check`
+- Must pass: `cargo build`, `cargo nextest run -p opurs`, `cargo clippy --all --all-targets --features tools -- -D warnings`, `cargo fmt --check`
 
 ## Performance Notes
 

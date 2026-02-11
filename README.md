@@ -48,19 +48,62 @@ let samples = decoder.decode(Some(encoded_packet), &mut output, false).unwrap();
 println!("Decoded {} samples per channel", samples);
 ```
 
+## Examples
+
+The crate includes several CLI tools as examples, gated behind the `tools` feature (which pulls in `libopus-sys`, `clap`, `rayon`, etc.).
+
+### opus_demo
+
+Encode and/or decode raw PCM audio using Opus.
+
+```bash
+# Encode and decode (roundtrip)
+cargo run --release --features tools --example opus_demo -- enc-dec audio 48000 2 64000 input.raw output.raw
+
+# Encode only
+cargo run --release --features tools --example opus_demo -- enc audio 48000 2 128000 input.raw output.opus
+
+# Decode only
+cargo run --release --features tools --example opus_demo -- dec 48000 2 input.opus output.raw
+```
+
+### opus_compare
+
+Compare two raw audio files using a PEAQ-style quality metric.
+
+```bash
+cargo run --release --features tools --example opus_compare -- reference.raw degraded.raw
+```
+
+### repacketizer_demo
+
+Merge or split Opus packets in a bitstream.
+
+```bash
+cargo run --release --features tools --example repacketizer_demo -- input.opus output.opus
+```
+
+### run_vectors2
+
+Run the IETF bit-exact vector test suite, comparing Rust output against the C reference.
+
+```bash
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors
+```
+
 ## Testing
 
 ```bash
 # Unit and integration tests
-cargo test --all
+cargo nextest run -p opurs
 
 # Bit-exact vector tests (requires IETF test vectors)
 curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
 tar -xzf vectors.tar.gz
-cargo run --release -p opurs-tools --bin run_vectors2 -- opus_newvectors
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors
 ```
 
-The vector test suite runs the encoder at 9 bitrates and the decoder at 10 configurations across all IETF test vectors, comparing output against the C reference implementation compiled from source in `upstream-libopus/`.
+The vector test suite runs the encoder at 9 bitrates and the decoder at 10 configurations across all IETF test vectors, comparing output against the C reference implementation compiled from source in `libopus-sys/`.
 
 ## Origin
 

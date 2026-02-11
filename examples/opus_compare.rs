@@ -5,8 +5,8 @@
 #![forbid(unsafe_code)]
 
 use clap::Parser;
-use opurs_tools::demo::{Channels, SampleRate};
-use opurs_tools::{opus_compare, CompareParams, CompareResult};
+use opurs::tools::demo::{Channels, SampleRate};
+use opurs::tools::{opus_compare, CompareParams, CompareResult};
 
 #[derive(Parser)]
 struct Args {

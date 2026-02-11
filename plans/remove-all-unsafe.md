@@ -318,7 +318,7 @@ After every stage:
 2. `cargo test --all` — all unit + integration tests pass
 3. `cargo clippy` — no warnings
 4. Vector tests (for stages touching encoder/decoder/codec internals):
-   `cargo run --release -p opurs-tools --bin run_vectors2 -- opus_newvectors`
+   `cargo run --release --features tools --example run_vectors2 -- opus_newvectors`
 
 ---
 

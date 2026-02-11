@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use crate::demo::{Channels, SampleRate};
+use super::demo::{Channels, SampleRate};
 use std::f32::consts::PI;
 use std::fmt::Display;
 

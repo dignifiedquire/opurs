@@ -10,11 +10,11 @@ use itertools::iproduct;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use indicatif::ParallelProgressIterator;
-use opurs_tools::demo::{
+use opurs::tools::demo::{
     opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, EncodeArgs, OpusBackend,
     SampleRate,
 };
-use opurs_tools::CompareResult;
+use opurs::tools::CompareResult;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::fmt::Display;

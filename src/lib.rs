@@ -3,6 +3,9 @@ extern crate core;
 pub mod api;
 pub mod util;
 
+#[cfg(feature = "tools")]
+pub mod tools;
+
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
