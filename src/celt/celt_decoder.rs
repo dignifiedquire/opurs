@@ -837,34 +837,7 @@ pub fn celt_decode_with_ec(
     dec: Option<&mut ec_dec>,
     accum: i32,
 ) -> i32 {
-    let mut c: i32 = 0;
-    let mut i: i32 = 0;
-    let mut N: i32 = 0;
-    let mut spread_decision: i32 = 0;
-    let mut bits: i32 = 0;
-    let mut shortBlocks: i32 = 0;
-    let mut isTransient: i32 = 0;
-    let mut intra_ener: i32 = 0;
     let CC: i32 = st.channels as i32;
-    let mut LM: i32 = 0;
-    let mut M: i32 = 0;
-    let mut start: i32 = 0;
-    let mut end: i32 = 0;
-    let mut effEnd: i32 = 0;
-    let mut codedBands: i32 = 0;
-    let mut alloc_trim: i32 = 0;
-    let mut postfilter_pitch: i32 = 0;
-    let mut postfilter_gain: opus_val16 = 0.;
-    let mut intensity: i32 = 0;
-    let mut dual_stereo: i32 = 0;
-    let mut total_bits: i32 = 0;
-    let mut balance: i32 = 0;
-    let mut tell: i32 = 0;
-    let mut dynalloc_logp: i32 = 0;
-    let mut postfilter_tapset: i32 = 0;
-    let mut anti_collapse_rsv: i32 = 0;
-    let mut anti_collapse_on: i32 = 0;
-    let mut silence: i32 = 0;
     let C: i32 = st.stream_channels as i32;
     let len: i32 = data.map_or(0, |d| d.len() as i32);
     validate_celt_decoder(&*st);
@@ -872,12 +845,12 @@ pub fn celt_decode_with_ec(
     let nbEBands = mode.nbEBands as i32;
     let overlap = mode.overlap as i32;
     let eBands = &mode.eBands;
-    start = st.start;
-    end = st.end;
+    let start = st.start;
+    let end = st.end;
     frame_size *= st.downsample;
     let chan_stride = DECODE_BUFFER_SIZE + overlap as usize;
 
-    LM = 0;
+    let mut LM: i32 = 0;
     while LM <= mode.maxLM {
         if mode.shortMdctSize << LM == frame_size {
             break;
@@ -887,14 +860,14 @@ pub fn celt_decode_with_ec(
     if LM > mode.maxLM {
         return OPUS_BAD_ARG;
     }
-    M = (1) << LM;
+    let M: i32 = (1) << LM;
     if !(0..=1275).contains(&len) {
         return OPUS_BAD_ARG;
     }
-    N = M * mode.shortMdctSize;
+    let N: i32 = M * mode.shortMdctSize;
     let n = N as usize;
     let out_syn_off = DECODE_BUFFER_SIZE - n;
-    effEnd = end;
+    let mut effEnd: i32 = end;
     if effEnd > mode.effEBands {
         effEnd = mode.effEBands;
     }
@@ -924,14 +897,105 @@ pub fn celt_decode_with_ec(
     // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
     let mut data_copy = data.unwrap().to_vec();
-    // ec_dec_init requires &mut [u8]. We erase the lifetime to avoid the compiler
-    // unifying data_copy's local lifetime with the caller-provided dec's lifetime.
-    // SAFETY: data_copy is live for the remainder of this function, and _dec is
-    // the only reference to it.
-    let data_ref: &mut [u8] =
-        unsafe { std::slice::from_raw_parts_mut(data_copy.as_mut_ptr(), data_copy.len()) };
-    let mut _dec = ec_dec_init(data_ref);
-    let dec = if let Some(dec) = dec { dec } else { &mut _dec };
+    // When the caller provides a dec, use it; otherwise create a local one.
+    // These are separate scopes to avoid lifetime unification between the
+    // caller-provided ec_dec and the locally-owned one (self-referential borrow).
+    if let Some(dec) = dec {
+        return celt_decode_body(
+            st,
+            pcm,
+            frame_size,
+            dec,
+            accum,
+            C,
+            CC,
+            len,
+            N,
+            n,
+            LM,
+            M,
+            start,
+            end,
+            effEnd,
+            nbEBands,
+            overlap,
+            mode,
+            eBands,
+            out_syn_off,
+            chan_stride,
+        );
+    }
+    let mut _dec = ec_dec_init(&mut data_copy);
+    celt_decode_body(
+        st,
+        pcm,
+        frame_size,
+        &mut _dec,
+        accum,
+        C,
+        CC,
+        len,
+        N,
+        n,
+        LM,
+        M,
+        start,
+        end,
+        effEnd,
+        nbEBands,
+        overlap,
+        mode,
+        eBands,
+        out_syn_off,
+        chan_stride,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn celt_decode_body(
+    st: &mut OpusCustomDecoder,
+    pcm: &mut [opus_val16],
+    frame_size: i32,
+    dec: &mut ec_dec,
+    accum: i32,
+    C: i32,
+    CC: i32,
+    len: i32,
+    N: i32,
+    n: usize,
+    LM: i32,
+    M: i32,
+    start: i32,
+    end: i32,
+    effEnd: i32,
+    nbEBands: i32,
+    overlap: i32,
+    mode: &'static OpusCustomMode,
+    eBands: &[i16],
+    out_syn_off: usize,
+    chan_stride: usize,
+) -> i32 {
+    let mut c: i32;
+    let mut i: i32;
+    let mut spread_decision: i32;
+    let mut bits: i32;
+    let shortBlocks: i32;
+    let isTransient: i32;
+    let intra_ener: i32;
+    let codedBands: i32;
+    let alloc_trim: i32;
+    let mut postfilter_pitch: i32;
+    let mut postfilter_gain: opus_val16;
+    let mut intensity: i32 = 0;
+    let mut dual_stereo: i32 = 0;
+    let mut total_bits: i32;
+    let mut balance: i32 = 0;
+    let mut tell: i32;
+    let mut dynalloc_logp: i32;
+    let mut postfilter_tapset: i32;
+    let anti_collapse_rsv: i32;
+    let mut anti_collapse_on: i32 = 0;
+    let silence: i32;
     if C == 1 {
         i = 0;
         let nb = nbEBands as usize;
