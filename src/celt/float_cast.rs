@@ -15,7 +15,10 @@ pub fn FLOAT2INT16(x: f32) -> i16 {
 }
 
 /// Upstream C: celt/float_cast.h:float2int
+///
+/// Uses round-to-nearest-even (IEEE 754 default), matching the C implementation
+/// which uses `lrintf()` or SSE `cvtss2si` depending on the platform.
 #[inline]
 pub fn float2int(x: f32) -> i32 {
-    (x + 0.5).floor() as i32
+    x.round_ties_even() as i32
 }
