@@ -178,6 +178,24 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     ec_enc_normalize(this);
 }
 
+/// Upstream C: celt/entenc.c:ec_enc_icdf16
+#[allow(dead_code)]
+pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
+    let r: u32 = this.rng >> ftb;
+    if s > 0 {
+        this.val = this.val.wrapping_add(
+            this.rng
+                .wrapping_sub(r.wrapping_mul(icdf[s as usize - 1] as u32)),
+        );
+        this.rng = r.wrapping_mul((icdf[s as usize - 1] as i32 - icdf[s as usize] as i32) as u32);
+    } else {
+        this.rng = this
+            .rng
+            .wrapping_sub(r.wrapping_mul(icdf[s as usize] as u32));
+    }
+    ec_enc_normalize(this);
+}
+
 /// Upstream C: celt/entenc.c:ec_enc_uint
 pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]

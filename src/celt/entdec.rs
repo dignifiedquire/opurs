@@ -161,6 +161,30 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
     ret
 }
 
+/// Upstream C: celt/entdec.c:ec_dec_icdf16
+#[allow(dead_code)]
+pub fn ec_dec_icdf16(this: &mut ec_dec, icdf: &[u16], ftb: u32) -> i32 {
+    let s_init = this.rng;
+    let d = this.val;
+    let r = s_init >> ftb;
+    let mut ret: i32 = -1;
+    let mut t;
+    let mut s = s_init;
+    loop {
+        t = s;
+        ret += 1;
+        s = r.wrapping_mul(icdf[ret as usize] as u32);
+        if d >= s {
+            break;
+        }
+    }
+    this.val = d.wrapping_sub(s);
+    this.rng = t.wrapping_sub(s);
+    ec_dec_normalize(this);
+
+    ret
+}
+
 /// Upstream C: celt/entdec.c:ec_dec_uint
 pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
     let mut ft: u32 = 0;

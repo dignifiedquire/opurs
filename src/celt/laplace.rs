@@ -2,8 +2,10 @@
 //!
 //! Upstream C: `celt/laplace.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_update, ec_decode_bin};
-use crate::celt::entenc::{ec_enc, ec_encode_bin};
+#[allow(unused_imports)]
+use crate::celt::entdec::{ec_dec, ec_dec_icdf16, ec_dec_update, ec_decode_bin};
+#[allow(unused_imports)]
+use crate::celt::entenc::{ec_enc, ec_enc_icdf16, ec_encode_bin};
 
 /// Upstream C: celt/laplace.h:LAPLACE_LOG_MINP
 pub const LAPLACE_LOG_MINP: i32 = 0;
@@ -116,4 +118,64 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
         32768,
     );
     val
+}
+
+/// Upstream C: celt/laplace.c:ec_laplace_encode_p0
+#[allow(dead_code)]
+pub fn ec_laplace_encode_p0(enc: &mut ec_enc, value: i32, p0: u16, decay: u16) {
+    let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
+    let s = if value == 0 {
+        0
+    } else if value > 0 {
+        1
+    } else {
+        2
+    };
+    ec_enc_icdf16(enc, s, &sign_icdf, 15);
+    let mut value = value.unsigned_abs() as i32;
+    if value != 0 {
+        let mut icdf = [0u16; 8];
+        icdf[0] = 7.max(decay);
+        for i in 1..7 {
+            icdf[i] = ((7 - i) as u16).max(((icdf[i - 1] as i32 * decay as i32) >> 15) as u16);
+        }
+        icdf[7] = 0;
+        value -= 1;
+        loop {
+            ec_enc_icdf16(enc, value.min(7), &icdf, 15);
+            value -= 7;
+            if value < 0 {
+                break;
+            }
+        }
+    }
+}
+
+/// Upstream C: celt/laplace.c:ec_laplace_decode_p0
+#[allow(dead_code)]
+pub fn ec_laplace_decode_p0(dec: &mut ec_dec, p0: u16, decay: u16) -> i32 {
+    let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
+    let mut s = ec_dec_icdf16(dec, &sign_icdf, 15);
+    if s == 2 {
+        s = -1;
+    }
+    if s != 0 {
+        let mut icdf = [0u16; 8];
+        icdf[0] = 7.max(decay);
+        for i in 1..7 {
+            icdf[i] = ((7 - i) as u16).max(((icdf[i - 1] as i32 * decay as i32) >> 15) as u16);
+        }
+        icdf[7] = 0;
+        let mut value: i32 = 1;
+        loop {
+            let v = ec_dec_icdf16(dec, &icdf, 15);
+            value += v;
+            if v != 7 {
+                break;
+            }
+        }
+        s * value
+    } else {
+        0
+    }
 }

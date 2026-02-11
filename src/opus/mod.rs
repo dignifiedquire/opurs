@@ -9,6 +9,7 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod analysis;
+pub mod extensions;
 pub mod mlp;
 pub mod opus_decoder;
 pub mod opus_encoder;
