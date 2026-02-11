@@ -4,7 +4,6 @@ use crate::src::repacketizer::FrameSource;
 pub mod arch_h {
     pub type opus_val16 = f32;
     pub type opus_val32 = f32;
-    pub const CELT_SIG_SCALE: f32 = 32768.0f32;
     pub const Q15ONE: f32 = 1.0f32;
     pub const EPSILON: f32 = 1e-15f32;
     pub const VERY_SMALL: f32 = 1e-30f32;
@@ -16,7 +15,7 @@ pub mod cpu_support_h {
         return 0;
     }
 }
-use self::arch_h::{opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON, Q15ONE, VERY_SMALL};
+use self::arch_h::{opus_val16, opus_val32, EPSILON, Q15ONE, VERY_SMALL};
 pub use self::cpu_support_h::opus_select_arch;
 use crate::celt::celt_encoder::{celt_encode_with_ec, OpusCustomEncoder, SILKInfo};
 use crate::celt::entcode::ec_tell;
@@ -37,8 +36,8 @@ use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
 use crate::src::analysis::{
-    downmix_func, run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo,
-    DownmixInput, TonalityAnalysisState,
+    run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo, DownmixInput,
+    TonalityAnalysisState,
 };
 use crate::src::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
@@ -234,15 +233,7 @@ impl OpusEncoder {
     /// negative Opus error code on failure.
     pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         let frame_size = pcm.len() as i32 / self.channels;
-        unsafe {
-            opus_encode(
-                self as *mut OpusEncoder,
-                pcm.as_ptr(),
-                frame_size,
-                output.as_mut_ptr(),
-                output.len() as i32,
-            )
-        }
+        opus_encode(self, pcm, frame_size, output)
     }
 
     /// Encode an audio frame from interleaved `f32` PCM samples.
@@ -257,15 +248,7 @@ impl OpusEncoder {
     /// negative Opus error code on failure.
     pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> i32 {
         let frame_size = pcm.len() as i32 / self.channels;
-        unsafe {
-            opus_encode_float(
-                self as *mut OpusEncoder,
-                pcm.as_ptr(),
-                frame_size,
-                output.as_mut_ptr(),
-                output.len() as i32,
-            )
-        }
+        opus_encode_float(self, pcm, frame_size, output)
     }
 
     // -- Type-safe CTL getters and setters --
@@ -817,82 +800,7 @@ fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes
         return st.user_bitrate_bps;
     };
 }
-pub unsafe fn downmix_float(
-    mut _x: *const core::ffi::c_void,
-    y: *mut opus_val32,
-    subframe: i32,
-    offset: i32,
-    c1: i32,
-    c2: i32,
-    C: i32,
-) {
-    let mut x: *const f32 = 0 as *const f32;
-    let mut j: i32 = 0;
-    x = _x as *const f32;
-    j = 0;
-    while j < subframe {
-        *y.offset(j as isize) = *x.offset(((j + offset) * C + c1) as isize) * CELT_SIG_SCALE;
-        j += 1;
-    }
-    if c2 > -1 {
-        j = 0;
-        while j < subframe {
-            let ref mut fresh0 = *y.offset(j as isize);
-            *fresh0 += *x.offset(((j + offset) * C + c2) as isize) * CELT_SIG_SCALE;
-            j += 1;
-        }
-    } else if c2 == -(2) {
-        let mut c: i32 = 0;
-        c = 1;
-        while c < C {
-            j = 0;
-            while j < subframe {
-                let ref mut fresh1 = *y.offset(j as isize);
-                *fresh1 += *x.offset(((j + offset) * C + c) as isize) * CELT_SIG_SCALE;
-                j += 1;
-            }
-            c += 1;
-        }
-    }
-}
-pub unsafe fn downmix_int(
-    mut _x: *const core::ffi::c_void,
-    y: *mut opus_val32,
-    subframe: i32,
-    offset: i32,
-    c1: i32,
-    c2: i32,
-    C: i32,
-) {
-    let mut x: *const i16 = 0 as *const i16;
-    let mut j: i32 = 0;
-    x = _x as *const i16;
-    j = 0;
-    while j < subframe {
-        *y.offset(j as isize) = *x.offset(((j + offset) * C + c1) as isize) as opus_val32;
-        j += 1;
-    }
-    if c2 > -1 {
-        j = 0;
-        while j < subframe {
-            let ref mut fresh2 = *y.offset(j as isize);
-            *fresh2 += *x.offset(((j + offset) * C + c2) as isize) as i32 as f32;
-            j += 1;
-        }
-    } else if c2 == -(2) {
-        let mut c: i32 = 0;
-        c = 1;
-        while c < C {
-            j = 0;
-            while j < subframe {
-                let ref mut fresh3 = *y.offset(j as isize);
-                *fresh3 += *x.offset(((j + offset) * C + c) as isize) as i32 as f32;
-                j += 1;
-            }
-            c += 1;
-        }
-    }
-}
+
 /// Upstream C: src/opus_encoder.c:frame_size_select
 pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
     let mut new_size: i32 = 0;
@@ -1218,24 +1126,19 @@ fn decide_dtx_mode(
     }
     return 0;
 }
-unsafe fn encode_multiframe_packet(
-    st: *mut OpusEncoder,
-    pcm: *const opus_val16,
+/// Upstream C: src/opus_encoder.c:encode_multiframe_packet
+fn encode_multiframe_packet(
+    st: &mut OpusEncoder,
+    pcm: &[opus_val16],
     nb_frames: i32,
     frame_size: i32,
-    data: *mut u8,
+    data: &mut [u8],
     out_data_bytes: i32,
     to_celt: i32,
     lsb_depth: i32,
     float_api: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let mut bak_mode: i32 = 0;
-    let mut bak_bandwidth: i32 = 0;
-    let mut bak_channels: i32 = 0;
-    let mut bak_to_mono: i32 = 0;
-    let mut cbr_bytes: i32 = 0;
-    let mut repacketize_len: i32 = 0;
 
     // Worst cases:
     // 2 frames: Code 2 with different compressed sizes
@@ -1245,17 +1148,18 @@ unsafe fn encode_multiframe_packet(
     } else {
         2 + (nb_frames - 1) * 2
     };
-    if (*st).use_vbr != 0 || (*st).user_bitrate_bps == OPUS_BITRATE_MAX {
+    let repacketize_len;
+    if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
         repacketize_len = out_data_bytes;
     } else {
-        cbr_bytes = 3 * (*st).bitrate_bps / (3 * 8 * (*st).Fs / (frame_size * nb_frames));
+        let cbr_bytes = 3 * st.bitrate_bps / (3 * 8 * st.Fs / (frame_size * nb_frames));
         repacketize_len = if cbr_bytes < out_data_bytes {
             cbr_bytes
         } else {
             out_data_bytes
         };
     }
-    let bytes_per_frame = if (1276) < 1 + (repacketize_len - max_header_bytes) / nb_frames {
+    let bytes_per_frame = if 1276 < 1 + (repacketize_len - max_header_bytes) / nb_frames {
         1276
     } else {
         1 + (repacketize_len - max_header_bytes) / nb_frames
@@ -1263,44 +1167,47 @@ unsafe fn encode_multiframe_packet(
     let vla = (nb_frames * bytes_per_frame) as usize;
     let mut tmp_data: Vec<u8> = vec![0u8; vla];
     let mut rp = OpusRepacketizer::default();
-    bak_mode = (*st).user_forced_mode;
-    bak_bandwidth = (*st).user_bandwidth;
-    bak_channels = (*st).force_channels;
-    (*st).user_forced_mode = (*st).mode;
-    (*st).user_bandwidth = (*st).bandwidth;
-    (*st).force_channels = (*st).stream_channels;
-    bak_to_mono = (*st).silk_mode.toMono;
+    let bak_mode = st.user_forced_mode;
+    let bak_bandwidth = st.user_bandwidth;
+    let bak_channels = st.force_channels;
+    st.user_forced_mode = st.mode;
+    st.user_bandwidth = st.bandwidth;
+    st.force_channels = st.stream_channels;
+    let bak_to_mono = st.silk_mode.toMono;
     if bak_to_mono != 0 {
-        (*st).force_channels = 1;
+        st.force_channels = 1;
     } else {
-        (*st).prev_channels = (*st).stream_channels;
+        st.prev_channels = st.stream_channels;
     }
     let mut offsets = Vec::new();
     for i in 0..nb_frames {
-        (*st).silk_mode.toMono = 0;
-        (*st).nonfinal_frame = (i < nb_frames - 1) as i32;
+        st.silk_mode.toMono = 0;
+        st.nonfinal_frame = (i < nb_frames - 1) as i32;
 
         let start = (i * bytes_per_frame) as usize;
+        let pcm_offset = (i * (st.channels * frame_size)) as usize;
 
         // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
         if to_celt != 0 && i == nb_frames - 1 {
-            (*st).user_forced_mode = MODE_CELT_ONLY;
+            st.user_forced_mode = MODE_CELT_ONLY;
         }
-        let tmp_len = opus_encode_native(
-            st,
-            pcm.offset((i * ((*st).channels * frame_size)) as isize),
-            frame_size,
-            tmp_data[start..].as_mut_ptr(),
-            bytes_per_frame,
-            lsb_depth,
-            std::ptr::null(),
-            0,
-            0,
-            0,
-            0,
-            None,
-            float_api,
-        );
+        // SAFETY: opus_encode_native still uses raw pointers internally
+        let tmp_len = unsafe {
+            opus_encode_native(
+                st as *mut OpusEncoder,
+                pcm[pcm_offset..].as_ptr(),
+                frame_size,
+                tmp_data[start..].as_mut_ptr(),
+                bytes_per_frame,
+                lsb_depth,
+                std::ptr::null(),
+                0,
+                0,
+                0,
+                0,
+                float_api,
+            )
+        };
         if tmp_len < 0 {
             return OPUS_INTERNAL_ERROR;
         }
@@ -1312,20 +1219,16 @@ unsafe fn encode_multiframe_packet(
         }
     }
 
-    // this relies on `rp.cat` keeping refernces into `tmp_data` and copying the frames from there,
-    // instead of from `data` which does not happen anymore, as `rp.frames` no stores offsets, insted of pointers
-
     let offsets = offsets
         .into_iter()
         .map(|(start, end)| &tmp_data[start..end])
         .collect();
-    let data = std::slice::from_raw_parts_mut(data, repacketize_len as _);
     ret = rp.out_range_impl(
         0,
         nb_frames,
-        data,
+        &mut data[..repacketize_len as usize],
         false,
-        (*st).use_vbr == 0,
+        st.use_vbr == 0,
         FrameSource::Slice { data: offsets },
     );
     if ret < 0 {
@@ -1333,10 +1236,10 @@ unsafe fn encode_multiframe_packet(
     }
 
     // Discard configs that were forced locally for the purpose of repacketization
-    (*st).user_forced_mode = bak_mode;
-    (*st).user_bandwidth = bak_bandwidth;
-    (*st).force_channels = bak_channels;
-    (*st).silk_mode.toMono = bak_to_mono;
+    st.user_forced_mode = bak_mode;
+    st.user_bandwidth = bak_bandwidth;
+    st.force_channels = bak_channels;
+    st.silk_mode.toMono = bak_to_mono;
 
     ret
 }
@@ -1387,7 +1290,6 @@ pub unsafe fn opus_encode_native(
     c1: i32,
     c2: i32,
     analysis_channels: i32,
-    downmix: downmix_func,
     float_api: i32,
 ) -> i32 {
     let mut celt_enc: *mut OpusCustomEncoder = 0 as *mut OpusCustomEncoder;
@@ -1957,11 +1859,11 @@ pub unsafe fn opus_encode_native(
             (*st).analysis.read_subframe = analysis_read_subframe_bak;
         }
         ret = encode_multiframe_packet(
-            st,
-            pcm,
+            &mut *st,
+            std::slice::from_raw_parts(pcm, (frame_size * (*st).channels) as usize),
             nb_frames,
             enc_frame_size,
-            data,
+            std::slice::from_raw_parts_mut(data, out_data_bytes as usize),
             out_data_bytes,
             to_celt,
             lsb_depth,
@@ -2675,89 +2577,65 @@ pub unsafe fn opus_encode_native(
     }
     return ret;
 }
-pub unsafe fn opus_encode(
-    st: *mut OpusEncoder,
-    pcm: *const i16,
+/// Upstream C: src/opus_encoder.c:opus_encode
+fn opus_encode(
+    st: &mut OpusEncoder,
+    pcm: &[i16],
     analysis_frame_size: i32,
-    data: *mut u8,
-    max_data_bytes: i32,
+    data: &mut [u8],
 ) -> i32 {
-    let mut i: i32 = 0;
-    let mut ret: i32 = 0;
-    let mut frame_size: i32 = 0;
-    frame_size = frame_size_select(analysis_frame_size, (*st).variable_duration, (*st).Fs);
+    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    let vla = (frame_size * (*st).channels) as usize;
-    let mut in_0: Vec<f32> = ::std::vec::from_elem(0., vla);
-    i = 0;
-    while i < frame_size * (*st).channels {
-        *in_0.as_mut_ptr().offset(i as isize) =
-            1.0f32 / 32768 as f32 * *pcm.offset(i as isize) as i32 as f32;
-        i += 1;
+    let vla = (frame_size * st.channels) as usize;
+    let mut in_0: Vec<f32> = vec![0.0; vla];
+    for i in 0..(frame_size * st.channels) as usize {
+        in_0[i] = 1.0f32 / 32768.0f32 * pcm[i] as i32 as f32;
     }
-    ret = opus_encode_native(
-        st,
-        in_0.as_mut_ptr(),
-        frame_size,
-        data,
-        max_data_bytes,
-        16,
-        pcm as *const core::ffi::c_void,
-        analysis_frame_size,
-        0,
-        -(2),
-        (*st).channels,
-        Some(
-            downmix_int
-                as unsafe fn(
-                    *const core::ffi::c_void,
-                    *mut opus_val32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                ) -> (),
-        ),
-        0,
-    );
-    return ret;
+    // SAFETY: opus_encode_native still uses raw pointers internally but operates
+    // only within the bounds of the provided slices.
+    unsafe {
+        opus_encode_native(
+            st as *mut OpusEncoder,
+            in_0.as_ptr(),
+            frame_size,
+            data.as_mut_ptr(),
+            data.len() as i32,
+            16,
+            pcm.as_ptr() as *const core::ffi::c_void,
+            analysis_frame_size,
+            0,
+            -2,
+            st.channels,
+            0,
+        )
+    }
 }
-unsafe fn opus_encode_float(
-    st: *mut OpusEncoder,
-    pcm: *const f32,
+/// Upstream C: src/opus_encoder.c:opus_encode_float
+fn opus_encode_float(
+    st: &mut OpusEncoder,
+    pcm: &[f32],
     analysis_frame_size: i32,
-    data: *mut u8,
-    out_data_bytes: i32,
+    data: &mut [u8],
 ) -> i32 {
-    let mut frame_size: i32 = 0;
-    frame_size = frame_size_select(analysis_frame_size, (*st).variable_duration, (*st).Fs);
-    return opus_encode_native(
-        st,
-        pcm,
-        frame_size,
-        data,
-        out_data_bytes,
-        24,
-        pcm as *const core::ffi::c_void,
-        analysis_frame_size,
-        0,
-        -(2),
-        (*st).channels,
-        Some(
-            downmix_float
-                as unsafe fn(
-                    *const core::ffi::c_void,
-                    *mut opus_val32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                    i32,
-                ) -> (),
-        ),
-        1,
-    );
+    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
+    // SAFETY: opus_encode_native still uses raw pointers internally but operates
+    // only within the bounds of the provided slices.
+    unsafe {
+        opus_encode_native(
+            st as *mut OpusEncoder,
+            pcm.as_ptr(),
+            frame_size,
+            data.as_mut_ptr(),
+            data.len() as i32,
+            24,
+            pcm.as_ptr() as *const core::ffi::c_void,
+            analysis_frame_size,
+            0,
+            -2,
+            st.channels,
+            1,
+        )
+    }
 }

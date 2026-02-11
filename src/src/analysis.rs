@@ -23,12 +23,7 @@ pub struct AnalysisInfo {
 }
 pub const LEAK_BANDS: i32 = 19;
 
-/// Legacy unsafe downmix callback type (used during transition in opus_encoder.rs)
-pub type downmix_func =
-    Option<unsafe fn(*const core::ffi::c_void, *mut opus_val32, i32, i32, i32, i32, i32) -> ()>;
-
 /// Safe representation of interleaved PCM input for downmixing.
-/// Replaces the `*const c_void` + `downmix_func` pattern.
 pub enum DownmixInput<'a> {
     Float(&'a [f32]),
     Int(&'a [i16]),
