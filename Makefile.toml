@@ -1,0 +1,96 @@
+[config]
+default_to_workspace = false
+
+[env]
+VECTORS_URL = "https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz"
+VECTORS_DIR = "opus_newvectors"
+OPUS_RELEASE_URL = "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz"
+
+# --- Test vectors ---
+
+[tasks.download-vectors]
+description = "Download IETF Opus test vectors"
+script_runner = "@duckscript"
+script = '''
+if not is_path_exists ${VECTORS_DIR}
+    echo "Downloading test vectors..."
+    exec curl -sL ${VECTORS_URL} -o vectors.tar.gz
+    exec tar -xzf vectors.tar.gz
+    rm vectors.tar.gz
+    echo "Test vectors extracted to ${VECTORS_DIR}/"
+else
+    echo "Test vectors already present at ${VECTORS_DIR}/"
+end
+'''
+
+[tasks.run-vectors]
+description = "Run bit-exact vector tests (downloads vectors if needed)"
+dependencies = ["download-vectors"]
+command = "cargo"
+args = ["run", "--release", "--features", "tools", "--example", "run_vectors2", "--", "${VECTORS_DIR}"]
+
+# --- DNN weight data ---
+
+[tasks.download-dnn-data]
+description = "Download DNN model weight data from the opus 1.5.2 release tarball"
+script_runner = "@duckscript"
+script = '''
+marker = set "libopus-sys/opus/dnn/fargan_data.c"
+if not is_path_exists ${marker}
+    tmpdir = set "${CARGO_MAKE_WORKING_DIRECTORY}/target/tmp"
+    mkdir ${tmpdir}
+
+    tarball = set "${tmpdir}/opus-1.5.2.tar.gz"
+    echo "Downloading opus 1.5.2 release tarball..."
+    exec curl -sL ${OPUS_RELEASE_URL} -o ${tarball}
+
+    echo "Extracting DNN weight data..."
+    exec tar -xzf ${tarball} -C ${tmpdir}
+
+    data_files = array fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h nolace_data.c nolace_data.h lossgen_data.c
+
+    dnn_dest = set "libopus-sys/opus/dnn"
+    dnn_src = set "${tmpdir}/opus-1.5.2/dnn"
+    for f in ${data_files}
+        src_path = set "${dnn_src}/${f}"
+        dst_path = set "${dnn_dest}/${f}"
+        cp ${src_path} ${dst_path}
+        echo "  ${f}"
+    end
+
+    rm -r ${tmpdir}
+    echo "DNN weight data installed to ${dnn_dest}/"
+else
+    echo "DNN weight data already present."
+end
+'''
+
+# --- Common workflows ---
+
+[tasks.test]
+description = "Run all tests"
+command = "cargo"
+args = ["nextest", "run", "--all", "--cargo-profile=release"]
+
+[tasks.check]
+description = "Run fmt, clippy, and tests"
+script_runner = "@duckscript"
+script = '''
+echo "==> cargo fmt --check"
+code = exec cargo fmt --all --check
+assert_eq ${code} 0 "cargo fmt failed"
+
+echo "==> cargo clippy"
+code = exec cargo clippy --all --all-targets --features tools -- -D warnings
+assert_eq ${code} 0 "cargo clippy failed"
+
+echo "==> cargo nextest run"
+code = exec cargo nextest run --all --cargo-profile=release
+assert_eq ${code} 0 "tests failed"
+
+echo "All checks passed."
+'''
+
+[tasks.ci]
+description = "Full CI: fmt + clippy + tests + vector tests"
+dependencies = ["check", "run-vectors"]

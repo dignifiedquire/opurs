@@ -8,3 +8,9 @@ aboba.tmp
 dump
 
 opus_newvectors
+
+# DNN weight data (downloaded via `cargo make download-dnn-data`)
+libopus-sys/opus/dnn/*_data.c
+libopus-sys/opus/dnn/*_data.h
+# Exception: dump_data.c and mlp_data.c are source code, not weights
+!libopus-sys/opus/dnn/dump_data.c
