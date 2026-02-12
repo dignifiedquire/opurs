@@ -265,6 +265,8 @@ pub struct EncoderOptions {
     pub delayed_decision: bool,
     pub dtx: bool,
     pub common: CommonOptions,
+    /// DRED duration in frames (0 = disabled). Requires `dred` feature.
+    pub dred_duration: i32,
     // TODO: do we need to support undocumented options?
     // there's a bunch of them:
     // -sweep, -random_framesize, -sweep_max, -random_fec
@@ -285,6 +287,7 @@ impl Default for EncoderOptions {
             delayed_decision: false,
             dtx: false,
             common: CommonOptions::default(),
+            dred_duration: 0,
         }
     }
 }
@@ -303,4 +306,13 @@ pub struct DecodeArgs {
     pub sample_rate: SampleRate,
     pub channels: Channels,
     pub options: CommonOptions,
+    /// Decoder complexity (0-10). Controls Deep PLC (>=5) and OSCE (>=6) activation.
+    pub complexity: Option<Complexity>,
+}
+
+/// Options for DNN weight loading (shared between encode and decode).
+#[derive(Debug, Clone, Default)]
+pub struct DnnOptions {
+    /// Path to an external weights blob file. If `None`, compiled-in weights are used.
+    pub weights_file: Option<std::path::PathBuf>,
 }

@@ -21,6 +21,10 @@ pub(crate) trait OpusBackendTrait {
     fn opus_encode(st: &mut Self::Encoder, pcm: &[i16], frame_size: i32, data: &mut [u8]) -> i32;
     fn opus_encoder_destroy(st: Self::Encoder);
 
+    fn enc_set_dred_duration(st: &mut Self::Encoder, val: i32);
+    fn enc_load_dnn_weights(st: &mut Self::Encoder) -> Result<(), i32>;
+    fn enc_set_dnn_blob(st: &mut Self::Encoder, data: &[u8]) -> Result<(), i32>;
+
     fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Self::Decoder, i32>;
     fn opus_decode(
         st: &mut Self::Decoder,
@@ -30,6 +34,9 @@ pub(crate) trait OpusBackendTrait {
         decode_fec: i32,
     ) -> i32;
     fn dec_get_final_range(st: &mut Self::Decoder) -> u32;
+    fn dec_set_complexity(st: &mut Self::Decoder, val: i32);
+    fn dec_load_dnn_weights(st: &mut Self::Decoder) -> Result<(), i32>;
+    fn dec_set_dnn_blob(st: &mut Self::Decoder, data: &[u8]) -> Result<(), i32>;
     fn opus_decoder_destroy(st: Self::Decoder);
 }
 
@@ -103,6 +110,38 @@ mod rust_backend {
             st.encode(&pcm[..(frame_size as usize * st.channels() as usize)], data)
         }
 
+        fn enc_set_dred_duration(st: &mut Box<OpusEncoder>, val: i32) {
+            #[cfg(feature = "dred")]
+            st.set_dred_duration(val).unwrap();
+            #[cfg(not(feature = "dred"))]
+            {
+                let _ = st;
+                if val != 0 {
+                    panic!("DRED support requires the 'dred' feature");
+                }
+            }
+        }
+
+        fn enc_load_dnn_weights(st: &mut Box<OpusEncoder>) -> Result<(), i32> {
+            #[cfg(all(feature = "dred", feature = "builtin-weights"))]
+            return st.load_dnn_weights();
+            #[cfg(not(all(feature = "dred", feature = "builtin-weights")))]
+            {
+                let _ = st;
+                panic!("compiled-in DNN weights require the 'builtin-weights' feature; use --weights <path> instead");
+            }
+        }
+
+        fn enc_set_dnn_blob(st: &mut Box<OpusEncoder>, data: &[u8]) -> Result<(), i32> {
+            #[cfg(feature = "dred")]
+            return st.set_dnn_blob(data);
+            #[cfg(not(feature = "dred"))]
+            {
+                let _ = (st, data);
+                Err(crate::OPUS_UNIMPLEMENTED)
+            }
+        }
+
         fn opus_encoder_destroy(_st: Box<OpusEncoder>) {}
 
         fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
@@ -123,6 +162,30 @@ mod rust_backend {
             st.final_range()
         }
 
+        fn dec_set_complexity(st: &mut Box<OpusDecoder>, val: i32) {
+            st.set_complexity(val).unwrap();
+        }
+
+        fn dec_load_dnn_weights(st: &mut Box<OpusDecoder>) -> Result<(), i32> {
+            #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
+            return st.load_dnn_weights();
+            #[cfg(not(all(feature = "deep-plc", feature = "builtin-weights")))]
+            {
+                let _ = st;
+                panic!("compiled-in DNN weights require the 'builtin-weights' feature; use --weights <path> instead");
+            }
+        }
+
+        fn dec_set_dnn_blob(st: &mut Box<OpusDecoder>, data: &[u8]) -> Result<(), i32> {
+            #[cfg(feature = "deep-plc")]
+            return st.set_dnn_blob(data);
+            #[cfg(not(feature = "deep-plc"))]
+            {
+                let _ = (st, data);
+                Err(crate::OPUS_UNIMPLEMENTED)
+            }
+        }
+
         fn opus_decoder_destroy(_st: Box<OpusDecoder>) {}
     }
 }
@@ -137,7 +200,8 @@ mod libopus {
 
     use crate::{
         OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,
-        OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
+        OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DNN_BLOB_REQUEST,
+        OPUS_SET_DRED_DURATION_REQUEST, OPUS_SET_DTX_REQUEST,
         OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
         OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
     };
@@ -217,6 +281,31 @@ mod libopus {
             }
         }
 
+        fn enc_set_dred_duration(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_DRED_DURATION_REQUEST, val) };
+        }
+
+        fn enc_load_dnn_weights(_st: &mut *mut OpusEncoder) -> Result<(), i32> {
+            // C library has weights compiled in; nothing to load.
+            Ok(())
+        }
+
+        fn enc_set_dnn_blob(st: &mut *mut OpusEncoder, data: &[u8]) -> Result<(), i32> {
+            let ret = unsafe {
+                opus_encoder_ctl(
+                    *st,
+                    OPUS_SET_DNN_BLOB_REQUEST,
+                    data.as_ptr(),
+                    data.len() as i32,
+                )
+            };
+            if ret < 0 {
+                Err(ret)
+            } else {
+                Ok(())
+            }
+        }
+
         fn opus_encoder_destroy(st: *mut OpusEncoder) {
             unsafe { opus_encoder_destroy(st) }
         }
@@ -254,6 +343,31 @@ mod libopus {
             let mut val: u32 = 0;
             unsafe { opus_decoder_ctl(*st, OPUS_GET_FINAL_RANGE_REQUEST, &mut val as *mut _) };
             val
+        }
+
+        fn dec_set_complexity(st: &mut *mut OpusDecoder, val: i32) {
+            unsafe { opus_decoder_ctl(*st, OPUS_SET_COMPLEXITY_REQUEST, val) };
+        }
+
+        fn dec_load_dnn_weights(_st: &mut *mut OpusDecoder) -> Result<(), i32> {
+            // C library has weights compiled in; nothing to load.
+            Ok(())
+        }
+
+        fn dec_set_dnn_blob(st: &mut *mut OpusDecoder, data: &[u8]) -> Result<(), i32> {
+            let ret = unsafe {
+                opus_decoder_ctl(
+                    *st,
+                    OPUS_SET_DNN_BLOB_REQUEST,
+                    data.as_ptr(),
+                    data.len() as i32,
+                )
+            };
+            if ret < 0 {
+                Err(ret)
+            } else {
+                Ok(())
+            }
         }
 
         fn opus_decoder_destroy(st: *mut OpusDecoder) {

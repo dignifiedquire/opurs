@@ -11,8 +11,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use indicatif::ParallelProgressIterator;
 use opurs::tools::demo::{
-    opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, EncodeArgs, OpusBackend,
-    SampleRate,
+    opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, DnnOptions, EncodeArgs,
+    OpusBackend, SampleRate,
 };
 use opurs::tools::CompareResult;
 use std::collections::btree_map::Entry;
@@ -155,12 +155,22 @@ fn run_test(
                 sample_rate,
                 channels,
                 options: Default::default(),
+                complexity: None,
             };
+            let no_dnn = DnnOptions::default();
 
-            let upstream_decoded =
-                opus_demo_decode(OpusBackend::Upstream, &test_vector.encoded, decode_args);
-            let rust_decoded =
-                opus_demo_decode(OpusBackend::Rust, &test_vector.encoded, decode_args);
+            let upstream_decoded = opus_demo_decode(
+                OpusBackend::Upstream,
+                &test_vector.encoded,
+                decode_args,
+                &no_dnn,
+            );
+            let rust_decoded = opus_demo_decode(
+                OpusBackend::Rust,
+                &test_vector.encoded,
+                decode_args,
+                &no_dnn,
+            );
 
             if let Some(dump_directory) = dump_directory {
                 let name_base = format!(
@@ -203,12 +213,14 @@ fn run_test(
                 sample_rate: SampleRate::R48000,
                 channels: Channels::Stereo,
                 options: Default::default(),
+                complexity: None,
             };
+            let no_dnn = DnnOptions::default();
 
             let (upstream_encoded, pre_skip) =
-                opus_demo_encode(OpusBackend::Upstream, true_decoded, encode_args);
+                opus_demo_encode(OpusBackend::Upstream, true_decoded, encode_args, &no_dnn);
             let (rust_encoded, rust_pre_skip) =
-                opus_demo_encode(OpusBackend::Rust, true_decoded, encode_args);
+                opus_demo_encode(OpusBackend::Rust, true_decoded, encode_args, &no_dnn);
             assert_eq!(rust_pre_skip, pre_skip);
 
             if let Some(dump_directory) = dump_directory {
@@ -226,10 +238,14 @@ fn run_test(
                 .unwrap();
 
                 // decode & save decoded files
-                let upstream_decoded =
-                    opus_demo_decode(OpusBackend::Upstream, &upstream_encoded, decode_args);
+                let upstream_decoded = opus_demo_decode(
+                    OpusBackend::Upstream,
+                    &upstream_encoded,
+                    decode_args,
+                    &no_dnn,
+                );
                 let rust_decoded =
-                    opus_demo_decode(OpusBackend::Upstream, &rust_encoded, decode_args);
+                    opus_demo_decode(OpusBackend::Upstream, &rust_encoded, decode_args, &no_dnn);
 
                 std::fs::write(
                     dump_directory

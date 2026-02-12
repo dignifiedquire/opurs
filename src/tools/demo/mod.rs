@@ -21,8 +21,8 @@ pub use self::backend::OpusBackend;
 use self::backend::{OpusBackendTrait, RustLibopusBackend, UpstreamLibopusBackend};
 
 pub use input::{
-    Application, Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, EncodeArgs,
-    EncoderOptions, FrameSize, SampleRate,
+    Application, Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions,
+    EncodeArgs, EncoderOptions, FrameSize, SampleRate,
 };
 
 use crate::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
@@ -35,10 +35,15 @@ const MAX_FRAME_SIZE: usize = 48000 * 2;
 /// Encode an opus stream, like `opus_demo -e`
 ///
 /// See module documentation for the format of input and output data.
-pub fn opus_demo_encode(backend: OpusBackend, data: &[u8], args: EncodeArgs) -> (Vec<u8>, usize) {
+pub fn opus_demo_encode(
+    backend: OpusBackend,
+    data: &[u8],
+    args: EncodeArgs,
+    dnn: &DnnOptions,
+) -> (Vec<u8>, usize) {
     match backend {
-        OpusBackend::Rust => opus_demo_encode_impl::<RustLibopusBackend>(data, args),
-        OpusBackend::Upstream => opus_demo_encode_impl::<UpstreamLibopusBackend>(data, args),
+        OpusBackend::Rust => opus_demo_encode_impl::<RustLibopusBackend>(data, args, dnn),
+        OpusBackend::Upstream => opus_demo_encode_impl::<UpstreamLibopusBackend>(data, args, dnn),
     }
 }
 
@@ -51,6 +56,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
         bitrate,
         options,
     }: EncodeArgs,
+    dnn: &DnnOptions,
 ) -> (Vec<u8>, usize) {
     let channels: usize = channels.into();
 
@@ -86,6 +92,17 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
     let skip = B::enc_get_lookahead(&mut enc);
     B::enc_set_lsb_depth(&mut enc, 16);
     B::enc_set_expert_frame_duration(&mut enc, OPUS_FRAMESIZE_ARG);
+
+    // DNN weight loading and DRED configuration
+    if options.dred_duration > 0 {
+        if let Some(ref path) = dnn.weights_file {
+            let blob = std::fs::read(path).expect("failed to read weights file");
+            B::enc_set_dnn_blob(&mut enc, &blob).expect("failed to load DNN weights blob");
+        } else {
+            B::enc_load_dnn_weights(&mut enc).expect("failed to load compiled-in DNN weights");
+        }
+        B::enc_set_dred_duration(&mut enc, options.dred_duration);
+    }
 
     let frame_size: usize = options.framesize.samples_for_rate(sampling_rate);
 
@@ -126,10 +143,15 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
 /// Decode an opus stream, like `opus_demo -d`
 ///
 /// See module documentation for the format of input and output data.
-pub fn opus_demo_decode(backend: OpusBackend, data: &[u8], args: DecodeArgs) -> Vec<u8> {
+pub fn opus_demo_decode(
+    backend: OpusBackend,
+    data: &[u8],
+    args: DecodeArgs,
+    dnn: &DnnOptions,
+) -> Vec<u8> {
     match backend {
-        OpusBackend::Rust => opus_demo_decode_impl::<RustLibopusBackend>(data, args),
-        OpusBackend::Upstream => opus_demo_decode_impl::<UpstreamLibopusBackend>(data, args),
+        OpusBackend::Rust => opus_demo_decode_impl::<RustLibopusBackend>(data, args, dnn),
+        OpusBackend::Upstream => opus_demo_decode_impl::<UpstreamLibopusBackend>(data, args, dnn),
     }
 }
 
@@ -139,7 +161,9 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
         sample_rate,
         channels,
         options,
+        complexity,
     }: DecodeArgs,
+    dnn: &DnnOptions,
 ) -> Vec<u8> {
     let mut cursor = Cursor::new(data);
     let len = cursor.get_ref().len();
@@ -154,6 +178,17 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
     }
     if options.loss != 0 {
         panic!("packet loss simulation not supported")
+    }
+
+    // DNN weight loading and decoder complexity
+    if let Some(c) = complexity {
+        B::dec_set_complexity(&mut dec, i32::from(c));
+        if let Some(ref path) = dnn.weights_file {
+            let blob = std::fs::read(path).expect("failed to read weights file");
+            B::dec_set_dnn_blob(&mut dec, &blob).expect("failed to load DNN weights blob");
+        } else {
+            B::dec_load_dnn_weights(&mut dec).expect("failed to load compiled-in DNN weights");
+        }
     }
 
     let mut frame_idx = 0;
