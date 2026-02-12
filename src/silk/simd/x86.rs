@@ -1178,7 +1178,8 @@ pub unsafe fn silk_VQ_WMat_EC_sse4_1(
         // First row of XX_Q17 — SIMD accelerated
         // Sign-extend cb_row_Q7[1..5] from i8 to i32
         let cb_ptr = cb_Q7.as_ptr().add(cb_row_off + 1);
-        let v_cb_row_31_Q7 = _mm_cvtepi8_epi32(_mm_cvtsi32_si128(*(cb_ptr as *const i32)));
+        let v_cb_row_31_Q7 =
+            _mm_cvtepi8_epi32(_mm_cvtsi32_si128((cb_ptr as *const i32).read_unaligned()));
         let v_cb_row_42_Q7 = _mm_shuffle_epi32(v_cb_row_31_Q7, 0x39);
 
         // Widening multiply: XX_Q17[i] * cb_Q7[j] -> i64, then horizontal sum

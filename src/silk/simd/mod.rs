@@ -83,11 +83,10 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32]) -> f64 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
+        // C reference only dispatches to AVX2 for this function (not SSE2).
+        // SSE2 would change float accumulation order vs scalar, causing bit-inexactness.
         if cpuid_avx2_fma::get() {
             return unsafe { x86::silk_inner_product_flp_avx2(data1, data2) };
-        }
-        if cpuid_sse2::get() {
-            return unsafe { x86::silk_inner_product_flp_sse2(data1, data2) };
         }
     }
 
