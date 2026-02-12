@@ -488,6 +488,79 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
     yy
 }
 
+/// SSE implementation of `comb_filter_const`.
+/// Port of `celt/x86/pitch_sse.c:comb_filter_const_sse`.
+///
+/// Processes 4 samples at a time using shuffles to slide the pitch-tap window.
+/// The C version takes raw pointers with negative indexing; here we use explicit
+/// offsets into the buffer slices.
+///
+/// # Safety
+/// Requires SSE support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse")]
+pub unsafe fn comb_filter_const_sse(
+    y: &mut [f32],
+    y_start: usize,
+    x: &[f32],
+    x_start: usize,
+    T: i32,
+    N: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+) {
+    let t = T as usize;
+    let n = N as usize;
+    let g10v = _mm_set1_ps(g10);
+    let g11v = _mm_set1_ps(g11);
+    let g12v = _mm_set1_ps(g12);
+
+    // x0v = x[x_start - T - 2 .. x_start - T + 2] (the initial 4-sample window)
+    let mut x0v = _mm_loadu_ps(x.as_ptr().add(x_start - t - 2));
+
+    let mut i = 0usize;
+    while i + 3 < n {
+        let xp = x_start + i - t - 2;
+        let yi = _mm_loadu_ps(x.as_ptr().add(x_start + i));
+        let x4v = _mm_loadu_ps(x.as_ptr().add(xp + 4));
+
+        // Construct shifted windows using shuffles (matches C #else path)
+        let x2v = _mm_shuffle_ps(x0v, x4v, 0x4e); // [x0[2],x0[3],x4[0],x4[1]]
+        let x1v = _mm_shuffle_ps(x0v, x2v, 0x99); // [x0[1],x0[2],x2[1],x2[2]] => offset+1
+        let x3v = _mm_shuffle_ps(x2v, x4v, 0x99); // [x2[1],x2[2],x4[1],x4[2]] => offset+3
+
+        // yi += g10*x2 + (g11*(x3+x1) + g12*(x4+x0))
+        let yi = _mm_add_ps(yi, _mm_mul_ps(g10v, x2v));
+        let yi2 = _mm_add_ps(
+            _mm_mul_ps(g11v, _mm_add_ps(x3v, x1v)),
+            _mm_mul_ps(g12v, _mm_add_ps(x4v, x0v)),
+        );
+        let yi = _mm_add_ps(yi, yi2);
+
+        x0v = x4v;
+        _mm_storeu_ps(y.as_mut_ptr().add(y_start + i), yi);
+        i += 4;
+    }
+
+    // Scalar tail for remaining 0-3 samples (N is typically a multiple of 4,
+    // but handle the general case for correctness like CUSTOM_MODES in C)
+    if i < n {
+        let mut xv4 = x[x_start + i - t - 2];
+        let mut xv3 = x[x_start + i - t - 1];
+        let mut xv2 = x[x_start + i - t];
+        let mut xv1 = x[x_start + i - t + 1];
+        while i < n {
+            let xv0 = x[x_start + i - t + 2];
+            y[y_start + i] = x[x_start + i] + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
+            xv4 = xv3;
+            xv3 = xv2;
+            xv2 = xv1;
+            xv1 = xv0;
+            i += 1;
+        }
+    }
+}
+
 /// SSE implementation of `celt_pitch_xcorr`.
 /// Processes 4 correlations at a time using `xcorr_kernel_sse`.
 ///

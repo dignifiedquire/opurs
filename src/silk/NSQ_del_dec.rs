@@ -127,6 +127,64 @@ pub fn silk_NSQ_del_dec_c(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
+    // AVX2 fast path: replaces entire function when nStatesDelayedDecision is 3 or 4
+    #[cfg(feature = "simd")]
+    {
+        if super::simd::use_nsq_del_dec_avx2(psEncC.nStatesDelayedDecision) {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            unsafe {
+                super::simd::silk_NSQ_del_dec_avx2(
+                    psEncC,
+                    NSQ,
+                    psIndices,
+                    x16,
+                    pulses,
+                    PredCoef_Q12,
+                    LTPCoef_Q14,
+                    AR_Q13,
+                    HarmShapeGain_Q14,
+                    Tilt_Q14,
+                    LF_shp_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    Lambda_Q10,
+                    LTP_scale_Q14,
+                );
+            }
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            return;
+        }
+    }
+
+    // NEON fast path: replaces entire function when nStatesDelayedDecision is 3 or 4 on aarch64
+    #[cfg(feature = "simd")]
+    {
+        if super::simd::use_neon_nsq_del_dec(psEncC.nStatesDelayedDecision) {
+            #[cfg(target_arch = "aarch64")]
+            unsafe {
+                super::simd::silk_NSQ_del_dec_neon(
+                    psEncC,
+                    NSQ,
+                    psIndices,
+                    x16,
+                    pulses,
+                    PredCoef_Q12,
+                    LTPCoef_Q14,
+                    AR_Q13,
+                    HarmShapeGain_Q14,
+                    Tilt_Q14,
+                    LF_shp_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    Lambda_Q10,
+                    LTP_scale_Q14,
+                );
+            }
+            #[cfg(target_arch = "aarch64")]
+            return;
+        }
+    }
+
     let mut lag: i32;
     let mut start_idx: i32;
     let mut Winner_ind: i32;

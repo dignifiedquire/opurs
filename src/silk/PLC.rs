@@ -19,10 +19,13 @@ pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::define::{LTP_ORDER, MAX_LPC_ORDER, TYPE_VOICED};
 use crate::silk::macros::{silk_CLZ32, silk_SMLAWB, silk_SMULBB, silk_SMULWW};
+#[cfg(feature = "simd")]
+use crate::silk::simd::silk_LPC_inverse_pred_gain;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
 use crate::silk::Inlines::{silk_INVERSE32_varQ, silk_SQRT_APPROX};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+#[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{
     silk_LSHIFT_SAT32, silk_RAND, silk_RSHIFT_ROUND, silk_SAT16, silk_max_16, silk_max_32,
@@ -263,8 +266,16 @@ fn silk_PLC_conceal(
                     as i16;
         } else {
             /* Reduce random noise for unvoiced frames with high LPC gain */
-            let invGain_Q30 =
-                silk_LPC_inverse_pred_gain_c(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order]);
+            let invGain_Q30 = {
+                #[cfg(feature = "simd")]
+                {
+                    silk_LPC_inverse_pred_gain(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order])
+                }
+                #[cfg(not(feature = "simd"))]
+                {
+                    silk_LPC_inverse_pred_gain_c(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order])
+                }
+            };
             let mut down_scale_Q30 = silk_min_32((1i32) << 30 >> 3, invGain_Q30);
             down_scale_Q30 = silk_max_32((1i32) << 30 >> 8, down_scale_Q30);
             down_scale_Q30 = ((down_scale_Q30 as u32) << 3) as i32;

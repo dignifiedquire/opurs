@@ -44,7 +44,7 @@ pub fn resampling_factor(rate: i32) -> i32 {
 ///
 /// Constant-coefficient comb filter inner loop.
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
-fn comb_filter_const_c(
+pub(crate) fn comb_filter_const_c(
     y: &mut [f32],
     y_start: usize,
     x: &[f32],
@@ -139,17 +139,34 @@ pub fn comb_filter(
             .copy_from_slice(&x[x_start + ov..x_start + N as usize]);
         return;
     }
-    comb_filter_const_c(
-        y,
-        y_start + i as usize,
-        x,
-        x_start + i as usize,
-        T1,
-        N - i,
-        g10,
-        g11,
-        g12,
-    );
+    #[cfg(feature = "simd")]
+    {
+        super::simd::comb_filter_const(
+            y,
+            y_start + i as usize,
+            x,
+            x_start + i as usize,
+            T1,
+            N - i,
+            g10,
+            g11,
+            g12,
+        );
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        comb_filter_const_c(
+            y,
+            y_start + i as usize,
+            x,
+            x_start + i as usize,
+            T1,
+            N - i,
+            g10,
+            g11,
+            g12,
+        );
+    }
 }
 
 /// Upstream C: celt/celt.c:comb_filter (in-place variant)
@@ -216,21 +233,50 @@ pub fn comb_filter_inplace(
         // In-place with no g1: nothing left to do after overlap
         return;
     }
-    // Constant-coefficient section: T >= 15 guarantees reads are always behind writes
-    let t = T1 as usize;
-    let pos = start + i;
-    let remain = (N as usize) - i;
-    let mut xv4 = buf[pos - t - 2];
-    let mut xv3 = buf[pos - t - 1];
-    let mut xv2 = buf[pos - t];
-    let mut xv1 = buf[pos - t + 1];
-    for j in 0..remain {
-        let xv0 = buf[pos + j - t + 2];
-        buf[pos + j] = buf[pos + j] + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
-        xv4 = xv3;
-        xv3 = xv2;
-        xv2 = xv1;
-        xv1 = xv0;
+    // Constant-coefficient section: T >= 15 guarantees reads are always behind writes.
+    // For the SSE path we need a separate output slice, but since T >= 15 the read
+    // positions are always 13+ samples behind the write positions, so we can safely
+    // use a pointer-based SSE implementation on the same buffer.
+    #[cfg(feature = "simd")]
+    {
+        let pos = start + i;
+        let remain = (N as usize) - i;
+        // SAFETY: T >= 15 guarantees no read/write aliasing within the SIMD window.
+        // The SSE function reads from buf[pos - T - 2..] and writes to buf[pos..pos+remain].
+        // Since pos - T - 2 + 4 < pos (because T >= 15), the 4-wide read window
+        // never overlaps the 4-wide write window.
+        let buf_ptr = buf.as_mut_ptr();
+        let x_slice = unsafe { core::slice::from_raw_parts(buf_ptr, pos + remain) };
+        let y_slice = unsafe { core::slice::from_raw_parts_mut(buf_ptr, pos + remain) };
+        super::simd::comb_filter_const(
+            y_slice,
+            pos,
+            x_slice,
+            pos,
+            T1,
+            remain as i32,
+            g10,
+            g11,
+            g12,
+        );
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        let t = T1 as usize;
+        let pos = start + i;
+        let remain = (N as usize) - i;
+        let mut xv4 = buf[pos - t - 2];
+        let mut xv3 = buf[pos - t - 1];
+        let mut xv2 = buf[pos - t];
+        let mut xv1 = buf[pos - t + 1];
+        for j in 0..remain {
+            let xv0 = buf[pos + j - t + 2];
+            buf[pos + j] = buf[pos + j] + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
+            xv4 = xv3;
+            xv3 = xv2;
+            xv2 = xv1;
+            xv1 = xv0;
+        }
     }
 }
 

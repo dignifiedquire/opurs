@@ -104,10 +104,36 @@ pub fn silk_noise_shape_quantizer_short_prediction(
     silk_noise_shape_quantizer_short_prediction_c(buf32, coef16, order)
 }
 
+/// Dispatch wrapper for noise shape feedback loop — routes to SIMD when available.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn silk_NSQ_noise_shape_feedback_loop(
+    data0: i32,
+    data1: &mut [i32],
+    coef: &[i16],
+    order: i32,
+) -> i32 {
+    super::simd::silk_NSQ_noise_shape_feedback_loop(data0, data1, coef, order)
+}
+
+/// Dispatch wrapper for noise shape feedback loop (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn silk_NSQ_noise_shape_feedback_loop(
+    data0: i32,
+    data1: &mut [i32],
+    coef: &[i16],
+    order: i32,
+) -> i32 {
+    silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
+}
+
 use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
-    QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
+    TYPE_VOICED,
 };
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+use crate::silk::define::QUANT_LEVEL_ADJUST_Q10;
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
@@ -141,8 +167,8 @@ pub fn silk_NSQ_c(
     let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
 
-    // Precompute quantization lookup table for SSE4.1 path
-    #[cfg(feature = "simd")]
+    // Precompute quantization lookup table for SSE4.1 path (x86 only)
+    #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
     let (use_simd_quantizer, table) = {
         let use_it = super::simd::use_nsq_sse4_1()
             && psEncC.shapingLPCOrder == 10
@@ -215,7 +241,7 @@ pub fn silk_NSQ_c(
             pitchL,
             psIndices.signalType as i32,
         );
-        #[cfg(feature = "simd")]
+        #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
         {
             if use_simd_quantizer {
                 unsafe {
@@ -265,7 +291,7 @@ pub fn silk_NSQ_c(
                 );
             }
         }
-        #[cfg(not(feature = "simd"))]
+        #[cfg(not(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64"))))]
         silk_noise_shape_quantizer(
             NSQ,
             psIndices.signalType as i32,
@@ -395,7 +421,7 @@ fn silk_noise_shape_quantizer(
 
         // Noise shape feedback
         assert!(shapingLPCOrder & 1 == 0);
-        n_AR_Q12 = silk_NSQ_noise_shape_feedback_loop_c(
+        n_AR_Q12 = silk_NSQ_noise_shape_feedback_loop(
             NSQ.sDiff_shp_Q14,
             &mut NSQ.sAR2_Q14,
             AR_shp_Q13,
@@ -655,7 +681,7 @@ fn silk_nsq_scale_states(
 /// Port of the table initialization from `silk/x86/NSQ_sse4_1.c:silk_NSQ_sse4_1`.
 ///
 /// table[32 + q1_Q0] = [q1_Q10, q2_Q10, 2*(q1_Q10 - q2_Q10), rd1_Q20 - rd2_Q20 + q1² - q2²]
-#[cfg(feature = "simd")]
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
 fn build_quantization_table(offset_Q10: i32, Lambda_Q10: i32) -> [[i32; 4]; 64] {
     let mut table = [[0i32; 4]; 64];
 

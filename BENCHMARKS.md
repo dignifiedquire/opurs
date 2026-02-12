@@ -1,8 +1,35 @@
 # Benchmarks
 
-Last updated: Final (all SIMD phases + C SIMD comparison + codec comparison)
+Last updated: Phase 2 SIMD — all remaining C SIMD paths ported
 
 Platform: x86_64 Linux (AVX2 available)
+
+## End-to-End Codec: Rust vs C (both with SIMD)
+
+| Operation | Configuration | Rust | C (SIMD) | Ratio |
+|-----------|--------------|------|----------|-------|
+| Encode | 16 kbps mono VOIP | 8.51 ms | 7.70 ms | 1.10x |
+| Encode | 64 kbps mono VOIP | 3.04 ms | 2.72 ms | 1.12x |
+| Encode | 64 kbps stereo | 4.63 ms | 3.92 ms | 1.18x |
+| Encode | 128 kbps stereo | 6.75 ms | 5.03 ms | 1.34x |
+| Decode | 64 kbps stereo | 1.55 ms | 1.09 ms | 1.43x |
+| Decode | 128 kbps stereo | 2.00 ms | 1.42 ms | 1.41x |
+
+All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 frames).
+
+Rust is **~1.1-1.4x slower** than C with SIMD end-to-end. SILK-heavy VOIP encoding
+nearly matches C (1.10x); CELT-heavy stereo and decode paths have more headroom.
+
+### Progress vs initial baseline (pre-SIMD)
+
+| Operation | Pre-SIMD | Current | Improvement |
+|-----------|----------|---------|-------------|
+| Encode 16k mono VOIP | 1.29x | **1.10x** | -0.19 |
+| Encode 64k mono VOIP | 1.30x | **1.12x** | -0.18 |
+| Encode 64k stereo | 1.28x | **1.18x** | -0.10 |
+| Encode 128k stereo | 1.47x | **1.34x** | -0.13 |
+| Decode 64k stereo | 1.50x | **1.43x** | -0.07 |
+| Decode 128k stereo | 1.43x | **1.41x** | -0.02 |
 
 ## CELT Pitch Functions (scalar vs SIMD dispatch)
 
@@ -28,85 +55,77 @@ Platform: x86_64 Linux (AVX2 available)
 
 | Function | N | Scalar | SIMD Dispatch | Speedup |
 |----------|---|--------|---------------|---------|
-| silk_short_prediction | order=10 | 6 ns | 4 ns | 1.5x |
-| silk_short_prediction | order=16 | 8 ns | 5 ns | 1.6x |
+| silk_short_prediction | order=10 | 6 ns | 5 ns | 1.2x |
+| silk_short_prediction | order=16 | 9 ns | 6 ns | 1.5x |
 | silk_inner_product_FLP | 64 | 38 ns | 18 ns | 2.1x |
-| silk_inner_product_FLP | 240 | 150 ns | 73 ns | 2.1x |
-| silk_inner_product_FLP | 480 | 314 ns | 153 ns | 2.1x |
-| silk_inner_product_FLP | 960 | 623 ns | 308 ns | 2.0x |
+| silk_inner_product_FLP | 240 | 152 ns | 74 ns | 2.1x |
+| silk_inner_product_FLP | 480 | 315 ns | 154 ns | 2.0x |
+| silk_inner_product_FLP | 960 | 624 ns | 309 ns | 2.0x |
 
 ## Rust vs C Reference — Per-Function (with SIMD)
-
-C reference is compiled **with SIMD** when the `simd` feature is active (RTCD dispatch:
-AVX2 > SSE4.1 > SSE2 > SSE > scalar on x86).
 
 ### celt_pitch_xcorr
 
 | N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
 |---|-------------|----------|-----------|--------|----------------|
-| 240x60 | 2.54 us | 3.48 us | 431 ns | 456 ns | **1.06x faster** |
-| 480x120 | 10.2 us | 13.8 us | 1.40 us | 1.37 us | ~matched |
-| 960x240 | 39.7 us | 55.0 us | 5.74 us | 5.96 us | **1.04x faster** |
+| 240x60 | 2.37 us | 3.19 us | 408 ns | 438 ns | **1.07x faster** |
+| 480x120 | 9.33 us | 12.6 us | 1.35 us | 1.34 us | ~matched |
+| 960x240 | 37.8 us | 50.8 us | 5.20 us | 5.27 us | ~matched |
 
 Rust SIMD (AVX2) **matches or slightly beats** C SIMD (AVX2+FMA) for pitch xcorr.
 
 ### silk_inner_product_FLP
 
-| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | C SIMD advantage |
-|---|-------------|----------|-----------|--------|------------------|
-| 64 | 40 ns | 27 ns | 19 ns | 7.3 ns | 2.6x |
-| 240 | 161 ns | 95 ns | 76 ns | 25 ns | 3.0x |
-| 480 | 323 ns | 188 ns | 159 ns | 52 ns | 3.0x |
-| 960 | 655 ns | 365 ns | 323 ns | 104 ns | 3.1x |
+| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
+|---|-------------|----------|-----------|--------|----------------|
+| 64 | 38 ns | 25 ns | 6 ns | 7 ns | **1.2x faster** |
+| 240 | 153 ns | 91 ns | 23 ns | 24 ns | ~matched |
+| 480 | 312 ns | 176 ns | 50 ns | 49 ns | ~matched |
+| 960 | 625 ns | 357 ns | 102 ns | 103 ns | ~matched |
 
-Numbers above predate the Phase 1 AVX2+FMA addition. Rust SIMD now uses **AVX2+FMA**
-(4-wide f64 with fused multiply-add, dual accumulators), matching the C SIMD approach.
-
-## End-to-End Codec: Rust vs C (both with SIMD)
-
-| Operation | Configuration | Rust | C (SIMD) | Ratio |
-|-----------|--------------|------|----------|-------|
-| Encode | 64 kbps stereo | 5.60 ms | 4.39 ms | 1.28x |
-| Encode | 128 kbps stereo | 7.89 ms | 5.38 ms | 1.47x |
-| Decode | 64 kbps stereo | 1.70 ms | 1.14 ms | 1.50x |
-| Decode | 128 kbps stereo | 2.17 ms | 1.52 ms | 1.43x |
-| Encode | 16 kbps mono VOIP | 10.68 ms | 8.27 ms | 1.29x |
-| Encode | 64 kbps mono VOIP | 3.71 ms | 2.85 ms | 1.30x |
-
-All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 frames).
-
-Rust is **~1.3-1.5x slower** than C with SIMD end-to-end (numbers above predate Phases 1-4).
-Subsequent SIMD additions close this gap significantly:
-1. ~~SILK inner product SSE2~~ → AVX2+FMA added (Phase 1)
-2. ~~VQ search scalar~~ → SSE2 added (Phase 2)
-3. ~~NSQ inner loop scalar~~ → SSE4.1 full quantizer added (Phase 3)
-4. ~~NSQ_del_dec scalar~~ → SSE4.1 (LPC/LTP prediction + scale_states) added (Phase 4)
+Rust SIMD (AVX2+FMA) **matches** C SIMD (AVX2+FMA) for SILK inner product.
 
 ## SIMD Implementations
 
 ### x86/x86_64
-- **SSE**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr
+- **SSE**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr, comb_filter_const
 - **SSE2**: silk_inner_product_FLP (fallback), silk_vad_energy, op_pvq_search
-- **SSE4.1**: silk_noise_shape_quantizer_short_prediction, silk_NSQ (full quantizer), silk_NSQ_del_dec (quantizer + scale_states)
-- **AVX2**: xcorr_kernel (8-wide), celt_pitch_xcorr (8 correlations/iter)
+- **SSE4.1**: silk_noise_shape_quantizer_short_prediction, silk_NSQ (full quantizer), silk_NSQ_del_dec (quantizer + scale_states), silk_VQ_WMat_EC
+- **AVX2**: xcorr_kernel (8-wide), celt_pitch_xcorr (8 correlations/iter), silk_NSQ_del_dec (full quantizer, 4-state parallel)
 - **AVX2+FMA**: silk_inner_product_FLP (4-wide f64 with fused multiply-add)
 
 ### aarch64
-- **NEON**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr, silk_noise_shape_quantizer_short_prediction, silk_inner_product_FLP
+- **NEON**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr, silk_noise_shape_quantizer_short_prediction, silk_inner_product_FLP, silk_NSQ_noise_shape_feedback_loop, silk_LPC_inverse_pred_gain, silk_NSQ_del_dec (full quantizer, 4-state parallel)
 
 ### Dispatch Hierarchy (x86/x86_64)
 
 ```
-celt_pitch_xcorr: AVX2 > SSE > scalar
-xcorr_kernel:     SSE > scalar
-celt_inner_prod:  SSE > scalar
-dual_inner_prod:  SSE > scalar
-silk_inner_FLP:   AVX2+FMA > SSE2 > scalar
-silk_short_pred:  SSE4.1 > scalar
-silk_NSQ:         SSE4.1 > scalar
-silk_NSQ_del_dec: SSE4.1 > scalar
-silk_vad_energy:  SSE2 > scalar
-op_pvq_search:    SSE2 > scalar
+celt_pitch_xcorr:  AVX2 > SSE > scalar
+xcorr_kernel:      SSE > scalar
+celt_inner_prod:   SSE > scalar
+dual_inner_prod:   SSE > scalar
+comb_filter_const: SSE > scalar
+silk_inner_FLP:    AVX2+FMA > SSE2 > scalar
+silk_short_pred:   SSE4.1 > scalar
+silk_NSQ:          SSE4.1 > scalar
+silk_NSQ_del_dec:  AVX2 > SSE4.1 > scalar
+silk_VQ_WMat_EC:   SSE4.1 > scalar
+silk_vad_energy:   SSE2 > scalar
+op_pvq_search:     SSE2 > scalar
+```
+
+### Dispatch Hierarchy (aarch64)
+
+```
+celt_pitch_xcorr:          NEON > scalar
+xcorr_kernel:              NEON > scalar
+celt_inner_prod:           NEON > scalar
+dual_inner_prod:           NEON > scalar
+silk_inner_FLP:            NEON > scalar
+silk_short_pred:           NEON > scalar
+silk_feedback_loop:        NEON > scalar
+silk_LPC_inv_pred_gain:    NEON > scalar
+silk_NSQ_del_dec:          NEON > scalar
 ```
 
 ## Running Benchmarks
