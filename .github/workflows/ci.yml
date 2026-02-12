@@ -105,8 +105,14 @@ jobs:
           - windows-i686
         profile: [release, dev]
         exclude:
-          # 32-bit dev builds are too slow (unoptimized encoder tests)
+          # Dev builds are slow; only run on linux-x86_64 to catch debug assertions
           - name: linux-i686
+            profile: dev
+          - name: macos-arm64
+            profile: dev
+          - name: macos-x86_64
+            profile: dev
+          - name: windows-x86_64
             profile: dev
           - name: windows-i686
             profile: dev
