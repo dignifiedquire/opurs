@@ -1,6 +1,6 @@
 # Benchmarks
 
-Last updated: Phase 2 SIMD — all remaining C SIMD paths ported
+Last updated: inline hints, stack allocations, FFT loop optimization
 
 Platform: x86_64 Linux (AVX2 available)
 
@@ -8,28 +8,24 @@ Platform: x86_64 Linux (AVX2 available)
 
 | Operation | Configuration | Rust | C (SIMD) | Ratio |
 |-----------|--------------|------|----------|-------|
-| Encode | 16 kbps mono VOIP | 8.51 ms | 7.70 ms | 1.10x |
-| Encode | 64 kbps mono VOIP | 3.04 ms | 2.72 ms | 1.12x |
-| Encode | 64 kbps stereo | 4.63 ms | 3.92 ms | 1.18x |
-| Encode | 128 kbps stereo | 6.75 ms | 5.03 ms | 1.34x |
-| Decode | 64 kbps stereo | 1.55 ms | 1.09 ms | 1.43x |
-| Decode | 128 kbps stereo | 2.00 ms | 1.42 ms | 1.41x |
+| Encode | 16 kbps mono VOIP | 8.37 ms | 7.56 ms | 1.11x |
+| Encode | 64 kbps mono VOIP | 2.97 ms | 2.67 ms | 1.11x |
+| Decode | 64 kbps stereo | 1.51 ms | 1.09 ms | 1.39x |
+| Decode | 128 kbps stereo | 1.90 ms | 1.42 ms | 1.34x |
 
 All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 frames).
 
 Rust is **~1.1-1.4x slower** than C with SIMD end-to-end. SILK-heavy VOIP encoding
-nearly matches C (1.10x); CELT-heavy stereo and decode paths have more headroom.
+nearly matches C (1.11x); CELT-heavy decode paths have more headroom.
 
 ### Progress vs initial baseline (pre-SIMD)
 
-| Operation | Pre-SIMD | Current | Improvement |
-|-----------|----------|---------|-------------|
-| Encode 16k mono VOIP | 1.29x | **1.10x** | -0.19 |
-| Encode 64k mono VOIP | 1.30x | **1.12x** | -0.18 |
-| Encode 64k stereo | 1.28x | **1.18x** | -0.10 |
-| Encode 128k stereo | 1.47x | **1.34x** | -0.13 |
-| Decode 64k stereo | 1.50x | **1.43x** | -0.07 |
-| Decode 128k stereo | 1.43x | **1.41x** | -0.02 |
+| Operation | Pre-SIMD | Post-SIMD | Current | Improvement |
+|-----------|----------|-----------|---------|-------------|
+| Encode 16k mono VOIP | 1.29x | 1.10x | **1.11x** | -0.18 |
+| Encode 64k mono VOIP | 1.30x | 1.12x | **1.11x** | -0.19 |
+| Decode 64k stereo | 1.50x | 1.43x | **1.39x** | -0.11 |
+| Decode 128k stereo | 1.43x | 1.41x | **1.34x** | -0.09 |
 
 ## CELT Pitch Functions (scalar vs SIMD dispatch)
 
