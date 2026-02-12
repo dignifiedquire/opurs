@@ -24,6 +24,7 @@ pub struct MdctLookup<'a> {
 }
 
 /// Upstream C: celt/mdct.c:clt_mdct_forward_c
+#[inline]
 pub fn mdct_forward(
     l: &MdctLookup,
     input: &[f32],
@@ -125,6 +126,7 @@ pub fn mdct_forward(
 }
 
 /// Upstream C: celt/mdct.c:clt_mdct_backward_c
+#[inline]
 pub fn mdct_backward(
     l: &MdctLookup,
     input: &[f32],

@@ -12,6 +12,7 @@ pub const LPC_ORDER: usize = 24;
 /// `ac` must have at least `lpc.len() + 1` elements.
 ///
 /// Upstream C: celt/celt_lpc.c:_celt_lpc
+#[inline]
 pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
     let p = lpc.len();
     assert!(ac.len() > p);
@@ -48,13 +49,14 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
 /// `num` has `ord` coefficients.
 ///
 /// Upstream C: celt/celt_lpc.c:celt_fir_c
+#[inline]
 pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
     let n = y.len();
     assert!(x.len() >= n + ord);
     assert!(num.len() >= ord);
 
     // Reverse the numerator coefficients
-    let mut rnum: Vec<f32> = vec![0.0; ord];
+    let mut rnum = [0.0f32; LPC_ORDER];
     for i in 0..ord {
         rnum[i] = num[ord - i - 1];
     }
@@ -93,6 +95,7 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
 /// on return.
 ///
 /// Upstream C: celt/celt_lpc.c:celt_iir
+#[inline]
 pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f32]) {
     assert!(buf.len() >= n);
     assert!(den.len() >= ord);
@@ -100,13 +103,14 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
     assert!(ord & 3 == 0);
 
     // Reverse the denominator coefficients
-    let mut rden: Vec<f32> = vec![0.0; ord];
+    let mut rden = [0.0f32; LPC_ORDER];
     for i in 0..ord {
         rden[i] = den[ord - i - 1];
     }
 
     // Internal y buffer with ord prefix for history
-    let mut yy: Vec<f32> = vec![0.0; n + ord];
+    // Max: n=1080 (960+120 for extrapolation) + ord=24 = 1104
+    let mut yy = [0.0f32; 1080 + LPC_ORDER];
     for i in 0..ord {
         yy[i] = -mem[ord - i - 1];
     }
@@ -158,6 +162,7 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
 /// Results are written to `ac[0..=lag]`.
 ///
 /// Upstream C: celt/celt_lpc.c:_celt_autocorr
+#[inline]
 pub fn _celt_autocorr(
     x: &[f32],
     ac: &mut [f32],
