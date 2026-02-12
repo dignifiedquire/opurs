@@ -32,6 +32,10 @@ struct Cli {
     /// Requires the tools-dnn feature.
     #[clap(long)]
     dnn: bool,
+    /// Run only DNN tests (skip standard encode/decode tests).
+    /// Useful when the library is compiled with DNN features that change baseline behavior.
+    #[clap(long)]
+    dnn_only: bool,
 }
 
 struct TestVector {
@@ -417,10 +421,14 @@ fn main() {
     .iter()
     .map(|&bitrate| TestKind::RustEncode { bitrate });
 
-    let mut test_kinds: Vec<TestKind> = decode_kinds.chain(encode_kinds).collect();
+    let mut test_kinds: Vec<TestKind> = if args.dnn_only {
+        Vec::new()
+    } else {
+        decode_kinds.chain(encode_kinds).collect()
+    };
 
     // DNN tests: DRED encode + Deep PLC / OSCE decode
-    if args.dnn {
+    if args.dnn || args.dnn_only {
         // DRED encode: 3 bitrates × 2 durations = 6 configs
         let dred_encode_kinds = iproduct!([32_000u32, 64_000, 128_000].iter(), [5i32, 10].iter())
             .map(|(&bitrate, &dred_duration)| TestKind::RustEncodeDred {

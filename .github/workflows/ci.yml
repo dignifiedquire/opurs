@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   OPUS_RELEASE_URL: https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz
@@ -322,6 +326,7 @@ jobs:
           key: dnn-weights-opus-1.5.2
       - name: Download DNN weight data
         if: steps.dnn-weights.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           curl -sL $OPUS_RELEASE_URL -o /tmp/opus.tar.gz
           tar -xzf /tmp/opus.tar.gz -C /tmp
@@ -335,6 +340,7 @@ jobs:
       - name: Build (release)
         run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
       - name: Download test vectors
+        shell: bash
         run: |
           curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
           tar -xzf vectors.tar.gz

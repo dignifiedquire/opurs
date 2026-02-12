@@ -624,6 +624,8 @@ fn opus_decode_frame(
             F5,
             None,
             0,
+            #[cfg(feature = "deep-plc")]
+            None,
         );
         redundant_rng = celt_dec.rng;
     }
@@ -644,6 +646,8 @@ fn opus_decode_frame(
             celt_frame_size,
             Some(&mut dec),
             celt_accum,
+            #[cfg(feature = "deep-plc")]
+            Some(&mut st.lpcnet),
         );
     } else {
         let silence: [u8; 2] = [0xff, 0xff];
@@ -663,6 +667,8 @@ fn opus_decode_frame(
                 F2_5,
                 None,
                 celt_accum,
+                #[cfg(feature = "deep-plc")]
+                None,
             );
         }
     }
@@ -685,6 +691,8 @@ fn opus_decode_frame(
             F5,
             None,
             0,
+            #[cfg(feature = "deep-plc")]
+            None,
         );
         redundant_rng = celt_dec.rng;
         let fade_off = (st.channels * (frame_size - F2_5)) as usize;

@@ -581,7 +581,12 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
 }
 
 /// Upstream C: celt/celt_decoder.c:celt_decode_lost
-fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
+fn celt_decode_lost(
+    st: &mut OpusCustomDecoder,
+    N: i32,
+    LM: i32,
+    #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
+) {
     let C: i32 = st.channels as i32;
     let mode = st.mode;
     let nbEBands = mode.nbEBands as i32;
@@ -593,6 +598,12 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
 
     let loss_duration = st.loss_duration;
     let start = st.start;
+    #[cfg(feature = "deep-plc")]
+    let noise_based = {
+        let fec_fill_pos = lpcnet.as_ref().map_or(0, |l| l.fec_fill_pos);
+        (start != 0 || (fec_fill_pos == 0 && (st.skip_plc != 0 || loss_duration >= 80))) as i32
+    };
+    #[cfg(not(feature = "deep-plc"))]
     let noise_based = (loss_duration >= 40 || start != 0 || st.skip_plc != 0) as i32;
     if noise_based != 0 {
         let end = st.end;
@@ -864,7 +875,7 @@ fn celt_decode_lost(st: &mut OpusCustomDecoder, N: i32, LM: i32) {
     }
     st.loss_duration = 10000_i32.min(loss_duration + (1 << LM));
 }
-/// Upstream C: celt/celt_decoder.c:celt_decode_with_ec
+/// Upstream C: celt/celt_decoder.c:celt_decode_with_ec / celt_decode_with_ec_dred
 pub fn celt_decode_with_ec(
     st: &mut OpusCustomDecoder,
     data: Option<&[u8]>,
@@ -872,6 +883,7 @@ pub fn celt_decode_with_ec(
     mut frame_size: i32,
     dec: Option<&mut ec_dec>,
     accum: i32,
+    #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
 ) -> i32 {
     let CC: i32 = st.channels as i32;
     let C: i32 = st.stream_channels as i32;
@@ -908,7 +920,13 @@ pub fn celt_decode_with_ec(
         effEnd = mode.effEBands;
     }
     if data.is_none() || len <= 1 {
-        celt_decode_lost(st, N, LM);
+        celt_decode_lost(
+            st,
+            N,
+            LM,
+            #[cfg(feature = "deep-plc")]
+            lpcnet,
+        );
         {
             let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
                 .map(|c| {

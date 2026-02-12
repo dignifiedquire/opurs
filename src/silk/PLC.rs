@@ -454,15 +454,26 @@ pub fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], l
                 gain_Q16 = ((silk_SQRT_APPROX(frac_Q24) as u32) << 4) as i32;
                 slope_Q16 = (((1) << 16) - gain_Q16) / length;
                 slope_Q16 = ((slope_Q16 as u32) << 2) as i32;
-                i = 0;
-                while i < length {
-                    frame[i as usize] =
-                        ((gain_Q16 as i64 * frame[i as usize] as i64) >> 16) as i32 as i16;
-                    gain_Q16 += slope_Q16;
-                    if gain_Q16 > (1) << 16 {
-                        break;
+                // When deep-plc is compiled in, skip the energy fade-in for 16 kHz
+                // SILK frames — the DNN PLC handles it. Matches upstream C behavior:
+                //   #ifdef ENABLE_DEEP_PLC
+                //   if ( psDec->sPLC.fs_kHz != 16 )
+                //   #endif
+                #[cfg(feature = "deep-plc")]
+                let do_fade = psPLC.fs_kHz != 16;
+                #[cfg(not(feature = "deep-plc"))]
+                let do_fade = true;
+                if do_fade {
+                    i = 0;
+                    while i < length {
+                        frame[i as usize] =
+                            ((gain_Q16 as i64 * frame[i as usize] as i64) >> 16) as i32 as i16;
+                        gain_Q16 += slope_Q16;
+                        if gain_Q16 > (1) << 16 {
+                            break;
+                        }
+                        i += 1;
                     }
-                    i += 1;
                 }
             }
         }
