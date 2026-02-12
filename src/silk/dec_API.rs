@@ -34,7 +34,7 @@ use crate::silk::decode_pulses::silk_decode_pulses;
 use crate::silk::decoder_set_fs::silk_decoder_set_fs;
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, CODE_INDEPENDENTLY_NO_LTP_SCALING, MAX_API_FS_KHZ,
-    SHELL_CODEC_FRAME_LENGTH, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED,
+    MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED,
 };
 use crate::silk::init_decoder::{silk_init_decoder, silk_reset_decoder};
 use crate::silk::resampler::silk_resampler;
@@ -78,6 +78,7 @@ pub fn silk_ResetDecoder(dec: &mut silk_decoder) {
 }
 
 /// Upstream C: silk/dec_API.c:silk_Decode
+#[inline]
 pub fn silk_Decode(
     decState: &mut silk_decoder,
     decControl: &mut silk_DecControlStruct,
@@ -277,10 +278,11 @@ pub fn silk_Decode(
     // The first 2 elements are stereo prediction state, decoded samples start at offset 2.
     let frame_len = channel_state[0].frame_length;
     let ch_buf_len = frame_len + 2;
-    let nChannelsInt = decControl.nChannelsInternal;
+    let _nChannelsInt = decControl.nChannelsInternal;
 
     // Always allocate the temp storage (simplifies logic vs. the C "delay_stack_alloc" trick)
-    let mut samplesOut1_tmp_storage: Vec<i16> = vec![0; nChannelsInt as usize * ch_buf_len];
+    // Max: 2 channels * (320 frame + 2 stereo state) = 644
+    let mut samplesOut1_tmp_storage = [0i16; 2 * (MAX_FRAME_LENGTH + 2)];
 
     // Channel offsets into samplesOut1_tmp_storage
     let ch0_off: usize = 0;
@@ -376,14 +378,8 @@ pub fn silk_Decode(
     *nSamplesOut =
         nSamplesOutDec * decControl.API_sampleRate / (channel_state[0].fs_kHz as i16 as i32 * 1000);
 
-    let mut samplesOut2_tmp: Vec<i16> = vec![
-        0;
-        if decControl.nChannelsAPI == 2 {
-            *nSamplesOut as usize
-        } else {
-            1
-        }
-    ];
+    // Max: API rate 48kHz, 20ms frame = 960 samples
+    let mut samplesOut2_tmp = [0i16; 960];
 
     n = 0;
     while n

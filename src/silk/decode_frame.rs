@@ -14,7 +14,7 @@ use crate::silk::decode_core::silk_decode_core;
 use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_parameters::silk_decode_parameters;
 use crate::silk::decode_pulses::silk_decode_pulses;
-use crate::silk::define::SHELL_CODEC_FRAME_LENGTH;
+use crate::silk::define::{MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::CNG::silk_CNG;
 use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
@@ -26,6 +26,7 @@ use crate::dnn::lpcnet::LPCNetPLCState;
 ///
 /// Decodes a SILK frame, writing `psDec.frame_length` samples to `pOut`.
 /// Returns `(error_code, num_samples_written)`.
+#[inline]
 pub fn silk_decode_frame(
     psDec: &mut silk_decoder_state,
     psRangeDec: &mut ec_dec,
@@ -57,7 +58,7 @@ pub fn silk_decode_frame(
         // add room for padding samples so that the samples are a multiple of 16
         // these samples are not _really_ part of the frame
         let padded_frame_length = (L as usize).next_multiple_of(SHELL_CODEC_FRAME_LENGTH);
-        let mut pulses: Vec<i16> = vec![0; padded_frame_length];
+        let mut pulses = [0i16; MAX_FRAME_LENGTH];
         silk_decode_indices(
             psDec,
             psRangeDec,
@@ -67,7 +68,7 @@ pub fn silk_decode_frame(
         );
         silk_decode_pulses(
             psRangeDec,
-            &mut pulses,
+            &mut pulses[..padded_frame_length],
             psDec.indices.signalType as i32,
             psDec.indices.quantOffsetType as i32,
         );

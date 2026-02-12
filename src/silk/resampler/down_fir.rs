@@ -9,7 +9,9 @@ pub mod typedef_h {
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use super::ar2::silk_resampler_private_AR2;
 use super::rom::{RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2};
-use crate::silk::resampler::{ResamplerParams, SILK_RESAMPLER_MAX_FIR_ORDER};
+use crate::silk::resampler::{
+    ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN, SILK_RESAMPLER_MAX_FIR_ORDER,
+};
 
 #[derive(Copy, Clone)]
 pub struct ResamplerDownFirParams {
@@ -225,8 +227,8 @@ pub(super) fn silk_resampler_private_down_FIR(
 ) {
     let mut nSamplesIn: usize = 0;
 
-    let mut buf: Vec<i32> =
-        ::std::vec::from_elem(0, resampler_params.batch_size + params.fir_order);
+    // Max: batch_size(480) + fir_order(36) = 516
+    let mut buf = [0i32; RESAMPLER_MAX_BATCH_SIZE_IN + SILK_RESAMPLER_MAX_FIR_ORDER];
 
     buf[..params.fir_order].copy_from_slice(&state.fir_state[..params.fir_order]);
 

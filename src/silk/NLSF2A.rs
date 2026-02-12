@@ -54,6 +54,7 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
 /// d       I   filter order (should be even)
 /// arch    I   Run-time architecture
 /// ```
+#[inline]
 pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
     let d = a_Q12.len();
 

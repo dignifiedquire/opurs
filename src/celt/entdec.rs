@@ -15,6 +15,7 @@ use crate::celt::entcode::{
 };
 
 /// Upstream C: celt/entdec.c:ec_read_byte
+#[inline]
 fn ec_read_byte(this: &mut ec_dec) -> i32 {
     if this.offs < this.storage {
         let res = this.buf[this.offs as usize] as i32;
@@ -28,6 +29,7 @@ fn ec_read_byte(this: &mut ec_dec) -> i32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_read_byte_from_end
+#[inline]
 fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
     if this.end_offs < this.storage {
         this.end_offs += 1;
@@ -39,6 +41,7 @@ fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_normalize
+#[inline]
 fn ec_dec_normalize(this: &mut ec_dec) {
     while this.rng <= EC_CODE_BOT {
         let mut sym: i32 = 0;
@@ -53,6 +56,7 @@ fn ec_dec_normalize(this: &mut ec_dec) {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_init
+#[inline]
 pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
     let mut this = ec_dec {
         storage: buf.len() as u32,
@@ -81,6 +85,7 @@ pub fn ec_dec_init(buf: &mut [u8]) -> ec_dec<'_> {
 }
 
 /// Upstream C: celt/entdec.c:ec_decode
+#[inline]
 pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
     let mut s: u32 = 0;
     this.ext = celt_udiv(this.rng, _ft);
@@ -92,6 +97,7 @@ pub fn ec_decode(this: &mut ec_dec, mut _ft: u32) -> u32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_decode_bin
+#[inline]
 pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
     let mut s: u32 = 0;
     this.ext = this.rng >> _bits;
@@ -104,6 +110,7 @@ pub fn ec_decode_bin(this: &mut ec_dec, mut _bits: u32) -> u32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_update
+#[inline]
 pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     let mut s: u32 = 0;
     s = (_this.ext).wrapping_mul(_ft.wrapping_sub(_fh));
@@ -117,6 +124,7 @@ pub fn ec_dec_update(mut _this: &mut ec_dec, mut _fl: u32, mut _fh: u32, mut _ft
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_bit_logp
+#[inline]
 pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
     let mut r: u32 = 0;
     let mut d: u32 = 0;
@@ -136,6 +144,7 @@ pub fn ec_dec_bit_logp(mut _this: &mut ec_dec, mut _logp: u32) -> i32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_icdf
+#[inline]
 pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
     let mut r: u32 = 0;
     let mut d: u32 = 0;
@@ -163,6 +172,7 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
 
 /// Upstream C: celt/entdec.c:ec_dec_icdf16
 #[allow(dead_code)]
+#[inline]
 pub fn ec_dec_icdf16(this: &mut ec_dec, icdf: &[u16], ftb: u32) -> i32 {
     let s_init = this.rng;
     let d = this.val;
@@ -186,6 +196,7 @@ pub fn ec_dec_icdf16(this: &mut ec_dec, icdf: &[u16], ftb: u32) -> i32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_uint
+#[inline]
 pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
     let mut ft: u32 = 0;
     let mut s: u32 = 0;
@@ -214,6 +225,7 @@ pub fn ec_dec_uint(mut _this: &mut ec_dec, mut _ft: u32) -> u32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_bits
+#[inline]
 pub fn ec_dec_bits(mut _this: &mut ec_dec, mut _bits: u32) -> u32 {
     let mut window: ec_window = 0;
     let mut available: i32 = 0;

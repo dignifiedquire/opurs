@@ -28,6 +28,7 @@ use crate::silk::NLSF_unpack::silk_NLSF_unpack;
 /// decode_LBRR   I     Flag indicating LBRR data is being decoded
 /// condCoding    I     The type of conditional coding to use
 /// ```
+#[inline]
 pub fn silk_decode_indices(
     psDec: &mut silk_decoder_state,
     psRangeDec: &mut ec_dec,

@@ -17,7 +17,9 @@ pub mod typedef_h {
 }
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::bwexpander::silk_bwexpander;
-use crate::silk::define::{LTP_ORDER, MAX_LPC_ORDER, TYPE_VOICED};
+use crate::silk::define::{
+    LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_SUB_FRAME_LENGTH, TYPE_VOICED,
+};
 use crate::silk::macros::{silk_CLZ32, silk_SMLAWB, silk_SMULBB, silk_SMULWW};
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_LPC_inverse_pred_gain;
@@ -46,6 +48,7 @@ pub fn silk_PLC_Reset(psDec: &mut silk_decoder_state) {
 }
 
 /// Upstream C: silk/PLC.c:silk_PLC
+#[inline]
 pub fn silk_PLC(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
@@ -172,7 +175,8 @@ fn silk_PLC_energy(
     subfr_length: usize,
     nb_subfr: usize,
 ) {
-    let mut exc_buf: Vec<i16> = vec![0; 2 * subfr_length];
+    // Max: 2 * subfr_length(80) = 160
+    let mut exc_buf = [0i16; 2 * MAX_SUB_FRAME_LENGTH];
     for k in 0..2 {
         let exc_off = (k + nb_subfr - 2) * subfr_length;
         for i in 0..subfr_length {
@@ -181,7 +185,7 @@ fn silk_PLC_energy(
         }
     }
     silk_sum_sqr_shift(energy1, shift1, &exc_buf[..subfr_length]);
-    silk_sum_sqr_shift(energy2, shift2, &exc_buf[subfr_length..]);
+    silk_sum_sqr_shift(energy2, shift2, &exc_buf[subfr_length..2 * subfr_length]);
 }
 
 /// Upstream C: silk/PLC.c:silk_PLC_conceal
@@ -193,8 +197,9 @@ fn silk_PLC_conceal(
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     _arch: i32,
 ) {
-    let mut sLTP_Q14: Vec<i32> = vec![0; psDec.ltp_mem_length + psDec.frame_length];
-    let mut sLTP: Vec<i16> = vec![0; psDec.ltp_mem_length];
+    // Max: ltp_mem_length(320) + frame_length(320) = 640
+    let mut sLTP_Q14 = [0i32; 2 * MAX_FRAME_LENGTH];
+    let mut sLTP = [0i16; MAX_FRAME_LENGTH];
 
     let prevGain_Q10: [i32; 2] = [
         psDec.sPLC.prevGain_Q16[0] >> 6,

@@ -44,6 +44,7 @@ pub fn resampling_factor(rate: i32) -> i32 {
 ///
 /// Constant-coefficient comb filter inner loop.
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
+#[inline]
 pub(crate) fn comb_filter_const_c(
     y: &mut [f32],
     y_start: usize,
@@ -76,6 +77,7 @@ pub(crate) fn comb_filter_const_c(
 /// must have lookback data: `x[x_start - T - 2]` through `x[x_start + N - 1]`
 /// must be valid. Output is written to `y[y_start..y_start + N]`.
 /// `window` may be empty if `overlap` is 0.
+#[inline]
 pub fn comb_filter(
     y: &mut [f32],
     y_start: usize,
@@ -174,6 +176,7 @@ pub fn comb_filter(
 /// In-place comb filter where input and output are in the same buffer.
 /// The buffer must have lookback data before `start`. Reads from
 /// `buf[start - T - 2..]` and writes to `buf[start..start + N]`.
+#[inline]
 pub fn comb_filter_inplace(
     buf: &mut [f32],
     start: usize,
