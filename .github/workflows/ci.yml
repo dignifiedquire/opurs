@@ -227,6 +227,48 @@ jobs:
       - name: Run test vectors
         run: cargo run --release --no-default-features --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
 
+  test-vectors-dnn:
+    name: DNN Vectors (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        name:
+          - linux-x86_64
+          - macos-arm64
+          - windows-x86_64
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: macos-arm64
+            os: macos-15
+            target: aarch64-apple-darwin
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: vectors-dnn-${{ matrix.target }}
+      - name: Setup clang
+        if: runner.os != 'macos'
+        uses: aminya/setup-cpp@v1
+        with:
+          compiler: llvm
+      - name: Build (release)
+        run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
+      - name: Download test vectors
+        run: |
+          curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+          tar -xzf vectors.tar.gz
+      - name: Run DNN vector tests (228 standard + 72 DRED + 192 DNN decode)
+        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- --dnn opus_newvectors
+
   test-no-simd:
     name: Test no-simd (linux-x86_64)
     runs-on: ubuntu-latest
