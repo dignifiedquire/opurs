@@ -18,7 +18,9 @@ unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
     let x = vmaxq_f32(vminq_f32(x, vdupq_n_f32(88.0)), vdupq_n_f32(-88.0));
 
     // exp(x) = exp2(x/log(2)); add 127 for the exponent later
-    let x = vmlaq_f32(vdupq_n_f32(127.0), x, vdupq_n_f32(1.44269504));
+    // C remaps vmlaq_f32 → vfmaq_f32 when __ARM_FEATURE_FMA is defined.
+    // We use vfmaq_f32 explicitly to match.
+    let x = vfmaq_f32(vdupq_n_f32(127.0), x, vdupq_n_f32(1.44269504));
 
     // Split into integer and fractional parts
     let i = vcvtq_s32_f32(x);
@@ -29,7 +31,7 @@ unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
     let k1 = vdupq_n_f32(0.69583354);
     let k2 = vdupq_n_f32(0.22606716);
     let k3 = vdupq_n_f32(0.078024523);
-    let y = vmlaq_f32(k0, x, vmlaq_f32(k1, x, vmlaq_f32(k2, k3, x)));
+    let y = vfmaq_f32(k0, x, vfmaq_f32(k1, x, vfmaq_f32(k2, k3, x)));
 
     // Compute 2^i by shifting integer into exponent bits
     let exponent = vreinterpretq_f32_s32(vshlq_n_s32::<23>(i));
@@ -50,8 +52,8 @@ unsafe fn tanh4_approx(x: float32x4_t) -> float32x4_t {
     let min_out = vdupq_n_f32(-1.0);
 
     let x2 = vmulq_f32(x, x);
-    let num = vmlaq_f32(n0, x2, vmlaq_f32(n1, n2, x2));
-    let den = vmlaq_f32(d0, x2, vmlaq_f32(d1, d2, x2));
+    let num = vfmaq_f32(n0, x2, vfmaq_f32(n1, n2, x2));
+    let den = vfmaq_f32(d0, x2, vfmaq_f32(d1, d2, x2));
     let num = vmulq_f32(num, x);
     let den = vrecpeq_f32(den);
     let num = vmulq_f32(num, den);
@@ -73,12 +75,56 @@ unsafe fn sigmoid4_approx(x: float32x4_t) -> float32x4_t {
     let min_out = vdupq_n_f32(0.0);
 
     let x2 = vmulq_f32(x, x);
-    let num = vmlaq_f32(n0, x2, vmlaq_f32(n1, n2, x2));
-    let den = vmlaq_f32(d0, x2, vmlaq_f32(d1, d2, x2));
+    let num = vfmaq_f32(n0, x2, vfmaq_f32(n1, n2, x2));
+    let den = vfmaq_f32(d0, x2, vfmaq_f32(d1, d2, x2));
     let num = vmulq_f32(num, x);
     let den = vrecpeq_f32(den);
-    let num = vmlaq_f32(half, num, den);
+    let num = vfmaq_f32(half, num, den);
     vmaxq_f32(min_out, vminq_f32(max_out, num))
+}
+
+// =========================================================================
+// Scalar wrappers via NEON (matching C vec_neon.h behavior)
+// =========================================================================
+// On aarch64, C's vec_neon.h redefines `lpcnet_exp`, `tanh_approx`, and
+// `sigmoid_approx` to broadcast the scalar into a NEON register, call the
+// 4-wide approximation (with FMA + vrecpe), and extract lane 0. This gives
+// different results than the scalar code due to FMA and approximate reciprocal.
+
+/// Scalar lpcnet_exp via NEON exp4_approx.
+/// Port of `vec_neon.h:lpcnet_exp` (NEON override).
+///
+/// # Safety
+/// Requires aarch64 NEON (always available on aarch64).
+#[target_feature(enable = "neon")]
+pub unsafe fn lpcnet_exp_neon(x: f32) -> f32 {
+    let xv = vdupq_n_f32(x);
+    let yv = exp4_approx(xv);
+    vgetq_lane_f32(yv, 0)
+}
+
+/// Scalar tanh_approx via NEON tanh4_approx.
+/// Port of `vec_neon.h:tanh_approx` (NEON override).
+///
+/// # Safety
+/// Requires aarch64 NEON (always available on aarch64).
+#[target_feature(enable = "neon")]
+pub unsafe fn tanh_approx_neon(x: f32) -> f32 {
+    let xv = vdupq_n_f32(x);
+    let yv = tanh4_approx(xv);
+    vgetq_lane_f32(yv, 0)
+}
+
+/// Scalar sigmoid_approx via NEON sigmoid4_approx.
+/// Port of `vec_neon.h:sigmoid_approx` (NEON override).
+///
+/// # Safety
+/// Requires aarch64 NEON (always available on aarch64).
+#[target_feature(enable = "neon")]
+pub unsafe fn sigmoid_approx_neon(x: f32) -> f32 {
+    let xv = vdupq_n_f32(x);
+    let yv = sigmoid4_approx(xv);
+    vgetq_lane_f32(yv, 0)
 }
 
 // =========================================================================
@@ -100,9 +146,10 @@ pub unsafe fn vec_tanh_neon(y: &mut [f32], x: &[f32]) {
         vst1q_f32(y.as_mut_ptr().add(i), yv);
         i += 4;
     }
-    // Scalar tail
+    // Scalar tail: C uses lpcnet_exp (NEON version) based formula
     while i < n {
-        y[i] = crate::dnn::vec::tanh_approx(x[i]);
+        let ex2 = lpcnet_exp_neon(2.0 * x[i]);
+        y[i] = (ex2 - 1.0) / (ex2 + 1.0);
         i += 1;
     }
 }
@@ -122,9 +169,10 @@ pub unsafe fn vec_sigmoid_neon(y: &mut [f32], x: &[f32]) {
         vst1q_f32(y.as_mut_ptr().add(i), yv);
         i += 4;
     }
-    // Scalar tail
+    // Scalar tail: C uses lpcnet_exp (NEON version) based formula
     while i < n {
-        y[i] = crate::dnn::vec::sigmoid_approx(x[i]);
+        let ex = lpcnet_exp_neon(x[i]);
+        y[i] = ex / (ex + 1.0);
         i += 1;
     }
 }
@@ -144,9 +192,9 @@ pub unsafe fn softmax_neon(y: &mut [f32], x: &[f32]) {
         vst1q_f32(y.as_mut_ptr().add(i), yv);
         i += 4;
     }
-    // Scalar tail
+    // Scalar tail: use NEON lpcnet_exp for consistency
     while i < n {
-        y[i] = crate::dnn::vec::lpcnet_exp(x[i]);
+        y[i] = lpcnet_exp_neon(x[i]);
         i += 1;
     }
 }

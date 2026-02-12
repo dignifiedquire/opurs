@@ -237,8 +237,9 @@ pub fn adaconv_process_frame(
             );
 
             for i in 0..overlap_size {
-                output_buffer[i + i_out * frame_size] +=
-                    window[i] * channel_buffer0[i] + (1.0 - window[i]) * channel_buffer1[i];
+                // C uses two separate += to match FP rounding order
+                output_buffer[i + i_out * frame_size] += window[i] * channel_buffer0[i];
+                output_buffer[i + i_out * frame_size] += (1.0 - window[i]) * channel_buffer1[i];
             }
             for i in overlap_size..frame_size {
                 output_buffer[i + i_out * frame_size] += channel_buffer1[i];
@@ -407,8 +408,8 @@ pub fn adashape_process_frame(
         for k in 0..avg_pool_k {
             tenv[i] += x_in[i * avg_pool_k + k].abs();
         }
-        // C uses double-precision log()
-        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05) as f64).ln() as f32;
+        // C uses double-precision log(): log(float_val) promotes to double
+        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64).ln() as f32;
         mean += tenv[i];
     }
     mean /= tenv_size as f32;
@@ -435,10 +436,15 @@ pub fn adashape_process_frame(
         ACTIVATION_LINEAR,
     );
 
-    // Leaky ReLU
+    // Leaky ReLU — C uses `0.2 * tmp` where 0.2 is a double literal,
+    // so the multiply is in double precision before truncating to float
     for i in 0..frame_size {
         let tmp = out_buffer[i] + tmp_buffer[i];
-        in_buffer[i] = if tmp >= 0.0 { tmp } else { 0.2 * tmp };
+        in_buffer[i] = if tmp >= 0.0 {
+            tmp
+        } else {
+            (0.2 * tmp as f64) as f32
+        };
     }
 
     compute_generic_conv1d(
@@ -450,8 +456,9 @@ pub fn adashape_process_frame(
         ACTIVATION_LINEAR,
     );
 
-    // Shape signal — C uses double-precision exp()
+    // Shape signal — C uses double-precision exp() and the multiply stays in double
+    // before truncating: x_out[i] = (float)(exp((double)out_buffer[i]) * (double)x_in[i])
     for i in 0..frame_size {
-        x_out[i] = (out_buffer[i] as f64).exp() as f32 * x_in[i];
+        x_out[i] = ((out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
     }
 }

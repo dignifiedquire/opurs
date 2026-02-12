@@ -9,7 +9,10 @@ pub mod util;
 #[cfg(feature = "tools")]
 pub mod tools;
 
+#[cfg(not(feature = "tools"))]
 mod celt;
+#[cfg(feature = "tools")]
+pub mod celt;
 
 mod silk;
 

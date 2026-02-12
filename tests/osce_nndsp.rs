@@ -347,8 +347,15 @@ fn test_adacomb_lace_cf1() {
 fn test_adashape_nolace_tdshape1() {
     let arrays = compiled_weights();
     let nolace = init_nolace(&arrays).expect("NoLACE init failed");
-    let out_size = NUM_FRAMES * NOLACE_TDSHAPE1_FRAME_SIZE;
+    let frame_size = NOLACE_TDSHAPE1_FRAME_SIZE;
 
+    // Test 1 frame first
+    let c_out_1 = c_adashape(1, SEED, frame_size);
+    let rust_out_1 = rust_adashape(&nolace, 1, SEED);
+    compare_outputs("nolace_tdshape1_1frame", &rust_out_1, &c_out_1);
+
+    // Then test all frames
+    let out_size = NUM_FRAMES * frame_size;
     let c_out = c_adashape(NUM_FRAMES as i32, SEED, out_size);
     let rust_out = rust_adashape(&nolace, NUM_FRAMES, SEED);
     compare_outputs("nolace_tdshape1", &rust_out, &c_out);
@@ -407,11 +414,244 @@ fn test_dense_tanh_lace_af1_gain() {
     compare_outputs("dense_tanh_lace_af1_gain", &rust_out, &c_out);
 }
 
+/// Test celt_pitch_xcorr in isolation to check for NEON bit-exactness.
+/// Uses same PRNG-generated kernel and signal data, len=16 (ADACONV_MAX_KERNEL_SIZE).
+#[test]
+fn test_celt_pitch_xcorr_neon() {
+    use opurs::celt::pitch::celt_pitch_xcorr;
+
+    let max_pitch = 40; // typical overlap_size
+    let len = ADACONV_MAX_KERNEL_SIZE;
+
+    // C reference
+    let mut c_out = vec![0.0f32; max_pitch];
+    unsafe {
+        libopus_sys::osce_test_celt_pitch_xcorr(c_out.as_mut_ptr(), max_pitch as i32, SEED);
+    }
+
+    // Rust: generate same PRNG inputs
+    let mut prng = Prng::new(SEED);
+    let kernel: Vec<f32> = (0..len).map(|_| prng.next_float() * 0.1).collect();
+    let signal: Vec<f32> = (0..max_pitch + len)
+        .map(|_| prng.next_float() * 0.5)
+        .collect();
+
+    let mut rust_out = vec![0.0f32; max_pitch];
+    celt_pitch_xcorr(&kernel, &signal, &mut rust_out, len);
+
+    compare_outputs("celt_pitch_xcorr_neon", &rust_out, &c_out);
+}
+
+/// Test compute_linear on NoLACE tdshape1_alpha1_f layer.
+/// Isolates whether the divergence in nolace_tdshape1 starts at the linear layer.
+#[test]
+fn test_compute_linear_nolace_tdshape() {
+    use opurs::dnn::nnet::compute_linear;
+
+    let arrays = compiled_weights();
+    let nolace = init_nolace(&arrays).expect("NoLACE init failed");
+
+    let layer = &nolace.layers.tdshape1_alpha1_f;
+    let nb_inputs = layer.nb_inputs;
+    let nb_outputs = layer.nb_outputs;
+
+    // C reference
+    let mut c_out = vec![0.0f32; 2048];
+    let c_nb_inputs =
+        unsafe { libopus_sys::osce_test_compute_linear_nolace_tdshape(c_out.as_mut_ptr(), SEED) }
+            as usize;
+    assert_eq!(c_nb_inputs, nb_inputs);
+    c_out.truncate(nb_outputs);
+
+    // Rust
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
+    let mut rust_out = vec![0.0f32; nb_outputs];
+    compute_linear(layer, &mut rust_out, &input);
+
+    compare_outputs("compute_linear_nolace_tdshape", &rust_out, &c_out);
+}
+
+/// Test compute_linear on NoLACE af2_kernel layer.
+/// Isolates whether the divergence in nolace_af2 starts at the linear layer.
+#[test]
+fn test_compute_linear_nolace_af2() {
+    use opurs::dnn::nnet::compute_linear;
+
+    let arrays = compiled_weights();
+    let nolace = init_nolace(&arrays).expect("NoLACE init failed");
+
+    let layer = &nolace.layers.af2_kernel;
+    let nb_inputs = layer.nb_inputs;
+    let nb_outputs = layer.nb_outputs;
+
+    // C reference
+    let mut c_out = vec![0.0f32; 2048];
+    let c_nb_inputs =
+        unsafe { libopus_sys::osce_test_compute_linear_nolace_af2(c_out.as_mut_ptr(), SEED) }
+            as usize;
+    assert_eq!(c_nb_inputs, nb_inputs);
+    c_out.truncate(nb_outputs);
+
+    // Rust
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
+    let mut rust_out = vec![0.0f32; nb_outputs];
+    compute_linear(layer, &mut rust_out, &input);
+
+    compare_outputs("compute_linear_nolace_af2", &rust_out, &c_out);
+}
+
+/// Diagnostic: dump adashape intermediates to find where divergence starts.
+#[test]
+#[allow(clippy::needless_range_loop, clippy::excessive_precision)]
+fn test_adashape_intermediates() {
+    use opurs::dnn::nndsp::*;
+    use opurs::dnn::nnet::*;
+
+    let arrays = compiled_weights();
+    let nolace = init_nolace(&arrays).expect("NoLACE init failed");
+    let frame_size = NOLACE_TDSHAPE1_FRAME_SIZE; // 80
+    let feature_dim = NOLACE_TDSHAPE1_FEATURE_DIM; // 160
+    let avg_pool_k = NOLACE_TDSHAPE1_AVG_POOL_K; // 4
+
+    // Get C intermediates
+    let mut c_buf = vec![0.0f32; 2 * frame_size];
+    unsafe { libopus_sys::osce_test_adashape_intermediates(c_buf.as_mut_ptr(), SEED) };
+    let c_out_buffer = &c_buf[..frame_size];
+    let c_x_out = &c_buf[frame_size..2 * frame_size];
+
+    // Run Rust step by step
+    let mut prng = Prng::new(SEED);
+    let features: Vec<f32> = (0..feature_dim).map(|_| prng.next_float() * 0.1).collect();
+    let x_in: Vec<f32> = (0..frame_size).map(|_| prng.next_float() * 0.5).collect();
+
+    let tenv_size = frame_size / avg_pool_k;
+    let mut in_buffer = vec![0.0f32; ADASHAPE_MAX_INPUT_DIM + ADASHAPE_MAX_FRAME_SIZE];
+    let mut out_buffer = vec![0.0f32; ADASHAPE_MAX_FRAME_SIZE];
+    let mut tmp_buffer = vec![0.0f32; ADASHAPE_MAX_FRAME_SIZE];
+
+    in_buffer[..feature_dim].copy_from_slice(&features);
+    let tenv = &mut in_buffer[feature_dim..];
+    tenv[..tenv_size + 1].fill(0.0);
+    let mut mean = 0.0f32;
+    for i in 0..tenv_size {
+        for k in 0..avg_pool_k {
+            tenv[i] += x_in[i * avg_pool_k + k].abs();
+        }
+        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64).ln() as f32;
+        mean += tenv[i];
+    }
+    mean /= tenv_size as f32;
+    for i in 0..tenv_size {
+        tenv[i] -= mean;
+    }
+    tenv[tenv_size] = mean;
+
+    let mut state = AdaShapeState::default();
+    compute_generic_conv1d(
+        &nolace.layers.tdshape1_alpha1_f,
+        &mut out_buffer,
+        &mut state.conv_alpha1f_state,
+        &in_buffer,
+        feature_dim,
+        ACTIVATION_LINEAR,
+    );
+    compute_generic_conv1d(
+        &nolace.layers.tdshape1_alpha1_t,
+        &mut tmp_buffer,
+        &mut state.conv_alpha1t_state,
+        &in_buffer[feature_dim..],
+        tenv_size + 1,
+        ACTIVATION_LINEAR,
+    );
+
+    // Check alpha1f output
+    eprintln!("=== alpha1f out_buffer[0..8] ===");
+    for i in 0..8 {
+        eprintln!(
+            "  [{}] rust={:e} (0x{:08x})",
+            i,
+            out_buffer[i],
+            out_buffer[i].to_bits()
+        );
+    }
+
+    // Check alpha1t output
+    eprintln!("=== alpha1t tmp_buffer[0..8] ===");
+    for i in 0..8 {
+        eprintln!(
+            "  [{}] rust={:e} (0x{:08x})",
+            i,
+            tmp_buffer[i],
+            tmp_buffer[i].to_bits()
+        );
+    }
+
+    // Leaky ReLU
+    for i in 0..frame_size {
+        let tmp = out_buffer[i] + tmp_buffer[i];
+        in_buffer[i] = if tmp >= 0.0 { tmp } else { 0.2 * tmp };
+    }
+
+    eprintln!("=== leaky_relu in_buffer[0..8] ===");
+    for i in 0..8 {
+        eprintln!(
+            "  [{}] rust={:e} (0x{:08x})",
+            i,
+            in_buffer[i],
+            in_buffer[i].to_bits()
+        );
+    }
+
+    compute_generic_conv1d(
+        &nolace.layers.tdshape1_alpha2,
+        &mut out_buffer,
+        &mut state.conv_alpha2_state,
+        &in_buffer,
+        frame_size,
+        ACTIVATION_LINEAR,
+    );
+
+    // Compare out_buffer (pre-exp)
+    eprintln!("=== out_buffer (pre-exp) ===");
+    for i in 0..frame_size.min(24) {
+        eprintln!(
+            "  [{}] rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
+            i,
+            out_buffer[i],
+            out_buffer[i].to_bits(),
+            c_out_buffer[i],
+            c_out_buffer[i].to_bits(),
+            (out_buffer[i] - c_out_buffer[i]).abs()
+        );
+    }
+
+    // Compare final x_out
+    let mut x_out = vec![0.0f32; frame_size];
+    for i in 0..frame_size {
+        x_out[i] = ((out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
+    }
+
+    eprintln!("=== x_out (final) ===");
+    for i in 0..frame_size.min(24) {
+        eprintln!(
+            "  [{}] rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
+            i,
+            x_out[i],
+            x_out[i].to_bits(),
+            c_x_out[i],
+            c_x_out[i].to_bits(),
+            (x_out[i] - c_x_out[i]).abs()
+        );
+    }
+}
+
 /// Diagnostic: check if compute_linear on gain layer diverges, or if tanh_approx does.
 #[test]
 fn test_diag_gain_linear_vs_tanh() {
     use opurs::dnn::nnet::{compute_generic_dense, compute_linear, ACTIVATION_TANH};
-    use opurs::dnn::vec::tanh_approx;
+    use opurs::dnn::simd::tanh_approx;
 
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
@@ -556,6 +796,16 @@ fn test_diag_gain_linear_vs_tanh() {
         rust_tanh_exact.to_bits()
     );
 
-    // Verify our tanh_out matches dense_out (sanity)
-    assert_eq!(tanh_out, dense_out, "our own tanh path should match dense");
+    // Verify tanh_approx matches C tanh_approx (both use NEON tanh4_approx)
+    assert_eq!(
+        rust_tanh_exact.to_bits(),
+        c_tanh_direct[0].to_bits(),
+        "tanh_approx should be bit-exact with C"
+    );
+
+    // Note: tanh_out (from tanh_approx/Padé) may differ from dense_out
+    // (from vec_tanh scalar tail using lpcnet_exp) for n=1 on NEON.
+    // The formulas are intentionally different in C's vec_neon.h.
+    // What matters is that dense_out matches C dense_tanh, verified by
+    // test_dense_tanh_lace_af1_gain.
 }

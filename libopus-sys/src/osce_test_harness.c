@@ -13,6 +13,8 @@
 #include "osce.h"
 #include "nndsp.h"
 #include "vec.h"
+#include "pitch.h"
+#include "cpu_support.h"
 #include "lace_data.h"
 #include "nolace_data.h"
 
@@ -138,7 +140,7 @@ int osce_test_adaconv(
             frame_size, overlap_size, in_channels, out_channels,
             kernel_size, left_padding,
             filter_gain_a, filter_gain_b, shape_gain,
-            window, 0);
+            window, opus_select_arch());
 
         memcpy(out + i_frame * frame_size * out_channels,
                x_out, sizeof(float) * frame_size * out_channels);
@@ -205,7 +207,7 @@ int osce_test_adacomb(
             pitch_lag, feature_dim, frame_size, overlap_size,
             kernel_size, left_padding,
             filter_gain_a, filter_gain_b, log_gain_limit,
-            window, 0);
+            window, opus_select_arch());
 
         memcpy(out + i_frame * frame_size, x_out, sizeof(float) * frame_size);
     }
@@ -250,7 +252,7 @@ int osce_test_adashape(
             &hNoLACE.nolace_tdshape1_alpha1_f,
             &hNoLACE.nolace_tdshape1_alpha1_t,
             &hNoLACE.nolace_tdshape1_alpha2,
-            feature_dim, frame_size, avg_pool_k, 0);
+            feature_dim, frame_size, avg_pool_k, opus_select_arch());
 
         memcpy(out + i_frame * frame_size, x_out, sizeof(float) * frame_size);
     }
@@ -277,7 +279,7 @@ int osce_test_compute_linear(
         input[i] = prng_float() * 0.1f;
     }
 
-    compute_linear(&hLACE.lace_af1_kernel, out, input, 0);
+    compute_linear(&hLACE.lace_af1_kernel, out, input, opus_select_arch());
     return hLACE.lace_af1_kernel.nb_inputs;
 }
 
@@ -299,7 +301,7 @@ int osce_test_dense_tanh(
         input[i] = prng_float() * 0.1f;
     }
 
-    compute_generic_dense(&hLACE.lace_af1_gain, out, input, ACTIVATION_TANH, 0);
+    compute_generic_dense(&hLACE.lace_af1_gain, out, input, ACTIVATION_TANH, opus_select_arch());
     return hLACE.lace_af1_gain.nb_inputs;
 }
 
@@ -321,7 +323,7 @@ int osce_test_compute_linear_gain(
         input[i] = prng_float() * 0.1f;
     }
 
-    compute_linear(&hLACE.lace_af1_gain, out, input, 0);
+    compute_linear(&hLACE.lace_af1_gain, out, input, opus_select_arch());
     return hLACE.lace_af1_gain.nb_inputs;
 }
 
@@ -336,6 +338,168 @@ int osce_test_tanh_approx(
     out[0] = tanh_approx(value);
     out[1] = value;
     return 0;
+}
+
+/* Run 1 frame of adashape and return out_buffer (before exp) for debugging.
+ * out[0..frame_size-1] = out_buffer values.
+ * out[frame_size..2*frame_size-1] = final x_out values. */
+int osce_test_adashape_intermediates(
+    float *out,
+    unsigned int seed
+)
+{
+    NOLACELayers hNoLACE;
+    AdaShapeState hAdaShape;
+
+    int feature_dim, frame_size, avg_pool_k;
+    float features[512];
+    float x_in[512];
+    float x_out[512];
+    int i, k;
+    int tenv_size;
+
+    float in_buffer[ADASHAPE_MAX_INPUT_DIM + ADASHAPE_MAX_FRAME_SIZE];
+    float out_buffer[ADASHAPE_MAX_FRAME_SIZE];
+    float tmp_buffer[ADASHAPE_MAX_FRAME_SIZE];
+    float mean;
+    float *tenv;
+
+    init_nolacelayers(&hNoLACE, nolacelayers_arrays);
+    feature_dim = NOLACE_TDSHAPE1_FEATURE_DIM;
+    frame_size = NOLACE_TDSHAPE1_FRAME_SIZE;
+    avg_pool_k = NOLACE_TDSHAPE1_AVG_POOL_K;
+
+    init_adashape_state(&hAdaShape);
+
+    prng_reset(seed);
+
+    /* Generate one frame of inputs */
+    for (i = 0; i < feature_dim; i++) {
+        features[i] = prng_float() * 0.1f;
+    }
+    for (i = 0; i < frame_size; i++) {
+        x_in[i] = prng_float() * 0.5f;
+    }
+
+    /* Replicate adashape_process_frame logic manually */
+    tenv_size = frame_size / avg_pool_k;
+    tenv = in_buffer + feature_dim;
+    OPUS_CLEAR(tenv, tenv_size + 1);
+    OPUS_COPY(in_buffer, features, feature_dim);
+
+    mean = 0;
+    for (i = 0; i < tenv_size; i++) {
+        for (k = 0; k < avg_pool_k; k++) {
+            tenv[i] += fabs(x_in[i * avg_pool_k + k]);
+        }
+        tenv[i] = log(tenv[i] / avg_pool_k + 1.52587890625e-05f);
+        mean += tenv[i];
+    }
+    mean /= tenv_size;
+    for (i = 0; i < tenv_size; i++) {
+        tenv[i] -= mean;
+    }
+    tenv[tenv_size] = mean;
+
+    compute_generic_conv1d(&hNoLACE.nolace_tdshape1_alpha1_f, out_buffer,
+        hAdaShape.conv_alpha1f_state, in_buffer, feature_dim, ACTIVATION_LINEAR, opus_select_arch());
+    compute_generic_conv1d(&hNoLACE.nolace_tdshape1_alpha1_t, tmp_buffer,
+        hAdaShape.conv_alpha1t_state, tenv, tenv_size + 1, ACTIVATION_LINEAR, opus_select_arch());
+
+    for (i = 0; i < frame_size; i++) {
+        float tmp = out_buffer[i] + tmp_buffer[i];
+        in_buffer[i] = tmp >= 0 ? tmp : 0.2 * tmp;
+    }
+
+    compute_generic_conv1d(&hNoLACE.nolace_tdshape1_alpha2, out_buffer,
+        hAdaShape.conv_alpha2_state, in_buffer, frame_size, ACTIVATION_LINEAR, opus_select_arch());
+
+    /* Copy out_buffer to first half of output */
+    memcpy(out, out_buffer, sizeof(float) * frame_size);
+
+    /* Compute final and copy to second half */
+    for (i = 0; i < frame_size; i++) {
+        x_out[i] = exp(out_buffer[i]) * x_in[i];
+    }
+    memcpy(out + frame_size, x_out, sizeof(float) * frame_size);
+
+    return frame_size;
+}
+
+/* Test compute_linear on a NoLACE layer (tdshape1_alpha1_f).
+ * This isolates whether the divergence starts at the dense layer level.
+ * out must have room for nb_outputs floats.
+ * Returns nb_inputs. */
+int osce_test_compute_linear_nolace_tdshape(
+    float *out,
+    unsigned int seed
+)
+{
+    NOLACELayers hNoLACE;
+    float input[2048];
+    int i;
+
+    init_nolacelayers(&hNoLACE, nolacelayers_arrays);
+
+    prng_reset(seed);
+    for (i = 0; i < hNoLACE.nolace_tdshape1_alpha1_f.nb_inputs; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+
+    compute_linear(&hNoLACE.nolace_tdshape1_alpha1_f, out, input, opus_select_arch());
+    return hNoLACE.nolace_tdshape1_alpha1_f.nb_inputs;
+}
+
+/* Test compute_linear on NoLACE af2_kernel layer.
+ * out must have room for nb_outputs floats.
+ * Returns nb_inputs. */
+int osce_test_compute_linear_nolace_af2(
+    float *out,
+    unsigned int seed
+)
+{
+    NOLACELayers hNoLACE;
+    float input[2048];
+    int i;
+
+    init_nolacelayers(&hNoLACE, nolacelayers_arrays);
+
+    prng_reset(seed);
+    for (i = 0; i < hNoLACE.nolace_af2_kernel.nb_inputs; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+
+    compute_linear(&hNoLACE.nolace_af2_kernel, out, input, opus_select_arch());
+    return hNoLACE.nolace_af2_kernel.nb_inputs;
+}
+
+/* Test celt_pitch_xcorr with deterministic inputs.
+ * Mimics the exact call pattern from adaconv_process_frame:
+ * kernel_size=16 (ADACONV_MAX_KERNEL_SIZE), max_pitch=overlap_size or frame_size.
+ *
+ * out[0..max_pitch-1] = xcorr results.
+ * Returns max_pitch. */
+int osce_test_celt_pitch_xcorr(
+    float *out,
+    int max_pitch,
+    unsigned int seed
+)
+{
+    float kernel[ADACONV_MAX_KERNEL_SIZE];
+    float signal[ADACONV_MAX_FRAME_SIZE + ADACONV_MAX_KERNEL_SIZE + 4];
+    int i;
+    int len = ADACONV_MAX_KERNEL_SIZE;
+
+    prng_reset(seed);
+    for (i = 0; i < len; i++) {
+        kernel[i] = prng_float() * 0.1f;
+    }
+    for (i = 0; i < max_pitch + len; i++) {
+        signal[i] = prng_float() * 0.5f;
+    }
+
+    celt_pitch_xcorr(kernel, signal, out, len, max_pitch, opus_select_arch());
+    return max_pitch;
 }
 
 #endif /* ENABLE_OSCE */

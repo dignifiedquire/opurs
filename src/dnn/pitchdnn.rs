@@ -6,6 +6,9 @@
 //! Upstream C: `dnn/pitchdnn.c`, `dnn/pitchdnn.h`, `dnn/pitchdnn_data.h`
 
 use super::nnet::*;
+#[cfg(feature = "simd")]
+use super::simd::lpcnet_exp;
+#[cfg(not(feature = "simd"))]
 use super::vec::lpcnet_exp;
 
 // --- Constants from pitchdnn_data.h ---

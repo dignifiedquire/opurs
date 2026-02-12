@@ -1237,4 +1237,25 @@ extern "C" {
 
     pub fn osce_test_tanh_approx(out: *mut f32, value: f32) -> ::std::os::raw::c_int;
 
+    pub fn osce_test_celt_pitch_xcorr(
+        out: *mut f32,
+        max_pitch: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_adashape_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_compute_linear_nolace_tdshape(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_compute_linear_nolace_af2(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
 }

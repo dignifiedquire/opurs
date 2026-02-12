@@ -30,18 +30,14 @@ cpufeatures::new!(cpuid_avx2, "avx2");
 // falling back to the scalar version.
 
 /// SIMD-accelerated 4-way cross-correlation kernel.
-/// Dispatches to SSE on x86 or NEON on aarch64, with scalar fallback.
+/// Dispatches to SSE on x86, with scalar fallback.
+///
+/// On aarch64, the C reference only uses NEON for `celt_pitch_xcorr`, not for
+/// the standalone `xcorr_kernel` (called from celt_lpc). The NEON version does
+/// NOT accumulate into `sum` (starts from zero), while the scalar version does.
+/// To match C behavior, we use scalar on aarch64 for this function.
 #[inline]
 pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
-    #[cfg(target_arch = "aarch64")]
-    {
-        // NEON is always available on aarch64
-        unsafe {
-            aarch64::xcorr_kernel_neon(x, y, sum, len);
-        }
-        return;
-    }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if cpuid_sse::get() {

@@ -146,6 +146,55 @@ pub fn sparse_cgemv8x4(
     }
 }
 
+// =========================================================================
+// Scalar activation functions (dispatch to NEON/AVX on supported platforms)
+// =========================================================================
+// On aarch64, C's vec_neon.h redefines the scalar activation functions to
+// broadcast into a NEON register, call the 4-wide version, and extract lane 0.
+// This gives slightly different results due to FMA and approximate reciprocal.
+
+/// Scalar tanh approximation, matching platform-specific behavior.
+#[inline]
+pub fn tanh_approx(x: f32) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { aarch64::tanh_approx_neon(x) };
+    }
+
+    #[allow(unreachable_code)]
+    {
+        super::vec::tanh_approx(x)
+    }
+}
+
+/// Scalar sigmoid approximation, matching platform-specific behavior.
+#[inline]
+pub fn sigmoid_approx(x: f32) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { aarch64::sigmoid_approx_neon(x) };
+    }
+
+    #[allow(unreachable_code)]
+    {
+        super::vec::sigmoid_approx(x)
+    }
+}
+
+/// Scalar lpcnet_exp, matching platform-specific behavior.
+#[inline]
+pub fn lpcnet_exp(x: f32) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { aarch64::lpcnet_exp_neon(x) };
+    }
+
+    #[allow(unreachable_code)]
+    {
+        super::vec::lpcnet_exp(x)
+    }
+}
+
 /// SIMD-accelerated batch tanh approximation.
 #[inline]
 pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
