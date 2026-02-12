@@ -105,6 +105,26 @@ cargo run --release --features tools --example run_vectors2 -- opus_newvectors
 
 The vector test suite runs the encoder at 9 bitrates and the decoder at 10 configurations across all IETF test vectors, comparing output against the C reference implementation compiled from source in `libopus-sys/`.
 
+## Cargo Features
+
+### DNN-based audio enhancement (optional)
+
+The crate includes optional deep neural network features ported from libopus 1.5.2. These are disabled by default and have no effect on the core codec when not enabled.
+
+| Feature | Description |
+|---------|-------------|
+| `deep-plc` | Deep Packet Loss Concealment -- neural vocoder (FARGAN) for high-quality speech recovery during packet loss. Activated when decoder complexity >= 5. |
+| `dred` | Deep REDundancy -- encodes redundant latent representations in packet padding for FEC. Implies `deep-plc`. |
+| `osce` | Opus Speech Clarity Enhancement -- post-filter that enhances SILK decoded speech. LACE at complexity >= 6, NoLACE at complexity >= 7. Implies `deep-plc`. |
+| `dnn` | Enables all DNN features (`deep-plc` + `dred` + `osce`). |
+
+```toml
+[dependencies]
+opurs = { version = "0.3", features = ["dnn"] }
+```
+
+When DNN features are compiled in but no model weights are loaded, the codec behaves identically to the non-DNN build. The 228 IETF test vectors pass with or without DNN features enabled.
+
 ## Origin
 
 This project started as a [c2rust](https://github.com/immunant/c2rust) transpilation of libopus 1.3.1 by [DCNick3](https://github.com/DCNick3/unsafe-libopus), then incrementally refactored toward safe, idiomatic Rust. The original transpilation eliminated the need for a C toolchain; the subsequent refactoring has brought the codebase to near-complete memory safety while maintaining bit-exact compatibility.
