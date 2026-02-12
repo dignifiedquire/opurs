@@ -40,6 +40,9 @@ itertools = "0.13.0"
 # idiomatic error types
 thiserror = "2"
 
+# runtime CPU feature detection for SIMD dispatch
+cpufeatures = { version = "0.2", optional = true }
+
 # for dumping data in ent-dump
 hex = { version = "0.4.3", optional = true }
 
@@ -53,8 +56,26 @@ indicatif = { version = "0.17", features = ["rayon"], optional = true }
 [dev-dependencies]
 getrandom = "0.2.15"
 insta = "1.29.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "pitch"
+harness = false
+
+[[bench]]
+name = "silk"
+harness = false
+
+[[bench]]
+name = "vq"
+harness = false
 
 [features]
+default = ["simd"]
+
+# SIMD acceleration via platform intrinsics (SSE/AVX on x86, NEON on aarch64)
+simd = ["dep:cpufeatures"]
+
 # dumps calls to entropy coder to console for easier upstream divergence debugging
 # (it's not _only_ entropy coder actually, there are some additional prints where it was found necessary)
 ent-dump = ["hex"]

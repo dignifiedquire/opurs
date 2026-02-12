@@ -213,8 +213,23 @@ jobs:
         run: |
           curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
           tar -xzf vectors.tar.gz
-      - name: Run test vectors
+      - name: Run test vectors (SIMD)
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
+      - name: Run test vectors (scalar)
+        run: cargo run --release --no-default-features --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
+
+  test-no-simd:
+    name: Test no-simd (linux-x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: no-simd
+      - uses: taiki-e/install-action@nextest
+      - name: Run tests (no default features)
+        run: cargo nextest run -p opurs --no-default-features
 
   docs:
     name: Docs
@@ -235,11 +250,24 @@ jobs:
       - name: Count unsafe in src/
         run: |
           echo "## Unsafe audit" >> $GITHUB_STEP_SUMMARY
-          count=$(grep -rE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ | wc -l)
-          echo "Total unsafe occurrences in src/: **$count**" >> $GITHUB_STEP_SUMMARY
-          echo ""
-          echo "### Files with unsafe:" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Core codec (non-SIMD):" >> $GITHUB_STEP_SUMMARY
+          core_count=$(grep -rE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ --include='*.rs' \
+            -l | grep -v '/simd/' | wc -l)
+          echo "Files with unsafe (excluding simd/): **$core_count**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -rlE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ || echo "(none)"
-          grep -rlE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ >> $GITHUB_STEP_SUMMARY || echo "(none)" >> $GITHUB_STEP_SUMMARY
+          grep -rlE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ --include='*.rs' | grep -v '/simd/' >> $GITHUB_STEP_SUMMARY || echo "(none)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### SIMD modules (unsafe expected for intrinsics):" >> $GITHUB_STEP_SUMMARY
+          simd_count=$(grep -rE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ --include='*.rs' \
+            -l | grep '/simd/' | wc -l)
+          echo "SIMD files with unsafe: **$simd_count**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -rlE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ --include='*.rs' | grep '/simd/' >> $GITHUB_STEP_SUMMARY || echo "(none)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          total=$(grep -rE 'unsafe\s*\{|unsafe\s+fn|unsafe\s+impl' src/ --include='*.rs' | wc -l)
+          echo "Total unsafe occurrences: **$total**" >> $GITHUB_STEP_SUMMARY

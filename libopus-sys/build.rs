@@ -106,7 +106,9 @@ fn build_opus() {
     let celt_headers_mk = parse_mk_file(&opus_source_path.join("celt_headers.mk"));
     let silk_headers_mk = parse_mk_file(&opus_source_path.join("silk_headers.mk"));
 
-    // Collect source files to compile (float mode, no SIMD/platform intrinsics)
+    let simd = cfg!(feature = "simd");
+
+    // Collect source files to compile (float mode)
     let mut sources: Vec<String> = Vec::new();
     // Extra sources that live outside the upstream tree (abs_path, relative_dest).
     let mut extra_sources: Vec<(PathBuf, PathBuf)> = Vec::new();
@@ -115,6 +117,48 @@ fn build_opus() {
     sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES"));
     sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES"));
     sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT"));
+
+    // SIMD source groups — compiled with per-file flags later
+    let mut simd_groups: Vec<(Vec<String>, &str)> = Vec::new(); // (sources, arch_flag)
+
+    if simd {
+        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+        if target_arch == "x86_64" || target_arch == "x86" {
+            // RTCD (runtime CPU detection) sources — no special flags
+            sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_X86_RTCD"));
+            sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_X86_RTCD"));
+
+            // SIMD sources with per-group compiler flags
+            simd_groups.push((get_sources(&celt_sources_mk, "CELT_SOURCES_SSE"), "-msse"));
+            simd_groups.push((get_sources(&celt_sources_mk, "CELT_SOURCES_SSE2"), "-msse2"));
+            simd_groups.push((
+                get_sources(&celt_sources_mk, "CELT_SOURCES_SSE4_1"),
+                "-msse4.1",
+            ));
+            simd_groups.push((
+                get_sources(&silk_sources_mk, "SILK_SOURCES_SSE4_1"),
+                "-msse4.1",
+            ));
+            simd_groups.push((
+                get_sources(&celt_sources_mk, "CELT_SOURCES_AVX2"),
+                "-mavx2 -mfma",
+            ));
+            simd_groups.push((get_sources(&silk_sources_mk, "SILK_SOURCES_AVX2"), "-mavx2"));
+            simd_groups.push((
+                get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT_AVX2"),
+                "-mavx2 -mfma",
+            ));
+        } else if target_arch == "aarch64" {
+            // RTCD sources
+            sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_RTCD"));
+            sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_RTCD"));
+
+            // NEON intrinsics (always available on aarch64, no extra flags needed)
+            sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_NEON_INTR"));
+            sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_NEON_INTR"));
+        }
+    }
 
     // Collect header files for dependency tracking
     let mut headers: Vec<String> = Vec::new();
@@ -185,7 +229,7 @@ fn build_opus() {
         sources.push(rel_dest.to_string_lossy().into_owned());
     }
 
-    // Write config.h with optional DNN defines
+    // Write config.h with optional DNN and SIMD defines
     let mut config = CONFIG_H.to_string();
     if deep_plc {
         config.push_str("#define ENABLE_DEEP_PLC 1\n");
@@ -196,6 +240,23 @@ fn build_opus() {
     if osce {
         config.push_str("#define ENABLE_OSCE 1\n");
     }
+
+    if simd {
+        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+        if target_arch == "x86_64" || target_arch == "x86" {
+            config.push_str("#define OPUS_X86_MAY_HAVE_SSE 1\n");
+            config.push_str("#define OPUS_X86_MAY_HAVE_SSE2 1\n");
+            config.push_str("#define OPUS_X86_MAY_HAVE_SSE4_1 1\n");
+            config.push_str("#define OPUS_X86_MAY_HAVE_AVX2 1\n");
+            config.push_str("#define OPUS_HAVE_RTCD 1\n");
+        } else if target_arch == "aarch64" {
+            config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
+            config.push_str("#define OPUS_ARM_ASM 1\n");
+            config.push_str("#define OPUS_HAVE_RTCD 1\n");
+        }
+    }
+
     fs::write(opus_build_src_dir.join("config.h"), config).expect("Could not write config.h");
 
     let mut build = cc::Build::new();
@@ -235,6 +296,59 @@ fn build_opus() {
     }
 
     build.compile("opus");
+
+    // Compile SIMD source groups with per-group arch flags
+    for (i, (simd_sources, arch_flags)) in simd_groups.iter().enumerate() {
+        let mut simd_build = cc::Build::new();
+        simd_build
+            .std("c11")
+            .includes(
+                OPUS_INCLUDES
+                    .iter()
+                    .map(|path| opus_build_src_dir.join(path)),
+            )
+            .define("HAVE_CONFIG_H", "1")
+            .out_dir(&opus_build_dir);
+
+        // Copy the same FP and platform flags
+        let compiler = simd_build.get_compiler();
+        if compiler.is_like_clang() || compiler.is_like_gnu() {
+            simd_build.flag("-ffp-contract=off");
+        }
+        if compiler.is_like_clang() {
+            simd_build.flag("-ffp-model=strict");
+        }
+        if compiler.is_like_msvc() {
+            simd_build.flag("/fp:strict");
+        }
+
+        // Add arch-specific flags
+        if compiler.is_like_clang() || compiler.is_like_gnu() {
+            for flag in arch_flags.split_whitespace() {
+                simd_build.flag(flag);
+            }
+        } else if compiler.is_like_msvc() {
+            // MSVC uses /arch: flags (SSE2 is default on x64, AVX2 needs /arch:AVX2)
+            if arch_flags.contains("avx2") {
+                simd_build.flag("/arch:AVX2");
+            }
+        }
+
+        // Copy SIMD sources to build dir and add to compilation
+        for source in simd_sources {
+            let source_path = opus_source_path.join(source);
+            let target_path = opus_build_src_dir.join(source);
+            fs::create_dir_all(target_path.parent().unwrap()).ok();
+            if source_path.exists() {
+                fs::copy(&source_path, &target_path).ok();
+            }
+            simd_build.file(&target_path);
+        }
+
+        let lib_name = format!("opus_simd_{}", i);
+        simd_build.compile(&lib_name);
+        println!("cargo:rustc-link-lib=static={}", lib_name);
+    }
 
     // Link
     println!("cargo:rustc-link-lib=static=opus");

@@ -17,6 +17,20 @@ use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
 use crate::silk::Inlines::silk_SQRT_APPROX;
 use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 
+#[cfg(feature = "simd")]
+use crate::silk::simd::silk_vad_energy;
+
+/// Scalar VAD energy: sum of (X[i] >> 3)^2.
+#[cfg(not(feature = "simd"))]
+fn silk_vad_energy(x: &[i16]) -> i32 {
+    let mut sum: i32 = 0;
+    for &sample in x {
+        let x_tmp = (sample as i32) >> 3;
+        sum += (x_tmp as i16 as i32) * (x_tmp as i16 as i32);
+    }
+    sum
+}
+
 /// Upstream C: silk/VAD.c:silk_VAD_Init
 pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
     let mut b: i32 = 0;
@@ -62,7 +76,6 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     let mut Xnrg: [i32; 4] = [0; 4];
     let mut NrgToNoiseRatio_Q8: [i32; 4] = [0; 4];
     let mut speech_nrg: i32 = 0;
-    let mut x_tmp: i32 = 0;
     let mut X_offset: [i32; 4] = [0; 4];
     let ret: i32 = 0;
     let psSilk_VAD: &mut silk_VAD_state = &mut psEncC.sVAD;
@@ -135,12 +148,10 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         Xnrg[b as usize] = psSilk_VAD.XnrgSubfr[b as usize];
         s = 0;
         while s < VAD_INTERNAL_SUBFRAMES {
-            sumSquared = 0;
-            i = 0;
-            while i < dec_subframe_length {
-                x_tmp = X[(X_offset[b as usize] + i + dec_subframe_offset) as usize] as i32 >> 3;
-                sumSquared += x_tmp as i16 as i32 * x_tmp as i16 as i32;
-                i += 1;
+            {
+                let start = (X_offset[b as usize] + dec_subframe_offset) as usize;
+                let end = start + dec_subframe_length as usize;
+                sumSquared = silk_vad_energy(&X[start..end]);
             }
             if s < VAD_INTERNAL_SUBFRAMES - 1 {
                 Xnrg[b as usize] = if (Xnrg[b as usize] as u32).wrapping_add(sumSquared as u32)

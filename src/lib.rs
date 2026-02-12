@@ -141,4 +141,14 @@ pub mod internals {
     // -- SILK LPC --
     pub use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
     pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
+
+    // -- CELT pitch (for benchmarks) --
+    pub use crate::celt::pitch::{
+        celt_inner_prod, celt_pitch_xcorr, dual_inner_prod, xcorr_kernel,
+    };
+
+    // -- SILK functions (for benchmarks) --
+    pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
+    pub use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
+    pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction_c;
 }
