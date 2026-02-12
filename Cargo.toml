@@ -70,11 +70,26 @@ harness = false
 name = "vq"
 harness = false
 
+[[bench]]
+name = "comparison"
+harness = false
+required-features = ["tools"]
+
+[[bench]]
+name = "codec"
+harness = false
+
+[[bench]]
+name = "codec_comparison"
+harness = false
+required-features = ["tools"]
+
 [features]
 default = ["simd"]
 
 # SIMD acceleration via platform intrinsics (SSE/AVX on x86, NEON on aarch64)
-simd = ["dep:cpufeatures"]
+# When tools is also enabled, forwards simd to libopus-sys for C SIMD compilation
+simd = ["dep:cpufeatures", "libopus-sys?/simd"]
 
 # dumps calls to entropy coder to console for easier upstream divergence debugging
 # (it's not _only_ entropy coder actually, there are some additional prints where it was found necessary)

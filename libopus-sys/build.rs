@@ -250,6 +250,14 @@ fn build_opus() {
             config.push_str("#define OPUS_X86_MAY_HAVE_SSE4_1 1\n");
             config.push_str("#define OPUS_X86_MAY_HAVE_AVX2 1\n");
             config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            // CPUID detection method for runtime CPU feature detection
+            let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+            if target_os == "windows" {
+                // MSVC uses __cpuid intrinsic from <intrin.h> (handled in x86cpu.c)
+            } else {
+                // GCC/Clang: use __get_cpuid from <cpuid.h>
+                config.push_str("#define CPU_INFO_BY_C 1\n");
+            }
         } else if target_arch == "aarch64" {
             config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
             config.push_str("#define OPUS_ARM_ASM 1\n");

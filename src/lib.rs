@@ -143,12 +143,23 @@ pub mod internals {
     pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
 
     // -- CELT pitch (for benchmarks) --
+    // Dispatch wrappers (use SIMD when available):
     pub use crate::celt::pitch::{
         celt_inner_prod, celt_pitch_xcorr, dual_inner_prod, xcorr_kernel,
     };
+    // Scalar implementations (for A/B comparison):
+    pub use crate::celt::pitch::{
+        celt_inner_prod_scalar, celt_pitch_xcorr_scalar, dual_inner_prod_scalar,
+        xcorr_kernel_scalar,
+    };
 
     // -- SILK functions (for benchmarks) --
+    // Dispatch wrappers:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
     pub use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
     pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction_c;
+    // SIMD dispatch wrapper for short prediction:
+    pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction;
+    // Scalar implementation:
+    pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP_scalar;
 }

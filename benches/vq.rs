@@ -17,7 +17,7 @@ fn bench_celt_inner_prod_vq(c: &mut Criterion) {
         let x = generate_f32_signal(n, 42);
         let y = generate_f32_signal(n, 123);
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
-            b.iter(|| opurs::internals::celt_inner_prod(black_box(&x), black_box(&y), n))
+            b.iter(|| black_box(opurs::internals::celt_inner_prod(&x, &y, n)))
         });
     }
     group.finish();

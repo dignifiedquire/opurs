@@ -4,7 +4,6 @@ fn generate_signal(len: usize, seed: u32) -> Vec<f32> {
     let mut v = Vec::with_capacity(len);
     let mut state = seed;
     for _ in 0..len {
-        // Simple PRNG for reproducible benchmarks
         state = state.wrapping_mul(1103515245).wrapping_add(12345);
         v.push((state as i32 >> 16) as f32 / 32768.0);
     }
@@ -16,16 +15,18 @@ fn bench_xcorr_kernel(c: &mut Criterion) {
     for &n in &[64, 240, 480, 960] {
         let x = generate_signal(n, 42);
         let y = generate_signal(n + 3, 123);
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
+        group.bench_with_input(BenchmarkId::new("scalar", n), &n, |b, &n| {
             b.iter(|| {
                 let mut sum = [0.0f32; 4];
-                opurs::internals::xcorr_kernel(
-                    black_box(&x[..n]),
-                    black_box(&y),
-                    black_box(&mut sum),
-                    n,
-                );
-                sum
+                opurs::internals::xcorr_kernel_scalar(&x[..n], &y, &mut sum, n);
+                black_box(sum)
+            })
+        });
+        group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
+            b.iter(|| {
+                let mut sum = [0.0f32; 4];
+                opurs::internals::xcorr_kernel(&x[..n], &y, &mut sum, n);
+                black_box(sum)
             })
         });
     }
@@ -37,8 +38,11 @@ fn bench_celt_inner_prod(c: &mut Criterion) {
     for &n in &[64, 240, 480, 960] {
         let x = generate_signal(n, 42);
         let y = generate_signal(n, 123);
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
-            b.iter(|| opurs::internals::celt_inner_prod(black_box(&x), black_box(&y), n))
+        group.bench_with_input(BenchmarkId::new("scalar", n), &n, |b, &n| {
+            b.iter(|| black_box(opurs::internals::celt_inner_prod_scalar(&x, &y, n)))
+        });
+        group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
+            b.iter(|| black_box(opurs::internals::celt_inner_prod(&x, &y, n)))
         });
     }
     group.finish();
@@ -50,15 +54,11 @@ fn bench_dual_inner_prod(c: &mut Criterion) {
         let x = generate_signal(n, 42);
         let y01 = generate_signal(n, 123);
         let y02 = generate_signal(n, 456);
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
-            b.iter(|| {
-                opurs::internals::dual_inner_prod(
-                    black_box(&x),
-                    black_box(&y01),
-                    black_box(&y02),
-                    n,
-                )
-            })
+        group.bench_with_input(BenchmarkId::new("scalar", n), &n, |b, &n| {
+            b.iter(|| black_box(opurs::internals::dual_inner_prod_scalar(&x, &y01, &y02, n)))
+        });
+        group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
+            b.iter(|| black_box(opurs::internals::dual_inner_prod(&x, &y01, &y02, n)))
         });
     }
     group.finish();
@@ -71,17 +71,24 @@ fn bench_celt_pitch_xcorr(c: &mut Criterion) {
         let y = generate_signal(len + max_pitch, 123);
         let label = format!("{}x{}", len, max_pitch);
         group.bench_with_input(
-            BenchmarkId::new("size", &label),
+            BenchmarkId::new("scalar", &label),
             &(len, max_pitch),
             |b, &(len, max_pitch)| {
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
-                    opurs::internals::celt_pitch_xcorr(
-                        black_box(&x[..len]),
-                        black_box(&y),
-                        black_box(&mut xcorr),
-                        len,
-                    );
+                    opurs::internals::celt_pitch_xcorr_scalar(&x[..len], &y, &mut xcorr, len);
+                    black_box(&xcorr);
+                })
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("dispatch", &label),
+            &(len, max_pitch),
+            |b, &(len, max_pitch)| {
+                let mut xcorr = vec![0.0f32; max_pitch];
+                b.iter(|| {
+                    opurs::internals::celt_pitch_xcorr(&x[..len], &y, &mut xcorr, len);
+                    black_box(&xcorr);
                 })
             },
         );
