@@ -13,6 +13,8 @@ bindgen = { version = "0.72", optional = true }
 [features]
 default = []
 generate_binding = ["bindgen"]
+# SIMD intrinsics (SSE/SSE2/SSE4.1/AVX2 on x86, NEON on aarch64)
+simd = []
 # DNN features — require weight data: `cargo make download-dnn-data`
 deep-plc = []
 dred = ["deep-plc"]

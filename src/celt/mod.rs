@@ -8,6 +8,9 @@
 #![allow(unused_assignments)]
 #![allow(clippy::too_many_arguments)]
 
+#[cfg(feature = "simd")]
+pub mod simd;
+
 pub mod bands;
 pub mod celt_decoder;
 pub mod celt_encoder;

@@ -8,6 +8,9 @@
 #![allow(unused_assignments)]
 #![allow(clippy::too_many_arguments)]
 
+#[cfg(feature = "simd")]
+pub mod simd;
+
 pub mod A2NLSF;
 pub mod CNG;
 pub mod HP_variable_cutoff;

@@ -6,12 +6,75 @@ use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
 
+// -- Dispatch wrappers --
+// When the `simd` feature is enabled, these route through the SIMD dispatch layer.
+// Otherwise, they call the scalar implementations directly.
+
+/// Dispatch wrapper for `dual_inner_prod`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+    super::simd::dual_inner_prod(x, y01, y02, n)
+}
+
+/// Dispatch wrapper for `dual_inner_prod` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+    dual_inner_prod_scalar(x, y01, y02, n)
+}
+
+/// Dispatch wrapper for `xcorr_kernel`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+    super::simd::xcorr_kernel(x, y, sum, len)
+}
+
+/// Dispatch wrapper for `xcorr_kernel` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+    xcorr_kernel_scalar(x, y, sum, len)
+}
+
+/// Dispatch wrapper for `celt_inner_prod`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
+    super::simd::celt_inner_prod(x, y, n)
+}
+
+/// Dispatch wrapper for `celt_inner_prod` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
+    celt_inner_prod_scalar(x, y, n)
+}
+
+/// Dispatch wrapper for `celt_pitch_xcorr`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+    super::simd::celt_pitch_xcorr(x, y, xcorr, len)
+}
+
+/// Dispatch wrapper for `celt_pitch_xcorr` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+    celt_pitch_xcorr_scalar(x, y, xcorr, len)
+}
+
 /// Upstream C: celt/pitch.c:dual_inner_prod_c
 ///
 /// Computes two inner products simultaneously: `(x . y01, x . y02)`.
 /// All slices must have at least `n` elements.
+///
+/// When the `simd` feature is enabled, callers should use the dispatch layer
+/// in `celt::simd::dual_inner_prod` instead of calling this directly.
 #[inline]
-pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
     let mut xy01: f32 = 0.0;
     let mut xy02: f32 = 0.0;
     for i in 0..n {
@@ -27,8 +90,11 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f
 /// `x` must have at least `len` elements.
 /// `y` must have at least `len + 3` elements.
 /// Results are accumulated into `sum[0..4]`.
+///
+/// When the `simd` feature is enabled, callers should use the dispatch layer
+/// in `celt::simd::xcorr_kernel` instead of calling this directly.
 #[inline]
-pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     assert!(len >= 3);
     let mut y_0: f32;
     let mut y_1: f32;
@@ -118,8 +184,11 @@ pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
 ///
 /// Computes the inner product (dot product) of `x` and `y`.
 /// Both slices must have at least `N` elements.
+///
+/// When the `simd` feature is enabled, callers should use the dispatch layer
+/// in `celt::simd::celt_inner_prod` instead of calling this directly.
 #[inline]
-pub fn celt_inner_prod(x: &[f32], y: &[f32], N: usize) -> f32 {
+pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     let mut xy: f32 = 0.0;
     for i in 0..N {
         xy += x[i] * y[i];
@@ -250,13 +319,16 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize) {
 /// `x` must have at least `len` elements.
 /// `y` must have at least `len + max_pitch` elements (where `max_pitch = xcorr.len()`).
 /// Results are written to `xcorr[0..max_pitch]`.
-pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+///
+/// When the `simd` feature is enabled, callers should use the dispatch layer
+/// in `celt::simd::celt_pitch_xcorr` instead of calling this directly.
+pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
     assert!(max_pitch > 0);
     let mut i = 0i32;
     while i < max_pitch as i32 - 3 {
         let mut sum: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
-        xcorr_kernel(&x[..len], &y[i as usize..], &mut sum, len);
+        xcorr_kernel_scalar(&x[..len], &y[i as usize..], &mut sum, len);
         xcorr[i as usize] = sum[0];
         xcorr[i as usize + 1] = sum[1];
         xcorr[i as usize + 2] = sum[2];
@@ -264,7 +336,7 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
         i += 4;
     }
     while (i as usize) < max_pitch {
-        xcorr[i as usize] = celt_inner_prod(x, &y[i as usize..], len);
+        xcorr[i as usize] = celt_inner_prod_scalar(x, &y[i as usize..], len);
         i += 1;
     }
 }
@@ -475,4 +547,106 @@ pub fn remove_doubling(
         *T0_ = minperiod0;
     }
     pg
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gen_f32(len: usize, seed: u32) -> Vec<f32> {
+        let mut v = Vec::with_capacity(len);
+        let mut s = seed;
+        for _ in 0..len {
+            s = s.wrapping_mul(1103515245).wrapping_add(12345);
+            v.push((s as i32 >> 16) as f32 / 32768.0);
+        }
+        v
+    }
+
+    // SSE reorders floating-point operations (4-wide parallel accumulation vs
+    // sequential scalar), producing slightly different rounding at the last ULP.
+    // This is expected and matches the C reference behavior (xcorr_kernel_sse
+    // vs xcorr_kernel_c also differ at the ULP level). Bit-exact codec output
+    // is verified by the integration tests and vector tests.
+    const MAX_REL_ERR: f32 = 5e-4;
+
+    fn approx_eq(a: f32, b: f32, label: &str) {
+        if a == b {
+            return;
+        }
+        let max_abs = a.abs().max(b.abs());
+        if max_abs < 1e-10 {
+            return;
+        }
+        let rel = (a - b).abs() / max_abs;
+        assert!(rel < MAX_REL_ERR, "{label}: {a} vs {b} (rel err {rel})",);
+    }
+
+    #[test]
+    fn test_celt_inner_prod_close_to_scalar() {
+        for &n in &[0, 1, 3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
+            let x = gen_f32(n, 42);
+            let y = gen_f32(n, 123);
+            let scalar = celt_inner_prod_scalar(&x, &y, n);
+            let dispatch = celt_inner_prod(&x, &y, n);
+            approx_eq(scalar, dispatch, &format!("inner_prod n={n}"));
+        }
+    }
+
+    #[test]
+    fn test_dual_inner_prod_close_to_scalar() {
+        for &n in &[0, 1, 3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
+            let x = gen_f32(n, 42);
+            let y01 = gen_f32(n, 123);
+            let y02 = gen_f32(n, 456);
+            let (s1, s2) = dual_inner_prod_scalar(&x, &y01, &y02, n);
+            let (d1, d2) = dual_inner_prod(&x, &y01, &y02, n);
+            approx_eq(s1, d1, &format!("dual_inner_prod xy01 n={n}"));
+            approx_eq(s2, d2, &format!("dual_inner_prod xy02 n={n}"));
+        }
+    }
+
+    #[test]
+    fn test_xcorr_kernel_close_to_scalar() {
+        for &n in &[3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
+            let x = gen_f32(n, 42);
+            let y = gen_f32(n + 3, 123);
+
+            let mut sum_scalar = [0.0f32; 4];
+            let mut sum_dispatch = [0.0f32; 4];
+
+            xcorr_kernel_scalar(&x, &y, &mut sum_scalar, n);
+            xcorr_kernel(&x, &y, &mut sum_dispatch, n);
+
+            for i in 0..4 {
+                approx_eq(
+                    sum_scalar[i],
+                    sum_dispatch[i],
+                    &format!("xcorr_kernel[{i}] n={n}"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_celt_pitch_xcorr_close_to_scalar() {
+        for &(len, max_pitch) in &[(64, 16), (240, 60), (480, 120), (960, 240)] {
+            let x = gen_f32(len, 42);
+            let y = gen_f32(len + max_pitch, 123);
+
+            let mut xcorr_s = vec![0.0f32; max_pitch];
+            let mut xcorr_d = vec![0.0f32; max_pitch];
+
+            celt_pitch_xcorr_scalar(&x, &y, &mut xcorr_s, len);
+            celt_pitch_xcorr(&x, &y, &mut xcorr_d, len);
+
+            for i in 0..max_pitch {
+                approx_eq(
+                    xcorr_s[i],
+                    xcorr_d[i],
+                    &format!("pitch_xcorr[{i}] len={len}"),
+                );
+            }
+        }
+    }
 }

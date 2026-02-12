@@ -81,6 +81,29 @@ pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 pub use self::NSQ_h::{
     silk_NSQ_noise_shape_feedback_loop_c, silk_noise_shape_quantizer_short_prediction_c,
 };
+
+/// Dispatch wrapper for short prediction — routes to SIMD when available.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn silk_noise_shape_quantizer_short_prediction(
+    buf32: &[i32],
+    coef16: &[i16],
+    order: i32,
+) -> i32 {
+    super::simd::silk_noise_shape_quantizer_short_prediction(buf32, coef16, order)
+}
+
+/// Dispatch wrapper for short prediction (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn silk_noise_shape_quantizer_short_prediction(
+    buf32: &[i32],
+    coef16: &[i16],
+    order: i32,
+) -> i32 {
+    silk_noise_shape_quantizer_short_prediction_c(buf32, coef16, order)
+}
+
 use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
@@ -275,7 +298,7 @@ fn silk_noise_shape_quantizer(
         NSQ.rand_seed = silk_RAND(NSQ.rand_seed);
 
         // LPC prediction: pass slice ending at current position
-        LPC_pred_Q10 = silk_noise_shape_quantizer_short_prediction_c(
+        LPC_pred_Q10 = silk_noise_shape_quantizer_short_prediction(
             &NSQ.sLPC_Q14[..lpc_idx + 1],
             a_Q12,
             predictLPCOrder,

@@ -8,8 +8,23 @@ use ndarray::{aview1, azip};
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 ///
-/// Inner product of two silk_float arrays, with result as double
+/// Inner product of two silk_float arrays, with result as double.
+/// When the `simd` feature is enabled, dispatches to SSE2 on x86 or scalar fallback.
+#[cfg(feature = "simd")]
 pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32]) -> f64 {
+    crate::silk::simd::silk_inner_product_flp(data1, data2)
+}
+
+/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
+///
+/// Inner product of two silk_float arrays, with result as double (scalar-only build).
+#[cfg(not(feature = "simd"))]
+pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32]) -> f64 {
+    silk_inner_product_FLP_scalar(data1, data2)
+}
+
+/// Scalar implementation of f32→f64 inner product.
+pub fn silk_inner_product_FLP_scalar(data1: &[f32], data2: &[f32]) -> f64 {
     let data1 = aview1(data1);
     let data2 = aview1(data2);
 

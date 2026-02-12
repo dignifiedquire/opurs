@@ -41,3 +41,6 @@ pub mod pitchdnn_data;
 pub mod plc_data;
 pub mod vec;
 pub mod weights;
+
+#[cfg(feature = "simd")]
+pub mod simd;

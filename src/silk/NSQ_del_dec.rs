@@ -7,11 +7,7 @@ pub mod typedef_h {
     pub const silk_int16_MIN: i32 = i16::MIN as i32;
     pub const silk_int16_MAX: i32 = i16::MAX as i32;
 }
-pub mod NSQ_h {
-    pub use crate::silk::NSQ::NSQ_h::silk_noise_shape_quantizer_short_prediction_c;
-}
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX};
-pub use self::NSQ_h::silk_noise_shape_quantizer_short_prediction_c;
 use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
     NSQ_LPC_BUF_LENGTH, TYPE_VOICED,
@@ -477,7 +473,7 @@ fn silk_noise_shape_quantizer_del_dec(
 
             // LPC prediction
             let lpc_idx = NSQ_LPC_BUF_LENGTH - 1 + i;
-            LPC_pred_Q14 = silk_noise_shape_quantizer_short_prediction_c(
+            LPC_pred_Q14 = crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction(
                 &psDD.sLPC_Q14[..lpc_idx + 1],
                 a_Q12,
                 predictLPCOrder,

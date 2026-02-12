@@ -61,43 +61,192 @@ pub fn sigmoid_approx(x: f32) -> f32 {
     0.5 + 0.5 * tanh_approx(0.5 * x)
 }
 
-/// Batch softmax (unnormalized exp).
+/// Batch softmax (unnormalized exp) — scalar implementation.
 ///
 /// Upstream C: dnn/vec.h:softmax
-pub fn softmax(y: &mut [f32], x: &[f32]) {
+pub fn softmax_scalar(y: &mut [f32], x: &[f32]) {
     let n = x.len().min(y.len());
     for i in 0..n {
         y[i] = lpcnet_exp(x[i]);
     }
 }
 
-/// Batch tanh approximation.
+/// Batch tanh approximation — scalar implementation.
 ///
 /// Upstream C: dnn/vec.h:vec_tanh
-pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
+pub fn vec_tanh_scalar(y: &mut [f32], x: &[f32]) {
     let n = x.len().min(y.len());
     for i in 0..n {
         y[i] = tanh_approx(x[i]);
     }
 }
 
-/// Batch sigmoid approximation.
+/// Batch sigmoid approximation — scalar implementation.
 ///
 /// Upstream C: dnn/vec.h:vec_sigmoid
-pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
+pub fn vec_sigmoid_scalar(y: &mut [f32], x: &[f32]) {
     let n = x.len().min(y.len());
     for i in 0..n {
         y[i] = sigmoid_approx(x[i]);
     }
 }
 
-/// Dense float matrix-vector multiply: out = weights^T * x
+// -- Dispatch wrappers --
+
+/// Returns `true` when the active int8 GEMV path uses unsigned u8 quantization,
+/// meaning `subias` should be used instead of `bias` for int8 weight layers.
+///
+/// Only x86 AVX2 uses unsigned quantization; all other paths use signed i8.
+///
+/// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
+#[cfg(feature = "simd")]
+#[inline]
+pub fn use_su_bias() -> bool {
+    super::simd::use_su_bias()
+}
+
+/// Scalar-only build: always `false` (scalar cgemv8x4 uses signed i8 quantization).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn use_su_bias() -> bool {
+    false
+}
+
+/// Dispatch wrapper for `softmax`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn softmax(y: &mut [f32], x: &[f32]) {
+    super::simd::softmax(y, x)
+}
+
+/// Dispatch wrapper for `softmax` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn softmax(y: &mut [f32], x: &[f32]) {
+    softmax_scalar(y, x)
+}
+
+/// Dispatch wrapper for `vec_tanh`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
+    super::simd::vec_tanh(y, x)
+}
+
+/// Dispatch wrapper for `vec_tanh` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
+    vec_tanh_scalar(y, x)
+}
+
+/// Dispatch wrapper for `vec_sigmoid`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
+    super::simd::vec_sigmoid(y, x)
+}
+
+/// Dispatch wrapper for `vec_sigmoid` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
+    vec_sigmoid_scalar(y, x)
+}
+
+/// Dispatch wrapper for `sgemv`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn sgemv(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    super::simd::sgemv(out, weights, rows, cols, col_stride, x)
+}
+
+/// Dispatch wrapper for `sgemv` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn sgemv(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    sgemv_scalar(out, weights, rows, cols, col_stride, x)
+}
+
+/// Dispatch wrapper for `sparse_sgemv8x4`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
+    super::simd::sparse_sgemv8x4(out, w, idx, rows, x)
+}
+
+/// Dispatch wrapper for `sparse_sgemv8x4` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
+    sparse_sgemv8x4_scalar(out, w, idx, rows, x)
+}
+
+/// Dispatch wrapper for `cgemv8x4`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, x: &[f32]) {
+    super::simd::cgemv8x4(out, w, scale, rows, cols, x)
+}
+
+/// Dispatch wrapper for `cgemv8x4` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, x: &[f32]) {
+    cgemv8x4_scalar(out, w, scale, rows, cols, x)
+}
+
+/// Dispatch wrapper for `sparse_cgemv8x4`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn sparse_cgemv8x4(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    super::simd::sparse_cgemv8x4(out, w, idx, scale, rows, cols, x)
+}
+
+/// Dispatch wrapper for `sparse_cgemv8x4` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn sparse_cgemv8x4(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x)
+}
+
+/// Dense float matrix-vector multiply: out = weights^T * x — scalar implementation.
 ///
 /// Weights are stored column-major with `col_stride` elements per column.
 /// `out` has `rows` elements, `x` has `cols` elements.
 ///
 /// Upstream C: dnn/vec.h:sgemv
-pub fn sgemv(
+pub fn sgemv_scalar(
     out: &mut [f32],
     weights: &[f32],
     rows: usize,
@@ -140,14 +289,14 @@ pub fn sgemv(
     }
 }
 
-/// Sparse float matrix-vector multiply (8x4 block sparse).
+/// Sparse float matrix-vector multiply (8x4 block sparse) — scalar implementation.
 ///
 /// `idx` contains: for each 8-row block, first the number of column-blocks,
 /// then for each column-block, the starting column position.
 /// `w` contains the 8x4 weight blocks packed sequentially.
 ///
 /// Upstream C: dnn/vec.h:sparse_sgemv8x4
-pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
+pub fn sparse_sgemv8x4_scalar(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
     for i in 0..rows {
         out[i] = 0.0;
     }
@@ -174,13 +323,20 @@ pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: 
     }
 }
 
-/// Dense int8 matrix-vector multiply (8x4 blocking).
+/// Dense int8 matrix-vector multiply (8x4 blocking) — scalar implementation.
 ///
 /// Input `_x` is quantized to int8 via `floor(0.5 + 127*x)`, dotted with int8
 /// weights, then scaled per-output by `scale[i]`.
 ///
 /// Upstream C: dnn/vec.h:cgemv8x4 (non-USE_SU_BIAS path)
-pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, _x: &[f32]) {
+pub fn cgemv8x4_scalar(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    _x: &[f32],
+) {
     // Quantize input to int8
     let mut x = [0i8; MAX_INPUTS];
     for i in 0..cols {
@@ -210,12 +366,12 @@ pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usi
     }
 }
 
-/// Sparse int8 matrix-vector multiply (8x4 block sparse).
+/// Sparse int8 matrix-vector multiply (8x4 block sparse) — scalar implementation.
 ///
 /// Same quantization as `cgemv8x4` but with sparse block indices.
 ///
 /// Upstream C: dnn/vec.h:sparse_cgemv8x4 (non-USE_SU_BIAS path)
-pub fn sparse_cgemv8x4(
+pub fn sparse_cgemv8x4_scalar(
     out: &mut [f32],
     w: &[i8],
     idx: &[i32],
@@ -255,5 +411,195 @@ pub fn sparse_cgemv8x4(
     }
     for i in 0..rows {
         out[i] *= scale[i];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gen_signal(len: usize, seed: u32) -> Vec<f32> {
+        let mut v = Vec::with_capacity(len);
+        let mut state = seed;
+        for _ in 0..len {
+            state = state.wrapping_mul(1103515245).wrapping_add(12345);
+            v.push((state as i32 >> 16) as f32 / 32768.0);
+        }
+        v
+    }
+
+    fn gen_weights_f32(n: usize, seed: u32) -> Vec<f32> {
+        gen_signal(n, seed)
+    }
+
+    fn gen_weights_i8(n: usize, seed: u32) -> Vec<i8> {
+        let mut v = Vec::with_capacity(n);
+        let mut state = seed;
+        for _ in 0..n {
+            state = state.wrapping_mul(1103515245).wrapping_add(12345);
+            v.push(((state >> 16) as i32 % 128) as i8);
+        }
+        v
+    }
+
+    #[test]
+    fn test_vec_tanh_dispatch_matches_scalar() {
+        for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let x = gen_signal(n, 42);
+            let mut y_scalar = vec![0.0f32; n];
+            let mut y_dispatch = vec![0.0f32; n];
+            vec_tanh_scalar(&mut y_scalar, &x);
+            vec_tanh(&mut y_dispatch, &x);
+            for i in 0..n {
+                assert!(
+                    (y_scalar[i] - y_dispatch[i]).abs() < 1e-3,
+                    "vec_tanh mismatch at [{}]: scalar={} dispatch={} (n={})",
+                    i,
+                    y_scalar[i],
+                    y_dispatch[i],
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_vec_sigmoid_dispatch_matches_scalar() {
+        for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let x = gen_signal(n, 123);
+            let mut y_scalar = vec![0.0f32; n];
+            let mut y_dispatch = vec![0.0f32; n];
+            vec_sigmoid_scalar(&mut y_scalar, &x);
+            vec_sigmoid(&mut y_dispatch, &x);
+            for i in 0..n {
+                assert!(
+                    (y_scalar[i] - y_dispatch[i]).abs() < 1e-3,
+                    "vec_sigmoid mismatch at [{}]: scalar={} dispatch={} (n={})",
+                    i,
+                    y_scalar[i],
+                    y_dispatch[i],
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_softmax_dispatch_matches_scalar() {
+        for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let x = gen_signal(n, 77);
+            let mut y_scalar = vec![0.0f32; n];
+            let mut y_dispatch = vec![0.0f32; n];
+            softmax_scalar(&mut y_scalar, &x);
+            softmax(&mut y_dispatch, &x);
+            for i in 0..n {
+                let tol = y_scalar[i].abs() * 1e-4 + 1e-6;
+                assert!(
+                    (y_scalar[i] - y_dispatch[i]).abs() < tol,
+                    "softmax mismatch at [{}]: scalar={} dispatch={} (n={})",
+                    i,
+                    y_scalar[i],
+                    y_dispatch[i],
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_sgemv_dispatch_matches_scalar() {
+        for &(rows, cols) in &[(8, 8), (16, 8), (16, 16), (64, 32), (128, 64)] {
+            let weights = gen_weights_f32(rows * cols, 42);
+            let x = gen_signal(cols, 123);
+            let mut out_scalar = vec![0.0f32; rows];
+            let mut out_dispatch = vec![0.0f32; rows];
+            sgemv_scalar(&mut out_scalar, &weights, rows, cols, rows, &x);
+            sgemv(&mut out_dispatch, &weights, rows, cols, rows, &x);
+            for i in 0..rows {
+                let tol = out_scalar[i].abs() * 1e-4 + 1e-4;
+                assert!(
+                    (out_scalar[i] - out_dispatch[i]).abs() < tol,
+                    "sgemv mismatch at [{}]: scalar={} dispatch={} ({}x{})",
+                    i,
+                    out_scalar[i],
+                    out_dispatch[i],
+                    rows,
+                    cols
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_cgemv8x4_dispatch_runs_without_error() {
+        // NOTE: SIMD cgemv8x4 uses unsigned u8 quantization (127 + round(127*x))
+        // while scalar uses signed i8 (round(0.5 + 127*x)). These produce different
+        // results intentionally — the subias in LinearLayer compensates at the bias step.
+        // Here we just verify the dispatch runs without error and produces finite results.
+        for &(rows, cols) in &[(8, 8), (16, 16), (64, 32)] {
+            let w = gen_weights_i8(rows * cols, 42);
+            let scale: Vec<f32> = (0..rows).map(|i| 0.01 + 0.001 * i as f32).collect();
+            let x = gen_signal(cols, 99);
+            let mut out = vec![0.0f32; rows];
+            cgemv8x4(&mut out, &w, &scale, rows, cols, &x);
+            for i in 0..rows {
+                assert!(
+                    out[i].is_finite(),
+                    "cgemv8x4 non-finite at [{}]: {} ({}x{})",
+                    i,
+                    out[i],
+                    rows,
+                    cols
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_sparse_sgemv8x4_dispatch_matches_scalar() {
+        // 16 output rows, 2 blocks of 8. Each block has 2 column-blocks of 4 cols.
+        let rows = 16;
+        let idx = vec![
+            2i32, 0, 4, // block 0: 2 col-blocks at positions 0, 4
+            2, 0, 4, // block 1: 2 col-blocks at positions 0, 4
+        ];
+        let w = gen_weights_f32(32 * 4, 42); // 4 col-blocks * 32 floats each
+        let x = gen_signal(8, 123);
+        let mut out_scalar = vec![0.0f32; rows];
+        let mut out_dispatch = vec![0.0f32; rows];
+        sparse_sgemv8x4_scalar(&mut out_scalar, &w, &idx, rows, &x);
+        sparse_sgemv8x4(&mut out_dispatch, &w, &idx, rows, &x);
+        for i in 0..rows {
+            let tol = out_scalar[i].abs() * 1e-4 + 1e-4;
+            assert!(
+                (out_scalar[i] - out_dispatch[i]).abs() < tol,
+                "sparse_sgemv8x4 mismatch at [{}]: scalar={} dispatch={}",
+                i,
+                out_scalar[i],
+                out_dispatch[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_sparse_cgemv8x4_dispatch_runs_without_error() {
+        // Same note as cgemv8x4: SIMD uses u8 quantization, scalar uses i8.
+        // Just verify the dispatch runs and produces finite results.
+        let rows = 8;
+        let cols = 8;
+        let idx = vec![2i32, 0, 4]; // 2 col-blocks at positions 0 and 4
+        let w = gen_weights_i8(32 * 2, 42); // 2 col-blocks * 32 bytes each
+        let scale: Vec<f32> = (0..rows).map(|i| 0.01 + 0.001 * i as f32).collect();
+        let x = gen_signal(cols, 99);
+        let mut out = vec![0.0f32; rows];
+        sparse_cgemv8x4(&mut out, &w, &idx, &scale, rows, cols, &x);
+        for i in 0..rows {
+            assert!(
+                out[i].is_finite(),
+                "sparse_cgemv8x4 non-finite at [{}]: {}",
+                i,
+                out[i]
+            );
+        }
     }
 }
