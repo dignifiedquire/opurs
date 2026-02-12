@@ -635,3 +635,87 @@ pub fn parse_weights(data: &[u8]) -> Option<Vec<WeightArray>> {
     }
     Some(arrays)
 }
+
+/// Serialize weight arrays to the binary "DNNw" blob format.
+///
+/// This is the inverse of [`parse_weights`]. Each array is written as a 64-byte
+/// header followed by the data padded to a 64-byte boundary.
+///
+/// Upstream C: dnn/write_lpcnet_weights.c:write_weights
+pub fn write_weights(arrays: &[WeightArray]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for array in arrays {
+        // 64-byte header
+        let mut header = [0u8; WEIGHT_BLOCK_SIZE];
+        header[0..4].copy_from_slice(b"DNNw");
+        header[4..8].copy_from_slice(&WEIGHT_BLOB_VERSION.to_le_bytes());
+        header[8..12].copy_from_slice(&array.type_id.to_le_bytes());
+        header[12..16].copy_from_slice(&(array.size as i32).to_le_bytes());
+        let block_size = array.size.div_ceil(WEIGHT_BLOCK_SIZE) * WEIGHT_BLOCK_SIZE;
+        header[16..20].copy_from_slice(&(block_size as i32).to_le_bytes());
+        let name_bytes = array.name.as_bytes();
+        let copy_len = name_bytes.len().min(43);
+        header[20..20 + copy_len].copy_from_slice(&name_bytes[..copy_len]);
+        out.extend_from_slice(&header);
+        // Data + zero-padding to block boundary
+        out.extend_from_slice(&array.data[..array.size]);
+        out.resize(out.len() + block_size - array.size, 0);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_weights_roundtrip() {
+        let original = vec![
+            WeightArray {
+                name: "test_bias".into(),
+                type_id: WEIGHT_TYPE_FLOAT,
+                size: 12,
+                data: vec![0u8; 12],
+            },
+            WeightArray {
+                name: "test_weights_int8".into(),
+                type_id: WEIGHT_TYPE_INT8,
+                size: 100,
+                data: (0..100u8).collect(),
+            },
+        ];
+        let blob = write_weights(&original);
+        let parsed = parse_weights(&blob).unwrap();
+        assert_eq!(original.len(), parsed.len());
+        for (orig, p) in original.iter().zip(parsed.iter()) {
+            assert_eq!(orig.name, p.name);
+            assert_eq!(orig.type_id, p.type_id);
+            assert_eq!(orig.size, p.size);
+            assert_eq!(orig.data, p.data);
+        }
+    }
+
+    #[test]
+    fn test_write_weights_empty() {
+        let blob = write_weights(&[]);
+        assert!(blob.is_empty());
+        let parsed = parse_weights(&blob).unwrap();
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_write_weights_block_alignment() {
+        // Data size not a multiple of 64 — verify padding
+        let arrays = vec![WeightArray {
+            name: "odd_size".into(),
+            type_id: WEIGHT_TYPE_INT8,
+            size: 7,
+            data: vec![1, 2, 3, 4, 5, 6, 7],
+        }];
+        let blob = write_weights(&arrays);
+        // Header (64) + data padded to 64 = 128 bytes total
+        assert_eq!(blob.len(), 128);
+        let parsed = parse_weights(&blob).unwrap();
+        assert_eq!(parsed[0].data, vec![1, 2, 3, 4, 5, 6, 7]);
+    }
+}
