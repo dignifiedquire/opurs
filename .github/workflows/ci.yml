@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  OPUS_RELEASE_URL: https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz
 
 jobs:
   fmt:
@@ -35,12 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features:
-          - deep-plc
-          - dred
-          - osce
-          - dnn
-          - "dnn,builtin-weights"
+        include:
+          - features: deep-plc
+            cache-key: deep-plc
+          - features: dred
+            cache-key: dred
+          - features: osce
+            cache-key: osce
+          - features: dnn
+            cache-key: dnn
+          - features: "dnn,builtin-weights"
+            cache-key: dnn-builtin-weights
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +55,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          key: clippy-dnn-${{ matrix.features }}
+          key: clippy-dnn-${{ matrix.cache-key }}
       - run: cargo clippy -p opurs --all-targets --features "${{ matrix.features }}" -- -D warnings
 
   clippy-tools-dnn:
@@ -63,6 +69,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy-tools-dnn
+      - name: Cache DNN weight data
+        id: dnn-weights
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: dnn-weights-opus-1.5.2
+      - name: Download DNN weight data
+        if: steps.dnn-weights.outputs.cache-hit != 'true'
+        run: |
+          curl -sL $OPUS_RELEASE_URL -o /tmp/opus.tar.gz
+          tar -xzf /tmp/opus.tar.gz -C /tmp
+          for f in fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h \
+                   dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h \
+                   dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h \
+                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h; do
+            cp "/tmp/opus-1.5.2/dnn/$f" "libopus-sys/opus/dnn/$f"
+          done
+          rm -rf /tmp/opus.tar.gz /tmp/opus-1.5.2
       - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
   test:
@@ -164,6 +190,26 @@ jobs:
         with:
           key: test-dnn-weights
       - uses: taiki-e/install-action@nextest
+      - name: Cache DNN weight data
+        id: dnn-weights
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: dnn-weights-opus-1.5.2
+      - name: Download DNN weight data
+        if: steps.dnn-weights.outputs.cache-hit != 'true'
+        run: |
+          curl -sL $OPUS_RELEASE_URL -o /tmp/opus.tar.gz
+          tar -xzf /tmp/opus.tar.gz -C /tmp
+          for f in fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h \
+                   dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h \
+                   dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h \
+                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h; do
+            cp "/tmp/opus-1.5.2/dnn/$f" "libopus-sys/opus/dnn/$f"
+          done
+          rm -rf /tmp/opus.tar.gz /tmp/opus-1.5.2
       - name: Run weight verification and integration tests
         run: cargo nextest run --features tools-dnn --cargo-profile=release
 

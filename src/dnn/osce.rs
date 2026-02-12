@@ -1261,7 +1261,7 @@ fn pitch_postprocessing(features: &mut OSCEFeatureState, lag: i32, signal_type: 
 
 /// Calculate OSCE features from decoded SILK frame.
 ///
-/// `xq` is decoded speech (i16), `pred_coef_q12` is [num_subframes/2][lpc_order],
+/// `xq` is decoded speech (i16), `pred_coef_q12` is \[num_subframes/2\]\[lpc_order\],
 /// `pitch_l` is per-subframe pitch lags, `ltp_coef_q14` is [num_subframes * 5],
 /// `gains_q16` is per-subframe gains.
 ///
