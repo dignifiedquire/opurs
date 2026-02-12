@@ -11,6 +11,7 @@ A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), b
 - **Pure Rust** -- no C compiler required, no FFI
 - **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.5.2, verified across 228 IETF test vectors
 - **Nearly unsafe-free** -- only 2 documented `unsafe` blocks remain (ndarray interleaved view splitting in the MDCT)
+- **SIMD accelerated** -- optional (enabled by default), with runtime CPU detection on x86/x86_64 and compile-time NEON on aarch64. Disable with `default-features = false` for scalar-only builds.
 - **Cross-platform** -- tested on Linux, macOS, and Windows (x86, x86_64, ARM64)
 - **Full codec support** -- SILK (speech), CELT (music), and hybrid modes at all standard sample rates (8/12/16/24/48 kHz)
 
@@ -124,6 +125,20 @@ opurs = { version = "0.3", features = ["dnn"] }
 ```
 
 When DNN features are compiled in but no model weights are loaded, the codec behaves identically to the non-DNN build. The 228 IETF test vectors pass with or without DNN features enabled.
+
+## SIMD Acceleration
+
+The `simd` feature (enabled by default) provides hardware-accelerated implementations for
+performance-critical codec and DNN functions:
+
+| Architecture | Tiers | Functions |
+|---|---|---|
+| x86/x86_64 | AVX2+FMA, SSE4.1, SSE2, SSE | Pitch xcorr, inner products, noise shaping (NSQ/NSQ_del_dec), VQ search, DNN inference |
+| aarch64 | NEON (always available) | Pitch xcorr, inner products, noise shaping, DNN inference |
+
+CPU features are detected at runtime on x86 (via the `cpufeatures` crate). SIMD produces valid
+but potentially different floating-point results from scalar due to different accumulation order.
+Bit-exact comparison with the C reference requires scalar mode (`--no-default-features`).
 
 ## Origin
 

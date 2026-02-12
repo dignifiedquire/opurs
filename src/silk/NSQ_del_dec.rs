@@ -58,7 +58,11 @@ impl Default for NSQ_del_dec_struct {
 /// This matches the C pattern: memcpy(dst+i, src+i, sizeof(struct)-i*sizeof(i32))
 /// which copies sLPC_Q14[i..] and all fields after sLPC_Q14.
 #[inline]
-fn copy_del_dec_state_partial(dst: &mut NSQ_del_dec_struct, src: &NSQ_del_dec_struct, keep: usize) {
+pub(crate) fn copy_del_dec_state_partial(
+    dst: &mut NSQ_del_dec_struct,
+    src: &NSQ_del_dec_struct,
+    keep: usize,
+) {
     dst.sLPC_Q14[keep..].copy_from_slice(&src.sLPC_Q14[keep..]);
     dst.RandState = src.RandState;
     dst.Q_Q10 = src.Q_Q10;
@@ -257,54 +261,116 @@ pub fn silk_NSQ_del_dec_c(
                 NSQ.rewhite_flag = 1;
             }
         }
-        silk_nsq_del_dec_scale_states(
-            psEncC,
-            NSQ,
-            &mut psDelDec,
-            &x16[x16_off..x16_off + subfr_len],
-            &mut x_sc_Q10,
-            &sLTP,
-            &mut sLTP_Q15,
-            k,
-            nStates,
-            LTP_scale_Q14,
-            Gains_Q16,
-            pitchL,
-            psIndices.signalType as i32,
-            decisionDelay,
-        );
+        #[cfg(feature = "simd")]
+        let use_simd = super::simd::use_nsq_sse4_1();
+        #[cfg(not(feature = "simd"))]
+        let use_simd = false;
+
+        if use_simd {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            unsafe {
+                super::simd::silk_nsq_del_dec_scale_states_sse4_1(
+                    psEncC,
+                    NSQ,
+                    &mut psDelDec,
+                    &x16[x16_off..x16_off + subfr_len],
+                    &mut x_sc_Q10,
+                    &sLTP,
+                    &mut sLTP_Q15,
+                    k,
+                    nStates,
+                    LTP_scale_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    psIndices.signalType as i32,
+                    decisionDelay,
+                );
+            }
+        } else {
+            silk_nsq_del_dec_scale_states(
+                psEncC,
+                NSQ,
+                &mut psDelDec,
+                &x16[x16_off..x16_off + subfr_len],
+                &mut x_sc_Q10,
+                &sLTP,
+                &mut sLTP_Q15,
+                k,
+                nStates,
+                LTP_scale_Q14,
+                Gains_Q16,
+                pitchL,
+                psIndices.signalType as i32,
+                decisionDelay,
+            );
+        }
         let fresh_subfr = subfr;
         subfr += 1;
-        silk_noise_shape_quantizer_del_dec(
-            NSQ,
-            &mut psDelDec,
-            psIndices.signalType as i32,
-            &x_sc_Q10,
-            pulses,
-            pulses_off,
-            pxq_off,
-            &mut sLTP_Q15,
-            &mut delayedGain_Q10,
-            a_Q12,
-            b_Q14,
-            ar_shp_Q13,
-            lag,
-            HarmShapeFIRPacked_Q14,
-            Tilt_Q14[k as usize],
-            LF_shp_Q14[k as usize],
-            Gains_Q16[k as usize],
-            Lambda_Q10,
-            offset_Q10,
-            subfr_len as i32,
-            fresh_subfr,
-            psEncC.shapingLPCOrder,
-            psEncC.predictLPCOrder,
-            psEncC.warping_Q16,
-            nStates,
-            &mut smpl_buf_idx,
-            decisionDelay,
-            psEncC.arch,
-        );
+        if use_simd {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            unsafe {
+                super::simd::silk_noise_shape_quantizer_del_dec_sse4_1(
+                    NSQ,
+                    &mut psDelDec,
+                    psIndices.signalType as i32,
+                    &x_sc_Q10,
+                    pulses,
+                    pulses_off,
+                    pxq_off,
+                    &mut sLTP_Q15,
+                    &mut delayedGain_Q10,
+                    a_Q12,
+                    b_Q14,
+                    ar_shp_Q13,
+                    lag,
+                    HarmShapeFIRPacked_Q14,
+                    Tilt_Q14[k as usize],
+                    LF_shp_Q14[k as usize],
+                    Gains_Q16[k as usize],
+                    Lambda_Q10,
+                    offset_Q10,
+                    subfr_len as i32,
+                    fresh_subfr,
+                    psEncC.shapingLPCOrder,
+                    psEncC.predictLPCOrder,
+                    psEncC.warping_Q16,
+                    nStates,
+                    &mut smpl_buf_idx,
+                    decisionDelay,
+                );
+            }
+        } else {
+            silk_noise_shape_quantizer_del_dec(
+                NSQ,
+                &mut psDelDec,
+                psIndices.signalType as i32,
+                &x_sc_Q10,
+                pulses,
+                pulses_off,
+                pxq_off,
+                &mut sLTP_Q15,
+                &mut delayedGain_Q10,
+                a_Q12,
+                b_Q14,
+                ar_shp_Q13,
+                lag,
+                HarmShapeFIRPacked_Q14,
+                Tilt_Q14[k as usize],
+                LF_shp_Q14[k as usize],
+                Gains_Q16[k as usize],
+                Lambda_Q10,
+                offset_Q10,
+                subfr_len as i32,
+                fresh_subfr,
+                psEncC.shapingLPCOrder,
+                psEncC.predictLPCOrder,
+                psEncC.warping_Q16,
+                nStates,
+                &mut smpl_buf_idx,
+                decisionDelay,
+                psEncC.arch,
+            );
+        }
         x16_off += subfr_len;
         pulses_off += subfr_len;
         pxq_off += subfr_len;

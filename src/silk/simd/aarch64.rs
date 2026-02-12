@@ -64,3 +64,46 @@ pub unsafe fn silk_noise_shape_quantizer_short_prediction_neon(
 
     out
 }
+
+/// NEON implementation of `silk_inner_product_FLP`.
+/// f32→f64 inner product using NEON widening conversion and FMA.
+///
+/// # Safety
+/// Requires aarch64 NEON (always available on aarch64).
+#[target_feature(enable = "neon")]
+pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
+    let n = data1.len().min(data2.len());
+    let mut acc1 = vdupq_n_f64(0.0);
+    let mut acc2 = vdupq_n_f64(0.0);
+    let mut i = 0usize;
+
+    // Main loop: 4 f32s per iteration → 2 pairs of f64s
+    while i + 3 < n {
+        let x = vld1q_f32(data1.as_ptr().add(i));
+        let y = vld1q_f32(data2.as_ptr().add(i));
+
+        // Low 2 elements: f32 → f64
+        let x_lo = vcvt_f64_f32(vget_low_f32(x));
+        let y_lo = vcvt_f64_f32(vget_low_f32(y));
+        acc1 = vfmaq_f64(acc1, x_lo, y_lo);
+
+        // High 2 elements: f32 → f64
+        let x_hi = vcvt_f64_f32(vget_high_f32(x));
+        let y_hi = vcvt_f64_f32(vget_high_f32(y));
+        acc2 = vfmaq_f64(acc2, x_hi, y_hi);
+
+        i += 4;
+    }
+
+    // Combine accumulators and horizontal sum
+    acc1 = vaddq_f64(acc1, acc2);
+    let mut result = vgetq_lane_f64(acc1, 0) + vgetq_lane_f64(acc1, 1);
+
+    // Scalar tail for remaining 0-3 elements
+    while i < n {
+        result += *data1.get_unchecked(i) as f64 * *data2.get_unchecked(i) as f64;
+        i += 1;
+    }
+
+    result
+}

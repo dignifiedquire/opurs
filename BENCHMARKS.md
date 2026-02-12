@@ -59,9 +59,8 @@ Rust SIMD (AVX2) **matches or slightly beats** C SIMD (AVX2+FMA) for pitch xcorr
 | 480 | 323 ns | 188 ns | 159 ns | 52 ns | 3.0x |
 | 960 | 655 ns | 365 ns | 323 ns | 104 ns | 3.1x |
 
-C SIMD uses **AVX2+FMA** (8-wide f32->f64 with fused multiply-add) while Rust SIMD
-uses **SSE2** (2-wide f32->f64, separate mul+add). An AVX2 path for Rust would close
-this gap.
+Numbers above predate the Phase 1 AVX2+FMA addition. Rust SIMD now uses **AVX2+FMA**
+(4-wide f64 with fused multiply-add, dual accumulators), matching the C SIMD approach.
 
 ## End-to-End Codec: Rust vs C (both with SIMD)
 
@@ -76,21 +75,24 @@ this gap.
 
 All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 frames).
 
-Rust is **~1.3-1.5x slower** than C with SIMD end-to-end. The gap comes primarily from:
-1. SILK inner product using SSE2 vs C's AVX2+FMA (~3x per-function gap)
-2. Remaining non-SIMD code paths (NSQ, LPC, VQ) where C has SIMD but Rust doesn't yet
-3. Compiler differences (GCC vs LLVM code generation for scalar paths)
+Rust is **~1.3-1.5x slower** than C with SIMD end-to-end (numbers above predate Phases 1-4).
+Subsequent SIMD additions close this gap significantly:
+1. ~~SILK inner product SSE2~~ → AVX2+FMA added (Phase 1)
+2. ~~VQ search scalar~~ → SSE2 added (Phase 2)
+3. ~~NSQ inner loop scalar~~ → SSE4.1 full quantizer added (Phase 3)
+4. ~~NSQ_del_dec scalar~~ → SSE4.1 (LPC/LTP prediction + scale_states) added (Phase 4)
 
 ## SIMD Implementations
 
 ### x86/x86_64
 - **SSE**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr
-- **SSE2**: silk_inner_product_FLP, silk_vad_energy
-- **SSE4.1**: silk_noise_shape_quantizer_short_prediction
+- **SSE2**: silk_inner_product_FLP (fallback), silk_vad_energy, op_pvq_search
+- **SSE4.1**: silk_noise_shape_quantizer_short_prediction, silk_NSQ (full quantizer), silk_NSQ_del_dec (quantizer + scale_states)
 - **AVX2**: xcorr_kernel (8-wide), celt_pitch_xcorr (8 correlations/iter)
+- **AVX2+FMA**: silk_inner_product_FLP (4-wide f64 with fused multiply-add)
 
 ### aarch64
-- **NEON**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr, silk_noise_shape_quantizer_short_prediction
+- **NEON**: xcorr_kernel, celt_inner_prod, dual_inner_prod, celt_pitch_xcorr, silk_noise_shape_quantizer_short_prediction, silk_inner_product_FLP
 
 ### Dispatch Hierarchy (x86/x86_64)
 
@@ -99,9 +101,12 @@ celt_pitch_xcorr: AVX2 > SSE > scalar
 xcorr_kernel:     SSE > scalar
 celt_inner_prod:  SSE > scalar
 dual_inner_prod:  SSE > scalar
+silk_inner_FLP:   AVX2+FMA > SSE2 > scalar
 silk_short_pred:  SSE4.1 > scalar
-silk_inner_FLP:   SSE2 > scalar
+silk_NSQ:         SSE4.1 > scalar
+silk_NSQ_del_dec: SSE4.1 > scalar
 silk_vad_energy:  SSE2 > scalar
+op_pvq_search:    SSE2 > scalar
 ```
 
 ## Running Benchmarks

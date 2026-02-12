@@ -318,6 +318,176 @@ pub unsafe fn dual_inner_prod_sse(x: &[f32], y01: &[f32], y02: &[f32], n: usize)
     (xy01, xy02)
 }
 
+/// SSE2 implementation of `op_pvq_search`.
+/// Port of `celt/x86/vq_sse2.c:op_pvq_search_sse2`.
+///
+/// Uses `_mm_rsqrt_ps` for approximate reciprocal sqrt in the greedy pulse search,
+/// which may produce slightly different results from scalar (this matches C behavior).
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse2")]
+pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32) -> f32 {
+    let n = N as usize;
+    // Pad to N+3 for safe SIMD overread + sentinel values
+    let mut X = vec![0.0f32; n + 3];
+    let mut y = vec![0.0f32; n + 3];
+    let mut signy = vec![0.0f32; n + 3];
+
+    X[..n].copy_from_slice(&_X[..n]);
+    X[n] = 0.0;
+    X[n + 1] = 0.0;
+    X[n + 2] = 0.0;
+
+    let signmask = _mm_set_ps1(-0.0f32);
+    let fours = _mm_set_epi32(4, 4, 4, 4);
+
+    // Initialize: compute |X|, save signs, clear y and iy
+    let mut sums = _mm_setzero_ps();
+    let mut j = 0usize;
+    while j < n {
+        let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+        let s4 = _mm_cmplt_ps(x4, _mm_setzero_ps());
+        // Get rid of the sign
+        let x4 = _mm_andnot_ps(signmask, x4);
+        sums = _mm_add_ps(sums, x4);
+        _mm_storeu_ps(y.as_mut_ptr().add(j), _mm_setzero_ps());
+        _mm_storeu_si128(iy.as_mut_ptr().add(j) as *mut __m128i, _mm_setzero_si128());
+        _mm_storeu_ps(X.as_mut_ptr().add(j), x4);
+        _mm_storeu_ps(signy.as_mut_ptr().add(j), s4);
+        j += 4;
+    }
+
+    // Horizontal sum of sums
+    sums = _mm_add_ps(sums, _mm_shuffle_ps(sums, sums, 0x4E));
+    sums = _mm_add_ps(sums, _mm_shuffle_ps(sums, sums, 0xB1));
+
+    let mut xy: f32 = 0.0;
+    let mut yy: f32 = 0.0;
+    let mut pulsesLeft = K;
+
+    // Pre-search by projecting on the pyramid
+    if K > (N >> 1) {
+        let mut sum = _mm_cvtss_f32(sums);
+        let epsilon = 1e-15f32;
+        if !(sum > epsilon && sum < 64.0) {
+            X[0] = 1.0;
+            for xj in X[1..n].iter_mut() {
+                *xj = 0.0;
+            }
+            sums = _mm_set_ps1(1.0);
+            sum = 1.0;
+            let _ = sum;
+        }
+        let rcp4 = _mm_mul_ps(_mm_set_ps1((K as f32) + 0.8), _mm_rcp_ps(sums));
+        let mut xy4 = _mm_setzero_ps();
+        let mut yy4 = _mm_setzero_ps();
+        let mut pulses_sum = _mm_setzero_si128();
+
+        j = 0;
+        while j < n {
+            let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+            let rx4 = _mm_mul_ps(x4, rcp4);
+            let iy4 = _mm_cvttps_epi32(rx4);
+            pulses_sum = _mm_add_epi32(pulses_sum, iy4);
+            _mm_storeu_si128(iy.as_mut_ptr().add(j) as *mut __m128i, iy4);
+            let y4 = _mm_cvtepi32_ps(iy4);
+            xy4 = _mm_add_ps(xy4, _mm_mul_ps(x4, y4));
+            yy4 = _mm_add_ps(yy4, _mm_mul_ps(y4, y4));
+            // Double y[] so we don't have to do it in the search loop
+            _mm_storeu_ps(y.as_mut_ptr().add(j), _mm_add_ps(y4, y4));
+            j += 4;
+        }
+
+        // Horizontal sum of pulses
+        pulses_sum = _mm_add_epi32(pulses_sum, _mm_shuffle_epi32(pulses_sum, 0x4E));
+        pulses_sum = _mm_add_epi32(pulses_sum, _mm_shuffle_epi32(pulses_sum, 0xB1));
+        pulsesLeft -= _mm_cvtsi128_si32(pulses_sum);
+
+        // Horizontal sum of xy
+        xy4 = _mm_add_ps(xy4, _mm_shuffle_ps(xy4, xy4, 0x4E));
+        xy4 = _mm_add_ps(xy4, _mm_shuffle_ps(xy4, xy4, 0xB1));
+        xy = _mm_cvtss_f32(xy4);
+
+        // Horizontal sum of yy
+        yy4 = _mm_add_ps(yy4, _mm_shuffle_ps(yy4, yy4, 0x4E));
+        yy4 = _mm_add_ps(yy4, _mm_shuffle_ps(yy4, yy4, 0xB1));
+        yy = _mm_cvtss_f32(yy4);
+    }
+
+    // Sentinel values prevent SIMD overread from affecting results
+    X[n] = -100.0;
+    X[n + 1] = -100.0;
+    X[n + 2] = -100.0;
+    y[n] = 100.0;
+    y[n + 1] = 100.0;
+    y[n + 2] = 100.0;
+
+    // Fill first bin with excess pulses (should never happen, but safety)
+    if pulsesLeft > N + 3 {
+        let tmp = pulsesLeft as f32;
+        yy += tmp * tmp;
+        yy += tmp * y[0];
+        iy[0] += pulsesLeft;
+        pulsesLeft = 0;
+    }
+
+    // Greedy per-pulse search
+    for _i in 0..pulsesLeft {
+        yy += 1.0;
+        let xy4 = _mm_load1_ps(&xy);
+        let yy4 = _mm_load1_ps(&yy);
+        let mut max = _mm_setzero_ps();
+        let mut pos = _mm_setzero_si128();
+        let mut count = _mm_set_epi32(3, 2, 1, 0);
+
+        j = 0;
+        while j < n {
+            let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+            let y4 = _mm_loadu_ps(y.as_ptr().add(j));
+            let x4 = _mm_add_ps(x4, xy4);
+            let y4 = _mm_add_ps(y4, yy4);
+            let y4 = _mm_rsqrt_ps(y4);
+            let r4 = _mm_mul_ps(x4, y4);
+            // Update index of max
+            pos = _mm_max_epi16(
+                pos,
+                _mm_and_si128(count, _mm_castps_si128(_mm_cmpgt_ps(r4, max))),
+            );
+            // Update max
+            max = _mm_max_ps(max, r4);
+            count = _mm_add_epi32(count, fours);
+            j += 4;
+        }
+
+        // Horizontal max
+        let mut max2 = _mm_max_ps(max, _mm_shuffle_ps(max, max, 0x4E));
+        max2 = _mm_max_ps(max2, _mm_shuffle_ps(max2, max2, 0xB1));
+        // Find which lane(s) match the global max
+        pos = _mm_and_si128(pos, _mm_castps_si128(_mm_cmpeq_ps(max, max2)));
+        pos = _mm_max_epi16(pos, _mm_unpackhi_epi64(pos, pos));
+        pos = _mm_max_epi16(pos, _mm_shufflelo_epi16(pos, 0x4E));
+        let best_id = _mm_cvtsi128_si32(pos) as usize;
+
+        xy += X[best_id];
+        yy += y[best_id];
+        y[best_id] += 2.0;
+        iy[best_id] += 1;
+    }
+
+    // Restore original signs
+    j = 0;
+    while j < n {
+        let y4 = _mm_loadu_si128(iy.as_ptr().add(j) as *const __m128i);
+        let s4 = _mm_castps_si128(_mm_loadu_ps(signy.as_ptr().add(j)));
+        let y4 = _mm_xor_si128(_mm_add_epi32(y4, s4), s4);
+        _mm_storeu_si128(iy.as_mut_ptr().add(j) as *mut __m128i, y4);
+        j += 4;
+    }
+
+    yy
+}
+
 /// SSE implementation of `celt_pitch_xcorr`.
 /// Processes 4 correlations at a time using `xcorr_kernel_sse`.
 ///

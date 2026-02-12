@@ -12,6 +12,20 @@ use crate::celt::pitch::celt_inner_prod;
 
 const EPSILON: f32 = 1e-15f32;
 
+/// Dispatch wrapper for `op_pvq_search`.
+#[cfg(feature = "simd")]
+#[inline]
+fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: i32) -> f32 {
+    super::simd::op_pvq_search(X, iy, K, N, arch)
+}
+
+/// Dispatch wrapper for `op_pvq_search` (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: i32) -> f32 {
+    op_pvq_search_c(X, iy, K, N, arch)
+}
+
 /// Upstream C: celt/vq.c:exp_rotation1
 fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
@@ -189,7 +203,7 @@ pub fn alg_quant(
     assert!(N > 1);
     let mut iy: Vec<i32> = vec![0; (N + 3) as usize];
     exp_rotation(X, N, 1, B, K, spread);
-    let yy = op_pvq_search_c(X, &mut iy, K, N, arch);
+    let yy = op_pvq_search(X, &mut iy, K, N, arch);
     encode_pulses(&iy[..N as usize], K, enc);
     if resynth != 0 {
         normalise_residual(&iy, X, N, yy, gain);

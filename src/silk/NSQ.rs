@@ -106,7 +106,7 @@ pub fn silk_noise_shape_quantizer_short_prediction(
 
 use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
-    TYPE_VOICED,
+    QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
@@ -140,6 +140,21 @@ pub fn silk_NSQ_c(
     lag = NSQ.lagPrev;
     let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
+
+    // Precompute quantization lookup table for SSE4.1 path
+    #[cfg(feature = "simd")]
+    let (use_simd_quantizer, table) = {
+        let use_it = super::simd::use_nsq_sse4_1()
+            && psEncC.shapingLPCOrder == 10
+            && psEncC.predictLPCOrder == 16;
+        let table = if use_it {
+            build_quantization_table(offset_Q10, Lambda_Q10)
+        } else {
+            [[0i32; 4]; 64]
+        };
+        (use_it, table)
+    };
+
     let LSF_interpolation_flag: i32 = if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
         0
     } else {
@@ -200,6 +215,57 @@ pub fn silk_NSQ_c(
             pitchL,
             psIndices.signalType as i32,
         );
+        #[cfg(feature = "simd")]
+        {
+            if use_simd_quantizer {
+                unsafe {
+                    super::simd::silk_noise_shape_quantizer_10_16_sse4_1(
+                        NSQ,
+                        psIndices.signalType as i32,
+                        &x_sc_Q10,
+                        &mut pulses[pulses_off..pulses_off + subfr_len],
+                        pxq_off,
+                        &mut sLTP_Q15,
+                        a_Q12,
+                        b_Q14,
+                        ar_shp_Q13,
+                        lag,
+                        HarmShapeFIRPacked_Q14,
+                        Tilt_Q14[k as usize],
+                        LF_shp_Q14[k as usize],
+                        Gains_Q16[k as usize],
+                        Lambda_Q10,
+                        offset_Q10,
+                        subfr_len as i32,
+                        &table,
+                    );
+                }
+            } else {
+                silk_noise_shape_quantizer(
+                    NSQ,
+                    psIndices.signalType as i32,
+                    &x_sc_Q10,
+                    &mut pulses[pulses_off..pulses_off + subfr_len],
+                    pxq_off,
+                    &mut sLTP_Q15,
+                    a_Q12,
+                    b_Q14,
+                    ar_shp_Q13,
+                    lag,
+                    HarmShapeFIRPacked_Q14,
+                    Tilt_Q14[k as usize],
+                    LF_shp_Q14[k as usize],
+                    Gains_Q16[k as usize],
+                    Lambda_Q10,
+                    offset_Q10,
+                    subfr_len as i32,
+                    psEncC.shapingLPCOrder,
+                    psEncC.predictLPCOrder,
+                    psEncC.arch,
+                );
+            }
+        }
+        #[cfg(not(feature = "simd"))]
         silk_noise_shape_quantizer(
             NSQ,
             psIndices.signalType as i32,
@@ -583,4 +649,73 @@ fn silk_nsq_scale_states(
 
         NSQ.prev_gain_Q16 = Gains_Q16[subfr as usize];
     }
+}
+
+/// Build the precomputed quantization lookup table used by the SSE4.1 quantizer.
+/// Port of the table initialization from `silk/x86/NSQ_sse4_1.c:silk_NSQ_sse4_1`.
+///
+/// table[32 + q1_Q0] = [q1_Q10, q2_Q10, 2*(q1_Q10 - q2_Q10), rd1_Q20 - rd2_Q20 + q1² - q2²]
+#[cfg(feature = "simd")]
+fn build_quantization_table(offset_Q10: i32, Lambda_Q10: i32) -> [[i32; 4]; 64] {
+    let mut table = [[0i32; 4]; 64];
+
+    // q1_Q0 == 0
+    {
+        let q1_Q10 = offset_Q10;
+        let q2_Q10 = offset_Q10 + (1024 - QUANT_LEVEL_ADJUST_Q10);
+        let rd1_Q20 = q1_Q10 * Lambda_Q10;
+        let rd2_Q20 = q2_Q10 * Lambda_Q10;
+        table[32] = [
+            q1_Q10,
+            q2_Q10,
+            2 * (q1_Q10 - q2_Q10),
+            (rd1_Q20 - rd2_Q20) + (q1_Q10 * q1_Q10 - q2_Q10 * q2_Q10),
+        ];
+    }
+
+    // q1_Q0 == -1
+    {
+        let q1_Q10 = offset_Q10 - (1024 - QUANT_LEVEL_ADJUST_Q10);
+        let q2_Q10 = offset_Q10;
+        let rd1_Q20 = -q1_Q10 * Lambda_Q10;
+        let rd2_Q20 = q2_Q10 * Lambda_Q10;
+        table[31] = [
+            q1_Q10,
+            q2_Q10,
+            2 * (q1_Q10 - q2_Q10),
+            (rd1_Q20 - rd2_Q20) + (q1_Q10 * q1_Q10 - q2_Q10 * q2_Q10),
+        ];
+    }
+
+    // q1_Q0 > 0 (k = 1..31)
+    for k in 1..=31 {
+        let tmp1 = offset_Q10 + (k << 10);
+        let q1_Q10 = tmp1 - QUANT_LEVEL_ADJUST_Q10;
+        let q2_Q10 = tmp1 - QUANT_LEVEL_ADJUST_Q10 + 1024;
+        let rd1_Q20 = q1_Q10 * Lambda_Q10;
+        let rd2_Q20 = q2_Q10 * Lambda_Q10;
+        table[(32 + k) as usize] = [
+            q1_Q10,
+            q2_Q10,
+            2 * (q1_Q10 - q2_Q10),
+            (rd1_Q20 - rd2_Q20) + (q1_Q10 * q1_Q10 - q2_Q10 * q2_Q10),
+        ];
+    }
+
+    // q1_Q0 < -1 (k = -32..-2)
+    for k in -32..=-2 {
+        let tmp1 = offset_Q10 + (k << 10);
+        let q1_Q10 = tmp1 + QUANT_LEVEL_ADJUST_Q10;
+        let q2_Q10 = tmp1 + QUANT_LEVEL_ADJUST_Q10 + 1024;
+        let rd1_Q20 = -q1_Q10 * Lambda_Q10;
+        let rd2_Q20 = -q2_Q10 * Lambda_Q10;
+        table[(32 + k) as usize] = [
+            q1_Q10,
+            q2_Q10,
+            2 * (q1_Q10 - q2_Q10),
+            (rd1_Q20 - rd2_Q20) + (q1_Q10 * q1_Q10 - q2_Q10 * q2_Q10),
+        ];
+    }
+
+    table
 }

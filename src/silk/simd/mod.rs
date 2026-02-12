@@ -22,6 +22,9 @@ cpufeatures::new!(cpuid_sse4_1, "sse4.1");
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 cpufeatures::new!(cpuid_sse2, "sse2");
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+cpufeatures::new!(cpuid_avx2_fma, "avx2", "fma");
+
 // -- Dispatch functions --
 // Placeholder dispatchers — implementations are added in later phases.
 // For now, all dispatch to scalar.
@@ -70,8 +73,16 @@ pub fn silk_inner_prod_aligned_scale(
 /// SIMD-accelerated f32→f64 inner product.
 #[inline]
 pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32]) -> f64 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { aarch64::silk_inner_product_flp_neon(data1, data2) };
+    }
+
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
+        if cpuid_avx2_fma::get() {
+            return unsafe { x86::silk_inner_product_flp_avx2(data1, data2) };
+        }
         if cpuid_sse2::get() {
             return unsafe { x86::silk_inner_product_flp_sse2(data1, data2) };
         }
@@ -108,4 +119,172 @@ fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
         sum += (x_tmp as i16 as i32) * (x_tmp as i16 as i32);
     }
     sum
+}
+
+/// Returns true if the SSE4.1 NSQ quantizer should be used.
+/// Requires SSE4.1 and the common LPC order combination (shaping=10, predict=16).
+#[inline]
+pub fn use_nsq_sse4_1() -> bool {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        return cpuid_sse4_1::get();
+    }
+    #[allow(unreachable_code)]
+    false
+}
+
+/// Run the SSE4.1 NSQ inner quantizer (specialized for order 10/16).
+///
+/// # Safety
+/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
+    NSQ: &mut super::structs::silk_nsq_state,
+    signalType: i32,
+    x_sc_Q10: &[i32],
+    pulses: &mut [i8],
+    xq_off: usize,
+    sLTP_Q15: &mut [i32],
+    a_Q12: &[i16],
+    b_Q14: &[i16],
+    AR_shp_Q13: &[i16],
+    lag: i32,
+    HarmShapeFIRPacked_Q14: i32,
+    Tilt_Q14: i32,
+    LF_shp_Q14: i32,
+    Gain_Q16: i32,
+    Lambda_Q10: i32,
+    offset_Q10: i32,
+    length: i32,
+    table: &[[i32; 4]; 64],
+) {
+    x86::silk_noise_shape_quantizer_10_16_sse4_1(
+        NSQ,
+        signalType,
+        x_sc_Q10,
+        pulses,
+        xq_off,
+        sLTP_Q15,
+        a_Q12,
+        b_Q14,
+        AR_shp_Q13,
+        lag,
+        HarmShapeFIRPacked_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gain_Q16,
+        Lambda_Q10,
+        offset_Q10,
+        length,
+        table,
+    );
+}
+
+/// Run the SSE4.1 NSQ del_dec scale_states.
+///
+/// # Safety
+/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
+    psEncC: &super::structs::NsqConfig,
+    NSQ: &mut super::structs::silk_nsq_state,
+    psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
+    x16: &[i16],
+    x_sc_Q10: &mut [i32],
+    sLTP: &[i16],
+    sLTP_Q15: &mut [i32],
+    subfr: i32,
+    nStatesDelayedDecision: i32,
+    LTP_scale_Q14: i32,
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    signal_type: i32,
+    decisionDelay: i32,
+) {
+    x86::silk_nsq_del_dec_scale_states_sse4_1(
+        psEncC,
+        NSQ,
+        psDelDec,
+        x16,
+        x_sc_Q10,
+        sLTP,
+        sLTP_Q15,
+        subfr,
+        nStatesDelayedDecision,
+        LTP_scale_Q14,
+        Gains_Q16,
+        pitchL,
+        signal_type,
+        decisionDelay,
+    );
+}
+
+/// Run the SSE4.1 NSQ del_dec inner quantizer.
+///
+/// # Safety
+/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
+    NSQ: &mut super::structs::silk_nsq_state,
+    psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
+    signalType: i32,
+    x_Q10: &[i32],
+    pulses: &mut [i8],
+    pulses_off: usize,
+    xq_off: usize,
+    sLTP_Q15: &mut [i32],
+    delayedGain_Q10: &mut [i32; 40],
+    a_Q12: &[i16],
+    b_Q14: &[i16],
+    AR_shp_Q13: &[i16],
+    lag: i32,
+    HarmShapeFIRPacked_Q14: i32,
+    Tilt_Q14: i32,
+    LF_shp_Q14: i32,
+    Gain_Q16: i32,
+    Lambda_Q10: i32,
+    offset_Q10: i32,
+    length: i32,
+    subfr: i32,
+    shapingLPCOrder: i32,
+    predictLPCOrder: i32,
+    warping_Q16: i32,
+    nStatesDelayedDecision: i32,
+    smpl_buf_idx: &mut i32,
+    decisionDelay: i32,
+) {
+    x86::silk_noise_shape_quantizer_del_dec_sse4_1(
+        NSQ,
+        psDelDec,
+        signalType,
+        x_Q10,
+        pulses,
+        pulses_off,
+        xq_off,
+        sLTP_Q15,
+        delayedGain_Q10,
+        a_Q12,
+        b_Q14,
+        AR_shp_Q13,
+        lag,
+        HarmShapeFIRPacked_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gain_Q16,
+        Lambda_Q10,
+        offset_Q10,
+        length,
+        subfr,
+        shapingLPCOrder,
+        predictLPCOrder,
+        warping_Q16,
+        nStatesDelayedDecision,
+        smpl_buf_idx,
+        decisionDelay,
+    );
 }
