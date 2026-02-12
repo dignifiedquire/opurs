@@ -40,6 +40,7 @@ jobs:
           - dred
           - osce
           - dnn
+          - "dnn,builtin-weights"
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +50,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy-dnn-${{ matrix.features }}
-      - run: cargo clippy -p opurs --all-targets --features ${{ matrix.features }} -- -D warnings
+      - run: cargo clippy -p opurs --all-targets --features "${{ matrix.features }}" -- -D warnings
+
+  clippy-tools-dnn:
+    name: Clippy tools-dnn
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-tools-dnn
+      - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
@@ -127,7 +141,20 @@ jobs:
           key: test-dnn-${{ matrix.features }}
       - uses: taiki-e/install-action@nextest
       - name: Run tests
-        run: cargo nextest run -p opurs --features ${{ matrix.features }}
+        run: cargo nextest run -p opurs --features "${{ matrix.features }}"
+
+  test-dnn-weights:
+    name: Test DNN weights
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-dnn-weights
+      - uses: taiki-e/install-action@nextest
+      - name: Run weight verification and integration tests
+        run: cargo nextest run --features tools-dnn --cargo-profile=release
 
   test-vectors:
     name: Vectors (${{ matrix.name }})
