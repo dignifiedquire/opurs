@@ -362,6 +362,41 @@ jobs:
       - name: Run DNN tests (scalar-only, no SIMD)
         run: cargo nextest run -p opurs --no-default-features --features deep-plc
 
+  cross-compile:
+    name: Cross (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name: android-arm64
+            os: ubuntu-latest
+            target: aarch64-linux-android
+          - name: android-x86_64
+            os: ubuntu-latest
+            target: x86_64-linux-android
+          - name: ios-arm64
+            os: macos-15
+            target: aarch64-apple-ios
+          - name: ios-simulator-arm64
+            os: macos-15
+            target: aarch64-apple-ios-sim
+          - name: windows-arm64
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cross-${{ matrix.target }}
+      - name: Build (release)
+        run: cargo build --release -p opurs --target ${{ matrix.target }}
+      - name: Build with DNN (release)
+        run: cargo build --release -p opurs --target ${{ matrix.target }} --features dnn
+
   docs:
     name: Docs
     runs-on: ubuntu-latest
