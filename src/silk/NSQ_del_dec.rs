@@ -325,7 +325,7 @@ pub fn silk_NSQ_del_dec_c(
         let use_simd = false;
 
         if use_simd {
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
             unsafe {
                 super::simd::silk_nsq_del_dec_scale_states_sse4_1(
                     psEncC,
@@ -365,7 +365,7 @@ pub fn silk_NSQ_del_dec_c(
         let fresh_subfr = subfr;
         subfr += 1;
         if use_simd {
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
             unsafe {
                 super::simd::silk_noise_shape_quantizer_del_dec_sse4_1(
                     NSQ,

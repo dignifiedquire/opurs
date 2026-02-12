@@ -889,6 +889,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
     let mut a_Q12_arch = [0i32; MAX_LPC_ORDER];
     neon_short_prediction_create_arch_coef(&mut a_Q12_arch, a_Q12, predict_order);
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..length as usize {
         // Long-term prediction (shared)
         let ltp_pred;
@@ -1316,7 +1317,7 @@ unsafe fn neon_scale_states(
     if gains_Q16[subfr as usize] != nsq.prev_gain_Q16 {
         let gain_adj = silk_DIV32_varQ(nsq.prev_gain_Q16, gains_Q16[subfr as usize], 16);
 
-        if gain_adj >= -65536 && gain_adj < 65536 {
+        if (-65536..65536).contains(&gain_adj) {
             let gv = vdup_n_s32((gain_adj as u32 as i32) << 15);
 
             let shp_start = (nsq.sLTP_shp_buf_idx - cfg.ltp_mem_length as i32) as usize;
@@ -1472,8 +1473,8 @@ pub unsafe fn silk_NSQ_del_dec_neon(
     let mut ddly = silk_min_int(DECISION_DELAY, subfr_len as i32);
     if psIndices.signalType as i32 == TYPE_VOICED {
         let mut pitch_min = pitchL[0];
-        for k in 1..psEncC.nb_subfr {
-            pitch_min = silk_min_int(pitch_min, pitchL[k]);
+        for p in pitchL.iter().take(psEncC.nb_subfr).skip(1) {
+            pitch_min = silk_min_int(pitch_min, *p);
         }
         ddly = silk_min_int(ddly, pitch_min - LTP_ORDER as i32 / 2 - 1);
     } else if lag > 0 {

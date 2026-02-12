@@ -128,12 +128,12 @@ pub fn silk_NSQ_noise_shape_feedback_loop(
     silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+use crate::silk::define::QUANT_LEVEL_ADJUST_Q10;
 use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
-#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-use crate::silk::define::QUANT_LEVEL_ADJUST_Q10;
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
