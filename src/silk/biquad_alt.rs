@@ -4,7 +4,6 @@
 
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB};
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
-use ndarray::azip;
 
 /// Upstream C: silk/biquad_alt.c:silk_biquad_alt_stride1
 ///
@@ -35,23 +34,21 @@ pub fn silk_biquad_alt_stride1(
 
     assert_eq!(signal.len() % 2, 0);
 
-    azip!(
-        (signal in signal) {
-            let inval = *signal as i32;
+    for signal in signal.iter_mut() {
+        let inval = *signal as i32;
 
-            /* S[ 0 ], S[ 1 ]: Q12 */
-            let out32_Q14 = silk_SMLAWB(S[0], B_Q28[0], inval) << 2;
+        /* S[ 0 ], S[ 1 ]: Q12 */
+        let out32_Q14 = silk_SMLAWB(S[0], B_Q28[0], inval) << 2;
 
-            S[0] = S[1] + silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A0_L_Q28), 14);
-            S[0] = silk_SMLAWB(S[0], out32_Q14, A0_U_Q28);
-            S[0] = silk_SMLAWB(S[0], B_Q28[1], inval);
+        S[0] = S[1] + silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A0_L_Q28), 14);
+        S[0] = silk_SMLAWB(S[0], out32_Q14, A0_U_Q28);
+        S[0] = silk_SMLAWB(S[0], B_Q28[1], inval);
 
-            S[1] = silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A1_L_Q28), 14);
-            S[1] = silk_SMLAWB(S[1], out32_Q14, A1_U_Q28);
-            S[1] = silk_SMLAWB(S[1], B_Q28[2], inval);
+        S[1] = silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A1_L_Q28), 14);
+        S[1] = silk_SMLAWB(S[1], out32_Q14, A1_U_Q28);
+        S[1] = silk_SMLAWB(S[1], B_Q28[2], inval);
 
-            /* Scale back to Q0 and saturate */
-            *signal = silk_SAT16((out32_Q14 + (1 << 14) - 1) >> 14) as i16;
-        }
-    );
+        /* Scale back to Q0 and saturate */
+        *signal = silk_SAT16((out32_Q14 + (1 << 14) - 1) >> 14) as i16;
+    }
 }

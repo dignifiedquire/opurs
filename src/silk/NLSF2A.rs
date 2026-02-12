@@ -11,7 +11,6 @@ use crate::silk::LPC_fit::silk_LPC_fit;
 #[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_RSHIFT_ROUND64, SILK_MAX_ORDER_LPC};
-use ndarray::azip;
 
 pub const QA: i32 = 16;
 
@@ -74,7 +73,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
 
     let mut cos_LSF_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
     let cos_LSF_QA = &mut cos_LSF_QA[..d + 1];
-    azip!((&ordering in ordering, &NLSF in NLSF) {
+    for (&ordering, &NLSF) in ordering.iter().zip(NLSF.iter()) {
         debug_assert!(NLSF >= 0);
 
         /* f_int on a scale 0-127 (rounded down) */
@@ -92,7 +91,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
 
         cos_LSF_QA[ordering as usize] =
             silk_RSHIFT_ROUND((cos_val << 8) + delta * f_frac, 20 - QA); /* QA */
-    });
+    }
 
     let dd = d / 2;
 
@@ -128,9 +127,9 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
         /* on the unscaled coefficients, convert to Q12 and measure again                   */
         silk_bwexpander_32(a32_QA1, 65536 - (2 << i));
 
-        azip!((a_Q12 in &mut a_Q12[..], &a32_QA1 in &a32_QA1[..]) {
+        for (a_Q12, &a32_QA1) in a_Q12.iter_mut().zip(a32_QA1.iter()) {
             *a_Q12 = silk_RSHIFT_ROUND(a32_QA1, QA + 1 - 12) as i16; /* QA+1 -> Q12 */
-        });
+        }
 
         i += 1;
     }

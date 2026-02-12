@@ -5,7 +5,6 @@
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::SigProc_FIX::silk_LIMIT;
-use ndarray::azip;
 
 use crate::silk::define::{
     MAX_DELTA_GAIN_QUANT, MAX_QGAIN_DB, MIN_DELTA_GAIN_QUANT, MIN_QGAIN_DB, N_LEVELS_QGAIN,
@@ -35,9 +34,9 @@ pub fn silk_gains_quant(
     prev_ind: &mut i8,
     conditional: bool,
 ) {
-    azip!((index k, out in ind, gain in gain_Q16) {
+    for (k, (out, gain)) in ind.iter_mut().zip(gain_Q16.iter_mut()).enumerate() {
         /* Convert to log scale, scale, floor() */
-        let mut ind  = silk_SMULWB(SCALE_Q16, silk_lin2log(*gain) - OFFSET) as i8;
+        let mut ind = silk_SMULWB(SCALE_Q16, silk_lin2log(*gain) - OFFSET) as i8;
 
         /* Round towards previous quantized gain (hysteresis) */
         if ind < *prev_ind {
@@ -81,7 +80,7 @@ pub fn silk_gains_quant(
             silk_SMULWB(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
             3967, /* 3967 = 31 in Q7 */
         ));
-    });
+    }
 }
 
 /// Upstream C: silk/gain_quant.c:silk_gains_dequant
@@ -96,7 +95,7 @@ pub fn silk_gains_quant(
 /// nb_subfr                   I     number of subframes
 /// ```
 pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, conditional: bool) {
-    azip!((index k, out in gain_Q16, &ind in ind) {
+    for (k, (out, &ind)) in gain_Q16.iter_mut().zip(ind.iter()).enumerate() {
         if k == 0 && !conditional {
             /* Gain index is not allowed to go down more than 16 steps (~21.8 dB) */
             *prev_ind = std::cmp::max(ind, *prev_ind - 16);
@@ -119,7 +118,7 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
             silk_SMULWB(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
             3967, /* 3967 = 31 in Q7 */
         ));
-    });
+    }
 }
 
 /// Upstream C: silk/gain_quant.c:silk_gains_ID
