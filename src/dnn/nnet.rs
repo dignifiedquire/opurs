@@ -163,12 +163,10 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
         }
     }
 
-    let bias = if !linear.subias.is_empty() && !linear.weights.is_empty() {
-        // USE_SU_BIAS path — not used in our scalar build, but supported
-        &linear.subias
-    } else {
-        &linear.bias
-    };
+    // Always use regular bias on our scalar code path, matching the C
+    // non-USE_SU_BIAS path. subias is only correct when paired with the
+    // unsigned-byte quantization in the AVX/SU path.
+    let bias = &linear.bias;
     if !bias.is_empty() {
         for i in 0..n {
             out[i] += bias[i];

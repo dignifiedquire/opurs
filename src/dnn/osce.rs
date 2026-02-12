@@ -2086,8 +2086,18 @@ pub fn osce_enhance_frame(
         }
     }
 
+    // Cross-fade / bypass on reset (upstream C: osce.c lines 1031-1041)
+    if psDec.osce.features.reset > 1 {
+        out_buffer.copy_from_slice(&in_buffer);
+        psDec.osce.features.reset -= 1;
+    } else if psDec.osce.features.reset == 1 {
+        osce_cross_fade_10ms(&mut out_buffer, &in_buffer, 320);
+        psDec.osce.features.reset = 0;
+    }
+
     // Scale output back to i16
     for i in 0..320 {
-        xq[i] = (out_buffer[i] * 32768.0).round().clamp(-32768.0, 32767.0) as i16;
+        let tmp = 32768.0 * out_buffer[i];
+        xq[i] = tmp.clamp(-32767.0, 32767.0).round_ties_even() as i16;
     }
 }

@@ -5,8 +5,6 @@
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::dnn::nnet::*;
 
-use std::f32::consts::PI;
-
 pub const ADACONV_MAX_KERNEL_SIZE: usize = 16;
 pub const ADACONV_MAX_INPUT_CHANNELS: usize = 2;
 pub const ADACONV_MAX_OUTPUT_CHANNELS: usize = 2;
@@ -87,7 +85,10 @@ impl Default for AdaShapeState {
 /// Upstream C: dnn/nndsp.c:compute_overlap_window
 pub fn compute_overlap_window(window: &mut [f32], overlap_size: usize) {
     for i in 0..overlap_size {
-        window[i] = 0.5 + 0.5 * (PI * (i as f32 + 0.5) / overlap_size as f32).cos();
+        // C uses double-precision: M_PI * (i_sample + 0.5f) / overlap_size → cos() → double result
+        window[i] = (0.5
+            + 0.5 * (std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64).cos())
+            as f32;
     }
 }
 
@@ -100,7 +101,7 @@ macro_rules! kernel_index {
 /// Normalize kernel over input channel and kernel dimension.
 ///
 /// Upstream C: dnn/nndsp.c:scale_kernel
-fn scale_kernel(
+pub fn scale_kernel(
     kernel: &mut [f32],
     in_channels: usize,
     out_channels: usize,
@@ -115,7 +116,8 @@ fn scale_kernel(
                 norm += kernel[idx] * kernel[idx];
             }
         }
-        norm = 1.0 / (1e-6 + norm.sqrt());
+        // C uses double-precision sqrt()
+        norm = (1.0 / (1e-6f64 + (norm as f64).sqrt())) as f32;
         for i_in in 0..in_channels {
             for i_k in 0..kernel_size {
                 let idx = kernel_index!(i_out, i_in, i_k, in_channels, kernel_size);
@@ -128,9 +130,15 @@ fn scale_kernel(
 /// Transform gains with exp(a*x + b).
 ///
 /// Upstream C: dnn/nndsp.c:transform_gains
-fn transform_gains(gains: &mut [f32], num_gains: usize, filter_gain_a: f32, filter_gain_b: f32) {
+pub fn transform_gains(
+    gains: &mut [f32],
+    num_gains: usize,
+    filter_gain_a: f32,
+    filter_gain_b: f32,
+) {
     for i in 0..num_gains {
-        gains[i] = (filter_gain_a * gains[i] + filter_gain_b).exp();
+        // C uses double-precision exp(): float promotes to double, exp in double, truncate back
+        gains[i] = ((filter_gain_a * gains[i] + filter_gain_b) as f64).exp() as f32;
     }
 }
 
@@ -309,8 +317,9 @@ pub fn adacomb_process_frame(
         ACTIVATION_TANH,
     );
 
-    gain = (log_gain_limit - gain).exp();
-    global_gain = (filter_gain_a * global_gain + filter_gain_b).exp();
+    // C uses double-precision exp() and log()
+    gain = ((log_gain_limit - gain) as f64).exp() as f32;
+    global_gain = ((filter_gain_a * global_gain + filter_gain_b) as f64).exp() as f32;
     scale_kernel(&mut kernel_buffer, 1, 1, kernel_size, &[gain]);
 
     let mut kernel = [0.0f32; ADACOMB_MAX_KERNEL_SIZE];
@@ -398,7 +407,8 @@ pub fn adashape_process_frame(
         for k in 0..avg_pool_k {
             tenv[i] += x_in[i * avg_pool_k + k].abs();
         }
-        tenv[i] = (tenv[i] / avg_pool_k as f32 + 1.52587890625e-05).ln();
+        // C uses double-precision log()
+        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05) as f64).ln() as f32;
         mean += tenv[i];
     }
     mean /= tenv_size as f32;
@@ -440,8 +450,8 @@ pub fn adashape_process_frame(
         ACTIVATION_LINEAR,
     );
 
-    // Shape signal
+    // Shape signal — C uses double-precision exp()
     for i in 0..frame_size {
-        x_out[i] = out_buffer[i].exp() * x_in[i];
+        x_out[i] = (out_buffer[i] as f64).exp() as f32 * x_in[i];
     }
 }

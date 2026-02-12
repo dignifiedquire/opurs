@@ -362,13 +362,13 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
     );
 
     // Pitch cross-correlation
-    let mut xcorr = vec![0.0f32; PITCH_MAX_PERIOD];
+    let mut xcorr = vec![0.0f32; PITCH_MAX_PERIOD - PITCH_MIN_PERIOD];
     let buf = &st.exc_buf;
     celt_pitch_xcorr(
         &buf[PITCH_MAX_PERIOD..PITCH_MAX_PERIOD + FRAME_SIZE],
         buf,
         &mut xcorr,
-        PITCH_MAX_PERIOD - PITCH_MIN_PERIOD,
+        FRAME_SIZE,
     );
 
     let ener0 = celt_inner_prod(
