@@ -275,13 +275,13 @@ jobs:
         with:
           compiler: llvm
       - name: Build (release)
-        run: cargo build --release --no-default-features --features tools --target ${{ matrix.target }}
+        run: cargo build --release --features tools --target ${{ matrix.target }}
       - name: Download test vectors
         run: |
           curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
           tar -xzf vectors.tar.gz
       - name: Run test vectors
-        run: cargo run --release --no-default-features --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
+        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
 
   test-vectors-dnn:
     name: DNN Vectors (${{ matrix.name }})

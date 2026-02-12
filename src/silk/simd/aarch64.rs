@@ -766,7 +766,7 @@ unsafe fn neon_copy_winner_state(
             nsq,
         );
         i += 8;
-        last_idx -= 8;
+        last_idx = last_idx.wrapping_sub(8);
     }
     // Scalar tail for wrap-around
     while i < decision_delay && last_idx < DECISION_DELAY as usize {

@@ -311,7 +311,7 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
 
     let mut sLF_AR_shp_Q14: i32 = NSQ.sLF_AR_shp_Q14;
     let mut xq_Q14: i32 = NSQ.sLPC_Q14[lpc_idx];
-    let mut sDiff_shp_Q14: i32 = NSQ.sDiff_shp_Q14;
+    let sDiff_shp_Q14: i32 = NSQ.sDiff_shp_Q14;
     let mut LTP_pred_Q13: i32 = 0;
 
     // --- Load a_Q12 coefficients, byte-reversed for paired computation ---
@@ -517,7 +517,11 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
         let tidx = (q1_Q0 + 32).clamp(0, 63) as usize;
         let mut q1_Q10 = table[tidx][0];
         let q2_Q10 = table[tidx][1];
-        if (r_Q10 as i64 * table[tidx][2] as i64 - table[tidx][3] as i64) < 0 {
+        if (r_Q10
+            .wrapping_mul(table[tidx][2])
+            .wrapping_sub(table[tidx][3]))
+            < 0
+        {
             q1_Q10 = q2_Q10;
         }
 
@@ -534,9 +538,10 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
         lpc_idx += 1;
         NSQ.sLPC_Q14[lpc_idx] = xq_Q14;
 
-        sDiff_shp_Q14 = xq_Q14 - ((x_sc_Q10[i] as u32) << 4) as i32;
-        NSQ.sDiff_shp_Q14 = sDiff_shp_Q14;
-        sLF_AR_shp_Q14 = sDiff_shp_Q14.wrapping_sub(((n_AR_Q12 as u32) << 2) as i32);
+        NSQ.sDiff_shp_Q14 = xq_Q14 - ((x_sc_Q10[i] as u32) << 4) as i32;
+        sLF_AR_shp_Q14 = NSQ
+            .sDiff_shp_Q14
+            .wrapping_sub(((n_AR_Q12 as u32) << 2) as i32);
         NSQ.sLF_AR_shp_Q14 = sLF_AR_shp_Q14;
 
         NSQ.sLTP_shp_Q14[NSQ.sLTP_shp_buf_idx as usize] =
