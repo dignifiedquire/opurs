@@ -30,6 +30,27 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all --all-targets --features tools -- -D warnings
 
+  clippy-dnn:
+    name: Clippy DNN (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - deep-plc
+          - dred
+          - osce
+          - dnn
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-dnn-${{ matrix.features }}
+      - run: cargo clippy -p opurs --all-targets --features ${{ matrix.features }} -- -D warnings
+
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
@@ -86,6 +107,27 @@ jobs:
           sudo apt-get install -y ${{ matrix.packages }}
       - name: Run tests
         run: cargo nextest run -p opurs --cargo-profile=${{ matrix.profile }} --target ${{ matrix.target }}
+
+  test-dnn:
+    name: Test DNN (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - deep-plc
+          - dred
+          - osce
+          - dnn
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-dnn-${{ matrix.features }}
+      - uses: taiki-e/install-action@nextest
+      - name: Run tests
+        run: cargo nextest run -p opurs --features ${{ matrix.features }}
 
   test-vectors:
     name: Vectors (${{ matrix.name }})
@@ -156,7 +198,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo doc --no-deps -p opurs
+      - run: cargo doc --no-deps -p opurs --features dnn
 
   unsafe-audit:
     name: Unsafe audit
