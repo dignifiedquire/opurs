@@ -809,3 +809,94 @@ fn test_diag_gain_linear_vs_tanh() {
     // What matters is that dense_out matches C dense_tanh, verified by
     // test_dense_tanh_lace_af1_gain.
 }
+
+/// Test compute_linear on LACE fnet_conv2 layer (int8 weights, exercises cgemv8x4).
+#[test]
+fn test_compute_linear_int8_lace_fnet_conv2() {
+    use opurs::dnn::nnet::compute_linear;
+
+    let arrays = compiled_weights();
+    let lace = init_lace(&arrays).expect("LACE init failed");
+
+    let mut c_out = vec![0.0f32; 512];
+    let nb_inputs =
+        unsafe { libopus_sys::osce_test_compute_linear_int8(c_out.as_mut_ptr(), SEED) } as usize;
+    let nb_outputs = lace.layers.fnet_conv2.nb_outputs;
+    c_out.truncate(nb_outputs);
+
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
+
+    let mut rust_out = vec![0.0f32; nb_outputs];
+    compute_linear(&lace.layers.fnet_conv2, &mut rust_out, &input);
+
+    compare_outputs("compute_linear_int8_lace_fnet_conv2", &rust_out, &c_out);
+}
+
+/// Test compute_generic_gru on LACE fnet GRU (int8 weights, 2 steps).
+#[test]
+fn test_gru_lace_fnet() {
+    use opurs::dnn::nnet::compute_generic_gru;
+    use opurs::dnn::osce::LACE_COND_DIM;
+
+    let arrays = compiled_weights();
+    let lace = init_lace(&arrays).expect("LACE init failed");
+
+    let mut c_out = vec![0.0f32; 2 * LACE_COND_DIM];
+    unsafe { libopus_sys::osce_test_gru_lace_fnet(c_out.as_mut_ptr(), SEED) };
+
+    let mut prng = Prng::new(SEED);
+    let mut state = vec![0.0f32; LACE_COND_DIM];
+
+    // Step 1
+    let input1: Vec<f32> = (0..LACE_COND_DIM)
+        .map(|_| prng.next_float() * 0.1)
+        .collect();
+    compute_generic_gru(
+        &lace.layers.fnet_gru_input,
+        &lace.layers.fnet_gru_recurrent,
+        &mut state,
+        &input1,
+    );
+    compare_outputs("gru_lace_fnet_step1", &state, &c_out[..LACE_COND_DIM]);
+
+    // Step 2
+    let input2: Vec<f32> = (0..LACE_COND_DIM)
+        .map(|_| prng.next_float() * 0.1)
+        .collect();
+    compute_generic_gru(
+        &lace.layers.fnet_gru_input,
+        &lace.layers.fnet_gru_recurrent,
+        &mut state,
+        &input2,
+    );
+    compare_outputs("gru_lace_fnet_step2", &state, &c_out[LACE_COND_DIM..]);
+}
+
+/// Test compute_generic_dense with ACTIVATION_TANH on LACE fnet_tconv (int8 weights, 128->512).
+#[test]
+fn test_dense_tanh_lace_tconv() {
+    use opurs::dnn::nnet::{compute_generic_dense, ACTIVATION_TANH};
+
+    let arrays = compiled_weights();
+    let lace = init_lace(&arrays).expect("LACE init failed");
+
+    let mut c_out = vec![0.0f32; 512];
+    let nb_inputs =
+        unsafe { libopus_sys::osce_test_dense_tanh_lace_tconv(c_out.as_mut_ptr(), SEED) } as usize;
+    let nb_outputs = lace.layers.fnet_tconv.nb_outputs;
+    c_out.truncate(nb_outputs);
+
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
+
+    let mut rust_out = vec![0.0f32; nb_outputs];
+    compute_generic_dense(
+        &lace.layers.fnet_tconv,
+        &mut rust_out,
+        &input,
+        ACTIVATION_TANH,
+    );
+
+    compare_outputs("dense_tanh_lace_tconv", &rust_out, &c_out);
+}

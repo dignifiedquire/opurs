@@ -161,13 +161,14 @@ pub fn interp_band_gain(g: &mut [f32], band_e: &[f32]) {
 ///
 /// Upstream C: dnn/freq.c:dct
 pub fn dct(out: &mut [f32], input: &[f32]) {
-    let scale = (2.0f32 / NB_BANDS as f32).sqrt();
+    // C: sum * sqrt(2./NB_BANDS) — sqrt in double, multiply in double
+    let scale = (2.0f64 / NB_BANDS as f64).sqrt();
     for i in 0..NB_BANDS {
         let mut sum = 0.0f32;
         for j in 0..NB_BANDS {
             sum += input[j] * DCT_TABLE[j * NB_BANDS + i];
         }
-        out[i] = sum * scale;
+        out[i] = (sum as f64 * scale) as f32;
     }
 }
 
@@ -175,13 +176,14 @@ pub fn dct(out: &mut [f32], input: &[f32]) {
 ///
 /// Upstream C: dnn/freq.c:idct
 fn idct(out: &mut [f32], input: &[f32]) {
-    let scale = (2.0f32 / NB_BANDS as f32).sqrt();
+    // C: sum * sqrt(2./NB_BANDS) — sqrt in double, multiply in double
+    let scale = (2.0f64 / NB_BANDS as f64).sqrt();
     for i in 0..NB_BANDS {
         let mut sum = 0.0f32;
         for j in 0..NB_BANDS {
             sum += input[j] * DCT_TABLE[i * NB_BANDS + j];
         }
-        out[i] = sum * scale;
+        out[i] = (sum as f64 * scale) as f32;
     }
 }
 

@@ -6,6 +6,11 @@ logs_*.txt
 tmp.out
 aboba.tmp
 dump
+dump_dnn
+dump_dnn2
+dump_dnn3
+dump_osce
+debug
 
 opus_newvectors
 

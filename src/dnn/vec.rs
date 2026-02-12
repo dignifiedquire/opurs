@@ -340,7 +340,7 @@ pub fn cgemv8x4_scalar(
     // Quantize input to int8
     let mut x = [0i8; MAX_INPUTS];
     for i in 0..cols {
-        x[i] = (0.5 + 127.0 * _x[i]).floor() as i8;
+        x[i] = (0.5f64 + 127.0f64 * _x[i] as f64).floor() as i8;
     }
     for i in 0..rows {
         out[i] = 0.0;
@@ -383,7 +383,7 @@ pub fn sparse_cgemv8x4_scalar(
     // Quantize input to int8
     let mut x = [0i8; MAX_INPUTS];
     for i in 0..cols {
-        x[i] = (0.5 + 127.0 * _x[i]).floor() as i8;
+        x[i] = (0.5f64 + 127.0f64 * _x[i] as f64).floor() as i8;
     }
     for i in 0..rows {
         out[i] = 0.0;

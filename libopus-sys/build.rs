@@ -275,6 +275,9 @@ fn build_opus() {
     if osce {
         config.push_str("#define ENABLE_OSCE 1\n");
     }
+    if env::var("OSCE_DUMP_DEBUG").is_ok() {
+        config.push_str("#define OSCE_DUMP_DEBUG 1\n");
+    }
 
     if simd {
         let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();

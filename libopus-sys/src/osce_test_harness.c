@@ -502,4 +502,90 @@ int osce_test_celt_pitch_xcorr(
     return max_pitch;
 }
 
+/* Test compute_linear on the LACE fnet_conv2 layer (int8 weights, 768->128).
+ * This exercises cgemv8x4 specifically. out gets nb_outputs (128) floats. */
+int osce_test_compute_linear_int8(
+    float *out,
+    unsigned int seed
+)
+{
+    LACELayers hLACE;
+    float input[1024];
+    int i;
+
+    init_lacelayers(&hLACE, lacelayers_arrays);
+
+    prng_reset(seed);
+    for (i = 0; i < hLACE.lace_fnet_conv2.nb_inputs; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+
+    compute_linear(&hLACE.lace_fnet_conv2, out, input, opus_select_arch());
+    return hLACE.lace_fnet_conv2.nb_inputs;
+}
+
+/* Test compute_generic_gru on LACE fnet GRU layers (int8 weights).
+ * Runs 2 GRU steps. out gets 2*LACE_COND_DIM floats (state after each step). */
+int osce_test_gru_lace_fnet(
+    float *out,
+    unsigned int seed
+)
+{
+    LACELayers hLACE;
+    float state[128]; /* LACE_COND_DIM */
+    float input[128];
+    int i;
+
+    init_lacelayers(&hLACE, lacelayers_arrays);
+
+    /* Zero initial state */
+    OPUS_CLEAR(state, 128);
+
+    prng_reset(seed);
+
+    /* Step 1 */
+    for (i = 0; i < 128; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+    compute_generic_gru(
+        &hLACE.lace_fnet_gru_input,
+        &hLACE.lace_fnet_gru_recurrent,
+        state, input, opus_select_arch());
+    OPUS_COPY(out, state, 128);
+
+    /* Step 2 */
+    for (i = 0; i < 128; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+    compute_generic_gru(
+        &hLACE.lace_fnet_gru_input,
+        &hLACE.lace_fnet_gru_recurrent,
+        state, input, opus_select_arch());
+    OPUS_COPY(out + 128, state, 128);
+
+    return 2 * 128;
+}
+
+/* Test compute_generic_dense on LACE fnet_tconv layer (int8 weights, 128->512, tanh).
+ * out gets 512 floats. */
+int osce_test_dense_tanh_lace_tconv(
+    float *out,
+    unsigned int seed
+)
+{
+    LACELayers hLACE;
+    float input[512];
+    int i;
+
+    init_lacelayers(&hLACE, lacelayers_arrays);
+
+    prng_reset(seed);
+    for (i = 0; i < hLACE.lace_fnet_tconv.nb_inputs; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+
+    compute_generic_dense(&hLACE.lace_fnet_tconv, out, input, ACTIVATION_TANH, opus_select_arch());
+    return hLACE.lace_fnet_tconv.nb_inputs;
+}
+
 #endif /* ENABLE_OSCE */

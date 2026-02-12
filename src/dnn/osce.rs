@@ -277,7 +277,8 @@ fn generate_osce_window() -> [f32; OSCE_SPEC_WINDOW_SIZE] {
         // The C window is precomputed. We'll use the formula: sin(pi*(i+0.5)/n) for a sine window.
         // Actually the C array matches: w[i] = sin(pi * (i + 0.5) / n) for i in 0..160, then mirror.
         // Let's just use the exact formula.
-        w[i] = (std::f32::consts::PI * (i as f32 + 0.5) / n as f32).sin();
+        // C table was generated with double-precision sin()
+        w[i] = (std::f64::consts::PI * (i as f64 + 0.5) / n as f64).sin() as f32;
     }
     w
 }
@@ -1142,8 +1143,9 @@ fn mag_spec_320_onesided(out: &mut [f32], input: &[f32]) {
     let mut buffer = [kiss_fft_cpx { re: 0.0, im: 0.0 }; OSCE_SPEC_WINDOW_SIZE];
     forward_transform(&mut buffer, input);
     for k in 0..OSCE_SPEC_NUM_FREQS {
-        out[k] = OSCE_SPEC_WINDOW_SIZE as f32
-            * (buffer[k].re * buffer[k].re + buffer[k].im * buffer[k].im).sqrt();
+        // C: OSCE_SPEC_WINDOW_SIZE * sqrt(re*re + im*im) — entire expression in double
+        let mag_sq = buffer[k].re * buffer[k].re + buffer[k].im * buffer[k].im;
+        out[k] = (OSCE_SPEC_WINDOW_SIZE as f64 * (mag_sq as f64).sqrt()) as f32;
     }
 }
 
@@ -1157,8 +1159,7 @@ fn calculate_log_spectrum_from_lpc(spec: &mut [f32], a_q12: &[i16], lpc_order: u
         buffer[i + 1] = -(a_q12[i] as f32) / (1 << 12) as f32;
     }
 
-    mag_spec_320_onesided(&mut buffer.clone(), &buffer);
-    // Note: mag_spec writes to out; we use buffer for both
+    // C: mag_spec_320_onesided(buffer, buffer) — in-place
     let mut mag = [0.0f32; OSCE_SPEC_NUM_FREQS];
     mag_spec_320_onesided(&mut mag, &buffer);
 
@@ -1176,7 +1177,8 @@ fn calculate_log_spectrum_from_lpc(spec: &mut [f32], a_q12: &[i16], lpc_order: u
     );
 
     for i in 0..OSCE_CLEAN_SPEC_NUM_BANDS {
-        spec[i] = 0.3 * (filtered[i] + 1e-9).ln();
+        // C: 0.3f * log(spec[i] + 1e-9f) — 0.3f promoted to double, entire expr in double
+        spec[i] = (0.3f32 as f64 * ((filtered[i] + 1e-9) as f64).ln()) as f32;
     }
 }
 
@@ -1203,7 +1205,8 @@ fn calculate_cepstrum(cepstrum: &mut [f32], signal: &[f32]) {
     );
 
     for n in 0..OSCE_NOISY_SPEC_NUM_BANDS {
-        spec[n] = (spec[n] + 1e-9).ln();
+        // C: log(spec[n] + 1e-9f) — log() is double precision
+        spec[n] = ((spec[n] + 1e-9) as f64).ln() as f32;
     }
 
     // DCT-II (orthonormal) — uses the same dct function from freq.rs
@@ -1231,7 +1234,8 @@ fn calculate_acorr(acorr: &mut [f32], signal: &[f32], signal_offset: usize, lag:
             yy += y * y;
             xy += x * y;
         }
-        acorr[(k + 2) as usize] = xy / (xx * yy + 1e-9).sqrt();
+        // C: xy / sqrt(xx * yy + 1e-9f) — xy promoted to double, entire expr in double
+        acorr[(k + 2) as usize] = (xy as f64 / ((xx * yy + 1e-9) as f64).sqrt()) as f32;
     }
 }
 
@@ -1344,9 +1348,9 @@ pub fn osce_calculate_features(
                 ltp_coef_q14[k * OSCE_LTP_LENGTH + i] as f32 / (1 << 14) as f32;
         }
 
-        // Frame gain
+        // Frame gain — C: log(gain / 65536 + 1e-9f) — log() is double precision
         features[base + OSCE_LOG_GAIN_START] =
-            (gains_q16[k] as f32 / (1u32 << 16) as f32 + 1e-9).ln();
+            ((gains_q16[k] as f32 / (1u32 << 16) as f32 + 1e-9) as f64).ln() as f32;
     }
 
     // Buffer update
@@ -1378,17 +1382,31 @@ fn compute_numbits_embedding(
     max_val: f32,
     logscale: bool,
 ) {
-    let nb = if logscale { numbits.ln() } else { numbits };
-    let x = nb.clamp(min_val, max_val) - (max_val + min_val) / 2.0;
+    // C: log() and sin() are double precision
+    let nb = if logscale {
+        (numbits as f64).ln() as f32
+    } else {
+        numbits
+    };
+    // Upstream C uses a buggy CLIP macro:
+    //   #define CLIP(a, min, max) (((a) < (min) ? (min) : (a)) > (max) ? (max) : (a))
+    // When a < min, this expands to: (min > max ? max : a) = a (not min).
+    // So the lower bound is never enforced. We must replicate this behavior.
+    let clipped = if (if nb < min_val { min_val } else { nb }) > max_val {
+        max_val
+    } else {
+        nb
+    };
+    let x = clipped - (max_val + min_val) / 2.0;
     for i in 0..8 {
-        emb[i] = (x * scales[i] - 0.5).sin();
+        emb[i] = ((x * scales[i] - 0.5) as f64).sin() as f32;
     }
 }
 
 /// Run LACE feature network.
 ///
 /// Upstream C: dnn/osce.c:lace_feature_net
-fn lace_feature_net(
+pub fn lace_feature_net(
     lace: &LACE,
     state: &mut LACEState,
     output: &mut [f32],
@@ -1401,20 +1419,23 @@ fn lace_feature_net(
     let mut output_buffer = vec![0.0f32; 4 * max_dim];
     let mut numbits_embedded = [0.0f32; 2 * LACE_NUMBITS_EMBEDDING_DIM];
 
+    // C: log(RANGE_LOW), log(RANGE_HIGH) — log() on integer constants, double precision
+    let range_low_ln = (LACE_NUMBITS_RANGE_LOW as f64).ln() as f32;
+    let range_high_ln = (LACE_NUMBITS_RANGE_HIGH as f64).ln() as f32;
     compute_numbits_embedding(
         &mut numbits_embedded[..LACE_NUMBITS_EMBEDDING_DIM],
         numbits[0],
         &LACE_NUMBITS_SCALES,
-        LACE_NUMBITS_RANGE_LOW.ln(),
-        LACE_NUMBITS_RANGE_HIGH.ln(),
+        range_low_ln,
+        range_high_ln,
         true,
     );
     compute_numbits_embedding(
         &mut numbits_embedded[LACE_NUMBITS_EMBEDDING_DIM..],
         numbits[1],
         &LACE_NUMBITS_SCALES,
-        LACE_NUMBITS_RANGE_LOW.ln(),
-        LACE_NUMBITS_RANGE_HIGH.ln(),
+        range_low_ln,
+        range_high_ln,
         true,
     );
 
@@ -1606,20 +1627,23 @@ fn nolace_feature_net(
     let mut output_buffer = vec![0.0f32; 4 * max_dim];
     let mut numbits_embedded = [0.0f32; 2 * NOLACE_NUMBITS_EMBEDDING_DIM];
 
+    // C: log(RANGE_LOW), log(RANGE_HIGH) — log() on integer constants, double precision
+    let range_low_ln = (NOLACE_NUMBITS_RANGE_LOW as f64).ln() as f32;
+    let range_high_ln = (NOLACE_NUMBITS_RANGE_HIGH as f64).ln() as f32;
     compute_numbits_embedding(
         &mut numbits_embedded[..NOLACE_NUMBITS_EMBEDDING_DIM],
         numbits[0],
         &NOLACE_NUMBITS_SCALES,
-        NOLACE_NUMBITS_RANGE_LOW.ln(),
-        NOLACE_NUMBITS_RANGE_HIGH.ln(),
+        range_low_ln,
+        range_high_ln,
         true,
     );
     compute_numbits_embedding(
         &mut numbits_embedded[NOLACE_NUMBITS_EMBEDDING_DIM..],
         numbits[1],
         &NOLACE_NUMBITS_SCALES,
-        NOLACE_NUMBITS_RANGE_LOW.ln(),
-        NOLACE_NUMBITS_RANGE_HIGH.ln(),
+        range_low_ln,
+        range_high_ln,
         true,
     );
 
@@ -2043,6 +2067,47 @@ pub fn osce_enhance_frame(
         in_buffer[i] = xq[i] as f32 * (1.0 / 32768.0);
     }
 
+    #[cfg(feature = "osce-dump-debug")]
+    {
+        use std::io::Write;
+        use std::sync::Mutex;
+        static FEAT_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
+            std::sync::LazyLock::new(|| {
+                Mutex::new(std::fs::File::create("/tmp/osce_rs_features.bin").unwrap())
+            });
+        static IN_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
+            std::sync::LazyLock::new(|| {
+                Mutex::new(std::fs::File::create("/tmp/osce_rs_in_buffer.bin").unwrap())
+            });
+        static OUT_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
+            std::sync::LazyLock::new(|| {
+                Mutex::new(std::fs::File::create("/tmp/osce_rs_out_buffer.bin").unwrap())
+            });
+        static NB_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
+            std::sync::LazyLock::new(|| {
+                Mutex::new(std::fs::File::create("/tmp/osce_rs_numbits.bin").unwrap())
+            });
+        static PER_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
+            std::sync::LazyLock::new(|| {
+                Mutex::new(std::fs::File::create("/tmp/osce_rs_periods.bin").unwrap())
+            });
+        FEAT_FILE
+            .lock()
+            .unwrap()
+            .write_all(bytemuck::cast_slice(&features))
+            .unwrap();
+        NB_FILE
+            .lock()
+            .unwrap()
+            .write_all(bytemuck::cast_slice(&numbits))
+            .unwrap();
+        PER_FILE
+            .lock()
+            .unwrap()
+            .write_all(bytemuck::cast_slice(&periods))
+            .unwrap();
+    }
+
     let method = if model.loaded {
         psDec.osce.method
     } else {
@@ -2086,6 +2151,27 @@ pub fn osce_enhance_frame(
         }
     }
 
+    #[cfg(feature = "osce-dump-debug")]
+    {
+        use std::io::Write;
+        use std::sync::Mutex;
+        static IN_F: std::sync::LazyLock<Mutex<std::fs::File>> = std::sync::LazyLock::new(|| {
+            Mutex::new(std::fs::File::create("/tmp/osce_rs_in_buffer.bin").unwrap())
+        });
+        static OUT_F: std::sync::LazyLock<Mutex<std::fs::File>> = std::sync::LazyLock::new(|| {
+            Mutex::new(std::fs::File::create("/tmp/osce_rs_out_buffer.bin").unwrap())
+        });
+        IN_F.lock()
+            .unwrap()
+            .write_all(bytemuck::cast_slice(&in_buffer))
+            .unwrap();
+        OUT_F
+            .lock()
+            .unwrap()
+            .write_all(bytemuck::cast_slice(&out_buffer))
+            .unwrap();
+    }
+
     // Cross-fade / bypass on reset (upstream C: osce.c lines 1031-1041)
     if psDec.osce.features.reset > 1 {
         out_buffer.copy_from_slice(&in_buffer);
@@ -2096,8 +2182,9 @@ pub fn osce_enhance_frame(
     }
 
     // Scale output back to i16
+    // C uses float2int(tmp) = lrintf(tmp) — round-to-nearest-even
     for i in 0..320 {
-        let tmp = 32768.0 * out_buffer[i];
+        let tmp = 32768.0f32 * out_buffer[i];
         xq[i] = tmp.clamp(-32767.0, 32767.0).round_ties_even() as i16;
     }
 }

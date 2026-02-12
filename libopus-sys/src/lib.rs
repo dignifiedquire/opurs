@@ -1258,4 +1258,19 @@ extern "C" {
         seed: ::std::os::raw::c_uint,
     ) -> ::std::os::raw::c_int;
 
+    pub fn osce_test_compute_linear_int8(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_gru_lace_fnet(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_dense_tanh_lace_tconv(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
 }

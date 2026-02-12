@@ -303,7 +303,7 @@ unsafe fn vector_ps_to_u8(dst: &mut [u8], src: &[f32], len: usize) {
     }
     // Scalar tail
     while i < len {
-        dst[i] = (127.0 + (0.5 + 127.0 * src[i]).floor()) as u8;
+        dst[i] = (127.0f64 + (0.5f64 + 127.0f64 * src[i] as f64).floor()) as u8;
         i += 1;
     }
 }

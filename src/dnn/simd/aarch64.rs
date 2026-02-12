@@ -404,7 +404,7 @@ pub unsafe fn cgemv8x4_neon(
         qi += 8;
     }
     while qi < cols {
-        x[qi] = (0.5 + 127.0 * _x[qi]).floor() as i8;
+        x[qi] = (0.5f64 + 127.0f64 * _x[qi] as f64).floor() as i8;
         qi += 1;
     }
 
@@ -492,7 +492,7 @@ pub unsafe fn sparse_cgemv8x4_neon(
         qi += 8;
     }
     while qi < cols {
-        x[qi] = (0.5 + 127.0 * _x[qi]).floor() as i8;
+        x[qi] = (0.5f64 + 127.0f64 * _x[qi] as f64).floor() as i8;
         qi += 1;
     }
 
