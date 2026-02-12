@@ -15,6 +15,7 @@
 #include "vec.h"
 #include "pitch.h"
 #include "cpu_support.h"
+#include "os_support.h"
 #include "lace_data.h"
 #include "nolace_data.h"
 
