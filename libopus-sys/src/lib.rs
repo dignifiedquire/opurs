@@ -1147,3 +1147,55 @@ extern "C" {
     pub fn opus_multistream_decoder_destroy(st: *mut OpusMSDecoder);
 }
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
+
+// -----------------------------------------------------------------------
+// DNN weight blob helpers (src/write_weights_blob.c, added by opurs)
+// -----------------------------------------------------------------------
+
+#[cfg(feature = "deep-plc")]
+extern "C" {
+    // Combined blob (all models enabled at compile time)
+    pub fn opus_dnn_weights_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_write_weights_blob(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // Per-model: PitchDNN
+    pub fn opus_dnn_pitchdnn_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // Per-model: FARGAN
+    pub fn opus_dnn_fargan_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // Per-model: PLCModel
+    pub fn opus_dnn_plcmodel_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "dred")]
+extern "C" {
+    // Per-model: RDOVAE Encoder
+    pub fn opus_dnn_rdovaeenc_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaeenc_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaeenc_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // Per-model: RDOVAE Decoder
+    pub fn opus_dnn_rdovaedec_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "osce")]
+extern "C" {
+    // Per-model: LACE
+    pub fn opus_dnn_lace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_lace_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_lace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // Per-model: NoLACE
+    pub fn opus_dnn_nolace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}

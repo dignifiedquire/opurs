@@ -108,6 +108,8 @@ fn build_opus() {
 
     // Collect source files to compile (float mode, no SIMD/platform intrinsics)
     let mut sources: Vec<String> = Vec::new();
+    // Extra sources that live outside the upstream tree (abs_path, relative_dest).
+    let mut extra_sources: Vec<(PathBuf, PathBuf)> = Vec::new();
     sources.extend(get_sources(&opus_sources_mk, "OPUS_SOURCES"));
     sources.extend(get_sources(&opus_sources_mk, "OPUS_SOURCES_FLOAT"));
     sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES"));
@@ -127,6 +129,14 @@ fn build_opus() {
 
         sources.extend(get_sources(&lpcnet_sources_mk, "DEEP_PLC_SOURCES"));
         headers.extend(get_sources(&lpcnet_headers_mk, "DEEP_PLC_HEAD"));
+
+        // Our helper that serializes compiled-in weight arrays to the blob format.
+        // Lives in libopus-sys/src/ (not in the upstream opus tree).
+        // We copy it into the build dir's dnn/ alongside the upstream sources.
+        extra_sources.push((
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/write_weights_blob.c"),
+            PathBuf::from("dnn/write_weights_blob.c"),
+        ));
 
         if dred {
             sources.extend(get_sources(&lpcnet_sources_mk, "DRED_SOURCES"));
@@ -164,6 +174,15 @@ fn build_opus() {
         // Some headers listed in .mk files are platform-specific and may not exist
         // in our vendored source (e.g. arm/, mips/ headers). That's fine — they're
         // only needed when compiling with those platform intrinsics enabled.
+    }
+
+    // Copy extra (non-upstream) sources into the build dir and register them.
+    for (abs_src, rel_dest) in &extra_sources {
+        let target_path = opus_build_src_dir.join(rel_dest);
+        fs::create_dir_all(target_path.parent().unwrap())
+            .expect("Could not create target directory");
+        fs::copy(abs_src, &target_path).expect("Could not copy extra source file");
+        sources.push(rel_dest.to_string_lossy().into_owned());
     }
 
     // Write config.h with optional DNN defines
