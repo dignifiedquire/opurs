@@ -123,22 +123,33 @@ jobs:
         run: cargo nextest run -p opurs --cargo-profile=${{ matrix.profile }} --target ${{ matrix.target }}
 
   test-dnn:
-    name: Test DNN (${{ matrix.features }})
-    runs-on: ubuntu-latest
+    name: Test DNN (${{ matrix.name }}, ${{ matrix.features }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        name:
+          - linux-x86_64
+          - macos-arm64
+          - windows-x86_64
         features:
           - deep-plc
           - dred
           - osce
           - dnn
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+          - name: macos-arm64
+            os: macos-15
+          - name: windows-x86_64
+            os: windows-latest
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: test-dnn-${{ matrix.features }}
+          key: test-dnn-${{ matrix.name }}-${{ matrix.features }}
       - uses: taiki-e/install-action@nextest
       - name: Run tests
         run: cargo nextest run -p opurs --features "${{ matrix.features }}"
@@ -228,6 +239,8 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Run tests (no default features)
         run: cargo nextest run -p opurs --no-default-features
+      - name: Run DNN tests (scalar-only, no SIMD)
+        run: cargo nextest run -p opurs --no-default-features --features deep-plc
 
   docs:
     name: Docs

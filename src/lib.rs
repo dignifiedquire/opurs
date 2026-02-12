@@ -162,4 +162,12 @@ pub mod internals {
     pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction;
     // Scalar implementation:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP_scalar;
+
+    // -- DNN vec functions (for benchmarks) --
+    #[cfg(feature = "deep-plc")]
+    pub use crate::dnn::vec::{
+        cgemv8x4, cgemv8x4_scalar, sgemv, sgemv_scalar, softmax, softmax_scalar, sparse_cgemv8x4,
+        sparse_cgemv8x4_scalar, sparse_sgemv8x4, sparse_sgemv8x4_scalar, vec_sigmoid,
+        vec_sigmoid_scalar, vec_tanh, vec_tanh_scalar,
+    };
 }

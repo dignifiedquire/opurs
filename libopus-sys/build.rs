@@ -118,6 +118,13 @@ fn build_opus() {
     sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES"));
     sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT"));
 
+    // Parse lpcnet_sources.mk early so it's accessible in the SIMD block
+    let lpcnet_sources_mk = if deep_plc {
+        Some(parse_mk_file(&opus_source_path.join("lpcnet_sources.mk")))
+    } else {
+        None
+    };
+
     // SIMD source groups — compiled with per-file flags later
     let mut simd_groups: Vec<(Vec<String>, &str)> = Vec::new(); // (sources, arch_flag)
 
@@ -149,6 +156,12 @@ fn build_opus() {
                 get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT_AVX2"),
                 "-mavx2 -mfma",
             ));
+            if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
+                sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_X86_RTCD"));
+                simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE2"), "-msse2"));
+                simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE4_1"), "-msse4.1"));
+                simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"), "-mavx2 -mfma"));
+            }
         } else if target_arch == "aarch64" {
             // RTCD sources
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_RTCD"));
@@ -157,6 +170,14 @@ fn build_opus() {
             // NEON intrinsics (always available on aarch64, no extra flags needed)
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_NEON_INTR"));
             sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_NEON_INTR"));
+            if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
+                sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_ARM_RTCD"));
+                sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_NEON"));
+                simd_groups.push((
+                    get_sources(lpcnet_mk, "DNN_SOURCES_DOTPROD"),
+                    "-march=armv8.2-a+dotprod",
+                ));
+            }
         }
     }
 
@@ -168,7 +189,8 @@ fn build_opus() {
 
     // DNN sources and headers (feature-gated)
     if deep_plc {
-        let lpcnet_sources_mk = parse_mk_file(&opus_source_path.join("lpcnet_sources.mk"));
+        let lpcnet_sources_mk = lpcnet_sources_mk
+            .unwrap_or_else(|| parse_mk_file(&opus_source_path.join("lpcnet_sources.mk")));
         let lpcnet_headers_mk = parse_mk_file(&opus_source_path.join("lpcnet_headers.mk"));
 
         sources.extend(get_sources(&lpcnet_sources_mk, "DEEP_PLC_SOURCES"));
@@ -261,6 +283,7 @@ fn build_opus() {
         } else if target_arch == "aarch64" {
             config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
             config.push_str("#define OPUS_ARM_ASM 1\n");
+            config.push_str("#define OPUS_ARM_MAY_HAVE_DOTPROD 1\n");
             config.push_str("#define OPUS_HAVE_RTCD 1\n");
         }
     }

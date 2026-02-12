@@ -84,6 +84,11 @@ name = "codec_comparison"
 harness = false
 required-features = ["tools"]
 
+[[bench]]
+name = "dnn"
+harness = false
+required-features = ["deep-plc"]
+
 [features]
 default = ["simd"]
 

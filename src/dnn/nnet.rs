@@ -163,8 +163,10 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
         }
     }
 
-    let bias = if !linear.subias.is_empty() && !linear.weights.is_empty() {
-        // USE_SU_BIAS path — not used in our scalar build, but supported
+    let bias = if use_su_bias() && !linear.subias.is_empty() && !linear.weights.is_empty() {
+        // USE_SU_BIAS: x86 AVX2 cgemv8x4 uses unsigned u8 quantization,
+        // so subias compensates for the +127 offset. NEON and scalar use
+        // signed i8 quantization and need regular bias.
         &linear.subias
     } else {
         &linear.bias
