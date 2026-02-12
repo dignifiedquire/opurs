@@ -22,6 +22,7 @@ const MAX_DOWNMIX_BUFFER: usize = 960 * 2;
 /// Full DRED encoder state.
 ///
 /// Upstream C: dnn/dred_encoder.h:DREDEnc
+#[derive(Clone)]
 pub struct DREDEnc {
     pub model: RDOVAEEnc,
     pub lpcnet_enc_state: LPCNetEncState,

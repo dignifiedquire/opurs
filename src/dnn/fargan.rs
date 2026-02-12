@@ -321,6 +321,7 @@ pub fn init_fargan(arrays: &[WeightArray]) -> Option<FARGAN> {
 /// FARGAN synthesizer state.
 ///
 /// Upstream C: dnn/fargan.h:FARGANState
+#[derive(Clone)]
 pub struct FARGANState {
     pub model: FARGAN,
     pub cont_initialized: bool,

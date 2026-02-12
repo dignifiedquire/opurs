@@ -4,6 +4,11 @@
 
 use crate::celt::entdec::ec_dec;
 
+#[cfg(feature = "osce")]
+use crate::celt::entcode::ec_tell;
+#[cfg(feature = "osce")]
+use crate::dnn::osce::{osce_enhance_frame, osce_reset, OSCEModel};
+
 use crate::silk::dec_API::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};
 use crate::silk::decode_core::silk_decode_core;
 use crate::silk::decode_indices::silk_decode_indices;
@@ -13,6 +18,9 @@ use crate::silk::define::SHELL_CODEC_FRAME_LENGTH;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::CNG::silk_CNG;
 use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
+
+#[cfg(feature = "deep-plc")]
+use crate::dnn::lpcnet::LPCNetPLCState;
 
 /// Upstream C: silk/decode_frame.c:silk_decode_frame
 ///
@@ -24,6 +32,8 @@ pub fn silk_decode_frame(
     pOut: &mut [i16],
     lostFlag: i32,
     condCoding: i32,
+    #[cfg(feature = "deep-plc")] lpcnet: Option<&mut LPCNetPLCState>,
+    #[cfg(feature = "osce")] osce_model: &OSCEModel,
     arch: i32,
 ) -> (i32, i32) {
     let L = psDec.frame_length as i32;
@@ -41,6 +51,9 @@ pub fn silk_decode_frame(
     if lostFlag == FLAG_DECODE_NORMAL
         || lostFlag == FLAG_DECODE_LBRR && psDec.LBRR_flags[psDec.nFramesDecoded as usize] == 1
     {
+        #[cfg(feature = "osce")]
+        let ec_start = ec_tell(psRangeDec);
+
         // add room for padding samples so that the samples are a multiple of 16
         // these samples are not _really_ part of the frame
         let padded_frame_length = (L as usize).next_multiple_of(SHELL_CODEC_FRAME_LENGTH);
@@ -75,14 +88,44 @@ pub fn silk_decode_frame(
         psDec.outBuf[mv_len..mv_len + psDec.frame_length]
             .copy_from_slice(&pOut_slice[..psDec.frame_length]);
 
-        silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 0, arch);
+        // Run OSCE enhancement
+        #[cfg(feature = "osce")]
+        {
+            let num_bits = ec_tell(psRangeDec) - ec_start;
+            osce_enhance_frame(osce_model, psDec, &psDecCtrl, pOut_slice, num_bits);
+        }
+
+        silk_PLC(
+            psDec,
+            &mut psDecCtrl,
+            pOut_slice,
+            0,
+            #[cfg(feature = "deep-plc")]
+            lpcnet,
+            arch,
+        );
         psDec.lossCnt = 0;
         psDec.prevSignalType = psDec.indices.signalType as i32;
         assert!(psDec.prevSignalType >= 0 && psDec.prevSignalType <= 2);
         psDec.first_frame_after_reset = 0;
     } else {
         psDec.indices.signalType = psDec.prevSignalType as i8;
-        silk_PLC(psDec, &mut psDecCtrl, pOut_slice, 1, arch);
+        silk_PLC(
+            psDec,
+            &mut psDecCtrl,
+            pOut_slice,
+            1,
+            #[cfg(feature = "deep-plc")]
+            lpcnet,
+            arch,
+        );
+
+        // Reset OSCE on loss
+        #[cfg(feature = "osce")]
+        {
+            let method = psDec.osce.method;
+            osce_reset(&mut psDec.osce, method);
+        }
 
         // Update output buffer
         assert!(psDec.ltp_mem_length >= psDec.frame_length);

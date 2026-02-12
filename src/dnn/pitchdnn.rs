@@ -126,6 +126,7 @@ pub fn init_pitchdnn(arrays: &[WeightArray]) -> Option<PitchDNN> {
 /// PitchDNN state: model + per-frame state.
 ///
 /// Upstream C: dnn/pitchdnn.h:PitchDNNState
+#[derive(Clone)]
 pub struct PitchDNNState {
     pub model: PitchDNN,
     pub gru_state: Vec<f32>,

@@ -156,6 +156,7 @@ impl PLCNetState {
 /// LPCNet encoder state for feature extraction.
 ///
 /// Upstream C: dnn/lpcnet_private.h:LPCNetEncState
+#[derive(Clone)]
 pub struct LPCNetEncState {
     pub pitchdnn: PitchDNNState,
     pub analysis_mem: Vec<f32>,
@@ -459,6 +460,7 @@ pub fn lpcnet_compute_single_frame_features_float(
 /// LPCNet PLC state: combines encoder, FARGAN, and PLC model.
 ///
 /// Upstream C: dnn/lpcnet_private.h:LPCNetPLCState
+#[derive(Clone)]
 pub struct LPCNetPLCState {
     pub model: PLCModel,
     pub fargan: FARGANState,
@@ -660,6 +662,29 @@ fn get_fec_or_pred(st: &mut LPCNetPLCState, out: &mut [f32]) -> bool {
 fn queue_features(st: &mut LPCNetPLCState, features: &[f32]) {
     st.cont_features.copy_within(NB_FEATURES.., 0);
     st.cont_features[(CONT_VECTORS - 1) * NB_FEATURES..].copy_from_slice(&features[..NB_FEATURES]);
+}
+
+/// Reset PLC state (preserving model weights).
+///
+/// Upstream C: dnn/lpcnet_plc.c:lpcnet_plc_reset
+pub fn lpcnet_plc_reset(st: &mut LPCNetPLCState) {
+    st.enc = LPCNetEncState::new();
+    for row in st.fec.iter_mut() {
+        row.fill(0.0);
+    }
+    st.analysis_gap = true;
+    st.fec_read_pos = 0;
+    st.fec_fill_pos = 0;
+    st.fec_skip = 0;
+    st.analysis_pos = PLC_BUF_SIZE;
+    st.predict_pos = PLC_BUF_SIZE;
+    st.pcm.fill(0.0);
+    st.blend = 0;
+    st.features.fill(0.0);
+    st.cont_features.fill(0.0);
+    st.loss_count = 0;
+    st.plc_net = PLCNetState::new();
+    st.plc_bak = [PLCNetState::new(), PLCNetState::new()];
 }
 
 /// Update PLC state with a good (received) frame.

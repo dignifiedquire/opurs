@@ -10,6 +10,7 @@ use crate::dnn::nndsp::*;
 use crate::dnn::nnet::*;
 
 use crate::celt::kiss_fft::kiss_fft_cpx;
+use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 
 // ========== OSCE Config (osce_config.h) ==========
 
@@ -312,6 +313,7 @@ impl Default for OSCEFeatureState {
 /// LACE model layers.
 ///
 /// Upstream C: dnn/lace_data.h:LACELayers
+#[derive(Clone)]
 pub struct LACELayers {
     pub pitch_embedding: LinearLayer,
     pub fnet_conv1: LinearLayer,
@@ -332,6 +334,7 @@ pub struct LACELayers {
 /// LACE model (layers + overlap window).
 ///
 /// Upstream C: dnn/osce_structs.h:LACE
+#[derive(Clone)]
 pub struct LACE {
     pub layers: LACELayers,
     pub window: Vec<f32>,
@@ -340,6 +343,7 @@ pub struct LACE {
 /// LACE runtime state.
 ///
 /// Upstream C: dnn/osce_structs.h:LACEState
+#[derive(Clone)]
 pub struct LACEState {
     pub feature_net_conv2_state: Vec<f32>,
     pub feature_net_gru_state: Vec<f32>,
@@ -367,6 +371,7 @@ impl Default for LACEState {
 /// NoLACE model layers.
 ///
 /// Upstream C: dnn/nolace_data.h:NOLACELayers
+#[derive(Clone)]
 pub struct NOLACELayers {
     pub pitch_embedding: LinearLayer,
     pub fnet_conv1: LinearLayer,
@@ -407,6 +412,7 @@ pub struct NOLACELayers {
 /// NoLACE model (layers + overlap window).
 ///
 /// Upstream C: dnn/osce_structs.h:NoLACE
+#[derive(Clone)]
 pub struct NoLACE {
     pub layers: NOLACELayers,
     pub window: Vec<f32>,
@@ -415,6 +421,7 @@ pub struct NoLACE {
 /// NoLACE runtime state.
 ///
 /// Upstream C: dnn/osce_structs.h:NoLACEState
+#[derive(Clone)]
 pub struct NoLACEState {
     pub feature_net_conv2_state: Vec<f32>,
     pub feature_net_gru_state: Vec<f32>,
@@ -464,7 +471,7 @@ impl Default for NoLACEState {
 /// Top-level OSCE model container.
 ///
 /// Upstream C: dnn/osce_structs.h:OSCEModel
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct OSCEModel {
     pub loaded: bool,
     pub lace: Option<LACE>,
@@ -474,6 +481,7 @@ pub struct OSCEModel {
 /// Combined OSCE state (features + method-specific runtime state).
 ///
 /// Upstream C: silk/structs.h:silk_OSCE_struct
+#[derive(Clone)]
 pub struct OSCEState {
     pub features: OSCEFeatureState,
     pub lace_state: LACEState,
@@ -1987,4 +1995,99 @@ pub fn osce_reset(state: &mut OSCEState, method: i32) {
     }
     state.method = method;
     state.features.reset = 2;
+}
+
+/// Enhance one decoded SILK frame using OSCE (LACE or NoLACE).
+///
+/// Upstream C: dnn/osce.c:osce_enhance_frame
+pub fn osce_enhance_frame(
+    model: &OSCEModel,
+    psDec: &mut silk_decoder_state,
+    psDecCtrl: &silk_decoder_control,
+    xq: &mut [i16],
+    num_bits: i32,
+) {
+    // Enhancement only implemented for 20 ms frame at 16kHz
+    if psDec.fs_kHz != 16 || psDec.nb_subfr != 4 {
+        let method = psDec.osce.method;
+        osce_reset(&mut psDec.osce, method);
+        return;
+    }
+
+    let mut features = [0.0f32; 4 * OSCE_FEATURE_DIM];
+    let mut numbits = [0.0f32; 2];
+    let mut periods = [0i32; 4];
+
+    // Build PredCoef_Q12 slices for feature extraction
+    let pred_coef_refs: [&[i16]; 2] = [&psDecCtrl.PredCoef_Q12[0], &psDecCtrl.PredCoef_Q12[1]];
+
+    osce_calculate_features(
+        &mut psDec.osce.features,
+        psDec.nb_subfr,
+        psDec.LPC_order,
+        psDec.indices.signalType as i32,
+        &pred_coef_refs,
+        &psDecCtrl.pitchL,
+        &psDecCtrl.LTPCoef_Q14,
+        &psDecCtrl.Gains_Q16,
+        xq,
+        num_bits,
+        &mut features,
+        &mut numbits,
+        &mut periods,
+    );
+
+    // Scale input to float [-1, 1]
+    let mut in_buffer = [0.0f32; 320];
+    for i in 0..320 {
+        in_buffer[i] = xq[i] as f32 * (1.0 / 32768.0);
+    }
+
+    let method = if model.loaded {
+        psDec.osce.method
+    } else {
+        OSCE_METHOD_NONE
+    };
+
+    let mut out_buffer = [0.0f32; 320];
+    match method {
+        OSCE_METHOD_LACE => {
+            if let Some(ref lace) = model.lace {
+                lace_process_20ms_frame(
+                    lace,
+                    &mut psDec.osce.lace_state,
+                    &mut out_buffer,
+                    &in_buffer,
+                    &features,
+                    &numbits,
+                    &periods,
+                );
+            } else {
+                out_buffer.copy_from_slice(&in_buffer);
+            }
+        }
+        OSCE_METHOD_NOLACE => {
+            if let Some(ref nolace) = model.nolace {
+                nolace_process_20ms_frame(
+                    nolace,
+                    &mut psDec.osce.nolace_state,
+                    &mut out_buffer,
+                    &in_buffer,
+                    &features,
+                    &numbits,
+                    &periods,
+                );
+            } else {
+                out_buffer.copy_from_slice(&in_buffer);
+            }
+        }
+        _ => {
+            out_buffer.copy_from_slice(&in_buffer);
+        }
+    }
+
+    // Scale output back to i16
+    for i in 0..320 {
+        xq[i] = (out_buffer[i] * 32768.0).round().clamp(-32768.0, 32767.0) as i16;
+    }
 }

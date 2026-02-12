@@ -44,6 +44,8 @@ pub struct OpusDecoder {
     pub(crate) DecControl: silk_DecControlStruct,
     pub(crate) decode_gain: i32,
     pub(crate) complexity: i32,
+    #[cfg(feature = "deep-plc")]
+    pub(crate) lpcnet: crate::dnn::lpcnet::LPCNetPLCState,
     pub(crate) stream_channels: i32,
     pub(crate) bandwidth: i32,
     pub(crate) mode: i32,
@@ -77,9 +79,14 @@ impl OpusDecoder {
                 internalSampleRate: 0,
                 payloadSize_ms: 0,
                 prevPitchLag: 0,
+                enable_deep_plc: false,
+                #[cfg(feature = "osce")]
+                osce_method: 0,
             },
             decode_gain: 0,
             complexity: 0,
+            #[cfg(feature = "deep-plc")]
+            lpcnet: crate::dnn::lpcnet::LPCNetPLCState::new(),
             stream_channels: channels as i32,
             bandwidth: 0,
             mode: 0,
@@ -194,6 +201,8 @@ impl OpusDecoder {
     pub fn reset(&mut self) {
         self.celt_dec.reset();
         silk_ResetDecoder(&mut self.silk_dec);
+        #[cfg(feature = "deep-plc")]
+        crate::dnn::lpcnet::lpcnet_plc_reset(&mut self.lpcnet);
         self.stream_channels = self.channels;
         self.bandwidth = 0;
         self.mode = 0;
@@ -441,6 +450,19 @@ fn opus_decode_frame(
                 st.DecControl.internalSampleRate = 16000;
             }
         }
+        // Set DNN control parameters based on complexity
+        st.DecControl.enable_deep_plc = st.complexity >= 5;
+        #[cfg(feature = "osce")]
+        {
+            st.DecControl.osce_method = 0; // OSCE_METHOD_NONE
+            if st.complexity >= 6 {
+                st.DecControl.osce_method = 1; // OSCE_METHOD_LACE
+            }
+            if st.complexity >= 7 {
+                st.DecControl.osce_method = 2; // OSCE_METHOD_NOLACE
+            }
+        }
+
         let lost_flag: i32 = if data.is_none() {
             1
         } else {
@@ -457,6 +479,8 @@ fn opus_decode_frame(
                 &mut dec,
                 &mut pcm_silk[pcm_ptr_off..],
                 &mut silk_frame_size,
+                #[cfg(feature = "deep-plc")]
+                Some(&mut st.lpcnet),
                 0,
             );
             if silk_ret != 0 {

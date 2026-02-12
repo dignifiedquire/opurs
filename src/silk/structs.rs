@@ -60,6 +60,8 @@ pub struct silk_PLC_struct {
     pub fs_kHz: i32,
     pub nb_subfr: i32,
     pub subfr_length: i32,
+    /// Whether Deep PLC is enabled (complexity >= 5)
+    pub enable_deep_plc: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -86,7 +88,7 @@ impl Default for silk_CNG_struct {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct silk_decoder_state {
     pub prev_gain_Q16: i32,
@@ -121,6 +123,8 @@ pub struct silk_decoder_state {
     pub prevSignalType: i32,
     pub arch: i32,
     pub sPLC: silk_PLC_struct,
+    #[cfg(feature = "osce")]
+    pub osce: crate::dnn::osce::OSCEState,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]

@@ -16,6 +16,7 @@ pub struct silk_EncControlStruct {
     pub packetLossPercentage: i32,
     pub complexity: i32,
     pub useInBandFEC: i32,
+    pub useDRED: i32,
     pub LBRR_coded: i32,
     pub useDTX: i32,
     pub useCBR: i32,

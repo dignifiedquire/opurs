@@ -48,6 +48,7 @@ pub fn silk_PLC(
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
     lost: i32,
+    #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     arch: i32,
 ) {
     if psDec.fs_kHz != psDec.sPLC.fs_kHz {
@@ -55,10 +56,31 @@ pub fn silk_PLC(
         psDec.sPLC.fs_kHz = psDec.fs_kHz;
     }
     if lost != 0 {
-        silk_PLC_conceal(psDec, psDecCtrl, frame, arch);
+        silk_PLC_conceal(
+            psDec,
+            psDecCtrl,
+            frame,
+            #[cfg(feature = "deep-plc")]
+            lpcnet,
+            arch,
+        );
         psDec.lossCnt += 1;
     } else {
         silk_PLC_update(psDec, psDecCtrl);
+        #[cfg(feature = "deep-plc")]
+        {
+            if let Some(lpcnet) = lpcnet {
+                if lpcnet.loaded && psDec.sPLC.fs_kHz == 16 {
+                    let subfr_length = psDec.subfr_length;
+                    for k in (0..psDec.nb_subfr).step_by(2) {
+                        crate::dnn::lpcnet::lpcnet_plc_update(
+                            lpcnet,
+                            &frame[k * subfr_length..(k + 2) * subfr_length],
+                        );
+                    }
+                }
+            }
+        }
     };
 }
 
@@ -165,6 +187,7 @@ fn silk_PLC_conceal(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
+    #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     _arch: i32,
 ) {
     let mut sLTP_Q14: Vec<i32> = vec![0; psDec.ltp_mem_length + psDec.frame_length];
@@ -350,6 +373,41 @@ fn silk_PLC_conceal(
             silk_SMULWW(sLTP_Q14[s], prevGain_Q10[1]),
             8,
         ))) as i16;
+    }
+
+    /* Deep PLC: override traditional PLC output with neural concealment */
+    #[cfg(feature = "deep-plc")]
+    {
+        if let Some(lpcnet) = lpcnet {
+            if lpcnet.loaded && psDec.sPLC.fs_kHz == 16 {
+                let run_deep_plc = psDec.sPLC.enable_deep_plc || lpcnet.fec_fill_pos != 0;
+                if run_deep_plc {
+                    let subfr_length = psDec.subfr_length;
+                    for k in (0..psDec.nb_subfr).step_by(2) {
+                        crate::dnn::lpcnet::lpcnet_plc_conceal(
+                            lpcnet,
+                            &mut frame[k * subfr_length..(k + 2) * subfr_length],
+                        );
+                    }
+                    // Reconstruct LPC state from neural PLC output so that
+                    // the traditional PLC state stays consistent.
+                    let sLPC_ptr = &mut sLTP_Q14[sLPC_off..];
+                    for i in 0..psDec.frame_length {
+                        sLPC_ptr[MAX_LPC_ORDER + i] = (0.5
+                            + frame[i] as f32 * ((1 << 24) as f32) / prevGain_Q10[1] as f32)
+                            as i32;
+                    }
+                } else {
+                    let subfr_length = psDec.subfr_length;
+                    for k in (0..psDec.nb_subfr).step_by(2) {
+                        crate::dnn::lpcnet::lpcnet_plc_update(
+                            lpcnet,
+                            &frame[k * subfr_length..(k + 2) * subfr_length],
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /* Save LPC state */

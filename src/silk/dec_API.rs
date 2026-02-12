@@ -11,6 +11,11 @@ pub struct silk_DecControlStruct {
     pub internalSampleRate: i32,
     pub payloadSize_ms: i32,
     pub prevPitchLag: i32,
+    /// Whether Deep PLC is enabled (complexity >= 5)
+    pub enable_deep_plc: bool,
+    /// OSCE enhancement method (0=none, 1=LACE, 2=NoLACE)
+    #[cfg(feature = "osce")]
+    pub osce_method: i32,
 }
 pub const FLAG_DECODE_NORMAL: i32 = 0;
 pub const FLAG_DECODE_LBRR: i32 = 2;
@@ -38,7 +43,7 @@ use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_d
 use crate::silk::structs::{silk_decoder_state, stereo_dec_state};
 use crate::silk::tables_other::silk_LBRR_flags_iCDF_ptr;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct silk_decoder {
     pub channel_state: [silk_decoder_state; 2],
@@ -46,6 +51,8 @@ pub struct silk_decoder {
     pub nChannelsAPI: i32,
     pub nChannelsInternal: i32,
     pub prev_decode_only_middle: bool,
+    #[cfg(feature = "osce")]
+    pub osce_model: crate::dnn::osce::OSCEModel,
 }
 pub fn silk_InitDecoder() -> silk_decoder {
     silk_decoder {
@@ -54,6 +61,8 @@ pub fn silk_InitDecoder() -> silk_decoder {
         nChannelsAPI: 0,
         nChannelsInternal: 0,
         prev_decode_only_middle: false,
+        #[cfg(feature = "osce")]
+        osce_model: crate::dnn::osce::OSCEModel::default(),
     }
 }
 
@@ -77,6 +86,7 @@ pub fn silk_Decode(
     psRangeDec: &mut ec_dec,
     samplesOut: &mut [i16],
     nSamplesOut: &mut i32,
+    #[cfg(feature = "deep-plc")] mut lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     arch: i32,
 ) -> i32 {
     let mut i: i32;
@@ -306,12 +316,32 @@ pub fn silk_Decode(
             }
             let ch_off = if n == 0 { ch0_off } else { ch1_off };
             let out_slice = &mut samplesOut1_tmp_storage[ch_off + 2..ch_off + 2 + frame_len];
+
+            // Reset OSCE state if method changed
+            #[cfg(feature = "osce")]
+            {
+                if channel_state[n as usize].osce.method != decControl.osce_method {
+                    crate::dnn::osce::osce_reset(
+                        &mut channel_state[n as usize].osce,
+                        decControl.osce_method,
+                    );
+                }
+            }
+
+            // Only pass lpcnet for channel 0 (mid channel)
+            #[cfg(feature = "deep-plc")]
+            let lpcnet_ch = if n == 0 { lpcnet.as_deref_mut() } else { None };
+
             let (err, n_out) = silk_decode_frame(
                 &mut channel_state[n as usize],
                 psRangeDec,
                 out_slice,
                 lostFlag,
                 condCoding_0,
+                #[cfg(feature = "deep-plc")]
+                lpcnet_ch,
+                #[cfg(feature = "osce")]
+                &psDec.osce_model,
                 arch,
             );
             ret += err;

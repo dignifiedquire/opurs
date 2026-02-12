@@ -29,6 +29,8 @@ use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
 
+#[cfg(feature = "dred")]
+use crate::dnn::dred::config::DRED_MAX_FRAMES;
 use crate::opus::analysis::{
     run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo, DownmixInput,
     TonalityAnalysisState,
@@ -52,7 +54,7 @@ use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};
 use crate::{opus_packet_pad, OpusRepacketizer};
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct OpusEncoder {
     pub(crate) silk_enc: silk_encoder,
@@ -104,6 +106,22 @@ pub struct OpusEncoder {
     pub(crate) peak_signal_energy: opus_val32,
     pub(crate) nonfinal_frame: i32,
     pub(crate) rangeFinal: u32,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_encoder: crate::dnn::dred::encoder::DREDEnc,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_duration: i32,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_q0: i32,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_dQ: i32,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_qmax: i32,
+    #[cfg(feature = "dred")]
+    pub(crate) dred_target_chunks: i32,
+    /// Activity memory for DRED encoder (2.5ms resolution).
+    /// Size: DRED_MAX_FRAMES * 4 = 416 bytes.
+    #[cfg(feature = "dred")]
+    pub(crate) activity_mem: [u8; DRED_MAX_FRAMES * 4],
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -157,6 +175,7 @@ impl OpusEncoder {
         silk_mode.packetLossPercentage = 0;
         silk_mode.complexity = 9;
         silk_mode.useInBandFEC = 0;
+        silk_mode.useDRED = 0;
         silk_mode.useDTX = 0;
         silk_mode.useCBR = 0;
         silk_mode.reducedDependency = 0;
@@ -225,6 +244,20 @@ impl OpusEncoder {
             peak_signal_energy: 0.0,
             nonfinal_frame: 0,
             rangeFinal: 0,
+            #[cfg(feature = "dred")]
+            dred_encoder: crate::dnn::dred::encoder::DREDEnc::new(),
+            #[cfg(feature = "dred")]
+            dred_duration: 0,
+            #[cfg(feature = "dred")]
+            dred_q0: 0,
+            #[cfg(feature = "dred")]
+            dred_dQ: 0,
+            #[cfg(feature = "dred")]
+            dred_qmax: 0,
+            #[cfg(feature = "dred")]
+            dred_target_chunks: 0,
+            #[cfg(feature = "dred")]
+            activity_mem: [0u8; DRED_MAX_FRAMES * 4],
         })
     }
 
@@ -502,6 +535,23 @@ impl OpusEncoder {
         }
     }
 
+    /// Set the DRED duration in frames (0 to disable, max DRED_MAX_FRAMES).
+    #[cfg(feature = "dred")]
+    pub fn set_dred_duration(&mut self, value: i32) -> Result<(), i32> {
+        if value < 0 || value > DRED_MAX_FRAMES as i32 {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.dred_duration = value;
+        self.silk_mode.useDRED = if value != 0 { 1 } else { 0 };
+        Ok(())
+    }
+
+    /// Get the current DRED duration setting.
+    #[cfg(feature = "dred")]
+    pub fn dred_duration(&self) -> i32 {
+        self.dred_duration
+    }
+
     pub fn reset(&mut self) {
         let mut dummy = silk_EncControlStruct::default();
         tonality_analysis_reset(&mut self.analysis);
@@ -544,6 +594,8 @@ impl OpusEncoder {
         self.mode = MODE_HYBRID;
         self.bandwidth = OPUS_BANDWIDTH_FULLBAND;
         self.variable_HP_smth2_Q15 = ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32;
+        #[cfg(feature = "dred")]
+        self.dred_encoder.reset();
     }
 }
 /// Upstream C: src/opus_encoder.c:gen_toc
@@ -1233,7 +1285,160 @@ fn encode_multiframe_packet(
     st.force_channels = bak_channels;
     st.silk_mode.toMono = bak_to_mono;
 
+    // Add DRED extension to the repacketized output
+    #[cfg(feature = "dred")]
+    {
+        use crate::dnn::dred::config::{
+            DRED_EXPERIMENTAL_BYTES, DRED_EXPERIMENTAL_VERSION, DRED_EXTENSION_ID,
+            DRED_MAX_DATA_SIZE, DRED_MIN_BYTES, DRED_NUM_REDUNDANCY_FRAMES,
+        };
+        use crate::dnn::dred::encoder::dred_encode_silk_frame;
+        use crate::opus::extensions::OpusExtensionData;
+        use crate::opus::repacketizer::opus_packet_pad_impl;
+
+        if st.dred_duration > 0 && st.dred_encoder.loaded {
+            let mut buf = [0u8; DRED_MAX_DATA_SIZE];
+            let mut dred_chunks =
+                ((st.dred_duration + 5) / 4).min(DRED_NUM_REDUNDANCY_FRAMES as i32 / 2);
+            if st.use_vbr != 0 {
+                dred_chunks = dred_chunks.min(st.dred_target_chunks);
+            }
+            let mut dred_bytes_left = (DRED_MAX_DATA_SIZE as i32).min(out_data_bytes - ret - 3);
+            dred_bytes_left -= (dred_bytes_left + 1 + DRED_EXPERIMENTAL_BYTES as i32) / 255;
+            if dred_chunks >= 1
+                && dred_bytes_left >= (DRED_MIN_BYTES + DRED_EXPERIMENTAL_BYTES) as i32
+            {
+                buf[0] = b'D';
+                buf[1] = DRED_EXPERIMENTAL_VERSION as u8;
+                let dred_bytes = dred_encode_silk_frame(
+                    &mut st.dred_encoder,
+                    &mut buf[DRED_EXPERIMENTAL_BYTES..],
+                    dred_chunks as usize,
+                    (dred_bytes_left - DRED_EXPERIMENTAL_BYTES as i32) as usize,
+                    st.dred_q0,
+                    st.dred_dQ,
+                    st.dred_qmax,
+                    &st.activity_mem,
+                );
+                if dred_bytes > 0 {
+                    let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;
+                    let extension = OpusExtensionData {
+                        id: DRED_EXTENSION_ID,
+                        frame: 0,
+                        data: buf[..total_dred_bytes].to_vec(),
+                    };
+                    ret = opus_packet_pad_impl(
+                        data,
+                        ret,
+                        out_data_bytes,
+                        st.use_vbr == 0,
+                        &[extension],
+                    );
+                    if ret < 0 {
+                        return OPUS_INTERNAL_ERROR;
+                    }
+                }
+            }
+        }
+    }
+
     ret
+}
+
+/// Upstream C: src/opus_encoder.c:dred_bits_table
+#[cfg(feature = "dred")]
+static DRED_BITS_TABLE: [f32; 16] = [
+    73.2, 68.1, 62.5, 57.0, 51.5, 45.7, 39.9, 32.4, 26.4, 20.4, 16.3, 13.0, 9.3, 8.2, 7.2, 6.4,
+];
+
+/// Upstream C: src/opus_encoder.c:estimate_dred_bitrate
+#[cfg(feature = "dred")]
+fn estimate_dred_bitrate(
+    q0: i32,
+    dq: i32,
+    qmax: i32,
+    duration: i32,
+    target_bits: i32,
+    target_chunks: &mut i32,
+) -> i32 {
+    use crate::dnn::dred::coding::compute_quantizer;
+    use crate::dnn::dred::config::{DRED_EXPERIMENTAL_BYTES, DRED_NUM_REDUNDANCY_FRAMES};
+
+    // Signaling DRED costs 3 bytes.
+    let mut bits: f32 = 8.0 * (3 + DRED_EXPERIMENTAL_BYTES) as f32;
+    // Approximation for the size of the IS.
+    bits += 50.0 + DRED_BITS_TABLE[q0 as usize];
+    let dred_chunks = ((duration + 5) / 4).min(DRED_NUM_REDUNDANCY_FRAMES as i32 / 2);
+    *target_chunks = 0;
+    for i in 0..dred_chunks {
+        let q = compute_quantizer(q0, dq, qmax, i);
+        bits += DRED_BITS_TABLE[q as usize];
+        if (bits as i32) < target_bits {
+            *target_chunks = i + 1;
+        }
+    }
+    (0.5 + bits).floor() as i32
+}
+
+/// Upstream C: src/opus_encoder.c:compute_dred_bitrate
+#[cfg(feature = "dred")]
+fn compute_dred_bitrate(st: &mut OpusEncoder, bitrate_bps: i32, frame_size: i32) -> i32 {
+    use crate::silk::macros::EC_CLZ0;
+
+    let bitrate_offset: i32;
+    let mut dred_frac: f32;
+
+    if st.silk_mode.useInBandFEC != 0 {
+        dred_frac = (0.7f32).min(3.0 * st.silk_mode.packetLossPercentage as f32 / 100.0);
+        bitrate_offset = 20000;
+    } else {
+        if st.silk_mode.packetLossPercentage > 5 {
+            dred_frac = (0.8f32).min(0.55 + st.silk_mode.packetLossPercentage as f32 / 100.0);
+        } else {
+            dred_frac = 12.0 * st.silk_mode.packetLossPercentage as f32 / 100.0;
+        }
+        bitrate_offset = 12000;
+    }
+    // Account for the fact that longer packets require less redundancy.
+    dred_frac =
+        dred_frac / (dred_frac + (1.0 - dred_frac) * (frame_size as f32 * 50.0) / st.Fs as f32);
+    // Approximate fit based on a few experiments.
+    let q0 = 15.min(4.max(
+        51 - 3 * (EC_CLZ0 - (1.max(bitrate_bps - bitrate_offset) as u32).leading_zeros() as i32),
+    ));
+    let dq = if bitrate_bps - bitrate_offset > 36000 {
+        3
+    } else {
+        5
+    };
+    let qmax = 15;
+    let target_dred_bitrate = 0.max((dred_frac * (bitrate_bps - bitrate_offset) as f32) as i32);
+    let mut target_chunks: i32 = 0;
+    let max_dred_bits: i32;
+    if st.dred_duration > 0 {
+        let target_bits = target_dred_bitrate * frame_size / st.Fs;
+        max_dred_bits = estimate_dred_bitrate(
+            q0,
+            dq,
+            qmax,
+            st.dred_duration,
+            target_bits,
+            &mut target_chunks,
+        );
+    } else {
+        max_dred_bits = 0;
+        target_chunks = 0;
+    }
+    let mut dred_bitrate = target_dred_bitrate.min(max_dred_bits * st.Fs / frame_size);
+    // If we can't afford enough bits, don't bother with DRED at all.
+    if target_chunks < 2 {
+        dred_bitrate = 0;
+    }
+    st.dred_q0 = q0;
+    st.dred_dQ = dq;
+    st.dred_qmax = qmax;
+    st.dred_target_chunks = target_chunks;
+    dred_bitrate
 }
 
 /// Upstream C: src/opus_encoder.c:compute_redundancy_bytes
@@ -1462,6 +1667,13 @@ pub fn opus_encode_native(
         st.bitrate_bps = cbrBytes * frame_rate12 * 8 / 12;
         max_data_bytes = if 1 > cbrBytes { 1 } else { cbrBytes };
     }
+    // Allocate some of the bits to DRED if needed.
+    #[cfg(feature = "dred")]
+    let dred_bitrate_bps = {
+        let dbr = compute_dred_bitrate(st, st.bitrate_bps, frame_size);
+        st.bitrate_bps -= dbr;
+        dbr
+    };
     if max_data_bytes < 3
         || st.bitrate_bps < 3 * frame_rate * 8
         || frame_rate < 50 && (max_data_bytes * frame_rate < 300 || st.bitrate_bps < 2400)
@@ -1665,6 +1877,7 @@ pub fn opus_encode_native(
             packetLossPercentage: 0,
             complexity: 0,
             useInBandFEC: 0,
+            useDRED: 0,
             LBRR_coded: 0,
             useDTX: 0,
             useCBR: 0,
@@ -1934,6 +2147,28 @@ pub fn opus_encode_native(
             st.hp_mem[0_usize] = st.hp_mem[1_usize];
         }
     }
+    // DRED encoder: compute latents from HP-filtered PCM
+    #[cfg(feature = "dred")]
+    {
+        if st.dred_duration > 0 && st.dred_encoder.loaded {
+            let frame_size_400hz = (frame_size * 400 / st.Fs) as usize;
+            crate::dnn::dred::encoder::dred_compute_latents(
+                &mut st.dred_encoder,
+                &pcm_buf,
+                frame_size as usize,
+                total_buffer as usize,
+            );
+            // Shift activity memory and fill with current activity
+            st.activity_mem
+                .copy_within(..DRED_MAX_FRAMES * 4 - frame_size_400hz, frame_size_400hz);
+            for i in 0..frame_size_400hz {
+                st.activity_mem[i] = activity as u8;
+            }
+        } else {
+            st.dred_encoder.latents_buffer_fill = 0;
+            st.activity_mem.fill(0);
+        }
+    }
     HB_gain = Q15ONE;
     if st.mode != MODE_CELT_ONLY {
         let mut total_bitRate: i32 = 0;
@@ -2060,13 +2295,17 @@ pub fn opus_encode_native(
             }
         }
         if st.silk_mode.useCBR != 0 {
-            if st.mode == MODE_HYBRID {
-                st.silk_mode.maxBits =
-                    if st.silk_mode.maxBits < st.silk_mode.bitRate * frame_size / st.Fs {
-                        st.silk_mode.maxBits
-                    } else {
-                        st.silk_mode.bitRate * frame_size / st.Fs
-                    };
+            #[cfg(feature = "dred")]
+            let switch_silk_to_vbr = st.mode == MODE_HYBRID || dred_bitrate_bps > 0;
+            #[cfg(not(feature = "dred"))]
+            let switch_silk_to_vbr = st.mode == MODE_HYBRID;
+            if switch_silk_to_vbr {
+                // When we have non-SILK data to encode, switch SILK to VBR with cap.
+                // Any variations will be absorbed by CELT and/or DRED.
+                let other_bits =
+                    0.max(st.silk_mode.maxBits - st.silk_mode.bitRate * frame_size / st.Fs);
+                st.silk_mode.maxBits = 0.max(st.silk_mode.maxBits - other_bits * 3 / 4);
+                st.silk_mode.useCBR = 0;
             }
         } else if st.mode == MODE_HYBRID {
             let maxBitRate: i32 = compute_silk_rate_for_hybrid(
@@ -2339,6 +2578,17 @@ pub fn opus_encode_native(
         nb_compr_bytes = ret;
     } else {
         nb_compr_bytes = max_data_bytes - 1 - redundancy_bytes;
+        #[cfg(feature = "dred")]
+        if st.dred_duration > 0 {
+            let dred_bytes = dred_bitrate_bps / (frame_rate * 8);
+            // Allow CELT to steal up to 25% of the remaining bits.
+            let mut max_celt_bytes = nb_compr_bytes - dred_bytes * 3 / 4;
+            // But try to give CELT at least 5 bytes to prevent a mismatch with
+            // the redundancy signaling.
+            max_celt_bytes = max_celt_bytes.max((ec_tell(&enc) + 7) / 8 + 5);
+            // Subject to the original max.
+            nb_compr_bytes = nb_compr_bytes.min(max_celt_bytes);
+        }
         ec_enc_shrink(&mut enc, nb_compr_bytes as u32);
     }
     if redundancy != 0 || st.mode != MODE_SILK_ONLY {
@@ -2399,6 +2649,17 @@ pub fn opus_encode_native(
                 st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bitRate;
             }
             st.celt_enc.vbr = st.use_vbr;
+            // When using DRED CBR, make the CELT part VBR and have DRED pick up the slack.
+            #[cfg(feature = "dred")]
+            if st.use_vbr == 0 && st.dred_duration > 0 {
+                let mut celt_bitrate = st.bitrate_bps;
+                st.celt_enc.vbr = 1;
+                st.celt_enc.constrained_vbr = 0;
+                if st.mode == MODE_HYBRID {
+                    celt_bitrate -= st.silk_mode.bitRate;
+                }
+                st.celt_enc.bitrate = celt_bitrate;
+            }
             ret = celt_encode_with_ec(
                 &mut st.celt_enc,
                 &pcm_buf,
@@ -2517,7 +2778,71 @@ pub fn opus_encode_native(
         }
     }
     ret += 1 + redundancy_bytes;
-    if st.use_vbr == 0 {
+    #[allow(unused_mut)]
+    let mut apply_padding = st.use_vbr == 0;
+    #[cfg(feature = "dred")]
+    {
+        use crate::dnn::dred::config::{
+            DRED_EXPERIMENTAL_BYTES, DRED_EXPERIMENTAL_VERSION, DRED_EXTENSION_ID,
+            DRED_MAX_DATA_SIZE, DRED_MIN_BYTES, DRED_NUM_REDUNDANCY_FRAMES,
+        };
+        use crate::dnn::dred::encoder::dred_encode_silk_frame;
+        use crate::opus::extensions::OpusExtensionData;
+        use crate::opus::repacketizer::opus_packet_pad_impl;
+
+        if st.dred_duration > 0 && st.dred_encoder.loaded {
+            let mut buf = [0u8; DRED_MAX_DATA_SIZE];
+            let mut dred_chunks =
+                ((st.dred_duration + 5) / 4).min(DRED_NUM_REDUNDANCY_FRAMES as i32 / 2);
+            if st.use_vbr != 0 {
+                dred_chunks = dred_chunks.min(st.dred_target_chunks);
+            }
+            // Remaining space for DRED, accounting for 3 extra bytes for code 3,
+            // padding length, and extension number.
+            let mut dred_bytes_left = (DRED_MAX_DATA_SIZE as i32).min(max_data_bytes - ret - 3);
+            // Account for the extra bytes required to signal large padding length.
+            dred_bytes_left -= (dred_bytes_left + 1 + DRED_EXPERIMENTAL_BYTES as i32) / 255;
+            // Check whether we actually have something to encode.
+            if dred_chunks >= 1
+                && dred_bytes_left >= (DRED_MIN_BYTES + DRED_EXPERIMENTAL_BYTES) as i32
+            {
+                // Add temporary extension type and version bytes.
+                buf[0] = b'D';
+                buf[1] = DRED_EXPERIMENTAL_VERSION as u8;
+                let dred_bytes = dred_encode_silk_frame(
+                    &mut st.dred_encoder,
+                    &mut buf[DRED_EXPERIMENTAL_BYTES..],
+                    dred_chunks as usize,
+                    (dred_bytes_left - DRED_EXPERIMENTAL_BYTES as i32) as usize,
+                    st.dred_q0,
+                    st.dred_dQ,
+                    st.dred_qmax,
+                    &st.activity_mem,
+                );
+                if dred_bytes > 0 {
+                    let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;
+                    assert!(total_dred_bytes <= dred_bytes_left as usize);
+                    let extension = OpusExtensionData {
+                        id: DRED_EXTENSION_ID,
+                        frame: 0,
+                        data: buf[..total_dred_bytes].to_vec(),
+                    };
+                    ret = opus_packet_pad_impl(
+                        data,
+                        ret,
+                        max_data_bytes,
+                        st.use_vbr == 0,
+                        &[extension],
+                    );
+                    if ret < 0 {
+                        return OPUS_INTERNAL_ERROR;
+                    }
+                    apply_padding = false;
+                }
+            }
+        }
+    }
+    if apply_padding {
         if opus_packet_pad(&mut data[..max_data_bytes as usize], ret, max_data_bytes) != OPUS_OK {
             return OPUS_INTERNAL_ERROR;
         }

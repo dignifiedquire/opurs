@@ -45,6 +45,10 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
     dec.prevSignalType = 0;
     dec.arch = 0;
     dec.sPLC = silk_PLC_struct::default();
+    #[cfg(feature = "osce")]
+    {
+        crate::dnn::osce::osce_reset(&mut dec.osce, crate::dnn::osce::OSCE_METHOD_NONE);
+    }
 
     silk_CNG_Reset(dec);
     silk_PLC_Reset(dec);
@@ -85,6 +89,8 @@ pub fn silk_init_decoder() -> silk_decoder_state {
         prevSignalType: 0,
         arch: 0,
         sPLC: silk_PLC_struct::default(),
+        #[cfg(feature = "osce")]
+        osce: crate::dnn::osce::OSCEState::default(),
     };
 
     // Full init zeroes everything, then reset sets the proper initial values

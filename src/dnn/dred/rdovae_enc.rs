@@ -316,6 +316,7 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
 /// RDOVAE encoder state.
 ///
 /// Upstream C: dnn/dred_rdovae_enc.h:RDOVAEEncStruct
+#[derive(Clone)]
 pub struct RDOVAEEncState {
     pub initialized: bool,
     pub gru1_state: Vec<f32>,
