@@ -84,14 +84,14 @@ pub unsafe fn xcorr_kernel_sse(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: us
     _mm_storeu_ps(sum.as_mut_ptr(), _mm_add_ps(xsum1, xsum2));
 }
 
-/// AVX2 implementation of 8-wide `xcorr_kernel`.
+/// AVX2+FMA implementation of 8-wide `xcorr_kernel`.
 /// Port of `celt/x86/pitch_avx.c:xcorr_kernel_avx`.
 /// Computes 8 cross-correlation results simultaneously using 256-bit vectors.
-/// Uses mul+add (no FMA) to maintain bit-exactness with scalar path.
+/// Uses FMA (`_mm256_fmadd_ps`) to match C reference exactly.
 ///
 /// # Safety
-/// Requires AVX2 support (checked by caller via cpufeatures).
-#[target_feature(enable = "avx2")]
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
+#[target_feature(enable = "avx2", enable = "fma")]
 unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize) {
     debug_assert!(x.len() >= len);
     debug_assert!(y.len() >= len + 7);
@@ -108,35 +108,14 @@ unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize
     let mut i = 0usize;
     while i + 7 < len {
         let x0 = _mm256_loadu_ps(x.as_ptr().add(i));
-        xsum0 = _mm256_add_ps(xsum0, _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i))));
-        xsum1 = _mm256_add_ps(
-            xsum1,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 1))),
-        );
-        xsum2 = _mm256_add_ps(
-            xsum2,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 2))),
-        );
-        xsum3 = _mm256_add_ps(
-            xsum3,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 3))),
-        );
-        xsum4 = _mm256_add_ps(
-            xsum4,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 4))),
-        );
-        xsum5 = _mm256_add_ps(
-            xsum5,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 5))),
-        );
-        xsum6 = _mm256_add_ps(
-            xsum6,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 6))),
-        );
-        xsum7 = _mm256_add_ps(
-            xsum7,
-            _mm256_mul_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 7))),
-        );
+        xsum0 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i)), xsum0);
+        xsum1 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 1)), xsum1);
+        xsum2 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 2)), xsum2);
+        xsum3 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 3)), xsum3);
+        xsum4 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 4)), xsum4);
+        xsum5 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 5)), xsum5);
+        xsum6 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 6)), xsum6);
+        xsum7 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y.as_ptr().add(i + 7)), xsum7);
         i += 8;
     }
 
@@ -147,38 +126,14 @@ unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize
         let remaining = len - i;
         let m = _mm256_loadu_si256(MASK_TABLE.as_ptr().add(7 - remaining) as *const __m256i);
         let x0 = _mm256_maskload_ps(x.as_ptr().add(i), m);
-        xsum0 = _mm256_add_ps(
-            xsum0,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i), m)),
-        );
-        xsum1 = _mm256_add_ps(
-            xsum1,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 1), m)),
-        );
-        xsum2 = _mm256_add_ps(
-            xsum2,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 2), m)),
-        );
-        xsum3 = _mm256_add_ps(
-            xsum3,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 3), m)),
-        );
-        xsum4 = _mm256_add_ps(
-            xsum4,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 4), m)),
-        );
-        xsum5 = _mm256_add_ps(
-            xsum5,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 5), m)),
-        );
-        xsum6 = _mm256_add_ps(
-            xsum6,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 6), m)),
-        );
-        xsum7 = _mm256_add_ps(
-            xsum7,
-            _mm256_mul_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 7), m)),
-        );
+        xsum0 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i), m), xsum0);
+        xsum1 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 1), m), xsum1);
+        xsum2 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 2), m), xsum2);
+        xsum3 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 3), m), xsum3);
+        xsum4 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 4), m), xsum4);
+        xsum5 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 5), m), xsum5);
+        xsum6 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 6), m), xsum6);
+        xsum7 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 7), m), xsum7);
     }
 
     // 8 horizontal sums
@@ -209,10 +164,11 @@ unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize
 
 /// AVX2 implementation of `celt_pitch_xcorr`.
 /// Processes 8 correlations at a time using `xcorr_kernel_avx2`.
+/// Tail uses scalar `celt_inner_prod` (dispatched to SSE via RTCD), matching C.
 ///
 /// # Safety
-/// Requires AVX2 support (checked by caller via cpufeatures).
-#[target_feature(enable = "avx2")]
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
+#[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn celt_pitch_xcorr_avx2(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
     debug_assert!(max_pitch > 0);
@@ -232,16 +188,8 @@ pub unsafe fn celt_pitch_xcorr_avx2(x: &[f32], y: &[f32], xcorr: &mut [f32], len
         xcorr[i + 7] = sum[7];
         i += 8;
     }
-    // Handle remaining with SSE (4 at a time) or scalar
-    while i + 3 < max_pitch {
-        let mut sum = [0.0f32; 4];
-        xcorr_kernel_sse(&x[..len], &y[i..], &mut sum, len);
-        xcorr[i] = sum[0];
-        xcorr[i + 1] = sum[1];
-        xcorr[i + 2] = sum[2];
-        xcorr[i + 3] = sum[3];
-        i += 4;
-    }
+    // Handle remaining 1-7 with SSE celt_inner_prod, matching C's
+    // `celt_inner_prod(_x, _y+i, len, arch)` which dispatches to SSE.
     while i < max_pitch {
         xcorr[i] = celt_inner_prod_sse(x, &y[i..], len);
         i += 1;

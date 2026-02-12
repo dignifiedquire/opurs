@@ -23,7 +23,7 @@ cpufeatures::new!(cpuid_sse2, "sse2");
 cpufeatures::new!(cpuid_sse4_1, "sse4.1");
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-cpufeatures::new!(cpuid_avx2, "avx2");
+cpufeatures::new!(cpuid_avx2_fma, "avx2", "fma");
 
 // -- Dispatch functions --
 // Each function selects the best available SIMD implementation at runtime,
@@ -112,7 +112,7 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if cpuid_avx2_fma::get() {
             unsafe {
                 x86::celt_pitch_xcorr_avx2(x, y, xcorr, len);
             }
