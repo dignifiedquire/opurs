@@ -67,6 +67,10 @@ deep-plc = []          # Deep PLC: nnet + freq + burg + pitchdnn + fargan + lpcn
 dred = ["deep-plc"]    # DRED: deep-plc + rdovae + extensions + dred enc/dec
 osce = ["deep-plc"]    # OSCE: deep-plc + nndsp + lace/nolace
 dnn = ["deep-plc", "dred", "osce"]  # All DNN features
+builtin-weights = ["deep-plc"]  # Compile ~4.7MB of weight data into the binary
+
+# Pass DNN features through to libopus-sys (for tools that need C weight data)
+tools-dnn = ["tools", "dnn", "builtin-weights", "libopus-sys/dnn"]
 
 [[example]]
 name = "run_vectors2"
@@ -83,3 +87,11 @@ required-features = ["tools"]
 [[example]]
 name = "repacketizer_demo"
 required-features = ["tools"]
+
+[[example]]
+name = "dnn_codegen"
+required-features = ["tools-dnn"]
+
+[[example]]
+name = "dnn_comparison"
+required-features = ["tools-dnn"]

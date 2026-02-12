@@ -10,5 +10,9 @@ pub mod config;
 pub mod decoder;
 pub mod encoder;
 pub mod rdovae_dec;
+#[cfg(feature = "builtin-weights")]
+pub mod rdovae_dec_data;
 pub mod rdovae_enc;
+#[cfg(feature = "builtin-weights")]
+pub mod rdovae_enc_data;
 pub mod stats;

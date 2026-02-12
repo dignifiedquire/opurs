@@ -20,6 +20,8 @@ pub mod burg;
 #[cfg(feature = "dred")]
 pub mod dred;
 pub mod fargan;
+#[cfg(feature = "builtin-weights")]
+pub mod fargan_data;
 pub mod freq;
 pub mod lpcnet;
 pub mod lpcnet_tables;
@@ -28,5 +30,14 @@ pub mod nndsp;
 pub mod nnet;
 #[cfg(feature = "osce")]
 pub mod osce;
+#[cfg(all(feature = "osce", feature = "builtin-weights"))]
+pub mod osce_lace_data;
+#[cfg(all(feature = "osce", feature = "builtin-weights"))]
+pub mod osce_nolace_data;
 pub mod pitchdnn;
+#[cfg(feature = "builtin-weights")]
+pub mod pitchdnn_data;
+#[cfg(feature = "builtin-weights")]
+pub mod plc_data;
 pub mod vec;
+pub mod weights;

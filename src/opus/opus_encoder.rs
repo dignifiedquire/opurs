@@ -552,6 +552,38 @@ impl OpusEncoder {
         self.dred_duration
     }
 
+    /// Load DNN models from compiled-in weight data.
+    ///
+    /// Returns `Ok(())` if all encoder-side models loaded successfully,
+    /// or `Err(OPUS_INTERNAL_ERROR)` if loading failed.
+    ///
+    /// Requires the `builtin-weights` feature.
+    #[cfg(all(feature = "dred", feature = "builtin-weights"))]
+    pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
+        let arrays = crate::dnn::weights::compiled_weights();
+        self.load_dnn_from_arrays(&arrays)
+    }
+
+    /// Load DNN models from an external binary weight blob.
+    ///
+    /// The blob must be in the upstream "DNNw" format.
+    #[cfg(feature = "dred")]
+    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
+        let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
+        self.load_dnn_from_arrays(&arrays)
+    }
+
+    #[cfg(feature = "dred")]
+    fn load_dnn_from_arrays(
+        &mut self,
+        arrays: &[crate::dnn::nnet::WeightArray],
+    ) -> Result<(), i32> {
+        if !self.dred_encoder.load_model(arrays) {
+            return Err(OPUS_INTERNAL_ERROR);
+        }
+        Ok(())
+    }
+
     pub fn reset(&mut self) {
         let mut dummy = silk_EncControlStruct::default();
         tonality_analysis_reset(&mut self.analysis);

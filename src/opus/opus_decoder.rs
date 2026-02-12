@@ -198,6 +198,44 @@ impl OpusDecoder {
         self.complexity
     }
 
+    /// Load DNN models from compiled-in weight data.
+    ///
+    /// Loads Deep PLC (always), OSCE (if `osce` feature), and DRED decoder
+    /// weights. Returns `Ok(())` on success.
+    ///
+    /// Requires the `builtin-weights` feature.
+    #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
+    pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
+        let arrays = crate::dnn::weights::compiled_weights();
+        self.load_dnn_from_arrays(&arrays)
+    }
+
+    /// Load DNN models from an external binary weight blob.
+    ///
+    /// The blob must be in the upstream "DNNw" format.
+    #[cfg(feature = "deep-plc")]
+    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
+        let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
+        self.load_dnn_from_arrays(&arrays)
+    }
+
+    #[cfg(feature = "deep-plc")]
+    fn load_dnn_from_arrays(
+        &mut self,
+        arrays: &[crate::dnn::nnet::WeightArray],
+    ) -> Result<(), i32> {
+        if !self.lpcnet.load_model(arrays) {
+            return Err(OPUS_INTERNAL_ERROR);
+        }
+        #[cfg(feature = "osce")]
+        {
+            if !crate::dnn::osce::osce_load_models(&mut self.silk_dec.osce_model, arrays) {
+                return Err(OPUS_INTERNAL_ERROR);
+            }
+        }
+        Ok(())
+    }
+
     pub fn reset(&mut self) {
         self.celt_dec.reset();
         silk_ResetDecoder(&mut self.silk_dec);

@@ -76,6 +76,23 @@ impl OpusDREDDecoder {
             None => false,
         }
     }
+
+    /// Load model from compiled-in weight data.
+    ///
+    /// Requires the `builtin-weights` feature.
+    #[cfg(feature = "builtin-weights")]
+    pub fn load_dnn_weights(&mut self) -> bool {
+        let arrays = super::super::weights::compiled_weights();
+        self.load_model(&arrays)
+    }
+
+    /// Load model from an external binary weight blob.
+    pub fn set_dnn_blob(&mut self, data: &[u8]) -> bool {
+        match super::super::weights::load_weights(data) {
+            Some(arrays) => self.load_model(&arrays),
+            None => false,
+        }
+    }
 }
 
 /// Decode latents from entropy-coded bytes.
