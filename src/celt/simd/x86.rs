@@ -48,20 +48,40 @@ pub unsafe fn xcorr_kernel_sse(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: us
         j += 4;
     }
 
-    xsum1 = _mm_add_ps(xsum1, xsum2);
-
-    // Handle remaining 1-3 elements
-    while j < len {
-        let xj = _mm_set1_ps(*x.get_unchecked(j));
-        let yj = _mm_loadu_ps(y.as_ptr().add(j));
-        xsum1 = _mm_add_ps(xsum1, _mm_mul_ps(xj, yj));
+    // Handle remaining 1-3 elements.
+    // Must match C accumulation order exactly: alternate xsum1/xsum2
+    // for each remaining element, then combine at the end.
+    if j < len {
+        xsum1 = _mm_add_ps(
+            xsum1,
+            _mm_mul_ps(
+                _mm_load1_ps(x.as_ptr().add(j)),
+                _mm_loadu_ps(y.as_ptr().add(j)),
+            ),
+        );
         j += 1;
+        if j < len {
+            xsum2 = _mm_add_ps(
+                xsum2,
+                _mm_mul_ps(
+                    _mm_load1_ps(x.as_ptr().add(j)),
+                    _mm_loadu_ps(y.as_ptr().add(j)),
+                ),
+            );
+            j += 1;
+            if j < len {
+                xsum1 = _mm_add_ps(
+                    xsum1,
+                    _mm_mul_ps(
+                        _mm_load1_ps(x.as_ptr().add(j)),
+                        _mm_loadu_ps(y.as_ptr().add(j)),
+                    ),
+                );
+            }
+        }
     }
 
-    _mm_storeu_ps(sum.as_mut_ptr(), xsum1);
-
-    // SIMD correctness is verified via unit tests that compare
-    // SIMD output against scalar output for identical inputs.
+    _mm_storeu_ps(sum.as_mut_ptr(), _mm_add_ps(xsum1, xsum2));
 }
 
 /// AVX2 implementation of 8-wide `xcorr_kernel`.

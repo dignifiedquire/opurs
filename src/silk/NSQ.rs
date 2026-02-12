@@ -170,8 +170,7 @@ pub fn silk_NSQ_c(
     // Precompute quantization lookup table for SSE4.1 path (x86 only)
     #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
     let (use_simd_quantizer, table) = {
-        let use_it = false
-            && super::simd::use_nsq_sse4_1()
+        let use_it = super::simd::use_nsq_sse4_1()
             && psEncC.shapingLPCOrder == 10
             && psEncC.predictLPCOrder == 16;
         let table = if use_it {
