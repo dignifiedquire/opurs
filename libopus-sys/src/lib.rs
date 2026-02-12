@@ -1198,4 +1198,43 @@ extern "C" {
     pub fn opus_dnn_nolace_blob_size() -> ::std::os::raw::c_int;
     pub fn opus_dnn_nolace_count() -> ::std::os::raw::c_int;
     pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    // OSCE test harness: run nndsp building blocks with deterministic inputs
+    pub fn osce_test_adaconv(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_adacomb(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_adashape(
+        out: *mut f32,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_compute_linear(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_dense_tanh(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_compute_linear_gain(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_tanh_approx(out: *mut f32, value: f32) -> ::std::os::raw::c_int;
+
 }

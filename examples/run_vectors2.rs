@@ -11,8 +11,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use indicatif::ParallelProgressIterator;
 use opurs::tools::demo::{
-    opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, DnnOptions, EncodeArgs,
-    OpusBackend, SampleRate,
+    opus_demo_decode, opus_demo_encode, Application, Channels, Complexity, DecodeArgs, DnnOptions,
+    EncodeArgs, EncoderOptions, OpusBackend, SampleRate,
 };
 use opurs::tools::CompareResult;
 use std::collections::btree_map::Entry;
@@ -28,6 +28,10 @@ struct Cli {
     /// Directory to save intermediate files to
     #[clap(long)]
     dump_dir: Option<PathBuf>,
+    /// Also run DNN comparison tests (DRED encode, Deep PLC / OSCE decode).
+    /// Requires the tools-dnn feature.
+    #[clap(long)]
+    dnn: bool,
 }
 
 struct TestVector {
@@ -39,6 +43,7 @@ struct TestVector {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[allow(clippy::enum_variant_names)]
 enum TestKind {
     RustDecode {
         channels: Channels,
@@ -46,6 +51,17 @@ enum TestKind {
     },
     RustEncode {
         bitrate: u32,
+    },
+    /// Encode with DRED redundancy, compare Rust vs C bitstreams.
+    RustEncodeDred {
+        bitrate: u32,
+        dred_duration: i32,
+    },
+    /// Decode at elevated complexity to exercise Deep PLC / OSCE, compare Rust vs C.
+    RustDecodeDnn {
+        channels: Channels,
+        sample_rate: SampleRate,
+        complexity: Complexity,
     },
 }
 
@@ -262,6 +278,99 @@ fn run_test(
 
             TestResult::Bitstream(upstream_encoded == rust_encoded)
         }
+        TestKind::RustEncodeDred {
+            bitrate,
+            dred_duration,
+        } => {
+            let true_decoded = &test_vector.decoded_stereo;
+
+            let encode_args = EncodeArgs {
+                application: Application::Audio,
+                sample_rate: SampleRate::R48000,
+                channels: Channels::Stereo,
+                bitrate,
+                options: EncoderOptions {
+                    dred_duration,
+                    ..Default::default()
+                },
+            };
+            let dnn = DnnOptions::default();
+
+            let (upstream_encoded, pre_skip) =
+                opus_demo_encode(OpusBackend::Upstream, true_decoded, encode_args, &dnn);
+            let (rust_encoded, rust_pre_skip) =
+                opus_demo_encode(OpusBackend::Rust, true_decoded, encode_args, &dnn);
+            assert_eq!(rust_pre_skip, pre_skip);
+
+            if let Some(dump_directory) = dump_directory {
+                std::fs::write(
+                    dump_directory.join(format!(
+                        "dred_enc_{}_{}_d{}_upstream.enc",
+                        test_vector.name, bitrate, dred_duration
+                    )),
+                    &upstream_encoded,
+                )
+                .unwrap();
+                std::fs::write(
+                    dump_directory.join(format!(
+                        "dred_enc_{}_{}_d{}_rust.enc",
+                        test_vector.name, bitrate, dred_duration
+                    )),
+                    &rust_encoded,
+                )
+                .unwrap();
+            }
+
+            TestResult::Bitstream(upstream_encoded == rust_encoded)
+        }
+        TestKind::RustDecodeDnn {
+            sample_rate,
+            channels,
+            complexity,
+        } => {
+            let decode_args = DecodeArgs {
+                sample_rate,
+                channels,
+                options: Default::default(),
+                complexity: Some(complexity),
+            };
+            let dnn = DnnOptions::default();
+
+            let upstream_decoded = opus_demo_decode(
+                OpusBackend::Upstream,
+                &test_vector.encoded,
+                decode_args,
+                &dnn,
+            );
+            let rust_decoded =
+                opus_demo_decode(OpusBackend::Rust, &test_vector.encoded, decode_args, &dnn);
+
+            if let Some(dump_directory) = dump_directory {
+                let name_base = format!(
+                    "dnn_dec_{}_{}_{}_c{}",
+                    test_vector.name,
+                    usize::from(sample_rate),
+                    match channels {
+                        Channels::Mono => "mono",
+                        Channels::Stereo => "stereo",
+                    },
+                    i32::from(complexity),
+                );
+
+                std::fs::write(
+                    dump_directory.join(format!("{}_upstream.dec", &name_base)),
+                    &upstream_decoded,
+                )
+                .unwrap();
+                std::fs::write(
+                    dump_directory.join(format!("{}_rust.dec", &name_base)),
+                    &rust_decoded,
+                )
+                .unwrap();
+            }
+
+            TestResult::Decoded(upstream_decoded == rust_decoded)
+        }
     }
 }
 
@@ -284,8 +393,8 @@ fn main() {
             .expect("Removing dump directory");
         std::fs::create_dir(dump_dir).expect("Creating dump directory");
     }
-    // TODO: test more configurations for the encoder/decoder
-    let test_kinds = iproduct!(
+    // Standard decode: 5 sample rates × 2 channels = 10 configs
+    let decode_kinds = iproduct!(
         [
             SampleRate::R48000,
             SampleRate::R24000,
@@ -299,20 +408,54 @@ fn main() {
     .map(|(&sample_rate, &channels)| TestKind::RustDecode {
         sample_rate,
         channels,
-    })
-    .chain([
-        TestKind::RustEncode { bitrate: 10_000 },
-        TestKind::RustEncode { bitrate: 20_000 },
-        TestKind::RustEncode { bitrate: 30_000 },
-        TestKind::RustEncode { bitrate: 45_000 },
-        TestKind::RustEncode { bitrate: 60_000 },
-        TestKind::RustEncode { bitrate: 90_000 },
-        TestKind::RustEncode { bitrate: 120_000 },
-        TestKind::RustEncode { bitrate: 180_000 },
-        TestKind::RustEncode { bitrate: 240_000 },
-    ]);
+    });
 
-    let tests = iproduct!(test_vectors.iter(), test_kinds).collect::<Vec<_>>();
+    // Standard encode: 9 bitrates
+    let encode_kinds = [
+        10_000u32, 20_000, 30_000, 45_000, 60_000, 90_000, 120_000, 180_000, 240_000,
+    ]
+    .iter()
+    .map(|&bitrate| TestKind::RustEncode { bitrate });
+
+    let mut test_kinds: Vec<TestKind> = decode_kinds.chain(encode_kinds).collect();
+
+    // DNN tests: DRED encode + Deep PLC / OSCE decode
+    if args.dnn {
+        // DRED encode: 3 bitrates × 2 durations = 6 configs
+        let dred_encode_kinds = iproduct!([32_000u32, 64_000, 128_000].iter(), [5i32, 10].iter())
+            .map(|(&bitrate, &dred_duration)| TestKind::RustEncodeDred {
+                bitrate,
+                dred_duration,
+            });
+
+        // DNN decode: 2 sample rates × 2 channels × 4 complexities = 16 configs
+        // Complexity 5 = Deep PLC, 6/7 = OSCE LACE, 10 = full
+        let dnn_decode_kinds = iproduct!(
+            [SampleRate::R48000, SampleRate::R16000].iter(),
+            [Channels::Mono, Channels::Stereo].iter(),
+            [
+                Complexity::C5,
+                Complexity::C6,
+                Complexity::C7,
+                Complexity::C10
+            ]
+            .iter()
+        )
+        .map(
+            |(&sample_rate, &channels, &complexity)| TestKind::RustDecodeDnn {
+                sample_rate,
+                channels,
+                complexity,
+            },
+        );
+
+        test_kinds.extend(dred_encode_kinds);
+        test_kinds.extend(dnn_decode_kinds);
+    }
+
+    let tests = iproduct!(test_vectors.iter(), test_kinds.iter())
+        .map(|(v, k)| (v, *k))
+        .collect::<Vec<_>>();
 
     println!("Running {} tests in parallel", tests.len());
 
@@ -350,6 +493,29 @@ fn main() {
             }
             TestKind::RustEncode { bitrate } => {
                 format!("ENC @ {:03}kbps", bitrate / 1000)
+            }
+            TestKind::RustEncodeDred {
+                bitrate,
+                dred_duration,
+            } => {
+                format!("DRED ENC @ {:03}kbps d={}", bitrate / 1000, dred_duration)
+            }
+            TestKind::RustDecodeDnn {
+                channels,
+                sample_rate,
+                complexity,
+            } => {
+                let channels = match channels {
+                    Channels::Mono => "M",
+                    Channels::Stereo => "S",
+                };
+                let sample_rate = format!("{:02}k", usize::from(sample_rate) / 1000);
+                format!(
+                    "DNN DEC {} {} c={}",
+                    channels,
+                    sample_rate,
+                    i32::from(complexity)
+                )
             }
         };
 

@@ -94,9 +94,9 @@ fn build_opus() {
     let opus_build_src_dir = out_dir.join("opus_src");
     let opus_source_path = Path::new("opus");
 
-    let deep_plc = cfg!(feature = "deep-plc");
-    let dred = cfg!(feature = "dred");
-    let osce = cfg!(feature = "osce");
+    let deep_plc = env::var("CARGO_FEATURE_DEEP_PLC").is_ok();
+    let dred = env::var("CARGO_FEATURE_DRED").is_ok();
+    let osce = env::var("CARGO_FEATURE_OSCE").is_ok();
 
     // Parse upstream .mk files for source and header lists
     let opus_sources_mk = parse_mk_file(&opus_source_path.join("opus_sources.mk"));
@@ -145,6 +145,11 @@ fn build_opus() {
         if osce {
             sources.extend(get_sources(&lpcnet_sources_mk, "OSCE_SOURCES"));
             headers.extend(get_sources(&lpcnet_headers_mk, "OSCE_HEAD"));
+
+            extra_sources.push((
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/osce_test_harness.c"),
+                PathBuf::from("dnn/osce_test_harness.c"),
+            ));
         }
     }
 
