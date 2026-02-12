@@ -4,8 +4,11 @@
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
+#[cfg(feature = "simd")]
+use crate::silk::simd::silk_LPC_inverse_pred_gain;
 use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;
 use crate::silk::LPC_fit::silk_LPC_fit;
+#[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_RSHIFT_ROUND64, SILK_MAX_ORDER_LPC};
 use ndarray::azip;
@@ -116,7 +119,11 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
     silk_LPC_fit(a_Q12, &mut a32_QA1[..d], 12, QA + 1);
 
     let mut i = 0;
-    while silk_LPC_inverse_pred_gain_c(a_Q12) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS {
+    #[cfg(feature = "simd")]
+    let pred_gain_fn = silk_LPC_inverse_pred_gain;
+    #[cfg(not(feature = "simd"))]
+    let pred_gain_fn = silk_LPC_inverse_pred_gain_c;
+    while pred_gain_fn(a_Q12) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS {
         /* Prediction coefficients are (too close to) unstable; apply bandwidth expansion   */
         /* on the unscaled coefficients, convert to Q12 and measure again                   */
         silk_bwexpander_32(a32_QA1, 65536 - (2 << i));

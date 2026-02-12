@@ -9,10 +9,13 @@ pub use self::typedef_h::silk_int32_MAX;
 use crate::silk::define::LTP_ORDER;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
+#[cfg(feature = "simd")]
+use crate::silk::simd::silk_VQ_WMat_EC;
 use crate::silk::tables_LTP::{
     silk_LTP_gain_BITS_Q5_ptrs, silk_LTP_vq_gain_ptrs_Q7, silk_LTP_vq_ptrs_Q7, silk_LTP_vq_sizes,
 };
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
+#[cfg(not(feature = "simd"))]
 use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
@@ -62,6 +65,22 @@ pub fn silk_quant_LTP_gains(
                     - sum_log_gain_tmp_Q7
                     + ((7 * ((1) << 7)) as f64 + 0.5f64) as i32,
             ) - gain_safety;
+            #[cfg(feature = "simd")]
+            silk_VQ_WMat_EC(
+                &mut temp_idx[j as usize],
+                &mut res_nrg_Q15_subfr,
+                &mut rate_dist_Q7_subfr,
+                &mut gain_Q7,
+                &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
+                &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
+                &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
+                &cbk_gain_ptr_Q7[..cbk_size as usize],
+                &cl_ptr_Q5[..cbk_size as usize],
+                subfr_len,
+                max_gain_Q7,
+                cbk_size,
+            );
+            #[cfg(not(feature = "simd"))]
             silk_VQ_WMat_EC_c(
                 &mut temp_idx[j as usize],
                 &mut res_nrg_Q15_subfr,

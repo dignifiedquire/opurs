@@ -131,3 +131,51 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
         super::pitch::celt_pitch_xcorr_scalar(x, y, xcorr, len);
     }
 }
+
+/// SIMD-accelerated constant-coefficient comb filter.
+/// Dispatches to SSE on x86, with scalar fallback.
+#[inline]
+pub fn comb_filter_const(
+    y: &mut [f32],
+    y_start: usize,
+    x: &[f32],
+    x_start: usize,
+    T: i32,
+    N: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if cpuid_sse::get() {
+            unsafe {
+                x86::comb_filter_const_sse(y, y_start, x, x_start, T, N, g10, g11, g12);
+            }
+            return;
+        }
+    }
+
+    #[allow(unreachable_code)]
+    {
+        super::common::comb_filter_const_c(y, y_start, x, x_start, T, N, g10, g11, g12);
+    }
+}
+
+/// SIMD-accelerated PVQ search.
+/// Dispatches to SSE2 on x86, with scalar fallback.
+#[inline]
+pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32) -> f32 {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        // SSE2 version requires N to be a multiple of 4
+        if cpuid_sse2::get() && (N & 3) == 0 {
+            return unsafe { x86::op_pvq_search_sse2(X, iy, K, N) };
+        }
+    }
+
+    #[allow(unreachable_code)]
+    {
+        super::vq::op_pvq_search_c(X, iy, K, N, _arch)
+    }
+}
