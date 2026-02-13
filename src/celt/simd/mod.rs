@@ -164,12 +164,13 @@ pub fn comb_filter_const(
 
 /// SIMD-accelerated PVQ search.
 /// Dispatches to SSE2 on x86, with scalar fallback.
+/// The SSE2 version handles any N by zero-padding arrays to N+3 elements,
+/// matching C which always uses SSE2 at arch >= 2 regardless of alignment.
 #[inline]
 pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // SSE2 version requires N to be a multiple of 4
-        if cpuid_sse2::get() && (N & 3) == 0 {
+        if cpuid_sse2::get() {
             return unsafe { x86::op_pvq_search_sse2(X, iy, K, N) };
         }
     }
