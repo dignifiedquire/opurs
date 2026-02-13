@@ -86,6 +86,40 @@ unsafe fn sigmoid8_approx(x: __m256) -> __m256 {
 }
 
 // =========================================================================
+// Scalar activation via broadcast-and-extract (matching C vec_avx.h)
+// =========================================================================
+// On x86 with AVX, C's scalar tanh_approx/sigmoid_approx/lpcnet_exp broadcast
+// into __m256, call the 8-wide SIMD version, and extract lane 0. This produces
+// slightly different results than a pure scalar implementation because the SIMD
+// versions use _mm256_rcp_ps (approximate reciprocal, ~12-bit precision) instead
+// of true division, and exp8_approx omits the sign-bit mask that scalar lpcnet_exp2
+// applies. We must match this behavior for bit-exactness with C.
+
+/// Scalar tanh via AVX2 broadcast. Port of `vec_avx.h:tanh_approx` (AVX path).
+#[target_feature(enable = "avx2", enable = "fma")]
+pub unsafe fn tanh_approx_avx2(x: f32) -> f32 {
+    let xv = _mm256_set1_ps(x);
+    let yv = tanh8_approx(xv);
+    _mm_cvtss_f32(_mm256_castps256_ps128(yv))
+}
+
+/// Scalar sigmoid via AVX2 broadcast. Port of `vec_avx.h:sigmoid_approx` (AVX path).
+#[target_feature(enable = "avx2", enable = "fma")]
+pub unsafe fn sigmoid_approx_avx2(x: f32) -> f32 {
+    let xv = _mm256_set1_ps(x);
+    let yv = sigmoid8_approx(xv);
+    _mm_cvtss_f32(_mm256_castps256_ps128(yv))
+}
+
+/// Scalar exp via AVX2 broadcast. Port of `vec_avx.h:lpcnet_exp` (AVX path).
+#[target_feature(enable = "avx2", enable = "fma")]
+pub unsafe fn lpcnet_exp_avx2(x: f32) -> f32 {
+    let xv = _mm256_set1_ps(x);
+    let yv = exp8_approx(xv);
+    _mm_cvtss_f32(_mm256_castps256_ps128(yv))
+}
+
+// =========================================================================
 // Batch activation functions
 // =========================================================================
 

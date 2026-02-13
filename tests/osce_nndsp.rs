@@ -266,15 +266,10 @@ fn compare_outputs(name: &str, rust: &[f32], c: &[f32]) {
         c.len()
     );
 
-    // On aarch64, both C and Rust use NEON so results should be bit-exact.
-    // On x86_64, C uses SSE/AVX while Rust uses scalar — different SIMD reduction
-    // order causes small floating-point differences. Allow a tolerance there.
-    // The end-to-end DNN vector tests verify bit-exact output regardless.
-    let tolerance: f32 = if cfg!(target_arch = "aarch64") {
-        0.0
-    } else {
-        1e-4
-    };
+    // Both C and Rust now use matching SIMD paths on all platforms:
+    // aarch64 NEON and x86 AVX2 scalar functions broadcast-and-extract
+    // to match C's behavior. Results should be bit-exact everywhere.
+    let tolerance: f32 = 0.0;
 
     let mut max_diff: f32 = 0.0;
     let mut first_diff = None;
@@ -806,22 +801,16 @@ fn test_diag_gain_linear_vs_tanh() {
         rust_tanh_exact.to_bits()
     );
 
-    // Verify tanh_approx matches C tanh_approx (both use NEON tanh4_approx)
-    if cfg!(target_arch = "aarch64") {
-        assert_eq!(
-            rust_tanh_exact.to_bits(),
-            c_tanh_direct[0].to_bits(),
-            "tanh_approx should be bit-exact with C on aarch64"
-        );
-    } else {
-        // On x86_64, C uses SSE/AVX tanh while Rust uses scalar — small differences expected.
-        let diff = (rust_tanh_exact - c_tanh_direct[0]).abs();
-        assert!(
-            diff < 1e-6,
-            "tanh_approx diff too large: rust={rust_tanh_exact} c={} diff={diff}",
-            c_tanh_direct[0]
-        );
-    }
+    // Verify tanh_approx matches C tanh_approx.
+    // Both C and Rust now use matching SIMD paths on all platforms:
+    // aarch64 NEON and x86 AVX2 scalar functions broadcast-and-extract
+    // to match C's behavior. Results should be bit-exact everywhere.
+    assert_eq!(
+        rust_tanh_exact.to_bits(),
+        c_tanh_direct[0].to_bits(),
+        "tanh_approx should be bit-exact with C: rust={rust_tanh_exact} c={}",
+        c_tanh_direct[0]
+    );
 
     // Note: tanh_out (from tanh_approx/Padé) may differ from dense_out
     // (from vec_tanh scalar tail using lpcnet_exp) for n=1 on NEON.

@@ -154,11 +154,23 @@ pub fn sparse_cgemv8x4(
 // This gives slightly different results due to FMA and approximate reciprocal.
 
 /// Scalar tanh approximation, matching platform-specific behavior.
+///
+/// On aarch64: broadcasts into NEON, calls tanh4_approx, extracts lane 0.
+/// On x86 with AVX2: broadcasts into __m256, calls tanh8_approx, extracts lane 0.
+/// This matches C's `vec_avx.h:tanh_approx` which uses `_mm256_rcp_ps` (approximate
+/// reciprocal) rather than true division, producing slightly different results.
 #[inline]
 pub fn tanh_approx(x: f32) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::tanh_approx_neon(x) };
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if cpuid_avx2::get() {
+            return unsafe { x86::tanh_approx_avx2(x) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -168,11 +180,21 @@ pub fn tanh_approx(x: f32) -> f32 {
 }
 
 /// Scalar sigmoid approximation, matching platform-specific behavior.
+///
+/// On aarch64: broadcasts into NEON, calls sigmoid4_approx, extracts lane 0.
+/// On x86 with AVX2: broadcasts into __m256, calls sigmoid8_approx, extracts lane 0.
 #[inline]
 pub fn sigmoid_approx(x: f32) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::sigmoid_approx_neon(x) };
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if cpuid_avx2::get() {
+            return unsafe { x86::sigmoid_approx_avx2(x) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -182,11 +204,21 @@ pub fn sigmoid_approx(x: f32) -> f32 {
 }
 
 /// Scalar lpcnet_exp, matching platform-specific behavior.
+///
+/// On aarch64: broadcasts into NEON, calls exp4_approx, extracts lane 0.
+/// On x86 with AVX2: broadcasts into __m256, calls exp8_approx, extracts lane 0.
 #[inline]
 pub fn lpcnet_exp(x: f32) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::lpcnet_exp_neon(x) };
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if cpuid_avx2::get() {
+            return unsafe { x86::lpcnet_exp_avx2(x) };
+        }
     }
 
     #[allow(unreachable_code)]
