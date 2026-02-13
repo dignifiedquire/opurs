@@ -3,12 +3,14 @@
 //!
 //! Run with: cargo test --release --features tools --test simd_comparison
 
-#![cfg(feature = "tools")]
+#![cfg(all(feature = "tools", target_arch = "x86_64"))]
 #![allow(non_snake_case)]
 
 extern crate opurs;
 
-// Link to the C SIMD functions (non-static symbols in libopus-sys)
+// These are internal SIMD symbols from the C library, not part of the public
+// opus API. They're available at link time because libopus-sys compiles the
+// full C source including SIMD variants.
 extern "C" {
     fn opus_select_arch() -> i32;
     fn xcorr_kernel_sse(x: *const f32, y: *const f32, sum: *mut f32, len: i32);

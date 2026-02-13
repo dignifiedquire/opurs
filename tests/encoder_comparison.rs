@@ -8,27 +8,8 @@
 
 extern crate opurs;
 
-extern "C" {
-    fn opus_encoder_create(
-        Fs: i32,
-        channels: i32,
-        application: i32,
-        error: *mut i32,
-    ) -> *mut std::ffi::c_void;
-    fn opus_encode(
-        st: *mut std::ffi::c_void,
-        pcm: *const i16,
-        frame_size: i32,
-        data: *mut u8,
-        max_data_bytes: i32,
-    ) -> i32;
-    fn opus_encoder_destroy(st: *mut std::ffi::c_void);
-    fn opus_encoder_ctl(st: *mut std::ffi::c_void, request: i32, ...) -> i32;
-}
-
-const OPUS_APPLICATION_AUDIO: i32 = 2049;
-const OPUS_SET_BITRATE_REQUEST: i32 = 4002;
-const OPUS_SET_COMPLEXITY_REQUEST: i32 = 4010;
+use libopus_sys::{opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy};
+use opurs::{OPUS_APPLICATION_AUDIO, OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST};
 
 /// Simple deterministic PRNG for audio generation
 struct Rng(u64);
