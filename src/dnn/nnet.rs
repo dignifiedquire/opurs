@@ -178,10 +178,13 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
     }
 
     if !linear.diag.is_empty() {
-        // Diag is only used for GRU recurrent weights: 3*M == N.
-        // Uses FMA to match C's auto-vectorized loop in compute_linear_avx2.
+        // Diag is only used for GRU recurrent weights: 3*M == N
         assert!(3 * m == n);
-        apply_diag(out, &linear.diag, input, m);
+        for i in 0..m {
+            out[i] += linear.diag[i] * input[i];
+            out[i + m] += linear.diag[i + m] * input[i];
+            out[i + 2 * m] += linear.diag[i + 2 * m] * input[i];
+        }
     }
 }
 
