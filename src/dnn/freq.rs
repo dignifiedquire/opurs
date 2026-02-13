@@ -279,8 +279,9 @@ pub fn lpc_from_cepstrum(lpc: &mut [f32], cepstrum: &[f32]) -> f32 {
     let mut ex = [0.0f32; NB_BANDS];
     idct(&mut ex, &tmp);
     for i in 0..NB_BANDS {
-        // black_box prevents LLVM auto-vectorization of powf() (see nndsp::compute_overlap_window).
-        ex[i] = (10.0f32).powf(std::hint::black_box(ex[i])) * COMPENSATION[i];
+        // C: pow(10.f, Ex[i]) — both floats promoted to double, result truncated back to float.
+        // black_box prevents LLVM auto-vectorization of powf().
+        ex[i] = (std::hint::black_box(10.0f64).powf(ex[i] as f64) * COMPENSATION[i] as f64) as f32;
     }
     lpc_from_bands(lpc, &ex)
 }
@@ -321,7 +322,9 @@ fn compute_burg_cepstrum(pcm: &[f32], burg_cepstrum: &mut [f32], len: usize, ord
     let mut x = [0.0f32; WINDOW_SIZE];
     x[0] = 1.0;
     for i in 0..order {
-        x[i + 1] = -burg_lpc[i] * (0.995f32).powi(i as i32 + 1);
+        // C: -burg_lpc[i]*pow(.995, i+1) — .995 is double, i+1 promoted to double, result is double.
+        // burg_lpc[i] (float) * double → double, truncated to float on assignment.
+        x[i + 1] = (-burg_lpc[i] as f64 * (0.995f64).powi(i as i32 + 1)) as f32;
     }
 
     // FFT of LPC impulse response
@@ -343,7 +346,9 @@ fn compute_burg_cepstrum(pcm: &[f32], burg_cepstrum: &mut [f32], len: usize, ord
     let mut log_max: f32 = -2.0;
     let mut follow: f32 = -2.0;
     for i in 0..NB_BANDS {
-        ly[i] = (1e-2 + eburg[i]).log10();
+        // C: log10(1e-2+Eburg[i]) — 1e-2 is double, Eburg[i] promoted to double, result is double,
+        // truncated to float on assignment.
+        ly[i] = (1e-2f64 + eburg[i] as f64).log10() as f32;
         ly[i] = ly[i].max(log_max - 8.0).max(follow - 2.5);
         log_max = log_max.max(ly[i]);
         follow = (follow - 2.5).max(ly[i]);

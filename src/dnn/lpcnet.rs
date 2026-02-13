@@ -291,7 +291,11 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
         // C_MULC: prod = X[i] * conj(prev_if[i])
         let prod_r = x_fft[i].re * st.prev_if[i].re + x_fft[i].im * st.prev_if[i].im;
         let prod_i = x_fft[i].im * st.prev_if[i].re - x_fft[i].re * st.prev_if[i].im;
-        let norm_1 = 1.0 / (1e-15 + prod_r * prod_r + prod_i * prod_i).sqrt();
+        // C: 1.f/sqrt(1e-15f + prod.r*prod.r + prod.i*prod.i) — sqrt(float) promotes to double,
+        // 1.f / double → double, truncated to float on assignment.
+        let norm_1 = (1.0f64
+            / (1e-15f64 + prod_r as f64 * prod_r as f64 + prod_i as f64 * prod_i as f64).sqrt())
+            as f32;
         st.if_features[3 * i - 2] = prod_r * norm_1;
         st.if_features[3 * i - 1] = prod_i * norm_1;
         st.if_features[3 * i] = ((1.0 / 64.0)
@@ -413,8 +417,13 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
         &st.lp_buf[PITCH_MAX_PERIOD - pitch_u..],
         FRAME_SIZE,
     );
-    let frame_corr = xy / (1.0 + xx * yy).sqrt();
-    let frame_corr = (1.0 + (5.0 * frame_corr).exp()).ln() / (1.0 + (5.0f32).exp()).ln();
+    // C: xy/sqrt(1+xx*yy) — sqrt(float) promotes to double, result is double,
+    // xy (float) / double → double, truncated to float on assignment.
+    let frame_corr = (xy as f64 / (1.0f64 + xx as f64 * yy as f64).sqrt()) as f32;
+    // C: log(1.f+exp(5.f*frame_corr))/log(1+exp(5.f)) — all math in double precision
+    // (exp/log promote float args to double), result truncated to float on assignment.
+    let frame_corr =
+        ((1.0f64 + (5.0f64 * frame_corr as f64).exp()).ln() / (1.0f64 + 5.0f64.exp()).ln()) as f32;
 
     st.features[NB_BANDS] = st.dnn_pitch;
     st.features[NB_BANDS + 1] = frame_corr - 0.5;

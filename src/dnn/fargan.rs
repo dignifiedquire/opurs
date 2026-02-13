@@ -449,7 +449,8 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         cond,
         ACTIVATION_LINEAR,
     );
-    let gain = gain[0].exp();
+    // C: gain = exp(gain) — float promoted to double, result truncated to float.
+    let gain = (gain[0] as f64).exp() as f32;
     let gain_1 = 1.0 / (1e-5 + gain);
 
     // Build pitch prediction and previous samples

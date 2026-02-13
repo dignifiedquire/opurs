@@ -1182,10 +1182,9 @@ fn test_libm_comparison() {
     let mut diffs = Vec::new();
 
     // cos values for overlap window
-    for i in 0..40 {
+    for (i, &c_val) in c_vals[..40].iter().enumerate() {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / 40.0;
         let rust_val = (0.5 + 0.5 * angle.cos()) as f32;
-        let c_val = c_vals[i];
         if rust_val.to_bits() != c_val.to_bits() {
             diffs.push(format!(
                 "  cos window[{}]: rust=0x{:08x} c=0x{:08x}",
@@ -1228,10 +1227,9 @@ fn test_libm_comparison() {
 
     // Also test with black_box
     let mut bb_diffs = Vec::new();
-    for i in 0..40 {
+    for (i, &c_val) in c_vals[..40].iter().enumerate() {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / 40.0;
         let rust_val = (0.5 + 0.5 * std::hint::black_box(angle).cos()) as f32;
-        let c_val = c_vals[i];
         if rust_val.to_bits() != c_val.to_bits() {
             bb_diffs.push(format!(
                 "  cos_bb window[{}]: rust=0x{:08x} c=0x{:08x}",
