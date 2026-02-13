@@ -1278,6 +1278,8 @@ extern "C" {
         seed: ::std::os::raw::c_uint,
     ) -> ::std::os::raw::c_int;
 
+    pub fn osce_test_libm_values(out: *mut f32);
+
 }
 
 // -----------------------------------------------------------------------

@@ -22,6 +22,34 @@
 #include <string.h>
 #include <math.h>
 
+/* Diagnostic: return C libm cos/exp/ln results for cross-platform comparison.
+ * out[0..40] = cos values for overlap window (PI * (i+0.5) / 40)
+ * out[40..48] = exp values
+ * out[48..56] = ln values */
+void osce_test_libm_values(float *out)
+{
+    int i;
+    /* overlap window cos values */
+    for (i = 0; i < 40; i++) {
+        double angle = M_PI * (i + 0.5) / 40.0;
+        out[i] = (float)(0.5 + 0.5 * cos(angle));
+    }
+    /* exp values */
+    {
+        double test_exp[] = {-0.5, -1.0, -2.0, -3.5, 0.1, 0.5, 1.0, 2.0};
+        for (i = 0; i < 8; i++) {
+            out[40 + i] = (float)exp(test_exp[i]);
+        }
+    }
+    /* ln values */
+    {
+        double test_ln[] = {0.001, 0.1, 0.5, 1.0, 2.0, 10.0, 100.0, 0.000015258789};
+        for (i = 0; i < 8; i++) {
+            out[48 + i] = (float)log(test_ln[i]);
+        }
+    }
+}
+
 /* Simple deterministic PRNG (xorshift32) for reproducible test data */
 static unsigned int prng_state = 12345;
 
