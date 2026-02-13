@@ -279,7 +279,8 @@ pub fn lpc_from_cepstrum(lpc: &mut [f32], cepstrum: &[f32]) -> f32 {
     let mut ex = [0.0f32; NB_BANDS];
     idct(&mut ex, &tmp);
     for i in 0..NB_BANDS {
-        ex[i] = (10.0f32).powf(ex[i]) * COMPENSATION[i];
+        // black_box prevents LLVM auto-vectorization of powf() (see nndsp::compute_overlap_window).
+        ex[i] = (10.0f32).powf(std::hint::black_box(ex[i])) * COMPENSATION[i];
     }
     lpc_from_bands(lpc, &ex)
 }

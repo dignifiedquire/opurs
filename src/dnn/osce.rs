@@ -278,7 +278,9 @@ fn generate_osce_window() -> [f32; OSCE_SPEC_WINDOW_SIZE] {
         // Actually the C array matches: w[i] = sin(pi * (i + 0.5) / n) for i in 0..160, then mirror.
         // Let's just use the exact formula.
         // C table was generated with double-precision sin()
-        w[i] = (std::f64::consts::PI * (i as f64 + 0.5) / n as f64).sin() as f32;
+        // black_box prevents LLVM auto-vectorization of sin() (see nndsp::compute_overlap_window).
+        let angle = std::f64::consts::PI * (i as f64 + 0.5) / n as f64;
+        w[i] = std::hint::black_box(angle).sin() as f32;
     }
     w
 }
@@ -1178,7 +1180,9 @@ fn calculate_log_spectrum_from_lpc(spec: &mut [f32], a_q12: &[i16], lpc_order: u
 
     for i in 0..OSCE_CLEAN_SPEC_NUM_BANDS {
         // C: 0.3f * log(spec[i] + 1e-9f) — 0.3f promoted to double, entire expr in double
-        spec[i] = (0.3f32 as f64 * ((filtered[i] + 1e-9) as f64).ln()) as f32;
+        // black_box prevents LLVM auto-vectorization of ln() (see nndsp::compute_overlap_window).
+        let val = (filtered[i] + 1e-9) as f64;
+        spec[i] = (0.3f32 as f64 * std::hint::black_box(val).ln()) as f32;
     }
 }
 
@@ -1206,7 +1210,9 @@ fn calculate_cepstrum(cepstrum: &mut [f32], signal: &[f32]) {
 
     for n in 0..OSCE_NOISY_SPEC_NUM_BANDS {
         // C: log(spec[n] + 1e-9f) — log() is double precision
-        spec[n] = ((spec[n] + 1e-9) as f64).ln() as f32;
+        // black_box prevents LLVM auto-vectorization of ln() (see nndsp::compute_overlap_window).
+        let val = (spec[n] + 1e-9) as f64;
+        spec[n] = std::hint::black_box(val).ln() as f32;
     }
 
     // DCT-II (orthonormal) — uses the same dct function from freq.rs
@@ -1349,8 +1355,8 @@ pub fn osce_calculate_features(
         }
 
         // Frame gain — C: log(gain / 65536 + 1e-9f) — log() is double precision
-        features[base + OSCE_LOG_GAIN_START] =
-            ((gains_q16[k] as f32 / (1u32 << 16) as f32 + 1e-9) as f64).ln() as f32;
+        let gain_val = (gains_q16[k] as f32 / (1u32 << 16) as f32 + 1e-9) as f64;
+        features[base + OSCE_LOG_GAIN_START] = std::hint::black_box(gain_val).ln() as f32;
     }
 
     // Buffer update
@@ -1399,7 +1405,9 @@ fn compute_numbits_embedding(
     };
     let x = clipped - (max_val + min_val) / 2.0;
     for i in 0..8 {
-        emb[i] = ((x * scales[i] - 0.5) as f64).sin() as f32;
+        // black_box prevents LLVM auto-vectorization of sin() (see nndsp::compute_overlap_window).
+        let val = (x * scales[i] - 0.5) as f64;
+        emb[i] = std::hint::black_box(val).sin() as f32;
     }
 }
 

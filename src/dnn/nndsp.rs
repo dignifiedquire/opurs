@@ -86,9 +86,10 @@ impl Default for AdaShapeState {
 pub fn compute_overlap_window(window: &mut [f32], overlap_size: usize) {
     for i in 0..overlap_size {
         // C uses double-precision: M_PI * (i_sample + 0.5f) / overlap_size → cos() → double result
-        window[i] = (0.5
-            + 0.5 * (std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64).cos())
-            as f32;
+        // black_box prevents LLVM from auto-vectorizing cos() — on Linux x86_64, vectorized cos
+        // (glibc libmvec _ZGVdN4v_cos) produces 1 ULP different results than scalar cos().
+        let angle = std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64;
+        window[i] = (0.5 + 0.5 * std::hint::black_box(angle).cos()) as f32;
     }
 }
 
@@ -138,7 +139,9 @@ pub fn transform_gains(
 ) {
     for i in 0..num_gains {
         // C uses double-precision exp(): float promotes to double, exp in double, truncate back
-        gains[i] = ((filter_gain_a * gains[i] + filter_gain_b) as f64).exp() as f32;
+        // black_box prevents LLVM auto-vectorization of exp() (see compute_overlap_window comment).
+        let val = (filter_gain_a * gains[i] + filter_gain_b) as f64;
+        gains[i] = std::hint::black_box(val).exp() as f32;
     }
 }
 
@@ -409,7 +412,9 @@ pub fn adashape_process_frame(
             tenv[i] += x_in[i * avg_pool_k + k].abs();
         }
         // C uses double-precision log(): log(float_val) promotes to double
-        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64).ln() as f32;
+        // black_box prevents LLVM auto-vectorization of ln() (see compute_overlap_window comment).
+        let val = (tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64;
+        tenv[i] = std::hint::black_box(val).ln() as f32;
         mean += tenv[i];
     }
     mean /= tenv_size as f32;
@@ -458,7 +463,8 @@ pub fn adashape_process_frame(
 
     // Shape signal — C uses double-precision exp() and the multiply stays in double
     // before truncating: x_out[i] = (float)(exp((double)out_buffer[i]) * (double)x_in[i])
+    // black_box prevents LLVM auto-vectorization of exp() (see compute_overlap_window comment).
     for i in 0..frame_size {
-        x_out[i] = ((out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
+        x_out[i] = (std::hint::black_box(out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
     }
 }
