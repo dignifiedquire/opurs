@@ -443,20 +443,20 @@ mod tests {
     }
 
     #[test]
-    fn test_vec_tanh_dispatch_matches_scalar() {
+    fn test_vec_tanh_scalar_approx() {
+        // Scalar Padé approximation with true division: max error ~6e-5 vs f64 tanh.
         for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
             let x = gen_signal(n, 42);
             let mut y_scalar = vec![0.0f32; n];
-            let mut y_dispatch = vec![0.0f32; n];
             vec_tanh_scalar(&mut y_scalar, &x);
-            vec_tanh(&mut y_dispatch, &x);
             for i in 0..n {
+                let reference = (x[i] as f64).tanh() as f32;
                 assert!(
-                    (y_scalar[i] - y_dispatch[i]).abs() < 1e-3,
-                    "vec_tanh mismatch at [{}]: scalar={} dispatch={} (n={})",
+                    (y_scalar[i] - reference).abs() < 1e-4,
+                    "vec_tanh_scalar vs f64 tanh at [{}]: scalar={} ref={} (n={})",
                     i,
                     y_scalar[i],
-                    y_dispatch[i],
+                    reference,
                     n
                 );
             }
@@ -464,20 +464,65 @@ mod tests {
     }
 
     #[test]
-    fn test_vec_sigmoid_dispatch_matches_scalar() {
+    fn test_vec_tanh_dispatch_approx() {
+        // SIMD paths use approximate reciprocal (vrecpe/rcp_ps) instead of
+        // true division. x86 _mm256_rcp_ps gives ~12-bit precision (max err ~3e-4),
+        // ARM vrecpeq_f32 gives ~8-bit precision (max err ~2e-3).
+        for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let x = gen_signal(n, 42);
+            let mut y_dispatch = vec![0.0f32; n];
+            vec_tanh(&mut y_dispatch, &x);
+            for i in 0..n {
+                let reference = (x[i] as f64).tanh() as f32;
+                assert!(
+                    (y_dispatch[i] - reference).abs() < 2e-3,
+                    "vec_tanh dispatch vs f64 tanh at [{}]: dispatch={} ref={} (n={})",
+                    i,
+                    y_dispatch[i],
+                    reference,
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_vec_sigmoid_scalar_approx() {
+        // Scalar sigmoid = 0.5 + 0.5 * tanh(0.5*x): max error ~3e-5.
         for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
             let x = gen_signal(n, 123);
             let mut y_scalar = vec![0.0f32; n];
-            let mut y_dispatch = vec![0.0f32; n];
             vec_sigmoid_scalar(&mut y_scalar, &x);
-            vec_sigmoid(&mut y_dispatch, &x);
             for i in 0..n {
+                let reference = (1.0 / (1.0 + (-(x[i] as f64)).exp())) as f32;
                 assert!(
-                    (y_scalar[i] - y_dispatch[i]).abs() < 1e-3,
-                    "vec_sigmoid mismatch at [{}]: scalar={} dispatch={} (n={})",
+                    (y_scalar[i] - reference).abs() < 1e-4,
+                    "vec_sigmoid_scalar vs f64 sigmoid at [{}]: scalar={} ref={} (n={})",
                     i,
                     y_scalar[i],
+                    reference,
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_vec_sigmoid_dispatch_approx() {
+        // SIMD sigmoid uses approximate reciprocal: max error ~2e-4 (x86),
+        // ~1e-3 (ARM vrecpeq_f32 with ~8-bit precision).
+        for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let x = gen_signal(n, 123);
+            let mut y_dispatch = vec![0.0f32; n];
+            vec_sigmoid(&mut y_dispatch, &x);
+            for i in 0..n {
+                let reference = (1.0 / (1.0 + (-(x[i] as f64)).exp())) as f32;
+                assert!(
+                    (y_dispatch[i] - reference).abs() < 2e-3,
+                    "vec_sigmoid dispatch vs f64 sigmoid at [{}]: dispatch={} ref={} (n={})",
+                    i,
                     y_dispatch[i],
+                    reference,
                     n
                 );
             }
