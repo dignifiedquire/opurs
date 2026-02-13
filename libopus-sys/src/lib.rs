@@ -1274,3 +1274,65 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 
 }
+
+// -----------------------------------------------------------------------
+// Internal SIMD functions (not part of public Opus API, but compiled into
+// the static library when the `simd` feature is enabled on x86/x86_64).
+// -----------------------------------------------------------------------
+
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+extern "C" {
+    /// Runtime CPU detection: returns 0=C, 1=SSE, 2=SSE2, 3=SSE4.1, 4=AVX2.
+    pub fn opus_select_arch() -> ::std::os::raw::c_int;
+
+    // -- SSE pitch functions (celt/x86/pitch_sse.c) --
+
+    pub fn xcorr_kernel_sse(
+        x: *const f32,
+        y: *const f32,
+        sum: *mut f32,
+        len: ::std::os::raw::c_int,
+    );
+
+    pub fn celt_inner_prod_sse(x: *const f32, y: *const f32, N: ::std::os::raw::c_int) -> f32;
+
+    pub fn dual_inner_prod_sse(
+        x: *const f32,
+        y01: *const f32,
+        y02: *const f32,
+        N: ::std::os::raw::c_int,
+        xy1: *mut f32,
+        xy2: *mut f32,
+    );
+
+    pub fn comb_filter_const_sse(
+        y: *mut f32,
+        x: *mut f32,
+        T: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        g10: f32,
+        g11: f32,
+        g12: f32,
+    );
+
+    // -- SSE2 VQ search (celt/x86/vq_sse2.c) --
+
+    pub fn op_pvq_search_sse2(
+        _X: *mut f32,
+        iy: *mut ::std::os::raw::c_int,
+        K: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    ) -> f32;
+
+    // -- AVX2 pitch cross-correlation (celt/x86/pitch_avx.c) --
+
+    pub fn celt_pitch_xcorr_avx2(
+        _x: *const f32,
+        _y: *const f32,
+        xcorr: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+}

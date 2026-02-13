@@ -8,40 +8,10 @@
 
 extern crate opurs;
 
-// These are internal SIMD symbols from the C library, not part of the public
-// opus API. They're available at link time because libopus-sys compiles the
-// full C source including SIMD variants.
-extern "C" {
-    fn opus_select_arch() -> i32;
-    fn xcorr_kernel_sse(x: *const f32, y: *const f32, sum: *mut f32, len: i32);
-    fn celt_inner_prod_sse(x: *const f32, y: *const f32, N: i32) -> f32;
-    fn dual_inner_prod_sse(
-        x: *const f32,
-        y01: *const f32,
-        y02: *const f32,
-        N: i32,
-        xy1: *mut f32,
-        xy2: *mut f32,
-    );
-    fn comb_filter_const_sse(
-        y: *mut f32,
-        x: *mut f32,
-        T: i32,
-        N: i32,
-        g10: f32,
-        g11: f32,
-        g12: f32,
-    );
-    fn op_pvq_search_sse2(_X: *mut f32, iy: *mut i32, K: i32, N: i32, arch: i32) -> f32;
-    fn celt_pitch_xcorr_avx2(
-        _x: *const f32,
-        _y: *const f32,
-        xcorr: *mut f32,
-        len: i32,
-        max_pitch: i32,
-        arch: i32,
-    );
-}
+use libopus_sys::{
+    celt_inner_prod_sse, celt_pitch_xcorr_avx2, comb_filter_const_sse, dual_inner_prod_sse,
+    op_pvq_search_sse2, opus_select_arch, xcorr_kernel_sse,
+};
 
 /// Simple deterministic pseudo-random number generator
 struct Rng(u64);
