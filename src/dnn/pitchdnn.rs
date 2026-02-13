@@ -6,10 +6,6 @@
 //! Upstream C: `dnn/pitchdnn.c`, `dnn/pitchdnn.h`, `dnn/pitchdnn_data.h`
 
 use super::nnet::*;
-#[cfg(feature = "simd")]
-use super::simd::lpcnet_exp;
-#[cfg(not(feature = "simd"))]
-use super::vec::lpcnet_exp;
 
 // --- Constants from pitchdnn_data.h ---
 
@@ -262,7 +258,8 @@ pub fn compute_pitchdnn(
     let start = pos.saturating_sub(2);
     let end = 179.min(pos + 2);
     for i in start..=end {
-        let p = lpcnet_exp(output[i]);
+        // C: exp(output[i]) — standard double-precision exp, NOT lpcnet_exp fast approx.
+        let p = (output[i] as f64).exp() as f32;
         sum += p * i as f32;
         count += p;
     }
