@@ -911,38 +911,49 @@ fn test_dense_tanh_lace_tconv() {
 }
 
 /// Diagnostic: compare adacomb intermediates step-by-step between Rust and C.
-/// Uses assertions so CI shows output on failure.
+/// Now includes xcorr output, window, x_in, and overlap-add result separately.
 #[test]
 fn test_adacomb_intermediates() {
+    use opurs::celt::pitch::celt_pitch_xcorr;
     use opurs::dnn::nndsp::*;
     use opurs::dnn::nnet::{
-        compute_generic_dense, compute_linear, ACTIVATION_LINEAR, ACTIVATION_RELU, ACTIVATION_TANH,
+        compute_generic_dense, ACTIVATION_LINEAR, ACTIVATION_RELU, ACTIVATION_TANH,
     };
 
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
-    // Get C intermediates: layout [0..15]=kernel, [16]=gain, [17]=global_gain,
-    // [18]=gain_exp, [19]=ggain_exp, [20..35]=scaled_kernel, [36..115]=final_output,
-    // [116]=linear_gain, [117]=linear_ggain
-    let mut c_buf = vec![0.0f32; 256];
+    // C intermediates layout (452 floats):
+    //   [0..15]=kernel, [16]=gain, [17]=global_gain, [18]=gain_exp, [19]=ggain_exp,
+    //   [20..35]=scaled_kernel, [36..115]=xcorr(80), [116..155]=window(40),
+    //   [156..235]=x_in(80), [236..315]=overlap_add(80), [316..395]=full_output(80),
+    //   [396]=pitch_lag, [397]=last_global_gain
+    let mut c_buf = vec![0.0f32; 512];
     unsafe { libopus_sys::osce_test_adacomb_intermediates(c_buf.as_mut_ptr(), SEED) };
 
-    let mut prng = Prng::new(SEED);
-    let feature_dim = LACE_COND_DIM;
-    let frame_size = LACE_FRAME_SIZE;
-    let kernel_size = LACE_CF1_KERNEL_SIZE;
+    let frame_size = LACE_FRAME_SIZE; // 80
+    let overlap_size = LACE_OVERLAP_SIZE; // 40
+    let kernel_size = LACE_CF1_KERNEL_SIZE; // 16
+    let feature_dim = LACE_COND_DIM; // 128
 
+    // Generate PRNG inputs matching C
+    let mut prng = Prng::new(SEED);
     let features: Vec<f32> = (0..feature_dim).map(|_| prng.next_float() * 0.1).collect();
-    // Consume x_in and pitch_lag PRNG values to stay in sync
-    for _ in 0..frame_size {
-        prng.next_float();
-    }
-    prng.next_float();
+    let x_in: Vec<f32> = (0..frame_size).map(|_| prng.next_float() * 0.5).collect();
+    let pitch_lag = {
+        let v = prng.next_float() * 32768.0 + 32768.0;
+        kernel_size as i32 + ((v as u32) % (250 - kernel_size as u32)) as i32
+    };
 
     let mut diffs = Vec::new();
 
-    // Step 1: kernel (compute_generic_dense cf1_kernel, int8 weights, 128->16)
+    // Verify pitch_lag matches
+    let c_pitch_lag = c_buf[396] as i32;
+    if pitch_lag != c_pitch_lag {
+        diffs.push(format!("  pitch_lag: rust={pitch_lag} c={c_pitch_lag}"));
+    }
+
+    // Step 1: kernel
     let mut rust_kernel = vec![0.0f32; 16];
     compute_generic_dense(
         &lace.layers.cf1_kernel,
@@ -951,20 +962,16 @@ fn test_adacomb_intermediates() {
         ACTIVATION_LINEAR,
     );
     for i in 0..16 {
-        let diff = (rust_kernel[i] - c_buf[i]).abs();
-        if diff > 0.0 {
+        if rust_kernel[i] != c_buf[i] {
             diffs.push(format!(
-                "  kernel[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-                rust_kernel[i],
+                "  kernel[{i}]: rust=0x{:08x} c=0x{:08x}",
                 rust_kernel[i].to_bits(),
-                c_buf[i],
-                c_buf[i].to_bits(),
-                diff
+                c_buf[i].to_bits()
             ));
         }
     }
 
-    // Step 2: gain (RELU) + linear-only
+    // Step 2: gain (RELU)
     let mut rust_gain = [0.0f32; 1];
     compute_generic_dense(
         &lace.layers.cf1_gain,
@@ -974,26 +981,13 @@ fn test_adacomb_intermediates() {
     );
     if rust_gain[0] != c_buf[16] {
         diffs.push(format!(
-            "  gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            rust_gain[0],
+            "  gain: rust=0x{:08x} c=0x{:08x}",
             rust_gain[0].to_bits(),
-            c_buf[16],
             c_buf[16].to_bits()
         ));
     }
-    let mut rust_linear_gain = [0.0f32; 1];
-    compute_linear(&lace.layers.cf1_gain, &mut rust_linear_gain, &features);
-    if rust_linear_gain[0] != c_buf[116] {
-        diffs.push(format!(
-            "  linear_gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            rust_linear_gain[0],
-            rust_linear_gain[0].to_bits(),
-            c_buf[116],
-            c_buf[116].to_bits()
-        ));
-    }
 
-    // Step 3: global_gain (TANH) + linear-only
+    // Step 3: global_gain (TANH)
     let mut rust_ggain = [0.0f32; 1];
     compute_generic_dense(
         &lace.layers.cf1_global_gain,
@@ -1003,26 +997,9 @@ fn test_adacomb_intermediates() {
     );
     if rust_ggain[0] != c_buf[17] {
         diffs.push(format!(
-            "  global_gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            rust_ggain[0],
+            "  global_gain: rust=0x{:08x} c=0x{:08x}",
             rust_ggain[0].to_bits(),
-            c_buf[17],
             c_buf[17].to_bits()
-        ));
-    }
-    let mut rust_linear_ggain = [0.0f32; 1];
-    compute_linear(
-        &lace.layers.cf1_global_gain,
-        &mut rust_linear_ggain,
-        &features,
-    );
-    if rust_linear_ggain[0] != c_buf[117] {
-        diffs.push(format!(
-            "  linear_ggain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            rust_linear_ggain[0],
-            rust_linear_ggain[0].to_bits(),
-            c_buf[117],
-            c_buf[117].to_bits()
         ));
     }
 
@@ -1032,19 +1009,15 @@ fn test_adacomb_intermediates() {
         ((LACE_CF1_FILTER_GAIN_A * rust_ggain[0] + LACE_CF1_FILTER_GAIN_B) as f64).exp() as f32;
     if gain_exp != c_buf[18] {
         diffs.push(format!(
-            "  gain_exp: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            gain_exp,
+            "  gain_exp: rust=0x{:08x} c=0x{:08x}",
             gain_exp.to_bits(),
-            c_buf[18],
             c_buf[18].to_bits()
         ));
     }
     if ggain_exp != c_buf[19] {
         diffs.push(format!(
-            "  ggain_exp: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-            ggain_exp,
+            "  ggain_exp: rust=0x{:08x} c=0x{:08x}",
             ggain_exp.to_bits(),
-            c_buf[19],
             c_buf[19].to_bits()
         ));
     }
@@ -1055,27 +1028,120 @@ fn test_adacomb_intermediates() {
     for i in 0..16 {
         if scaled[i] != c_buf[20 + i] {
             diffs.push(format!(
-                "  scaled_kernel[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
-                scaled[i],
+                "  scaled_kernel[{i}]: rust=0x{:08x} c=0x{:08x}",
                 scaled[i].to_bits(),
-                c_buf[20 + i],
                 c_buf[20 + i].to_bits()
             ));
         }
     }
 
-    // Step 6: full adacomb output — ALL 80 samples
-    let rust_final = rust_adacomb(&lace, 1, SEED);
-    let c_final = &c_buf[36..36 + frame_size];
-    for i in 0..frame_size {
-        if rust_final[i] != c_final[i] {
+    // Step 6: window comparison
+    let c_window = &c_buf[116..116 + overlap_size];
+    let mut rust_window = vec![0.0f32; overlap_size];
+    compute_overlap_window(&mut rust_window, overlap_size);
+    for i in 0..overlap_size {
+        if rust_window[i] != c_window[i] {
             diffs.push(format!(
-                "  output[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-                rust_final[i],
-                rust_final[i].to_bits(),
-                c_final[i],
-                c_final[i].to_bits(),
-                (rust_final[i] - c_final[i]).abs()
+                "  window[{i}]: rust=0x{:08x} c=0x{:08x}",
+                rust_window[i].to_bits(),
+                c_window[i].to_bits()
+            ));
+        }
+    }
+
+    // Step 7: x_in comparison
+    let c_x_in = &c_buf[156..156 + frame_size];
+    for i in 0..frame_size {
+        if x_in[i] != c_x_in[i] {
+            diffs.push(format!(
+                "  x_in[{i}]: rust=0x{:08x} c=0x{:08x}",
+                x_in[i].to_bits(),
+                c_x_in[i].to_bits()
+            ));
+        }
+    }
+
+    // Step 8: xcorr comparison
+    // Replicate input_buffer setup from adacomb_process_frame
+    let hist_len = kernel_size + ADACOMB_MAX_LAG;
+    let mut input_buffer =
+        vec![0.0f32; ADACOMB_MAX_FRAME_SIZE + ADACOMB_MAX_LAG + ADACOMB_MAX_KERNEL_SIZE];
+    // history is zeros for frame 0
+    input_buffer[hist_len..hist_len + frame_size].copy_from_slice(&x_in);
+    let p_offset = hist_len; // p_input = &input_buffer[p_offset]
+    let left_padding = kernel_size - 1;
+
+    let mut kernel_padded = [0.0f32; ADACOMB_MAX_KERNEL_SIZE];
+    kernel_padded[..kernel_size].copy_from_slice(&scaled[..kernel_size]);
+
+    let xcorr_start = p_offset - left_padding - pitch_lag as usize;
+    let mut rust_xcorr = vec![0.0f32; frame_size];
+    celt_pitch_xcorr(
+        &kernel_padded,
+        &input_buffer[xcorr_start..],
+        &mut rust_xcorr,
+        ADACOMB_MAX_KERNEL_SIZE,
+    );
+
+    let c_xcorr = &c_buf[36..36 + frame_size];
+    for i in 0..frame_size {
+        if rust_xcorr[i] != c_xcorr[i] {
+            diffs.push(format!(
+                "  xcorr[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
+                rust_xcorr[i],
+                rust_xcorr[i].to_bits(),
+                c_xcorr[i],
+                c_xcorr[i].to_bits(),
+                (rust_xcorr[i] - c_xcorr[i]).abs()
+            ));
+        }
+    }
+
+    // Step 9: overlap-add comparison
+    // Replicate the three overlap-add loops from adacomb_process_frame
+    let last_global_gain = 0.0f32; // frame 0
+    let mut output = rust_xcorr.clone();
+    // Loop 1: crossfade (last_global_gain=0, so first term vanishes)
+    for i in 0..overlap_size {
+        output[i] = last_global_gain * rust_window[i] * 0.0 // output_buffer_last[i] = 0
+            + ggain_exp * (1.0 - rust_window[i]) * output[i];
+    }
+    // Loop 2: add direct signal (overlap)
+    for i in 0..overlap_size {
+        output[i] += (rust_window[i] * last_global_gain + (1.0 - rust_window[i]) * ggain_exp)
+            * input_buffer[p_offset + i];
+    }
+    // Loop 3: add direct signal (non-overlap)
+    for i in overlap_size..frame_size {
+        output[i] = ggain_exp * (output[i] + input_buffer[p_offset + i]);
+    }
+
+    let c_overlap = &c_buf[236..236 + frame_size];
+    for i in 0..frame_size {
+        if output[i] != c_overlap[i] {
+            diffs.push(format!(
+                "  overlap[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
+                output[i],
+                output[i].to_bits(),
+                c_overlap[i],
+                c_overlap[i].to_bits(),
+                (output[i] - c_overlap[i]).abs()
+            ));
+        }
+    }
+
+    // Step 10: full adacomb_process_frame output cross-check
+    let rust_full = rust_adacomb(&lace, 1, SEED);
+    let c_full = &c_buf[316..316 + frame_size];
+    for i in 0..frame_size {
+        if rust_full[i] != c_full[i] {
+            diffs.push(format!(
+                "  full_output[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
+                rust_full[i],
+                rust_full[i].to_bits(),
+                c_full[i],
+                c_full[i].to_bits(),
+                (rust_full[i] - c_full[i]).abs()
             ));
         }
     }
