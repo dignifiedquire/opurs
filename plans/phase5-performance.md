@@ -9,12 +9,15 @@ with safe code makes performance optimization easier to reason about.
 
 ---
 
-## Current State
+## Current State (updated 2026-02-13)
 
 - C version with inline assembly + intrinsics + RTCD is ~20% faster
-- Rust version uses no SIMD, no inline assembly, no runtime CPU detection
-- Pure Rust floating-point throughout
-- No benchmark suite exists
+- Rust version now has **full SIMD parity** with C reference (PR #3 + fixups)
+  - All C SIMD functions ported to Rust `std::arch` intrinsics
+  - Runtime CPU detection via `is_x86_feature_detected!`
+  - 228/228 standard vector tests pass with SIMD enabled on all 6 CI targets
+- No benchmark suite exists yet
+- Performance gap likely reduced significantly (SIMD was the main contributor)
 
 ---
 
@@ -72,42 +75,31 @@ Low-hanging fruit that doesn't require SIMD:
   ```
 - [ ] **Commit**: `perf: add inline annotations and optimize hot paths`
 
-### Stage 5.4 — SIMD Intrinsics for CELT
+### Stage 5.4 — SIMD Intrinsics for CELT ✅
 
-Target the hottest CELT functions with `std::arch` SIMD.
+All C SIMD functions ported in PR #3 + fixups. Bit-exact with C reference.
 
-- [ ] `celt_inner_prod` / `dual_inner_prod` — SSE2/NEON inner product
-  - Upstream C: `celt/pitch.c` with SSE/NEON variants
-  - Pattern: `std::arch::x86_64::*` with runtime detection
-- [ ] `xcorr_kernel` — cross-correlation kernel
-  - Upstream C: `celt/pitch.c`
-  - Most performance-critical function in pitch analysis
-- [ ] `kiss_fft` butterfly operations — SSE2/NEON complex multiply
-  - Upstream C: `celt/kiss_fft.c` with SSE variants
-- [ ] `clt_mdct_forward` / `clt_mdct_backward` — MDCT pre/post rotations
-  - Upstream C: `celt/mdct.c`
-- [ ] Runtime CPU detection:
-  ```rust
-  #[cfg(target_arch = "x86_64")]
-  if is_x86_feature_detected!("sse2") { ... }
-  #[cfg(target_arch = "x86_64")]
-  if is_x86_feature_detected!("avx2") { ... }
-  #[cfg(target_arch = "aarch64")]
-  if is_x86_feature_detected!("neon") { ... }
-  ```
-- [ ] **Commit per function group**: `perf: add SIMD for celt::<function>`
+- [x] `celt_inner_prod` / `dual_inner_prod` — SSE inner product
+- [x] `xcorr_kernel` — SSE cross-correlation + AVX2+FMA variant
+- [x] `celt_pitch_xcorr` — AVX2+FMA pitch cross-correlation
+- [x] `comb_filter_const` — SSE comb filter
+- [x] `op_pvq_search` — SSE2 PVQ search
+- [x] Runtime CPU detection via `is_x86_feature_detected!`
+- [x] NEON variants for aarch64
+- [ ] `kiss_fft` butterfly operations — not ported (C has no SSE variant for this)
+- [ ] `clt_mdct_forward` / `clt_mdct_backward` — not ported (C has no SSE variant)
 
-### Stage 5.5 — SIMD Intrinsics for SILK
+### Stage 5.5 — SIMD Intrinsics for SILK ✅
 
-- [ ] `silk_NSQ_*` inner loops — noise shaping quantizer
-  - Upstream C: `silk/NSQ.c` with SSE variants
-- [ ] `silk_inner_prod_aligned` — inner product
-  - Upstream C: `silk/inner_prod_aligned.c`
-- [ ] `silk_warped_autocorrelation` — warped autocorrelation
-  - Upstream C: `silk/float/warped_autocorrelation_FLP.c`
-- [ ] `silk_burg_modified` — Burg's method
-- [ ] `silk_pitch_analysis_core` — pitch detection inner loops
-- [ ] **Commit per function**: `perf: add SIMD for silk::<function>`
+All C SIMD functions ported in PR #3 + fixups. Bit-exact with C reference.
+
+- [x] `silk_NSQ` / `silk_NSQ_del_dec` — SSE4.1 noise shaping quantizer
+- [x] `silk_inner_product_FLP` — AVX2 inner product
+- [x] `silk_VQ_WMat_EC` — SSE4.1 VQ search
+- [x] `silk_LPC_analysis_filter` — AVX2 LPC analysis
+- [x] `silk_burg_modified` — SSE4.1 Burg's method
+- [x] `silk_warped_autocorrelation` — SSE4.1 warped autocorrelation
+- [ ] `silk_pitch_analysis_core` — not ported (C has no SIMD variant)
 
 ### Stage 5.6 — Validate Performance Parity
 

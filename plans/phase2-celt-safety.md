@@ -184,11 +184,12 @@ pub struct ec_dec<'a> { pub buf: &'a [u8], ... }
 ## Definition of Done
 
 - [x] Zero `unsafe fn` declarations in `src/celt/` (except FFI boundaries if any)
-- [ ] Zero `unsafe {}` blocks in `src/celt/` — **21 remain across 4 files:**
-  - `bands.rs`: 16 blocks (non-overlapping slice creation from raw pointers for X/Y band splitting — borrow checker workaround)
-  - `celt_decoder.rs`: 2 blocks (non-overlapping channel slice creation, lifetime erasure for ec_dec)
-  - `celt_encoder.rs`: 1 block (energy_mask from_raw_parts, externally-owned pointer)
-  - `mdct.rs`: 2 blocks (ndarray interlaced view splitting)
+- [~] Zero `unsafe {}` blocks in `src/celt/` — **2 remain in 1 file** (down from 21):
+  - `mdct.rs`: 2 blocks (ndarray interlaced view splitting — no safe alternative exists)
+  - ~~`bands.rs`: 16 blocks~~ — eliminated during later refactoring
+  - ~~`celt_decoder.rs`: 2 blocks~~ — eliminated
+  - ~~`celt_encoder.rs`: 1 block~~ — eliminated
+  - Note: `src/celt/simd/x86.rs` has 26 unsafe blocks + 2 unsafe fn for SIMD intrinsics (expected, tracked in Phase 5)
 - [x] Every function has `/// Upstream C:` comment
 - [x] All tests pass (cargo test + vector tests)
 - [x] Clippy clean, formatted

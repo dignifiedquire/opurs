@@ -391,14 +391,14 @@ pub fn version() -> &'static str;
 
 ---
 
-## Current State (updated 2026-02-11)
+## Current State (updated 2026-02-13)
 
 | File | unsafe fn | unsafe {} | Key issues |
 |------|-----------|-----------|------------|
-| `opus_encoder.rs` | 6 | 4 | encode_native, downmix, encode/encode_float |
-| `opus_decoder.rs` | 2 | 3 | decode_frame, decode_native |
+| `opus_encoder.rs` | 0 | 0 | **Safe** ✓ — typed API, CTL methods |
+| `opus_decoder.rs` | 0 | 0 | **Safe** ✓ — typed API, CTL methods |
 | `opus.rs` | 0 | 0 | **Safe** ✓ |
-| `analysis.rs` | 0 | 0 | **Safe** ✓ (legacy downmix_func type alias remains) |
+| `analysis.rs` | 0 | 0 | **Safe** ✓ |
 | `repacketizer.rs` | 0 | 0 | **Already safe** — needs API wrapper only |
 | `mlp/` | 0 | 0 | **Already safe** |
 | `opus_defines.rs` | 0 | 0 | Constants only — replace with enums |
@@ -406,7 +406,7 @@ pub fn version() -> &'static str;
 | `externs.rs` | — | — | **Deleted** ✓ |
 | `varargs.rs` | — | — | **Deleted** ✓ |
 
-**Total remaining in src/src/**: 8 unsafe fn + 7 unsafe blocks = 15
+**Total remaining in src/src/**: 0 unsafe fn + 0 unsafe blocks = 0 ✓
 
 ---
 
@@ -478,11 +478,10 @@ All callers converted, `externs.rs` deleted:
 - `unsafe fn opus_decode_native` — internal, ~170 lines, orchestrates multi-frame decode
 - 3 unsafe blocks (1 calling opus_decode_native, 2 in decode internals)
 
-- [ ] Make `opus_decode_frame` safe (eliminate raw pointer usage)
-- [ ] Make `opus_decode_native` safe
-- [ ] Remove remaining 3 unsafe blocks
+- [x] Make `opus_decode_frame` safe (eliminate raw pointer usage)
+- [x] Make `opus_decode_native` safe
+- [x] Remove remaining 3 unsafe blocks
 - [ ] Implement `Decoder` wrapper struct (public API) — or use `OpusDecoder` directly
-- [ ] **Commit**: `refactor: safe Decoder with idiomatic Rust API`
 
 ### Stage 4.5 — Safe opus_encoder.rs
 
@@ -518,14 +517,12 @@ eliminated. Remaining work is the encode path itself.
 - `unsafe fn opus_encode_float` — public f32 API, calls opus_encode_native
 - 4 unsafe blocks (mem::zeroed in new, from_raw_parts in encode_native)
 
-- [ ] Make `downmix_float`/`downmix_int` safe (replace `*const c_void` with slices)
-- [ ] Make `opus_encode_native` safe (~1300 lines of pointer-heavy code)
-- [ ] Make `encode_multiframe_packet` safe (depends on opus_encode_native)
-- [ ] Make `opus_encode`/`opus_encode_float` safe (depends on opus_encode_native)
-- [ ] Replace `mem::zeroed()` in `OpusEncoder::new()` with field-by-field init
+- [x] Make `downmix_float`/`downmix_int` safe (replace `*const c_void` with slices)
+- [x] Make `opus_encode_native` safe (~1300 lines of pointer-heavy code)
+- [x] Make `encode_multiframe_packet` safe (depends on opus_encode_native)
+- [x] Make `opus_encode`/`opus_encode_float` safe (depends on opus_encode_native)
+- [x] Replace `mem::zeroed()` in `OpusEncoder::new()` with field-by-field init
 - [ ] Implement `Encoder` wrapper struct (public API) — or use `OpusEncoder` directly
-- [ ] **Commit(s)**: `refactor: safe Encoder with idiomatic Rust API`
-  (likely 3-5 commits)
 
 ### Stage 4.6 — Repacketizer & SoftClip wrappers
 
