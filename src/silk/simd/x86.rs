@@ -1674,8 +1674,12 @@ unsafe fn silk_LPC_analysis_filter_avx2(
             sum = _mm256_add_epi32(sum, _mm256_mullo_epi32(in_v, b_v));
         } else {
             // order == 10: only need 2 more coefficients
-            let in_v = _mm256_cvtepi16_epi32(_mm_cvtsi32_si128(*(in_ptr.sub(10) as *const i32)));
-            let b_v = _mm256_cvtepi16_epi32(_mm_cvtsi32_si128(*(b.as_ptr().add(8) as *const i32)));
+            let in_v = _mm256_cvtepi16_epi32(_mm_cvtsi32_si128(
+                (in_ptr.sub(10) as *const i32).read_unaligned(),
+            ));
+            let b_v = _mm256_cvtepi16_epi32(_mm_cvtsi32_si128(
+                (b.as_ptr().add(8) as *const i32).read_unaligned(),
+            ));
             let b_v = _mm256_shuffle_epi32(b_v, 0x01);
             sum = _mm256_add_epi32(sum, _mm256_mullo_epi32(in_v, b_v));
         }
