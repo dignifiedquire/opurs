@@ -910,8 +910,8 @@ fn test_dense_tanh_lace_tconv() {
     compare_outputs("dense_tanh_lace_tconv", &rust_out, &c_out);
 }
 
-/// Diagnostic: dump adacomb intermediates to find where divergence starts.
-/// Compares each step of the adacomb pipeline between Rust and C.
+/// Diagnostic: compare adacomb intermediates step-by-step between Rust and C.
+/// Uses assertions so CI shows output on failure.
 #[test]
 fn test_adacomb_intermediates() {
     use opurs::dnn::nndsp::*;
@@ -922,24 +922,27 @@ fn test_adacomb_intermediates() {
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
-    // Get C intermediates
+    // Get C intermediates: layout [0..15]=kernel, [16]=gain, [17]=global_gain,
+    // [18]=gain_exp, [19]=ggain_exp, [20..35]=scaled_kernel, [36..115]=final_output,
+    // [116]=linear_gain, [117]=linear_ggain
     let mut c_buf = vec![0.0f32; 256];
     unsafe { libopus_sys::osce_test_adacomb_intermediates(c_buf.as_mut_ptr(), SEED) };
 
-    // Generate same PRNG inputs as C
     let mut prng = Prng::new(SEED);
-    let feature_dim = LACE_COND_DIM; // 128
-    let frame_size = LACE_FRAME_SIZE; // 80
-    let kernel_size = LACE_CF1_KERNEL_SIZE; // 16
+    let feature_dim = LACE_COND_DIM;
+    let frame_size = LACE_FRAME_SIZE;
+    let kernel_size = LACE_CF1_KERNEL_SIZE;
 
     let features: Vec<f32> = (0..feature_dim).map(|_| prng.next_float() * 0.1).collect();
-    let _x_in: Vec<f32> = (0..frame_size).map(|_| prng.next_float() * 0.5).collect();
-    let _pitch_lag = {
-        let v = prng.next_float() * 32768.0 + 32768.0;
-        kernel_size as i32 + ((v as u32) % (250 - kernel_size as u32)) as i32
-    };
+    // Consume x_in and pitch_lag PRNG values to stay in sync
+    for _ in 0..frame_size {
+        prng.next_float();
+    }
+    prng.next_float();
 
-    // Step 1: compute_generic_dense on cf1_kernel (128 -> 16, ACTIVATION_LINEAR)
+    let mut diffs = Vec::new();
+
+    // Step 1: kernel (compute_generic_dense cf1_kernel, int8 weights, 128->16)
     let mut rust_kernel = vec![0.0f32; 16];
     compute_generic_dense(
         &lace.layers.cf1_kernel,
@@ -947,29 +950,21 @@ fn test_adacomb_intermediates() {
         &features,
         ACTIVATION_LINEAR,
     );
-    let c_kernel = &c_buf[0..16];
-    eprintln!("=== Step 1: kernel_buffer (compute_generic_dense cf1_kernel) ===");
-    let mut kernel_ok = true;
     for i in 0..16 {
-        let diff = (rust_kernel[i] - c_kernel[i]).abs();
+        let diff = (rust_kernel[i] - c_buf[i]).abs();
         if diff > 0.0 {
-            eprintln!(
-                "  [{}] DIFF rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-                i,
+            diffs.push(format!(
+                "  kernel[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
                 rust_kernel[i],
                 rust_kernel[i].to_bits(),
-                c_kernel[i],
-                c_kernel[i].to_bits(),
+                c_buf[i],
+                c_buf[i].to_bits(),
                 diff
-            );
-            kernel_ok = false;
+            ));
         }
     }
-    if kernel_ok {
-        eprintln!("  ALL MATCH");
-    }
 
-    // Step 2: compute_generic_dense on cf1_gain (128 -> 1, ACTIVATION_RELU)
+    // Step 2: gain (RELU) + linear-only
     let mut rust_gain = [0.0f32; 1];
     compute_generic_dense(
         &lace.layers.cf1_gain,
@@ -977,156 +972,127 @@ fn test_adacomb_intermediates() {
         &features,
         ACTIVATION_RELU,
     );
-    eprintln!("=== Step 2: gain (dense RELU cf1_gain) ===");
-    eprintln!(
-        "  rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-        rust_gain[0],
-        rust_gain[0].to_bits(),
-        c_buf[16],
-        c_buf[16].to_bits(),
-        (rust_gain[0] - c_buf[16]).abs()
-    );
-
-    // Step 2b: compute_linear alone on cf1_gain (to isolate linear vs activation)
+    if rust_gain[0] != c_buf[16] {
+        diffs.push(format!(
+            "  gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            rust_gain[0],
+            rust_gain[0].to_bits(),
+            c_buf[16],
+            c_buf[16].to_bits()
+        ));
+    }
     let mut rust_linear_gain = [0.0f32; 1];
     compute_linear(&lace.layers.cf1_gain, &mut rust_linear_gain, &features);
-    eprintln!("=== Step 2b: linear-only gain (cf1_gain) ===");
-    eprintln!(
-        "  rust_linear={:e} (0x{:08x}) c_linear={:e} (0x{:08x}) diff={:e}",
-        rust_linear_gain[0],
-        rust_linear_gain[0].to_bits(),
-        c_buf[116],
-        c_buf[116].to_bits(),
-        (rust_linear_gain[0] - c_buf[116]).abs()
-    );
+    if rust_linear_gain[0] != c_buf[116] {
+        diffs.push(format!(
+            "  linear_gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            rust_linear_gain[0],
+            rust_linear_gain[0].to_bits(),
+            c_buf[116],
+            c_buf[116].to_bits()
+        ));
+    }
 
-    // Step 3: compute_generic_dense on cf1_global_gain (128 -> 1, ACTIVATION_TANH)
-    let mut rust_global_gain = [0.0f32; 1];
+    // Step 3: global_gain (TANH) + linear-only
+    let mut rust_ggain = [0.0f32; 1];
     compute_generic_dense(
         &lace.layers.cf1_global_gain,
-        &mut rust_global_gain,
+        &mut rust_ggain,
         &features,
         ACTIVATION_TANH,
     );
-    eprintln!("=== Step 3: global_gain (dense TANH cf1_global_gain) ===");
-    eprintln!(
-        "  rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-        rust_global_gain[0],
-        rust_global_gain[0].to_bits(),
-        c_buf[17],
-        c_buf[17].to_bits(),
-        (rust_global_gain[0] - c_buf[17]).abs()
-    );
-
-    // Step 3b: compute_linear alone on cf1_global_gain
+    if rust_ggain[0] != c_buf[17] {
+        diffs.push(format!(
+            "  global_gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            rust_ggain[0],
+            rust_ggain[0].to_bits(),
+            c_buf[17],
+            c_buf[17].to_bits()
+        ));
+    }
     let mut rust_linear_ggain = [0.0f32; 1];
     compute_linear(
         &lace.layers.cf1_global_gain,
         &mut rust_linear_ggain,
         &features,
     );
-    eprintln!("=== Step 3b: linear-only global_gain (cf1_global_gain) ===");
-    eprintln!(
-        "  rust_linear={:e} (0x{:08x}) c_linear={:e} (0x{:08x}) diff={:e}",
-        rust_linear_ggain[0],
-        rust_linear_ggain[0].to_bits(),
-        c_buf[117],
-        c_buf[117].to_bits(),
-        (rust_linear_ggain[0] - c_buf[117]).abs()
-    );
+    if rust_linear_ggain[0] != c_buf[117] {
+        diffs.push(format!(
+            "  linear_ggain: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            rust_linear_ggain[0],
+            rust_linear_ggain[0].to_bits(),
+            c_buf[117],
+            c_buf[117].to_bits()
+        ));
+    }
 
-    // Step 4: transform gains
-    let gain_transformed = ((LACE_CF1_LOG_GAIN_LIMIT - rust_gain[0]) as f64).exp() as f32;
-    let global_gain_transformed = ((LACE_CF1_FILTER_GAIN_A * rust_global_gain[0]
-        + LACE_CF1_FILTER_GAIN_B) as f64)
-        .exp() as f32;
-    eprintln!("=== Step 4: transformed gains ===");
-    eprintln!(
-        "  gain: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-        gain_transformed,
-        gain_transformed.to_bits(),
-        c_buf[18],
-        c_buf[18].to_bits(),
-        (gain_transformed - c_buf[18]).abs()
-    );
-    eprintln!(
-        "  ggain: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-        global_gain_transformed,
-        global_gain_transformed.to_bits(),
-        c_buf[19],
-        c_buf[19].to_bits(),
-        (global_gain_transformed - c_buf[19]).abs()
-    );
+    // Step 4: transformed gains
+    let gain_exp = ((LACE_CF1_LOG_GAIN_LIMIT - rust_gain[0]) as f64).exp() as f32;
+    let ggain_exp =
+        ((LACE_CF1_FILTER_GAIN_A * rust_ggain[0] + LACE_CF1_FILTER_GAIN_B) as f64).exp() as f32;
+    if gain_exp != c_buf[18] {
+        diffs.push(format!(
+            "  gain_exp: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            gain_exp,
+            gain_exp.to_bits(),
+            c_buf[18],
+            c_buf[18].to_bits()
+        ));
+    }
+    if ggain_exp != c_buf[19] {
+        diffs.push(format!(
+            "  ggain_exp: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+            ggain_exp,
+            ggain_exp.to_bits(),
+            c_buf[19],
+            c_buf[19].to_bits()
+        ));
+    }
 
-    // Step 5: scale_kernel
-    let mut scaled_kernel = rust_kernel.clone();
-    scale_kernel(&mut scaled_kernel, 1, 1, kernel_size, &[gain_transformed]);
-    eprintln!("=== Step 5: scaled kernel ===");
-    let c_scaled = &c_buf[20..36];
-    let mut scaled_ok = true;
+    // Step 5: scaled kernel
+    let mut scaled = rust_kernel.clone();
+    scale_kernel(&mut scaled, 1, 1, kernel_size, &[gain_exp]);
     for i in 0..16 {
-        let diff = (scaled_kernel[i] - c_scaled[i]).abs();
-        if diff > 0.0 {
-            eprintln!(
-                "  [{}] DIFF rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-                i,
-                scaled_kernel[i],
-                scaled_kernel[i].to_bits(),
-                c_scaled[i],
-                c_scaled[i].to_bits(),
-                diff
-            );
-            scaled_ok = false;
+        if scaled[i] != c_buf[20 + i] {
+            diffs.push(format!(
+                "  scaled_kernel[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x})",
+                scaled[i],
+                scaled[i].to_bits(),
+                c_buf[20 + i],
+                c_buf[20 + i].to_bits()
+            ));
         }
     }
-    if scaled_ok {
-        eprintln!("  ALL MATCH");
-    }
 
-    // Step 6: compare final output (first 24 samples)
-    let c_final = &c_buf[36..36 + frame_size];
-    // Run full Rust adacomb
+    // Step 6: full adacomb output — ALL 80 samples
     let rust_final = rust_adacomb(&lace, 1, SEED);
-    eprintln!("=== Step 6: final adacomb output (first 24 samples) ===");
-    for i in 0..24.min(frame_size) {
-        let diff = (rust_final[i] - c_final[i]).abs();
-        if diff > 0.0 {
-            eprintln!(
-                "  [{}] DIFF rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-                i,
+    let c_final = &c_buf[36..36 + frame_size];
+    for i in 0..frame_size {
+        if rust_final[i] != c_final[i] {
+            diffs.push(format!(
+                "  output[{i}]: rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
                 rust_final[i],
                 rust_final[i].to_bits(),
                 c_final[i],
                 c_final[i].to_bits(),
-                diff
-            );
+                (rust_final[i] - c_final[i]).abs()
+            ));
         }
     }
 
-    // Layer properties for debugging
-    eprintln!("=== Layer properties ===");
-    eprintln!(
-        "  cf1_kernel: in={} out={} float_w={} int8_w={} sparse={}",
-        lace.layers.cf1_kernel.nb_inputs,
-        lace.layers.cf1_kernel.nb_outputs,
-        lace.layers.cf1_kernel.float_weights.len(),
-        lace.layers.cf1_kernel.weights.len(),
-        lace.layers.cf1_kernel.weights_idx.len(),
+    assert!(
+        diffs.is_empty(),
+        "adacomb intermediates mismatches:\n{}",
+        diffs.join("\n")
     );
-    eprintln!(
-        "  cf1_gain: in={} out={} float_w={} int8_w={} sparse={}",
-        lace.layers.cf1_gain.nb_inputs,
-        lace.layers.cf1_gain.nb_outputs,
-        lace.layers.cf1_gain.float_weights.len(),
-        lace.layers.cf1_gain.weights.len(),
-        lace.layers.cf1_gain.weights_idx.len(),
-    );
-    eprintln!(
-        "  cf1_global_gain: in={} out={} float_w={} int8_w={} sparse={}",
-        lace.layers.cf1_global_gain.nb_inputs,
-        lace.layers.cf1_global_gain.nb_outputs,
-        lace.layers.cf1_global_gain.float_weights.len(),
-        lace.layers.cf1_global_gain.weights.len(),
-        lace.layers.cf1_global_gain.weights_idx.len(),
-    );
+}
+
+/// Test adacomb with 1 frame only — isolates whether divergence is in frame 0.
+#[test]
+fn test_adacomb_lace_cf1_1frame() {
+    let arrays = compiled_weights();
+    let lace = init_lace(&arrays).expect("LACE init failed");
+    let c_out = c_adacomb(0, 1, SEED, LACE_FRAME_SIZE);
+    let rust_out = rust_adacomb(&lace, 1, SEED);
+    compare_outputs("lace_cf1_1frame", &rust_out, &c_out);
 }
