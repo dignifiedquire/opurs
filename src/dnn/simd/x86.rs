@@ -138,9 +138,10 @@ pub unsafe fn vec_tanh_avx2(y: &mut [f32], x: &[f32]) {
         _mm256_storeu_ps(y.as_mut_ptr().add(i), yv);
         i += 8;
     }
-    // Scalar tail
+    // Scalar tail: use broadcast-and-extract to match C's vec_avx.h which
+    // redefines tanh_approx to use tanh8_approx (with _mm256_rcp_ps).
     while i < n {
-        y[i] = crate::dnn::vec::tanh_approx(x[i]);
+        y[i] = tanh_approx_avx2(x[i]);
         i += 1;
     }
 }
@@ -160,9 +161,9 @@ pub unsafe fn vec_sigmoid_avx2(y: &mut [f32], x: &[f32]) {
         _mm256_storeu_ps(y.as_mut_ptr().add(i), yv);
         i += 8;
     }
-    // Scalar tail
+    // Scalar tail: use broadcast-and-extract to match C's vec_avx.h.
     while i < n {
-        y[i] = crate::dnn::vec::sigmoid_approx(x[i]);
+        y[i] = sigmoid_approx_avx2(x[i]);
         i += 1;
     }
 }
@@ -182,9 +183,9 @@ pub unsafe fn softmax_avx2(y: &mut [f32], x: &[f32]) {
         _mm256_storeu_ps(y.as_mut_ptr().add(i), yv);
         i += 8;
     }
-    // Scalar tail
+    // Scalar tail: use broadcast-and-extract to match C's vec_avx.h.
     while i < n {
-        y[i] = crate::dnn::vec::lpcnet_exp(x[i]);
+        y[i] = lpcnet_exp_avx2(x[i]);
         i += 1;
     }
 }
