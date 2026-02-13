@@ -96,6 +96,9 @@ unsafe fn sigmoid8_approx(x: __m256) -> __m256 {
 // applies. We must match this behavior for bit-exactness with C.
 
 /// Scalar tanh via AVX2 broadcast. Port of `vec_avx.h:tanh_approx` (AVX path).
+///
+/// # Safety
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn tanh_approx_avx2(x: f32) -> f32 {
     let xv = _mm256_set1_ps(x);
@@ -104,6 +107,9 @@ pub unsafe fn tanh_approx_avx2(x: f32) -> f32 {
 }
 
 /// Scalar sigmoid via AVX2 broadcast. Port of `vec_avx.h:sigmoid_approx` (AVX path).
+///
+/// # Safety
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn sigmoid_approx_avx2(x: f32) -> f32 {
     let xv = _mm256_set1_ps(x);
@@ -112,6 +118,9 @@ pub unsafe fn sigmoid_approx_avx2(x: f32) -> f32 {
 }
 
 /// Scalar exp via AVX2 broadcast. Port of `vec_avx.h:lpcnet_exp` (AVX path).
+///
+/// # Safety
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn lpcnet_exp_avx2(x: f32) -> f32 {
     let xv = _mm256_set1_ps(x);
