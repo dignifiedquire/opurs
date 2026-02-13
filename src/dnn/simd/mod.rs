@@ -334,3 +334,44 @@ pub fn softmax(y: &mut [f32], x: &[f32]) {
         super::vec::softmax_scalar(y, x);
     }
 }
+
+/// Apply GRU diagonal weights with FMA: out[offset+i] += diag[offset+i] * input[i]
+/// for three streams (offset = 0, m, 2m).
+///
+/// Matches C's auto-vectorized diag loop in `compute_linear_avx2()`, which uses
+/// `_mm256_fmadd_ps` under `-mavx2 -mfma` + `#pragma GCC optimize("tree-vectorize")`.
+#[inline]
+pub fn apply_diag(out: &mut [f32], diag: &[f32], input: &[f32], m: usize) {
+    #[cfg(target_arch = "aarch64")]
+    {
+        // NEON: nnet_neon.c also gets auto-vectorized with FMA.
+        // Use mul_add for matching behavior.
+        for stream in 0..3 {
+            let offset = stream * m;
+            for i in 0..m {
+                out[offset + i] = diag[offset + i].mul_add(input[i], out[offset + i]);
+            }
+        }
+        return;
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if cpuid_avx2::get() {
+            unsafe {
+                x86::apply_diag_avx2(out, diag, input, m);
+            }
+            return;
+        }
+    }
+
+    #[allow(unreachable_code)]
+    {
+        // Scalar fallback: no FMA available, use separate mul+add.
+        for i in 0..m {
+            out[i] += diag[i] * input[i];
+            out[i + m] += diag[i + m] * input[i];
+            out[i + 2 * m] += diag[i + 2 * m] * input[i];
+        }
+    }
+}

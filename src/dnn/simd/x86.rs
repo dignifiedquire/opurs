@@ -434,6 +434,57 @@ pub unsafe fn cgemv8x4_avx2(
 }
 
 // =========================================================================
+// FMA-accelerated element-wise operations
+// =========================================================================
+// These match what GCC auto-vectorizes with `-mavx2 -mfma -O2
+// -ftree-vectorize` when compiling nnet_arch.h functions.
+
+/// Apply GRU diagonal weights: out[i] += diag[i] * input[i] using FMA.
+///
+/// Matches C's `compute_linear_avx2` diag loop, which GCC auto-vectorizes
+/// with `_mm256_fmadd_ps` under `-mavx2 -mfma` + `#pragma GCC optimize("tree-vectorize")`.
+/// Without FMA, Rust does separate mul+add (two roundings per element),
+/// causing cumulative divergence through GRU recurrent state.
+///
+/// # Safety
+/// Requires AVX2+FMA support (checked by caller via cpufeatures).
+#[target_feature(enable = "avx2", enable = "fma")]
+pub unsafe fn apply_diag_avx2(out: &mut [f32], diag: &[f32], input: &[f32], m: usize) {
+    // Process three independent streams: out[0..m], out[m..2m], out[2m..3m]
+    // Each stream: out[offset+i] += diag[offset+i] * input[i]
+    for stream in 0..3 {
+        let offset = stream * m;
+        let mut i = 0;
+
+        // 8-wide AVX2 FMA loop
+        while i + 8 <= m {
+            let vout = _mm256_loadu_ps(out.as_ptr().add(offset + i));
+            let vdiag = _mm256_loadu_ps(diag.as_ptr().add(offset + i));
+            let vin = _mm256_loadu_ps(input.as_ptr().add(i));
+            let vresult = _mm256_fmadd_ps(vdiag, vin, vout);
+            _mm256_storeu_ps(out.as_mut_ptr().add(offset + i), vresult);
+            i += 8;
+        }
+
+        // 4-wide SSE FMA tail
+        if i + 4 <= m {
+            let vout = _mm_loadu_ps(out.as_ptr().add(offset + i));
+            let vdiag = _mm_loadu_ps(diag.as_ptr().add(offset + i));
+            let vin = _mm_loadu_ps(input.as_ptr().add(i));
+            let vresult = _mm_fmadd_ps(vdiag, vin, vout);
+            _mm_storeu_ps(out.as_mut_ptr().add(offset + i), vresult);
+            i += 4;
+        }
+
+        // Scalar tail — use f32::mul_add for FMA semantics
+        while i < m {
+            out[offset + i] = diag[offset + i].mul_add(input[i], out[offset + i]);
+            i += 1;
+        }
+    }
+}
+
+// =========================================================================
 // Sparse int8 GEMV
 // =========================================================================
 

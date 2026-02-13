@@ -240,6 +240,27 @@ pub fn sparse_cgemv8x4(
     sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x)
 }
 
+/// Apply GRU diagonal weights: out[offset+i] += diag[offset+i] * input[i]
+/// for three streams (offset = 0, m, 2m).
+///
+/// Uses FMA when available to match C's auto-vectorized diag loop.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn apply_diag(out: &mut [f32], diag: &[f32], input: &[f32], m: usize) {
+    super::simd::apply_diag(out, diag, input, m)
+}
+
+/// Apply GRU diagonal weights (scalar-only build).
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn apply_diag(out: &mut [f32], diag: &[f32], input: &[f32], m: usize) {
+    for i in 0..m {
+        out[i] += diag[i] * input[i];
+        out[i + m] += diag[i + m] * input[i];
+        out[i + 2 * m] += diag[i + 2 * m] * input[i];
+    }
+}
+
 /// Dense float matrix-vector multiply: out = weights^T * x — scalar implementation.
 ///
 /// Weights are stored column-major with `col_stride` elements per column.
