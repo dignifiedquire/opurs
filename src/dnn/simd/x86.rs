@@ -347,8 +347,12 @@ pub unsafe fn cgemv8x4_avx2(
         let mut vy0 = _mm256_setzero_si256();
         let mut j = 0;
 
-        // Unrolled by 4
-        while j + 16 <= cols {
+        // Unrolled by 4: process 4 groups of 4 columns per iteration.
+        // Must match C condition `j < cols - 12` (enters when 13+ columns remain)
+        // rather than `j + 16 <= cols` (16+ remain), because _mm256_maddubs_epi16
+        // uses saturating i16 addition internally — different accumulation grouping
+        // produces different results.
+        while j + 12 < cols {
             let vxj = _mm256_broadcastd_epi32(_mm_loadu_si32(x.as_ptr().add(j) as *const _));
             let vw = _mm256_loadu_si256(w.as_ptr().add(w_pos) as *const __m256i);
             vy0 = opus_mm256_dpbusds_epi32(vy0, vxj, vw);

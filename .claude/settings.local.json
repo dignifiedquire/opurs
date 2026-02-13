@@ -5,7 +5,8 @@
       "mcp__acp__Write",
       "mcp__acp__Edit",
       "WebFetch(domain:docs.rs)",
-      "WebFetch(domain:opus-codec.org)"
+      "WebFetch(domain:opus-codec.org)",
+      "WebFetch(domain:media.xiph.org)"
     ]
   }
 }
