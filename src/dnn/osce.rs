@@ -267,22 +267,81 @@ static BAND_WEIGHTS_NOISY: [f32; 18] = [
     0.080000000000,
 ];
 
-// The 320-sample analysis window is embedded here (from osce_features.c).
-// For brevity, include only the generation formula used at init time.
-fn generate_osce_window() -> [f32; OSCE_SPEC_WINDOW_SIZE] {
-    let mut w = [0.0f32; OSCE_SPEC_WINDOW_SIZE];
-    let n = OSCE_SPEC_WINDOW_SIZE;
-    for i in 0..n {
-        // Hann window: 0.5 * (1 - cos(2*pi*i/(n-1)))... but the C uses a custom sine window.
-        // The C window is precomputed. We'll use the formula: sin(pi*(i+0.5)/n) for a sine window.
-        // Actually the C array matches: w[i] = sin(pi * (i + 0.5) / n) for i in 0..160, then mirror.
-        // Let's just use the exact formula.
-        // C table was generated with double-precision sin()
-        // black_box prevents LLVM auto-vectorization of sin() (see nndsp::compute_overlap_window).
-        let angle = std::f64::consts::PI * (i as f64 + 0.5) / n as f64;
-        w[i] = std::hint::black_box(angle).sin() as f32;
-    }
-    w
+/// Precomputed 320-sample sine window, matching the static table in osce_features.c.
+///
+/// Values are `sin(PI * (i + 0.5) / 320)` for i in 0..160, mirrored for 160..320.
+/// Stored as hex literals for bit-exact reproducibility across platforms (different
+/// libm implementations of `sin()` can differ by 1 ULP).
+#[rustfmt::skip]
+const OSCE_WINDOW: [f32; 320] = [
+    f32::from_bits(0x3ba0d951), f32::from_bits(0x3c7143fe), f32::from_bits(0x3cc90ab0), f32::from_bits(0x3d0cb735), f32::from_bits(0x3d34e59a),
+    f32::from_bits(0x3d5d0f88), f32::from_bits(0x3d829a01), f32::from_bits(0x3d96a905), f32::from_bits(0x3daab451), f32::from_bits(0x3dbebb67),
+    f32::from_bits(0x3dd2bdc8), f32::from_bits(0x3de6baf6), f32::from_bits(0x3dfab273), f32::from_bits(0x3e0751e0), f32::from_bits(0x3e114730),
+    f32::from_bits(0x3e1b38ea), f32::from_bits(0x3e2526d0), f32::from_bits(0x3e2f10a2), f32::from_bits(0x3e38f623), f32::from_bits(0x3e42d713),
+    f32::from_bits(0x3e4cb335), f32::from_bits(0x3e568a4a), f32::from_bits(0x3e605c13), f32::from_bits(0x3e6a2854), f32::from_bits(0x3e73eecd),
+    f32::from_bits(0x3e7daf42), f32::from_bits(0x3e83b4ba), f32::from_bits(0x3e888e93), f32::from_bits(0x3e8d650e), f32::from_bits(0x3e92380b),
+    f32::from_bits(0x3e97076d), f32::from_bits(0x3e9bd315), f32::from_bits(0x3ea09ae5), f32::from_bits(0x3ea55ebe), f32::from_bits(0x3eaa1e82),
+    f32::from_bits(0x3eaeda15), f32::from_bits(0x3eb39156), f32::from_bits(0x3eb8442a), f32::from_bits(0x3ebcf271), f32::from_bits(0x3ec19c0f),
+    f32::from_bits(0x3ec640e6), f32::from_bits(0x3ecae0d9), f32::from_bits(0x3ecf7bca), f32::from_bits(0x3ed4119d), f32::from_bits(0x3ed8a234),
+    f32::from_bits(0x3edd2d73), f32::from_bits(0x3ee1b33d), f32::from_bits(0x3ee63375), f32::from_bits(0x3eeaadff), f32::from_bits(0x3eef22bf),
+    f32::from_bits(0x3ef39198), f32::from_bits(0x3ef7fa6f), f32::from_bits(0x3efc5d27), f32::from_bits(0x3f005cd3), f32::from_bits(0x3f0287e7),
+    f32::from_bits(0x3f04afc3), f32::from_bits(0x3f06d459), f32::from_bits(0x3f08f59b), f32::from_bits(0x3f0b137c), f32::from_bits(0x3f0d2dee),
+    f32::from_bits(0x3f0f44e5), f32::from_bits(0x3f115853), f32::from_bits(0x3f13682a), f32::from_bits(0x3f15745f), f32::from_bits(0x3f177ce4),
+    f32::from_bits(0x3f1981ab), f32::from_bits(0x3f1b82a9), f32::from_bits(0x3f1d7fd1), f32::from_bits(0x3f1f7916), f32::from_bits(0x3f216e6c),
+    f32::from_bits(0x3f235fc6), f32::from_bits(0x3f254d18), f32::from_bits(0x3f273656), f32::from_bits(0x3f291b74), f32::from_bits(0x3f2afc65),
+    f32::from_bits(0x3f2cd91f), f32::from_bits(0x3f2eb194), f32::from_bits(0x3f3085bb), f32::from_bits(0x3f325586), f32::from_bits(0x3f3420eb),
+    f32::from_bits(0x3f35e7de), f32::from_bits(0x3f37aa54), f32::from_bits(0x3f396842), f32::from_bits(0x3f3b219d), f32::from_bits(0x3f3cd659),
+    f32::from_bits(0x3f3e866d), f32::from_bits(0x3f4031ce), f32::from_bits(0x3f41d870), f32::from_bits(0x3f437a4a), f32::from_bits(0x3f451752),
+    f32::from_bits(0x3f46af7c), f32::from_bits(0x3f4842c0), f32::from_bits(0x3f49d112), f32::from_bits(0x3f4b5a6a), f32::from_bits(0x3f4cdebd),
+    f32::from_bits(0x3f4e5e02), f32::from_bits(0x3f4fd830), f32::from_bits(0x3f514d3d), f32::from_bits(0x3f52bd20), f32::from_bits(0x3f5427cf),
+    f32::from_bits(0x3f558d43), f32::from_bits(0x3f56ed72), f32::from_bits(0x3f584853), f32::from_bits(0x3f599dde), f32::from_bits(0x3f5aee0a),
+    f32::from_bits(0x3f5c38d0), f32::from_bits(0x3f5d7e26), f32::from_bits(0x3f5ebe05), f32::from_bits(0x3f5ff866), f32::from_bits(0x3f612d40),
+    f32::from_bits(0x3f625c8b), f32::from_bits(0x3f638641), f32::from_bits(0x3f64aa59), f32::from_bits(0x3f65c8cd), f32::from_bits(0x3f66e196),
+    f32::from_bits(0x3f67f4ac), f32::from_bits(0x3f690209), f32::from_bits(0x3f6a09a7), f32::from_bits(0x3f6b0b7e), f32::from_bits(0x3f6c0788),
+    f32::from_bits(0x3f6cfdbf), f32::from_bits(0x3f6dee1e), f32::from_bits(0x3f6ed89e), f32::from_bits(0x3f6fbd39), f32::from_bits(0x3f709be9),
+    f32::from_bits(0x3f7174aa), f32::from_bits(0x3f724776), f32::from_bits(0x3f731447), f32::from_bits(0x3f73db19), f32::from_bits(0x3f749be7),
+    f32::from_bits(0x3f7556ac), f32::from_bits(0x3f760b62), f32::from_bits(0x3f76ba07), f32::from_bits(0x3f776296), f32::from_bits(0x3f780509),
+    f32::from_bits(0x3f78a15e), f32::from_bits(0x3f793791), f32::from_bits(0x3f79c79d), f32::from_bits(0x3f7a5180), f32::from_bits(0x3f7ad536),
+    f32::from_bits(0x3f7b52bb), f32::from_bits(0x3f7bca0d), f32::from_bits(0x3f7c3b28), f32::from_bits(0x3f7ca60a), f32::from_bits(0x3f7d0ab0),
+    f32::from_bits(0x3f7d6918), f32::from_bits(0x3f7dc13f), f32::from_bits(0x3f7e1324), f32::from_bits(0x3f7e5ec3), f32::from_bits(0x3f7ea41c),
+    f32::from_bits(0x3f7ee32c), f32::from_bits(0x3f7f1bf2), f32::from_bits(0x3f7f4e6d), f32::from_bits(0x3f7f7a9c), f32::from_bits(0x3f7fa07c),
+    f32::from_bits(0x3f7fc00e), f32::from_bits(0x3f7fd951), f32::from_bits(0x3f7fec43), f32::from_bits(0x3f7ff8e5), f32::from_bits(0x3f7fff36),
+    f32::from_bits(0x3f7fff36), f32::from_bits(0x3f7ff8e5), f32::from_bits(0x3f7fec43), f32::from_bits(0x3f7fd951), f32::from_bits(0x3f7fc00e),
+    f32::from_bits(0x3f7fa07c), f32::from_bits(0x3f7f7a9c), f32::from_bits(0x3f7f4e6d), f32::from_bits(0x3f7f1bf2), f32::from_bits(0x3f7ee32c),
+    f32::from_bits(0x3f7ea41c), f32::from_bits(0x3f7e5ec3), f32::from_bits(0x3f7e1324), f32::from_bits(0x3f7dc13f), f32::from_bits(0x3f7d6918),
+    f32::from_bits(0x3f7d0ab0), f32::from_bits(0x3f7ca60a), f32::from_bits(0x3f7c3b28), f32::from_bits(0x3f7bca0d), f32::from_bits(0x3f7b52bb),
+    f32::from_bits(0x3f7ad536), f32::from_bits(0x3f7a5180), f32::from_bits(0x3f79c79d), f32::from_bits(0x3f793791), f32::from_bits(0x3f78a15e),
+    f32::from_bits(0x3f780509), f32::from_bits(0x3f776296), f32::from_bits(0x3f76ba07), f32::from_bits(0x3f760b62), f32::from_bits(0x3f7556ac),
+    f32::from_bits(0x3f749be7), f32::from_bits(0x3f73db19), f32::from_bits(0x3f731447), f32::from_bits(0x3f724776), f32::from_bits(0x3f7174aa),
+    f32::from_bits(0x3f709be9), f32::from_bits(0x3f6fbd39), f32::from_bits(0x3f6ed89e), f32::from_bits(0x3f6dee1e), f32::from_bits(0x3f6cfdbf),
+    f32::from_bits(0x3f6c0788), f32::from_bits(0x3f6b0b7e), f32::from_bits(0x3f6a09a7), f32::from_bits(0x3f690209), f32::from_bits(0x3f67f4ac),
+    f32::from_bits(0x3f66e196), f32::from_bits(0x3f65c8cd), f32::from_bits(0x3f64aa59), f32::from_bits(0x3f638641), f32::from_bits(0x3f625c8b),
+    f32::from_bits(0x3f612d40), f32::from_bits(0x3f5ff866), f32::from_bits(0x3f5ebe05), f32::from_bits(0x3f5d7e26), f32::from_bits(0x3f5c38d0),
+    f32::from_bits(0x3f5aee0a), f32::from_bits(0x3f599dde), f32::from_bits(0x3f584853), f32::from_bits(0x3f56ed72), f32::from_bits(0x3f558d43),
+    f32::from_bits(0x3f5427cf), f32::from_bits(0x3f52bd20), f32::from_bits(0x3f514d3d), f32::from_bits(0x3f4fd830), f32::from_bits(0x3f4e5e02),
+    f32::from_bits(0x3f4cdebd), f32::from_bits(0x3f4b5a6a), f32::from_bits(0x3f49d112), f32::from_bits(0x3f4842c0), f32::from_bits(0x3f46af7c),
+    f32::from_bits(0x3f451752), f32::from_bits(0x3f437a4a), f32::from_bits(0x3f41d870), f32::from_bits(0x3f4031ce), f32::from_bits(0x3f3e866d),
+    f32::from_bits(0x3f3cd659), f32::from_bits(0x3f3b219d), f32::from_bits(0x3f396842), f32::from_bits(0x3f37aa54), f32::from_bits(0x3f35e7de),
+    f32::from_bits(0x3f3420eb), f32::from_bits(0x3f325586), f32::from_bits(0x3f3085bb), f32::from_bits(0x3f2eb194), f32::from_bits(0x3f2cd91f),
+    f32::from_bits(0x3f2afc65), f32::from_bits(0x3f291b74), f32::from_bits(0x3f273656), f32::from_bits(0x3f254d18), f32::from_bits(0x3f235fc6),
+    f32::from_bits(0x3f216e6c), f32::from_bits(0x3f1f7916), f32::from_bits(0x3f1d7fd1), f32::from_bits(0x3f1b82a9), f32::from_bits(0x3f1981ab),
+    f32::from_bits(0x3f177ce4), f32::from_bits(0x3f15745f), f32::from_bits(0x3f13682a), f32::from_bits(0x3f115853), f32::from_bits(0x3f0f44e5),
+    f32::from_bits(0x3f0d2dee), f32::from_bits(0x3f0b137c), f32::from_bits(0x3f08f59b), f32::from_bits(0x3f06d459), f32::from_bits(0x3f04afc3),
+    f32::from_bits(0x3f0287e7), f32::from_bits(0x3f005cd3), f32::from_bits(0x3efc5d27), f32::from_bits(0x3ef7fa6f), f32::from_bits(0x3ef39198),
+    f32::from_bits(0x3eef22bf), f32::from_bits(0x3eeaadff), f32::from_bits(0x3ee63375), f32::from_bits(0x3ee1b33d), f32::from_bits(0x3edd2d73),
+    f32::from_bits(0x3ed8a234), f32::from_bits(0x3ed4119d), f32::from_bits(0x3ecf7bca), f32::from_bits(0x3ecae0d9), f32::from_bits(0x3ec640e6),
+    f32::from_bits(0x3ec19c0f), f32::from_bits(0x3ebcf271), f32::from_bits(0x3eb8442a), f32::from_bits(0x3eb39156), f32::from_bits(0x3eaeda15),
+    f32::from_bits(0x3eaa1e82), f32::from_bits(0x3ea55ebe), f32::from_bits(0x3ea09ae5), f32::from_bits(0x3e9bd315), f32::from_bits(0x3e97076d),
+    f32::from_bits(0x3e92380b), f32::from_bits(0x3e8d650e), f32::from_bits(0x3e888e93), f32::from_bits(0x3e83b4ba), f32::from_bits(0x3e7daf42),
+    f32::from_bits(0x3e73eecd), f32::from_bits(0x3e6a2854), f32::from_bits(0x3e605c13), f32::from_bits(0x3e568a4a), f32::from_bits(0x3e4cb335),
+    f32::from_bits(0x3e42d713), f32::from_bits(0x3e38f623), f32::from_bits(0x3e2f10a2), f32::from_bits(0x3e2526d0), f32::from_bits(0x3e1b38ea),
+    f32::from_bits(0x3e114730), f32::from_bits(0x3e0751e0), f32::from_bits(0x3dfab273), f32::from_bits(0x3de6baf6), f32::from_bits(0x3dd2bdc8),
+    f32::from_bits(0x3dbebb67), f32::from_bits(0x3daab451), f32::from_bits(0x3d96a905), f32::from_bits(0x3d829a01), f32::from_bits(0x3d5d0f88),
+    f32::from_bits(0x3d34e59a), f32::from_bits(0x3d0cb735), f32::from_bits(0x3cc90ab0), f32::from_bits(0x3c7143fe), f32::from_bits(0x3ba0d951),
+];
+
+fn generate_osce_window() -> &'static [f32; OSCE_SPEC_WINDOW_SIZE] {
+    &OSCE_WINDOW
 }
 
 // ========== Structs ==========
