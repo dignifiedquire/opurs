@@ -589,4 +589,134 @@ int osce_test_dense_tanh_lace_tconv(
     return hLACE.lace_fnet_tconv.nb_inputs;
 }
 
+/* Dump adacomb intermediates for one frame.
+ * Layout of out buffer:
+ *   [0..15]    = kernel_buffer (16 floats from compute_generic_dense on cf1_kernel)
+ *   [16]       = gain (after compute_generic_dense with RELU)
+ *   [17]       = global_gain (after compute_generic_dense with TANH)
+ *   [18]       = gain after exp transform
+ *   [19]       = global_gain after exp transform
+ *   [20..35]   = kernel after scale_kernel
+ *   [36..115]  = xcorr output_buffer (frame_size=80)
+ *   [116..195] = final x_out (frame_size=80)
+ * Total: 196 floats
+ */
+int osce_test_adacomb_intermediates(
+    float *out,
+    unsigned int seed
+)
+{
+    LACELayers hLACE;
+    AdaCombState hAdaComb;
+
+    int feature_dim, frame_size, overlap_size;
+    int kernel_size, left_padding;
+    float filter_gain_a, filter_gain_b, log_gain_limit;
+    float window[ADACOMB_MAX_OVERLAP_SIZE];
+    float features[512];
+    float x_in[512];
+    float x_out[512];
+    int i;
+    int pitch_lag;
+
+    float kernel_buffer[ADACOMB_MAX_KERNEL_SIZE];
+    float gain, global_gain;
+
+    init_lacelayers(&hLACE, lacelayers_arrays);
+    feature_dim = LACE_CF1_FEATURE_DIM;
+    frame_size = LACE_CF1_FRAME_SIZE;
+    overlap_size = LACE_CF1_OVERLAP_SIZE;
+    kernel_size = LACE_CF1_KERNEL_SIZE;
+    left_padding = LACE_CF1_LEFT_PADDING;
+    filter_gain_a = LACE_CF1_FILTER_GAIN_A;
+    filter_gain_b = LACE_CF1_FILTER_GAIN_B;
+    log_gain_limit = LACE_CF1_LOG_GAIN_LIMIT;
+
+    init_adacomb_state(&hAdaComb);
+    compute_overlap_window(window, overlap_size);
+
+    prng_reset(seed);
+
+    /* Generate one frame of inputs */
+    for (i = 0; i < feature_dim; i++) {
+        features[i] = prng_float() * 0.1f;
+    }
+    for (i = 0; i < frame_size; i++) {
+        x_in[i] = prng_float() * 0.5f;
+    }
+    pitch_lag = kernel_size + (int)((unsigned int)(prng_float() * 32768.0f + 32768.0f) % (250 - kernel_size));
+
+    /* Step 1: compute_generic_dense on kernel */
+    compute_generic_dense(&hLACE.lace_cf1_kernel, kernel_buffer, features, ACTIVATION_LINEAR, opus_select_arch());
+    memcpy(out, kernel_buffer, sizeof(float) * 16);
+
+    /* Step 2: compute_generic_dense on gain (RELU) */
+    compute_generic_dense(&hLACE.lace_cf1_gain, &gain, features, ACTIVATION_RELU, opus_select_arch());
+    out[16] = gain;
+
+    /* Step 3: compute_generic_dense on global_gain (TANH) */
+    compute_generic_dense(&hLACE.lace_cf1_global_gain, &global_gain, features, ACTIVATION_TANH, opus_select_arch());
+    out[17] = global_gain;
+
+    /* Step 4: transform gains */
+    gain = exp(log_gain_limit - gain);
+    global_gain = exp(filter_gain_a * global_gain + filter_gain_b);
+    out[18] = gain;
+    out[19] = global_gain;
+
+    /* Step 5: scale_kernel — inlined since scale_kernel is static in nndsp.c */
+    {
+        float norm = 0;
+        int k;
+        for (k = 0; k < kernel_size; k++) {
+            norm += kernel_buffer[k] * kernel_buffer[k];
+        }
+        norm = (float)(1.0 / (1e-6 + sqrt(norm)));
+        for (k = 0; k < kernel_size; k++) {
+            kernel_buffer[k] *= norm * gain;
+        }
+    }
+    memcpy(out + 20, kernel_buffer, sizeof(float) * 16);
+
+    /* Step 6: Run full adacomb to get the final output */
+    /* Re-init state and re-generate inputs */
+    init_adacomb_state(&hAdaComb);
+    prng_reset(seed);
+    for (i = 0; i < feature_dim; i++) {
+        features[i] = prng_float() * 0.1f;
+    }
+    for (i = 0; i < frame_size; i++) {
+        x_in[i] = prng_float() * 0.5f;
+    }
+    pitch_lag = kernel_size + (int)((unsigned int)(prng_float() * 32768.0f + 32768.0f) % (250 - kernel_size));
+
+    adacomb_process_frame(&hAdaComb, x_out, x_in, features,
+        &hLACE.lace_cf1_kernel, &hLACE.lace_cf1_gain, &hLACE.lace_cf1_global_gain,
+        pitch_lag, feature_dim, frame_size, overlap_size,
+        kernel_size, left_padding,
+        filter_gain_a, filter_gain_b, log_gain_limit,
+        window, opus_select_arch());
+
+    memcpy(out + 36, x_out, sizeof(float) * frame_size);
+
+    /* Also run compute_linear alone on cf1_gain to compare */
+    /* Use same seed, regenerate features */
+    prng_reset(seed);
+    for (i = 0; i < feature_dim; i++) {
+        features[i] = prng_float() * 0.1f;
+    }
+    {
+        float linear_gain;
+        compute_linear(&hLACE.lace_cf1_gain, &linear_gain, features, opus_select_arch());
+        out[116] = linear_gain;
+    }
+    {
+        float linear_ggain;
+        compute_linear(&hLACE.lace_cf1_global_gain, &linear_ggain, features, opus_select_arch());
+        out[117] = linear_ggain;
+    }
+
+    return 0;
+}
+
 #endif /* ENABLE_OSCE */

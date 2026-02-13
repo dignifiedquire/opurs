@@ -1273,6 +1273,11 @@ extern "C" {
         seed: ::std::os::raw::c_uint,
     ) -> ::std::os::raw::c_int;
 
+    pub fn osce_test_adacomb_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+
 }
 
 // -----------------------------------------------------------------------
