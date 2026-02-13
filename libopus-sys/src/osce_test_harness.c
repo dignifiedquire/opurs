@@ -31,7 +31,7 @@ void osce_test_libm_values(float *out)
     int i;
     /* overlap window cos values */
     for (i = 0; i < 40; i++) {
-        double angle = M_PI * (i + 0.5) / 40.0;
+        double angle = 3.14159265358979323846 * (i + 0.5) / 40.0;
         out[i] = (float)(0.5 + 0.5 * cos(angle));
     }
     /* exp values */
