@@ -386,10 +386,10 @@ pub fn clt_compute_allocation(
             total -= dual_stereo_rsv;
         }
     }
-    let mut bits1: Vec<i32> = vec![0; len as usize];
-    let mut bits2: Vec<i32> = vec![0; len as usize];
-    let mut thresh: Vec<i32> = vec![0; len as usize];
-    let mut trim_offset: Vec<i32> = vec![0; len as usize];
+    let mut bits1 = [0i32; 21];
+    let mut bits2 = [0i32; 21];
+    let mut thresh = [0i32; 21];
+    let mut trim_offset = [0i32; 21];
     j = start;
     while j < end {
         thresh[j as usize] = (C << 3).max(

@@ -4,7 +4,6 @@
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
-use ndarray::azip;
 
 /// Upstream C: silk/LPC_fit.c:silk_LPC_fit
 ///
@@ -17,6 +16,7 @@ use ndarray::azip;
 /// QIN      I     Input Q domain
 /// d        I     Filter order
 /// ```
+#[inline]
 pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) {
     let d = a_QOUT.len();
     assert_eq!(a_QIN.len(), d);
@@ -53,13 +53,13 @@ pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) 
 
     if i == 10 {
         /* Reached the last iteration, clip the coefficients */
-        azip!((out in a_QOUT, input in a_QIN) {
+        for (out, input) in a_QOUT.iter_mut().zip(a_QIN.iter_mut()) {
             *out = silk_SAT16(silk_RSHIFT_ROUND(*input, QIN - QOUT)) as i16;
             *input = (*out as i32) << (QIN - QOUT);
-        });
+        }
     } else {
-        azip!((out in a_QOUT, &mut input in a_QIN) {
-            *out = silk_RSHIFT_ROUND(input, QIN - QOUT) as i16;
-        });
+        for (out, input) in a_QOUT.iter_mut().zip(a_QIN.iter()) {
+            *out = silk_RSHIFT_ROUND(*input, QIN - QOUT) as i16;
+        }
     };
 }

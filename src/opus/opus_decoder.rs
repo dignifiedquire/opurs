@@ -322,7 +322,12 @@ fn opus_decode_frame(
     let mut celt_ret: i32 = 0;
     // data_copy must be declared before dec so it outlives the borrow.
     // ec_dec_init requires &mut [u8]; decoder only reads from it.
-    let mut data_copy: Vec<u8> = data.map_or_else(Vec::new, |d| d.to_vec());
+    // Use stack buffer to avoid heap allocation. Max 1275 bytes per packet.
+    let mut data_copy = [0u8; 1275];
+    let data_copy_len = data.map_or(0, |d| {
+        data_copy[..d.len()].copy_from_slice(d);
+        d.len()
+    });
     let mut dec: ec_dec = ec_dec {
         buf: &mut [],
         storage: 0,
@@ -379,7 +384,7 @@ fn opus_decode_frame(
         audiosize = st.frame_size;
         mode = st.mode;
         bandwidth = st.bandwidth;
-        dec = ec_dec_init(&mut data_copy);
+        dec = ec_dec_init(&mut data_copy[..data_copy_len]);
     } else {
         audiosize = frame_size;
         mode = if st.prev_redundancy != 0 {

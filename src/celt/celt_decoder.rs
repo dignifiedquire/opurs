@@ -191,6 +191,7 @@ impl OpusCustomDecoder {
 }
 
 /// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
+#[inline]
 fn deemphasis_stereo_simple(
     ch0: &[celt_sig],
     ch1: &[celt_sig],
@@ -216,6 +217,7 @@ fn deemphasis_stereo_simple(
     mem[1] = m1;
 }
 /// Upstream C: celt/celt_decoder.c:deemphasis
+#[inline]
 fn deemphasis(
     in_channels: &[&[celt_sig]],
     pcm: &mut [opus_val16],
@@ -239,8 +241,7 @@ fn deemphasis(
         return;
     }
     assert!(accum == 0);
-    let vla = N as usize;
-    let mut scratch: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
+    let mut scratch = [0.0f32; 960];
     let coef0: opus_val16 = coef[0];
     let Nd: i32 = N / downsample;
     let mut c = 0;
@@ -282,6 +283,7 @@ fn deemphasis(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_synthesis
+#[inline]
 fn celt_synthesis(
     mode: &OpusCustomMode,
     X: &[celt_norm],
@@ -310,7 +312,7 @@ fn celt_synthesis(
     // Allocate N + M - 1 elements so that strided mdct_backward calls
     // can form slices freq[b..b + n2*B] for b in 0..B without going
     // out of bounds. The extra elements are never read (stride skips them).
-    let mut freq: Vec<celt_sig> = ::std::vec::from_elem(0., n + M as usize - 1);
+    let mut freq = [0.0f32; 960 + 8 - 1];
     if isTransient != 0 {
         B = M;
         NB = mode.shortMdctSize;
@@ -334,8 +336,8 @@ fn celt_synthesis(
             downsample,
             silence,
         );
-        // Use a temporary Vec for freq2 instead of borrowing out_syn_ch1
-        let mut freq2 = vec![0.0f32; n + M as usize - 1];
+        // Use a temporary array for freq2 instead of borrowing out_syn_ch1
+        let mut freq2 = [0.0f32; 960 + 8 - 1];
         freq2[..n].copy_from_slice(&freq[..n]);
         b = 0;
         while b < B {
@@ -378,7 +380,7 @@ fn celt_synthesis(
             silence,
         );
         // freq2 for the second channel
-        let mut freq2 = vec![0.0f32; n];
+        let mut freq2 = [0.0f32; 960];
         denormalise_bands(
             mode,
             &X[n..2 * n],
@@ -545,7 +547,7 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
     let mut c = 0;
     loop {
         let ch_off = c as usize * chan_stride;
-        let mut etmp: Vec<opus_val32> = vec![0.0; overlap_u];
+        let mut etmp = [0.0f32; 120];
 
         // Apply the pre-filter to the MDCT overlap for the next frame because
         // the post-filter will be re-applied in the decoder after the MDCT overlap.
@@ -581,6 +583,7 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
 }
 
 /// Upstream C: celt/celt_decoder.c:celt_decode_lost
+#[inline]
 fn celt_decode_lost(
     st: &mut OpusCustomDecoder,
     N: i32,
@@ -950,9 +953,11 @@ pub fn celt_decode_with_ec(
     if st.loss_duration == 0 {
         st.skip_plc = 0;
     }
-    // Copy data into a local buffer so ec_dec_init can take &mut [u8] without
+    // Copy data into a stack buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
-    let mut data_copy = data.unwrap().to_vec();
+    let data_slice = data.unwrap();
+    let mut data_copy = [0u8; 1275];
+    data_copy[..data_slice.len()].copy_from_slice(data_slice);
     // When the caller provides a dec, use it; otherwise create a local one.
     // These are separate scopes to avoid lifetime unification between the
     // caller-provided ec_dec and the locally-owned one (self-referential borrow).
@@ -981,7 +986,7 @@ pub fn celt_decode_with_ec(
             chan_stride,
         );
     }
-    let mut _dec = ec_dec_init(&mut data_copy);
+    let mut _dec = ec_dec_init(&mut data_copy[..data_slice.len()]);
     celt_decode_body(
         st,
         pcm,
@@ -1008,6 +1013,7 @@ pub fn celt_decode_with_ec(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[inline]
 fn celt_decode_body(
     st: &mut OpusCustomDecoder,
     pcm: &mut [opus_val16],
@@ -1167,19 +1173,16 @@ fn celt_decode_body(
         C,
         LM,
     );
-    let vla = nbEBands as usize;
-    let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla);
+    let mut tf_res = [0i32; 21];
     tf_decode(start, end, isTransient, &mut tf_res, LM, dec);
     tell = ec_tell(dec);
     spread_decision = SPREAD_NORMAL;
     if tell + 4 <= total_bits {
         spread_decision = ec_dec_icdf(dec, &spread_icdf, 5);
     }
-    let vla_0 = nbEBands as usize;
-    let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_0);
+    let mut cap = [0i32; 21];
     init_caps(mode, &mut cap, LM, C);
-    let vla_1 = nbEBands as usize;
-    let mut offsets: Vec<i32> = ::std::vec::from_elem(0, vla_1);
+    let mut offsets = [0i32; 21];
     dynalloc_logp = 6;
     total_bits <<= BITRES;
     tell = ec_tell_frac(dec) as i32;
@@ -1220,8 +1223,7 @@ fn celt_decode_body(
         }
         i += 1;
     }
-    let vla_2 = nbEBands as usize;
-    let mut fine_quant: Vec<i32> = ::std::vec::from_elem(0, vla_2);
+    let mut fine_quant = [0i32; 21];
     let alloc_trim: i32 = if tell + ((6) << BITRES) <= total_bits {
         ec_dec_icdf(dec, &trim_icdf, 7)
     } else {
@@ -1236,10 +1238,8 @@ fn celt_decode_body(
         0
     };
     bits -= anti_collapse_rsv;
-    let vla_3 = nbEBands as usize;
-    let mut pulses: Vec<i32> = ::std::vec::from_elem(0, vla_3);
-    let vla_4 = nbEBands as usize;
-    let mut fine_priority: Vec<i32> = ::std::vec::from_elem(0, vla_4);
+    let mut pulses = [0i32; 21];
+    let mut fine_priority = [0i32; 21];
     let codedBands: i32 = clt_compute_allocation(
         mode,
         start,
@@ -1281,10 +1281,8 @@ fn celt_decode_body(
             break;
         }
     }
-    let vla_5 = (C * nbEBands) as usize;
-    let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_5);
-    let vla_6 = (C * N) as usize;
-    let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_6);
+    let mut collapse_masks = [0u8; 42];
+    let mut X = [0.0f32; 1920];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(

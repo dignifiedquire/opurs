@@ -117,6 +117,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
 /// A_Q12   I   Prediction coefficients, Q12 [order]
 /// order   I   Prediction order
 /// ```
+#[inline]
 pub fn silk_LPC_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
     let mut Atmp_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
     let mut DC_resp: i32 = 0;

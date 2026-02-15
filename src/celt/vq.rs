@@ -27,6 +27,7 @@ fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: i32) -> f3
 }
 
 /// Upstream C: celt/vq.c:exp_rotation1
+#[inline]
 fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
     // Forward pass
@@ -52,6 +53,7 @@ fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
 }
 
 /// Upstream C: celt/vq.c:exp_rotation
+#[inline]
 pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, spread: i32) {
     static SPREAD_FACTOR: [i32; 3] = [15, 10, 5];
     let mut stride2: i32 = 0;
@@ -88,6 +90,7 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
 }
 
 /// Upstream C: celt/vq.c:normalise_residual
+#[inline]
 fn normalise_residual(iy: &[i32], X: &mut [f32], N: i32, Ryy: f32, gain: f32) {
     let g = celt_rsqrt_norm(Ryy) * gain;
     for i in 0..N as usize {
@@ -213,6 +216,7 @@ pub fn alg_quant(
 }
 
 /// Upstream C: celt/vq.c:alg_unquant
+#[inline]
 pub fn alg_unquant(
     X: &mut [f32],
     N: i32,
@@ -224,7 +228,7 @@ pub fn alg_unquant(
 ) -> u32 {
     assert!(K > 0);
     assert!(N > 1);
-    let mut iy: Vec<i32> = vec![0; N as usize];
+    let mut iy = [0i32; 176];
     let Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
     normalise_residual(&iy, X, N, Ryy, gain);
     exp_rotation(X, N, -1, B, K, spread);
@@ -232,6 +236,7 @@ pub fn alg_unquant(
 }
 
 /// Upstream C: celt/vq.c:renormalise_vector
+#[inline]
 pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
     let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize);
     let g = celt_rsqrt_norm(E) * gain;
@@ -241,6 +246,7 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
 }
 
 /// Upstream C: celt/vq.c:stereo_itheta
+#[inline]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i32 {
     let mut Emid: f32 = EPSILON;
     let mut Eside: f32 = EPSILON;
