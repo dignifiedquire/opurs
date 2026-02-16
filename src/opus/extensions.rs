@@ -1,14 +1,21 @@
 //! Opus packet extension parsing and generation.
 //!
 //! Extensions are carried in the padding area of Opus packets.
-//! Each extension has an ID (2..127), a frame number, and variable-length data.
+//! Each extension has an ID (3..127), a frame number, and variable-length data.
+//! IDs 0-1 are reserved (padding/separator), ID 2 is "Repeat These Extensions".
 //!
 //! Upstream C: `src/extensions.c`
 
-// These functions are used by the DNN subsystem (DRED), not yet integrated.
+// These functions are used by the DNN subsystem (DRED) and QEXT.
 #![allow(dead_code)]
 
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
+
+/// Extension ID 2: "Repeat These Extensions" (reserved, not yet implemented).
+pub const EXTENSION_ID_REPEAT: i32 = 2;
+
+/// Minimum valid user extension ID.
+pub const EXTENSION_ID_MIN: i32 = 3;
 
 /// Extension data associated with a specific frame in an Opus packet.
 ///
@@ -77,10 +84,11 @@ fn skip_extension(data: &[u8], mut pos: usize, len: usize) -> Result<(usize, usi
     }
 }
 
-/// Count the number of extensions (excluding padding and separators).
+/// Count the number of extensions (excluding padding, separators, and repeat markers).
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_count
-pub fn opus_packet_extensions_count(data: &[u8]) -> Result<i32, i32> {
+pub fn opus_packet_extensions_count(data: &[u8], nb_frames: i32) -> Result<i32, i32> {
+    let _ = nb_frames; // reserved for future repeat mechanism
     let len = data.len();
     let mut count: i32 = 0;
     let mut pos: usize = 0;
@@ -92,7 +100,7 @@ pub fn opus_packet_extensions_count(data: &[u8]) -> Result<i32, i32> {
         let consumed = remaining - new_remaining;
         pos += consumed;
         remaining = new_remaining;
-        if id > 1 {
+        if id >= EXTENSION_ID_MIN as u8 {
             count += 1;
         }
     }
@@ -101,13 +109,16 @@ pub fn opus_packet_extensions_count(data: &[u8]) -> Result<i32, i32> {
 
 /// Parse extensions from Opus padding data.
 ///
-/// Returns a vector of `OpusExtensionData` entries (excluding padding and separators).
+/// Returns a vector of `OpusExtensionData` entries (excluding padding, separators,
+/// and repeat markers).
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_parse
 pub fn opus_packet_extensions_parse(
     data: &[u8],
     max_extensions: i32,
+    nb_frames: i32,
 ) -> Result<Vec<OpusExtensionData>, i32> {
+    let _ = nb_frames; // reserved for future repeat mechanism
     let len = data.len();
     let mut extensions = Vec::new();
     let mut curr_frame: i32 = 0;
@@ -119,7 +130,7 @@ pub fn opus_packet_extensions_parse(
 
         let ext_data_start = pos;
 
-        if id > 1 {
+        if id >= EXTENSION_ID_MIN as u8 {
             // Real extension — will record after skip
         } else if id == 1 {
             // Frame separator
@@ -140,7 +151,7 @@ pub fn opus_packet_extensions_parse(
         pos += consumed;
         remaining = new_remaining;
 
-        if id > 1 {
+        if id >= EXTENSION_ID_MIN as u8 {
             if extensions.len() as i32 == max_extensions {
                 return Err(OPUS_BUFFER_TOO_SMALL);
             }
@@ -173,7 +184,7 @@ pub fn opus_packet_extensions_generate(
     let mut max_frame: i32 = 0;
     for ext in extensions {
         max_frame = max_frame.max(ext.frame);
-        if ext.id < 2 || ext.id > 127 {
+        if ext.id < EXTENSION_ID_MIN || ext.id > 127 {
             return Err(OPUS_BAD_ARG);
         }
     }
@@ -261,6 +272,56 @@ pub fn opus_packet_extensions_generate(
     Ok(pos)
 }
 
+/// Find the first extension with the given ID for a frame in `[0, frame_max)`.
+///
+/// Returns `Some(OpusExtensionData)` if found, `None` otherwise.
+/// This is a simplified version of the C iterator's `opus_extension_iterator_find`.
+pub fn opus_packet_extension_find(
+    data: &[u8],
+    target_id: i32,
+    frame_max: i32,
+    nb_frames: i32,
+) -> Option<OpusExtensionData> {
+    let _ = nb_frames; // reserved for future repeat mechanism
+    let len = data.len();
+    let mut curr_frame: i32 = 0;
+    let mut pos: usize = 0;
+    let mut remaining = len;
+
+    while remaining > 0 {
+        let id = data[pos] >> 1;
+        let ext_data_start = pos;
+
+        if id == 1 {
+            let l = data[pos] & 1;
+            if l == 0 {
+                curr_frame += 1;
+            } else if remaining >= 2 {
+                curr_frame += data[pos + 1] as i32;
+            }
+            if curr_frame >= frame_max {
+                return None;
+            }
+        }
+
+        let (new_remaining, header_size) = skip_extension(data, pos, pos + remaining).ok()?;
+        let consumed = remaining - new_remaining;
+        pos += consumed;
+        remaining = new_remaining;
+
+        if id as i32 == target_id && curr_frame < frame_max {
+            let data_start = ext_data_start + header_size;
+            let data_end = pos;
+            return Some(OpusExtensionData {
+                id: id as i32,
+                frame: curr_frame,
+                data: data[data_start..data_end].to_vec(),
+            });
+        }
+    }
+    None
+}
+
 /// Generate extension data, returning the required size without writing.
 ///
 /// This is equivalent to calling generate with a None output to measure the size.
@@ -274,7 +335,7 @@ pub fn opus_packet_extensions_generate_size(
     let mut max_frame: i32 = 0;
     for ext in extensions {
         max_frame = max_frame.max(ext.frame);
-        if ext.id < 2 || ext.id > 127 {
+        if ext.id < EXTENSION_ID_MIN || ext.id > 127 {
             return Err(OPUS_BAD_ARG);
         }
     }
