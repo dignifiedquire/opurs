@@ -47,6 +47,11 @@ pub static static_mode_list: [&OpusCustomMode; 2] = [
 use crate::celt::mdct::MdctLookup;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
 
+#[cfg(feature = "qext")]
+use self::data_96000::{
+    NB_QEXT_BANDS, QEXT_EBANDS_180, QEXT_EBANDS_240, QEXT_LOGN_180, QEXT_LOGN_240,
+};
+
 static eband5ms: [i16; 22] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100,
 ];
@@ -85,4 +90,36 @@ pub fn opus_custom_mode_create(
         *error = OPUS_BAD_ARG;
     }
     None
+}
+
+/// Build a temporary QEXT mode from the base mode.
+///
+/// Selects the appropriate eBands/logN tables based on frame size,
+/// sets nbEBands/effEBands to NB_QEXT_BANDS, and copies the
+/// pre-computed pulse cache from the base mode's qext_cache.
+///
+/// Upstream C: celt/modes.c:compute_qext_mode
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+pub fn compute_qext_mode(m: &OpusCustomMode) -> OpusCustomMode {
+    let mut qext = *m;
+    if m.shortMdctSize * 48000 == 120 * m.Fs {
+        qext.eBands = &QEXT_EBANDS_240;
+        qext.logN = &QEXT_LOGN_240;
+    } else if m.shortMdctSize * 48000 == 90 * m.Fs {
+        qext.eBands = &QEXT_EBANDS_180;
+        qext.logN = &QEXT_LOGN_180;
+    } else {
+        panic!("compute_qext_mode: unsupported shortMdctSize/Fs combination");
+    }
+    qext.nbEBands = NB_QEXT_BANDS;
+    qext.effEBands = NB_QEXT_BANDS as i32;
+    // Trim effEBands if last eBand exceeds shortMdctSize
+    while qext.eBands[qext.effEBands as usize] > qext.shortMdctSize as i16 {
+        qext.effEBands -= 1;
+    }
+    qext.nbAllocVectors = 0;
+    qext.allocVectors = &[];
+    qext.cache = m.qext_cache;
+    qext
 }

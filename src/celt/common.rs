@@ -94,6 +94,13 @@ pub fn comb_filter(
     mut overlap: i32,
     _arch: i32,
 ) {
+    #[cfg(feature = "qext")]
+    if overlap == 240 {
+        comb_filter_qext(
+            y, y_start, x, x_start, T0, T1, N, g0, g1, tapset0, tapset1, window, overlap, _arch,
+        );
+        return;
+    }
     if g0 == 0.0f32 && g1 == 0.0f32 {
         y[y_start..y_start + N as usize].copy_from_slice(&x[x_start..x_start + N as usize]);
         return;
@@ -279,6 +286,109 @@ pub fn comb_filter_inplace(
             xv3 = xv2;
             xv2 = xv1;
             xv1 = xv0;
+        }
+    }
+}
+
+/// Comb filter for 96 kHz QEXT operation.
+///
+/// At 96 kHz, we double the period and the spacing between taps, which is equivalent
+/// to creating a mirror image of the filter around 24 kHz. Even and odd samples
+/// are processed completely independently.
+///
+/// Upstream C: celt/celt.c:comb_filter_qext
+#[cfg(feature = "qext")]
+pub fn comb_filter_qext(
+    y: &mut [f32],
+    y_start: usize,
+    x: &[f32],
+    x_start: usize,
+    T0: i32,
+    T1: i32,
+    N: i32,
+    g0: opus_val16,
+    g1: opus_val16,
+    tapset0: i32,
+    tapset1: i32,
+    window: &[f32],
+    overlap: i32,
+    arch: i32,
+) {
+    let N2 = (N / 2) as usize;
+    let overlap2 = (overlap / 2) as usize;
+
+    // Process even (s=0) and odd (s=1) samples independently.
+    for s in 0..2usize {
+        let mut new_window = vec![0.0f32; overlap2];
+        for i in 0..overlap2 {
+            new_window[i] = window[2 * i + s];
+        }
+
+        // Build deinterleaved memory buffer: mem_buf[0..COMBFILTER_MAXPERIOD + N2]
+        let mem_len = COMBFILTER_MAXPERIOD as usize + N2;
+        let mut mem_buf = vec![0.0f32; mem_len];
+        for (i, mem) in mem_buf.iter_mut().enumerate() {
+            // x[x_start + 2*i + s - 2*COMBFILTER_MAXPERIOD]
+            let src_idx =
+                x_start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
+            *mem = x[src_idx as usize];
+        }
+
+        let in_place = std::ptr::eq(
+            y.as_ptr().wrapping_add(y_start),
+            x.as_ptr().wrapping_add(x_start),
+        );
+
+        if in_place {
+            // In-place: work in mem_buf directly
+            let cf_start = COMBFILTER_MAXPERIOD as usize;
+            let mem_buf_copy = mem_buf.clone();
+            comb_filter(
+                &mut mem_buf,
+                cf_start,
+                &mem_buf_copy,
+                cf_start,
+                T0,
+                T1,
+                N2 as i32,
+                g0,
+                g1,
+                tapset0,
+                tapset1,
+                &new_window,
+                overlap2 as i32,
+                arch,
+            );
+            // Write back interleaved
+            for i in 0..N2 {
+                y[y_start + 2 * i + s] = mem_buf[cf_start + i];
+            }
+        } else {
+            // Separate output: deinterleave y into buf, apply filter, reinterleave
+            let mut buf = vec![0.0f32; N2];
+            for i in 0..N2 {
+                buf[i] = y[y_start + 2 * i + s];
+            }
+            let cf_start = COMBFILTER_MAXPERIOD as usize;
+            comb_filter(
+                &mut buf,
+                0,
+                &mem_buf,
+                cf_start,
+                T0,
+                T1,
+                N2 as i32,
+                g0,
+                g1,
+                tapset0,
+                tapset1,
+                &new_window,
+                overlap2 as i32,
+                arch,
+            );
+            for i in 0..N2 {
+                y[y_start + 2 * i + s] = buf[i];
+            }
         }
     }
 }

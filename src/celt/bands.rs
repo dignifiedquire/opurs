@@ -5,6 +5,8 @@
 use crate::celt::entcode::{celt_sudiv, celt_udiv, ec_ctx, ec_tell_frac, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_uint, ec_dec_update, ec_decode};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint, ec_encode};
+#[cfg(feature = "qext")]
+use crate::celt::mathops::celt_cos_norm2;
 use crate::celt::mathops::{celt_exp2, celt_rsqrt, celt_rsqrt_norm, celt_sqrt, isqrt32};
 use crate::celt::modes::OpusCustomMode;
 use crate::celt::pitch::{celt_inner_prod, dual_inner_prod};
@@ -13,6 +15,8 @@ use crate::celt::rate::{
     bits2pulses, get_pulses, pulses2bits, QTHETA_OFFSET, QTHETA_OFFSET_TWOPHASE,
 };
 use crate::celt::vq::{alg_quant, alg_unquant, renormalise_vector, stereo_itheta};
+#[cfg(feature = "qext")]
+use crate::celt::vq::{cubic_quant, cubic_unquant};
 use crate::silk::macros::EC_CLZ0;
 
 const EPSILON: f32 = 1e-15f32;
@@ -46,6 +50,21 @@ struct band_ctx<'a> {
     theta_round: i32,
     disable_inv: i32,
     avoid_split_noise: i32,
+    #[cfg(feature = "qext")]
+    ext_ec: *mut ec_ctx<'a>,
+    #[cfg(feature = "qext")]
+    extra_bits: i32,
+    #[cfg(feature = "qext")]
+    ext_total_bits: i32,
+    #[cfg(feature = "qext")]
+    extra_bands: bool,
+    #[cfg(feature = "qext")]
+    ext_b: i32,
+    #[cfg(feature = "qext")]
+    cap: *const i32,
+    #[cfg(feature = "qext")]
+    #[allow(dead_code)]
+    cap_len: i32,
 }
 
 /// Upstream C: celt/bands.c:struct split_ctx
@@ -57,6 +76,8 @@ struct split_ctx {
     delta: i32,
     itheta: i32,
     qalloc: i32,
+    #[cfg(feature = "qext")]
+    itheta_q30: i32,
 }
 
 /// Upstream C: celt/bands.c:hysteresis_decision
@@ -627,6 +648,8 @@ fn compute_theta(
     ec: &mut ec_ctx,
 ) {
     let mut itheta: i32 = 0;
+    #[allow(unused_assignments)]
+    let mut itheta_q30: i32 = 0;
     let mut imid: i32;
     let mut iside: i32;
     let mut inv: i32 = 0;
@@ -647,7 +670,8 @@ fn compute_theta(
         qn = 1;
     }
     if encode != 0 {
-        itheta = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch);
+        itheta_q30 = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch);
+        itheta = itheta_q30 >> 16;
     }
     let tell = ec_tell_frac(ec) as i32;
     if qn != 1 {
@@ -778,6 +802,46 @@ fn compute_theta(
         }
         assert!(itheta >= 0);
         itheta = celt_udiv((itheta * 16384) as u32, qn as u32) as i32;
+        #[cfg(feature = "qext")]
+        {
+            ctx.ext_b = ctx
+                .ext_b
+                .min(ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32);
+            if ctx.ext_b >= (2 * N) << BITRES
+                && ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32 - 1
+                    > 2 << BITRES
+            {
+                let extra_bits = 12.min(2.max(celt_sudiv(ctx.ext_b, (2 * N - 1) << BITRES)));
+                let ext_tell = ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+                if encode != 0 {
+                    itheta_q30 -= itheta << 16;
+                    itheta_q30 = ((itheta_q30 as i64 * qn as i64 * ((1 << extra_bits) - 1) as i64
+                        + (1i64 << 29))
+                        >> 30) as i32;
+                    itheta_q30 += (1 << (extra_bits - 1)) - 1;
+                    itheta_q30 = 0.max(((1 << extra_bits) - 2).min(itheta_q30));
+                    ec_enc_uint(
+                        unsafe { &mut *ctx.ext_ec },
+                        itheta_q30 as u32,
+                        ((1 << extra_bits) - 1) as u32,
+                    );
+                } else {
+                    itheta_q30 =
+                        ec_dec_uint(unsafe { &mut *ctx.ext_ec }, ((1 << extra_bits) - 1) as u32)
+                            as i32;
+                }
+                itheta_q30 -= (1 << (extra_bits - 1)) - 1;
+                itheta_q30 = (itheta << 16)
+                    + (itheta_q30 as i64 * (1i64 << 30)
+                        / (qn as i64 * ((1 << extra_bits) - 1) as i64))
+                        as i32;
+                // Hard bounds on itheta (can only trigger on corrupted bitstreams).
+                itheta_q30 = 0.max(1073741824i32.min(itheta_q30));
+                ctx.ext_b -= ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32 - ext_tell;
+            } else {
+                itheta_q30 = itheta << 16;
+            }
+        }
         if encode != 0 && stereo != 0 {
             if itheta == 0 {
                 intensity_stereo(m, X, Y, bandE, i, N);
@@ -810,6 +874,7 @@ fn compute_theta(
             inv = 0;
         }
         itheta = 0;
+        itheta_q30 = 0;
     }
     let qalloc = (ec_tell_frac(ec)).wrapping_sub(tell as u32) as i32;
     *b -= qalloc;
@@ -835,6 +900,10 @@ fn compute_theta(
     sctx.iside = iside;
     sctx.itheta = itheta;
     sctx.qalloc = qalloc;
+    #[cfg(feature = "qext")]
+    {
+        sctx.itheta_q30 = itheta_q30;
+    }
 }
 
 /// Upstream C: celt/bands.c:quant_band_n1
@@ -927,6 +996,8 @@ fn quant_partition(
             delta: 0,
             itheta: 0,
             qalloc: 0,
+            #[cfg(feature = "qext")]
+            itheta_q30: 0,
         };
         N >>= 1;
         let n = N as usize;
@@ -957,8 +1028,25 @@ fn quant_partition(
         let mut delta = sctx.delta;
         let itheta = sctx.itheta;
         let qalloc = sctx.qalloc;
-        let mid = 1.0f32 / 32768.0f32 * imid as f32;
-        let side = 1.0f32 / 32768.0f32 * iside as f32;
+        #[cfg(feature = "qext")]
+        let mid: f32;
+        #[cfg(feature = "qext")]
+        let side: f32;
+        #[cfg(not(feature = "qext"))]
+        let mid: f32;
+        #[cfg(not(feature = "qext"))]
+        let side: f32;
+        #[cfg(feature = "qext")]
+        {
+            let _ = (imid, iside);
+            mid = celt_cos_norm2(sctx.itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+            side = celt_cos_norm2(1.0f32 - sctx.itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+        }
+        #[cfg(not(feature = "qext"))]
+        {
+            mid = 1.0f32 / 32768.0f32 * imid as f32;
+            side = 1.0f32 / 32768.0f32 * iside as f32;
+        }
         if B0 > 1 && itheta & 0x3fff != 0 {
             if itheta > 8192 {
                 delta -= delta >> (4 - LM);
@@ -986,6 +1074,12 @@ fn quant_partition(
         ctx.remaining_bits -= qalloc;
         let next_lowband2 = lowband.map(|lb| &lb[n..]);
         let mut rebalance = ctx.remaining_bits;
+        #[cfg(feature = "qext")]
+        let saved_ext_b = ctx.ext_b;
+        #[cfg(feature = "qext")]
+        {
+            ctx.ext_b = saved_ext_b / 2;
+        }
         if mbits >= sbits {
             {
                 let (x_lo, x_hi) = X.split_at_mut(n);
@@ -993,6 +1087,10 @@ fn quant_partition(
                 rebalance = mbits - (rebalance - ctx.remaining_bits);
                 if rebalance > (3) << BITRES && itheta != 0 {
                     sbits += rebalance - ((3) << BITRES);
+                }
+                #[cfg(feature = "qext")]
+                {
+                    ctx.ext_b = saved_ext_b / 2;
                 }
                 cm |= quant_partition(
                     ctx,
@@ -1026,10 +1124,27 @@ fn quant_partition(
                 if rebalance > (3) << BITRES && itheta != 16384 {
                     mbits += rebalance - ((3) << BITRES);
                 }
+                #[cfg(feature = "qext")]
+                {
+                    ctx.ext_b = saved_ext_b / 2;
+                }
                 cm |= quant_partition(ctx, x_lo, N, mbits, B, lowband, LM, gain * mid, fill, ec);
             }
         }
     } else {
+        #[cfg(feature = "qext")]
+        let extra_bits: i32;
+        #[cfg(feature = "qext")]
+        {
+            let mut eb = (ctx.ext_b / (N - 1)) >> BITRES;
+            let ext_remaining_bits =
+                ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+            if ext_remaining_bits < ((eb + 1) * (N - 1) + N) << BITRES {
+                eb = ((ext_remaining_bits - (N << BITRES)) / (N - 1)) >> BITRES;
+                eb = 0.max(eb - 1);
+            }
+            extra_bits = 12.min(eb);
+        }
         let q = {
             let mut q = bits2pulses(m, i, LM, b);
             let mut curr_bits = pulses2bits(m, i, LM, q);
@@ -1055,43 +1170,212 @@ fn quant_partition(
                     gain,
                     ctx.resynth,
                     ctx.arch,
+                    #[cfg(feature = "qext")]
+                    unsafe {
+                        &mut *ctx.ext_ec
+                    },
+                    #[cfg(feature = "qext")]
+                    extra_bits,
                 );
             } else {
-                cm = alg_unquant(&mut X[..N as usize], N, K, spread, B, ec, gain);
+                cm = alg_unquant(
+                    &mut X[..N as usize],
+                    N,
+                    K,
+                    spread,
+                    B,
+                    ec,
+                    gain,
+                    #[cfg(feature = "qext")]
+                    unsafe {
+                        &mut *ctx.ext_ec
+                    },
+                    #[cfg(feature = "qext")]
+                    extra_bits,
+                );
             }
         } else {
-            cm = 0;
-            if ctx.resynth != 0 {
-                let cm_mask = (((1_u64) << B) as u32).wrapping_sub(1);
-                fill = (fill as u32 & cm_mask) as i32;
-                if fill == 0 {
-                    X[..N as usize].fill(0.0);
+            #[cfg(feature = "qext")]
+            if ctx.ext_b > (2 * N) << BITRES {
+                // No pulses but have extension bits: use cubic quantization.
+                let mut eb = (ctx.ext_b / (N - 1)) >> BITRES;
+                let ext_remaining_bits =
+                    ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+                if ext_remaining_bits < ((eb + 1) * (N - 1) + N) << BITRES {
+                    eb = ((ext_remaining_bits - (N << BITRES)) / (N - 1)) >> BITRES;
+                    eb = 0.max(eb - 1);
+                }
+                let cubic_bits = 14.min(eb);
+                if encode != 0 {
+                    cm = cubic_quant(
+                        &mut X[..N as usize],
+                        N,
+                        cubic_bits,
+                        B,
+                        unsafe { &mut *ctx.ext_ec },
+                        gain,
+                        ctx.resynth,
+                    );
                 } else {
-                    if let Some(lb) = lowband {
-                        let mut j = 0;
-                        while j < N {
-                            let mut tmp = 1.0f32 / 256.0f32;
-                            ctx.seed = celt_lcg_rand(ctx.seed);
-                            tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
-                            X[j as usize] = lb[j as usize] + tmp;
-                            j += 1;
-                        }
-                        cm = fill as u32;
+                    cm = cubic_unquant(
+                        &mut X[..N as usize],
+                        N,
+                        cubic_bits,
+                        B,
+                        unsafe { &mut *ctx.ext_ec },
+                        gain,
+                    );
+                }
+            } else {
+                cm = 0;
+                if ctx.resynth != 0 {
+                    let cm_mask = (((1_u64) << B) as u32).wrapping_sub(1);
+                    fill = (fill as u32 & cm_mask) as i32;
+                    if fill == 0 {
+                        X[..N as usize].fill(0.0);
                     } else {
-                        let mut j = 0;
-                        while j < N {
-                            ctx.seed = celt_lcg_rand(ctx.seed);
-                            X[j as usize] = (ctx.seed as i32 >> 20) as f32;
-                            j += 1;
+                        if let Some(lb) = lowband {
+                            let mut j = 0;
+                            while j < N {
+                                let mut tmp = 1.0f32 / 256.0f32;
+                                ctx.seed = celt_lcg_rand(ctx.seed);
+                                tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
+                                X[j as usize] = lb[j as usize] + tmp;
+                                j += 1;
+                            }
+                            cm = fill as u32;
+                        } else {
+                            let mut j = 0;
+                            while j < N {
+                                ctx.seed = celt_lcg_rand(ctx.seed);
+                                X[j as usize] = (ctx.seed as i32 >> 20) as f32;
+                                j += 1;
+                            }
+                            cm = cm_mask;
                         }
-                        cm = cm_mask;
+                        renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
                     }
-                    renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
+                }
+            }
+            #[cfg(not(feature = "qext"))]
+            {
+                cm = 0;
+                if ctx.resynth != 0 {
+                    let cm_mask = (((1_u64) << B) as u32).wrapping_sub(1);
+                    fill = (fill as u32 & cm_mask) as i32;
+                    if fill == 0 {
+                        X[..N as usize].fill(0.0);
+                    } else {
+                        if let Some(lb) = lowband {
+                            let mut j = 0;
+                            while j < N {
+                                let mut tmp = 1.0f32 / 256.0f32;
+                                ctx.seed = celt_lcg_rand(ctx.seed);
+                                tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
+                                X[j as usize] = lb[j as usize] + tmp;
+                                j += 1;
+                            }
+                            cm = fill as u32;
+                        } else {
+                            let mut j = 0;
+                            while j < N {
+                                ctx.seed = celt_lcg_rand(ctx.seed);
+                                X[j as usize] = (ctx.seed as i32 >> 20) as f32;
+                                j += 1;
+                            }
+                            cm = cm_mask;
+                        }
+                        renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
+                    }
                 }
             }
         }
     }
     cm
+}
+
+/// Upstream C: celt/bands.c:cubic_quant_partition
+///
+/// Alternative quantization path for QEXT at very high bitrates.
+/// Uses cubic quantization instead of PVQ.
+#[cfg(feature = "qext")]
+fn cubic_quant_partition(
+    ctx: &mut band_ctx,
+    X: &mut [f32],
+    mut N: i32,
+    mut b: i32,
+    B: i32,
+    ec: &mut ec_ctx,
+    mut LM: i32,
+    gain: f32,
+    resynth: i32,
+    encode: i32,
+) -> u32 {
+    assert!(LM >= 0);
+    ctx.remaining_bits = ec.storage as i32 * 8 * 8 - ec_tell_frac(ec) as i32;
+    b = b.min(ctx.remaining_bits);
+    if LM == 0 || b <= (2 * N) << BITRES {
+        b = b.min((b + ((N - 1) << BITRES) / 2).min(ctx.remaining_bits));
+        // Resolution left after coding the cube face
+        let res = ((b - (1 << BITRES) - ctx.m.logN[ctx.i as usize] as i32 - (LM << BITRES) - 1)
+            / (N - 1))
+            >> BITRES;
+        let res = 14.min(0.max(res));
+        if encode != 0 {
+            cubic_quant(X, N, res, B, ec, gain, resynth)
+        } else {
+            cubic_unquant(X, N, res, B, ec, gain)
+        }
+    } else {
+        let N0 = N;
+        N >>= 1;
+        let n = N as usize;
+        LM -= 1;
+        let B_new = (B + 1) >> 1;
+        // Allocate bits for theta (1-16 bits)
+        let theta_res = 16.min((b >> BITRES) / (N0 - 1) + 1);
+        let qtheta = if encode != 0 {
+            let (x_lo, x_hi) = X.split_at_mut(n);
+            let raw_itheta = stereo_itheta(&x_lo[..n], &x_hi[..n], 0, N, ctx.arch);
+            let q = (raw_itheta + (1 << (29 - theta_res))) >> (30 - theta_res);
+            ec_enc_uint(ec, q as u32, ((1 << theta_res) + 1) as u32);
+            q
+        } else {
+            ec_dec_uint(ec, ((1 << theta_res) + 1) as u32) as i32
+        };
+        let itheta_q30 = qtheta << (30 - theta_res);
+        b -= theta_res << BITRES;
+        let delta = ((N0 - 1) * 23 * ((itheta_q30 >> 16) - 8192)) >> (17 - BITRES);
+        let g1 = celt_cos_norm2(itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+        let g2 = celt_cos_norm2(1.0f32 - itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+        let (b1, b2);
+        if itheta_q30 == 0 {
+            b1 = b;
+            b2 = 0;
+        } else if itheta_q30 == 1073741824 {
+            b1 = 0;
+            b2 = b;
+        } else {
+            b1 = b.min(0.max((b - delta) / 2));
+            b2 = b - b1;
+        }
+        let (x_lo, x_hi) = X.split_at_mut(n);
+        let mut cm =
+            cubic_quant_partition(ctx, x_lo, N, b1, B_new, ec, LM, gain * g1, resynth, encode);
+        cm |= cubic_quant_partition(
+            ctx,
+            &mut x_hi[..n],
+            N,
+            b2,
+            B_new,
+            ec,
+            LM,
+            gain * g2,
+            resynth,
+            encode,
+        );
+        cm
+    }
 }
 
 /// Upstream C: celt/bands.c:quant_band
@@ -1194,7 +1478,20 @@ fn quant_band(
     }
     // Pass lowband as read-only to quant_partition
     let lb_ref: Option<&[f32]> = lb_work.as_deref();
-    cm = quant_partition(ctx, X, N, b, B, lb_ref, LM, gain, fill, ec);
+    #[cfg(feature = "qext")]
+    {
+        if ctx.extra_bands
+            && b > ((3 * N) << BITRES) + (ctx.m.logN[ctx.i as usize] as i32 + 8 + 8 * LM)
+        {
+            cm = cubic_quant_partition(ctx, X, N, b, B, ec, LM, gain, ctx.resynth, ctx.encode);
+        } else {
+            cm = quant_partition(ctx, X, N, b, B, lb_ref, LM, gain, fill, ec);
+        }
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        cm = quant_partition(ctx, X, N, b, B, lb_ref, LM, gain, fill, ec);
+    }
     if ctx.resynth != 0 {
         if B0 > 1 {
             interleave_hadamard(
@@ -1265,6 +1562,8 @@ fn quant_band_stereo(
         delta: 0,
         itheta: 0,
         qalloc: 0,
+        #[cfg(feature = "qext")]
+        itheta_q30: 0,
     };
     let orig_fill = fill;
     let encode = ctx.encode;
@@ -1291,8 +1590,25 @@ fn quant_band_stereo(
     let delta: i32 = sctx.delta;
     let itheta: i32 = sctx.itheta;
     let qalloc: i32 = sctx.qalloc;
-    let mid: f32 = 1.0f32 / 32768.0f32 * imid as f32;
-    let side: f32 = 1.0f32 / 32768.0f32 * iside as f32;
+    #[cfg(feature = "qext")]
+    let mid: f32;
+    #[cfg(feature = "qext")]
+    let side: f32;
+    #[cfg(not(feature = "qext"))]
+    let mid: f32;
+    #[cfg(not(feature = "qext"))]
+    let side: f32;
+    #[cfg(feature = "qext")]
+    {
+        let _ = (imid, iside);
+        mid = celt_cos_norm2(sctx.itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+        side = celt_cos_norm2(1.0f32 - sctx.itheta_q30 as f32 * (1.0f32 / (1i32 << 30) as f32));
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        mid = 1.0f32 / 32768.0f32 * imid as f32;
+        side = 1.0f32 / 32768.0f32 * iside as f32;
+    }
     if N == 2 {
         let mut sign: i32 = 0;
         mbits = b;
@@ -1319,6 +1635,10 @@ fn quant_band_stereo(
         }
         sign = 1 - 2 * sign;
         // quant_band on x2 (the "primary" channel for this theta)
+        #[cfg(feature = "qext")]
+        {
+            ctx.ext_b /= 2;
+        }
         if c != 0 {
             cm = quant_band(
                 ctx,
@@ -1383,8 +1703,23 @@ fn quant_band_stereo(
         };
         sbits = b - mbits;
         ctx.remaining_bits -= qalloc;
+        #[cfg(feature = "qext")]
+        let qext_extra = {
+            let mut extra = 0i32;
+            if !ctx.cap.is_null() && ctx.ext_b != 0 {
+                let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
+                extra = 0.max((ctx.ext_b / 2).min(mbits - cap_val / 2));
+            }
+            extra
+        };
         let mut rebalance = ctx.remaining_bits;
+        #[cfg(feature = "qext")]
+        let saved_ext_b = ctx.ext_b;
         if mbits >= sbits {
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = saved_ext_b / 2 + qext_extra;
+            }
             cm = quant_band(
                 ctx,
                 X,
@@ -1403,6 +1738,14 @@ fn quant_band_stereo(
             if rebalance > (3) << BITRES && itheta != 0 {
                 sbits += rebalance - ((3) << BITRES);
             }
+            #[cfg(feature = "qext")]
+            if ctx.extra_bands {
+                sbits = sbits.min(ctx.remaining_bits);
+            }
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = saved_ext_b / 2 - qext_extra;
+            }
             cm |= quant_band(
                 ctx,
                 Y,
@@ -1418,6 +1761,10 @@ fn quant_band_stereo(
                 ec,
             );
         } else {
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = saved_ext_b / 2 - qext_extra;
+            }
             cm = quant_band(
                 ctx,
                 Y,
@@ -1435,6 +1782,10 @@ fn quant_band_stereo(
             rebalance = sbits - (rebalance - ctx.remaining_bits);
             if rebalance > (3) << BITRES && itheta != 16384 {
                 mbits += rebalance - ((3) << BITRES);
+            }
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = saved_ext_b / 2 + qext_extra;
             }
             cm |= quant_band(
                 ctx,
@@ -1487,15 +1838,15 @@ fn special_hybrid_folding(
 
 /// Upstream C: celt/bands.c:quant_all_bands
 #[inline]
-pub fn quant_all_bands(
+pub fn quant_all_bands<'a>(
     encode: i32,
-    m: &OpusCustomMode,
+    m: &'a OpusCustomMode,
     start: i32,
     end: i32,
     X_: &mut [f32],
     Y_: Option<&mut [f32]>,
     collapse_masks: &mut [u8],
-    bandE: &[f32],
+    bandE: &'a [f32],
     pulses: &mut [i32],
     shortBlocks: i32,
     spread: i32,
@@ -1511,6 +1862,10 @@ pub fn quant_all_bands(
     complexity: i32,
     arch: i32,
     disable_inv: i32,
+    #[cfg(feature = "qext")] ext_ec: &mut ec_ctx<'a>,
+    #[cfg(feature = "qext")] extra_pulses: &[i32],
+    #[cfg(feature = "qext")] ext_total_bits: i32,
+    #[cfg(feature = "qext")] cap: &[i32],
 ) {
     let mut remaining_bits: i32;
     let eBands = &m.eBands;
@@ -1520,8 +1875,15 @@ pub fn quant_all_bands(
     let mut update_lowband: i32 = 1;
     let C: i32 = if Y_.is_some() { 2 } else { 1 };
     let norm_offset: i32 = M * eBands[start as usize] as i32;
-    let theta_rdo: i32 =
+    #[allow(unused_mut)]
+    let mut theta_rdo: i32 =
         (encode != 0 && Y_.is_some() && dual_stereo == 0 && complexity >= 8) as i32;
+    #[cfg(feature = "qext")]
+    let extra_bands = end == crate::celt::modes::data_96000::NB_QEXT_BANDS as i32 || end == 2;
+    #[cfg(feature = "qext")]
+    if extra_bands {
+        theta_rdo = 0;
+    }
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
 
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
@@ -1548,6 +1910,11 @@ pub fn quant_all_bands(
     // Y_ kept as Option<&mut [f32]> — reborrowed per-band in the loop.
     let mut y_mut = Y_;
 
+    #[cfg(feature = "qext")]
+    let mut ext_balance: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut ext_tell: i32 = 0;
+
     let mut ctx = band_ctx {
         encode,
         resynth,
@@ -1563,6 +1930,20 @@ pub fn quant_all_bands(
         disable_inv,
         theta_round: 0,
         avoid_split_noise: (B > 1) as i32,
+        #[cfg(feature = "qext")]
+        ext_ec: ext_ec as *mut ec_ctx,
+        #[cfg(feature = "qext")]
+        extra_bits: 0,
+        #[cfg(feature = "qext")]
+        ext_total_bits,
+        #[cfg(feature = "qext")]
+        extra_bands,
+        #[cfg(feature = "qext")]
+        ext_b: 0,
+        #[cfg(feature = "qext")]
+        cap: cap.as_ptr(),
+        #[cfg(feature = "qext")]
+        cap_len: cap.len() as i32,
     };
 
     let mut i = start;
@@ -1621,6 +2002,29 @@ pub fn quant_all_bands(
         } else {
             0
         };
+        // QEXT: per-band extension bit allocation
+        #[cfg(feature = "qext")]
+        let ext_b: i32;
+        #[cfg(feature = "qext")]
+        {
+            if i != start {
+                ext_balance += extra_pulses[i as usize - 1] + ext_tell;
+            }
+            ext_tell = ec_tell_frac(ext_ec) as i32;
+            ctx.extra_bits = extra_pulses[i as usize];
+            if i != start {
+                ext_balance -= ext_tell;
+            }
+            if i < codedBands {
+                let ext_curr_balance = celt_sudiv(ext_balance, 3.min(codedBands - i));
+                ext_b = 0.max(16383.min(
+                    (ext_total_bits - ext_tell).min(extra_pulses[i as usize] + ext_curr_balance),
+                ));
+            } else {
+                ext_b = 0;
+            }
+            ctx.ext_b = ext_b;
+        }
         if resynth != 0
             && (M * eBands[i as usize] as i32 - N >= M * eBands[start as usize] as i32
                 || i == start + 1)
@@ -1731,6 +2135,10 @@ pub fn quant_all_bands(
                 Some(&mut norm1[norm_band_out_off..])
             };
             let x_band = &mut x_band_src[band_start..band_start + n];
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = ext_b / 2;
+            }
             x_cm = quant_band(
                 &mut ctx,
                 x_band,
@@ -1770,6 +2178,10 @@ pub fn quant_all_bands(
                 None
             };
             let y_band = &mut y_mut.as_deref_mut().unwrap()[band_start..band_start + n];
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = ext_b / 2;
+            }
             y_cm = quant_band(
                 &mut ctx,
                 y_band,
@@ -1790,6 +2202,10 @@ pub fn quant_all_bands(
             );
         } else if use_norm_xy {
             // Beyond effEBands: use norm buffer as dummy X/Y, no lowband/scratch needed.
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = 0;
+            }
             if has_y {
                 let (dummy_x, dummy_rest) = _norm.split_at_mut(n);
                 let dummy_y = &mut dummy_rest[..n];
@@ -1918,6 +2334,10 @@ pub fn quant_all_bands(
                         None
                     };
                     ctx.theta_round = 1;
+                    #[cfg(feature = "qext")]
+                    {
+                        ctx.ext_b = ext_b;
+                    }
                     x_cm = quant_band_stereo(
                         &mut ctx,
                         x_band,

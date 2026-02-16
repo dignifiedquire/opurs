@@ -78,6 +78,12 @@ pub struct OpusCustomDecoder {
     pub oldLogE: [f32; 2 * 21],                            /* Size = 2*mode->nbEBands */
     pub oldLogE2: [f32; 2 * 21],                           /* Size = 2*mode->nbEBands */
     pub backgroundLogE: [f32; 2 * 21],                     /* Size = 2*mode->nbEBands */
+    /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
+    #[cfg(feature = "qext")]
+    pub qext_scale: i32,
+    /// QEXT: old band energies for extension bands
+    #[cfg(feature = "qext")]
+    pub qext_oldBandE: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
@@ -167,6 +173,10 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         oldLogE: [0.0; 2 * 21],
         oldLogE2: [0.0; 2 * 21],
         backgroundLogE: [0.0; 2 * 21],
+        #[cfg(feature = "qext")]
+        qext_scale: 1,
+        #[cfg(feature = "qext")]
+        qext_oldBandE: [0.0; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
     };
 
     st.reset();
@@ -1379,6 +1389,28 @@ fn celt_decode_body(
     }
     let mut collapse_masks = [0u8; 42];
     let mut X = [0.0f32; 1920];
+    // TODO(qext): Wire up proper ext_ec, extra_pulses, ext_total_bits, cap
+    #[cfg(feature = "qext")]
+    let mut _qext_dummy_buf = [0u8; 4];
+    #[cfg(feature = "qext")]
+    let mut _qext_dummy_ec = crate::celt::entcode::ec_ctx {
+        buf: &mut _qext_dummy_buf,
+        storage: 4,
+        end_offs: 0,
+        end_window: 0,
+        nend_bits: 0,
+        nbits_total: 32,
+        offs: 0,
+        rng: 0x80000000,
+        val: 0,
+        ext: 0,
+        rem: 0,
+        error: 0,
+    };
+    #[cfg(feature = "qext")]
+    let _qext_dummy_pulses: Vec<i32> = vec![0i32; end as usize];
+    #[cfg(feature = "qext")]
+    let _qext_dummy_cap: Vec<i32> = vec![0i32; end as usize];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(
@@ -1405,6 +1437,14 @@ fn celt_decode_body(
             0,
             st.arch,
             st.disable_inv,
+            #[cfg(feature = "qext")]
+            &mut _qext_dummy_ec,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_pulses,
+            #[cfg(feature = "qext")]
+            0,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_cap,
         );
     } else {
         quant_all_bands(
@@ -1431,6 +1471,14 @@ fn celt_decode_body(
             0,
             st.arch,
             st.disable_inv,
+            #[cfg(feature = "qext")]
+            &mut _qext_dummy_ec,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_pulses,
+            #[cfg(feature = "qext")]
+            0,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_cap,
         );
     }
     if anti_collapse_rsv > 0 {

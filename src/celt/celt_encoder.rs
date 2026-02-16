@@ -115,6 +115,12 @@ pub struct OpusCustomEncoder {
     pub oldLogE2: [opus_val16; 2 * 21],
     /// Energy quantization error, size = channels * nbEBands (max 2*21 = 42)
     pub energyError: [opus_val16; 2 * 21],
+    /// QEXT: enable quality extension encoding
+    #[cfg(feature = "qext")]
+    pub enable_qext: i32,
+    /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
+    #[cfg(feature = "qext")]
+    pub qext_scale: i32,
 }
 
 impl OpusCustomEncoder {
@@ -188,6 +194,10 @@ impl OpusCustomEncoder {
             oldLogE: [0.0; 2 * 21],
             oldLogE2: [0.0; 2 * 21],
             energyError: [0.0; 2 * 21],
+            #[cfg(feature = "qext")]
+            enable_qext: 0,
+            #[cfg(feature = "qext")]
+            qext_scale: 1,
         };
         st.reset();
         Ok(st)
@@ -3140,6 +3150,28 @@ pub fn celt_encode_with_ec<'b>(
     );
     let vla_15 = (C * nbEBands) as usize;
     let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
+    // TODO(qext): Wire up proper ext_ec, extra_pulses, ext_total_bits, cap
+    #[cfg(feature = "qext")]
+    let mut _qext_dummy_buf = [0u8; 4];
+    #[cfg(feature = "qext")]
+    let mut _qext_dummy_ec = crate::celt::entcode::ec_ctx {
+        buf: &mut _qext_dummy_buf,
+        storage: 4,
+        end_offs: 0,
+        end_window: 0,
+        nend_bits: 0,
+        nbits_total: 32,
+        offs: 0,
+        rng: 0x80000000,
+        val: 0,
+        ext: 0,
+        rem: 0,
+        error: 0,
+    };
+    #[cfg(feature = "qext")]
+    let _qext_dummy_pulses: Vec<i32> = vec![0i32; end as usize];
+    #[cfg(feature = "qext")]
+    let _qext_dummy_cap: Vec<i32> = vec![0i32; end as usize];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(
@@ -3166,6 +3198,14 @@ pub fn celt_encode_with_ec<'b>(
             st.complexity,
             st.arch,
             st.disable_inv,
+            #[cfg(feature = "qext")]
+            &mut _qext_dummy_ec,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_pulses,
+            #[cfg(feature = "qext")]
+            0,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_cap,
         );
     } else {
         quant_all_bands(
@@ -3192,6 +3232,14 @@ pub fn celt_encode_with_ec<'b>(
             st.complexity,
             st.arch,
             st.disable_inv,
+            #[cfg(feature = "qext")]
+            &mut _qext_dummy_ec,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_pulses,
+            #[cfg(feature = "qext")]
+            0,
+            #[cfg(feature = "qext")]
+            &_qext_dummy_cap,
         );
     }
     if anti_collapse_rsv > 0 {

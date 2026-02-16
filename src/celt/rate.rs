@@ -2,10 +2,21 @@
 //!
 //! Upstream C: `celt/rate.c`
 
+#[cfg(feature = "qext")]
+use crate::celt::entcode::ec_tell_frac;
 use crate::celt::entcode::{celt_udiv, ec_ctx, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_uint};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_uint};
 use crate::celt::modes::OpusCustomMode;
+
+#[cfg(feature = "qext")]
+use crate::celt::entdec::ec_dec_icdf;
+#[cfg(feature = "qext")]
+use crate::celt::entenc::ec_enc_icdf;
+#[cfg(feature = "qext")]
+use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+#[cfg(feature = "qext")]
+use crate::celt::quant_bands::eMeans;
 
 pub const FINE_OFFSET: i32 = 21;
 pub const MAX_FINE_BITS: i32 = 8;
@@ -499,4 +510,356 @@ pub fn clt_compute_allocation(
         prev,
         signalBandwidth,
     )
+}
+
+// ---------------------------------------------------------------------------
+// QEXT extra allocation — depth-based bit allocation for extended bands
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+static LAST_ZERO: [u8; 3] = [64, 50, 0];
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+static LAST_CAP: [u8; 3] = [110, 60, 0];
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+static LAST_OTHER: [u8; 4] = [120, 112, 70, 0];
+
+/// Context-adaptive entropy encoding of a depth value.
+///
+/// Upstream C: celt/rate.c:ec_enc_depth
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+fn ec_enc_depth(enc: &mut ec_ctx, depth: i32, cap: i32, last: &mut i32) {
+    let mut sym = 3;
+    if depth == *last {
+        sym = 2;
+    }
+    if depth == cap {
+        sym = 1;
+    }
+    if depth == 0 {
+        sym = 0;
+    }
+    if *last == 0 {
+        ec_enc_icdf(enc, sym.min(2), &LAST_ZERO, 7);
+    } else if *last == cap {
+        ec_enc_icdf(enc, sym.min(2), &LAST_CAP, 7);
+    } else {
+        ec_enc_icdf(enc, sym, &LAST_OTHER, 7);
+    }
+    if sym == 3 {
+        ec_enc_uint(enc, (depth - 1) as u32, cap as u32);
+    }
+    *last = depth;
+}
+
+/// Context-adaptive entropy decoding of a depth value.
+///
+/// Upstream C: celt/rate.c:ec_dec_depth
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+fn ec_dec_depth(dec: &mut ec_ctx, cap: i32, last: &mut i32) -> i32 {
+    let sym;
+    if *last == 0 {
+        let s = ec_dec_icdf(dec, &LAST_ZERO, 7);
+        sym = if s == 2 { 3 } else { s };
+    } else if *last == cap {
+        let s = ec_dec_icdf(dec, &LAST_CAP, 7);
+        sym = if s == 2 { 3 } else { s };
+    } else {
+        sym = ec_dec_icdf(dec, &LAST_OTHER, 7);
+    }
+    let depth = if sym == 0 {
+        0
+    } else if sym == 1 {
+        cap
+    } else if sym == 2 {
+        *last
+    } else {
+        1 + ec_dec_uint(dec, cap as u32) as i32
+    };
+    *last = depth;
+    depth
+}
+
+/// Compute median of 5 values using a comparison network.
+///
+/// Upstream C: celt/rate.c:median_of_5_val16
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+fn median_of_5_val16(x: &[f32]) -> f32 {
+    let t2 = x[2];
+    let (mut t0, mut t1) = if x[0] > x[1] {
+        (x[1], x[0])
+    } else {
+        (x[0], x[1])
+    };
+    let (mut t3, mut t4) = if x[3] > x[4] {
+        (x[4], x[3])
+    } else {
+        (x[3], x[4])
+    };
+    if t0 > t3 {
+        std::mem::swap(&mut t0, &mut t3);
+        std::mem::swap(&mut t1, &mut t4);
+    }
+    if t2 > t1 {
+        if t1 < t3 {
+            t2.min(t3)
+        } else {
+            t4.min(t1)
+        }
+    } else if t2 < t3 {
+        t1.min(t3)
+    } else {
+        t2.min(t4)
+    }
+}
+
+/// Compute extra bit allocation (depth) for QEXT extended bands.
+///
+/// On encode: analyses the spectrum, computes depth per band, entropy-codes the depths.
+/// On decode: reads the depths from the bitstream.
+/// For both: converts depth to `extra_pulses` and `extra_equant` per band.
+///
+/// `qext_mode`: the QEXT mode (or None if no QEXT bands).
+/// `qext_end`: number of QEXT bands to allocate for.
+/// `bandLogE` / `qext_bandLogE`: per-band log energies (encoder only).
+/// `total`: total bits available for extra allocation (in BITRES units).
+/// `extra_pulses` / `extra_equant`: output arrays, length = end + qext_end.
+/// `tone_freq`, `toneishness`: tone detection parameters (encoder only).
+///
+/// Upstream C: celt/rate.c:clt_compute_extra_allocation
+#[cfg(feature = "qext")]
+#[allow(dead_code)]
+pub fn clt_compute_extra_allocation(
+    m: &OpusCustomMode,
+    qext_mode: Option<&OpusCustomMode>,
+    start: i32,
+    end: i32,
+    qext_end: i32,
+    bandLogE: Option<&[f32]>,
+    qext_bandLogE: Option<&[f32]>,
+    total: i32,
+    extra_pulses: &mut [i32],
+    extra_equant: &mut [i32],
+    C: i32,
+    LM: i32,
+    ec: &mut ec_ctx,
+    encode: i32,
+    tone_freq: f32,
+    toneishness: f32,
+) {
+    let mut last: i32 = 0;
+    let tot_bands: i32;
+    let tot_samples: i32;
+
+    if let Some(qm) = qext_mode {
+        assert!(end == m.nbEBands as i32);
+        tot_bands = end + qext_end;
+        tot_samples = (qm.eBands[qext_end as usize] as i32 * C) << LM;
+    } else {
+        tot_bands = end;
+        tot_samples = ((m.eBands[end as usize] as i32 - m.eBands[start as usize] as i32) * C) << LM;
+    }
+
+    let mut cap = vec![0i32; tot_bands as usize];
+    for i in start..end {
+        cap[i as usize] = 12;
+    }
+    if qext_mode.is_some() {
+        for i in 0..qext_end {
+            cap[(end + i) as usize] = 14;
+        }
+    }
+
+    if total <= 0 {
+        for i in start..(m.nbEBands as i32 + qext_end) {
+            extra_pulses[i as usize] = 0;
+            extra_equant[i as usize] = 0;
+        }
+        return;
+    }
+
+    let mut depth = vec![0i32; tot_bands as usize];
+
+    if encode != 0 {
+        let bandLogE = bandLogE.unwrap();
+        let mut flatE = vec![0.0f32; tot_bands as usize];
+        let mut min_arr = vec![0.0f32; tot_bands as usize];
+        let mut Ncoef = vec![0i32; tot_bands as usize];
+
+        for i in start..end {
+            let iu = i as usize;
+            Ncoef[iu] = ((m.eBands[iu + 1] as i32 - m.eBands[iu] as i32) * C) << LM;
+        }
+
+        // Remove the effect of band width, eMeans and pre-emphasis to compute flat spectrum.
+        for i in start..end {
+            let iu = i as usize;
+            flatE[iu] = bandLogE[iu] - 0.0625 * m.logN[iu] as f32 + eMeans[iu]
+                - 0.0062 * (i + 5) as f32 * (i + 5) as f32;
+            min_arr[iu] = 0.0;
+        }
+        if C == 2 {
+            for i in start..end {
+                let iu = i as usize;
+                let alt = bandLogE[m.nbEBands + iu] - 0.0625 * m.logN[iu] as f32 + eMeans[iu]
+                    - 0.0062 * (i + 5) as f32 * (i + 5) as f32;
+                if alt > flatE[iu] {
+                    flatE[iu] = alt;
+                }
+            }
+        }
+        flatE[(end - 1) as usize] += 2.0; // QCONST16(2.f, 10) = 2.0 in float
+
+        if let Some(qm) = qext_mode {
+            let qext_bandLogE = qext_bandLogE.unwrap();
+            let mut min_depth: f32 = 0.0;
+            // If we have enough bits, give at least 1 bit of depth to all higher bands.
+            if total
+                >= ((3
+                    * C
+                    * (qm.eBands[qext_end as usize] as i32 - qm.eBands[start as usize] as i32))
+                    << LM)
+                    << BITRES
+                && (toneishness < 0.98 || tone_freq > 1.33)
+            {
+                min_depth = 1.0; // QCONST16(1.f, 10) = 1.0 in float
+            }
+            for i in 0..qext_end {
+                let iu = i as usize;
+                let eid = (end + i) as usize;
+                Ncoef[eid] = ((qm.eBands[iu + 1] as i32 - qm.eBands[iu] as i32) * C) << LM;
+                min_arr[eid] = min_depth;
+            }
+            for i in 0..qext_end {
+                let iu = i as usize;
+                let eid = (end + i) as usize;
+                flatE[eid] = qext_bandLogE[iu] - 0.0625 * qm.logN[iu] as f32 + eMeans[iu]
+                    - 0.0062 * (end + i + 5) as f32 * (end + i + 5) as f32;
+            }
+            if C == 2 {
+                for i in 0..qext_end {
+                    let iu = i as usize;
+                    let eid = (end + i) as usize;
+                    let alt = qext_bandLogE[NB_QEXT_BANDS + iu] - 0.0625 * qm.logN[iu] as f32
+                        + eMeans[iu]
+                        - 0.0062 * (end + i + 5) as f32 * (end + i + 5) as f32;
+                    if alt > flatE[eid] {
+                        flatE[eid] = alt;
+                    }
+                }
+            }
+        }
+
+        // Median filter to smooth spectrum
+        let mut follower = vec![0.0f32; tot_bands as usize];
+        for i in (start + 2)..(tot_bands - 2) {
+            follower[i as usize] = median_of_5_val16(&flatE[(i - 2) as usize..]);
+        }
+        follower[start as usize] = follower[(start + 2) as usize];
+        follower[(start + 1) as usize] = follower[(start + 2) as usize];
+        follower[(tot_bands - 1) as usize] = follower[(tot_bands - 3) as usize];
+        follower[(tot_bands - 2) as usize] = follower[(tot_bands - 3) as usize];
+
+        // Monotonic increase from left
+        for i in (start + 1)..tot_bands {
+            let iu = i as usize;
+            follower[iu] = follower[iu].max(follower[iu - 1] - 1.0);
+        }
+        // Monotonic increase from right
+        for i in (start..=(tot_bands - 2)).rev() {
+            let iu = i as usize;
+            follower[iu] = follower[iu].max(follower[iu + 1] - 1.0);
+        }
+
+        // Blend out the follower based on tone content
+        for i in start..tot_bands {
+            let iu = i as usize;
+            flatE[iu] -= (1.0 - toneishness) * follower[iu];
+        }
+        // QEXT boost
+        if qext_mode.is_some() {
+            for i in 0..qext_end {
+                let eid = (end + i) as usize;
+                flatE[eid] = flatE[eid] + 3.0 + 0.2 * i as f32;
+            }
+        }
+
+        // Approximate fill level assuming all bands contribute fully.
+        let mut sum: f32 = 0.0;
+        for i in start..tot_bands {
+            let iu = i as usize;
+            sum += Ncoef[iu] as f32 * flatE[iu];
+        }
+        let total_shifted = total >> BITRES;
+        let mut fill: f32 = ((total_shifted as f32) * 1024.0 + sum) / tot_samples as f32;
+
+        // Iteratively refine the fill level considering depth min and cap.
+        for _iter in 0..10 {
+            sum = 0.0;
+            for i in start..tot_bands {
+                let iu = i as usize;
+                let clamped = (flatE[iu] - fill)
+                    .max(min_arr[iu])
+                    .min(cap[iu] as f32 * 1024.0);
+                sum += Ncoef[iu] as f32 * clamped;
+            }
+            fill -= ((total_shifted as f32) * 1024.0 - sum) / tot_samples as f32;
+        }
+
+        // Convert fill level to depth and encode
+        for i in start..tot_bands {
+            let iu = i as usize;
+            let clamped = (flatE[iu] - fill)
+                .max(min_arr[iu])
+                .min(cap[iu] as f32 * 1024.0);
+            depth[iu] = (0.5 + 4.0 * clamped).floor() as i32;
+
+            if ec_tell_frac(ec) + 80 < (ec.storage * 8) << BITRES {
+                ec_enc_depth(ec, depth[iu], 4 * cap[iu], &mut last);
+            } else {
+                depth[iu] = 0;
+            }
+        }
+    } else {
+        // Decode path
+        for i in start..tot_bands {
+            let iu = i as usize;
+            if ec_tell_frac(ec) + 80 < (ec.storage * 8) << BITRES {
+                depth[iu] = ec_dec_depth(ec, 4 * cap[iu], &mut last);
+            } else {
+                depth[iu] = 0;
+            }
+        }
+    }
+
+    // Convert depth to extra_equant and extra_pulses for main bands
+    for i in start..end {
+        let iu = i as usize;
+        extra_equant[iu] = (depth[iu] + 3) >> 2;
+        extra_pulses[iu] = ((((m.eBands[iu + 1] as i32 - m.eBands[iu] as i32) << LM) - 1)
+            * C
+            * depth[iu]
+            * (1 << BITRES)
+            + 2)
+            >> 2;
+    }
+    // Convert for QEXT bands
+    if let Some(qm) = qext_mode {
+        for i in 0..qext_end {
+            let iu = i as usize;
+            let eid = (end + i) as usize;
+            extra_equant[eid] = (depth[eid] + 3) >> 2;
+            extra_pulses[eid] = ((((qm.eBands[iu + 1] as i32 - qm.eBands[iu] as i32) << LM) - 1)
+                * C
+                * depth[eid]
+                * (1 << BITRES)
+                + 2)
+                >> 2;
+        }
+    }
 }

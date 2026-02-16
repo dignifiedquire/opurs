@@ -97,6 +97,39 @@ pub fn celt_cos_norm(x: f32) -> f32 {
     ((0.5f32 * PI * x) as f64).cos() as f32
 }
 
+/// Polynomial approximation of cos(PI/2 * x) using only even-powered terms.
+///
+/// This is NOT the same as `celt_cos_norm` — it uses a Lolremez polynomial
+/// approximation that must match the C reference exactly for QEXT bit-exactness.
+///
+/// Upstream C: celt/mathops.h:celt_cos_norm2
+#[cfg(feature = "qext")]
+#[inline]
+#[allow(clippy::excessive_precision)]
+pub fn celt_cos_norm2(x: f32) -> f32 {
+    const COS_COEFF_A0: f32 = 9.999999403953552246093750000000e-01;
+    const COS_COEFF_A2: f32 = -1.233698248863220214843750000000000;
+    const COS_COEFF_A4: f32 = 2.536507546901702880859375000000e-01;
+    const COS_COEFF_A6: f32 = -2.08106283098459243774414062500e-02;
+    const COS_COEFF_A8: f32 = 8.581906440667808055877685546875e-04;
+
+    // Restrict x to [-1, 3]
+    let mut x = x - 4.0 * (0.25 * (x + 1.0)).floor();
+    // Negative sign for [1, 3]
+    let output_sign: f32 = if x > 1.0 { -1.0 } else { 1.0 };
+    // Restrict to [-1, 1]
+    if x > 1.0 {
+        x -= 2.0;
+    }
+    let x_norm_sq = x * x;
+    output_sign
+        * (COS_COEFF_A0
+            + x_norm_sq
+                * (COS_COEFF_A2
+                    + x_norm_sq
+                        * (COS_COEFF_A4 + x_norm_sq * (COS_COEFF_A6 + x_norm_sq * COS_COEFF_A8))))
+}
+
 /// Upstream C: celt/mathops.h:celt_log
 #[inline]
 pub fn celt_log(x: f32) -> f32 {
