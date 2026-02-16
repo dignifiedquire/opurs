@@ -19,8 +19,6 @@ pub fn silk_interpolate(
     for ((xi, &x0), &x1) in xi.iter_mut().zip(x0.iter()).zip(x1.iter()) {
         let x0 = x0 as i32;
         let x1 = x1 as i32;
-        *xi = (x0
-            + (((x1 - x0) as i16 as i32 * ifact_Q2 as i16 as i32) >> 2))
-            as i16;
+        *xi = (x0 + (((x1 - x0) as i16 as i32 * ifact_Q2 as i16 as i32) >> 2)) as i16;
     }
 }

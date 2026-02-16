@@ -90,8 +90,8 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
         let cos_val = silk_LSFCosTab_FIX_Q12[f_int as usize] as i32; /* Q12 */
         let delta = silk_LSFCosTab_FIX_Q12[(f_int + 1) as usize] as i32 - cos_val; /* Q12, with a range of 0..200 */
 
-        cos_LSF_QA[ordering as usize] =
-            silk_RSHIFT_ROUND((cos_val << 8) + delta * f_frac, 20 - QA); /* QA */
+        cos_LSF_QA[ordering as usize] = silk_RSHIFT_ROUND((cos_val << 8) + delta * f_frac, 20 - QA);
+        /* QA */
     }
 
     let dd = d / 2;
