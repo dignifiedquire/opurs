@@ -69,6 +69,13 @@ const CONFIG_H: &str = r##"
 #define STDC_HEADERS 1
 #define VAR_ARRAYS 1
 
+/* M_PI is not guaranteed by strict -std=c11; upstream gets it from -std=gnu11.
+   Provide it here so that nndsp.c's fallback (which has a float suffix bug)
+   is never reached. */
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #define restrict __restrict
 #if defined __SUNPRO_CC && !defined __RESTRICT
 # define _Restrict

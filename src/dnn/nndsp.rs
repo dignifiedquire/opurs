@@ -80,25 +80,13 @@ impl Default for AdaShapeState {
     }
 }
 
-// Use C's cos() to guarantee bit-exact match with upstream C on every platform.
-// Rust's f64::cos() may use LLVM builtins that differ from the platform's libm cos()
-// by 1 ULP, causing OSCE overlap window divergence on Linux x86_64.
-extern "C" {
-    fn cos(x: f64) -> f64;
-}
-
 /// Compute overlap window (raised cosine).
 ///
 /// Upstream C: dnn/nndsp.c:compute_overlap_window
-///
-/// Calls C's `cos()` via FFI to guarantee bit-exact match with the upstream C
-/// implementation on every platform. Rust's `f64::cos()` uses LLVM intrinsics
-/// that may produce 1 ULP different results from the platform's libm `cos()`.
 pub fn compute_overlap_window(window: &mut [f32], overlap_size: usize) {
     for i in 0..overlap_size {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64;
-        // Safety: cos() is a standard C library function, always available.
-        window[i] = (0.5 + 0.5 * unsafe { cos(angle) }) as f32;
+        window[i] = (0.5 + 0.5 * angle.cos()) as f32;
     }
 }
 
