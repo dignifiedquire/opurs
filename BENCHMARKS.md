@@ -1,10 +1,24 @@
 # Benchmarks
 
-Last updated: inline hints, stack allocations, FFT loop optimization
-
-Platform: x86_64 Linux (AVX2 available)
+Last updated: ndarray removal, inline hints, stack allocations, FFT loop optimization, bench profile (LTO + codegen-units=1)
 
 ## End-to-End Codec: Rust vs C (both with SIMD)
+
+### aarch64 (Apple Silicon M4, NEON)
+
+| Operation | Configuration | Rust | C (NEON) | Ratio |
+|-----------|--------------|------|----------|-------|
+| Encode | 64 kbps stereo | 3.68 ms | 3.54 ms | 1.04x |
+| Encode | 128 kbps stereo | 5.03 ms | 4.66 ms | 1.08x |
+| Decode | 64 kbps stereo | 956 us | 938 us | 1.02x |
+| Decode | 128 kbps stereo | 1.14 ms | 1.12 ms | 1.02x |
+| Encode | 16 kbps mono VOIP | 5.23 ms | 7.06 ms | **0.74x (Rust faster)** |
+| Encode | 64 kbps mono VOIP | 2.78 ms | 2.57 ms | 1.08x |
+
+Rust is **within 2-8% of C** on most paths. SILK-heavy 16 kbps VOIP encoding is
+**26% faster than C** due to ndarray removal and inline optimizations in the SILK path.
+
+### x86_64 Linux (AVX2)
 
 | Operation | Configuration | Rust | C (SIMD) | Ratio |
 |-----------|--------------|------|----------|-------|
@@ -15,19 +29,77 @@ Platform: x86_64 Linux (AVX2 available)
 
 All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 frames).
 
-Rust is **~1.1-1.4x slower** than C with SIMD end-to-end. SILK-heavy VOIP encoding
-nearly matches C (1.11x); CELT-heavy decode paths have more headroom.
+### Progress vs initial baseline
 
-### Progress vs initial baseline (pre-SIMD)
+| Operation | Pre-SIMD | Post-SIMD | Current (aarch64) | Current (x86) |
+|-----------|----------|-----------|-------------------|----------------|
+| Encode 16k mono VOIP | 1.29x | 1.10x | **0.74x** | 1.11x |
+| Encode 64k mono VOIP | 1.30x | 1.12x | **1.08x** | 1.11x |
+| Decode 64k stereo | 1.50x | 1.43x | **1.02x** | 1.39x |
+| Decode 128k stereo | 1.43x | 1.41x | **1.02x** | 1.34x |
 
-| Operation | Pre-SIMD | Post-SIMD | Current | Improvement |
-|-----------|----------|-----------|---------|-------------|
-| Encode 16k mono VOIP | 1.29x | 1.10x | **1.11x** | -0.18 |
-| Encode 64k mono VOIP | 1.30x | 1.12x | **1.11x** | -0.19 |
-| Decode 64k stereo | 1.50x | 1.43x | **1.39x** | -0.11 |
-| Decode 128k stereo | 1.43x | 1.41x | **1.34x** | -0.09 |
+Note: x86 numbers are from a previous run without the bench profile optimizations
+(LTO, codegen-units=1). Re-running on x86 with the new profile is expected to improve
+those ratios.
 
-## CELT Pitch Functions (scalar vs SIMD dispatch)
+## Per-Function: Rust vs C (with SIMD)
+
+### celt_pitch_xcorr — aarch64 (NEON)
+
+| N | Rust Scalar | C Scalar | Rust NEON | C NEON | Rust vs C NEON |
+|---|-------------|----------|-----------|--------|----------------|
+| 240x60 | 1.85 us | 2.25 us | 1.77 us | 1.77 us | **matched** |
+| 480x120 | 8.47 us | 9.77 us | 8.94 us | 8.88 us | **matched** |
+| 960x240 | 35.9 us | 41.3 us | 44.6 us | 46.2 us | **1.04x faster** |
+
+Rust NEON **matches** C NEON for pitch xcorr. Rust scalar is consistently faster
+than C scalar (auto-vectorization differences).
+
+### celt_pitch_xcorr — x86_64 (AVX2)
+
+| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
+|---|-------------|----------|-----------|--------|----------------|
+| 240x60 | 2.37 us | 3.19 us | 408 ns | 438 ns | **1.07x faster** |
+| 480x120 | 9.33 us | 12.6 us | 1.35 us | 1.34 us | ~matched |
+| 960x240 | 37.8 us | 50.8 us | 5.20 us | 5.27 us | ~matched |
+
+Rust SIMD (AVX2) **matches or slightly beats** C SIMD (AVX2+FMA) for pitch xcorr.
+
+### silk_inner_product_FLP — aarch64 (NEON)
+
+| N | Rust Scalar | C Scalar | Rust NEON | Rust vs C Scalar |
+|---|-------------|----------|-----------|------------------|
+| 64 | 15 ns | 16 ns | 7 ns | 2.3x faster |
+| 240 | 85 ns | 61 ns | 39 ns | 1.6x faster |
+| 480 | 211 ns | 122 ns | 84 ns | 1.5x faster |
+| 960 | 482 ns | 243 ns | 203 ns | 1.2x faster |
+
+C has no NEON variant for silk_inner_product_FLP on aarch64 (only x86 AVX2).
+Rust NEON dispatch is **1.2-2.3x faster** than C scalar on this function.
+
+### silk_inner_product_FLP — x86_64 (AVX2)
+
+| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
+|---|-------------|----------|-----------|--------|----------------|
+| 64 | 38 ns | 25 ns | 6 ns | 7 ns | **1.2x faster** |
+| 240 | 153 ns | 91 ns | 23 ns | 24 ns | ~matched |
+| 480 | 312 ns | 176 ns | 50 ns | 49 ns | ~matched |
+| 960 | 625 ns | 357 ns | 102 ns | 103 ns | ~matched |
+
+Rust SIMD (AVX2+FMA) **matches** C SIMD (AVX2+FMA) for SILK inner product.
+
+## CELT Pitch Functions — Rust scalar vs NEON dispatch (aarch64)
+
+| Function | N | Scalar | NEON Dispatch | Speedup |
+|----------|---|--------|---------------|---------|
+| celt_pitch_xcorr | 240x60 | 1.85 us | 1.77 us | 1.0x |
+| celt_pitch_xcorr | 480x120 | 8.47 us | 8.94 us | ~1.0x |
+| celt_pitch_xcorr | 960x240 | 35.9 us | 44.6 us | 0.8x |
+
+On aarch64, NEON dispatch for pitch_xcorr does not provide significant speedup
+over scalar — LLVM auto-vectorizes the scalar path effectively with NEON.
+
+## CELT Pitch Functions — Rust scalar vs SIMD dispatch (x86_64)
 
 | Function | N | Scalar | SIMD Dispatch | Speedup |
 |----------|---|--------|---------------|---------|
@@ -47,7 +119,16 @@ nearly matches C (1.11x); CELT-heavy decode paths have more headroom.
 | celt_pitch_xcorr | 480x120 | 9.25 us | 1.31 us | 7.1x |
 | celt_pitch_xcorr | 960x240 | 37.9 us | 5.25 us | 7.2x |
 
-## SILK Functions (scalar vs SIMD dispatch)
+## SILK Functions — Rust scalar vs NEON dispatch (aarch64)
+
+| Function | N | Scalar | NEON Dispatch | Speedup |
+|----------|---|--------|---------------|---------|
+| silk_inner_product_FLP | 64 | 15 ns | 7 ns | 2.1x |
+| silk_inner_product_FLP | 240 | 85 ns | 39 ns | 2.2x |
+| silk_inner_product_FLP | 480 | 211 ns | 84 ns | 2.5x |
+| silk_inner_product_FLP | 960 | 482 ns | 203 ns | 2.4x |
+
+## SILK Functions — Rust scalar vs SIMD dispatch (x86_64)
 
 | Function | N | Scalar | SIMD Dispatch | Speedup |
 |----------|---|--------|---------------|---------|
@@ -57,29 +138,6 @@ nearly matches C (1.11x); CELT-heavy decode paths have more headroom.
 | silk_inner_product_FLP | 240 | 152 ns | 74 ns | 2.1x |
 | silk_inner_product_FLP | 480 | 315 ns | 154 ns | 2.0x |
 | silk_inner_product_FLP | 960 | 624 ns | 309 ns | 2.0x |
-
-## Rust vs C Reference — Per-Function (with SIMD)
-
-### celt_pitch_xcorr
-
-| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
-|---|-------------|----------|-----------|--------|----------------|
-| 240x60 | 2.37 us | 3.19 us | 408 ns | 438 ns | **1.07x faster** |
-| 480x120 | 9.33 us | 12.6 us | 1.35 us | 1.34 us | ~matched |
-| 960x240 | 37.8 us | 50.8 us | 5.20 us | 5.27 us | ~matched |
-
-Rust SIMD (AVX2) **matches or slightly beats** C SIMD (AVX2+FMA) for pitch xcorr.
-
-### silk_inner_product_FLP
-
-| N | Rust Scalar | C Scalar | Rust SIMD | C SIMD | Rust vs C SIMD |
-|---|-------------|----------|-----------|--------|----------------|
-| 64 | 38 ns | 25 ns | 6 ns | 7 ns | **1.2x faster** |
-| 240 | 153 ns | 91 ns | 23 ns | 24 ns | ~matched |
-| 480 | 312 ns | 176 ns | 50 ns | 49 ns | ~matched |
-| 960 | 625 ns | 357 ns | 102 ns | 103 ns | ~matched |
-
-Rust SIMD (AVX2+FMA) **matches** C SIMD (AVX2+FMA) for SILK inner product.
 
 ## SIMD Implementations
 
@@ -127,6 +185,9 @@ silk_NSQ_del_dec:          NEON > scalar
 ## Running Benchmarks
 
 ```bash
+# Recommended: use target-cpu=native for best results
+export RUSTFLAGS="-C target-cpu=native"
+
 # Individual function benchmarks (Rust only)
 cargo bench --bench pitch
 cargo bench --bench silk
@@ -153,3 +214,6 @@ cargo bench --features tools --bench codec_comparison
 - `--no-default-features` disables all SIMD, falling through to scalar.
 - C SIMD is automatically compiled when both `tools` and `simd` features are active.
   The `simd` feature forwards to `libopus-sys/simd` via optional dependency forwarding.
+- Bench profile uses `lto = "thin"` and `codegen-units = 1` for consistent, optimized results.
+- C reference on aarch64 has no NEON variant for `silk_inner_product_FLP` (only x86 has AVX2);
+  Rust provides NEON dispatch for this function, giving a consistent advantage on ARM.

@@ -22,25 +22,30 @@ extern "C" {
     fn silk_inner_product_FLP_c(data1: *const f32, data2: *const f32, data_size: i32) -> f64;
 }
 
-// SIMD dispatch tables and arch detection (only available when C SIMD is compiled)
-#[cfg(feature = "simd")]
+// x86 SIMD: dispatch tables and arch detection (RTCD)
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
 extern "C" {
     fn opus_select_arch() -> i32;
 
-    // x86: PITCH_XCORR_IMPL dispatch table (OPUS_ARCHMASK + 1 = 8 entries)
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     static PITCH_XCORR_IMPL:
         [unsafe extern "C" fn(*const f32, *const f32, *mut f32, i32, i32, i32); 8];
 
-    // x86: SILK_INNER_PRODUCT_FLP_IMPL dispatch table
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     static SILK_INNER_PRODUCT_FLP_IMPL:
         [unsafe extern "C" fn(*const f32, *const f32, i32) -> f64; 8];
+}
 
-    // aarch64: CELT_PITCH_XCORR_IMPL dispatch table (OPUS_ARCHMASK + 1 = 8 entries)
-    #[cfg(target_arch = "aarch64")]
-    static CELT_PITCH_XCORR_IMPL:
-        [unsafe extern "C" fn(*const f32, *const f32, *mut f32, i32, i32, i32); 8];
+// aarch64 SIMD: NEON is presumed, no dispatch tables — call NEON functions directly.
+// silk_inner_product_FLP has no NEON variant in upstream C (only x86 AVX2).
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+extern "C" {
+    fn celt_pitch_xcorr_float_neon(
+        x: *const f32,
+        y: *const f32,
+        xcorr: *mut f32,
+        len: i32,
+        max_pitch: i32,
+        arch: i32,
+    );
 }
 
 fn generate_signal(len: usize, seed: u32) -> Vec<f32> {
@@ -129,22 +134,22 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
             },
         );
 
+        // aarch64: NEON is presumed, call directly (no dispatch table)
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         group.bench_with_input(
-            BenchmarkId::new("c_simd", &label),
+            BenchmarkId::new("c_neon", &label),
             &(len, max_pitch),
             |b, &(len, max_pitch)| {
-                let arch = unsafe { opus_select_arch() };
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
                     unsafe {
-                        CELT_PITCH_XCORR_IMPL[(arch as usize) & 7](
+                        celt_pitch_xcorr_float_neon(
                             x.as_ptr(),
                             y.as_ptr(),
                             xcorr.as_mut_ptr(),
                             len as i32,
                             max_pitch as i32,
-                            arch,
+                            0,
                         );
                     }
                     black_box(&xcorr);

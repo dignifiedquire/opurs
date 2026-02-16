@@ -17,6 +17,11 @@ members = [
 [profile.release]
 debug = true
 
+[profile.bench]
+lto = "thin"
+codegen-units = 1
+debug = true
+
 [dependencies]
 # for complex numbers impl
 num-traits = "0.2.16"
