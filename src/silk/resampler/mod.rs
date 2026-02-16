@@ -28,7 +28,7 @@ pub use down2_3::silk_resampler_down2_3;
 
 const RESAMPLER_MAX_BATCH_SIZE_MS: i32 = 10;
 const RESAMPLER_MAX_FS_KHZ: usize = 48;
-const RESAMPLER_MAX_BATCH_SIZE_IN: usize =
+pub(crate) const RESAMPLER_MAX_BATCH_SIZE_IN: usize =
     RESAMPLER_MAX_BATCH_SIZE_MS as usize * RESAMPLER_MAX_FS_KHZ;
 
 /*
@@ -78,7 +78,7 @@ fn rate_id(r: i32) -> usize {
     }
 }
 
-const SILK_RESAMPLER_MAX_FIR_ORDER: usize = 36;
+pub(crate) const SILK_RESAMPLER_MAX_FIR_ORDER: usize = 36;
 
 #[derive(Copy, Clone)]
 pub struct ResamplerState {
@@ -241,6 +241,7 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
 /* Resampler: convert from one sampling rate to another */
 /* Input and output sampling rate are at most 48000 Hz  */
 /// Upstream C: silk/resampler.c:silk_resampler
+#[inline]
 pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> i32 {
     /* Need at least 1 ms of input data */
     assert!(in_0.len() >= S.params.fs_in_khz);

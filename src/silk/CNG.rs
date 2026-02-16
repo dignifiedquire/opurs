@@ -4,7 +4,7 @@
 
 use crate::silk::define::{
     CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16, CNG_NLSF_SMTH_Q16,
-    MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
+    MAX_FRAME_LENGTH, MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
 };
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_CNG_struct, silk_decoder_control, silk_decoder_state};
@@ -61,6 +61,7 @@ pub fn silk_CNG_Reset(psDec: &mut silk_decoder_state) {
 /// frame[]       I/O   Signal
 /// length        I     Length of residual
 /// ```
+#[inline]
 pub fn silk_CNG(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
@@ -117,8 +118,8 @@ pub fn silk_CNG(
 
     /* Add CNG when packet is lost or during DTX */
     if psDec.lossCnt != 0 {
-        let vla = frame.len() + MAX_LPC_ORDER;
-        let mut CNG_sig_Q14: Vec<i32> = ::std::vec::from_elem(0, vla);
+        // Max: frame_length(320) + MAX_LPC_ORDER(16) = 336
+        let mut CNG_sig_Q14 = [0i32; MAX_FRAME_LENGTH + MAX_LPC_ORDER];
 
         /* Generate CNG excitation */
         let mut gain_Q16 = silk_SMULWW(psDec.sPLC.randScale_Q14 as i32, psDec.sPLC.prevGain_Q16[1]);
@@ -135,7 +136,7 @@ pub fn silk_CNG(
         }
         let gain_Q10 = gain_Q16 >> 6;
         silk_CNG_exc(
-            &mut CNG_sig_Q14[MAX_LPC_ORDER..],
+            &mut CNG_sig_Q14[MAX_LPC_ORDER..MAX_LPC_ORDER + frame.len()],
             &psCNG.CNG_exc_buf_Q14[..frame.len()],
             &mut psCNG.rand_seed,
         );

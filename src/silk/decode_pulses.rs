@@ -23,6 +23,7 @@ use itertools::izip;
 /// quantOffsetType   I     quantOffsetType
 /// frame_length      I     Frame length
 /// ```
+#[inline]
 pub fn silk_decode_pulses(
     psRangeDec: &mut ec_dec,
     pulses: &mut [i16],

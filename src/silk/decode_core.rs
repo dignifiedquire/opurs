@@ -3,7 +3,8 @@
 //! Upstream C: `silk/decode_core.c`
 
 use crate::silk::define::{
-    LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
+    LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_SUB_FRAME_LENGTH,
+    QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
@@ -25,17 +26,18 @@ use crate::silk::SigProc_FIX::{
 /// pulses[ MAX_FRAME_LENGTH ]   I     Pulse signal
 /// arch                         I     Run-time architecture
 /// ```
+#[inline]
 pub fn silk_decode_core(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
     xq: &mut [i16],
     pulses: &[i16],
 ) {
-    let mut sLTP: Vec<i16> = ::std::vec::from_elem(0, psDec.ltp_mem_length);
-    let mut sLTP_Q15: Vec<i32> =
-        ::std::vec::from_elem(0, psDec.ltp_mem_length + psDec.frame_length);
-    let mut res_Q14: Vec<i32> = ::std::vec::from_elem(0, psDec.subfr_length);
-    let mut sLPC_Q14: Vec<i32> = ::std::vec::from_elem(0, psDec.subfr_length + MAX_LPC_ORDER);
+    // Max sizes: ltp_mem_length=320, frame_length=320, subfr_length=80
+    let mut sLTP = [0i16; MAX_FRAME_LENGTH];
+    let mut sLTP_Q15 = [0i32; 2 * MAX_FRAME_LENGTH];
+    let mut res_Q14 = [0i32; MAX_SUB_FRAME_LENGTH];
+    let mut sLPC_Q14 = [0i32; MAX_SUB_FRAME_LENGTH + MAX_LPC_ORDER];
 
     let offset_Q10 = silk_Quantization_Offsets_Q10[(psDec.indices.signalType as i32 >> 1) as usize]
         [psDec.indices.quantOffsetType as usize] as i32;
@@ -300,7 +302,7 @@ pub fn silk_decode_core(
         }
 
         /* Update LPC filter state */
-        sLPC_Q14.copy_within(psDec.subfr_length.., 0);
+        sLPC_Q14.copy_within(psDec.subfr_length..psDec.subfr_length + MAX_LPC_ORDER, 0);
         pexc_Q14 = &mut pexc_Q14[psDec.subfr_length..];
         // pxq = &mut pxq[psDec.subfr_length..];
         k += 1;

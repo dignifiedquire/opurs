@@ -8,7 +8,7 @@ pub mod typedef_h {
     pub const silk_int16_MAX: i32 = i16::MAX as i32;
     pub const silk_int16_MIN: i32 = i16::MIN as i32;
 }
-use crate::silk::resampler::ResamplerParams;
+use crate::silk::resampler::{ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN};
 
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 
@@ -84,7 +84,8 @@ pub(super) fn silk_resampler_private_IIR_FIR(
 ) {
     let mut nSamplesIn: usize = 0;
     let mut max_index_Q16: i32 = 0;
-    let mut buf: Vec<i16> = ::std::vec::from_elem(0, 2 * resampler_params.batch_size + 8);
+    // Max: 2 * batch_size(480) + 8 = 968
+    let mut buf = [0i16; 2 * RESAMPLER_MAX_BATCH_SIZE_IN + RESAMPLER_ORDER_FIR_12];
 
     /* Copy buffered samples to start of buffer */
     buf[0..RESAMPLER_ORDER_FIR_12].copy_from_slice(&state.fir_state);

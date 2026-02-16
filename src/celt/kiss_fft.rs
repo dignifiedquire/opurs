@@ -22,6 +22,7 @@ pub struct kiss_fft_state<'a> {
 }
 
 /// Upstream C: kiss_fft.c:kf_bfly2
+#[inline]
 fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
     let tw: f32 = std::f32::consts::FRAC_1_SQRT_2;
     /* We know that m==4 here because the radix-2 is just after a radix-4 */
@@ -54,6 +55,7 @@ fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
     }
 }
 /// Upstream C: kiss_fft.c:kf_bfly4
+#[inline]
 fn kf_bfly4(
     Fout: &mut [kiss_fft_cpx],
     fstride: usize,
@@ -83,38 +85,33 @@ fn kf_bfly4(
         let m = m as usize;
         let m2 = 2 * m;
         let m3 = 3 * m;
+        let tw = st.twiddles.as_slice();
 
         for i in 0..N {
-            let mut chunk = &mut Fout[(i * mm) as usize..][..4 * m];
-            let mut tw1 = st.twiddles.as_slice();
-            let mut tw2 = tw1;
-            let mut tw3 = tw2;
+            let base = (i * mm) as usize;
             /* m is guaranteed to be a multiple of 4. */
-            for _ in 0..m {
-                scratch[0] = chunk[m] * tw1[0];
-                scratch[1] = chunk[m2] * tw2[0];
-                scratch[2] = chunk[m3] * tw3[0];
+            for j in 0..m {
+                scratch[0] = Fout[base + j + m] * tw[j * fstride];
+                scratch[1] = Fout[base + j + m2] * tw[j * fstride * 2];
+                scratch[2] = Fout[base + j + m3] * tw[j * fstride * 3];
 
-                scratch[5] = chunk[0] - scratch[1];
-                chunk[0] += scratch[1];
+                scratch[5] = Fout[base + j] - scratch[1];
+                Fout[base + j] += scratch[1];
                 scratch[3] = scratch[0] + scratch[2];
                 scratch[4] = scratch[0] - scratch[2];
-                chunk[m2] = chunk[0] - scratch[3];
-                tw1 = &tw1[fstride..];
-                tw2 = &tw2[fstride * 2..];
-                tw3 = &tw3[fstride * 3..];
-                chunk[0] += scratch[3];
+                Fout[base + j + m2] = Fout[base + j] - scratch[3];
+                Fout[base + j] += scratch[3];
 
-                chunk[m].re = scratch[5].re + scratch[4].im;
-                chunk[m].im = scratch[5].im - scratch[4].re;
-                chunk[m3].re = scratch[5].re - scratch[4].im;
-                chunk[m3].im = scratch[5].im + scratch[4].re;
-                chunk = &mut chunk[1..];
+                Fout[base + j + m].re = scratch[5].re + scratch[4].im;
+                Fout[base + j + m].im = scratch[5].im - scratch[4].re;
+                Fout[base + j + m3].re = scratch[5].re - scratch[4].im;
+                Fout[base + j + m3].im = scratch[5].im + scratch[4].re;
             }
         }
     };
 }
 /// Upstream C: kiss_fft.c:kf_bfly3
+#[inline]
 fn kf_bfly3(
     Fout: &mut [kiss_fft_cpx],
     fstride: usize,
@@ -127,37 +124,33 @@ fn kf_bfly3(
     let m2 = 2 * m;
     let mut scratch: [kiss_fft_cpx; 5] = [kiss_fft_cpx::zero(); 5];
     let epi3 = st.twiddles[fstride * m];
+    let tw = st.twiddles.as_slice();
     for i in 0..N {
-        let mut chunk = &mut Fout[(i * mm) as usize..][..3 * m];
-        let mut tw2 = st.twiddles.as_slice();
-        let mut tw1 = tw2;
+        let base = (i * mm) as usize;
         /* For non-custom modes, m is guaranteed to be a multiple of 4. */
-        for _ in 0..m {
-            scratch[1] = chunk[m] * tw1[0];
-            scratch[2] = chunk[m2] * tw2[0];
+        for j in 0..m {
+            scratch[1] = Fout[base + j + m] * tw[j * fstride];
+            scratch[2] = Fout[base + j + m2] * tw[j * fstride * 2];
 
             scratch[3] = scratch[1] + scratch[2];
             scratch[0] = scratch[1] - scratch[2];
-            tw1 = &tw1[fstride..];
-            tw2 = &tw2[fstride * 2..];
 
-            chunk[m] = chunk[0] - scratch[3] * 0.5f32;
+            Fout[base + j + m] = Fout[base + j] - scratch[3] * 0.5f32;
 
             scratch[0] *= epi3.im;
 
-            chunk[0] += scratch[3];
+            Fout[base + j] += scratch[3];
 
-            chunk[m2].re = chunk[m].re + scratch[0].im;
-            chunk[m2].im = chunk[m].im - scratch[0].re;
+            Fout[base + j + m2].re = Fout[base + j + m].re + scratch[0].im;
+            Fout[base + j + m2].im = Fout[base + j + m].im - scratch[0].re;
 
-            chunk[m].re -= scratch[0].im;
-            chunk[m].im += scratch[0].re;
-
-            chunk = &mut chunk[1..];
+            Fout[base + j + m].re -= scratch[0].im;
+            Fout[base + j + m].im += scratch[0].re;
         }
     }
 }
 /// Upstream C: kiss_fft.c:kf_bfly5
+#[inline]
 fn kf_bfly5(
     Fout: &mut [kiss_fft_cpx],
     fstride: usize,
@@ -171,28 +164,27 @@ fn kf_bfly5(
     let yb = st.twiddles[fstride * m as usize * 2];
     let tw = st.twiddles.as_slice();
     let m = m as usize;
+    let m2 = 2 * m;
+    let m3 = 3 * m;
+    let m4 = 4 * m;
     for i in 0..N {
-        let chunk = &mut Fout[(i * mm) as usize..][..5 * m];
-        let (mut chunk0, chunk) = chunk.split_at_mut(m);
-        let (mut chunk1, chunk) = chunk.split_at_mut(m);
-        let (mut chunk2, chunk) = chunk.split_at_mut(m);
-        let (mut chunk3, mut chunk4) = chunk.split_at_mut(m);
+        let base = (i * mm) as usize;
 
         /* For non-custom modes, m is guaranteed to be a multiple of 4. */
         for u in 0..m {
-            scratch[0] = chunk0[0];
+            scratch[0] = Fout[base + u];
 
-            scratch[1] = chunk1[0] * tw[u * fstride];
-            scratch[2] = chunk2[0] * tw[2 * u * fstride];
-            scratch[3] = chunk3[0] * tw[3 * u * fstride];
-            scratch[4] = chunk4[0] * tw[4 * u * fstride];
+            scratch[1] = Fout[base + m + u] * tw[u * fstride];
+            scratch[2] = Fout[base + m2 + u] * tw[2 * u * fstride];
+            scratch[3] = Fout[base + m3 + u] * tw[3 * u * fstride];
+            scratch[4] = Fout[base + m4 + u] * tw[4 * u * fstride];
 
             scratch[7] = scratch[1] + scratch[4];
             scratch[10] = scratch[1] - scratch[4];
             scratch[8] = scratch[2] + scratch[3];
             scratch[9] = scratch[2] - scratch[3];
 
-            chunk0[0] += scratch[7] + scratch[8];
+            Fout[base + u] += scratch[7] + scratch[8];
 
             scratch[5].re = scratch[0].re + (scratch[7].re * ya.re + scratch[8].re * yb.re);
             scratch[5].im = scratch[0].im + (scratch[7].im * ya.re + scratch[8].im * yb.re);
@@ -200,27 +192,22 @@ fn kf_bfly5(
             scratch[6].re = scratch[10].im * ya.im + scratch[9].im * yb.im;
             scratch[6].im = -(scratch[10].re * ya.im + scratch[9].re * yb.im);
 
-            chunk1[0] = scratch[5] - scratch[6];
-            chunk4[0] = scratch[5] + scratch[6];
+            Fout[base + m + u] = scratch[5] - scratch[6];
+            Fout[base + m4 + u] = scratch[5] + scratch[6];
 
             scratch[11].re = scratch[0].re + (scratch[7].re * yb.re + scratch[8].re * ya.re);
             scratch[11].im = scratch[0].im + (scratch[7].im * yb.re + scratch[8].im * ya.re);
             scratch[12].re = scratch[9].im * ya.im - scratch[10].im * yb.im;
             scratch[12].im = scratch[10].re * yb.im - scratch[9].re * ya.im;
 
-            chunk2[0] = scratch[11] + scratch[12];
-            chunk3[0] = scratch[11] - scratch[12];
-
-            chunk0 = &mut chunk0[1..];
-            chunk1 = &mut chunk1[1..];
-            chunk2 = &mut chunk2[1..];
-            chunk3 = &mut chunk3[1..];
-            chunk4 = &mut chunk4[1..];
+            Fout[base + m2 + u] = scratch[11] + scratch[12];
+            Fout[base + m3 + u] = scratch[11] - scratch[12];
         }
     }
 }
 
 /// Upstream C: kiss_fft.c:opus_fft_impl
+#[inline]
 pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
     assert_eq!(st.nfft, fout.len());
     let shift = st.shift.max(0);
@@ -253,6 +240,7 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
 }
 
 /// Upstream C: kiss_fft.c:opus_fft_c
+#[inline]
 pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
     let mut scale: f32 = 0.;
     scale = st.scale;

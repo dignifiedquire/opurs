@@ -3,19 +3,23 @@
 //! Upstream C: `src/mlp.c`
 
 use crate::opus::mlp::tansig::{sigmoid_approx, tansig_approx};
-use ndarray::{
-    aview1, aview_mut1, azip, ArrayView1, ArrayView2, ArrayViewMut1, Axis, ShapeBuilder as _,
-};
 
 pub const WEIGHTS_SCALE: f32 = 1.0f32 / 128f32;
 
-fn gemm_accum(mut out: ArrayViewMut1<f32>, weights: ArrayView2<i8>, x: ArrayView1<f32>) {
-    azip!((out in &mut out, weights in weights.rows()) {
-        azip!((&w in weights, &x in x) {
-            let v = (w as f32) * x;
-            *out += v;
-        })
-    });
+/// Matrix-vector multiply-accumulate: out[i] += sum_j(weights[i * col_stride + j] * x[j])
+///
+/// The weight matrix is stored in interleaved layout with `col_stride` between columns,
+/// where rows are contiguous starting at offset `row` (stride 1 between rows).
+fn gemm_accum(out: &mut [f32], weights: &[i8], n: usize, m: usize, col_stride: usize, x: &[f32]) {
+    debug_assert_eq!(out.len(), n);
+    debug_assert_eq!(x.len(), m);
+    for i in 0..n {
+        let mut acc = 0.0f32;
+        for j in 0..m {
+            acc += weights[i + j * col_stride] as f32 * x[j];
+        }
+        out[i] += acc;
+    }
 }
 
 pub enum ActivationFunction {
@@ -38,43 +42,33 @@ impl AnalysisDenseLayer {
         self.bias.len()
     }
 
-    // TODO: it would be nice to have to do this only once (converting slices to arrays requires some bound checks)
-    pub fn as_arrays(&self) -> (ArrayView1<'_, i8>, ArrayView2<'_, i8>) {
-        let n = self.nb_neurons();
-        let m = self.nb_inputs();
-        let col_stride = n;
-
-        let bias = aview1(self.bias);
-        let input_weights =
-            ArrayView2::from_shape((n, m).strides((1, col_stride)), self.input_weights).unwrap();
-
-        (bias, input_weights)
-    }
-
     #[inline]
     pub fn compute(&self, out: &mut [f32], input: &[f32]) {
-        assert_eq!(self.nb_neurons(), out.len());
-        assert_eq!(self.nb_inputs(), input.len());
+        let n = self.nb_neurons();
+        let m = self.nb_inputs();
+        assert_eq!(n, out.len());
+        assert_eq!(m, input.len());
 
-        let mut out = aview_mut1(out);
-        let input = aview1(input);
-
-        let (bias, input_weights) = self.as_arrays();
-
-        azip!((out in &mut out, &bias in &bias) {
+        for (out, &bias) in out.iter_mut().zip(self.bias.iter()) {
             *out = bias as f32;
-        });
+        }
 
-        gemm_accum(out.view_mut(), input_weights, input);
+        gemm_accum(out, self.input_weights, n, m, n, input);
 
-        out.mapv_inplace(|out| out * WEIGHTS_SCALE);
+        for out in out.iter_mut() {
+            *out *= WEIGHTS_SCALE;
+        }
 
         match self.activation {
             ActivationFunction::Tansig => {
-                out.mapv_inplace(tansig_approx);
+                for out in out.iter_mut() {
+                    *out = tansig_approx(*out);
+                }
             }
             ActivationFunction::Sigmoid => {
-                out.mapv_inplace(sigmoid_approx);
+                for out in out.iter_mut() {
+                    *out = sigmoid_approx(*out);
+                }
             }
         }
     }
@@ -96,97 +90,75 @@ impl AnalysisGRULayer {
         self.bias.len() / 3
     }
 
-    #[allow(clippy::type_complexity)]
-    fn as_arrays(
-        &self,
-    ) -> (
-        [ArrayView1<'_, i8>; 3],
-        [ArrayView2<'_, i8>; 3],
-        [ArrayView2<'_, i8>; 3],
-    ) {
-        let m = self.nb_inputs();
-        let n = self.nb_neurons();
-        let col_stride = 3 * n;
-
-        let bias = aview1(self.bias);
-        let input_weights =
-            ArrayView2::from_shape((n * 3, m).strides((1, col_stride)), self.input_weights)
-                .unwrap();
-        let recurrent_weights =
-            ArrayView2::from_shape((n * 3, n).strides((1, col_stride)), self.recurrent_weights)
-                .unwrap();
-
-        let (bias1, tail) = bias.split_at(Axis(0), n);
-        let (bias2, bias3) = tail.split_at(Axis(0), n);
-
-        let (input_weights1, tail) = input_weights.split_at(Axis(0), n);
-        let (input_weights2, input_weights3) = tail.split_at(Axis(0), n);
-
-        let (recurrent_weights1, tail) = recurrent_weights.split_at(Axis(0), n);
-        let (recurrent_weights2, recurrent_weights3) = tail.split_at(Axis(0), n);
-
-        (
-            [bias1, bias2, bias3],
-            [input_weights1, input_weights2, input_weights3],
-            [recurrent_weights1, recurrent_weights2, recurrent_weights3],
-        )
-    }
-
     #[inline]
     pub fn compute(&self, state: &mut [f32], input: &[f32]) {
         const MAX_NEURONS: usize = 32;
 
-        assert_eq!(self.nb_neurons(), state.len());
-        assert_eq!(self.nb_inputs(), input.len());
-
-        assert!(self.nb_neurons() < MAX_NEURONS);
         let n = self.nb_neurons();
+        let m = self.nb_inputs();
+        assert_eq!(n, state.len());
+        assert_eq!(m, input.len());
 
-        let mut state = aview_mut1(state);
-        let input = aview1(input);
+        assert!(n < MAX_NEURONS);
 
-        let mut tmp: [f32; MAX_NEURONS] = [0.; MAX_NEURONS];
+        let col_stride = 3 * n;
+
+        // Bias sub-slices (3 concatenated vectors of length n)
+        let bias0 = &self.bias[..n];
+        let bias1 = &self.bias[n..2 * n];
+        let bias2 = &self.bias[2 * n..3 * n];
+
+        // Weight sub-slices: each sub-matrix starts at offset 0, n, or 2*n within the interleaved layout
+        let iw0 = self.input_weights;
+        let iw1 = &self.input_weights[n..];
+        let iw2 = &self.input_weights[2 * n..];
+        let rw0 = self.recurrent_weights;
+        let rw1 = &self.recurrent_weights[n..];
+        let rw2 = &self.recurrent_weights[2 * n..];
+
         let mut z: [f32; MAX_NEURONS] = [0.; MAX_NEURONS];
         let mut r: [f32; MAX_NEURONS] = [0.; MAX_NEURONS];
         let mut h: [f32; MAX_NEURONS] = [0.; MAX_NEURONS];
-
-        let mut tmp = aview_mut1(&mut tmp[..n]);
-        let mut z = aview_mut1(&mut z[..n]);
-        let mut r = aview_mut1(&mut r[..n]);
-        let mut h = aview_mut1(&mut h[..n]);
-
-        let (bias, input_weights, recurrent_weights) = self.as_arrays();
+        let z = &mut z[..n];
+        let r = &mut r[..n];
+        let h = &mut h[..n];
 
         /* Compute update gate. */
-        azip!((z in &mut z, &bias in &bias[0]) {
+        for (z, &bias) in z.iter_mut().zip(bias0.iter()) {
             *z = bias as f32;
-        });
-        gemm_accum(z.view_mut(), input_weights[0], input);
-        gemm_accum(z.view_mut(), recurrent_weights[0], state.view());
-        z.mapv_inplace(|z| sigmoid_approx(WEIGHTS_SCALE * z));
+        }
+        gemm_accum(z, iw0, n, m, col_stride, input);
+        gemm_accum(z, rw0, n, n, col_stride, state);
+        for z in z.iter_mut() {
+            *z = sigmoid_approx(WEIGHTS_SCALE * *z);
+        }
 
         /* Compute reset gate. */
-        azip!((r in &mut r, &bias in &bias[1]) {
+        for (r, &bias) in r.iter_mut().zip(bias1.iter()) {
             *r = bias as f32;
-        });
-        gemm_accum(r.view_mut(), input_weights[1], input);
-        gemm_accum(r.view_mut(), recurrent_weights[1], state.view());
-        r.mapv_inplace(|r| sigmoid_approx(WEIGHTS_SCALE * r));
+        }
+        gemm_accum(r, iw1, n, m, col_stride, input);
+        gemm_accum(r, rw1, n, n, col_stride, state);
+        for r in r.iter_mut() {
+            *r = sigmoid_approx(WEIGHTS_SCALE * *r);
+        }
 
         /* Compute output. */
-        azip!((h in &mut h, &bias in &bias[2]) {
+        for (h, &bias) in h.iter_mut().zip(bias2.iter()) {
             *h = bias as f32;
-        });
-        azip!((tmp in &mut tmp, &state in &state, &r in &r) {
-            *tmp = state * r;
-        });
-        gemm_accum(h.view_mut(), input_weights[2], input);
-        gemm_accum(h.view_mut(), recurrent_weights[2], tmp.view());
-        azip!((h in &mut h, &state in &state, &z in &z) {
-            *h = z * state + (1.0 - z) * tansig_approx(WEIGHTS_SCALE * *h);
-        });
-        azip!((state in &mut state, &h in &h) {
+        }
+        let mut tmp: [f32; MAX_NEURONS] = [0.; MAX_NEURONS];
+        let tmp = &mut tmp[..n];
+        for ((tmp, &s), &r) in tmp.iter_mut().zip(state.iter()).zip(r.iter()) {
+            *tmp = s * r;
+        }
+        gemm_accum(h, iw2, n, m, col_stride, input);
+        gemm_accum(h, rw2, n, n, col_stride, tmp);
+        for ((h, &s), &z) in h.iter_mut().zip(state.iter()).zip(z.iter()) {
+            *h = z * s + (1.0 - z) * tansig_approx(WEIGHTS_SCALE * *h);
+        }
+        for (state, &h) in state.iter_mut().zip(h.iter()) {
             *state = h;
-        });
+        }
     }
 }

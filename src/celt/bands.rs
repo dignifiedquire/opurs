@@ -84,11 +84,13 @@ pub fn hysteresis_decision(
 }
 
 /// Upstream C: celt/bands.c:celt_lcg_rand
+#[inline]
 pub fn celt_lcg_rand(seed: u32) -> u32 {
     (1664525_u32).wrapping_mul(seed).wrapping_add(1013904223)
 }
 
 /// Upstream C: celt/bands.c:bitexact_cos
+#[inline]
 pub fn bitexact_cos(x: i16) -> i16 {
     let tmp = (4096 + x as i32 * x as i32) >> 13;
     let x2 = tmp as i16;
@@ -189,6 +191,7 @@ pub fn normalise_bands(
 }
 
 /// Upstream C: celt/bands.c:denormalise_bands
+#[inline]
 pub fn denormalise_bands(
     m: &OpusCustomMode,
     X: &[f32],
@@ -243,6 +246,7 @@ pub fn denormalise_bands(
 }
 
 /// Upstream C: celt/bands.c:anti_collapse
+#[inline]
 pub fn anti_collapse(
     m: &OpusCustomMode,
     X_: &mut [f32],
@@ -332,6 +336,7 @@ fn compute_channel_weights(mut Ex: f32, mut Ey: f32, w: &mut [f32]) {
 }
 
 /// Upstream C: celt/bands.c:intensity_stereo
+#[inline]
 fn intensity_stereo(
     m: &OpusCustomMode,
     X: &mut [f32],
@@ -356,6 +361,7 @@ fn intensity_stereo(
 }
 
 /// Upstream C: celt/bands.c:stereo_split
+#[inline]
 fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
     let mut j = 0;
     while j < N {
@@ -368,6 +374,7 @@ fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
 }
 
 /// Upstream C: celt/bands.c:stereo_merge
+#[inline]
 fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: i32) {
     let n = N as usize;
     let (xp, side) = dual_inner_prod(&Y[..n], &X[..n], &Y[..n], n);
@@ -495,9 +502,10 @@ static ordery_table: [i32; 30] = [
 ];
 
 /// Upstream C: celt/bands.c:deinterleave_hadamard
+#[inline]
 fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
-    let mut tmp = vec![0.0f32; N];
+    let mut tmp = [0.0f32; 176];
     assert!(stride > 0);
     if hadamard != 0 {
         let ordery = &ordery_table[(stride - 2) as usize..];
@@ -525,9 +533,10 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
 }
 
 /// Upstream C: celt/bands.c:interleave_hadamard
+#[inline]
 fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
-    let mut tmp = vec![0.0f32; N];
+    let mut tmp = [0.0f32; 176];
     if hadamard != 0 {
         let ordery = &ordery_table[(stride - 2) as usize..];
         let mut i = 0;
@@ -554,6 +563,7 @@ fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
 }
 
 /// Upstream C: celt/bands.c:haar1
+#[inline]
 pub fn haar1(X: &mut [f32], mut N0: i32, stride: i32) {
     N0 >>= 1;
     let mut i = 0;
@@ -571,6 +581,7 @@ pub fn haar1(X: &mut [f32], mut N0: i32, stride: i32) {
 }
 
 /// Upstream C: celt/bands.c:compute_qn
+#[inline]
 fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
     const EXP2_TABLE8: [i16; 8] = [16384, 17866, 19483, 21247, 23170, 25267, 27554, 30048];
     let mut N2 = 2 * N - 1;
@@ -599,6 +610,7 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
 /// Uses raw pointers internally for X/Y because the caller (`quant_partition`)
 /// needs to split X at varying offsets and pass sub-slices. The pointer
 /// arithmetic is confined to this function.
+#[inline]
 fn compute_theta(
     ctx: &mut band_ctx,
     sctx: &mut split_ctx,
@@ -825,6 +837,7 @@ fn compute_theta(
 }
 
 /// Upstream C: celt/bands.c:quant_band_n1
+#[inline]
 fn quant_band_n1(
     ctx: &mut band_ctx,
     X: &mut [f32],
@@ -884,6 +897,7 @@ fn quant_band_n1(
 }
 
 /// Upstream C: celt/bands.c:quant_partition
+#[inline]
 fn quant_partition(
     ctx: &mut band_ctx,
     X: &mut [f32],
@@ -1080,6 +1094,7 @@ fn quant_partition(
 }
 
 /// Upstream C: celt/bands.c:quant_band
+#[inline]
 fn quant_band(
     ctx: &mut band_ctx,
     X: &mut [f32],
@@ -1223,6 +1238,7 @@ fn quant_band(
 }
 
 /// Upstream C: celt/bands.c:quant_band_stereo
+#[inline]
 fn quant_band_stereo(
     ctx: &mut band_ctx,
     X: &mut [f32],
@@ -1449,6 +1465,7 @@ fn quant_band_stereo(
 }
 
 /// Upstream C: celt/bands.c:special_hybrid_folding
+#[inline]
 fn special_hybrid_folding(
     m: &OpusCustomMode,
     norm: &mut [f32],
@@ -1468,6 +1485,7 @@ fn special_hybrid_folding(
 }
 
 /// Upstream C: celt/bands.c:quant_all_bands
+#[inline]
 pub fn quant_all_bands(
     encode: i32,
     m: &OpusCustomMode,
@@ -1507,26 +1525,19 @@ pub fn quant_all_bands(
 
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;
-    let mut _norm = vec![0.0f32; C as usize * norm_size];
+    let mut _norm = [0.0f32; 1920];
 
-    let resynth_alloc: i32 = if encode != 0 && resynth != 0 {
+    let _resynth_alloc: i32 = if encode != 0 && resynth != 0 {
         M * (eBands[m.nbEBands] as i32 - eBands[m.nbEBands - 1] as i32)
     } else {
         0
     };
-    let mut _lowband_scratch = vec![
-        0.0f32;
-        if resynth_alloc > 0 {
-            resynth_alloc as usize
-        } else {
-            1
-        }
-    ];
-    let mut _X_save = vec![0.0f32; resynth_alloc as usize];
-    let mut _Y_save = vec![0.0f32; resynth_alloc as usize];
-    let mut _X_save2 = vec![0.0f32; resynth_alloc as usize];
-    let mut _Y_save2 = vec![0.0f32; resynth_alloc as usize];
-    let mut _norm_save2 = vec![0.0f32; resynth_alloc as usize];
+    let mut _lowband_scratch = [0.0f32; 176];
+    let mut _X_save = [0.0f32; 176];
+    let mut _Y_save = [0.0f32; 176];
+    let mut _X_save2 = [0.0f32; 176];
+    let mut _Y_save2 = [0.0f32; 176];
+    let mut _norm_save2 = [0.0f32; 176];
 
     // In decode-only mode, lowband_scratch comes from the end of X_
     let decode_scratch_off = (M * eBands[m.effEBands as usize - 1] as i32) as usize;
@@ -1708,12 +1719,11 @@ pub fn quant_all_bands(
             // Copy lowband data to a temp buffer so we can give lowband_out a &mut into _norm.
             // The lowband read range [effective_lowband..effective_lowband+N] may overlap with
             // the lowband_out write range [norm_band_out_off..], so we can't split_at_mut.
-            let mut lowband_x_buf: Vec<f32> = if effective_lowband != -1 {
+            let mut lowband_x_buf = [0.0f32; 176];
+            if effective_lowband != -1 {
                 let lb_start = effective_lowband as usize;
-                norm1[lb_start..lb_start + n].to_vec()
-            } else {
-                Vec::new()
-            };
+                lowband_x_buf[..n].copy_from_slice(&norm1[lb_start..lb_start + n]);
+            }
             let lowband_out_x: Option<&mut [f32]> = if last != 0 {
                 None
             } else {
@@ -1727,7 +1737,7 @@ pub fn quant_all_bands(
                 b / 2,
                 B,
                 if effective_lowband != -1 {
-                    Some(&mut lowband_x_buf)
+                    Some(&mut lowband_x_buf[..n])
                 } else {
                     None
                 },
@@ -1739,12 +1749,11 @@ pub fn quant_all_bands(
                 ec,
             );
             // Same lowband copy approach for channel 2.
-            let mut lowband_y_buf: Vec<f32> = if effective_lowband != -1 {
+            let mut lowband_y_buf = [0.0f32; 176];
+            if effective_lowband != -1 {
                 let lb_start = effective_lowband as usize;
-                norm2[lb_start..lb_start + n].to_vec()
-            } else {
-                Vec::new()
-            };
+                lowband_y_buf[..n].copy_from_slice(&norm2[lb_start..lb_start + n]);
+            }
             let lowband_out_y: Option<&mut [f32]> = if last != 0 {
                 None
             } else {
@@ -1767,7 +1776,7 @@ pub fn quant_all_bands(
                 b / 2,
                 B,
                 if effective_lowband != -1 {
-                    Some(&mut lowband_y_buf)
+                    Some(&mut lowband_y_buf[..n])
                 } else {
                     None
                 },
@@ -1818,12 +1827,11 @@ pub fn quant_all_bands(
         } else {
             // Copy lowband data to a temp buffer so lowband_out can borrow _norm mutably.
             // The lowband read range may overlap with the lowband_out write range.
-            let mut lowband_buf: Vec<f32> = if effective_lowband != -1 {
+            let mut lowband_buf = [0.0f32; 176];
+            if effective_lowband != -1 {
                 let lb_start = effective_lowband as usize;
-                _norm[lb_start..lb_start + n].to_vec()
-            } else {
-                Vec::new()
-            };
+                lowband_buf[..n].copy_from_slice(&_norm[lb_start..lb_start + n]);
+            }
             let lowband_out_ref: Option<&mut [f32]> = if last != 0 {
                 None
             } else {
@@ -1854,7 +1862,7 @@ pub fn quant_all_bands(
                         b,
                         B,
                         if effective_lowband != -1 {
-                            Some(&mut lowband_buf)
+                            Some(&mut lowband_buf[..n])
                         } else {
                             None
                         },
@@ -1917,7 +1925,7 @@ pub fn quant_all_bands(
                         b,
                         B,
                         if effective_lowband != -1 {
-                            Some(&mut lowband_buf)
+                            Some(&mut lowband_buf[..n])
                         } else {
                             None
                         },
@@ -1951,7 +1959,7 @@ pub fn quant_all_bands(
                         b,
                         B,
                         if effective_lowband != -1 {
-                            Some(&mut lowband_buf)
+                            Some(&mut lowband_buf[..n])
                         } else {
                             None
                         },
@@ -1973,7 +1981,7 @@ pub fn quant_all_bands(
                     b,
                     B,
                     if effective_lowband != -1 {
-                        Some(&mut lowband_buf)
+                        Some(&mut lowband_buf[..n])
                     } else {
                         None
                     },

@@ -2,8 +2,6 @@
 //!
 //! Upstream C: `silk/interpolate.c`
 
-use ndarray::{aview1, aview_mut1, azip};
-
 /// Upstream C: silk/interpolate.c:silk_interpolate
 // Interpolate two vectors
 pub fn silk_interpolate(
@@ -18,15 +16,9 @@ pub fn silk_interpolate(
 
     assert!((0..=4).contains(&ifact_Q2));
 
-    let xi = aview_mut1(xi);
-    let x0 = aview1(x0);
-    let x1 = aview1(x1);
-
-    azip!((xi in xi, &x0 in x0, &x1 in x1) {
+    for ((xi, &x0), &x1) in xi.iter_mut().zip(x0.iter()).zip(x1.iter()) {
         let x0 = x0 as i32;
         let x1 = x1 as i32;
-        *xi = (x0
-            + (((x1 - x0) as i16 as i32 * ifact_Q2 as i16 as i32) >> 2))
-            as i16;
-    });
+        *xi = (x0 + (((x1 - x0) as i16 as i32 * ifact_Q2 as i16 as i32) >> 2)) as i16;
+    }
 }

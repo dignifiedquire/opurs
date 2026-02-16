@@ -16,6 +16,7 @@ use crate::celt::entcode::{
 use crate::silk::macros::EC_CLZ0;
 
 /// Upstream C: celt/entenc.c:ec_write_byte
+#[inline]
 fn ec_write_byte(this: &mut ec_enc, value: u32) -> i32 {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_write_byte(0x{:x} @ 0x{:x})", value, this.offs);
@@ -30,6 +31,7 @@ fn ec_write_byte(this: &mut ec_enc, value: u32) -> i32 {
 }
 
 /// Upstream C: celt/entenc.c:ec_write_byte_at_end
+#[inline]
 fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
     #[cfg(feature = "ent-dump")]
     eprintln!(
@@ -47,6 +49,7 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_carry_out
+#[inline]
 fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
     if c as u32 != EC_SYM_MAX {
         let mut carry: i32 = 0;
@@ -103,6 +106,7 @@ pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc<'_> {
 }
 
 /// Upstream C: celt/entenc.c:ec_encode
+#[inline]
 pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode({}, {}, {})", _fl, _fh, _ft);
@@ -120,6 +124,7 @@ pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
 }
 
 /// Upstream C: celt/entenc.c:ec_encode_bin
+#[inline]
 pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode_bin({}, {}, {})", _fl, _fh, _bits);
@@ -140,6 +145,7 @@ pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_bit_logp
+#[inline]
 pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bit_logp({}, {})", _val, _logp);
@@ -158,6 +164,7 @@ pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_icdf
+#[inline]
 pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     // we do a sub-slice here because the C code doesn't have an idea about the icdf length (it doesn't need to)
     #[cfg(feature = "ent-dump")]
@@ -180,6 +187,7 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
 
 /// Upstream C: celt/entenc.c:ec_enc_icdf16
 #[allow(dead_code)]
+#[inline]
 pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
     let r: u32 = this.rng >> ftb;
     if s > 0 {
@@ -197,6 +205,7 @@ pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_uint
+#[inline]
 pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_uint({}, {})", _fl, _ft);
@@ -218,6 +227,7 @@ pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_bits
+#[inline]
 pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bits({}, {})", _fl, _bits);

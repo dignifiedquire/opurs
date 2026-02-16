@@ -437,6 +437,7 @@ pub fn quant_energy_finalise(
 }
 
 /// Upstream C: celt/quant_bands.c:unquant_coarse_energy
+#[inline]
 pub fn unquant_coarse_energy(
     m: &OpusCustomMode,
     start: i32,
@@ -495,6 +496,7 @@ pub fn unquant_coarse_energy(
 }
 
 /// Upstream C: celt/quant_bands.c:unquant_fine_energy
+#[inline]
 pub fn unquant_fine_energy(
     m: &OpusCustomMode,
     start: i32,
@@ -525,6 +527,7 @@ pub fn unquant_fine_energy(
 }
 
 /// Upstream C: celt/quant_bands.c:unquant_energy_finalise
+#[inline]
 pub fn unquant_energy_finalise(
     m: &OpusCustomMode,
     start: i32,

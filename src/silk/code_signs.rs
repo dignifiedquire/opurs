@@ -66,6 +66,7 @@ pub fn silk_encode_signs(
 /// quantOffsetType                     I     Quantization offset type
 /// sum_pulses[ MAX_NB_SHELL_BLOCKS ]   I     Sum of absolute pulses per block
 /// ```
+#[inline]
 pub fn silk_decode_signs(
     psRangeDec: &mut ec_dec,
     pulses: &mut [i16],
