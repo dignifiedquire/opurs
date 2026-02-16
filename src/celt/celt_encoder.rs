@@ -3144,6 +3144,7 @@ pub fn celt_encode_with_ec<'b>(
         end,
         &mut st.oldBandE[..(C * nbEBands) as usize],
         &mut error,
+        None,
         &fine_quant,
         enc,
         C,

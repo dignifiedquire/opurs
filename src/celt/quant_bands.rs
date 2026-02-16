@@ -357,35 +357,43 @@ pub fn quant_fine_energy(
     end: i32,
     oldEBands: &mut [f32],
     error: &mut [f32],
-    fine_quant: &[i32],
+    prev_quant: Option<&[i32]>,
+    extra_quant: &[i32],
     enc: &mut ec_enc,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;
     for i in start..end {
-        let frac = (1i32 << fine_quant[i as usize]) as i16;
-        if fine_quant[i as usize] > 0 {
-            let mut c = 0;
-            loop {
-                let mut q2 = ((error[(i + c * nbEBands) as usize] + 0.5f32) * frac as i32 as f32)
-                    .floor() as i32;
-                if q2 > frac as i32 - 1 {
-                    q2 = frac as i32 - 1;
-                }
-                if q2 < 0 {
-                    q2 = 0;
-                }
-                ec_enc_bits(enc, q2 as u32, fine_quant[i as usize] as u32);
-                let offset = (q2 as f32 + 0.5f32)
-                    * ((1) << (14 - fine_quant[i as usize])) as f32
-                    * (1.0f32 / 16384.0)
-                    - 0.5f32;
-                oldEBands[(i + c * nbEBands) as usize] += offset;
-                error[(i + c * nbEBands) as usize] -= offset;
-                c += 1;
-                if c >= C {
-                    break;
-                }
+        let extra = 1i32 << extra_quant[i as usize];
+        if extra_quant[i as usize] <= 0 {
+            continue;
+        }
+        if ec_tell(enc) + C * extra_quant[i as usize] > enc.storage as i32 * 8 {
+            continue;
+        }
+        let prev = prev_quant.map_or(0, |pq| pq[i as usize]);
+        let mut c = 0;
+        loop {
+            let mut q2 = ((error[(i + c * nbEBands) as usize] * (1 << prev) as f32 + 0.5f32)
+                * extra as f32)
+                .floor() as i32;
+            if q2 > extra - 1 {
+                q2 = extra - 1;
+            }
+            if q2 < 0 {
+                q2 = 0;
+            }
+            ec_enc_bits(enc, q2 as u32, extra_quant[i as usize] as u32);
+            let mut offset = (q2 as f32 + 0.5f32)
+                * ((1) << (14 - extra_quant[i as usize])) as f32
+                * (1.0f32 / 16384.0)
+                - 0.5f32;
+            offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
+            oldEBands[(i + c * nbEBands) as usize] += offset;
+            error[(i + c * nbEBands) as usize] -= offset;
+            c += 1;
+            if c >= C {
+                break;
             }
         }
     }
@@ -502,25 +510,31 @@ pub fn unquant_fine_energy(
     start: i32,
     end: i32,
     oldEBands: &mut [f32],
-    fine_quant: &[i32],
+    prev_quant: Option<&[i32]>,
+    extra_quant: &[i32],
     dec: &mut ec_dec,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;
     for i in start..end {
-        if fine_quant[i as usize] > 0 {
-            let mut c = 0;
-            loop {
-                let q2 = ec_dec_bits(dec, fine_quant[i as usize] as u32) as i32;
-                let offset = (q2 as f32 + 0.5f32)
-                    * ((1) << (14 - fine_quant[i as usize])) as f32
-                    * (1.0f32 / 16384.0)
-                    - 0.5f32;
-                oldEBands[(i + c * nbEBands) as usize] += offset;
-                c += 1;
-                if c >= C {
-                    break;
-                }
+        let extra = extra_quant[i as usize];
+        if extra_quant[i as usize] <= 0 {
+            continue;
+        }
+        if ec_tell(dec) + C * extra_quant[i as usize] > dec.storage as i32 * 8 {
+            continue;
+        }
+        let prev = prev_quant.map_or(0, |pq| pq[i as usize]);
+        let mut c = 0;
+        loop {
+            let q2 = ec_dec_bits(dec, extra as u32) as i32;
+            let mut offset =
+                (q2 as f32 + 0.5f32) * ((1) << (14 - extra)) as f32 * (1.0f32 / 16384.0) - 0.5f32;
+            offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
+            oldEBands[(i + c * nbEBands) as usize] += offset;
+            c += 1;
+            if c >= C {
+                break;
             }
         }
     }
