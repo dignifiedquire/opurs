@@ -846,7 +846,7 @@ pub static mdct_twiddles960: [&[f32]; 4] = [
         -0.991_866_7, -0.994_858_6, -0.997_168_8, -0.99879545, -0.999_737_6,
     ]
 ];
-static mode48000_960_120: OpusCustomMode = OpusCustomMode {
+pub(crate) static mode48000_960_120: OpusCustomMode = OpusCustomMode {
     Fs: 48000,
     overlap: 120,
     nbEBands: 21,
@@ -877,7 +877,15 @@ static mode48000_960_120: OpusCustomMode = OpusCustomMode {
         bits: &cache_bits50,
         caps: &cache_caps50,
     },
+    #[cfg(feature = "qext")]
+    qext_cache: PulseCache {
+        size: 86,
+        index: &super::data_96000::qext_cache_index50,
+        bits: &super::data_96000::qext_cache_bits50,
+        caps: &super::data_96000::qext_cache_caps50,
+    },
 };
+#[cfg(not(feature = "qext"))]
 pub static static_mode_list: [&OpusCustomMode; 1] = [&mode48000_960_120];
 
 use super::{band_allocation, eband5ms};

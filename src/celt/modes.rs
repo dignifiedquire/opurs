@@ -20,6 +20,8 @@ pub struct OpusCustomMode {
     pub window: &'static [f32],
     pub mdct: MdctLookup<'static>,
     pub(crate) cache: PulseCache,
+    #[cfg(feature = "qext")]
+    pub(crate) qext_cache: PulseCache,
 }
 /// Upstream C: celt/modes.h:PulseCache
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -31,9 +33,17 @@ pub struct PulseCache {
 }
 pub const MAX_PERIOD: i32 = 1024;
 
+#[cfg(feature = "qext")]
+pub mod data_96000;
 pub mod static_modes_float_h;
 
+#[cfg(not(feature = "qext"))]
 pub use self::static_modes_float_h::static_mode_list;
+#[cfg(feature = "qext")]
+pub static static_mode_list: [&OpusCustomMode; 2] = [
+    &static_modes_float_h::mode48000_960_120,
+    &data_96000::mode96000_1920_240,
+];
 use crate::celt::mdct::MdctLookup;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
 

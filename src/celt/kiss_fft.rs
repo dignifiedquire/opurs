@@ -18,7 +18,7 @@ pub struct kiss_fft_state<'a> {
     pub shift: i32,
     pub factors: [(i32, i32); 8],
     pub bitrev: &'a [i16],
-    pub twiddles: &'a [kiss_twiddle_cpx; 480],
+    pub twiddles: &'a [kiss_twiddle_cpx],
 }
 
 /// Upstream C: kiss_fft.c:kf_bfly2
@@ -85,7 +85,7 @@ fn kf_bfly4(
         let m = m as usize;
         let m2 = 2 * m;
         let m3 = 3 * m;
-        let tw = st.twiddles.as_slice();
+        let tw = st.twiddles;
 
         for i in 0..N {
             let base = (i * mm) as usize;
@@ -124,7 +124,7 @@ fn kf_bfly3(
     let m2 = 2 * m;
     let mut scratch: [kiss_fft_cpx; 5] = [kiss_fft_cpx::zero(); 5];
     let epi3 = st.twiddles[fstride * m];
-    let tw = st.twiddles.as_slice();
+    let tw = st.twiddles;
     for i in 0..N {
         let base = (i * mm) as usize;
         /* For non-custom modes, m is guaranteed to be a multiple of 4. */
@@ -162,7 +162,7 @@ fn kf_bfly5(
     let mut scratch: [kiss_fft_cpx; 13] = [kiss_fft_cpx::zero(); 13];
     let ya = st.twiddles[fstride * m as usize];
     let yb = st.twiddles[fstride * m as usize * 2];
-    let tw = st.twiddles.as_slice();
+    let tw = st.twiddles;
     let m = m as usize;
     let m2 = 2 * m;
     let m3 = 3 * m;
