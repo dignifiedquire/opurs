@@ -275,24 +275,13 @@ fn compare_outputs(name: &str, rust: &[f32], c: &[f32]) {
         c.len()
     );
 
-    // Both C and Rust now use matching SIMD paths on all platforms:
-    // aarch64 NEON and x86 AVX2 scalar functions broadcast-and-extract
-    // to match C's behavior. Results should be bit-exact everywhere.
-    let tolerance: f32 = 0.0;
-
-    let mut max_diff: f32 = 0.0;
-    let mut first_diff = None;
     for (i, (&r, &c_val)) in rust.iter().zip(c.iter()).enumerate() {
-        let diff = (r - c_val).abs();
-        if diff > tolerance && first_diff.is_none() {
-            first_diff = Some((i, r, c_val, diff));
-        }
-        max_diff = max_diff.max(diff);
-    }
-
-    if let Some((idx, r, c_val, diff)) = first_diff {
-        panic!(
-            "{name}: MISMATCH at sample {idx}: rust={r} c={c_val} diff={diff} max_diff={max_diff} tolerance={tolerance}"
+        assert_eq!(
+            r.to_bits(),
+            c_val.to_bits(),
+            "{name}: MISMATCH at sample {i}: rust={r} (0x{:08x}) c={c_val} (0x{:08x})",
+            r.to_bits(),
+            c_val.to_bits(),
         );
     }
 }
@@ -516,316 +505,36 @@ fn test_compute_linear_nolace_af2() {
     compare_outputs("compute_linear_nolace_af2", &rust_out, &c_out);
 }
 
-/// Diagnostic: dump adashape intermediates to find where divergence starts.
+/// Verify tanh_approx is bit-exact between Rust and C.
 #[test]
-#[allow(clippy::needless_range_loop, clippy::excessive_precision)]
-fn test_adashape_intermediates() {
-    use opurs::dnn::nndsp::*;
-    use opurs::dnn::nnet::*;
-
-    let arrays = compiled_weights();
-    let nolace = init_nolace(&arrays).expect("NoLACE init failed");
-    let frame_size = NOLACE_TDSHAPE1_FRAME_SIZE; // 80
-    let feature_dim = NOLACE_TDSHAPE1_FEATURE_DIM; // 160
-    let avg_pool_k = NOLACE_TDSHAPE1_AVG_POOL_K; // 4
-
-    // Get C intermediates
-    let mut c_buf = vec![0.0f32; 2 * frame_size];
-    unsafe { libopus_sys::osce_test_adashape_intermediates(c_buf.as_mut_ptr(), SEED) };
-    let c_out_buffer = &c_buf[..frame_size];
-    let c_x_out = &c_buf[frame_size..2 * frame_size];
-
-    // Run Rust step by step
-    let mut prng = Prng::new(SEED);
-    let features: Vec<f32> = (0..feature_dim).map(|_| prng.next_float() * 0.1).collect();
-    let x_in: Vec<f32> = (0..frame_size).map(|_| prng.next_float() * 0.5).collect();
-
-    let tenv_size = frame_size / avg_pool_k;
-    let mut in_buffer = vec![0.0f32; ADASHAPE_MAX_INPUT_DIM + ADASHAPE_MAX_FRAME_SIZE];
-    let mut out_buffer = vec![0.0f32; ADASHAPE_MAX_FRAME_SIZE];
-    let mut tmp_buffer = vec![0.0f32; ADASHAPE_MAX_FRAME_SIZE];
-
-    in_buffer[..feature_dim].copy_from_slice(&features);
-    let tenv = &mut in_buffer[feature_dim..];
-    tenv[..tenv_size + 1].fill(0.0);
-    let mut mean = 0.0f32;
-    for i in 0..tenv_size {
-        for k in 0..avg_pool_k {
-            tenv[i] += x_in[i * avg_pool_k + k].abs();
-        }
-        tenv[i] = ((tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64).ln() as f32;
-        mean += tenv[i];
-    }
-    mean /= tenv_size as f32;
-    for i in 0..tenv_size {
-        tenv[i] -= mean;
-    }
-    tenv[tenv_size] = mean;
-
-    let mut state = AdaShapeState::default();
-    compute_generic_conv1d(
-        &nolace.layers.tdshape1_alpha1_f,
-        &mut out_buffer,
-        &mut state.conv_alpha1f_state,
-        &in_buffer,
-        feature_dim,
-        ACTIVATION_LINEAR,
-    );
-    compute_generic_conv1d(
-        &nolace.layers.tdshape1_alpha1_t,
-        &mut tmp_buffer,
-        &mut state.conv_alpha1t_state,
-        &in_buffer[feature_dim..],
-        tenv_size + 1,
-        ACTIVATION_LINEAR,
-    );
-
-    // Check alpha1f output
-    eprintln!("=== alpha1f out_buffer[0..8] ===");
-    for i in 0..8 {
-        eprintln!(
-            "  [{}] rust={:e} (0x{:08x})",
-            i,
-            out_buffer[i],
-            out_buffer[i].to_bits()
-        );
-    }
-
-    // Check alpha1t output
-    eprintln!("=== alpha1t tmp_buffer[0..8] ===");
-    for i in 0..8 {
-        eprintln!(
-            "  [{}] rust={:e} (0x{:08x})",
-            i,
-            tmp_buffer[i],
-            tmp_buffer[i].to_bits()
-        );
-    }
-
-    // Leaky ReLU
-    for i in 0..frame_size {
-        let tmp = out_buffer[i] + tmp_buffer[i];
-        in_buffer[i] = if tmp >= 0.0 { tmp } else { 0.2 * tmp };
-    }
-
-    eprintln!("=== leaky_relu in_buffer[0..8] ===");
-    for i in 0..8 {
-        eprintln!(
-            "  [{}] rust={:e} (0x{:08x})",
-            i,
-            in_buffer[i],
-            in_buffer[i].to_bits()
-        );
-    }
-
-    compute_generic_conv1d(
-        &nolace.layers.tdshape1_alpha2,
-        &mut out_buffer,
-        &mut state.conv_alpha2_state,
-        &in_buffer,
-        frame_size,
-        ACTIVATION_LINEAR,
-    );
-
-    // Compare out_buffer (pre-exp)
-    eprintln!("=== out_buffer (pre-exp) ===");
-    for i in 0..frame_size.min(24) {
-        eprintln!(
-            "  [{}] rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-            i,
-            out_buffer[i],
-            out_buffer[i].to_bits(),
-            c_out_buffer[i],
-            c_out_buffer[i].to_bits(),
-            (out_buffer[i] - c_out_buffer[i]).abs()
-        );
-    }
-
-    // Compare final x_out
-    let mut x_out = vec![0.0f32; frame_size];
-    for i in 0..frame_size {
-        x_out[i] = ((out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
-    }
-
-    eprintln!("=== x_out (final) ===");
-    for i in 0..frame_size.min(24) {
-        eprintln!(
-            "  [{}] rust={:e} (0x{:08x}) c={:e} (0x{:08x}) diff={:e}",
-            i,
-            x_out[i],
-            x_out[i].to_bits(),
-            c_x_out[i],
-            c_x_out[i].to_bits(),
-            (x_out[i] - c_x_out[i]).abs()
-        );
-    }
-}
-
-/// Diagnostic: check if compute_linear on gain layer diverges, or if tanh_approx does.
-#[test]
-fn test_diag_gain_linear_vs_tanh() {
-    use opurs::dnn::nnet::{compute_generic_dense, compute_linear, ACTIVATION_TANH};
+fn test_tanh_approx() {
+    use opurs::dnn::nnet::compute_linear;
     use opurs::dnn::simd::tanh_approx;
 
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
+    // Generate input from the gain layer's compute_linear output
     let nb_inputs = lace.layers.af1_gain.nb_inputs;
-    let nb_outputs = lace.layers.af1_gain.nb_outputs;
-
     let mut prng = Prng::new(SEED);
     let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
-
-    // compute_linear only
-    let mut linear_out = vec![0.0f32; nb_outputs];
+    let mut linear_out = vec![0.0f32; lace.layers.af1_gain.nb_outputs];
     compute_linear(&lace.layers.af1_gain, &mut linear_out, &input);
 
-    // tanh on top
-    let tanh_out: Vec<f32> = linear_out.iter().map(|&v| tanh_approx(v)).collect();
-
-    // compute_generic_dense (linear + tanh together)
-    let mut dense_out = vec![0.0f32; nb_outputs];
-    compute_generic_dense(
-        &lace.layers.af1_gain,
-        &mut dense_out,
-        &input,
-        ACTIVATION_TANH,
-    );
-
-    // C reference
-    let mut c_out = vec![0.0f32; 512];
-    unsafe { libopus_sys::osce_test_dense_tanh(c_out.as_mut_ptr(), SEED) };
-    c_out.truncate(nb_outputs);
-
-    eprintln!("gain layer: nb_inputs={nb_inputs} nb_outputs={nb_outputs}");
-    eprintln!("linear_out = {linear_out:?}");
-    eprintln!("tanh_out   = {tanh_out:?}");
-    eprintln!("dense_out  = {dense_out:?}");
-    eprintln!("c_out      = {c_out:?}");
-    eprintln!(
-        "tanh_out vs dense_out diff = {}",
-        (tanh_out[0] - dense_out[0]).abs()
-    );
-    eprintln!(
-        "tanh_out vs c_out diff     = {}",
-        (tanh_out[0] - c_out[0]).abs()
-    );
-
-    // Print layer properties
-    eprintln!(
-        "gain layer weights: int8={} float={} sparse_idx={}",
-        lace.layers.af1_gain.weights.len(),
-        lace.layers.af1_gain.float_weights.len(),
-        lace.layers.af1_gain.weights_idx.len(),
-    );
-    eprintln!(
-        "gain layer bias={} subias={} scale={} diag={}",
-        lace.layers.af1_gain.bias.len(),
-        lace.layers.af1_gain.subias.len(),
-        lace.layers.af1_gain.scale.len(),
-        lace.layers.af1_gain.diag.len(),
-    );
-    eprintln!(
-        "kernel layer weights: int8={} float={} sparse_idx={}",
-        lace.layers.af1_kernel.weights.len(),
-        lace.layers.af1_kernel.float_weights.len(),
-        lace.layers.af1_kernel.weights_idx.len(),
-    );
-
-    // Dump first few float weights and bias
-    eprintln!(
-        "gain float_weights[0..8] = {:?}",
-        &lace.layers.af1_gain.float_weights[..8]
-    );
-    eprintln!("gain bias = {:?}", &lace.layers.af1_gain.bias);
-    eprintln!("input[0..8] = {:?}", &input[..8]);
-
-    // C compute_linear on gain layer (no activation)
-    let mut c_linear = vec![0.0f32; 8];
-    unsafe { libopus_sys::osce_test_compute_linear_gain(c_linear.as_mut_ptr(), SEED) };
-    eprintln!(
-        "c_linear[0]    = {:e} (0x{:08x})",
-        c_linear[0],
-        c_linear[0].to_bits()
-    );
-    eprintln!(
-        "rust_linear[0] = {:e} (0x{:08x})",
-        linear_out[0],
-        linear_out[0].to_bits()
-    );
-    eprintln!(
-        "c_tanh[0]      = {:e} (0x{:08x})",
-        c_out[0],
-        c_out[0].to_bits()
-    );
-    eprintln!(
-        "rust_tanh[0]   = {:e} (0x{:08x})",
-        tanh_out[0],
-        tanh_out[0].to_bits()
-    );
-
-    // Direct tanh_approx comparison
-    let test_val: f32 = -0.07047112;
-    let mut c_tanh_direct = [0.0f32; 2];
-    unsafe { libopus_sys::osce_test_tanh_approx(c_tanh_direct.as_mut_ptr(), test_val) };
-    let rust_tanh_direct = tanh_approx(test_val);
-    eprintln!(
-        "direct tanh_approx({:e} / 0x{:08x}):",
-        test_val,
-        test_val.to_bits()
-    );
-    eprintln!(
-        "  C:    {:e} (0x{:08x})",
-        c_tanh_direct[0],
-        c_tanh_direct[0].to_bits()
-    );
-    eprintln!(
-        "  Rust: {:e} (0x{:08x})",
-        rust_tanh_direct,
-        rust_tanh_direct.to_bits()
-    );
-    eprintln!(
-        "  C echoed input: {:e} (0x{:08x})",
-        c_tanh_direct[1],
-        c_tanh_direct[1].to_bits()
-    );
-
-    // Also test with the exact bit pattern from compute_linear
+    // Compare Rust tanh_approx against C tanh_approx for the computed value
     let exact_val = linear_out[0];
-    unsafe { libopus_sys::osce_test_tanh_approx(c_tanh_direct.as_mut_ptr(), exact_val) };
-    let rust_tanh_exact = tanh_approx(exact_val);
-    eprintln!(
-        "exact tanh_approx({:e} / 0x{:08x}):",
-        exact_val,
-        exact_val.to_bits()
-    );
-    eprintln!(
-        "  C:    {:e} (0x{:08x})",
-        c_tanh_direct[0],
-        c_tanh_direct[0].to_bits()
-    );
-    eprintln!(
-        "  Rust: {:e} (0x{:08x})",
-        rust_tanh_exact,
-        rust_tanh_exact.to_bits()
-    );
+    let mut c_tanh = [0.0f32; 2];
+    unsafe { libopus_sys::osce_test_tanh_approx(c_tanh.as_mut_ptr(), exact_val) };
+    let rust_tanh = tanh_approx(exact_val);
 
-    // Verify tanh_approx matches C tanh_approx.
-    // Both C and Rust now use matching SIMD paths on all platforms:
-    // aarch64 NEON and x86 AVX2 scalar functions broadcast-and-extract
-    // to match C's behavior. Results should be bit-exact everywhere.
     assert_eq!(
-        rust_tanh_exact.to_bits(),
-        c_tanh_direct[0].to_bits(),
-        "tanh_approx should be bit-exact with C: rust={rust_tanh_exact} c={}",
-        c_tanh_direct[0]
+        rust_tanh.to_bits(),
+        c_tanh[0].to_bits(),
+        "tanh_approx mismatch: rust={rust_tanh} (0x{:08x}) c={} (0x{:08x})",
+        rust_tanh.to_bits(),
+        c_tanh[0],
+        c_tanh[0].to_bits(),
     );
-
-    // Note: tanh_out (from tanh_approx/Padé) may differ from dense_out
-    // (from vec_tanh scalar tail using lpcnet_exp) for n=1 on NEON.
-    // The formulas are intentionally different in C's vec_neon.h.
-    // What matters is that dense_out matches C dense_tanh, verified by
-    // test_dense_tanh_lace_af1_gain.
 }
 
 /// Test compute_linear on LACE fnet_conv2 layer (int8 weights, exercises cgemv8x4).
@@ -919,8 +628,7 @@ fn test_dense_tanh_lace_tconv() {
     compare_outputs("dense_tanh_lace_tconv", &rust_out, &c_out);
 }
 
-/// Diagnostic: compare adacomb intermediates step-by-step between Rust and C.
-/// Now includes xcorr output, window, x_in, and overlap-add result separately.
+/// Step-by-step bit-exact comparison of adacomb intermediates between Rust and C.
 #[test]
 fn test_adacomb_intermediates() {
     use opurs::celt::pitch::celt_pitch_xcorr;
@@ -1162,55 +870,22 @@ fn test_adacomb_intermediates() {
     );
 }
 
-/// Test adacomb with 1 frame only — isolates whether divergence is in frame 0.
-#[test]
-fn test_adacomb_lace_cf1_1frame() {
-    let arrays = compiled_weights();
-    let lace = init_lace(&arrays).expect("LACE init failed");
-    let c_out = c_adacomb(0, 1, SEED, LACE_FRAME_SIZE);
-    let rust_out = rust_adacomb(&lace, 1, SEED);
-    compare_outputs("lace_cf1_1frame", &rust_out, &c_out);
-}
-
-/// Diagnostic: compare Rust vs C libm values for cos/exp/ln.
-///
-/// Compares three `cos()` sources:
-/// 1. Rust `f64::cos()` (LLVM intrinsic → libm or builtin)
-/// 2. C `osce_test_libm_values()` (all-double formula in harness)
-/// 3. C `compute_overlap_window()` (upstream nndsp.c formula via osce_test_adacomb_intermediates)
+/// Verify Rust cos/exp/ln match C libm for values used in OSCE.
 #[test]
 fn test_libm_comparison() {
     let c_vals = c_libm_values();
 
-    // Compute Rust values
-    let mut diffs = Vec::new();
-
-    // cos values for overlap window — Rust vs C harness
+    // cos values for overlap window angles
     for (i, &c_val) in c_vals[..40].iter().enumerate() {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / 40.0;
         let rust_val = (0.5 + 0.5 * angle.cos()) as f32;
-        if rust_val.to_bits() != c_val.to_bits() {
-            diffs.push(format!(
-                "  cos window[{}]: rust=0x{:08x} c_harness=0x{:08x}",
-                i,
-                rust_val.to_bits(),
-                c_val.to_bits()
-            ));
-        }
-    }
-
-    // Also compare Rust compute_overlap_window output
-    let mut rust_window = vec![0.0f32; 40];
-    compute_overlap_window(&mut rust_window, 40);
-    for (i, &c_val) in c_vals[..40].iter().enumerate() {
-        if rust_window[i].to_bits() != c_val.to_bits() {
-            diffs.push(format!(
-                "  compute_overlap_window[{}]: rust=0x{:08x} c_harness=0x{:08x}",
-                i,
-                rust_window[i].to_bits(),
-                c_val.to_bits()
-            ));
-        }
+        assert_eq!(
+            rust_val.to_bits(),
+            c_val.to_bits(),
+            "cos window[{i}]: rust=0x{:08x} c=0x{:08x}",
+            rust_val.to_bits(),
+            c_val.to_bits(),
+        );
     }
 
     // exp values
@@ -1218,14 +893,13 @@ fn test_libm_comparison() {
     for (j, &v) in test_exp.iter().enumerate() {
         let rust_val = v.exp() as f32;
         let c_val = c_vals[40 + j];
-        if rust_val.to_bits() != c_val.to_bits() {
-            diffs.push(format!(
-                "  exp({}): rust=0x{:08x} c=0x{:08x}",
-                v,
-                rust_val.to_bits(),
-                c_val.to_bits()
-            ));
-        }
+        assert_eq!(
+            rust_val.to_bits(),
+            c_val.to_bits(),
+            "exp({v}): rust=0x{:08x} c=0x{:08x}",
+            rust_val.to_bits(),
+            c_val.to_bits(),
+        );
     }
 
     // ln values
@@ -1233,21 +907,12 @@ fn test_libm_comparison() {
     for (j, &v) in test_ln.iter().enumerate() {
         let rust_val = v.ln() as f32;
         let c_val = c_vals[48 + j];
-        if rust_val.to_bits() != c_val.to_bits() {
-            diffs.push(format!(
-                "  ln({}): rust=0x{:08x} c=0x{:08x}",
-                v,
-                rust_val.to_bits(),
-                c_val.to_bits()
-            ));
-        }
-    }
-
-    if !diffs.is_empty() {
-        panic!(
-            "libm Rust vs C differences ({}):\n{}",
-            diffs.len(),
-            diffs.join("\n"),
+        assert_eq!(
+            rust_val.to_bits(),
+            c_val.to_bits(),
+            "ln({v}): rust=0x{:08x} c=0x{:08x}",
+            rust_val.to_bits(),
+            c_val.to_bits(),
         );
     }
 }
