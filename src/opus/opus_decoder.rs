@@ -631,6 +631,8 @@ fn opus_decode_frame(
             0,
             #[cfg(feature = "deep-plc")]
             None,
+            #[cfg(feature = "qext")]
+            None,
         );
         redundant_rng = celt_dec.rng;
     }
@@ -653,6 +655,8 @@ fn opus_decode_frame(
             celt_accum,
             #[cfg(feature = "deep-plc")]
             Some(&mut st.lpcnet),
+            #[cfg(feature = "qext")]
+            None, // TODO: pass actual QEXT payload from extension parsing
         );
     } else {
         let silence: [u8; 2] = [0xff, 0xff];
@@ -673,6 +677,8 @@ fn opus_decode_frame(
                 None,
                 celt_accum,
                 #[cfg(feature = "deep-plc")]
+                None,
+                #[cfg(feature = "qext")]
                 None,
             );
         }
@@ -697,6 +703,8 @@ fn opus_decode_frame(
             None,
             0,
             #[cfg(feature = "deep-plc")]
+            None,
+            #[cfg(feature = "qext")]
             None,
         );
         redundant_rng = celt_dec.rng;

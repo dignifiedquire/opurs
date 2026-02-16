@@ -993,6 +993,7 @@ pub fn celt_decode_with_ec(
     dec: Option<&mut ec_dec>,
     accum: i32,
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
+    #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
 ) -> i32 {
     let CC: i32 = st.channels as i32;
     let C: i32 = st.stream_channels as i32;
@@ -1090,6 +1091,8 @@ pub fn celt_decode_with_ec(
             eBands,
             out_syn_off,
             chan_stride,
+            #[cfg(feature = "qext")]
+            qext_payload,
         );
     }
     let mut _dec = ec_dec_init(&mut data_copy[..data_slice.len()]);
@@ -1115,6 +1118,8 @@ pub fn celt_decode_with_ec(
         eBands,
         out_syn_off,
         chan_stride,
+        #[cfg(feature = "qext")]
+        qext_payload,
     )
 }
 
@@ -1142,6 +1147,7 @@ fn celt_decode_body(
     eBands: &[i16],
     out_syn_off: usize,
     chan_stride: usize,
+    #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
 ) -> i32 {
     let mut c: i32;
     let mut i: i32;
@@ -1279,6 +1285,93 @@ fn celt_decode_body(
         C,
         LM,
     );
+
+    // QEXT: Set up extension decoder and decode QEXT band energies
+    #[cfg(feature = "qext")]
+    let mut qext_bytes: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_end: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_intensity: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_dual_stereo: i32 = 0;
+    #[cfg(feature = "qext")]
+    let _qext_bandE = [0.0f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    let _qext_bandLogE = [0.0f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    let mut ext_dec_buf: Vec<u8>;
+    #[cfg(feature = "qext")]
+    let mut ext_dec: ec_dec;
+    #[cfg(feature = "qext")]
+    let qext_mode: Option<OpusCustomMode>;
+    #[cfg(feature = "qext")]
+    {
+        use crate::celt::modes::compute_qext_mode;
+        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+
+        if let Some(payload) = qext_payload {
+            ext_dec_buf = payload.to_vec();
+            ext_dec = ec_dec_init(&mut ext_dec_buf);
+            qext_bytes = payload.len() as i32;
+        } else {
+            ext_dec_buf = vec![0u8; 4];
+            ext_dec = crate::celt::entcode::ec_ctx {
+                buf: &mut ext_dec_buf,
+                storage: 0,
+                end_offs: 0,
+                end_window: 0,
+                nend_bits: 0,
+                nbits_total: 32,
+                offs: 0,
+                rng: 0x80000000,
+                val: 0,
+                ext: 0,
+                rem: 0,
+                error: 0,
+            };
+            qext_bytes = 0;
+        }
+
+        if qext_bytes > 0
+            && end == nbEBands
+            && (mode.Fs == 48000 || mode.Fs == 96000)
+            && (mode.shortMdctSize == 120 * st.qext_scale
+                || mode.shortMdctSize == 90 * st.qext_scale)
+        {
+            let qext_mode_struct = compute_qext_mode(mode);
+            qext_end = if ec_dec_bit_logp(&mut ext_dec, 1) != 0 {
+                NB_QEXT_BANDS as i32
+            } else {
+                2
+            };
+            if C == 2 {
+                qext_intensity = ec_dec_uint(&mut ext_dec, (qext_end + 1) as u32) as i32;
+                if qext_intensity != 0 {
+                    qext_dual_stereo = ec_dec_bit_logp(&mut ext_dec, 1);
+                }
+            }
+            let qext_intra_ener = if ec_tell(&ext_dec) + 3 <= qext_bytes * 8 {
+                ec_dec_bit_logp(&mut ext_dec, 3)
+            } else {
+                0
+            };
+            unquant_coarse_energy(
+                &qext_mode_struct,
+                0,
+                qext_end,
+                &mut st.qext_oldBandE[..(C * NB_QEXT_BANDS as i32) as usize],
+                qext_intra_ener,
+                &mut ext_dec,
+                C,
+                LM,
+            );
+            qext_mode = Some(qext_mode_struct);
+        } else {
+            qext_mode = None;
+        }
+    }
+
     let mut tf_res = [0i32; 21];
     tf_decode(start, end, isTransient, &mut tf_res, LM, dec);
     tell = ec_tell(dec);
@@ -1376,6 +1469,48 @@ fn celt_decode_body(
         dec,
         C,
     );
+
+    // QEXT: Compute extra allocation and decode QEXT fine energy
+    #[cfg(feature = "qext")]
+    let mut extra_pulses =
+        vec![0i32; nbEBands as usize + crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    let mut extra_quant =
+        vec![0i32; nbEBands as usize + crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    {
+        let qext_bits = ((qext_bytes * 8) << BITRES) - ec_tell_frac(&ext_dec) as i32 - 1;
+        crate::celt::rate::clt_compute_extra_allocation(
+            mode,
+            qext_mode.as_ref(),
+            start,
+            end,
+            qext_end,
+            None, // bandLogE (encoder only)
+            None, // qext_bandLogE (encoder only)
+            qext_bits,
+            &mut extra_pulses,
+            &mut extra_quant,
+            C,
+            LM,
+            &mut ext_dec,
+            0,   // encode=0
+            0.0, // tone_freq (encoder only)
+            0.0, // toneishness (encoder only)
+        );
+        if qext_bytes > 0 {
+            unquant_fine_energy(
+                mode,
+                start,
+                end,
+                &mut st.oldEBands[..(C * nbEBands) as usize],
+                &extra_quant[..nbEBands as usize],
+                &mut ext_dec,
+                C,
+            );
+        }
+    }
+
     c = 0;
     loop {
         let ch_off = c as usize * chan_stride;
@@ -1389,28 +1524,6 @@ fn celt_decode_body(
     }
     let mut collapse_masks = [0u8; 42];
     let mut X = [0.0f32; 1920];
-    // TODO(qext): Wire up proper ext_ec, extra_pulses, ext_total_bits, cap
-    #[cfg(feature = "qext")]
-    let mut _qext_dummy_buf = [0u8; 4];
-    #[cfg(feature = "qext")]
-    let mut _qext_dummy_ec = crate::celt::entcode::ec_ctx {
-        buf: &mut _qext_dummy_buf,
-        storage: 4,
-        end_offs: 0,
-        end_window: 0,
-        nend_bits: 0,
-        nbits_total: 32,
-        offs: 0,
-        rng: 0x80000000,
-        val: 0,
-        ext: 0,
-        rem: 0,
-        error: 0,
-    };
-    #[cfg(feature = "qext")]
-    let _qext_dummy_pulses: Vec<i32> = vec![0i32; end as usize];
-    #[cfg(feature = "qext")]
-    let _qext_dummy_cap: Vec<i32> = vec![0i32; end as usize];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(
@@ -1438,13 +1551,13 @@ fn celt_decode_body(
             st.arch,
             st.disable_inv,
             #[cfg(feature = "qext")]
-            &mut _qext_dummy_ec,
+            &mut ext_dec,
             #[cfg(feature = "qext")]
-            &_qext_dummy_pulses,
+            &extra_pulses,
             #[cfg(feature = "qext")]
-            0,
+            (qext_bytes * (8 << BITRES)),
             #[cfg(feature = "qext")]
-            &_qext_dummy_cap,
+            &cap,
         );
     } else {
         quant_all_bands(
@@ -1472,15 +1585,128 @@ fn celt_decode_body(
             st.arch,
             st.disable_inv,
             #[cfg(feature = "qext")]
-            &mut _qext_dummy_ec,
+            &mut ext_dec,
             #[cfg(feature = "qext")]
-            &_qext_dummy_pulses,
+            &extra_pulses,
             #[cfg(feature = "qext")]
-            0,
+            (qext_bytes * (8 << BITRES)),
             #[cfg(feature = "qext")]
-            &_qext_dummy_cap,
+            &cap,
         );
     }
+    // QEXT: Decode high-frequency band residuals
+    #[cfg(feature = "qext")]
+    {
+        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+
+        if let Some(ref qm) = qext_mode {
+            let mut qext_collapse_masks = [0u8; 2 * NB_QEXT_BANDS];
+            let mut dummy_buf = [0u8; 4];
+            let mut dummy_dec = crate::celt::entcode::ec_ctx {
+                buf: &mut dummy_buf,
+                storage: 0,
+                end_offs: 0,
+                end_window: 0,
+                nend_bits: 0,
+                nbits_total: 32,
+                offs: 0,
+                rng: 0x80000000,
+                val: 0,
+                ext: 0,
+                rem: 0,
+                error: 0,
+            };
+            let zeros = vec![0i32; nbEBands as usize];
+            let ext_balance = {
+                let mut bal = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_dec) as i32;
+                for j in 0..qext_end {
+                    bal -= extra_pulses[nbEBands as usize + j as usize]
+                        + C * (extra_quant[nbEBands as usize + 1] << BITRES);
+                }
+                bal
+            };
+            unquant_fine_energy(
+                qm,
+                0,
+                qext_end,
+                &mut st.qext_oldBandE[..(C * NB_QEXT_BANDS as i32) as usize],
+                &extra_quant[nbEBands as usize..],
+                &mut ext_dec,
+                C,
+            );
+            if C == 2 {
+                let (x_part, y_part) = X.split_at_mut(N as usize);
+                quant_all_bands(
+                    0,
+                    qm,
+                    0,
+                    qext_end,
+                    x_part,
+                    Some(y_part),
+                    &mut qext_collapse_masks,
+                    &[],
+                    &mut extra_pulses[nbEBands as usize..],
+                    shortBlocks,
+                    spread_decision,
+                    qext_dual_stereo,
+                    qext_intensity,
+                    &mut zeros.clone(),
+                    qext_bytes * (8 << BITRES),
+                    ext_balance,
+                    &mut ext_dec,
+                    LM,
+                    qext_end,
+                    &mut st.rng,
+                    0,
+                    st.arch,
+                    st.disable_inv,
+                    #[cfg(feature = "qext")]
+                    &mut dummy_dec,
+                    #[cfg(feature = "qext")]
+                    &zeros,
+                    #[cfg(feature = "qext")]
+                    0,
+                    #[cfg(feature = "qext")]
+                    &[],
+                );
+            } else {
+                quant_all_bands(
+                    0,
+                    qm,
+                    0,
+                    qext_end,
+                    &mut X,
+                    None,
+                    &mut qext_collapse_masks,
+                    &[],
+                    &mut extra_pulses[nbEBands as usize..],
+                    shortBlocks,
+                    spread_decision,
+                    qext_dual_stereo,
+                    qext_intensity,
+                    &mut zeros.clone(),
+                    qext_bytes * (8 << BITRES),
+                    ext_balance,
+                    &mut ext_dec,
+                    LM,
+                    qext_end,
+                    &mut st.rng,
+                    0,
+                    st.arch,
+                    st.disable_inv,
+                    #[cfg(feature = "qext")]
+                    &mut dummy_dec,
+                    #[cfg(feature = "qext")]
+                    &zeros,
+                    #[cfg(feature = "qext")]
+                    0,
+                    #[cfg(feature = "qext")]
+                    &[],
+                );
+            }
+        }
+    }
+
     if anti_collapse_rsv > 0 {
         anti_collapse_on = ec_dec_bits(dec, 1) as i32;
     }
@@ -1662,6 +1888,10 @@ fn celt_decode_body(
         }
     }
     st.rng = dec.rng;
+    #[cfg(feature = "qext")]
+    if qext_bytes > 0 {
+        st.rng ^= ext_dec.rng;
+    }
     {
         let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
             .map(|c| {
