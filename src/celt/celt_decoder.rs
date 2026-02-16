@@ -8,7 +8,7 @@ use crate::celt::bands::{
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc, celt_fir_c, celt_iir, LPC_ORDER};
 use crate::celt::common::{
     comb_filter, comb_filter_inplace, init_caps, resampling_factor, spread_icdf, tapset_icdf,
-    tf_select_table, trim_icdf,
+    tf_select_table, trim_icdf, COMBFILTER_MINPERIOD,
 };
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entdec::{
@@ -701,6 +701,54 @@ fn celt_decode_lost(
                 0,
                 st.arch,
             );
+        }
+        // Run the postfilter with the last parameters
+        {
+            let mut c = 0;
+            loop {
+                st.postfilter_period = st.postfilter_period.max(COMBFILTER_MINPERIOD);
+                st.postfilter_period_old = st.postfilter_period_old.max(COMBFILTER_MINPERIOD);
+                let ch_off = c as usize * chan_stride;
+                let out_syn_off = DECODE_BUFFER_SIZE - n;
+                let dm_slice = &mut st.decode_mem[ch_off..ch_off + chan_stride];
+                comb_filter_inplace(
+                    dm_slice,
+                    out_syn_off,
+                    st.postfilter_period_old,
+                    st.postfilter_period,
+                    mode.shortMdctSize,
+                    st.postfilter_gain_old,
+                    st.postfilter_gain,
+                    st.postfilter_tapset_old,
+                    st.postfilter_tapset,
+                    &mode.window[..overlap as usize],
+                    overlap,
+                    st.arch,
+                );
+                if LM != 0 {
+                    comb_filter_inplace(
+                        dm_slice,
+                        out_syn_off + mode.shortMdctSize as usize,
+                        st.postfilter_period,
+                        st.postfilter_period,
+                        N - mode.shortMdctSize,
+                        st.postfilter_gain,
+                        st.postfilter_gain,
+                        st.postfilter_tapset,
+                        st.postfilter_tapset,
+                        &mode.window[..overlap as usize],
+                        overlap,
+                        st.arch,
+                    );
+                }
+                c += 1;
+                if c >= C {
+                    break;
+                }
+            }
+            st.postfilter_period_old = st.postfilter_period;
+            st.postfilter_gain_old = st.postfilter_gain;
+            st.postfilter_tapset_old = st.postfilter_tapset;
         }
         st.prefilter_and_fold = 0;
         // Skip regular PLC until we get two consecutive packets.

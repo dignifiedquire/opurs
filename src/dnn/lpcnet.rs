@@ -22,7 +22,7 @@ pub const NB_TOTAL_FEATURES: usize = 36;
 const PITCH_FRAME_SIZE: usize = 320;
 const PITCH_BUF_SIZE: usize = PITCH_MAX_PERIOD + PITCH_FRAME_SIZE;
 
-pub const PLC_MAX_FEC: usize = 100;
+pub const PLC_MAX_FEC: usize = 102;
 const CONT_VECTORS: usize = 5;
 const FEATURES_DELAY: usize = 1;
 

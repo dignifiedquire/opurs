@@ -75,6 +75,13 @@ impl<'a> DownmixInput<'a> {
                         c += 1;
                     }
                 }
+                // Saturate and replace NaN to prevent downstream issues
+                for sample in y.iter_mut().take(subframe as usize) {
+                    *sample = sample.clamp(-65536.0, 65536.0);
+                    if sample.is_nan() {
+                        *sample = 0.0;
+                    }
+                }
             }
             DownmixInput::Int(x) => {
                 let mut j = 0;

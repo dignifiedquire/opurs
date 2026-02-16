@@ -1960,8 +1960,8 @@ pub fn celt_encode_with_ec<'b>(
     };
     nbAvailableBytes = nbCompressedBytes - nbFilledBytes;
     if st.vbr != 0 && st.bitrate != OPUS_BITRATE_MAX {
-        let den: i32 = mode.Fs >> BITRES;
-        vbr_rate = (st.bitrate * frame_size + (den >> 1)) / den;
+        let den: i32 = mode.Fs >> (BITRES + 2);
+        vbr_rate = (((st.bitrate * frame_size) >> 2) + (den >> 1)) / den;
         effectiveBytes = vbr_rate >> (3 + BITRES);
     } else {
         let mut tmp: i32 = 0;

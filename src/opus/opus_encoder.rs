@@ -891,7 +891,7 @@ fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes
     if st.user_bitrate_bps == OPUS_AUTO {
         60 * st.Fs / frame_size + st.Fs * st.channels
     } else if st.user_bitrate_bps == OPUS_BITRATE_MAX {
-        max_data_bytes * 8 * st.Fs / frame_size
+        1_500_000i32.min(max_data_bytes * 8 * (st.Fs / 1000) / frame_size * 1000)
     } else {
         st.user_bitrate_bps
     }
@@ -992,9 +992,9 @@ pub fn compute_stereo_width(
         xx = yy;
         xy = xx;
     }
-    mem.XX += short_alpha * (xx - mem.XX);
-    mem.XY += short_alpha * (xy - mem.XY);
-    mem.YY += short_alpha * (yy - mem.YY);
+    mem.XX = (1.0 - short_alpha) * mem.XX + short_alpha * xx;
+    mem.XY = (1.0 - short_alpha) * mem.XY + short_alpha * xy;
+    mem.YY = (1.0 - short_alpha) * mem.YY + short_alpha * yy;
     mem.XX = if 0 as f32 > mem.XX { 0 as f32 } else { mem.XX };
     mem.XY = if 0 as f32 > mem.XY { 0 as f32 } else { mem.XY };
     mem.YY = if 0 as f32 > mem.YY { 0 as f32 } else { mem.YY };
@@ -1013,7 +1013,7 @@ pub fn compute_stereo_width(
         };
         corr = mem.XY / (1e-15f32 + sqrt_xx * sqrt_yy);
         ldiff = 1.0f32 * (qrrt_xx - qrrt_yy).abs() / (EPSILON + qrrt_xx + qrrt_yy);
-        width = celt_sqrt(1.0f32 - corr * corr) * ldiff;
+        width = celt_sqrt(1.0f32 - corr * corr).min(Q15ONE) * ldiff;
         mem.smoothed_width += (width - mem.smoothed_width) / frame_rate as f32;
         mem.max_follower = if mem.max_follower - 0.02f32 / frame_rate as f32 > mem.smoothed_width {
             mem.max_follower - 0.02f32 / frame_rate as f32
@@ -2108,11 +2108,11 @@ pub fn opus_encode_native(
             redundancy = 0;
         }
     }
-    bytes_target = (if max_data_bytes - redundancy_bytes < st.bitrate_bps * frame_size / (st.Fs * 8)
+    bytes_target = (if max_data_bytes - redundancy_bytes < (st.bitrate_bps / 8) * frame_size / st.Fs
     {
         max_data_bytes - redundancy_bytes
     } else {
-        st.bitrate_bps * frame_size / (st.Fs * 8)
+        (st.bitrate_bps / 8) * frame_size / st.Fs
     }) - 1;
     enc = ec_enc_init(&mut data[1..max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
