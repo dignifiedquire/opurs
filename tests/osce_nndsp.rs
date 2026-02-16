@@ -1173,7 +1173,11 @@ fn test_adacomb_lace_cf1_1frame() {
 }
 
 /// Diagnostic: compare Rust vs C libm values for cos/exp/ln.
-/// This test always fails with output showing the exact differences.
+///
+/// Compares three `cos()` sources:
+/// 1. Rust `f64::cos()` (LLVM intrinsic → libm or builtin)
+/// 2. C `osce_test_libm_values()` (all-double formula in harness)
+/// 3. C `compute_overlap_window()` (upstream nndsp.c formula via osce_test_adacomb_intermediates)
 #[test]
 fn test_libm_comparison() {
     let c_vals = c_libm_values();
@@ -1181,15 +1185,29 @@ fn test_libm_comparison() {
     // Compute Rust values
     let mut diffs = Vec::new();
 
-    // cos values for overlap window
+    // cos values for overlap window — Rust vs C harness
     for (i, &c_val) in c_vals[..40].iter().enumerate() {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / 40.0;
         let rust_val = (0.5 + 0.5 * angle.cos()) as f32;
         if rust_val.to_bits() != c_val.to_bits() {
             diffs.push(format!(
-                "  cos window[{}]: rust=0x{:08x} c=0x{:08x}",
+                "  cos window[{}]: rust=0x{:08x} c_harness=0x{:08x}",
                 i,
                 rust_val.to_bits(),
+                c_val.to_bits()
+            ));
+        }
+    }
+
+    // Also compare Rust compute_overlap_window output
+    let mut rust_window = vec![0.0f32; 40];
+    compute_overlap_window(&mut rust_window, 40);
+    for (i, &c_val) in c_vals[..40].iter().enumerate() {
+        if rust_window[i].to_bits() != c_val.to_bits() {
+            diffs.push(format!(
+                "  compute_overlap_window[{}]: rust=0x{:08x} c_harness=0x{:08x}",
+                i,
+                rust_window[i].to_bits(),
                 c_val.to_bits()
             ));
         }
@@ -1225,28 +1243,11 @@ fn test_libm_comparison() {
         }
     }
 
-    // Also test with black_box
-    let mut bb_diffs = Vec::new();
-    for (i, &c_val) in c_vals[..40].iter().enumerate() {
-        let angle = std::f64::consts::PI * (i as f64 + 0.5) / 40.0;
-        let rust_val = (0.5 + 0.5 * std::hint::black_box(angle).cos()) as f32;
-        if rust_val.to_bits() != c_val.to_bits() {
-            bb_diffs.push(format!(
-                "  cos_bb window[{}]: rust=0x{:08x} c=0x{:08x}",
-                i,
-                rust_val.to_bits(),
-                c_val.to_bits()
-            ));
-        }
-    }
-
-    if !diffs.is_empty() || !bb_diffs.is_empty() {
+    if !diffs.is_empty() {
         panic!(
-            "libm Rust vs C differences ({} cos/exp/ln, {} cos_bb):\n{}\n{}",
+            "libm Rust vs C differences ({}):\n{}",
             diffs.len(),
-            bb_diffs.len(),
             diffs.join("\n"),
-            bb_diffs.join("\n")
         );
     }
 }

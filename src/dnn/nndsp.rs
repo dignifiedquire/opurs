@@ -80,41 +80,25 @@ impl Default for AdaShapeState {
     }
 }
 
-/// Precomputed raised-cosine overlap window for size 40.
-///
-/// Values are: `window[i] = (0.5 + 0.5 * cos(PI * (i + 0.5) / 40)) as f32`
-///
-/// Stored as `f32::from_bits` hex literals for bit-exact reproducibility across
-/// platforms (different libm implementations of `cos()` can differ by 1 ULP).
-/// These values match the reference C implementation's output.
-#[rustfmt::skip]
-const OVERLAP_WINDOW_40: [f32; 40] = [
-    f32::from_bits(0x3f7fe6bd), f32::from_bits(0x3f7f1cde), f32::from_bits(0x3f7d8a5f), f32::from_bits(0x3f7b31bc),
-    f32::from_bits(0x3f7816a7), f32::from_bits(0x3f743e09), f32::from_bits(0x3f6fadf3), f32::from_bits(0x3f6a6d99),
-    f32::from_bits(0x3f648544), f32::from_bits(0x3f5dfe48), f32::from_bits(0x3f56e2f1), f32::from_bits(0x3f4f3e78),
-    f32::from_bits(0x3f471ced), f32::from_bits(0x3f3e8b24), f32::from_bits(0x3f3596a4), f32::from_bits(0x3f2c4d90),
-    f32::from_bits(0x3f22be90), f32::from_bits(0x3f18f8b8), f32::from_bits(0x3f0f0b77), f32::from_bits(0x3f050677),
-    f32::from_bits(0x3ef5f312), f32::from_bits(0x3ee1e912), f32::from_bits(0x3ece0e90), f32::from_bits(0x3eba82e1),
-    f32::from_bits(0x3ea764df), f32::from_bits(0x3e94d2b7), f32::from_bits(0x3e82e9b8), f32::from_bits(0x3e638c4c),
-    f32::from_bits(0x3e43061e), f32::from_bits(0x3e24743b), f32::from_bits(0x3e0806e1), f32::from_bits(0x3ddbd5e1),
-    f32::from_bits(0x3dac933b), f32::from_bits(0x3d829068), f32::from_bits(0x3d3c1f6f), f32::from_bits(0x3cfd2b15),
-    f32::from_bits(0x3c99c88a), f32::from_bits(0x3c1d6830), f32::from_bits(0x3b6321ff), f32::from_bits(0x39ca1a81),
-];
+// Use C's cos() to guarantee bit-exact match with upstream C on every platform.
+// Rust's f64::cos() may use LLVM builtins that differ from the platform's libm cos()
+// by 1 ULP, causing OSCE overlap window divergence on Linux x86_64.
+extern "C" {
+    fn cos(x: f64) -> f64;
+}
 
 /// Compute overlap window (raised cosine).
 ///
 /// Upstream C: dnn/nndsp.c:compute_overlap_window
 ///
-/// Uses a precomputed lookup table for `overlap_size=40` (the only size used in
-/// LACE/NoLACE) to avoid cross-platform differences in libm `cos()` implementations.
+/// Calls C's `cos()` via FFI to guarantee bit-exact match with the upstream C
+/// implementation on every platform. Rust's `f64::cos()` uses LLVM intrinsics
+/// that may produce 1 ULP different results from the platform's libm `cos()`.
 pub fn compute_overlap_window(window: &mut [f32], overlap_size: usize) {
-    if overlap_size == 40 {
-        window[..40].copy_from_slice(&OVERLAP_WINDOW_40);
-    } else {
-        for i in 0..overlap_size {
-            let angle = std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64;
-            window[i] = (0.5 + 0.5 * angle.cos()) as f32;
-        }
+    for i in 0..overlap_size {
+        let angle = std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64;
+        // Safety: cos() is a standard C library function, always available.
+        window[i] = (0.5 + 0.5 * unsafe { cos(angle) }) as f32;
     }
 }
 
