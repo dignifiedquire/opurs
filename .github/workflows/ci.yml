@@ -188,7 +188,7 @@ jobs:
           key: test-dnn-${{ matrix.name }}-${{ matrix.features }}
       - uses: taiki-e/install-action@nextest
       - name: Run tests
-        run: cargo nextest run -p opurs --features "${{ matrix.features }}"
+        run: cargo nextest run -p opurs --cargo-profile=release --features "${{ matrix.features }}"
 
   test-dnn-weights:
     name: Test DNN weights
