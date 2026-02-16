@@ -122,6 +122,8 @@ pub struct OpusEncoder {
     /// Size: DRED_MAX_FRAMES * 4 = 416 bytes.
     #[cfg(feature = "dred")]
     pub(crate) activity_mem: [u8; DRED_MAX_FRAMES * 4],
+    #[cfg(feature = "qext")]
+    pub(crate) enable_qext: i32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -148,7 +150,13 @@ static fec_thresholds: [i32; 10] = [
 
 impl OpusEncoder {
     pub fn new(Fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
-        if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
+        let valid_fs = Fs == 48000
+            || Fs == 24000
+            || Fs == 16000
+            || Fs == 12000
+            || Fs == 8000
+            || cfg!(feature = "qext") && Fs == 96000;
+        if !valid_fs
             || channels != 1 && channels != 2
             || application != OPUS_APPLICATION_VOIP
                 && application != OPUS_APPLICATION_AUDIO
@@ -258,6 +266,8 @@ impl OpusEncoder {
             dred_target_chunks: 0,
             #[cfg(feature = "dred")]
             activity_mem: [0u8; DRED_MAX_FRAMES * 4],
+            #[cfg(feature = "qext")]
+            enable_qext: 0,
         })
     }
 
@@ -1237,11 +1247,17 @@ fn encode_multiframe_packet(
     // Worst cases:
     // 2 frames: Code 2 with different compressed sizes
     // >2 frames: Code 3 VBR
-    let max_header_bytes = if nb_frames == 2 {
+    #[allow(unused_mut)]
+    let mut max_header_bytes = if nb_frames == 2 {
         3
     } else {
         2 + (nb_frames - 1) * 2
     };
+    // Cover the use of separators for extension signaling during repacketization.
+    #[cfg(feature = "qext")]
+    if st.enable_qext != 0 {
+        max_header_bytes += (nb_frames - 1) + 1;
+    }
     let repacketize_len = if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
         out_data_bytes
     } else {
@@ -1252,11 +1268,22 @@ fn encode_multiframe_packet(
             out_data_bytes
         }
     };
-    let bytes_per_frame = if 1276 < 1 + (repacketize_len - max_header_bytes) / nb_frames {
-        1276
+    #[cfg(feature = "qext")]
+    let frame_size_cap = if st.enable_qext != 0 {
+        crate::celt::modes::data_96000::QEXT_PACKET_SIZE_CAP
     } else {
-        1 + (repacketize_len - max_header_bytes) / nb_frames
+        1276
     };
+    #[cfg(not(feature = "qext"))]
+    let frame_size_cap = 1276;
+    #[allow(unused_mut)]
+    let mut bytes_per_frame =
+        frame_size_cap.min(1 + (repacketize_len - max_header_bytes) / nb_frames);
+    // Leave room for signaling the extension size once we repacketize.
+    #[cfg(feature = "qext")]
+    if st.enable_qext != 0 {
+        bytes_per_frame -= bytes_per_frame / 254;
+    }
     let vla = (nb_frames * bytes_per_frame) as usize;
     let mut tmp_data: Vec<u8> = vec![0u8; vla];
     let mut rp = OpusRepacketizer::default();
@@ -1591,11 +1618,19 @@ pub fn opus_encode_native(
     let mut analysis_read_pos_bak: i32 = -1;
     let mut analysis_read_subframe_bak: i32 = -1;
     let mut is_silence: i32 = 0;
-    max_data_bytes = if (1276) < out_data_bytes {
-        1276
+    #[cfg(feature = "qext")]
+    let packet_size_cap = if st.enable_qext != 0 {
+        crate::celt::modes::data_96000::QEXT_PACKET_SIZE_CAP
     } else {
-        out_data_bytes
+        1276
     };
+    #[cfg(not(feature = "qext"))]
+    let packet_size_cap = 1276;
+    // orig_max_data_bytes: the actual buffer limit (uncapped by standard 1276).
+    // In the C reference, opus_encode_native passes this to opus_encode_frame_native
+    // as orig_max_data_bytes.
+    let orig_max_data_bytes = (packet_size_cap * 6).min(out_data_bytes);
+    max_data_bytes = orig_max_data_bytes.min(1276);
     st.rangeFinal = 0;
     if frame_size <= 0 || max_data_bytes <= 0 {
         return OPUS_BAD_ARG;
@@ -2134,7 +2169,7 @@ pub fn opus_encode_native(
         frame_size,
     )) - 8)
         / 8;
-    enc = ec_enc_init(&mut data[1..max_data_bytes as usize]);
+    enc = ec_enc_init(&mut data[1..orig_max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
     {
@@ -2156,6 +2191,10 @@ pub fn opus_encode_native(
     {
         let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
         let out_off = (total_buffer * st.channels) as usize;
+        #[cfg(feature = "qext")]
+        let skip_hp = st.enable_qext != 0;
+        #[cfg(not(feature = "qext"))]
+        let skip_hp = false;
         if st.application == OPUS_APPLICATION_VOIP {
             hp_cutoff(
                 pcm_slice,
@@ -2167,6 +2206,10 @@ pub fn opus_encode_native(
                 st.Fs,
                 st.arch,
             );
+        } else if skip_hp {
+            // At 96 kHz with QEXT, skip DC rejection and copy directly.
+            let len = (frame_size * st.channels) as usize;
+            pcm_buf[out_off..out_off + len].copy_from_slice(&pcm_slice[..len]);
         } else {
             dc_reject(
                 pcm_slice,
@@ -2314,6 +2357,12 @@ pub fn opus_encode_native(
             st.silk_mode.minInternalSampleRate = 8000;
         }
         st.silk_mode.maxInternalSampleRate = 16000;
+        // At 96 kHz, force SILK to 16 kHz since we don't have 8/12 kHz resamplers for 96 kHz.
+        #[cfg(feature = "qext")]
+        if st.Fs == 96000 {
+            st.silk_mode.maxInternalSampleRate = 16000;
+            st.silk_mode.desiredInternalSampleRate = 16000;
+        }
         if st.mode == MODE_SILK_ONLY {
             let mut effective_max_rate: i32 = max_rate;
             if frame_rate > 50 {
@@ -2630,6 +2679,11 @@ pub fn opus_encode_native(
         nb_compr_bytes = ret;
     } else {
         nb_compr_bytes = max_data_bytes - 1 - redundancy_bytes;
+        #[cfg(feature = "qext")]
+        if st.mode == MODE_CELT_ONLY && st.enable_qext != 0 {
+            debug_assert!(redundancy_bytes == 0);
+            nb_compr_bytes = orig_max_data_bytes - 1;
+        }
         #[cfg(feature = "dred")]
         if st.dred_duration > 0 {
             let dred_bytes = dred_bitrate_bps / (frame_rate * 8);
@@ -2720,6 +2774,10 @@ pub fn opus_encode_native(
                 }
                 st.celt_enc.bitrate = celt_bitrate;
             }
+            #[cfg(feature = "qext")]
+            if st.mode == MODE_CELT_ONLY {
+                st.celt_enc.enable_qext = st.enable_qext;
+            }
             ret = celt_encode_with_ec(
                 &mut st.celt_enc,
                 &pcm_buf,
@@ -2728,10 +2786,14 @@ pub fn opus_encode_native(
                 nb_compr_bytes,
                 Some(&mut enc),
                 #[cfg(feature = "qext")]
-                None, // TODO: pass actual ext_enc from Opus-layer QEXT framing
+                None, // TODO: pass actual QEXT payload buffer once packet framing is complete
                 #[cfg(feature = "qext")]
                 0,
             );
+            #[cfg(feature = "qext")]
+            {
+                st.celt_enc.enable_qext = 0;
+            }
             if ret < 0 {
                 return OPUS_INTERNAL_ERROR;
             }
@@ -2871,7 +2933,7 @@ pub fn opus_encode_native(
             }
             // Remaining space for DRED, accounting for 3 extra bytes for code 3,
             // padding length, and extension number.
-            let mut dred_bytes_left = (DRED_MAX_DATA_SIZE as i32).min(max_data_bytes - ret - 3);
+            let mut dred_bytes_left = (DRED_MAX_DATA_SIZE as i32).min(orig_max_data_bytes - ret - 3);
             // Account for the extra bytes required to signal large padding length.
             dred_bytes_left -= (dred_bytes_left + 1 + DRED_EXPERIMENTAL_BYTES as i32) / 255;
             // Check whether we actually have something to encode.
@@ -2902,7 +2964,7 @@ pub fn opus_encode_native(
                     ret = opus_packet_pad_impl(
                         data,
                         ret,
-                        max_data_bytes,
+                        orig_max_data_bytes,
                         st.use_vbr == 0,
                         &[extension],
                     );
@@ -2915,10 +2977,12 @@ pub fn opus_encode_native(
         }
     }
     if apply_padding {
-        if opus_packet_pad(&mut data[..max_data_bytes as usize], ret, max_data_bytes) != OPUS_OK {
+        if opus_packet_pad(&mut data[..orig_max_data_bytes as usize], ret, orig_max_data_bytes)
+            != OPUS_OK
+        {
             return OPUS_INTERNAL_ERROR;
         }
-        ret = max_data_bytes;
+        ret = orig_max_data_bytes;
     }
     ret
 }

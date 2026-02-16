@@ -61,9 +61,13 @@ impl OpusDecoder {
         self.channels
     }
     pub fn new(Fs: i32, channels: usize) -> Result<OpusDecoder, i32> {
-        if Fs != 48000 && Fs != 24000 && Fs != 16000 && Fs != 12000 && Fs != 8000
-            || channels != 1 && channels != 2
-        {
+        let valid_fs = Fs == 48000
+            || Fs == 24000
+            || Fs == 16000
+            || Fs == 12000
+            || Fs == 8000
+            || cfg!(feature = "qext") && Fs == 96000;
+        if !valid_fs || channels != 1 && channels != 2 {
             return Err(OPUS_BAD_ARG);
         }
 

@@ -133,7 +133,23 @@ pub struct OpusCustomEncoder {
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
     pub fn new(sampling_rate: i32, channels: i32, arch: i32) -> Result<Self, i32> {
-        let mode = opus_custom_mode_create(48000, 960, None).unwrap();
+        #[cfg(feature = "qext")]
+        let (mode, upsample) = if sampling_rate == 96000 {
+            (
+                opus_custom_mode_create(96000, 1920, None).unwrap(),
+                1,
+            )
+        } else {
+            (
+                opus_custom_mode_create(48000, 960, None).unwrap(),
+                resampling_factor(sampling_rate),
+            )
+        };
+        #[cfg(not(feature = "qext"))]
+        let (mode, upsample) = (
+            opus_custom_mode_create(48000, 960, None).unwrap(),
+            resampling_factor(sampling_rate),
+        );
         let mut st = OpusCustomEncoder {
             mode,
             channels,
@@ -142,7 +158,7 @@ impl OpusCustomEncoder {
             clip: 1,
             disable_pf: 0,
             complexity: 5,
-            upsample: resampling_factor(sampling_rate),
+            upsample,
             start: 0,
             end: mode.effEBands,
             bitrate: OPUS_BITRATE_MAX,

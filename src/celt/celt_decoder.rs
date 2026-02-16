@@ -121,9 +121,22 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert!(st.postfilter_tapset_old >= 0);
 }
 pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> OpusCustomDecoder {
-    let mode = opus_custom_mode_create(48000, 960, None).unwrap();
+    #[cfg(feature = "qext")]
+    let (mode, downsample) = if sampling_rate == 96000 {
+        (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
+    } else {
+        (
+            opus_custom_mode_create(48000, 960, None).unwrap(),
+            resampling_factor(sampling_rate),
+        )
+    };
+    #[cfg(not(feature = "qext"))]
+    let (mode, downsample) = (
+        opus_custom_mode_create(48000, 960, None).unwrap(),
+        resampling_factor(sampling_rate),
+    );
     let mut st = opus_custom_decoder_init(mode, channels);
-    st.downsample = resampling_factor(sampling_rate);
+    st.downsample = downsample;
     if st.downsample == 0 {
         panic!("Unsupported sampling rate: {}", sampling_rate);
     }

@@ -1076,8 +1076,13 @@ fn test_enc_api_inner() {
     // Test OpusEncoder::new() error paths for invalid channel/sample-rate combos
     for c in 0..4 {
         for i in -7..=96000 {
-            if !((i == 8000 || i == 12000 || i == 16000 || i == 24000 || i == 48000)
-                && (c == 1 || c == 2))
+            let valid_rate = i == 8000
+                || i == 12000
+                || i == 16000
+                || i == 24000
+                || i == 48000
+                || cfg!(feature = "qext") && i == 96000;
+            if !(valid_rate && (c == 1 || c == 2))
             {
                 let fs = match i {
                     -5 => -8000,
