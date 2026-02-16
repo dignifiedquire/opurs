@@ -37,12 +37,16 @@ use crate::celt::entenc::{
 };
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
+#[cfg(feature = "qext")]
+use crate::celt::modes::compute_qext_mode;
 use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 use crate::celt::pitch::{celt_inner_prod, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
     amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
 };
 use crate::celt::rate::clt_compute_allocation;
+#[cfg(feature = "qext")]
+use crate::celt::rate::clt_compute_extra_allocation;
 
 use crate::opus::analysis::AnalysisInfo;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
@@ -121,6 +125,9 @@ pub struct OpusCustomEncoder {
     /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
     #[cfg(feature = "qext")]
     pub qext_scale: i32,
+    /// QEXT: old band energies for extension bands
+    #[cfg(feature = "qext")]
+    pub qext_oldBandE: [opus_val16; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
 impl OpusCustomEncoder {
@@ -198,6 +205,8 @@ impl OpusCustomEncoder {
             enable_qext: 0,
             #[cfg(feature = "qext")]
             qext_scale: 1,
+            #[cfg(feature = "qext")]
+            qext_oldBandE: [0.0; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
         };
         st.reset();
         Ok(st)
@@ -2030,6 +2039,8 @@ pub fn celt_encode_with_ec<'b>(
     compressed: &'b mut [u8],
     mut nbCompressedBytes: i32,
     mut enc: Option<&mut ec_enc<'b>>,
+    #[cfg(feature = "qext")] qext_payload: Option<&mut [u8]>,
+    #[cfg(feature = "qext")] qext_bytes: i32,
 ) -> i32 {
     let mut i: i32 = 0;
     let mut c: i32 = 0;
@@ -2102,6 +2113,29 @@ pub fn celt_encode_with_ec<'b>(
     let mut hybrid: i32 = 0;
     let mut weak_transient: i32 = 0;
     let mut enable_tf_analysis: i32 = 0;
+    // QEXT: Initialize extension entropy encoder from payload buffer
+    #[cfg(feature = "qext")]
+    let mut _qext_empty_buf = [0u8; 0];
+    #[cfg(feature = "qext")]
+    let mut ext_enc = if let Some(payload) = qext_payload {
+        ec_enc_init(payload)
+    } else {
+        ec_enc_init(&mut _qext_empty_buf)
+    };
+    #[cfg(feature = "qext")]
+    let mut qext_end: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_intensity: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_dual_stereo: i32 = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_mode: Option<crate::celt::modes::OpusCustomMode> = None;
+    #[cfg(feature = "qext")]
+    let mut qext_bandE = [0.0f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    let mut qext_bandLogE = [0.0f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS];
+    #[cfg(feature = "qext")]
+    let mut qext_error = [0.0f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS];
     let mode: &'static OpusCustomMode = st.mode;
     nbEBands = mode.nbEBands as i32;
     overlap = mode.overlap as i32;
@@ -3149,30 +3183,133 @@ pub fn celt_encode_with_ec<'b>(
         enc,
         C,
     );
-    let vla_15 = (C * nbEBands) as usize;
-    let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
-    // TODO(qext): Wire up proper ext_ec, extra_pulses, ext_total_bits, cap
+    // QEXT: Compute QEXT mode and band energies after first-pass fine energy
     #[cfg(feature = "qext")]
-    let mut _qext_dummy_buf = [0u8; 4];
+    let qext_scale = st.qext_scale;
     #[cfg(feature = "qext")]
-    let mut _qext_dummy_ec = crate::celt::entcode::ec_ctx {
-        buf: &mut _qext_dummy_buf,
-        storage: 4,
-        end_offs: 0,
-        end_window: 0,
-        nend_bits: 0,
-        nbits_total: 32,
-        offs: 0,
-        rng: 0x80000000,
-        val: 0,
-        ext: 0,
-        rem: 0,
-        error: 0,
+    {
+        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+
+        if qext_bytes > 0
+            && end == nbEBands
+            && (mode.Fs == 48000 || mode.Fs == 96000)
+            && (mode.shortMdctSize == 120 * qext_scale || mode.shortMdctSize == 90 * qext_scale)
+        {
+            let qext_mode_struct = compute_qext_mode(mode);
+            qext_end = if qext_scale == 2 {
+                NB_QEXT_BANDS as i32
+            } else {
+                2
+            };
+            qext_mode = Some(qext_mode_struct);
+        }
+
+        if let Some(ref qm) = qext_mode {
+            // Compute band energies at higher frequency resolution
+            compute_band_energies(qm, &freq, &mut qext_bandE, qext_end, C, LM, st.arch);
+            normalise_bands(qm, &freq, &mut X, &qext_bandE, qext_end, C, M);
+            amp2Log2(qm, qext_end, qext_end, &qext_bandE, &mut qext_bandLogE, C);
+
+            // Encode stereo params for QEXT bands
+            if C == 2 {
+                qext_intensity = qext_end;
+                qext_dual_stereo = dual_stereo;
+                ec_enc_uint(&mut ext_enc, qext_intensity as u32, (qext_end + 1) as u32);
+                if qext_intensity != 0 {
+                    ec_enc_bit_logp(&mut ext_enc, qext_dual_stereo, 1);
+                }
+            }
+
+            // Coarse quantization of QEXT band energies
+            let mut qext_delayedIntra: opus_val32 = 0.0;
+            quant_coarse_energy(
+                qm,
+                0,
+                qext_end,
+                qext_end,
+                &qext_bandLogE,
+                &mut st.qext_oldBandE,
+                (qext_bytes * 8) as u32,
+                &mut qext_error,
+                &mut ext_enc,
+                C,
+                LM,
+                qext_bytes,
+                st.force_intra,
+                &mut qext_delayedIntra,
+                (st.complexity >= 4) as i32,
+                st.loss_rate,
+                st.lfe,
+            );
+        }
+    }
+
+    // QEXT: Compute extra allocation and second-pass fine energy
+    st.energyError[..(nbEBands * CC) as usize].fill(0.0);
+    #[cfg(feature = "qext")]
+    let mut extra_pulses = {
+        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+        vec![0i32; nbEBands as usize + NB_QEXT_BANDS]
     };
     #[cfg(feature = "qext")]
-    let _qext_dummy_pulses: Vec<i32> = vec![0i32; end as usize];
+    let mut extra_quant = {
+        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+        vec![0i32; nbEBands as usize + NB_QEXT_BANDS]
+    };
     #[cfg(feature = "qext")]
-    let _qext_dummy_cap: Vec<i32> = vec![0i32; end as usize];
+    let mut error_bak: Vec<opus_val16> = vec![0.0; (C * nbEBands) as usize];
+    #[cfg(feature = "qext")]
+    {
+        let qext_bits = ((qext_bytes * 8) << BITRES) - ec_tell_frac(&ext_enc) as i32 - 1;
+        clt_compute_extra_allocation(
+            mode,
+            qext_mode.as_ref(),
+            start,
+            end,
+            qext_end,
+            Some(&bandLogE),
+            if qext_mode.is_some() {
+                Some(&qext_bandLogE)
+            } else {
+                None
+            },
+            qext_bits,
+            &mut extra_pulses,
+            &mut extra_quant,
+            C,
+            LM,
+            &mut ext_enc,
+            1, // encode=1
+            tone_freq,
+            toneishness,
+        );
+        error_bak[..(C * nbEBands) as usize].copy_from_slice(&error[..(C * nbEBands) as usize]);
+        if qext_bytes > 0 {
+            quant_fine_energy(
+                mode,
+                start,
+                end,
+                &mut st.oldBandE[..(C * nbEBands) as usize],
+                &mut error,
+                Some(&fine_quant),
+                &extra_quant[..nbEBands as usize],
+                &mut ext_enc,
+                C,
+            );
+        }
+    }
+
+    // Residual quantisation
+    let vla_15 = (C * nbEBands) as usize;
+    let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
+
+    #[cfg(feature = "qext")]
+    let ext_total_bits = if qext_bytes > 0 {
+        qext_bytes * (8 << BITRES)
+    } else {
+        0
+    };
+
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(
@@ -3200,13 +3337,13 @@ pub fn celt_encode_with_ec<'b>(
             st.arch,
             st.disable_inv,
             #[cfg(feature = "qext")]
-            &mut _qext_dummy_ec,
+            &mut ext_enc,
             #[cfg(feature = "qext")]
-            &_qext_dummy_pulses,
+            &extra_pulses,
             #[cfg(feature = "qext")]
-            0,
+            ext_total_bits,
             #[cfg(feature = "qext")]
-            &_qext_dummy_cap,
+            &cap,
         );
     } else {
         quant_all_bands(
@@ -3234,32 +3371,166 @@ pub fn celt_encode_with_ec<'b>(
             st.arch,
             st.disable_inv,
             #[cfg(feature = "qext")]
-            &mut _qext_dummy_ec,
+            &mut ext_enc,
             #[cfg(feature = "qext")]
-            &_qext_dummy_pulses,
+            &extra_pulses,
             #[cfg(feature = "qext")]
-            0,
+            ext_total_bits,
             #[cfg(feature = "qext")]
-            &_qext_dummy_cap,
+            &cap,
         );
     }
+
+    // QEXT: Second quant_all_bands for QEXT residual bands
+    #[cfg(feature = "qext")]
+    {
+        if let Some(ref qm) = qext_mode {
+            use crate::celt::modes::data_96000::NB_QEXT_BANDS;
+
+            let mut qext_collapse_masks = [0u8; 2 * NB_QEXT_BANDS];
+            let zeros = vec![0i32; nbEBands as usize];
+
+            // Compute ext_balance
+            let mut ext_balance = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_enc) as i32;
+            for j in 0..qext_end {
+                ext_balance -= extra_pulses[nbEBands as usize + j as usize]
+                    + C * (extra_quant[nbEBands as usize + 1] << BITRES);
+            }
+
+            // Fine energy for QEXT bands
+            quant_fine_energy(
+                qm,
+                0,
+                qext_end,
+                &mut st.qext_oldBandE[..(C * NB_QEXT_BANDS as i32) as usize],
+                &mut qext_error,
+                None,
+                &extra_quant[nbEBands as usize..],
+                &mut ext_enc,
+                C,
+            );
+
+            // Dummy encoder for the nested ext_enc arg of quant_all_bands
+            let mut dummy_buf = [0u8; 4];
+            let mut dummy_enc = crate::celt::entcode::ec_ctx {
+                buf: &mut dummy_buf,
+                storage: 4,
+                end_offs: 0,
+                end_window: 0,
+                nend_bits: 0,
+                nbits_total: 32,
+                offs: 0,
+                rng: 0x80000000,
+                val: 0,
+                ext: 0,
+                rem: 0,
+                error: 0,
+            };
+
+            if C == 2 {
+                let (x_part, y_part) = X.split_at_mut(N as usize);
+                quant_all_bands(
+                    1,
+                    qm,
+                    0,
+                    qext_end,
+                    x_part,
+                    Some(y_part),
+                    &mut qext_collapse_masks,
+                    &qext_bandE,
+                    &mut extra_pulses[nbEBands as usize..],
+                    shortBlocks,
+                    st.spread_decision,
+                    qext_dual_stereo,
+                    qext_intensity,
+                    &mut zeros.clone(),
+                    qext_bytes * (8 << BITRES),
+                    ext_balance,
+                    &mut ext_enc,
+                    LM,
+                    qext_end,
+                    &mut st.rng,
+                    st.complexity,
+                    st.arch,
+                    st.disable_inv,
+                    &mut dummy_enc,
+                    &zeros,
+                    0,
+                    &[],
+                );
+            } else {
+                quant_all_bands(
+                    1,
+                    qm,
+                    0,
+                    qext_end,
+                    &mut X,
+                    None,
+                    &mut qext_collapse_masks,
+                    &qext_bandE,
+                    &mut extra_pulses[nbEBands as usize..],
+                    shortBlocks,
+                    st.spread_decision,
+                    qext_dual_stereo,
+                    qext_intensity,
+                    &mut zeros.clone(),
+                    qext_bytes * (8 << BITRES),
+                    ext_balance,
+                    &mut ext_enc,
+                    LM,
+                    qext_end,
+                    &mut st.rng,
+                    st.complexity,
+                    st.arch,
+                    st.disable_inv,
+                    &mut dummy_enc,
+                    &zeros,
+                    0,
+                    &[],
+                );
+            }
+        }
+    }
+
     if anti_collapse_rsv > 0 {
         anti_collapse_on = (st.consec_transient < 2) as i32;
         ec_enc_bits(enc, anti_collapse_on as u32, 1);
     }
-    quant_energy_finalise(
-        mode,
-        start,
-        end,
-        &mut st.oldBandE[..(C * nbEBands) as usize],
-        &mut error,
-        &fine_quant,
-        &fine_priority,
-        nbCompressedBytes * 8 - ec_tell(enc),
-        enc,
-        C,
-    );
-    st.energyError[..(nbEBands * CC) as usize].fill(0.0);
+
+    // Energy finalisation: skip when QEXT is active (use error_bak instead)
+    #[cfg(feature = "qext")]
+    {
+        if qext_bytes == 0 {
+            quant_energy_finalise(
+                mode,
+                start,
+                end,
+                &mut st.oldBandE[..(C * nbEBands) as usize],
+                &mut error,
+                &fine_quant,
+                &fine_priority,
+                nbCompressedBytes * 8 - ec_tell(enc),
+                enc,
+                C,
+            );
+        }
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        quant_energy_finalise(
+            mode,
+            start,
+            end,
+            &mut st.oldBandE[..(C * nbEBands) as usize],
+            &mut error,
+            &fine_quant,
+            &fine_priority,
+            nbCompressedBytes * 8 - ec_tell(enc),
+            enc,
+            C,
+        );
+    }
+
     c = 0;
     loop {
         i = start;
@@ -3271,6 +3542,26 @@ pub fn celt_encode_with_ec<'b>(
         c += 1;
         if c >= C {
             break;
+        }
+    }
+
+    // QEXT: When qext_bytes > 0, run finalise with error_bak (original error before QEXT fine energy)
+    #[cfg(feature = "qext")]
+    {
+        if qext_bytes > 0 {
+            // Pass NULL for oldBandE (don't update), use error_bak
+            quant_energy_finalise(
+                mode,
+                start,
+                end,
+                &mut [0.0f32; 42][..(C * nbEBands) as usize], // dummy, won't be used meaningfully
+                &mut error_bak,
+                &fine_quant,
+                &fine_priority,
+                nbCompressedBytes * 8 - ec_tell(enc),
+                enc,
+                C,
+            );
         }
     }
     if silence != 0 {
@@ -3332,6 +3623,14 @@ pub fn celt_encode_with_ec<'b>(
         st.consec_transient = 0;
     }
     st.rng = enc.rng;
+    // QEXT: XOR ext_enc RNG into encoder state and finalize
+    #[cfg(feature = "qext")]
+    {
+        if qext_bytes > 0 {
+            ec_enc_done(&mut ext_enc);
+            st.rng ^= ext_enc.rng;
+        }
+    }
     ec_enc_done(enc);
     if ec_get_error(enc) != 0 {
         OPUS_INTERNAL_ERROR

@@ -2671,6 +2671,10 @@ pub fn opus_encode_native(
             &mut redundancy_tmp,
             redundancy_bytes,
             None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
         );
         if err < 0 {
             return OPUS_INTERNAL_ERROR;
@@ -2692,6 +2696,10 @@ pub fn opus_encode_native(
                 &mut dummy_0,
                 2,
                 None,
+                #[cfg(feature = "qext")]
+                None,
+                #[cfg(feature = "qext")]
+                0,
             );
             st.celt_enc.disable_pf = 1;
             st.celt_enc.force_intra = 1;
@@ -2719,6 +2727,10 @@ pub fn opus_encode_native(
                 &mut [],
                 nb_compr_bytes,
                 Some(&mut enc),
+                #[cfg(feature = "qext")]
+                None, // TODO: pass actual ext_enc from Opus-layer QEXT framing
+                #[cfg(feature = "qext")]
+                0,
             );
             if ret < 0 {
                 return OPUS_INTERNAL_ERROR;
@@ -2755,6 +2767,10 @@ pub fn opus_encode_native(
             &mut dummy_1,
             2,
             None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
         );
         err_0 = celt_encode_with_ec(
             &mut st.celt_enc,
@@ -2763,6 +2779,10 @@ pub fn opus_encode_native(
             &mut redundancy_tmp,
             redundancy_bytes,
             None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
         );
         if err_0 < 0 {
             return OPUS_INTERNAL_ERROR;
