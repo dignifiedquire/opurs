@@ -177,6 +177,7 @@ pub fn opus_packet_parse_impl(
     size: &mut [i16],
     payload_offset: Option<&mut i32>,
     packet_offset: Option<&mut i32>,
+    padding_out: Option<&mut i32>,
 ) -> i32 {
     let len = data.len() as i32;
     if len < 0 {
@@ -364,6 +365,9 @@ pub fn opus_packet_parse_impl(
     if let Some(out_toc) = out_toc {
         *out_toc = toc;
     }
+    if let Some(padding_out) = padding_out {
+        *padding_out = pad;
+    }
 
     count
 }
@@ -396,6 +400,7 @@ pub fn opus_packet_parse(
         frames.map(|s| s.as_mut_slice()),
         size.as_mut_slice(),
         payload_offset,
+        None,
         None,
     )
 }

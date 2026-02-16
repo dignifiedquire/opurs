@@ -259,7 +259,14 @@ impl OpusDecoder {
 
 fn validate_opus_decoder(st: &OpusDecoder) {
     assert!(st.channels == 1 || st.channels == 2);
-    assert!(st.Fs == 48000 || st.Fs == 24000 || st.Fs == 16000 || st.Fs == 12000 || st.Fs == 8000);
+    assert!(
+        st.Fs == 48000
+            || st.Fs == 24000
+            || st.Fs == 16000
+            || st.Fs == 12000
+            || st.Fs == 8000
+            || cfg!(feature = "qext") && st.Fs == 96000
+    );
     assert!(st.DecControl.API_sampleRate == st.Fs);
     assert!(
         st.DecControl.internalSampleRate == 0
@@ -320,13 +327,18 @@ fn opus_decode_frame(
     pcm: &mut [opus_val16],
     mut frame_size: i32,
     decode_fec: i32,
+    #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
 ) -> i32 {
     let mut i: i32;
     let mut silk_ret: i32;
     let mut celt_ret: i32 = 0;
     // data_copy must be declared before dec so it outlives the borrow.
     // ec_dec_init requires &mut [u8]; decoder only reads from it.
-    // Use stack buffer to avoid heap allocation. Max 1275 bytes per packet.
+    // Use stack buffer to avoid heap allocation. Max 1275 bytes per standard packet,
+    // up to QEXT_PACKET_SIZE_CAP (3825) with QEXT.
+    #[cfg(feature = "qext")]
+    let mut data_copy = vec![0u8; data.map_or(0, |d| d.len())];
+    #[cfg(not(feature = "qext"))]
     let mut data_copy = [0u8; 1275];
     let data_copy_len = data.map_or(0, |d| {
         data_copy[..d.len()].copy_from_slice(d);
@@ -412,6 +424,8 @@ fn opus_decode_frame(
                     &mut pcm[pcm_off..],
                     if audiosize < F20 { audiosize } else { F20 },
                     0,
+                    #[cfg(feature = "qext")]
+                    None,
                 );
                 if ret < 0 {
                     return ret;
@@ -455,6 +469,8 @@ fn opus_decode_frame(
             &mut pcm_transition_celt,
             if F5 < audiosize { F5 } else { audiosize },
             0,
+            #[cfg(feature = "qext")]
+            None,
         );
     }
     if audiosize > frame_size {
@@ -590,6 +606,8 @@ fn opus_decode_frame(
             &mut pcm_transition_silk,
             if F5 < audiosize { F5 } else { audiosize },
             0,
+            #[cfg(feature = "qext")]
+            None,
         );
     }
 
@@ -660,7 +678,7 @@ fn opus_decode_frame(
             #[cfg(feature = "deep-plc")]
             Some(&mut st.lpcnet),
             #[cfg(feature = "qext")]
-            None, // TODO: pass actual QEXT payload from extension parsing
+            qext_payload,
         );
     } else {
         let silence: [u8; 2] = [0xff, 0xff];
@@ -849,6 +867,8 @@ pub fn opus_decode_native(
                 &mut pcm[(pcm_count * st.channels) as usize..],
                 frame_size - pcm_count,
                 0,
+                #[cfg(feature = "qext")]
+                None,
             );
             if ret < 0 {
                 return ret;
@@ -868,6 +888,7 @@ pub fn opus_decode_native(
     packet_bandwidth = opus_packet_get_bandwidth(data[0]);
     packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.Fs);
     packet_stream_channels = opus_packet_get_nb_channels(data[0]);
+    let mut padding_len: i32 = 0;
     count = opus_packet_parse_impl(
         data,
         self_delimited,
@@ -876,10 +897,19 @@ pub fn opus_decode_native(
         &mut size,
         Some(&mut offset),
         packet_offset,
+        Some(&mut padding_len),
     );
     if count < 0 {
         return count;
     }
+    // Padding data is at the end of the original packet.
+    #[cfg(feature = "qext")]
+    let padding_data = if padding_len > 0 {
+        let pkt_len = data.len();
+        &data[pkt_len - padding_len as usize..]
+    } else {
+        &[] as &[u8]
+    };
     let mut data = &data[offset as usize..];
     if decode_fec != 0 {
         let mut duration_copy: i32 = 0;
@@ -918,6 +948,8 @@ pub fn opus_decode_native(
             &mut pcm[(st.channels * (frame_size - packet_frame_size)) as usize..],
             packet_frame_size,
             1,
+            #[cfg(feature = "qext")]
+            None,
         );
         if ret_0 < 0 {
             return ret_0;
@@ -935,14 +967,62 @@ pub fn opus_decode_native(
     st.frame_size = packet_frame_size;
     st.stream_channels = packet_stream_channels;
     nb_samples = 0;
+    #[cfg(feature = "qext")]
+    let mut iter = if !padding_data.is_empty() {
+        Some(crate::opus::extensions::OpusExtensionIterator::new(
+            padding_data,
+            count,
+        ))
+    } else {
+        None
+    };
     i = 0;
     while i < count {
+        // Per-frame QEXT extension lookup
+        #[cfg(feature = "qext")]
+        let qext_payload_vec: Option<Vec<u8>>;
+        #[cfg(feature = "qext")]
+        {
+            let mut ext_data: Option<crate::opus::extensions::ExtensionRef> = None;
+            if let Some(ref mut it) = iter {
+                // Search forward until we find an extension for frame >= i,
+                // matching the C pattern of saving/restoring iterator state.
+                loop {
+                    let frame_of_ext = ext_data.as_ref().map_or(-1, |e| e.frame);
+                    if frame_of_ext >= i {
+                        break;
+                    }
+                    let it_copy = it.clone();
+                    match it.find(crate::celt::modes::data_96000::QEXT_EXTENSION_ID) {
+                        Ok(Some(ext)) => {
+                            if ext.frame > i {
+                                // Went past our frame — restore iterator
+                                *it = it_copy;
+                                ext_data = Some(ext);
+                                break;
+                            }
+                            ext_data = Some(ext);
+                        }
+                        _ => break,
+                    }
+                }
+            }
+            qext_payload_vec = ext_data.and_then(|ext| {
+                if ext.frame == i {
+                    Some(padding_data[ext.data_offset..ext.data_offset + ext.len].to_vec())
+                } else {
+                    None
+                }
+            });
+        }
         let ret_1 = opus_decode_frame(
             st,
             Some(&data[..size[i as usize] as usize]),
             &mut pcm[(nb_samples * st.channels as usize)..],
             frame_size - nb_samples as i32,
             0,
+            #[cfg(feature = "qext")]
+            qext_payload_vec.as_deref(),
         );
         if ret_1 < 0 {
             return ret_1;

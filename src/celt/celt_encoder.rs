@@ -135,10 +135,7 @@ impl OpusCustomEncoder {
     pub fn new(sampling_rate: i32, channels: i32, arch: i32) -> Result<Self, i32> {
         #[cfg(feature = "qext")]
         let (mode, upsample) = if sampling_rate == 96000 {
-            (
-                opus_custom_mode_create(96000, 1920, None).unwrap(),
-                1,
-            )
+            (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
         } else {
             (
                 opus_custom_mode_create(48000, 960, None).unwrap(),

@@ -495,6 +495,22 @@ impl OpusEncoder {
         self.celt_enc.disable_inv != 0
     }
 
+    /// Enable or disable QEXT (Quality Extension / Opus HD).
+    ///
+    /// When enabled, the encoder can produce extended-quality packets with
+    /// 96 kHz support, extra frequency bands, and higher precision.
+    /// Requires the `qext` feature.
+    #[cfg(feature = "qext")]
+    pub fn set_qext(&mut self, enabled: bool) {
+        self.enable_qext = enabled as i32;
+    }
+
+    /// Returns whether QEXT is enabled.
+    #[cfg(feature = "qext")]
+    pub fn qext(&self) -> bool {
+        self.enable_qext != 0
+    }
+
     pub fn set_force_mode(&mut self, mode: i32) -> Result<(), i32> {
         if !(MODE_SILK_ONLY..=MODE_CELT_ONLY).contains(&mode) && mode != OPUS_AUTO {
             return Err(OPUS_BAD_ARG);
@@ -2933,7 +2949,8 @@ pub fn opus_encode_native(
             }
             // Remaining space for DRED, accounting for 3 extra bytes for code 3,
             // padding length, and extension number.
-            let mut dred_bytes_left = (DRED_MAX_DATA_SIZE as i32).min(orig_max_data_bytes - ret - 3);
+            let mut dred_bytes_left =
+                (DRED_MAX_DATA_SIZE as i32).min(orig_max_data_bytes - ret - 3);
             // Account for the extra bytes required to signal large padding length.
             dred_bytes_left -= (dred_bytes_left + 1 + DRED_EXPERIMENTAL_BYTES as i32) / 255;
             // Check whether we actually have something to encode.
@@ -2977,8 +2994,11 @@ pub fn opus_encode_native(
         }
     }
     if apply_padding {
-        if opus_packet_pad(&mut data[..orig_max_data_bytes as usize], ret, orig_max_data_bytes)
-            != OPUS_OK
+        if opus_packet_pad(
+            &mut data[..orig_max_data_bytes as usize],
+            ret,
+            orig_max_data_bytes,
+        ) != OPUS_OK
         {
             return OPUS_INTERNAL_ERROR;
         }

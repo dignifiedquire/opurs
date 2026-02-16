@@ -133,6 +133,7 @@ impl OpusRepacketizer {
             &mut self.len[self.nb_frames as usize..],
             None,
             None,
+            None,
         );
         if num_frames < 1 {
             return num_frames;

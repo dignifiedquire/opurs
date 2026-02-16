@@ -1082,8 +1082,7 @@ fn test_enc_api_inner() {
                 || i == 24000
                 || i == 48000
                 || cfg!(feature = "qext") && i == 96000;
-            if !(valid_rate && (c == 1 || c == 2))
-            {
+            if !(valid_rate && (c == 1 || c == 2)) {
                 let fs = match i {
                     -5 => -8000,
                     -6 => 2147483647,
