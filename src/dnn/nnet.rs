@@ -15,6 +15,7 @@ pub const ACTIVATION_TANH: i32 = 2;
 pub const ACTIVATION_RELU: i32 = 3;
 pub const ACTIVATION_SOFTMAX: i32 = 4;
 pub const ACTIVATION_SWISH: i32 = 5;
+pub const ACTIVATION_EXP: i32 = 6;
 
 // --- Weight array types ---
 
