@@ -791,9 +791,9 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16]) {
     // Attenuation
     if st.loss_count >= 10 {
         st.features[0] =
-            (-10.0f32).max(st.features[0] + ATT_TABLE[9] - 2.0 * (st.loss_count - 9) as f32);
+            (-15.0f32).max(st.features[0] + ATT_TABLE[9] - 2.0 * (st.loss_count - 9) as f32);
     } else {
-        st.features[0] = (-10.0f32).max(st.features[0] + ATT_TABLE[st.loss_count as usize]);
+        st.features[0] = (-15.0f32).max(st.features[0] + ATT_TABLE[st.loss_count as usize]);
     }
 
     let features_copy = st.features.clone();

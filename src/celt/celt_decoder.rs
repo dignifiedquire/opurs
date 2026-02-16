@@ -60,6 +60,8 @@ pub struct OpusCustomDecoder {
     pub error: i32,
     pub last_pitch_index: i32,
     pub loss_duration: i32,
+    pub plc_duration: i32,
+    pub last_frame_type: i32,
     pub skip_plc: i32,
     pub postfilter_period: i32,
     pub postfilter_period_old: i32,
@@ -81,6 +83,15 @@ pub struct OpusCustomDecoder {
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
+
+const FRAME_NONE: i32 = 0;
+const FRAME_NORMAL: i32 = 1;
+const FRAME_PLC_NOISE: i32 = 2;
+const FRAME_PLC_PERIODIC: i32 = 3;
+#[cfg(feature = "deep-plc")]
+const FRAME_PLC_NEURAL: i32 = 4;
+#[cfg(feature = "dred")]
+const FRAME_DRED: i32 = 5;
 pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert_eq!(st.mode, opus_custom_mode_create(48000, 960, None).unwrap());
     assert_eq!(st.overlap, 120);
@@ -138,6 +149,8 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         error: 0,
         last_pitch_index: 0,
         loss_duration: 0,
+        plc_duration: 0,
+        last_frame_type: FRAME_NONE,
         skip_plc: 0,
         postfilter_period: 0,
         postfilter_period_old: 0,
@@ -172,6 +185,8 @@ impl OpusCustomDecoder {
         self.error = 0;
         self.last_pitch_index = 0;
         self.loss_duration = 0;
+        self.plc_duration = 0;
+        self.last_frame_type = FRAME_NONE;
         self.skip_plc = 1;
         self.postfilter_period = 0;
         self.postfilter_period_old = 0;
@@ -601,14 +616,25 @@ fn celt_decode_lost(
 
     let loss_duration = st.loss_duration;
     let start = st.start;
+    let mut curr_frame_type = FRAME_PLC_PERIODIC;
+    if st.plc_duration >= 40 || start != 0 || st.skip_plc != 0 {
+        curr_frame_type = FRAME_PLC_NOISE;
+    }
     #[cfg(feature = "deep-plc")]
-    let noise_based = {
-        let fec_fill_pos = lpcnet.as_ref().map_or(0, |l| l.fec_fill_pos);
-        (start != 0 || (fec_fill_pos == 0 && (st.skip_plc != 0 || loss_duration >= 80))) as i32
-    };
-    #[cfg(not(feature = "deep-plc"))]
-    let noise_based = (loss_duration >= 40 || start != 0 || st.skip_plc != 0) as i32;
-    if noise_based != 0 {
+    if start == 0 {
+        if let Some(ref lpcnet) = lpcnet {
+            if lpcnet.loaded {
+                if st.complexity >= 5 && st.plc_duration < 80 && st.skip_plc == 0 {
+                    curr_frame_type = FRAME_PLC_NEURAL;
+                }
+                #[cfg(feature = "dred")]
+                if lpcnet.fec_fill_pos > lpcnet.fec_read_pos {
+                    curr_frame_type = FRAME_DRED;
+                }
+            }
+        }
+    }
+    if curr_frame_type == FRAME_PLC_NOISE {
         let end = st.end;
         let effEnd = if start
             > (if end < mode.effEBands {
@@ -756,7 +782,22 @@ fn celt_decode_lost(
     } else {
         let mut fade: opus_val16 = Q15ONE;
         let pitch_index: i32;
-        if loss_duration == 0 {
+        #[cfg(feature = "deep-plc")]
+        let curr_neural = curr_frame_type == FRAME_PLC_NEURAL || curr_frame_type == FRAME_DRED;
+        #[cfg(feature = "deep-plc")]
+        let last_neural =
+            st.last_frame_type == FRAME_PLC_NEURAL || st.last_frame_type == FRAME_DRED;
+        let need_pitch_search = {
+            #[cfg(feature = "deep-plc")]
+            {
+                st.last_frame_type != FRAME_PLC_PERIODIC && !(last_neural && curr_neural)
+            }
+            #[cfg(not(feature = "deep-plc"))]
+            {
+                st.last_frame_type != FRAME_PLC_PERIODIC
+            }
+        };
+        if need_pitch_search {
             let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
             pitch_index = celt_plc_pitch_search(
                 &ch0[..DECODE_BUFFER_SIZE],
@@ -793,7 +834,7 @@ fn celt_decode_lost(
                     i += 1;
                 }
             }
-            if loss_duration == 0 {
+            if need_pitch_search {
                 let mut ac: [opus_val32; 25] = [0.; 25];
                 _celt_autocorr(
                     &_exc[exc_off..exc_off + MAX_PERIOD as usize],
@@ -925,6 +966,13 @@ fn celt_decode_lost(
         st.prefilter_and_fold = 1;
     }
     st.loss_duration = 10000_i32.min(loss_duration + (1 << LM));
+    st.plc_duration = 10000_i32.min(st.plc_duration + (1 << LM));
+    #[cfg(feature = "dred")]
+    if curr_frame_type == FRAME_DRED {
+        st.plc_duration = 0;
+        st.skip_plc = 0;
+    }
+    st.last_frame_type = curr_frame_type;
 }
 /// Upstream C: celt/celt_decoder.c:celt_decode_with_ec / celt_decode_with_ec_dred
 pub fn celt_decode_with_ec(
@@ -1584,6 +1632,8 @@ fn celt_decode_body(
         );
     }
     st.loss_duration = 0;
+    st.plc_duration = 0;
+    st.last_frame_type = FRAME_NORMAL;
     st.prefilter_and_fold = 0;
     if ec_tell(dec) > 8 * len {
         return OPUS_INTERNAL_ERROR;
