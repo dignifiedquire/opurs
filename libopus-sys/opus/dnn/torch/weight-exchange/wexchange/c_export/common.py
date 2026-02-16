@@ -40,6 +40,7 @@ def print_vector(writer, vector, name, dtype='float', reshape_8x4=False, static=
 
     dtype_suffix = {
         'float' : 'float',
+        'opus_uint8' : 'uint8',
         'opus_int8' : 'int8',
         'opus_uint16' : 'uint16',
         'opus_int16' : 'int16',
@@ -64,8 +65,7 @@ f'''
 
     if debug_float:
         f.write('#ifndef DISABLE_DEBUG_FLOAT\n')
-    if binary_blob:
-        f.write(
+    f.write(
 f'''
 #define WEIGHTS_{name}_DEFINED
 #define WEIGHTS_{name}_TYPE WEIGHT_TYPE_{dtype_suffix[dtype]}
@@ -297,7 +297,6 @@ def print_conv1d_layer(writer : CWriter,
     writer.header.write(f"\n#define {name.upper()}_OUT_SIZE {weight.shape[2]}\n")
     writer.header.write(f"\n#define {name.upper()}_IN_SIZE {weight.shape[1]}\n")
     writer.header.write(f"\n#define {name.upper()}_STATE_SIZE ({weight.shape[1]} * ({weight.shape[0] - 1}))\n")
-    writer.header.write(f"\n#define {name.upper()}_DELAY {(weight.shape[0] - 1) // 2}\n") # CAVE: delay is not a property of the conv layer
 
     return weight.shape[0] * weight.shape[1]
 

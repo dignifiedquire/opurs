@@ -4,7 +4,7 @@ default_to_workspace = false
 [env]
 VECTORS_URL = "https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz"
 VECTORS_DIR = "opus_newvectors"
-OPUS_RELEASE_URL = "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz"
+OPUS_RELEASE_URL = "https://downloads.xiph.org/releases/opus/opus-1.6.1.tar.gz"
 
 # --- Test vectors ---
 
@@ -32,7 +32,7 @@ args = ["run", "--release", "--features", "tools", "--example", "run_vectors2", 
 # --- DNN weight data ---
 
 [tasks.download-dnn-data]
-description = "Download DNN model weight data from the opus 1.5.2 release tarball"
+description = "Download DNN model weight data from the opus 1.6.1 release tarball"
 script_runner = "@duckscript"
 script = '''
 marker = set "libopus-sys/opus/dnn/fargan_data.c"
@@ -40,17 +40,17 @@ if not is_path_exists ${marker}
     tmpdir = set "${CARGO_MAKE_WORKING_DIRECTORY}/target/tmp"
     mkdir ${tmpdir}
 
-    tarball = set "${tmpdir}/opus-1.5.2.tar.gz"
-    echo "Downloading opus 1.5.2 release tarball..."
+    tarball = set "${tmpdir}/opus-1.6.1.tar.gz"
+    echo "Downloading opus 1.6.1 release tarball..."
     exec curl -sL ${OPUS_RELEASE_URL} -o ${tarball}
 
     echo "Extracting DNN weight data..."
     exec tar -xzf ${tarball} -C ${tmpdir}
 
-    data_files = array fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h
+    data_files = array fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h bbwenet_data.c bbwenet_data.h
 
     dnn_dest = set "libopus-sys/opus/dnn"
-    dnn_src = set "${tmpdir}/opus-1.5.2/dnn"
+    dnn_src = set "${tmpdir}/opus-1.6.1/dnn"
     for f in ${data_files}
         src_path = set "${dnn_src}/${f}"
         dst_path = set "${dnn_dest}/${f}"

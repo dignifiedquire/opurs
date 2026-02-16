@@ -44,6 +44,7 @@ parser.add_argument('--cuda-visible-devices', type=str, help="comma separates li
 model_group = parser.add_argument_group(title="model parameters")
 model_group.add_argument('--cond-size', type=int, help="first conditioning size, default: 256", default=256)
 model_group.add_argument('--gamma', type=float, help="Use A(z/gamma), default: 0.9", default=0.9)
+model_group.add_argument('--softquant', action="store_true", help="enables soft quantization during training")
 
 training_group = parser.add_argument_group(title="training parameters")
 training_group.add_argument('--batch-size', type=int, help="batch size, default: 128", default=128)
@@ -53,7 +54,7 @@ training_group.add_argument('--sequence-length', type=int, help='sequence length
 training_group.add_argument('--lr-decay', type=float, help='learning rate decay factor, default: 0.0', default=0.0)
 training_group.add_argument('--initial-checkpoint', type=str, help='initial checkpoint to start training from, default: None', default=None)
 training_group.add_argument('--reg-weight', type=float, help='regression loss weight, default: 1.0', default=1.0)
-training_group.add_argument('--fmap-weight', type=float, help='feature matchin loss weight, default: 1.0', default=1.)
+training_group.add_argument('--fmap-weight', type=float, help='feature matching loss weight, default: 1.0', default=1.)
 
 args = parser.parse_args()
 
@@ -93,7 +94,7 @@ checkpoint['adam_betas'] = adam_betas
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 checkpoint['model_args']    = ()
-checkpoint['model_kwargs']  = {'cond_size': cond_size, 'gamma': args.gamma}
+checkpoint['model_kwargs']  = {'cond_size': cond_size, 'gamma': args.gamma, 'softquant': args.softquant}
 print(checkpoint['model_kwargs'])
 model = fargan.FARGAN(*checkpoint['model_args'], **checkpoint['model_kwargs'])
 

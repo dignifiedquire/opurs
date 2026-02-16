@@ -281,7 +281,7 @@ int osce_test_adashape(
             &hNoLACE.nolace_tdshape1_alpha1_f,
             &hNoLACE.nolace_tdshape1_alpha1_t,
             &hNoLACE.nolace_tdshape1_alpha2,
-            feature_dim, frame_size, avg_pool_k, opus_select_arch());
+            feature_dim, frame_size, avg_pool_k, 1, opus_select_arch());
 
         memcpy(out + i_frame * frame_size, x_out, sizeof(float) * frame_size);
     }

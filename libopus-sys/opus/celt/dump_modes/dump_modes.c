@@ -49,6 +49,11 @@
 #define WORD32 FLOAT
 #endif
 
+#define COEF16(x, a) ((opus_int16)SATURATE(((opus_int64)(x)+(1<<(a)>>1))>>(a), 32767))
+int opus_select_arch(void) {
+   return 0;
+}
+
 void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
 {
    int i, j, k;
@@ -94,9 +99,19 @@ void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
 
       fprintf(file, "#ifndef DEF_WINDOW%d\n", mode->overlap);
       fprintf(file, "#define DEF_WINDOW%d\n", mode->overlap);
-      fprintf (file, "static const opus_val16 window%d[%d] = {\n", mode->overlap, mode->overlap);
+      fprintf (file, "static const celt_coef window%d[%d] = {\n", mode->overlap, mode->overlap);
+#if defined(FIXED_POINT) && defined(ENABLE_QEXT)
+      fprintf(file, "#ifdef ENABLE_QEXT\n");
+      for (j=0;j<mode->overlap;j++)
+         fprintf (file, WORD32 ",%c", mode->window[j],(j+6)%5==0?'\n':' ');
+      fprintf(file, "#else\n");
+      for (j=0;j<mode->overlap;j++)
+         fprintf (file, WORD16 ",%c", COEF16(mode->window[j], 16),(j+6)%5==0?'\n':' ');
+      fprintf(file, "#endif\n");
+#else
       for (j=0;j<mode->overlap;j++)
          fprintf (file, WORD16 ",%c", mode->window[j],(j+6)%5==0?'\n':' ');
+#endif
       fprintf (file, "};\n");
       fprintf(file, "#endif\n");
       fprintf(file, "\n");
@@ -145,13 +160,46 @@ void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
       fprintf(file, "#endif\n");
       fprintf(file, "\n");
 
+      /* QEXT Pulse cache */
+      if (mode->qext_cache.index != NULL) {
+         fprintf(file, "#ifdef ENABLE_QEXT\n");
+         fprintf(file, "# ifndef DEF_QEXT_PULSE_CACHE%d\n", mode->Fs/mdctSize);
+         fprintf(file, "# define DEF_QEXT_PULSE_CACHE%d\n", mode->Fs/mdctSize);
+         fprintf (file, "static const opus_int16 qext_cache_index%d[%d] = {\n", mode->Fs/mdctSize, (mode->maxLM+2)*NB_QEXT_BANDS);
+         for (j=0;j<NB_QEXT_BANDS*(mode->maxLM+2);j++)
+            fprintf (file, "%d,%c", mode->qext_cache.index[j],(j+16)%15==0?'\n':' ');
+         fprintf (file, "};\n");
+         fprintf (file, "static const unsigned char qext_cache_bits%d[%d] = {\n", mode->Fs/mdctSize, mode->qext_cache.size);
+         for (j=0;j<mode->qext_cache.size;j++)
+            fprintf (file, "%d,%c", mode->qext_cache.bits[j],(j+16)%15==0?'\n':' ');
+         fprintf (file, "};\n");
+         fprintf (file, "static const unsigned char qext_cache_caps%d[%d] = {\n", mode->Fs/mdctSize, (mode->maxLM+1)*2*NB_QEXT_BANDS);
+         for (j=0;j<(mode->maxLM+1)*2*NB_QEXT_BANDS;j++)
+            fprintf (file, "%d,%c", mode->qext_cache.caps[j],(j+16)%15==0?'\n':' ');
+         fprintf (file, "};\n");
+         fprintf(file, "# endif\n");
+         fprintf(file, "#endif\n");
+         fprintf(file, "\n");
+      }
+
       /* FFT twiddles */
       fprintf(file, "#ifndef FFT_TWIDDLES%d_%d\n", mode->Fs, mdctSize);
       fprintf(file, "#define FFT_TWIDDLES%d_%d\n", mode->Fs, mdctSize);
+
       fprintf (file, "static const kiss_twiddle_cpx fft_twiddles%d_%d[%d] = {\n",
             mode->Fs, mdctSize, mode->mdct.kfft[0]->nfft);
+#if defined(FIXED_POINT) && defined(ENABLE_QEXT)
+      fprintf(file, "#ifdef ENABLE_QEXT\n");
+      for (j=0;j<mode->mdct.kfft[0]->nfft;j++)
+         fprintf (file, "{" WORD32 ", " WORD32 "},%c", mode->mdct.kfft[0]->twiddles[j].r, mode->mdct.kfft[0]->twiddles[j].i,(j+3)%2==0?'\n':' ');
+      fprintf(file, "#else\n");
+      for (j=0;j<mode->mdct.kfft[0]->nfft;j++)
+         fprintf (file, "{" WORD16 ", " WORD16 "},%c", COEF16(mode->mdct.kfft[0]->twiddles[j].r,16), COEF16(mode->mdct.kfft[0]->twiddles[j].i,16),(j+3)%2==0?'\n':' ');
+      fprintf(file, "#endif\n");
+#else
       for (j=0;j<mode->mdct.kfft[0]->nfft;j++)
          fprintf (file, "{" WORD16 ", " WORD16 "},%c", mode->mdct.kfft[0]->twiddles[j].r, mode->mdct.kfft[0]->twiddles[j].i,(j+3)%2==0?'\n':' ');
+#endif
       fprintf (file, "};\n");
 
 #ifdef OVERRIDE_FFT
@@ -180,7 +228,16 @@ void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
          fprintf (file, "static const kiss_fft_state fft_state%d_%d_%d = {\n",
                mode->Fs, mdctSize, k);
          fprintf (file, "%d,    /* nfft */\n", mode->mdct.kfft[k]->nfft);
+
+#if defined(FIXED_POINT) && defined(ENABLE_QEXT)
+         fprintf(file, "#ifdef ENABLE_QEXT\n");
+         fprintf (file, WORD32 ",    /* scale */\n", mode->mdct.kfft[k]->scale);
+         fprintf(file, "#else\n");
+         fprintf (file, WORD16 ",    /* scale */\n", COEF16(mode->mdct.kfft[k]->scale, 15));
+         fprintf(file, "#endif\n");
+#else
          fprintf (file, WORD16 ",    /* scale */\n", mode->mdct.kfft[k]->scale);
+#endif
 #ifdef FIXED_POINT
          fprintf (file, "%d,    /* scale_shift */\n", mode->mdct.kfft[k]->scale_shift);
 #endif
@@ -211,10 +268,22 @@ void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
       mdct_twiddles_size = mode->mdct.n-(mode->mdct.n/2>>mode->mdct.maxshift);
       fprintf(file, "#ifndef MDCT_TWIDDLES%d\n", mdctSize);
       fprintf(file, "#define MDCT_TWIDDLES%d\n", mdctSize);
-      fprintf (file, "static const opus_val16 mdct_twiddles%d[%d] = {\n",
+      fprintf (file, "static const celt_coef mdct_twiddles%d[%d] = {\n",
             mdctSize, mdct_twiddles_size);
+
+#if defined(FIXED_POINT) && defined(ENABLE_QEXT)
+      fprintf(file, "#ifdef ENABLE_QEXT\n");
+      for (j=0;j<mdct_twiddles_size;j++)
+         fprintf (file, WORD32 ",%c", mode->mdct.trig[j],(j+6)%5==0?'\n':' ');
+      fprintf(file, "#else\n");
+      for (j=0;j<mdct_twiddles_size;j++)
+         fprintf (file, WORD16 ",%c", COEF16(mode->mdct.trig[j], 16),(j+6)%5==0?'\n':' ');
+      fprintf(file, "#endif\n");
+#else
       for (j=0;j<mdct_twiddles_size;j++)
          fprintf (file, WORD16 ",%c", mode->mdct.trig[j],(j+6)%5==0?'\n':' ');
+#endif
+
       fprintf (file, "};\n");
 
       fprintf(file, "#endif\n");
@@ -255,6 +324,15 @@ void dump_modes(FILE *file, CELTMode **modes, int nb_modes)
 
       fprintf(file, "{%d, cache_index%d, cache_bits%d, cache_caps%d},    /* cache */\n",
             mode->cache.size, mode->Fs/mdctSize, mode->Fs/mdctSize, mode->Fs/mdctSize);
+
+      fprintf(file, "#ifdef ENABLE_QEXT\n");
+      if (mode->qext_cache.index != NULL) {
+         fprintf(file, "{%d, qext_cache_index%d, qext_cache_bits%d, qext_cache_caps%d},    /* qext_cache */\n",
+               mode->qext_cache.size, mode->Fs/mdctSize, mode->Fs/mdctSize, mode->Fs/mdctSize);
+      } else {
+         fprintf(file, "{0, NULL, NULL, NULL},    /* qext_cache */\n");
+      }
+      fprintf(file, "#endif\n");
       fprintf(file, "};\n");
    }
    fprintf(file, "\n");
