@@ -883,18 +883,32 @@ fn gain_fade(
     }
 }
 
+/// Upstream C: celt/celt.h:bits_to_bitrate
+#[inline]
+fn bits_to_bitrate(bits: i32, fs: i32, frame_size: i32) -> i32 {
+    bits * (6 * fs / frame_size) / 6
+}
+
+/// Upstream C: celt/celt.h:bitrate_to_bits
+#[inline]
+fn bitrate_to_bits(bitrate: i32, fs: i32, frame_size: i32) -> i32 {
+    bitrate * 6 / (6 * fs / frame_size)
+}
+
 /// Upstream C: src/opus_encoder.c:user_bitrate_to_bitrate
 fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
     if frame_size == 0 {
         frame_size = st.Fs / 400;
     }
-    if st.user_bitrate_bps == OPUS_AUTO {
+    let max_bitrate = bits_to_bitrate(max_data_bytes * 8, st.Fs, frame_size);
+    let user_bitrate = if st.user_bitrate_bps == OPUS_AUTO {
         60 * st.Fs / frame_size + st.Fs * st.channels
     } else if st.user_bitrate_bps == OPUS_BITRATE_MAX {
-        1_500_000i32.min(max_data_bytes * 8 * (st.Fs / 1000) / frame_size * 1000)
+        1_500_000
     } else {
         st.user_bitrate_bps
-    }
+    };
+    user_bitrate.min(max_bitrate)
 }
 
 /// Upstream C: src/opus_encoder.c:frame_size_select
@@ -950,7 +964,7 @@ pub fn compute_stereo_width(
     let mut short_alpha: opus_val16 = 0.;
     frame_rate = Fs / frame_size;
     short_alpha =
-        Q15ONE - 25 as opus_val32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
+        25 as opus_val32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
     yy = 0 as opus_val32;
     xy = yy;
     xx = xy;
@@ -1448,7 +1462,7 @@ fn compute_dred_bitrate(st: &mut OpusEncoder, bitrate_bps: i32, frame_size: i32)
     let mut target_chunks: i32 = 0;
     let max_dred_bits: i32;
     if st.dred_duration > 0 {
-        let target_bits = target_dred_bitrate * frame_size / st.Fs;
+        let target_bits = bitrate_to_bits(target_dred_bitrate, st.Fs, frame_size);
         max_dred_bits = estimate_dred_bitrate(
             q0,
             dq,
@@ -1461,7 +1475,8 @@ fn compute_dred_bitrate(st: &mut OpusEncoder, bitrate_bps: i32, frame_size: i32)
         max_dred_bits = 0;
         target_chunks = 0;
     }
-    let mut dred_bitrate = target_dred_bitrate.min(max_dred_bits * st.Fs / frame_size);
+    let mut dred_bitrate =
+        target_dred_bitrate.min(bits_to_bitrate(max_dred_bits, st.Fs, frame_size));
     // If we can't afford enough bits, don't bother with DRED at all.
     if target_chunks < 2 {
         dred_bitrate = 0;
@@ -1622,7 +1637,10 @@ pub fn opus_encode_native(
             lsb_depth,
             &mut analysis_info,
         );
-        if is_silence == 0 && analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
+        if is_silence == 0
+            && (analysis_info.valid == 0
+                || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD)
+        {
             let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
             st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
                 > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
@@ -1647,6 +1665,10 @@ pub fn opus_encode_native(
             let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
             activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
         }
+    } else if st.mode == MODE_CELT_ONLY {
+        let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
+        // Boosting peak energy a bit because we didn't just average the active frames.
+        activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * 0.5 * noise_energy) as i32;
     }
     st.detected_bandwidth = 0;
     if analysis_info.valid != 0 {
@@ -1690,13 +1712,9 @@ pub fn opus_encode_native(
     frame_rate = st.Fs / frame_size;
     if st.use_vbr == 0 {
         let mut cbrBytes: i32 = 0;
-        let frame_rate12: i32 = 12 * st.Fs / frame_size;
-        cbrBytes = if (12 * st.bitrate_bps / 8 + frame_rate12 / 2) / frame_rate12 < max_data_bytes {
-            (12 * st.bitrate_bps / 8 + frame_rate12 / 2) / frame_rate12
-        } else {
-            max_data_bytes
-        };
-        st.bitrate_bps = cbrBytes * frame_rate12 * 8 / 12;
+        cbrBytes =
+            ((bitrate_to_bits(st.bitrate_bps, st.Fs, frame_size) + 4) / 8).min(max_data_bytes);
+        st.bitrate_bps = bits_to_bitrate(cbrBytes * 8, st.Fs, frame_size);
         max_data_bytes = if 1 > cbrBytes { 1 } else { cbrBytes };
     }
     // Allocate some of the bits to DRED if needed.
@@ -1767,7 +1785,7 @@ pub fn opus_encode_native(
         }
         return ret;
     }
-    max_rate = frame_rate * max_data_bytes * 8;
+    max_rate = bits_to_bitrate(max_data_bytes * 8, st.Fs, frame_size);
     equiv_rate = compute_equiv_rate(
         st.bitrate_bps,
         st.channels,
@@ -1849,7 +1867,9 @@ pub fn opus_encode_native(
         if st.silk_mode.useDTX != 0 && voice_est > 100 {
             st.mode = MODE_SILK_ONLY;
         }
-        if max_data_bytes < (if frame_rate > 50 { 9000 } else { 6000 }) * frame_size / (st.Fs * 8) {
+        if max_data_bytes
+            < bitrate_to_bits(if frame_rate > 50 { 9000 } else { 6000 }, st.Fs, frame_size) / 8
+        {
             st.mode = MODE_CELT_ONLY;
         }
     } else {
@@ -2108,12 +2128,12 @@ pub fn opus_encode_native(
             redundancy = 0;
         }
     }
-    bytes_target = (if max_data_bytes - redundancy_bytes < (st.bitrate_bps / 8) * frame_size / st.Fs
-    {
-        max_data_bytes - redundancy_bytes
-    } else {
-        (st.bitrate_bps / 8) * frame_size / st.Fs
-    }) - 1;
+    bytes_target = ((8 * (max_data_bytes - redundancy_bytes)).min(bitrate_to_bits(
+        st.bitrate_bps,
+        st.Fs,
+        frame_size,
+    )) - 8)
+        / 8;
     enc = ec_enc_init(&mut data[1..max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
@@ -2207,7 +2227,7 @@ pub fn opus_encode_native(
         let mut celt_rate: i32 = 0;
         let vla_0 = (st.channels * frame_size) as usize;
         let mut pcm_silk: Vec<i16> = ::std::vec::from_elem(0, vla_0);
-        total_bitRate = 8 * bytes_target * frame_rate;
+        total_bitRate = bits_to_bitrate(bytes_target * 8, st.Fs, frame_size);
         if st.mode == MODE_HYBRID {
             st.silk_mode.bitRate = compute_silk_rate_for_hybrid(
                 total_bitRate,
@@ -2348,7 +2368,7 @@ pub fn opus_encode_native(
                 st.silk_mode.LBRR_coded,
                 st.stream_channels,
             );
-            st.silk_mode.maxBits = maxBitRate * frame_size / st.Fs;
+            st.silk_mode.maxBits = bitrate_to_bits(maxBitRate, st.Fs, frame_size);
         }
         if prefill != 0 {
             let mut zero: i32 = 0;

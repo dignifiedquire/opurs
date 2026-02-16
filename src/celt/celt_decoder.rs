@@ -1462,6 +1462,7 @@ fn celt_decode_body(
             &st.oldLogE2[..(2 * nbEBands) as usize],
             &pulses,
             st.rng,
+            0, // encode=0 for decoder
             st.arch,
         );
     }

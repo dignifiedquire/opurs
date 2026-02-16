@@ -261,6 +261,7 @@ pub fn anti_collapse(
     prev2logE: &[f32],
     pulses: &[i32],
     mut seed: u32,
+    encode: i32,
     arch: i32,
 ) {
     let mut i = start;
@@ -276,7 +277,7 @@ pub fn anti_collapse(
         loop {
             let mut prev1 = prev1logE[(c * m.nbEBands as i32 + i) as usize];
             let mut prev2 = prev2logE[(c * m.nbEBands as i32 + i) as usize];
-            if C == 1 {
+            if encode == 0 && C == 1 {
                 prev1 = if prev1 > prev1logE[(m.nbEBands as i32 + i) as usize] {
                     prev1
                 } else {

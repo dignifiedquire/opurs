@@ -259,6 +259,8 @@ fn transient_analysis(
     tf_chan: &mut i32,
     allow_weak_transients: i32,
     weak_transient: &mut i32,
+    tone_freq: opus_val16,
+    toneishness: opus_val32,
 ) -> i32 {
     let mut i: i32 = 0;
     let mut mem0: opus_val32 = 0.;
@@ -360,6 +362,12 @@ fn transient_analysis(
         c += 1;
     }
     is_transient = (mask_metric > 200) as i32;
+    // Prevent the transient detector from confusing the partial cycle of a
+    // very low frequency tone with a transient.
+    if toneishness > 0.98 && tone_freq < 0.026 {
+        is_transient = 0;
+        mask_metric = 0;
+    }
     if allow_weak_transients != 0 && is_transient != 0 && mask_metric < 600 {
         is_transient = 0;
         *weak_transient = 1;
@@ -1153,6 +1161,8 @@ fn dynalloc_analysis(
     analysis: &AnalysisInfo,
     importance: &mut [i32],
     spread_weight: &mut [i32],
+    tone_freq: opus_val16,
+    toneishness: opus_val32,
 ) -> opus_val16 {
     let mut i: i32 = 0;
     let mut c: i32 = 0;
@@ -1430,6 +1440,36 @@ fn dynalloc_analysis(
                 i += 1;
             }
         }
+        // Compensate for Opus' under-allocation on tones.
+        if toneishness > 0.98 {
+            let freq_bin = (0.5 + tone_freq as f64 * 120.0 / std::f64::consts::PI) as i32;
+            for i in start..end {
+                if freq_bin >= eBands[i as usize] as i32
+                    && freq_bin <= eBands[(i + 1) as usize] as i32
+                {
+                    follower[i as usize] += 2.0;
+                }
+                if freq_bin >= eBands[i as usize] as i32 - 1
+                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 1
+                {
+                    follower[i as usize] += 1.0;
+                }
+                if freq_bin >= eBands[i as usize] as i32 - 2
+                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 2
+                {
+                    follower[i as usize] += 1.0;
+                }
+                if freq_bin >= eBands[i as usize] as i32 - 3
+                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 3
+                {
+                    follower[i as usize] += 0.5;
+                }
+            }
+            if freq_bin >= eBands[end as usize] as i32 {
+                follower[(end - 1) as usize] += 2.0;
+                follower[(end - 2) as usize] += 1.0;
+            }
+        }
         i = start;
         while i < end {
             if i < 8 {
@@ -1492,6 +1532,112 @@ fn dynalloc_analysis(
     *tot_boost_ = tot_boost;
     maxDepth
 }
+/// 2nd-order LPC analysis using the forward/backward covariance method.
+/// Returns `true` on failure (ill-conditioned).
+///
+/// Upstream C: celt/celt_encoder.c:tone_lpc
+fn tone_lpc(x: &[opus_val16], len: usize, delay: usize, lpc: &mut [opus_val32; 2]) -> bool {
+    debug_assert!(len > 2 * delay);
+    // Compute forward correlations.
+    let mut r00: opus_val32 = 0.0;
+    let mut r01: opus_val32 = 0.0;
+    let mut r02: opus_val32 = 0.0;
+    for i in 0..len - 2 * delay {
+        r00 += x[i] * x[i];
+        r01 += x[i] * x[i + delay];
+        r02 += x[i] * x[i + 2 * delay];
+    }
+    let mut edges: opus_val32 = 0.0;
+    for i in 0..delay {
+        edges += x[len + i - 2 * delay] * x[len + i - 2 * delay] - x[i] * x[i];
+    }
+    let r11 = r00 + edges;
+    edges = 0.0;
+    for i in 0..delay {
+        edges += x[len + i - delay] * x[len + i - delay] - x[i + delay] * x[i + delay];
+    }
+    let r22 = r11 + edges;
+    edges = 0.0;
+    for i in 0..delay {
+        edges += x[len + i - 2 * delay] * x[len + i - delay] - x[i] * x[i + delay];
+    }
+    let r12 = r01 + edges;
+    // Reverse and sum to get the backward contribution.
+    // C: R00=r00+r22, R01=r01+r12, R11=2*r11, R02=2*r02, R12=r12+r01, R22=r00+r22
+    // Note: R01 == R12, R00 == R22.
+    let r00 = r00 + r22;
+    let r01 = r01 + r12;
+    let r11 = 2.0 * r11;
+    let r02 = 2.0 * r02;
+    // r12_combined = r12 + r01_original, but since r01_combined = r01_orig + r12,
+    // we have r12_combined == r01_combined.
+
+    // Solve A*x=b, where A=[r00, r01; r01, r11] and b=[r02; r12].
+    // Since r12_combined == r01, we use r01 for both.
+    let den = r00 * r11 - r01 * r01;
+    if den < 0.001 * r00 * r11 {
+        return true; // fail
+    }
+    let num1 = r02 * r11 - r01 * r01; // r01 * r12, but r12 == r01
+    if num1 >= den {
+        lpc[1] = 1.0;
+    } else if num1 <= -den {
+        lpc[1] = -1.0;
+    } else {
+        lpc[1] = num1 / den;
+    }
+    let num0 = r00 * r01 - r02 * r01; // r00 * r12 - r02 * r01, but r12 == r01
+    if 0.5 * num0 >= den {
+        lpc[0] = 1.999999;
+    } else if 0.5 * num0 <= -den {
+        lpc[0] = -1.999999;
+    } else {
+        lpc[0] = num0 / den;
+    }
+    false // success
+}
+
+/// Detects pure or nearly pure tones to prevent them from causing
+/// problems with the encoder.
+///
+/// Upstream C: celt/celt_encoder.c:tone_detect
+fn tone_detect(
+    input: &[celt_sig],
+    CC: i32,
+    N: i32,
+    toneishness: &mut opus_val32,
+    Fs: i32,
+) -> opus_val16 {
+    let n = N as usize;
+    let mut delay: usize = 1;
+    let mut lpc = [0.0f32; 2];
+    let mut x: Vec<opus_val16> = vec![0.0; n];
+    // In float build, SHR32/PSHR32/ADD32 are identity ops, so the
+    // downscaling is just averaging channels for stereo.
+    if CC == 2 {
+        for i in 0..n {
+            x[i] = (input[i] * 0.5) + (input[i + n] * 0.5);
+        }
+    } else {
+        x[..n].copy_from_slice(&input[..n]);
+    }
+    let mut fail = tone_lpc(&x, n, delay, &mut lpc);
+    // If our LPC filter resonates too close to DC, retry with down-sampling.
+    while delay <= (Fs / 3000) as usize && (fail || (lpc[0] > 1.0 && lpc[1] < 0.0)) {
+        delay *= 2;
+        fail = tone_lpc(&x, n, delay, &mut lpc);
+    }
+    // Check that our filter has complex roots.
+    if !fail && lpc[0] * lpc[0] + 3.999999 * lpc[1] < 0.0 {
+        // Squared radius of the poles.
+        *toneishness = -lpc[1];
+        (0.5 * lpc[0]).acos() / delay as f32
+    } else {
+        *toneishness = 0.0;
+        -1.0
+    }
+}
+
 /// Upstream C: celt/celt_encoder.c:run_prefilter
 fn run_prefilter(
     st: &mut OpusCustomEncoder,
@@ -1505,6 +1651,8 @@ fn run_prefilter(
     enabled: i32,
     nbAvailableBytes: i32,
     analysis: &AnalysisInfo,
+    tone_freq: opus_val16,
+    toneishness: opus_val32,
 ) -> i32 {
     let mut pitch_index: i32 = 0;
     let mut gain1: opus_val16 = 0.;
@@ -1530,7 +1678,30 @@ fn run_prefilter(
             ..pre_base + COMBFILTER_MAXPERIOD as usize + N as usize]
             .copy_from_slice(&in_0[in_src..in_src + N as usize]);
     }
-    if enabled != 0 {
+    if enabled != 0 && toneishness > 0.99 {
+        // If we detect that the signal is dominated by a single tone, don't rely
+        // on the standard pitch estimator, as it can become unreliable.
+        let mut multiple = 1i32;
+        let mut tf = tone_freq;
+        // Using aliased version of the postfilter above 24 kHz.
+        if tf >= std::f32::consts::PI {
+            tf = std::f32::consts::PI - tf;
+        }
+        // If the pitch is too high for our post-filter, apply pitch doubling
+        // until we can get something that fits.
+        while tf >= multiple as f32 * 0.39 {
+            multiple += 1;
+        }
+        if tf > 0.006148 {
+            pitch_index = ((0.5 + 2.0 * std::f64::consts::PI * multiple as f64 / tf as f64) as i32)
+                .min(COMBFILTER_MAXPERIOD - 2);
+        } else {
+            // If the pitch is too low, using a very high pitch will actually give
+            // us an improvement due to the DC component of the filter.
+            pitch_index = COMBFILTER_MINPERIOD;
+        }
+        gain1 = 0.75;
+    } else if enabled != 0 {
         let vla_0 = ((COMBFILTER_MAXPERIOD + N) >> 1) as usize;
         let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
         {
@@ -1901,6 +2072,8 @@ pub fn celt_encode_with_ec<'b>(
     let mut silence: i32 = 0;
     let mut tf_chan: i32 = 0;
     let mut tf_estimate: opus_val16 = 0.;
+    let mut tone_freq: opus_val16 = -1.0;
+    let mut toneishness: opus_val32 = 0.0;
     let mut pitch_change: i32 = 0;
     let mut tot_boost: i32 = 0;
     let mut sample_max: opus_val32 = 0.;
@@ -1960,8 +2133,7 @@ pub fn celt_encode_with_ec<'b>(
     };
     nbAvailableBytes = nbCompressedBytes - nbFilledBytes;
     if st.vbr != 0 && st.bitrate != OPUS_BITRATE_MAX {
-        let den: i32 = mode.Fs >> (BITRES + 2);
-        vbr_rate = (((st.bitrate * frame_size) >> 2) + (den >> 1)) / den;
+        vbr_rate = (st.bitrate * 6 / (6 * mode.Fs / frame_size)) << BITRES;
         effectiveBytes = vbr_rate >> (3 + BITRES);
     } else {
         let mut tmp: i32 = 0;
@@ -2103,6 +2275,26 @@ pub fn celt_encode_with_ec<'b>(
             break;
         }
     }
+    // Tone detection — must be before transient_analysis and run_prefilter.
+    tone_freq = tone_detect(&in_0, CC, N + overlap, &mut toneishness, mode.Fs);
+    isTransient = 0;
+    shortBlocks = 0;
+    if st.complexity >= 1 && st.lfe == 0 {
+        let allow_weak_transients: i32 =
+            (hybrid != 0 && effectiveBytes < 15 && st.silk_info.signalType != 2) as i32;
+        isTransient = transient_analysis(
+            &in_0,
+            N + overlap,
+            CC,
+            &mut tf_estimate,
+            &mut tf_chan,
+            allow_weak_transients,
+            &mut weak_transient,
+            tone_freq,
+            toneishness,
+        );
+    }
+    toneishness = toneishness.min(1.0 - tf_estimate);
     let mut enabled: i32 = 0;
     let mut qg: i32 = 0;
     enabled = ((st.lfe != 0 && nbAvailableBytes > 3 || nbAvailableBytes > 12 * C)
@@ -2125,6 +2317,8 @@ pub fn celt_encode_with_ec<'b>(
             enabled,
             nbAvailableBytes,
             &analysis,
+            tone_freq,
+            toneishness,
         );
     }
     #[cfg(feature = "ent-dump")]
@@ -2154,21 +2348,6 @@ pub fn celt_encode_with_ec<'b>(
         pitch_index -= 1;
         ec_enc_bits(enc, qg as u32, 3);
         ec_enc_icdf(enc, prefilter_tapset, &tapset_icdf, 2);
-    }
-    isTransient = 0;
-    shortBlocks = 0;
-    if st.complexity >= 1 && st.lfe == 0 {
-        let allow_weak_transients: i32 =
-            (hybrid != 0 && effectiveBytes < 15 && st.silk_info.signalType != 2) as i32;
-        isTransient = transient_analysis(
-            &in_0,
-            N + overlap,
-            CC,
-            &mut tf_estimate,
-            &mut tf_chan,
-            allow_weak_transients,
-            &mut weak_transient,
-        );
     }
     if LM > 0 && ec_tell(enc) + 3 <= total_bits {
         if isTransient != 0 {
@@ -2444,8 +2623,11 @@ pub fn celt_encode_with_ec<'b>(
     let vla_5 = (C * N) as usize;
     let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_5);
     normalise_bands(mode, &freq, &mut X, &bandE, effEnd, C, M);
-    enable_tf_analysis =
-        (effectiveBytes >= 15 * C && hybrid == 0 && st.complexity >= 2 && st.lfe == 0) as i32;
+    enable_tf_analysis = (effectiveBytes >= 15 * C
+        && hybrid == 0
+        && st.complexity >= 2
+        && st.lfe == 0
+        && toneishness < 0.98) as i32;
     let vla_6 = nbEBands as usize;
     let mut offsets: Vec<i32> = ::std::vec::from_elem(0, vla_6);
     let vla_7 = nbEBands as usize;
@@ -2475,6 +2657,8 @@ pub fn celt_encode_with_ec<'b>(
         &st.analysis,
         &mut importance,
         &mut spread_weight,
+        tone_freq,
+        toneishness,
     );
     let vla_9 = nbEBands as usize;
     let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla_9);
@@ -2596,6 +2780,8 @@ pub fn celt_encode_with_ec<'b>(
             );
         }
         ec_enc_icdf(enc, st.spread_decision, &spread_icdf, 5);
+    } else {
+        st.spread_decision = SPREAD_NORMAL;
     }
     if st.lfe != 0 {
         offsets[0_usize] = if (8) < effectiveBytes / 3 {
