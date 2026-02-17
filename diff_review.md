@@ -834,3 +834,113 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 - Rust: `src/silk/resampler/down_fir.rs:214`
 - Upstream: `libopus-sys/opus/silk/resampler_private_down_FIR.c:138-141`
 - Detail: Upstream uses `celt_assert(0)` in the `FIR_Order` switch default and then returns (assert-gated behavior). Rust uses `unreachable!()` for the same branch, producing an unconditional hard panic if reached.
+
+166. [HIGH][QEXT][SILK Resampler] `silk_resampler_init` lacks upstream 96 kHz delay-table/rate-index coverage.
+- Rust: `src/silk/resampler/mod.rs:53-67`, `src/silk/resampler/mod.rs:70-78`, `src/silk/resampler/mod.rs:121-143`
+- Upstream: `libopus-sys/opus/silk/resampler.c:53-68`, `libopus-sys/opus/silk/resampler.c:70-72`, `libopus-sys/opus/silk/resampler.c:92-114`
+- Detail: Upstream includes QEXT-aware 96 kHz support in `delay_matrix_enc`/`delay_matrix_dec` and `rateID()` mapping (with `ENABLE_QEXT` validation arms). Rust tables/indexing only cover up to 48 kHz, so QEXT 96 kHz init paths cannot be represented and fall into panic paths.
+
+167. [MEDIUM][API Semantics][SILK Resampler] `silk_resampler_init` return surface is non-equivalent to upstream status-return API.
+- Rust: `src/silk/resampler/mod.rs:120` (returns `ResamplerState` directly)
+- Upstream: `libopus-sys/opus/silk/resampler.c:79-84`, `libopus-sys/opus/silk/resampler.c:99-101`, `libopus-sys/opus/silk/resampler.c:110-112`, `libopus-sys/opus/silk/resampler.c:178`
+- Detail: Upstream `silk_resampler_init(...)` returns `opus_int` and uses `-1` failure status on invalid tuples/ratios. Rust always returns a state object and uses panic paths for invalid inputs, removing upstream error-code semantics from this API boundary.
+
+168. [LOW][Runtime Semantics][SILK Resampler] Unsupported downsampling ratio handling is panic-based rather than assert+status.
+- Rust: `src/silk/resampler/mod.rs:207-209`
+- Upstream: `libopus-sys/opus/silk/resampler.c:161-165`
+- Detail: Upstream handles unreachable ratio combinations with `celt_assert(0)` and `return -1`. Rust uses `unreachable!(...)`, which unconditionally panics instead of preserving upstream status-return flow.
+
+169. [LOW][Validation Semantics][SILK] `silk_A2NLSF` omits upstream non-negative root assertion.
+- Rust: `src/silk/A2NLSF.rs:147-149` (root assignment without explicit non-negative assert)
+- Upstream: `libopus-sys/opus/silk/A2NLSF.c:214-217`
+- Detail: Upstream checks `silk_assert( NLSF[root_ix] >= 0 )` immediately after each root interpolation. Rust computes/stores `NLSF[root_ix]` without the matching assertion, so this specific invariant is not mirrored.
+
+170. [LOW][Runtime Semantics][SILK] `silk_sum_sqr_shift` uses `debug_assert!` where upstream keeps assert-gated post-loop invariants.
+- Rust: `src/silk/sum_sqr_shift.rs:25`
+- Upstream: `libopus-sys/opus/silk/sum_sqr_shift.c:61`, `libopus-sys/opus/silk/sum_sqr_shift.c:77`
+- Detail: Upstream checks `nrg >= 0` after both accumulation passes with `silk_assert`. Rust only checks this condition inside helper `silk_sum_sqr_shift_inner` via `debug_assert!`, so release builds drop the invariant checks and there is no explicit second-pass postcondition check mirroring upstream placement.
+
+171. [LOW][Runtime Semantics][SILK] `silk_LPC_inverse_pred_gain_c` keeps several upstream invariant checks only as `debug_assert!`.
+- Rust: `src/silk/LPC_inv_pred_gain.rs:44-45`, `src/silk/LPC_inv_pred_gain.rs:50-51`, `src/silk/LPC_inv_pred_gain.rs:102-103`
+- Upstream: `libopus-sys/opus/silk/LPC_inv_pred_gain.c:62-63`, `libopus-sys/opus/silk/LPC_inv_pred_gain.c:68-69`, `libopus-sys/opus/silk/LPC_inv_pred_gain.c:112-113`
+- Detail: Upstream enforces `rc_mult1_Q30` and `invGain_Q30` bounds with `silk_assert` at each stage. Rust downgrades these to `debug_assert!`, so release builds drop the checks and no longer mirror upstream invariant enforcement points.
+
+172. [LOW][Runtime Semantics][CELT Mathops] `celt_atan2p_norm` precondition check is `debug_assert!` in Rust.
+- Rust: `src/celt/mathops.rs:92-94`
+- Upstream: `libopus-sys/opus/celt/mathops.h:170-173`
+- Detail: Upstream guards non-negative-domain inputs with `celt_sig_assert(x>=0 && y>=0)`. Rust uses `debug_assert!`, so release builds drop this invariant check and no longer mirror upstream assert-gated behavior at that call boundary.
+
+173. [LOW][API Surface][SILK Decoder Init] `silk_init_decoder`/`silk_reset_decoder` do not mirror upstream in-place status-return API.
+- Rust: `src/silk/init_decoder.rs:14`, `src/silk/init_decoder.rs:58` (reset is `fn(...){...}`; init constructs/returns `silk_decoder_state`)
+- Upstream: `libopus-sys/opus/silk/init_decoder.c:43-45`, `libopus-sys/opus/silk/init_decoder.c:73-75`, `libopus-sys/opus/silk/init_decoder.c:66-67`, `libopus-sys/opus/silk/init_decoder.c:82`
+- Detail: Upstream initializes/reset an existing decoder struct and returns `opus_int` status (`0` on success). Rust exposes a constructor-style init returning the state directly and a void reset path, so the initialization API contract differs from upstream C.
+
+174. [LOW][Runtime Semantics][SILK+OSCE] Decoder reset initializes OSCE method to `NONE` rather than upstream `OSCE_DEFAULT_METHOD`.
+- Rust: `src/silk/init_decoder.rs:50`
+- Upstream: `libopus-sys/opus/silk/init_decoder.c:61-64`, `libopus-sys/opus/dnn/osce.h:59-67`
+- Detail: With OSCE enabled, upstream `silk_reset_decoder` calls `osce_reset(..., OSCE_DEFAULT_METHOD)` (typically NOLACE/LACE when compiled). Rust reset uses `OSCE_METHOD_NONE`, changing default post-reset OSCE state semantics.
+
+175. [HIGH][QEXT][DRED] DRED 16 kHz conversion helper omits upstream 96 kHz handling.
+- Rust: `src/dnn/dred/encoder.rs:154-161`
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:143-163`
+- Detail: Upstream includes `case 96000: up = 1` under `ENABLE_QEXT` in `dred_convert_to_16k`. Rust switch has no `96000` arm and falls into panic on that rate, so QEXT-enabled 96 kHz DRED conversion is not mirrored.
+
+176. [MEDIUM][Initialization Semantics][DRED] `dred_encoder_init` does not mirror upstream built-in model auto-load behavior.
+- Rust: `src/dnn/dred/encoder.rs:110-115`
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:79-87`
+- Detail: Upstream `dred_encoder_init` sets `loaded=1` when built-in RDOVAE weights are compiled (`!USE_WEIGHTS_FILE`) before reset. Rust `DREDEnc::init` unconditionally sets `loaded=false` and resets without an equivalent built-in auto-load path at this API boundary.
+
+177. [LOW][API Coverage][DRED] Upstream encoder deinitialization helper is not mirrored as a dedicated Rust API.
+- Rust: `src/dnn/dred/encoder.rs` (no `dred_deinit_encoder` equivalent found)
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.h:65`
+- Detail: Upstream declares `dred_deinit_encoder(DREDEnc*)` as part of the DRED encoder lifecycle surface. Rust relies on ownership/drop and does not expose a direct deinit helper, so lifecycle API parity is incomplete.
+
+178. [LOW][API Coverage][MLP] Upstream analysis-layer helper entry points are not mirrored as direct Rust APIs.
+- Rust: `src/opus/mlp/mod.rs:13-15`, `src/opus/mlp/analysis_mlp.rs:267-276` (only high-level `run_analysis_mlp` exposed)
+- Upstream: `libopus-sys/opus/src/mlp.h:56-58`, `libopus-sys/opus/src/mlp.c:70-131`
+- Detail: Upstream provides callable helper functions `analysis_compute_dense(...)` and `analysis_compute_gru(...)`. Rust implements equivalent logic inside layer methods (`src/opus/mlp/layers.rs`) but does not expose matching standalone entry points, so API-level parity for these MLP helpers is incomplete.
+
+179. [MEDIUM][DNN API Coverage][LPCNet] Standalone LPCNet decoder/synthesis API surface from upstream headers is not mirrored.
+- Rust: `src/dnn/lpcnet.rs` (provides `LPCNetEncState`, `LPCNetPLCState`, feature/PLC helpers; no `LPCNetDecState`/`LPCNetState` create/decode/synthesize API)
+- Upstream: `libopus-sys/opus/dnn/lpcnet.h:40-79`, `libopus-sys/opus/dnn/lpcnet.h:134-166`
+- Detail: Upstream declares standalone LPCNet decoder/synthesis lifecycle and processing entry points (`lpcnet_decoder_*`, `lpcnet_*`, `lpcnet_synthesize`, `lpcnet_decode`). Rust currently exposes encoder-analysis and PLC components but not the equivalent decoder/synth API set.
+
+180. [LOW][DNN API Surface][LPCNet] Direct blob-based LPCNet load helpers are not mirrored as one-shot APIs.
+- Rust: `src/dnn/lpcnet.rs:215-216`, `src/dnn/lpcnet.rs:571-580`, plus parser helper `src/dnn/weights.rs:37-38`
+- Upstream: `libopus-sys/opus/dnn/lpcnet.h:97`, `libopus-sys/opus/dnn/lpcnet.h:180-181`
+- Detail: Upstream exposes direct blob loaders (`lpcnet_encoder_load_model`, `lpcnet_load_model`, `lpcnet_plc_load_model`) taking `(const void*, len)`. Rust exposes `load_model(&[WeightArray])` methods and a separate weight parser, but no equivalent one-call LPCNet blob-loading entry points.
+
+181. [MEDIUM][Constants][DRED] Experimental DRED version constant differs from upstream.
+- Rust: `src/dnn/dred/config.rs:8`
+- Upstream: `libopus-sys/opus/dnn/dred_config.h:35`
+- Detail: Rust sets `DRED_EXPERIMENTAL_VERSION = 10`, while upstream 1.6.1 defines `DRED_EXPERIMENTAL_VERSION 12`. This can alter extension compatibility/version-tag behavior for experimental DRED packet signaling.
+
+182. [HIGH][Model Constants][DRED] RDOVAE dimension/stat-table constants diverge from upstream generated headers.
+- Rust: `src/dnn/dred/config.rs:28-31`, `src/dnn/dred/stats.rs:6`, `src/dnn/dred/stats.rs:84`
+- Upstream: `libopus-sys/opus/dnn/dred_rdovae_constants.h:12-19`, `libopus-sys/opus/dnn/dred_rdovae_stats_data.h:15-24`
+- Detail: Upstream defines `DRED_LATENT_DIM=25`, `DRED_STATE_DIM=50`, `DRED_PADDED_LATENT_DIM=32`, `DRED_PADDED_STATE_DIM=56`, with corresponding stats table sizes `400` and `800`. Rust currently uses `21/19/24/24` and stats arrays sized `336/304`, indicating a different model-constant/data layout than upstream 1.6.1.
+
+183. [HIGH][Data Layout][DRED Decoder] `OpusDRED.latents` layout omits upstream per-latent extra slot (`DRED_LATENT_DIM+1`).
+- Rust: `src/dnn/dred/decoder.rs:38`, `src/dnn/dred/decoder.rs:179`, `src/dnn/dred/decoder.rs:200-206`
+- Upstream: `libopus-sys/opus/dnn/dred_decoder.h:40`, `libopus-sys/opus/dnn/dred_decoder.c:117`, `libopus-sys/opus/dnn/dred_decoder.c:123`
+- Detail: Upstream stores latents as `(DRED_NUM_REDUNDANCY_FRAMES/2)*(DRED_LATENT_DIM+1)` and writes an extra trailing value per latent (`q_level*.125 - 1`). Rust allocates/stores only `DRED_LATENT_DIM` values per latent frame, so decoded DRED latent layout differs from upstream.
+
+184. [LOW][Runtime Semantics][LPCNet PLC] FEC queue-full behavior differs from upstream assert-gated contract.
+- Rust: `src/dnn/lpcnet.rs:597-607`
+- Upstream: `libopus-sys/opus/dnn/lpcnet_plc.c:96-99`
+- Detail: Upstream `lpcnet_plc_fec_add` asserts `fec_fill_pos < PLC_MAX_FEC` and then appends. Rust instead handles `fec_fill_pos == PLC_MAX_FEC` by shifting buffered entries and continuing insertion. This changes overflow/invariant behavior compared with upstream's assert-based contract.
+
+185. [LOW][API Signature][DNN NNet] Generic DNN compute helpers omit upstream `arch` argument.
+- Rust: `src/dnn/nnet.rs:197`, `src/dnn/nnet.rs:214`, `src/dnn/nnet.rs:253`, `src/dnn/nnet.rs:272`, `src/dnn/nnet.rs:299`
+- Upstream: `libopus-sys/opus/dnn/nnet.h:89-93`, `libopus-sys/opus/dnn/nnet.c:60`, `libopus-sys/opus/dnn/nnet.c:76`, `libopus-sys/opus/dnn/nnet.c:107`, `libopus-sys/opus/dnn/nnet.c:124`, `libopus-sys/opus/dnn/nnet.c:136`
+- Detail: Upstream signatures carry an explicit `arch` parameter through generic dense/GRU/GLU/conv helpers (matching runtime dispatch conventions). Rust equivalents expose no `arch` parameter, so function-level API surface and call-shape are not source-equivalent.
+
+186. [LOW][API Coverage][DNN NNDSP] Explicit adaptive-filter state init helpers from upstream headers are not mirrored as direct functions.
+- Rust: `src/dnn/nndsp.rs:30`, `src/dnn/nndsp.rs:54`, `src/dnn/nndsp.rs:74` (`Default` impls for `AdaConvState`/`AdaCombState`/`AdaShapeState`)
+- Upstream: `libopus-sys/opus/dnn/nndsp.h:80-84`
+- Detail: Upstream exports `init_adaconv_state`, `init_adacomb_state`, and `init_adashape_state`. Rust initializes these states via struct defaults but does not expose matching named init helpers, leaving API-level parity incomplete.
+
+187. [LOW][API Signature][LPCNet] Single-frame feature extraction helpers omit upstream `arch` argument.
+- Rust: `src/dnn/lpcnet.rs:435`, `src/dnn/lpcnet.rs:454`
+- Upstream: `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
+- Detail: Upstream `lpcnet_compute_single_frame_features*` signatures include an explicit `arch` parameter. Rust helpers expose no `arch` input, so API call shape differs and does not mirror upstream arch-parameterized entry points.
