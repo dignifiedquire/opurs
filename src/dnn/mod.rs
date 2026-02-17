@@ -16,6 +16,8 @@
 #![allow(clippy::approx_constant)]
 #![allow(clippy::wildcard_in_or_patterns)]
 
+#[cfg(all(feature = "osce", feature = "builtin-weights"))]
+pub mod bbwenet_data;
 pub mod burg;
 #[cfg(feature = "dred")]
 pub mod dred;

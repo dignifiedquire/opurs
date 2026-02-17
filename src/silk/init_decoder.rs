@@ -91,6 +91,10 @@ pub fn silk_init_decoder() -> silk_decoder_state {
         sPLC: silk_PLC_struct::default(),
         #[cfg(feature = "osce")]
         osce: crate::dnn::osce::OSCEState::default(),
+        #[cfg(feature = "osce")]
+        osce_bwe: crate::dnn::osce::OSCEBWEState::default(),
+        #[cfg(feature = "osce")]
+        osce_bwe_features: crate::dnn::osce::OSCEBWEFeatureState::default(),
     };
 
     // Full init zeroes everything, then reset sets the proper initial values

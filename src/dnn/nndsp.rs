@@ -5,11 +5,11 @@
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::dnn::nnet::*;
 
-pub const ADACONV_MAX_KERNEL_SIZE: usize = 16;
-pub const ADACONV_MAX_INPUT_CHANNELS: usize = 2;
-pub const ADACONV_MAX_OUTPUT_CHANNELS: usize = 2;
-pub const ADACONV_MAX_FRAME_SIZE: usize = 80;
-pub const ADACONV_MAX_OVERLAP_SIZE: usize = 40;
+pub const ADACONV_MAX_KERNEL_SIZE: usize = 32;
+pub const ADACONV_MAX_INPUT_CHANNELS: usize = 3;
+pub const ADACONV_MAX_OUTPUT_CHANNELS: usize = 3;
+pub const ADACONV_MAX_FRAME_SIZE: usize = 240;
+pub const ADACONV_MAX_OVERLAP_SIZE: usize = 120;
 
 pub const ADACOMB_MAX_LAG: usize = 300;
 pub const ADACOMB_MAX_KERNEL_SIZE: usize = 16;
@@ -17,7 +17,7 @@ pub const ADACOMB_MAX_FRAME_SIZE: usize = 80;
 pub const ADACOMB_MAX_OVERLAP_SIZE: usize = 40;
 
 pub const ADASHAPE_MAX_INPUT_DIM: usize = 512;
-pub const ADASHAPE_MAX_FRAME_SIZE: usize = 160;
+pub const ADASHAPE_MAX_FRAME_SIZE: usize = 240;
 
 /// Upstream C: dnn/nndsp.h:AdaConvState
 #[derive(Clone)]
@@ -68,6 +68,7 @@ pub struct AdaShapeState {
     pub conv_alpha1f_state: Vec<f32>,
     pub conv_alpha1t_state: Vec<f32>,
     pub conv_alpha2_state: Vec<f32>,
+    pub interpolate_state: [f32; 1],
 }
 
 impl Default for AdaShapeState {
@@ -76,6 +77,7 @@ impl Default for AdaShapeState {
             conv_alpha1f_state: vec![0.0; ADASHAPE_MAX_INPUT_DIM],
             conv_alpha1t_state: vec![0.0; ADASHAPE_MAX_INPUT_DIM],
             conv_alpha2_state: vec![0.0; ADASHAPE_MAX_FRAME_SIZE],
+            interpolate_state: [0.0],
         }
     }
 }
@@ -389,8 +391,11 @@ pub fn adashape_process_frame(
     feature_dim: usize,
     frame_size: usize,
     avg_pool_k: usize,
+    interpolate_k: usize,
 ) {
     assert!(frame_size.is_multiple_of(avg_pool_k));
+    assert!(frame_size.is_multiple_of(interpolate_k));
+    let hidden_dim = frame_size / interpolate_k;
     let tenv_size = frame_size / avg_pool_k;
     assert!(feature_dim + tenv_size + 1 < ADASHAPE_MAX_INPUT_DIM);
 
@@ -440,7 +445,7 @@ pub fn adashape_process_frame(
 
     // Leaky ReLU — C uses `0.2 * tmp` where 0.2 is a double literal,
     // so the multiply is in double precision before truncating to float
-    for i in 0..frame_size {
+    for i in 0..hidden_dim {
         let tmp = out_buffer[i] + tmp_buffer[i];
         in_buffer[i] = if tmp >= 0.0 {
             tmp
@@ -451,12 +456,23 @@ pub fn adashape_process_frame(
 
     compute_generic_conv1d(
         alpha2,
-        &mut out_buffer,
+        &mut tmp_buffer,
         &mut state.conv_alpha2_state,
         &in_buffer,
-        frame_size,
+        hidden_dim,
         ACTIVATION_LINEAR,
     );
+
+    // Interpolation stage (new in 1.6.1)
+    // When interpolate_k=1, hidden_dim=frame_size, inner loop runs once with alpha=1.0 → no-op
+    for i in 0..hidden_dim {
+        for k in 0..interpolate_k {
+            let alpha = (k + 1) as f32 / interpolate_k as f32;
+            out_buffer[i * interpolate_k + k] =
+                alpha * tmp_buffer[i] + (1.0 - alpha) * state.interpolate_state[0];
+        }
+        state.interpolate_state[0] = tmp_buffer[i];
+    }
 
     // Shape signal — C uses double-precision exp() and the multiply stays in double
     // before truncating: x_out[i] = (float)(exp((double)out_buffer[i]) * (double)x_in[i])
