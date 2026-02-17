@@ -944,3 +944,69 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 - Rust: `src/dnn/lpcnet.rs:435`, `src/dnn/lpcnet.rs:454`
 - Upstream: `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
 - Detail: Upstream `lpcnet_compute_single_frame_features*` signatures include an explicit `arch` parameter. Rust helpers expose no `arch` input, so API call shape differs and does not mirror upstream arch-parameterized entry points.
+
+188. [LOW][Tooling Coverage][Compare] Rust compare utility does not mirror upstream QEXT compare tool path (`qext_compare`).
+- Rust: `src/tools/compare.rs:100-106`, `src/tools/demo/input.rs:41-47` (band table/sample-rate model tops out at 48 kHz)
+- Upstream: `libopus-sys/opus/src/qext_compare.c:60-62`, `libopus-sys/opus/src/qext_compare.c:308`
+- Detail: Upstream includes a dedicated 96 kHz/QEXT-aware compare utility with different band/frequency/window configuration (`NBANDS=28`, `NFREQS=480`, `TEST_WIN_SIZE=960`) and explicit 96 kHz handling. Rust currently exposes a single `opus_compare`-style path for up to 48 kHz.
+
+189. [LOW][Tooling Coverage][Compare] DRED-specific compare utility from upstream is not mirrored.
+- Rust: `src/tools/mod.rs:5-8` (exports `demo` and `opus_compare` utilities)
+- Upstream: `libopus-sys/opus/dnn/dred_compare.c`
+- Detail: Upstream provides `dred_compare` for DRED-focused quality evaluation workflows. Rust tools module has no dedicated equivalent utility surface for this comparison path.
+
+190. [MEDIUM][Runtime Semantics][DNN Vec x86] x86 non-AVX2 quantization/bias path diverges from upstream `USE_SU_BIAS` behavior.
+- Rust: `src/dnn/simd/mod.rs:100`, `src/dnn/simd/mod.rs:110`, `src/dnn/simd/mod.rs:135`, `src/dnn/simd/mod.rs:145`, `src/dnn/simd/mod.rs:302`
+- Rust fallback kernels: `src/dnn/vec.rs:202`, `src/dnn/vec.rs:216`
+- Upstream: `libopus-sys/opus/dnn/vec.h:38-39`, `libopus-sys/opus/dnn/vec_avx.h:41`, `libopus-sys/opus/dnn/vec.h:187`, `libopus-sys/opus/dnn/vec.h:221`
+- Detail: Upstream x86/SSE2 builds include `vec_avx.h` and use `USE_SU_BIAS` unsigned-input quantization (`127+round(127*x)`) for int8 GEMV paths. Rust only enables SU-bias semantics when AVX2 is detected and otherwise falls back to signed scalar GEMV, so x86 non-AVX2 behavior is not upstream-equivalent.
+
+191. [LOW][API Signature][OSCE] `osce_load_models` does not mirror upstream blob-loading entry point.
+- Rust: `src/dnn/osce.rs:1597`
+- Upstream: `libopus-sys/opus/dnn/osce.h:89`
+- Detail: Upstream signature is `osce_load_models(OSCEModel*, const void *data, int len)`. Rust exposes `osce_load_models(&mut OSCEModel, &[WeightArray]) -> bool`, requiring pre-parsed arrays and omitting the direct `(blob,len)` API shape.
+
+192. [LOW][API Signature][OSCE] `osce_enhance_frame`/`osce_bwe` omit upstream `arch` parameter.
+- Rust: `src/dnn/osce.rs:2527`, `src/dnn/osce.rs:3339`
+- Upstream: `libopus-sys/opus/dnn/osce.h:79`, `libopus-sys/opus/dnn/osce.h:93`
+- Detail: Upstream OSCE processing entry points include explicit run-time `arch` dispatch arguments. Rust equivalents do not take `arch`, so function-level call signatures are not source-equivalent.
+
+193. [LOW][API Signature][OSCE] `osce_bwe_reset` signature differs by requiring explicit feature-state argument.
+- Rust: `src/dnn/osce.rs:3299`
+- Upstream: `libopus-sys/opus/dnn/osce.h:102`, `libopus-sys/opus/dnn/osce.c:1410`
+- Detail: Upstream reset API takes only `silk_OSCE_BWE_struct*`. Rust requires both `OSCEBWEState` and `OSCEBWEFeatureState`, changing reset-call contract and API parity.
+
+194. [LOW][Arch Dispatch Coverage][DNN] Upstream RTCD x86/ARM specialized NNet kernels are not mirrored as architecture-specific backends.
+- Rust: `src/dnn/` (no `src/dnn/x86/*` or `src/dnn/arm/*` backend modules for `compute_linear/activation/conv2d`)
+- Upstream: `libopus-sys/opus/dnn/x86/dnn_x86.h`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c`, `libopus-sys/opus/dnn/x86/nnet_sse2.c`, `libopus-sys/opus/dnn/x86/nnet_sse4_1.c`, `libopus-sys/opus/dnn/x86/nnet_avx2.c`, `libopus-sys/opus/dnn/arm/nnet_dotprod.c`, `libopus-sys/opus/dnn/arm/nnet_neon.c`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c`
+- Detail: Upstream provides RTCD-selected architecture-specific implementations for core NNet ops beyond generic C. Rust currently provides generic kernels plus a vec-level SIMD layer, but no equivalent x86/ARM NNet backend surface.
+
+195. [MEDIUM][Validation Semantics][DNN Weights] `linear_init` omits upstream sparse-index structural validation.
+- Rust: `src/dnn/nnet.rs:501-517`
+- Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-120`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:151`
+- Detail: Upstream `find_idx_check` validates sparse index stream shape (`remain < nb_blocks+1`), 4-column alignment (`pos&0x3`), and bounds (`pos+3 < nb_in`) before accepting `weights_idx`. Rust only counts blocks and output groups, then accepts the index array without these checks, so malformed sparse index blobs that upstream rejects can be accepted.
+
+196. [LOW][Initialization Semantics][DNN Weights] Optional float-weight size mismatches are silently ignored instead of treated as init errors.
+- Rust: `src/dnn/nnet.rs:523-526`, `src/dnn/nnet.rs:534-538`, `src/dnn/nnet.rs:578-582`
+- Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:92`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:155-157`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:163-165`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:193-195`
+- Detail: Upstream uses `opt_array_check(..., &err)` and fails initialization when an optional named float array exists with wrong size. Rust uses `if let Some(...)` and simply leaves fields empty when size check fails, changing error behavior and potentially masking corrupted/incompatible blobs.
+
+197. [LOW][Validation Semantics][DNN Weights] `parse_weights` accepts zero-sized records that upstream rejects.
+- Rust: `src/dnn/nnet.rs:629-635`
+- Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:52`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:64`
+- Detail: Upstream `parse_record` returns `array->size` and `parse_weights` only accepts `ret > 0`; records with `size == 0` are treated as parse failure. Rust currently pushes arrays regardless of `size` (including zero), so malformed/empty records can be accepted where upstream rejects the blob.
+
+198. [LOW][Validation Semantics][DNN Weights] Record-name termination check is weaker than upstream.
+- Rust: `src/dnn/nnet.rs:620-623`
+- Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:43`
+- Detail: Upstream requires `h->name[43] == 0` (fixed-field null termination) and rejects records otherwise. Rust scans for the first NUL and allows fully non-terminated 44-byte names (`unwrap_or(44)`), so some headers rejected upstream are accepted in Rust.
+
+199. [LOW][API Coverage][DNN NNet] `compute_gated_activation` helper from upstream header is not mirrored.
+- Rust: `src/dnn/nnet.rs` (no `compute_gated_activation` function)
+- Upstream: `libopus-sys/opus/dnn/nnet.h:94`
+- Detail: Upstream exposes `compute_gated_activation(const LinearLayer*, float*, const float*, int activation, int arch)` as part of the generic NNet API surface. Rust currently exposes `compute_glu` and other helpers but no equivalent gated-activation entry point.
+
+200. [LOW][API Signature][DNN Weights] `parse_weights` return contract differs from upstream C API.
+- Rust: `src/dnn/nnet.rs:591`
+- Upstream: `libopus-sys/opus/dnn/nnet.h:97`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:55-79`
+- Detail: Upstream `parse_weights(WeightArray **list, const void *data, int len)` allocates a null-terminated C array and returns the array count (or `-1`). Rust returns `Option<Vec<WeightArray>>` with copied payloads and no C-style sentinel/list ownership contract, so parser API shape and memory/lifecycle semantics are not source-equivalent.
