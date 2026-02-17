@@ -7,7 +7,7 @@ use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entenc::ec_enc;
-use crate::celt::mathops::{celt_cos_norm, celt_rsqrt_norm, celt_sqrt, fast_atan2f};
+use crate::celt::mathops::{celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
 
 #[cfg(feature = "qext")]
@@ -690,8 +690,5 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);
-    #[allow(clippy::approx_constant)]
-    // Intentional: C reference uses 0.63662, not exact 2/PI
-    let frac_2_pi = 0.63662f32;
-    (0.5f32 + 65536.0 * 16384.0 * frac_2_pi * fast_atan2f(side, mid)).floor() as i32
+    (0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid)).floor() as i32
 }
