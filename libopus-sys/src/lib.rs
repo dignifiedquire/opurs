@@ -1199,6 +1199,11 @@ extern "C" {
     pub fn opus_dnn_nolace_count() -> ::std::os::raw::c_int;
     pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
 
+    // Per-model: BBWENet
+    pub fn opus_dnn_bbwenet_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_count() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
     // OSCE test harness: run nndsp building blocks with deterministic inputs
     pub fn osce_test_adaconv(
         out: *mut f32,

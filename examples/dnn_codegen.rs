@@ -222,6 +222,14 @@ fn main() {
             ffi_size: libopus_sys::opus_dnn_nolace_blob_size,
             ffi_write: libopus_sys::opus_dnn_nolace_write,
         },
+        ModelDesc {
+            rust_path: "src/dnn/bbwenet_data.rs",
+            c_source: "bbwenet_data.c",
+            feature: "osce",
+            fn_name: "bbwenetlayers_arrays",
+            ffi_size: libopus_sys::opus_dnn_bbwenet_blob_size,
+            ffi_write: libopus_sys::opus_dnn_bbwenet_write,
+        },
     ];
 
     println!("Generating DNN weight data files from upstream C library...\n");

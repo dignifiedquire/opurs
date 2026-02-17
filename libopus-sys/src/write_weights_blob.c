@@ -18,6 +18,9 @@
 #ifdef ENABLE_OSCE
 extern const WeightArray lacelayers_arrays[];
 extern const WeightArray nolacelayers_arrays[];
+#ifdef ENABLE_OSCE_BWE
+extern const WeightArray bbwenetlayers_arrays[];
+#endif
 #endif
 
 /* Count bytes needed for one WeightArray list (NULL-terminated). */
@@ -84,6 +87,9 @@ int opus_dnn_weights_blob_size(void)
 #ifdef ENABLE_OSCE
     total += weight_list_blob_size(lacelayers_arrays);
     total += weight_list_blob_size(nolacelayers_arrays);
+#ifdef ENABLE_OSCE_BWE
+    total += weight_list_blob_size(bbwenetlayers_arrays);
+#endif
 #endif
     return total;
 }
@@ -105,6 +111,9 @@ int opus_dnn_write_weights_blob(unsigned char *buf)
 #ifdef ENABLE_OSCE
     pos += write_weight_list(lacelayers_arrays, buf + pos);
     pos += write_weight_list(nolacelayers_arrays, buf + pos);
+#ifdef ENABLE_OSCE_BWE
+    pos += write_weight_list(bbwenetlayers_arrays, buf + pos);
+#endif
 #endif
     return pos;
 }
@@ -151,4 +160,11 @@ int opus_dnn_lace_write(unsigned char *buf)     { return write_weight_list(lacel
 int opus_dnn_nolace_blob_size(void)    { return weight_list_blob_size(nolacelayers_arrays); }
 int opus_dnn_nolace_count(void)        { return weight_list_count(nolacelayers_arrays); }
 int opus_dnn_nolace_write(unsigned char *buf)   { return write_weight_list(nolacelayers_arrays, buf); }
+
+#ifdef ENABLE_OSCE_BWE
+/* BBWENet */
+int opus_dnn_bbwenet_blob_size(void)   { return weight_list_blob_size(bbwenetlayers_arrays); }
+int opus_dnn_bbwenet_count(void)       { return weight_list_count(bbwenetlayers_arrays); }
+int opus_dnn_bbwenet_write(unsigned char *buf)  { return write_weight_list(bbwenetlayers_arrays, buf); }
+#endif
 #endif

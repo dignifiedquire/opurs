@@ -210,6 +210,9 @@ fn build_opus() {
 
         sources.extend(get_sources(&lpcnet_sources_mk, "DEEP_PLC_SOURCES"));
         headers.extend(get_sources(&lpcnet_headers_mk, "DEEP_PLC_HEAD"));
+        // DRED headers are always needed because the C opus_decoder.c
+        // includes dred_rdovae_dec_data.h under ENABLE_DEEP_PLC.
+        headers.extend(get_sources(&lpcnet_headers_mk, "DRED_HEAD"));
 
         // Our helper that serializes compiled-in weight arrays to the blob format.
         // Lives in libopus-sys/src/ (not in the upstream opus tree).
@@ -281,6 +284,7 @@ fn build_opus() {
     }
     if osce {
         config.push_str("#define ENABLE_OSCE 1\n");
+        config.push_str("#define ENABLE_OSCE_BWE 1\n");
     }
     if env::var("OSCE_DUMP_DEBUG").is_ok() {
         config.push_str("#define OSCE_DUMP_DEBUG 1\n");
