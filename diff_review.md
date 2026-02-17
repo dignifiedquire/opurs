@@ -1010,3 +1010,62 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 - Rust: `src/dnn/nnet.rs:591`
 - Upstream: `libopus-sys/opus/dnn/nnet.h:97`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:55-79`
 - Detail: Upstream `parse_weights(WeightArray **list, const void *data, int len)` allocates a null-terminated C array and returns the array count (or `-1`). Rust returns `Option<Vec<WeightArray>>` with copied payloads and no C-style sentinel/list ownership contract, so parser API shape and memory/lifecycle semantics are not source-equivalent.
+
+201. [MEDIUM][Builtin Weights Coverage][OSCE] `compiled_weights()` omits BBWENet arrays needed for OSCE-BWE model loading.
+- Rust: `src/dnn/weights.rs:15-30`
+- Rust BBWE arrays exist but are not included: `src/dnn/bbwenet_data.rs:112975`
+- Rust OSCE loader consumes BBWENet weights if present: `src/dnn/osce.rs:1597-1601`
+- Upstream builtin path initializes BBWENet arrays alongside LACE/NoLACE: `libopus-sys/opus/dnn/osce.c:1465-1468`
+- Detail: Upstream built-in OSCE model loading includes `bbwenetlayers_arrays` when OSCE-BWE is enabled. Rust `compiled_weights()` includes `lacelayers` and `nolacelayers` but not `bbwenetlayers`, so one-shot built-in weight aggregation is not upstream-equivalent for OSCE-BWE coverage.
+
+202. [LOW][Arch Dispatch Coverage][SILK VAD] Full-function SSE4.1 VAD RTCD path is not mirrored.
+- Rust: `src/silk/VAD.rs:60`, `src/silk/VAD.rs:154`, `src/silk/simd/mod.rs:101-113`
+- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:61-69`
+- Detail: Upstream x86 RTCD dispatches `silk_VAD_GetSA_Q8` to an SSE4.1 implementation at higher arch levels. Rust keeps `silk_VAD_GetSA_Q8_c` as the top-level path and only SIMD-accelerates the inner energy accumulator helper, so full-function RTCD parity for VAD is incomplete.
+
+203. [LOW][Arch Dispatch Coverage][SILK NSQ] Full-function SSE4.1 NSQ RTCD replacement is not mirrored.
+- Rust: `src/silk/NSQ.rs:170-176`, `src/silk/NSQ.rs:244-270`, `src/silk/simd/mod.rs:226-233`, `src/silk/simd/mod.rs:241`
+- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:72-92`
+- Detail: Upstream x86 RTCD can dispatch the entire `silk_NSQ` function to SSE4.1. Rust uses scalar `silk_NSQ_c` as the top-level flow and conditionally swaps only the inner `silk_noise_shape_quantizer_10_16` kernel, so function-level RTCD parity is partial.
+
+204. [MEDIUM][Arch Dispatch Semantics][CELT x86] `celt_pitch_xcorr` uses SSE fallback in Rust where upstream keeps scalar for non-AVX2.
+- Rust: `src/celt/simd/mod.rs:113-126`
+- Rust SSE implementation exists: `src/celt/simd/x86.rs:538`
+- Upstream: `libopus-sys/opus/celt/x86/x86_celt_map.c:95-108`
+- Detail: Upstream x86 RTCD table dispatches `celt_pitch_xcorr` to AVX2 only; non-AVX2 arch levels stay on `celt_pitch_xcorr_c`. Rust dispatch adds an SSE path before scalar fallback, changing architecture-dependent execution path (and potentially floating-point accumulation behavior) relative to upstream.
+
+205. [MEDIUM][Arch Dispatch Semantics][CELT VQ] `op_pvq_search` ignores caller-provided `arch` level in Rust SIMD path.
+- Rust: `src/celt/simd/mod.rs:170-175`, `src/celt/simd/mod.rs:180`
+- Rust call path still passes `arch`: `src/celt/vq.rs:25-26`, `src/celt/vq.rs:554`
+- Upstream: `libopus-sys/opus/celt/vq.h:60-64`, `libopus-sys/opus/celt/x86/x86_celt_map.c:175-182`
+- Detail: Upstream dispatch can be controlled via the `arch` argument (through `OP_PVQ_SEARCH_IMPL[(arch)&mask]`). Rust SIMD dispatch chooses SSE2 solely from host CPUID and ignores `_arch`, so callers cannot force scalar/lower-arch behavior in the same way.
+
+206. [MEDIUM][Initialization Semantics][OSCE] Rust OSCE model loader treats partial model initialization as success.
+- Rust: `src/dnn/osce.rs:1597-1602`
+- Upstream: `libopus-sys/opus/dnn/osce.c:1438-1449`, `libopus-sys/opus/dnn/osce.c:1457-1468`, `libopus-sys/opus/dnn/osce.c:1473-1474`
+- Detail: Upstream chains init calls with `if (ret == 0)` and returns failure (`-1`) if any enabled model init fails. Rust sets `loaded=true` when *any* of LACE/NoLACE/BBWENet init succeeds, allowing partial-load success that upstream would report as failure.
+
+207. [LOW][API Signature][DRED RDOVAE] RDOVAE encode/decode entry points omit upstream `arch` parameter.
+- Rust: `src/dnn/dred/rdovae_enc.rs:373`, `src/dnn/dred/rdovae_dec.rs:441`, `src/dnn/dred/rdovae_dec.rs:483`, `src/dnn/dred/rdovae_dec.rs:662`
+- Upstream: `libopus-sys/opus/dnn/dred_rdovae_enc.h:49`, `libopus-sys/opus/dnn/dred_rdovae_dec.h:49-51`
+- Detail: Upstream RDOVAE APIs (`dred_rdovae_encode_dframe`, `dred_rdovae_dec_init_states`, `dred_rdovae_decode_qframe`, `DRED_rdovae_decode_all`) all take explicit run-time `arch` arguments. Rust equivalents do not expose `arch`, so call signatures and RTCD control surface are not source-equivalent.
+
+208. [LOW][API Signature][DRED Encoder] Encoder entry points omit upstream `arch` parameter.
+- Rust: `src/dnn/dred/encoder.rs:333`, `src/dnn/dred/encoder.rs:429`
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.h:67`, `libopus-sys/opus/dnn/dred_encoder.h:69`
+- Detail: Upstream `dred_compute_latents(...)` and `dred_encode_silk_frame(...)` include explicit run-time `arch` arguments for dispatch parity. Rust equivalents do not expose `arch`, so call signatures and arch-control surface differ.
+
+209. [MEDIUM][Initialization/API Semantics][FARGAN] Rust state init does not mirror upstream built-in auto-load and blob loader entry points.
+- Rust: `src/dnn/fargan.rs:345-370` (`FARGANState::new`, `FARGANState::init(&[WeightArray])`)
+- Upstream: `libopus-sys/opus/dnn/fargan.c:174-185` (`fargan_init` builtin auto-load), `libopus-sys/opus/dnn/fargan.c:187-195` (`fargan_load_model(const void*, len)`), `libopus-sys/opus/dnn/fargan.h:59-60`
+- Detail: Upstream exposes C entry points that initialize state (including builtin-model load when compiled) and a direct blob loader. Rust exposes constructor/reset plus array-based init only, without equivalent one-call blob loader or builtin auto-load behavior at init entry.
+
+210. [LOW][API Signature][PitchDNN] `compute_pitchdnn` omits upstream `arch` parameter.
+- Rust: `src/dnn/pitchdnn.rs:174-178`
+- Upstream: `libopus-sys/opus/dnn/pitchdnn.h:27-31`, `libopus-sys/opus/dnn/pitchdnn.c:12-17`
+- Detail: Upstream pitch estimator entry point takes explicit run-time `arch` for DNN op dispatch. Rust `compute_pitchdnn` has no `arch` argument, so function signature and arch-control surface differ.
+
+211. [LOW][State Layout][PitchDNN] `PitchDNNState` omits upstream `xcorr_mem3` field.
+- Rust: `src/dnn/pitchdnn.rs:129-134`
+- Upstream: `libopus-sys/opus/dnn/pitchdnn.h:18-20`
+- Detail: Upstream `PitchDNNState` includes `xcorr_mem1`, `xcorr_mem2`, and `xcorr_mem3`. Rust state currently stores only `xcorr_mem1` and `xcorr_mem2`, so struct/state-surface parity is incomplete.
