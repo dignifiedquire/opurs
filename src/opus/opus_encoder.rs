@@ -318,7 +318,7 @@ impl OpusEncoder {
     pub fn set_bitrate(&mut self, bitrate: Bitrate) {
         let value: i32 = bitrate.into();
         if value != OPUS_AUTO && value != OPUS_BITRATE_MAX {
-            let clamped = value.max(500).min(300000 * self.channels);
+            let clamped = value.max(500).min(750000 * self.channels);
             self.user_bitrate_bps = clamped;
         } else {
             self.user_bitrate_bps = value;
