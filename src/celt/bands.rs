@@ -1570,6 +1570,20 @@ fn quant_band_stereo(
     if N == 1 {
         return quant_band_n1(ctx, &mut X[..1], Some(&mut Y[..1]), b, lowband_out, ec);
     }
+    // When one stereo channel has near-zero energy, copy the other channel's data
+    // to avoid numerical issues in the stereo angle computation.
+    const MIN_STEREO_ENERGY: f32 = 1e-10f32;
+    if encode != 0 {
+        let e_left = ctx.bandE[ctx.i as usize];
+        let e_right = ctx.bandE[(ctx.m.nbEBands as i32 + ctx.i) as usize];
+        if e_left < MIN_STEREO_ENERGY || e_right < MIN_STEREO_ENERGY {
+            if e_left > e_right {
+                Y[..N as usize].copy_from_slice(&X[..N as usize]);
+            } else {
+                X[..N as usize].copy_from_slice(&Y[..N as usize]);
+            }
+        }
+    }
     compute_theta(
         ctx,
         &mut sctx,
