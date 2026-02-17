@@ -412,7 +412,7 @@ pub static fft_bitrev60: [i16; 60] = [
 ];
 pub static fft_state48000_960_0: kiss_fft_state = kiss_fft_state {
     nfft: 480,
-    scale: 0.002083333,
+    scale: 0.0020833334,
     shift: -1,
     factors: [
         (5, 96),
@@ -446,7 +446,7 @@ pub static fft_state48000_960_1: kiss_fft_state = kiss_fft_state {
 };
 pub static fft_state48000_960_2: kiss_fft_state = kiss_fft_state {
     nfft: 120,
-    scale: 0.008333333,
+    scale: 0.008333334,
     shift: 2,
     factors: [
         (5, 24),

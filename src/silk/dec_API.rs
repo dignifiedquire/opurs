@@ -16,6 +16,15 @@ pub struct silk_DecControlStruct {
     /// OSCE enhancement method (0=none, 1=LACE, 2=NoLACE)
     #[cfg(feature = "osce")]
     pub osce_method: i32,
+    /// Whether OSCE bandwidth extension is enabled
+    #[cfg(feature = "osce")]
+    pub enable_osce_bwe: bool,
+    /// Current extended mode (from packet extensions)
+    #[cfg(feature = "osce")]
+    pub osce_extended_mode: i32,
+    /// Previous extended mode
+    #[cfg(feature = "osce")]
+    pub prev_osce_extended_mode: i32,
 }
 pub const FLAG_DECODE_NORMAL: i32 = 0;
 pub const FLAG_DECODE_LBRR: i32 = 2;
@@ -85,7 +94,7 @@ pub fn silk_Decode(
     lostFlag: i32,
     newPacketFlag: i32,
     psRangeDec: &mut ec_dec,
-    samplesOut: &mut [i16],
+    samplesOut: &mut [f32],
     nSamplesOut: &mut i32,
     #[cfg(feature = "deep-plc")] mut lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     arch: i32,
@@ -381,6 +390,9 @@ pub fn silk_Decode(
     // Max: API rate 48kHz, 20ms frame = 960 samples
     let mut samplesOut2_tmp = [0i16; 960];
 
+    #[cfg(feature = "osce")]
+    let mut resamp_buffer = [0i16; 3 * MAX_FRAME_LENGTH];
+
     n = 0;
     while n
         < (if (decControl.nChannelsAPI as i32) < decControl.nChannelsInternal {
@@ -393,25 +405,97 @@ pub fn silk_Decode(
         let resample_input =
             &samplesOut1_tmp_storage[ch_off + 1..ch_off + 1 + nSamplesOutDec as usize];
 
-        if decControl.nChannelsAPI == 2 {
-            ret += silk_resampler(
-                &mut channel_state[n as usize].resampler_state,
-                &mut samplesOut2_tmp,
-                resample_input,
-            );
-            i = 0;
-            while i < *nSamplesOut {
-                samplesOut[(n + 2 * i) as usize] = samplesOut2_tmp[i as usize];
-                i += 1;
+        // Always resample into temp buffer, then convert int16→float into samplesOut
+        let resample_out: &mut [i16] = &mut samplesOut2_tmp;
+
+        #[cfg(feature = "osce")]
+        {
+            use crate::dnn::osce::{
+                osce_bwe, osce_bwe_cross_fade_10ms, osce_bwe_reset, OSCE_MODE_HYBRID,
+                OSCE_MODE_SILK_BBWE, OSCE_MODE_SILK_ONLY,
+            };
+
+            if decControl.osce_extended_mode == OSCE_MODE_SILK_BBWE {
+                if decControl.prev_osce_extended_mode != OSCE_MODE_SILK_BBWE {
+                    osce_bwe_reset(
+                        &mut channel_state[n as usize].osce_bwe,
+                        &mut channel_state[n as usize].osce_bwe_features,
+                    );
+                }
+
+                osce_bwe(
+                    &psDec.osce_model,
+                    &mut channel_state[n as usize].osce_bwe,
+                    &mut channel_state[n as usize].osce_bwe_features,
+                    resample_out,
+                    resample_input,
+                    nSamplesOutDec as usize,
+                );
+
+                if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_ONLY
+                    || decControl.prev_osce_extended_mode == OSCE_MODE_HYBRID
+                {
+                    // Cross-fade with upsampled signal
+                    silk_resampler(
+                        &mut channel_state[n as usize].resampler_state,
+                        &mut resamp_buffer,
+                        resample_input,
+                    );
+                    osce_bwe_cross_fade_10ms(resample_out, &resamp_buffer, 480);
+                }
+            } else {
+                ret += silk_resampler(
+                    &mut channel_state[n as usize].resampler_state,
+                    resample_out,
+                    resample_input,
+                );
+                if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_BBWE
+                    && decControl.internalSampleRate == 16000
+                {
+                    // Fade out: run BWE into temp buffer and crossfade
+                    osce_bwe(
+                        &psDec.osce_model,
+                        &mut channel_state[n as usize].osce_bwe,
+                        &mut channel_state[n as usize].osce_bwe_features,
+                        &mut resamp_buffer,
+                        resample_input,
+                        nSamplesOutDec as usize,
+                    );
+                    osce_bwe_cross_fade_10ms(resample_out, &resamp_buffer, 480);
+                }
             }
-        } else {
+        }
+
+        #[cfg(not(feature = "osce"))]
+        {
             ret += silk_resampler(
                 &mut channel_state[n as usize].resampler_state,
-                &mut samplesOut[..*nSamplesOut as usize],
+                resample_out,
                 resample_input,
             );
         }
+
+        // Interleave if stereo output, or copy for mono; convert int16→float
+        if decControl.nChannelsAPI == 2 {
+            i = 0;
+            while i < *nSamplesOut {
+                samplesOut[(n + 2 * i) as usize] =
+                    samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
+                i += 1;
+            }
+        } else {
+            i = 0;
+            while i < *nSamplesOut {
+                samplesOut[i as usize] = samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
+                i += 1;
+            }
+        }
         n += 1;
+    }
+
+    #[cfg(feature = "osce")]
+    {
+        decControl.prev_osce_extended_mode = decControl.osce_extended_mode;
     }
 
     // Create two channel output from mono stream
@@ -426,7 +510,8 @@ pub fn silk_Decode(
             );
             i = 0;
             while i < *nSamplesOut {
-                samplesOut[(1 + 2 * i) as usize] = samplesOut2_tmp[i as usize];
+                samplesOut[(1 + 2 * i) as usize] =
+                    samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
                 i += 1;
             }
         } else {

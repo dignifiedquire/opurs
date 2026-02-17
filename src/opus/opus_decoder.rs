@@ -21,7 +21,7 @@ use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCust
 use crate::celt::entcode::ec_tell;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
-use crate::celt::float_cast::FLOAT2INT16;
+use crate::celt::float_cast::celt_float2int16;
 use crate::celt::mathops::celt_exp2;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
@@ -86,6 +86,12 @@ impl OpusDecoder {
                 enable_deep_plc: false,
                 #[cfg(feature = "osce")]
                 osce_method: 0,
+                #[cfg(feature = "osce")]
+                enable_osce_bwe: false,
+                #[cfg(feature = "osce")]
+                osce_extended_mode: 0,
+                #[cfg(feature = "osce")]
+                prev_osce_extended_mode: 0,
             },
             decode_gain: 0,
             complexity: 0,
@@ -200,6 +206,22 @@ impl OpusDecoder {
 
     pub fn complexity(&self) -> i32 {
         self.complexity
+    }
+
+    /// Enable or disable OSCE bandwidth extension (BWE).
+    ///
+    /// When enabled and conditions are met (complexity >= 4, 48kHz output,
+    /// 16kHz internal, SILK-only mode), the decoder extends SILK wideband
+    /// audio to fullband using a neural network.
+    #[cfg(feature = "osce")]
+    pub fn set_osce_bwe(&mut self, value: bool) {
+        self.DecControl.enable_osce_bwe = value;
+    }
+
+    /// Returns whether OSCE bandwidth extension is enabled.
+    #[cfg(feature = "osce")]
+    pub fn osce_bwe(&self) -> bool {
+        self.DecControl.enable_osce_bwe
     }
 
     /// Load DNN models from compiled-in weight data.
@@ -445,7 +467,7 @@ fn opus_decode_frame(
             }
         }
     }
-    let celt_accum: i32 = 0;
+    let celt_accum: i32 = (mode != MODE_CELT_ONLY) as i32;
     pcm_transition_silk_size = ALLOC_NONE;
     pcm_transition_celt_size = ALLOC_NONE;
     if data.is_some()
@@ -478,13 +500,16 @@ fn opus_decode_frame(
     } else {
         frame_size = audiosize;
     }
-    let pcm_silk_size: i32 = if mode != MODE_CELT_ONLY && celt_accum == 0 {
-        (if F10 > frame_size { F10 } else { frame_size }) * st.channels
+    // In hybrid/SILK mode, SILK decodes directly into pcm (float).
+    // If frame_size < F10, we need a temp buffer since SILK needs at least F10.
+    let pcm_too_small = frame_size < F10;
+    let pcm_silk_size: i32 = if mode != MODE_CELT_ONLY && pcm_too_small {
+        F10 * st.channels
     } else {
         ALLOC_NONE
     };
     let vla_0 = pcm_silk_size as usize;
-    let mut pcm_silk: Vec<i16> = ::std::vec::from_elem(0, vla_0);
+    let mut pcm_silk: Vec<f32> = ::std::vec::from_elem(0., vla_0);
     if mode != MODE_CELT_ONLY {
         let mut decoded_samples: i32;
         let mut pcm_ptr_off: usize = 0;
@@ -524,6 +549,28 @@ fn opus_decode_frame(
             if st.complexity >= 7 {
                 st.DecControl.osce_method = 2; // OSCE_METHOD_NOLACE
             }
+
+            // BWE mode selection
+            if st.complexity >= 4
+                && st.DecControl.enable_osce_bwe
+                && st.Fs == 48000
+                && st.DecControl.internalSampleRate == 16000
+                && (mode == MODE_SILK_ONLY || data.is_none())
+            {
+                // Request WB -> FB signal extension
+                st.DecControl.osce_extended_mode = crate::dnn::osce::OSCE_MODE_SILK_BBWE;
+            } else {
+                // At this point, mode can only be MODE_SILK_ONLY or MODE_HYBRID
+                st.DecControl.osce_extended_mode = if mode == MODE_SILK_ONLY {
+                    crate::dnn::osce::OSCE_MODE_SILK_ONLY
+                } else {
+                    crate::dnn::osce::OSCE_MODE_HYBRID
+                };
+            }
+            if st.prev_mode == MODE_CELT_ONLY {
+                // Update extended mode for CELT->SILK transition
+                st.DecControl.prev_osce_extended_mode = crate::dnn::osce::OSCE_MODE_CELT_ONLY;
+            }
         }
 
         let lost_flag: i32 = if data.is_none() {
@@ -534,13 +581,19 @@ fn opus_decode_frame(
         decoded_samples = 0;
         loop {
             let first_frame: i32 = (decoded_samples == 0) as i32;
+            // SILK decodes into pcm directly, or pcm_silk if frame is too small
+            let silk_out: &mut [f32] = if pcm_too_small {
+                &mut pcm_silk[pcm_ptr_off..]
+            } else {
+                &mut pcm[pcm_ptr_off..]
+            };
             silk_ret = silk_Decode(
                 &mut st.silk_dec,
                 &mut st.DecControl,
                 lost_flag,
                 first_frame,
                 &mut dec,
-                &mut pcm_silk[pcm_ptr_off..],
+                silk_out,
                 &mut silk_frame_size,
                 #[cfg(feature = "deep-plc")]
                 Some(&mut st.lpcnet),
@@ -549,8 +602,13 @@ fn opus_decode_frame(
             if silk_ret != 0 {
                 if lost_flag != 0 {
                     silk_frame_size = frame_size;
-                    for j in 0..(frame_size * st.channels) as usize {
-                        pcm_silk[pcm_ptr_off + j] = 0;
+                    let silk_out: &mut [f32] = if pcm_too_small {
+                        &mut pcm_silk[pcm_ptr_off..]
+                    } else {
+                        &mut pcm[pcm_ptr_off..]
+                    };
+                    for s in silk_out[..(frame_size * st.channels) as usize].iter_mut() {
+                        *s = 0.;
                     }
                 } else {
                     return OPUS_INTERNAL_ERROR;
@@ -561,6 +619,10 @@ fn opus_decode_frame(
             if decoded_samples >= frame_size {
                 break;
             }
+        }
+        if pcm_too_small {
+            pcm[..(frame_size * st.channels) as usize]
+                .copy_from_slice(&pcm_silk[..(frame_size * st.channels) as usize]);
         }
     }
     start_band = 0;
@@ -659,7 +721,12 @@ fn opus_decode_frame(
         redundant_rng = celt_dec.rng;
     }
     celt_dec.start = start_band;
-    if mode != MODE_SILK_ONLY {
+    #[cfg(feature = "osce")]
+    let celt_decode_enabled = mode != MODE_SILK_ONLY
+        && st.DecControl.osce_extended_mode != crate::dnn::osce::OSCE_MODE_SILK_BBWE;
+    #[cfg(not(feature = "osce"))]
+    let celt_decode_enabled = mode != MODE_SILK_ONLY;
+    if celt_decode_enabled {
         let celt_frame_size: i32 = if F20 < frame_size { F20 } else { frame_size };
         if mode != st.prev_mode && st.prev_mode > 0 && st.prev_redundancy == 0 {
             celt_dec.reset();
@@ -680,6 +747,7 @@ fn opus_decode_frame(
             #[cfg(feature = "qext")]
             qext_payload,
         );
+        st.rangeFinal = celt_dec.rng;
     } else {
         let silence: [u8; 2] = [0xff, 0xff];
         if celt_accum == 0 {
@@ -704,14 +772,11 @@ fn opus_decode_frame(
                 None,
             );
         }
+        st.rangeFinal = dec.rng;
     }
-    if mode != MODE_CELT_ONLY && celt_accum == 0 {
-        i = 0;
-        while i < frame_size * st.channels {
-            pcm[i as usize] += 1.0f32 / 32768.0f32 * pcm_silk[i as usize] as i32 as f32;
-            i += 1;
-        }
-    }
+    // In C 1.5.2: SILK decoded to int16 buffer, then mixed here.
+    // In C 1.6.1: SILK decodes to float directly into pcm, CELT accumulates on top.
+    // The mixing loop is no longer needed.
     let celt_mode = celt_dec.mode;
     let window = &celt_mode.window;
     if redundancy != 0 && celt_to_silk == 0 {
@@ -818,7 +883,7 @@ fn opus_decode_frame(
     if data.is_none() {
         st.rangeFinal = 0;
     } else {
-        st.rangeFinal = dec.rng ^ redundant_rng;
+        st.rangeFinal ^= redundant_rng;
     }
     st.prev_mode = mode;
     st.prev_redundancy = (redundancy != 0 && celt_to_silk == 0) as i32;
@@ -1071,9 +1136,7 @@ pub fn opus_decode(
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
     let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
     if ret > 0 {
-        for j in 0..(ret * st.channels) as usize {
-            pcm[j] = FLOAT2INT16(out[j]);
-        }
+        celt_float2int16(&out, pcm, (ret * st.channels) as usize);
     }
     ret
 }

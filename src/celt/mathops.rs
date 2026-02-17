@@ -94,7 +94,7 @@ pub fn celt_rsqrt_norm(x: f32) -> f32 {
 /// Upstream C: celt/mathops.h:celt_cos_norm
 #[inline]
 pub fn celt_cos_norm(x: f32) -> f32 {
-    ((0.5f32 * PI * x) as f64).cos() as f32
+    (0.5 * std::f64::consts::PI * x as f64).cos() as f32
 }
 
 /// Polynomial approximation of cos(PI/2 * x) using only even-powered terms.
@@ -103,7 +103,7 @@ pub fn celt_cos_norm(x: f32) -> f32 {
 /// approximation that must match the C reference exactly for QEXT bit-exactness.
 ///
 /// Upstream C: celt/mathops.h:celt_cos_norm2
-#[cfg(feature = "qext")]
+#[cfg(any(feature = "qext", feature = "osce"))]
 #[inline]
 #[allow(clippy::excessive_precision)]
 pub fn celt_cos_norm2(x: f32) -> f32 {

@@ -96,7 +96,7 @@ const FRAME_PLC_NOISE: i32 = 2;
 const FRAME_PLC_PERIODIC: i32 = 3;
 #[cfg(feature = "deep-plc")]
 const FRAME_PLC_NEURAL: i32 = 4;
-#[cfg(feature = "dred")]
+#[cfg(feature = "deep-plc")]
 const FRAME_DRED: i32 = 5;
 pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert_eq!(st.mode, opus_custom_mode_create(48000, 960, None).unwrap());
@@ -278,7 +278,6 @@ fn deemphasis(
         );
         return;
     }
-    assert!(accum == 0);
     let mut scratch = [0.0f32; 960];
     let coef0: opus_val16 = coef[0];
     let Nd: i32 = N / downsample;
@@ -296,6 +295,14 @@ fn deemphasis(
                 j += 1;
             }
             apply_downsampling = 1;
+        } else if accum != 0 {
+            j = 0;
+            while j < N {
+                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                m = coef0 * tmp;
+                pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
+                j += 1;
+            }
         } else {
             j = 0;
             while j < N {
@@ -307,11 +314,20 @@ fn deemphasis(
         }
         mem[c as usize] = m;
         if apply_downsampling != 0 {
-            j = 0;
-            while j < Nd {
-                pcm[(c + j * C) as usize] =
-                    scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
-                j += 1;
+            if accum != 0 {
+                j = 0;
+                while j < Nd {
+                    pcm[(c + j * C) as usize] +=
+                        scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
+                    j += 1;
+                }
+            } else {
+                j = 0;
+                while j < Nd {
+                    pcm[(c + j * C) as usize] =
+                        scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
+                    j += 1;
+                }
             }
         }
         c += 1;
@@ -646,14 +662,12 @@ fn celt_decode_lost(
     #[cfg(feature = "deep-plc")]
     if start == 0 {
         if let Some(ref lpcnet) = lpcnet {
-            if lpcnet.loaded {
-                if st.complexity >= 5 && st.plc_duration < 80 && st.skip_plc == 0 {
-                    curr_frame_type = FRAME_PLC_NEURAL;
-                }
-                #[cfg(feature = "dred")]
-                if lpcnet.fec_fill_pos > lpcnet.fec_read_pos {
-                    curr_frame_type = FRAME_DRED;
-                }
+            if lpcnet.loaded && st.complexity >= 5 && st.plc_duration < 80 && st.skip_plc == 0 {
+                curr_frame_type = FRAME_PLC_NEURAL;
+            }
+            #[cfg(feature = "dred")]
+            if lpcnet.loaded && lpcnet.fec_fill_pos > lpcnet.fec_read_pos {
+                curr_frame_type = FRAME_DRED;
             }
         }
     }
@@ -966,7 +980,7 @@ fn celt_decode_lost(
                     i += 1;
                 }
             } else if S1 < S2 {
-                let ratio: opus_val16 = celt_sqrt((S1 + 1.0) / (S2 + 1.0));
+                let ratio: opus_val16 = celt_sqrt((S1 * 0.5 + 1.0) / (S2 + 1.0));
                 let mut i = 0;
                 while i < overlap {
                     let tmp_g: opus_val16 = Q15ONE - window[i as usize] * (1.0f32 - ratio);
@@ -1266,6 +1280,7 @@ fn celt_decode_body(
                     } else {
                         0.5f32 * (e2 - e0)
                     };
+                    let slope = slope.min(2.0f32);
                     let new_e = e0
                         - (if 0.0f32 > (1 + missing) as f32 * slope {
                             0.0f32
