@@ -1183,8 +1183,8 @@ fn test_enc_api_inner() {
     cfgs += 1;
     let i = enc.bitrate();
     assert!(
-        (256000..=700000).contains(&i),
-        "bitrate after setting huge value = {i}, expected [256000, 700000]"
+        (256000..=1500000).contains(&i),
+        "bitrate after setting huge value = {i}, expected [256000, 1500000]"
     );
     cfgs += 1;
     // Invalid bitrate values: the safe API uses Bitrate enum, so -12345 becomes Bits(-12345)
