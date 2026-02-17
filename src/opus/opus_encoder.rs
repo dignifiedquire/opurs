@@ -1667,14 +1667,14 @@ pub fn opus_encode_native(
         st.lsb_depth
     };
     let celt_mode = st.celt_enc.mode;
+    is_silence = is_digital_silence(
+        &pcm[..(frame_size * st.channels) as usize],
+        frame_size,
+        st.channels,
+        lsb_depth,
+    );
     analysis_info.valid = 0;
-    if st.silk_mode.complexity >= 7 && st.Fs >= 16000 {
-        is_silence = is_digital_silence(
-            &pcm[..(frame_size * st.channels) as usize],
-            frame_size,
-            st.channels,
-            lsb_depth,
-        );
+    if st.silk_mode.complexity >= 7 && st.Fs >= 16000 && st.Fs <= 48000 {
         analysis_read_pos_bak = st.analysis.read_pos;
         analysis_read_subframe_bak = st.analysis.read_subframe;
         run_analysis(
@@ -1690,38 +1690,13 @@ pub fn opus_encode_native(
             lsb_depth,
             &mut analysis_info,
         );
-        if is_silence == 0
-            && (analysis_info.valid == 0
-                || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD)
-        {
-            let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
-            st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
-                > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-            {
-                0.999f32 * st.peak_signal_energy
-            } else {
-                compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-            };
-        }
     } else if st.analysis.initialized != 0 {
         tonality_analysis_reset(&mut st.analysis);
     }
+    // Reset voice_ratio if this frame is not silent or if analysis is disabled.
+    // Otherwise, preserve voice_ratio from the last non-silent frame.
     if is_silence == 0 {
         st.voice_ratio = -1;
-    }
-    let mut activity: i32 = VAD_NO_DECISION;
-    if is_silence != 0 {
-        activity = (is_silence == 0) as i32;
-    } else if analysis_info.valid != 0 {
-        activity = (analysis_info.activity_probability >= DTX_ACTIVITY_THRESHOLD) as i32;
-        if activity == 0 {
-            let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
-            activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
-        }
-    } else if st.mode == MODE_CELT_ONLY {
-        let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
-        // Boosting peak energy a bit because we didn't just average the active frames.
-        activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * 0.5 * noise_energy) as i32;
     }
     st.detected_bandwidth = 0;
     if analysis_info.valid != 0 {
@@ -1748,6 +1723,19 @@ pub fn opus_encode_native(
             st.detected_bandwidth = OPUS_BANDWIDTH_SUPERWIDEBAND;
         } else {
             st.detected_bandwidth = OPUS_BANDWIDTH_FULLBAND;
+        }
+    }
+    // Track the peak signal energy
+    if analysis_info.valid == 0 || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
+        if is_silence == 0 {
+            let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
+            st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
+                > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
+            {
+                0.999f32 * st.peak_signal_energy
+            } else {
+                compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
+            };
         }
     }
     if st.channels == 2 && st.force_channels != 1 {
@@ -2160,6 +2148,22 @@ pub fn opus_encode_native(
             float_api,
         );
         return ret;
+    }
+    // Compute activity decision (in C 1.6.1 this is in opus_encode_frame_native,
+    // after mode/bandwidth decisions have been made)
+    let mut activity: i32 = VAD_NO_DECISION;
+    if is_silence != 0 {
+        activity = (is_silence == 0) as i32;
+    } else if analysis_info.valid != 0 {
+        activity = (analysis_info.activity_probability >= DTX_ACTIVITY_THRESHOLD) as i32;
+        if activity == 0 {
+            let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
+            activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * noise_energy) as i32;
+        }
+    } else if st.mode == MODE_CELT_ONLY {
+        let noise_energy = compute_frame_energy(pcm, frame_size, st.channels, st.arch);
+        // Boosting peak energy a bit because we didn't just average the active frames.
+        activity = (st.peak_signal_energy < PSEUDO_SNR_THRESHOLD * 0.5 * noise_energy) as i32;
     }
     if st.silk_bw_switch != 0 {
         redundancy = 1;
@@ -2902,7 +2906,7 @@ pub fn opus_encode_native(
     st.prev_channels = st.stream_channels;
     st.prev_framesize = frame_size;
     st.first = 0;
-    if st.use_dtx != 0 && (analysis_info.valid != 0 || is_silence != 0) {
+    if st.use_dtx != 0 && st.silk_mode.useDTX == 0 {
         if decide_dtx_mode(
             activity,
             &mut st.nb_no_activity_ms_Q1,

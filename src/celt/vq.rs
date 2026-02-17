@@ -675,8 +675,8 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
 /// Callers that need Q14 should right-shift by 16.
 #[inline]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i32 {
-    let mut Emid: f32 = EPSILON;
-    let mut Eside: f32 = EPSILON;
+    let mut Emid: f32 = 0.0;
+    let mut Eside: f32 = 0.0;
     if stereo != 0 {
         for i in 0..N as usize {
             let m = X[i] + Y[i];

@@ -2398,6 +2398,11 @@ pub fn celt_encode_with_ec<'b>(
             &mut st.preemph_memE[c as usize],
             need_clip,
         );
+        // Copy overlap from prefilter_mem into in_0 (must be before tone_detect/transient_analysis)
+        let in_dst = (c * (N + overlap)) as usize;
+        let pfm_src = ((c + 1) * COMBFILTER_MAXPERIOD - overlap) as usize;
+        in_0[in_dst..in_dst + overlap as usize]
+            .copy_from_slice(&st.prefilter_mem[pfm_src..pfm_src + overlap as usize]);
         c += 1;
         if c >= CC {
             break;

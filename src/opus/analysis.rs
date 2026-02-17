@@ -634,7 +634,6 @@ fn downmix_and_resample(
     C: i32,
     Fs: i32,
 ) -> opus_val32 {
-    let mut scale: opus_val32;
     let mut j: i32;
     let mut ret: opus_val32 = 0 as opus_val32;
     if subframe == 0 {
@@ -649,16 +648,12 @@ fn downmix_and_resample(
     }
     let mut tmp: Vec<opus_val32> = vec![0.0; subframe as usize];
     input.downmix(&mut tmp, subframe, offset, c1, c2, C);
-    scale = 1.0f32 / 32768_f32;
-    if c2 == -(2) {
-        scale /= C as f32;
-    } else if c2 > -1 {
-        scale /= 2_f32;
-    }
-    j = 0;
-    while j < subframe {
-        tmp[j as usize] *= scale;
-        j += 1;
+    if (c2 == -2 && C == 2) || c2 > -1 {
+        j = 0;
+        while j < subframe {
+            tmp[j as usize] = 0.5f32 * tmp[j as usize];
+            j += 1;
+        }
     }
     if Fs == 48000 {
         ret = silk_resampler_down2_hp(S, y, &tmp, subframe);
@@ -675,6 +670,7 @@ fn downmix_and_resample(
         }
         silk_resampler_down2_hp(S, y, &tmp3x, 3 * subframe);
     }
+    ret *= 1.0f32 / 32768.0 / 32768.0;
     ret
 }
 pub fn tonality_analysis_init(tonal: &mut TonalityAnalysisState, Fs: i32) {
@@ -1194,7 +1190,7 @@ fn tonality_analysis(
         E += binE;
         i += 1;
     }
-    // E = E;
+    E *= 1.0f32 / 32768.0 / 32768.0;
     band_log2[0_usize] = 0.5f32 * std::f32::consts::LOG2_E * celt_log(E + 1e-10f32);
     b = 0;
     while b < NB_TBANDS {
@@ -1210,7 +1206,7 @@ fn tonality_analysis(
                 + out[(N - i) as usize].re * out[(N - i) as usize].re
                 + out[i as usize].im * out[i as usize].im
                 + out[(N - i) as usize].im * out[(N - i) as usize].im;
-            // binE_0 = binE_0;
+            let binE_0 = binE_0 * (1.0f32 / 32768.0 / 32768.0);
             E_0 += binE_0;
             tE += binE_0
                 * (if 0 as f32 > tonality[i as usize] {
@@ -1408,7 +1404,7 @@ fn tonality_analysis(
             E_1 += binE_1;
             i += 1;
         }
-        // E_1 = E_1;
+        E_1 *= 1.0f32 / 32768.0 / 32768.0;
         maxE = if maxE > E_1 { maxE } else { E_1 };
         if band_start < 64 {
             below_max_pitch += E_1;
