@@ -142,3 +142,15 @@ required-features = ["tools-dnn"]
 [[example]]
 name = "dnn_comparison"
 required-features = ["tools-dnn"]
+
+[[example]]
+name = "float_decode_compare"
+required-features = ["tools"]
+
+[[example]]
+name = "c_only_decode_check"
+required-features = ["tools"]
+
+[[example]]
+name = "debug_encode"
+required-features = ["tools"]
