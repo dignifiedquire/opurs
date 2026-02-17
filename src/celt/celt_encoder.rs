@@ -1717,8 +1717,9 @@ fn run_prefilter(
         let mut multiple = 1i32;
         let mut tf = tone_freq;
         // Using aliased version of the postfilter above 24 kHz.
-        if tf >= std::f32::consts::PI {
-            tf = std::f32::consts::PI - tf;
+        // Threshold is purposely slightly above pi to avoid triggering for Fs=48kHz.
+        if tf >= 3.1416f32 {
+            tf = 3.141593f32 - tf;
         }
         // If the pitch is too high for our post-filter, apply pitch doubling
         // until we can get something that fits.
