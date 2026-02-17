@@ -1069,3 +1069,144 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 - Rust: `src/dnn/pitchdnn.rs:129-134`
 - Upstream: `libopus-sys/opus/dnn/pitchdnn.h:18-20`
 - Detail: Upstream `PitchDNNState` includes `xcorr_mem1`, `xcorr_mem2`, and `xcorr_mem3`. Rust state currently stores only `xcorr_mem1` and `xcorr_mem2`, so struct/state-surface parity is incomplete.
+
+212. [MEDIUM][Arch Dispatch/API Surface][DNN Core] Core DNN compute APIs omit upstream `arch` parameter and lose explicit RTCD control surface.
+- Rust: `src/dnn/nnet.rs:108`, `src/dnn/nnet.rs:137`, `src/dnn/nnet.rs:197-202`, `src/dnn/nnet.rs:214-219`, `src/dnn/nnet.rs:253`, `src/dnn/nnet.rs:272-279`, `src/dnn/nnet.rs:299-307`, `src/dnn/nnet.rs:386-394`
+- Upstream API signatures: `libopus-sys/opus/dnn/nnet.h:89-94`
+- Upstream arch-dispatch macros: `libopus-sys/opus/dnn/nnet.h:145-154`
+- Upstream RTCD tables: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:39-78`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:39-82`
+- Detail: Upstream threads an explicit `arch` argument through DNN compute entry points and can route through `DNN_COMPUTE_*_IMPL[(arch)&OPUS_ARCHMASK]`. Rust DNN compute functions select SIMD path from host capabilities internally and expose no `arch` parameter, so callers cannot force/mirror upstream arch-tier execution semantics.
+
+213. [MEDIUM][Arch Dispatch Coverage][DNN x86] Rust DNN SIMD dispatch has AVX2-only acceleration on x86, missing upstream SSE2/SSE4.1 tiers.
+- Rust: `src/dnn/simd/mod.rs:19-20`, `src/dnn/simd/mod.rs:44-57`, `src/dnn/simd/mod.rs:71-84`, `src/dnn/simd/mod.rs:98-110`
+- Upstream: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:46-48`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:59-61`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:75-77`
+- Detail: Upstream RTCD supports SSE2 and SSE4.1 dispatch levels for linear/activation/conv2d before AVX2. Rust x86 DNN dispatch checks only `avx2+fma` and otherwise falls back to scalar, so non-AVX2 x86 behavior/perf tiering is not source-equivalent.
+
+214. [LOW][Arch Dispatch Coverage][DNN ARM] ARM DOTPROD dispatch tier is not mirrored.
+- Rust: `src/dnn/simd/aarch64.rs:1-6`, `src/dnn/simd/mod.rs:36-42`, `src/dnn/simd/mod.rs:63-69`, `src/dnn/simd/mod.rs:90-96`
+- Upstream: `libopus-sys/opus/dnn/arm/arm_dnn_map.c:47-49`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:64-66`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:80-82`
+- Detail: Upstream ARM RTCD can dispatch DNN kernels at NEON and DOTPROD tiers. Rust aarch64 path currently assumes NEON-only implementations and has no DOTPROD-specific dispatch tier, so ARM dispatch coverage is incomplete relative to upstream.
+
+215. [LOW][Algorithmic Path][DNN Conv2D] Rust `compute_conv2d` lacks upstream 3x3 specialized convolution branch.
+- Rust: `src/dnn/nnet.rs:351-381`, `src/dnn/nnet.rs:406-416`
+- Upstream: `libopus-sys/opus/dnn/nnet_arch.h:230-233`
+- Detail: Upstream selects `conv2d_3x3_float` when `ktime == 3 && kheight == 3`; otherwise it uses generic `conv2d_float`. Rust always executes the generic loop nest, so operation ordering/optimization path differs for the common 3x3 case.
+
+216. [LOW][API Signature][LPCNet] LPCNet feature extraction entry points omit upstream `arch` parameter.
+- Rust: `src/dnn/lpcnet.rs:277`, `src/dnn/lpcnet.rs:435-439`, `src/dnn/lpcnet.rs:454-458`
+- Upstream: `libopus-sys/opus/dnn/lpcnet_private.h:76`, `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
+- Detail: Upstream `compute_frame_features`, `lpcnet_compute_single_frame_features`, and `lpcnet_compute_single_frame_features_float` all take explicit run-time `arch`. Rust equivalents do not expose `arch`, so API surface and explicit RTCD control differ.
+
+217. [LOW][Documentation/Versioning][DNN] DNN module documentation still references Opus 1.5.2 rather than 1.6.1.
+- Rust: `src/dnn/README.md:3`
+- Upstream baseline being tracked in this repo: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
+- Detail: The DNN README claims the port targets Opus 1.5.2, while the build/config baseline in-tree is 1.6.1. This is a documentation parity drift that can mislead future reviews and regeneration workflows.
+
+218. [MEDIUM][Validation Semantics][DNN Weights] Sparse index validation in `linear_init` is weaker than upstream `find_idx_check`.
+- Rust: `src/dnn/nnet.rs:501-517`
+- Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-121`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:149-152`
+- Detail: Upstream validates each sparse block index (`remain < nb_blocks+1`, `pos+3 < nb_in`, and `pos` 4-aligned) before accepting `weights_idx`. Rust only counts blocks and output groups, without per-index bounds/alignment checks, so malformed sparse index blobs that upstream rejects may be accepted.
+
+219. [LOW][Boundary Condition][MLP] GRU neuron-capacity assertion is off-by-one versus upstream fixed-size buffers.
+- Rust: `src/opus/mlp/layers.rs:95`, `src/opus/mlp/layers.rs:102`, `src/opus/mlp/layers.rs:119-124`
+- Upstream: `libopus-sys/opus/src/mlp.h:35`, `libopus-sys/opus/src/mlp.c:97-100`, `libopus-sys/opus/src/mlp.c:101-103`
+- Detail: Upstream allocates `tmp/z/r/h` with `MAX_NEURONS` (=32) and supports `N == 32`. Rust asserts `n < MAX_NEURONS`, which rejects `n == 32` and can panic on valid upstream-size models.
+
+220. [LOW][Numeric Fidelity][MLP] `tansig_approx` polynomial coefficients are truncated compared with upstream constants.
+- Rust: `src/opus/mlp/tansig.rs:10-15`
+- Upstream: `libopus-sys/opus/src/mlp.c:41-46`
+- Detail: Rust uses shortened constants (e.g. `952.528`, `952.724`, `413.368`) while upstream uses higher-precision literals (`952.52801514f`, `952.72399902f`, `413.36801147f`, etc.). This can introduce small output differences in MLP activations relative to upstream.
+
+221. [MEDIUM][Initialization Semantics][LPCNet PLC] Rust `init()` ignores encoder/FARGAN init outcomes when determining loaded state.
+- Rust: `src/dnn/lpcnet.rs:552-560` (calls `self.fargan.init(arrays)` and `self.enc.load_model(arrays)` without checking return values; sets `loaded=true` if `init_plcmodel` succeeds)
+- Rust checked path for comparison: `src/dnn/lpcnet.rs:571-583` (`load_model()` requires PLC model, encoder model, and FARGAN init to all succeed)
+- Upstream init flow: `libopus-sys/opus/dnn/lpcnet_plc.c:58-67`, `libopus-sys/opus/dnn/lpcnet_plc.c:70`
+- Detail: Upstream init path relies on builtin-model initialization assertions and marks loaded only on successful model init. Rust `init()` can mark `loaded=true` even if encoder/FARGAN model init fails, which diverges from the stricter all-components-ready contract already enforced in Rust `load_model()`.
+
+222. [MEDIUM][API Behavior/Version Reporting][Public API] `opus_get_version_string()` does not mirror upstream version-format and build-suffix semantics.
+- Rust: `src/celt/common.rs:426-427`
+- Upstream implementation: `libopus-sys/opus/celt/celt.c:360-372`
+- Upstream API contract notes: `libopus-sys/opus/include/opus_defines.h:852-861`
+- Detail: Upstream returns `"libopus " PACKAGE_VERSION` and conditionally appends `-fixed` / `-fuzzing`, and documentation explicitly allows apps to detect fixed-point builds from this string. Rust returns a hardcoded `"opurs (rust port) 1.5.2"`, which drops upstream format, version baseline, and build-suffix signaling semantics.
+
+223. [LOW][Documentation/Versioning][Top-Level Docs] Top-level crate and `libopus-sys` README still claim Opus 1.5.2.
+- Rust: `src/lib.rs:1`, `libopus-sys/README.md:1`
+- Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
+- Detail: User-facing docs advertise 1.5.2 while the vendored/build baseline declares 1.6.1. This is documentation/versioning drift that can mislead reviewers and downstream users about compatibility targets.
+
+224. [MEDIUM][Build Parity][libopus-sys ARM SIMD/RTCD] `libopus-sys/build.rs` does not mirror upstream ARM RTCD + DOTPROD source/define enablement.
+- Rust build setup: `libopus-sys/build.rs:180-195`, `libopus-sys/build.rs:310-319`
+- Upstream RTCD/ARM source selection: `libopus-sys/opus/dnn/meson.build:17-30`, `libopus-sys/opus/meson.build:345-351`
+- Upstream ARM RTCD source lists: `libopus-sys/opus/lpcnet_sources.mk:43-45`, `libopus-sys/opus/celt_sources.mk:27-28`, `libopus-sys/opus/silk_sources.mk:34-35`
+- Detail: Upstream can enable ARM runtime dispatch (`OPUS_HAVE_RTCD`) and DOTPROD tier (`OPUS_ARM_MAY_HAVE_DOTPROD`) with `DNN_SOURCES_ARM_RTCD`/`DNN_SOURCES_DOTPROD` (plus CELT/SILK ARM RTCD maps). `build.rs` currently hard-presumes NEON on aarch64 and leaves RTCD/DOTPROD sources/defines behind TODO gates, so build-time SIMD dispatch coverage differs from upstream.
+
+225. [LOW][Build Config Defaults][libopus-sys DNN] `DISABLE_DEBUG_FLOAT` default from upstream build systems is not mirrored in generated config.
+- Rust build config: `libopus-sys/build.rs:45-84`, `libopus-sys/build.rs:277-322`
+- Upstream default option and define path: `libopus-sys/opus/meson_options.txt:13`, `libopus-sys/opus/meson.build:191-193`
+- Affected generated weights guards: `libopus-sys/opus/dnn/bbwenet_data.c:11673-11678`
+- Detail: Upstream defaults `dnn-debug-float` to disabled and defines `DISABLE_DEBUG_FLOAT`. `build.rs` never emits that macro, so debug-float guarded weight sections remain enabled when compiling C DNN sources, diverging from upstream default build footprint/config semantics.
+
+226. [LOW][Build Feature Parity][libopus-sys/QEXT] `libopus-sys` does not expose or map upstream `ENABLE_QEXT` build feature.
+- Rust features: `Cargo.toml:117`, `Cargo.toml:119-120`, `libopus-sys/Cargo.toml:13-22`
+- Rust build config path: `libopus-sys/build.rs:112-115`, `libopus-sys/build.rs:277-322`
+- Upstream feature define: `libopus-sys/opus/configure.ac:158-165`
+- Detail: Upstream has an explicit `--enable-qext` build switch that defines `ENABLE_QEXT`. The workspace has a Rust `qext` feature, but `libopus-sys` has no corresponding feature and `build.rs` never defines `ENABLE_QEXT`, so C-side tool/comparison builds cannot be configured to mirror upstream QEXT-enabled configuration.
+
+227. [LOW][API Behavior][Public API] `opus_strerror()` returns non-upstream message strings.
+- Rust: `src/celt/common.rs:409-418`
+- Upstream: `libopus-sys/opus/celt/celt.c:344-353`
+- Detail: Upstream returns canonical short strings (e.g. `"success"`, `"invalid argument"`), while Rust appends numeric suffixes (e.g. `"success (0)"`). Applications/tests comparing exact libopus error text will observe divergence.
+
+228. [LOW][Documentation/Metadata][Package] Crate package metadata still states bit-exactness against 1.5.2.
+- Rust: `Cargo.toml:8`
+- Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
+- Detail: Published package description advertises 1.5.2 despite in-repo baseline updates to 1.6.1, creating metadata drift for downstream users evaluating compatibility.
+
+229. [HIGH][Feature Behavior][QEXT Encoder] Rust Opus encoder never provisions QEXT extension payload bytes, effectively disabling upstream QEXT bitstream path.
+- Rust caller path: `src/opus/opus_encoder.rs:2810-2820`
+- Rust CELT entry shape: `src/celt/celt_encoder.rs:2119-2127`, `src/celt/celt_encoder.rs:3283`
+- Upstream behavior: `libopus-sys/opus/celt/celt_encoder.c:2535-2590`, `libopus-sys/opus/celt/celt_encoder.c:2816-2818`
+- Detail: Upstream `celt_encode_with_ec` computes `qext_bytes`, carves extension payload space from the packet, and entropy-codes QEXT data when `st->enable_qext` is set. Rust currently calls `celt_encode_with_ec` with `qext_payload=None` and `qext_bytes=0` (TODO noted), so QEXT coding branches guarded by `qext_bytes > 0` never activate, diverging from upstream QEXT-enabled encoding behavior.
+
+230. [MEDIUM][Arch Dispatch Semantics][CELT/SILK SIMD] Rust SIMD dispatch ignores upstream `arch`-masked control path and always uses host CPUID result.
+- Rust dispatch: `src/celt/simd/mod.rs:40-55`, `src/celt/simd/mod.rs:60-76`, `src/celt/simd/mod.rs:104-133`, `src/celt/simd/mod.rs:170-181`, `src/silk/simd/mod.rs:37-62`, `src/silk/simd/mod.rs:78-97`, `src/silk/simd/mod.rs:152-206`
+- Rust evidence of dropped `arch` parameter: `src/celt/simd/mod.rs:170` (`_arch` unused)
+- Upstream arch-masked dispatch macros/tables: `libopus-sys/opus/celt/x86/pitch_sse.h:74-77`, `libopus-sys/opus/celt/x86/pitch_sse.h:126-129`, `libopus-sys/opus/celt/x86/vq_sse.h:43-47`, `libopus-sys/opus/silk/x86/main_sse.h:266-269`, `libopus-sys/opus/silk/x86/main_sse.h:293`
+- Detail: Upstream SIMD selection is keyed by `(arch & OPUS_ARCHMASK)` (allowing explicit arch-tier control by caller/state). Rust dispatches directly off runtime CPUID checks inside wrappers and does not honor an `arch`-tier input for SIMD selection, so execution-tier semantics differ from upstream RTCD behavior.
+
+231. [MEDIUM][SIMD Coverage/Semantics][SILK FLP] Rust enables aarch64 NEON SIMD for `silk_inner_product_FLP`, while upstream only defines SIMD override on x86 AVX2.
+- Rust: `src/silk/simd/mod.rs:78-82`, `src/silk/float/inner_product_FLP.rs:13-15`
+- Upstream default macro path (scalar): `libopus-sys/opus/silk/float/SigProc_FLP.h:132-133`
+- Upstream SIMD override path (x86 AVX2 only): `libopus-sys/opus/silk/x86/main_sse.h:279-293`, `libopus-sys/opus/silk/x86/x86_silk_map.c:165-175`
+- Detail: Upstream routes `silk_inner_product_FLP` to AVX2 on x86 (or scalar otherwise). Rust adds an aarch64 NEON implementation and dispatches to it unconditionally on aarch64, introducing architecture-dependent numeric/decision-path behavior that upstream does not have.
+
+232. [LOW][Build SIMD Flags][libopus-sys x86 AVX2] `libopus-sys/build.rs` uses weaker AVX2 flags for `SILK_SOURCES_AVX2` than upstream build scripts.
+- Rust build flags: `libopus-sys/build.rs:169-173`
+- Upstream CMake AVX2 flags for same source group: `libopus-sys/opus/CMakeLists.txt:528`, `libopus-sys/opus/CMakeLists.txt:531`
+- Detail: Upstream applies `-mavx2 -mfma -mavx` to `silk_sources_avx2`; `build.rs` applies only `-mavx2` for `SILK_SOURCES_AVX2` (while using `-mavx2 -mfma` for `SILK_SOURCES_FLOAT_AVX2`). This is a compile-flag parity drift in SIMD build configuration.
+
+233. [LOW][SIMD Coverage][SILK VAD] Rust SIMD path accelerates only VAD energy inner loop, not upstream full-function SSE4.1 override surface.
+- Rust: `src/silk/VAD.rs:59-60`, `src/silk/VAD.rs:154`, `src/silk/simd/mod.rs:99-124`
+- Upstream SIMD override: `libopus-sys/opus/silk/x86/main_sse.h:250-269`, `libopus-sys/opus/silk/x86/VAD_sse4_1.c:45-260`
+- Detail: Upstream x86 can replace the full `silk_VAD_GetSA_Q8` routine with `silk_VAD_GetSA_Q8_sse4_1` via RTCD/presume macros. Rust keeps the scalar `silk_VAD_GetSA_Q8_c` control flow and only swaps in SIMD for the subframe energy accumulation helper, so SIMD coverage and dispatch granularity differ from upstream.
+
+234. [MEDIUM][SIMD Coverage][DNN x86] Rust DNN SIMD runtime dispatch only uses AVX2+FMA tier, while upstream includes SSE2/SSE4.1 RTCD tiers.
+- Rust dispatch: `src/dnn/simd/mod.rs:44-57`, `src/dnn/simd/mod.rs:71-85`, `src/dnn/simd/mod.rs:98-112`, `src/dnn/simd/mod.rs:133-147`, `src/dnn/simd/mod.rs:268-281`, `src/dnn/simd/mod.rs:322-335`
+- Upstream x86 RTCD tables: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:39-49`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:51-62`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:64-78`
+- Upstream x86 dispatch macros: `libopus-sys/opus/dnn/x86/dnn_x86.h:82-114`
+- Detail: On x86 CPUs without AVX2+FMA but with SSE2/SSE4.1, upstream still uses SIMD DNN implementations via RTCD tables. Rust falls back to scalar for those CPUs, reducing SIMD coverage/perf relative to upstream architecture tiers.
+
+235. [MEDIUM][Arch Dispatch Semantics][DNN] Rust DNN path does not preserve upstream arch-indexed RTCD selection semantics.
+- Rust call path: `src/dnn/nnet.rs:108-112`, `src/dnn/nnet.rs:137-160`, `src/dnn/simd/mod.rs:26-147`
+- Upstream arch-indexed dispatch: `libopus-sys/opus/dnn/x86/dnn_x86.h:89`, `libopus-sys/opus/dnn/x86/dnn_x86.h:100`, `libopus-sys/opus/dnn/x86/dnn_x86.h:114`, `libopus-sys/opus/dnn/arm/dnn_arm.h:62`, `libopus-sys/opus/dnn/arm/dnn_arm.h:84`, `libopus-sys/opus/dnn/arm/dnn_arm.h:98`
+- Detail: Upstream DNN compute entry points select implementations by `(arch & OPUS_ARCHMASK)` through RTCD tables/macros. Rust DNN wrappers select by host target/cpufeatures directly and expose no arch-tier control, so forced-tier testing/reproducibility semantics differ from upstream.
+
+236. [LOW][SIMD Tier Parity][DNN aarch64] Rust aarch64 DNN int8 GEMV uses only NEON dot-product emulation and does not expose upstream DOTPROD tier selection.
+- Rust aarch64 implementation: `src/dnn/simd/aarch64.rs:364-377`, `src/dnn/simd/aarch64.rs:387-462`, `src/dnn/simd/aarch64.rs:474-530`
+- Upstream DOTPROD tier and maps: `libopus-sys/opus/dnn/arm/arm_dnn_map.c:39-49`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:55-82`, `libopus-sys/opus/dnn/arm/dnn_arm.h:34-41`, `libopus-sys/opus/dnn/arm/nnet_dotprod.c:33-36`
+- Detail: Upstream ARM RTCD has a separate DOTPROD tier (`OPUS_ARCH_ARM_DOTPROD`) for DNN compute functions. Rust keeps a NEON emulated dot-product path and does not expose DOTPROD-specific runtime tiering, so ARM SIMD tier parity is incomplete.
+
+237. [LOW][Build SIMD Flags][libopus-sys x86 AVX2] `libopus-sys/build.rs` omits upstream `-mavx` companion flag for CELT/DNN AVX2 groups.
+- Rust AVX2 group flags: `libopus-sys/build.rs:165-168`, `libopus-sys/build.rs:178`
+- Upstream AVX2 flags assignment and usage: `libopus-sys/opus/CMakeLists.txt:528`, `libopus-sys/opus/CMakeLists.txt:530`, `libopus-sys/opus/CMakeLists.txt:535`, `libopus-sys/opus/meson.build:509`
+- Detail: Upstream builds AVX2 groups with `-mavx -mfma -mavx2`; Rust uses `-mavx2 -mfma` for `CELT_SOURCES_AVX2` and `DNN_SOURCES_AVX2` (and only `-mavx2` for one SILK group in finding 232). This is additional AVX2 compile-flag parity drift.
