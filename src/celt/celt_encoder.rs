@@ -1472,6 +1472,16 @@ fn dynalloc_analysis(
                 i += 1;
             }
         }
+        i = start;
+        while i < end {
+            if i < 8 {
+                follower[i as usize] *= 2_f32;
+            }
+            if i >= 12 {
+                follower[i as usize] *= 0.5f32;
+            }
+            i += 1;
+        }
         // Compensate for Opus' under-allocation on tones.
         if toneishness > 0.98 {
             let freq_bin = (0.5 + tone_freq as f64 * 120.0 / std::f64::consts::PI) as i32;
@@ -1501,16 +1511,6 @@ fn dynalloc_analysis(
                 follower[(end - 1) as usize] += 2.0;
                 follower[(end - 2) as usize] += 1.0;
             }
-        }
-        i = start;
-        while i < end {
-            if i < 8 {
-                follower[i as usize] *= 2_f32;
-            }
-            if i >= 12 {
-                follower[i as usize] *= 0.5f32;
-            }
-            i += 1;
         }
         if analysis.valid != 0 {
             i = start;
@@ -1681,6 +1681,7 @@ fn run_prefilter(
     gain: &mut opus_val16,
     qgain: &mut i32,
     enabled: i32,
+    tf_estimate: opus_val16,
     nbAvailableBytes: i32,
     analysis: &AnalysisInfo,
     tone_freq: opus_val16,
@@ -1689,7 +1690,7 @@ fn run_prefilter(
     let mut pitch_index: i32 = 0;
     let mut gain1: opus_val16 = 0.;
     let mut pf_threshold: opus_val16;
-    let pf_on: i32;
+    let mut pf_on: i32;
     let mut qg: i32 = 0;
     let mode = st.mode;
     let overlap = mode.overlap as i32;
@@ -1733,7 +1734,7 @@ fn run_prefilter(
             pitch_index = COMBFILTER_MINPERIOD;
         }
         gain1 = 0.75;
-    } else if enabled != 0 {
+    } else if enabled != 0 && st.complexity >= 5 {
         let vla_0 = ((COMBFILTER_MAXPERIOD + N) >> 1) as usize;
         let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
         {
@@ -1785,6 +1786,10 @@ fn run_prefilter(
     pf_threshold = 0.2f32;
     if (pitch_index - st.prefilter_period).abs() * 10 > pitch_index {
         pf_threshold += 0.2f32;
+        // Completely disable the prefilter on strong transients without continuity.
+        if tf_estimate > 0.98f32 {
+            gain1 = 0.;
+        }
     }
     if nbAvailableBytes < 25 {
         pf_threshold += 0.1f32;
@@ -1822,17 +1827,21 @@ fn run_prefilter(
         gain1 = 0.09375f32 * (qg + 1) as f32;
         pf_on = 1;
     }
+    let mut before = [0f32; 2];
+    let mut after = [0f32; 2];
+    let mut cancel_pitch = false;
+
     for c in 0..CC as usize {
         let offset: i32 = mode.shortMdctSize - overlap;
-        st.prefilter_period = if st.prefilter_period > 15 {
-            st.prefilter_period
-        } else {
-            15
-        };
+        st.prefilter_period = st.prefilter_period.max(COMBFILTER_MINPERIOD);
         // Copy in_mem overlap into in_0
         let in_dst = c * (N + overlap) as usize;
         in_0[in_dst..in_dst + overlap as usize]
             .copy_from_slice(&st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]);
+        // Measure energy before comb filter
+        for i in 0..N as usize {
+            before[c] += in_0[c * (N + overlap) as usize + overlap as usize + i].abs();
+        }
         {
             let pre_base = c * pre_chan_len;
             let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
@@ -1873,6 +1882,68 @@ fn run_prefilter(
                 st.arch,
             );
         }
+        // Measure energy after comb filter
+        for i in 0..N as usize {
+            after[c] += in_0[c * (N + overlap) as usize + overlap as usize + i].abs();
+        }
+    }
+
+    // Check if comb filter made things worse
+    if CC == 2 {
+        let thresh0 = 0.25f32 * gain1 * before[0] + 0.01f32 * before[1];
+        let thresh1 = 0.25f32 * gain1 * before[1] + 0.01f32 * before[0];
+        // Don't use the filter if one channel gets significantly worse.
+        if after[0] - before[0] > thresh0 || after[1] - before[1] > thresh1 {
+            cancel_pitch = true;
+        }
+        // Use the filter only if at least one channel gets significantly better.
+        if before[0] - after[0] < thresh0 && before[1] - after[1] < thresh1 {
+            cancel_pitch = true;
+        }
+    } else {
+        // Check that the mono channel actually got better.
+        if after[0] > before[0] {
+            cancel_pitch = true;
+        }
+    }
+
+    // If needed, revert to a gain of zero.
+    if cancel_pitch {
+        for c in 0..CC as usize {
+            let offset: i32 = mode.shortMdctSize - overlap;
+            let pre_base = c * pre_chan_len;
+            let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
+            let in_base = c * (N + overlap) as usize + overlap as usize;
+            // Revert: copy original pre data back
+            in_0[in_base..in_base + N as usize].copy_from_slice(
+                &pre_slice
+                    [COMBFILTER_MAXPERIOD as usize..COMBFILTER_MAXPERIOD as usize + N as usize],
+            );
+            // Re-apply transition with gain=0
+            let in_slice = &mut in_0[in_base..in_base + N as usize];
+            comb_filter(
+                in_slice,
+                offset as usize,
+                pre_slice,
+                (COMBFILTER_MAXPERIOD + offset) as usize,
+                st.prefilter_period,
+                pitch_index,
+                overlap,
+                -st.prefilter_gain,
+                -0.,
+                st.prefilter_tapset,
+                prefilter_tapset,
+                mode.window,
+                overlap,
+                st.arch,
+            );
+        }
+        gain1 = 0.;
+        pf_on = 0;
+        qg = 0;
+    }
+
+    for c in 0..CC as usize {
         // Copy end of in_0 back into in_mem overlap
         let in_src = c * (N + overlap) as usize + N as usize;
         st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]
@@ -1890,7 +1961,7 @@ fn run_prefilter(
                 pfm_base + N as usize..pfm_base + COMBFILTER_MAXPERIOD as usize,
                 pfm_base,
             );
-            // Copy last N samples from _pre[1024..1024+N] (which is _pre[pre_base+1024..])
+            // Copy last N samples from _pre
             st.prefilter_mem[pfm_base + COMBFILTER_MAXPERIOD as usize - N as usize
                 ..pfm_base + COMBFILTER_MAXPERIOD as usize]
                 .copy_from_slice(
@@ -2357,8 +2428,8 @@ pub fn celt_encode_with_ec<'b>(
     enabled = ((st.lfe != 0 && nbAvailableBytes > 3 || nbAvailableBytes > 12 * C)
         && hybrid == 0
         && silence == 0
-        && st.disable_pf == 0
-        && st.complexity >= 5) as i32;
+        && tell + 16 <= total_bits
+        && st.disable_pf == 0) as i32;
     prefilter_tapset = st.tapset_decision;
     {
         let analysis = st.analysis;
@@ -2372,6 +2443,7 @@ pub fn celt_encode_with_ec<'b>(
             &mut gain1,
             &mut qg,
             enabled,
+            tf_estimate,
             nbAvailableBytes,
             &analysis,
             tone_freq,

@@ -44,7 +44,8 @@ use crate::opus::opus_defines::{
 };
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::silk::define::{
-    DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX, VAD_NO_DECISION,
+    DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX,
+    TYPE_NO_VOICE_ACTIVITY, VAD_NO_DECISION,
 };
 use crate::silk::enc_API::silk_EncControlStruct;
 use crate::silk::enc_API::{silk_Encode, silk_InitEncoder};
@@ -1032,9 +1033,10 @@ pub fn compute_stereo_width(
         xx = yy;
         xy = xx;
     }
-    mem.XX = (1.0 - short_alpha) * mem.XX + short_alpha * xx;
-    mem.XY = (1.0 - short_alpha) * mem.XY + short_alpha * xy;
-    mem.YY = (1.0 - short_alpha) * mem.YY + short_alpha * yy;
+    mem.XX += short_alpha * (xx - mem.XX);
+    // Rewritten to avoid overflows on abrupt sign change.
+    mem.XY = (Q15ONE - short_alpha) * mem.XY + short_alpha * xy;
+    mem.YY += short_alpha * (yy - mem.YY);
     mem.XX = if 0 as f32 > mem.XX { 0 as f32 } else { mem.XX };
     mem.XY = if 0 as f32 > mem.XY { 0 as f32 } else { mem.XY };
     mem.YY = if 0 as f32 > mem.YY { 0 as f32 } else { mem.YY };
@@ -1596,7 +1598,7 @@ pub fn opus_encode_native(
         rem: 0,
         error: 0,
     };
-    let mut bytes_target: i32 = 0;
+    let mut bits_target: i32 = 0;
     let mut prefill: i32 = 0;
     let mut start_band: i32 = 0;
     let mut redundancy: i32 = 0;
@@ -2179,12 +2181,11 @@ pub fn opus_encode_native(
             redundancy = 0;
         }
     }
-    bytes_target = ((8 * (max_data_bytes - redundancy_bytes)).min(bitrate_to_bits(
+    bits_target = (8 * (max_data_bytes - redundancy_bytes)).min(bitrate_to_bits(
         st.bitrate_bps,
         st.Fs,
         frame_size,
-    )) - 8)
-        / 8;
+    )) - 8;
     enc = ec_enc_init(&mut data[1..orig_max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
@@ -2286,7 +2287,7 @@ pub fn opus_encode_native(
         let mut celt_rate: i32 = 0;
         let vla_0 = (st.channels * frame_size) as usize;
         let mut pcm_silk: Vec<i16> = ::std::vec::from_elem(0, vla_0);
-        total_bitRate = bits_to_bitrate(bytes_target * 8, st.Fs, frame_size);
+        total_bitRate = bits_to_bitrate(bits_target, st.Fs, frame_size);
         if st.mode == MODE_HYBRID {
             st.silk_mode.bitRate = compute_silk_rate_for_hybrid(
                 total_bitRate,
@@ -2504,6 +2505,14 @@ pub fn opus_encode_native(
         };
         st.silk_mode.opusCanSwitch =
             (st.silk_mode.switchReady != 0 && st.nonfinal_frame == 0) as i32;
+
+        if activity == VAD_NO_DECISION {
+            activity = (st.silk_mode.signalType != TYPE_NO_VOICE_ACTIVITY) as i32;
+            #[cfg(feature = "dred")]
+            for i in 0..(frame_size * 400 / st.Fs) as usize {
+                st.activity_mem[i] = activity as u8;
+            }
+        }
         if nBytes == 0 {
             st.rangeFinal = 0;
             data[0] = gen_toc(
