@@ -1,6 +1,7 @@
 //! Static mode tables for floating-point operation.
 //!
 //! Upstream C: `celt/static_modes_float.h`
+#![allow(clippy::excessive_precision)]
 
 #[rustfmt::skip]
 pub static window120: [f32; 120] = [

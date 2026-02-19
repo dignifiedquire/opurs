@@ -1187,8 +1187,13 @@ fn test_enc_api_inner() {
         "bitrate after setting huge value = {i}, expected [256000, 1500000]"
     );
     cfgs += 1;
-    // Invalid bitrate values: the safe API uses Bitrate enum, so -12345 becomes Bits(-12345)
-    // and 0 becomes Bits(0). The encoder clamps these internally rather than erroring.
+    // Invalid non-positive explicit bitrate values are ignored (upstream CTL rejects them).
+    enc.set_bitrate(Bitrate::Bits(256000));
+    let prev = enc.bitrate();
+    enc.set_bitrate(Bitrate::Bits(0));
+    assert_eq!(enc.bitrate(), prev);
+    enc.set_bitrate(Bitrate::Bits(-12345));
+    assert_eq!(enc.bitrate(), prev);
     enc.set_bitrate(Bitrate::Bits(500));
     assert_eq!(enc.bitrate(), 500);
     enc.set_bitrate(Bitrate::Bits(256000));

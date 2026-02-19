@@ -258,6 +258,12 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 50. [MEDIUM] Encoder analysis gating misses upstream restricted-SILK application guard.
 - Rust: `src/opus/opus_encoder.rs:1677-1681`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:1252`
+
+51. [HIGH][Bitexact] CELT float math path used `FLOAT_APPROX` polynomial implementations unconditionally.
+- Rust (before fix): `src/celt/mathops.rs:celt_log2`, `src/celt/mathops.rs:celt_exp2`
+- Upstream: `libopus-sys/opus/celt/mathops.h:346-351` (default non-`FLOAT_APPROX` uses libc `log/exp`)
+- Detail: Rust always used the Remez polynomial path for `celt_log2/celt_exp2`, while upstream C in this build uses the non-`FLOAT_APPROX` path (`1.442695...*log(x)` and `exp(0.693147...*x)`). This produced systematic CELT encode drift.
+- Validation: after switching Rust to the upstream default float path, `opus_newvectors` improved from `109/228` to `216/228` (remaining failures are all `ENC @ 010kbps`, SILK-mode dominated).
 - Detail: Upstream only runs `run_analysis(...)` when `application != OPUS_APPLICATION_RESTRICTED_SILK`. Rust gating currently checks only complexity/Fs and can run analysis in restricted-SILK mode, diverging from upstream mode behavior.
 
 51. [HIGH] `frame_size_select` omits application-dependent restricted-SILK minimum-frame rule.
@@ -1210,3 +1216,16 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 - Rust AVX2 group flags: `libopus-sys/build.rs:165-168`, `libopus-sys/build.rs:178`
 - Upstream AVX2 flags assignment and usage: `libopus-sys/opus/CMakeLists.txt:528`, `libopus-sys/opus/CMakeLists.txt:530`, `libopus-sys/opus/CMakeLists.txt:535`, `libopus-sys/opus/meson.build:509`
 - Detail: Upstream builds AVX2 groups with `-mavx -mfma -mavx2`; Rust uses `-mavx2 -mfma` for `CELT_SOURCES_AVX2` and `DNN_SOURCES_AVX2` (and only `-mavx2` for one SILK group in finding 232). This is additional AVX2 compile-flag parity drift.
+
+238. [HIGH][Encode Input Semantics][SILK API] Rust `silk_Encode` accepted quantized `i16` input while upstream float build consumes `opus_res` and quantizes after stereo summation, causing SILK mono downmix divergence (resolved).
+- Rust pre-fix path: `src/opus/opus_encoder.rs:2332`, `src/opus/opus_encoder.rs:2525`, `src/opus/opus_encoder.rs:2542`, `src/silk/enc_API.rs:120`, `src/silk/enc_API.rs:314`
+- Upstream float path: `libopus-sys/opus/src/opus_encoder.c:2246`, `libopus-sys/opus/silk/enc_API.c:327`
+- Fix: `src/silk/enc_API.rs:120`, `src/silk/enc_API.rs:276`, `src/silk/enc_API.rs:299`, `src/silk/enc_API.rs:314`, `src/silk/enc_API.rs:368`, `src/opus/opus_encoder.rs:2332`, `src/opus/opus_encoder.rs:2525`, `src/opus/opus_encoder.rs:2542`
+- Evidence:
+  - Before fix, packet-1 traces diverged at downmix/input buffer:
+    - `RSILK pkt=1 downmix ... mix_hash=2d201ffa371a95d1` vs `CSILK ... mix_hash=cd93df8163d0318c`
+    - `RSILK pkt=1 pre-frame ... in_hash=3573f440da2905bd` vs `CSILK ... in_hash=f978183424e60343`
+  - After fix, packet-1 traces matched exactly through SILK entropy state:
+    - downmix/input hashes equal, `frame_call tell/rng/val/nbits_total` equal.
+  - Vector result moved to full parity:
+    - `opus_newvectors`: `216/228` -> `228/228` passed.

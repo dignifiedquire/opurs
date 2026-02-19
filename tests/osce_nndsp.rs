@@ -260,6 +260,7 @@ fn rust_adashape(nolace: &NoLACE, num_frames: usize, seed: u32) -> Vec<f32> {
             feature_dim,
             frame_size,
             NOLACE_TDSHAPE1_AVG_POOL_K,
+            1,
         );
         all_out.extend_from_slice(&x_out);
     }

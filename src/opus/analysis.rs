@@ -651,7 +651,7 @@ fn downmix_and_resample(
     if (c2 == -2 && C == 2) || c2 > -1 {
         j = 0;
         while j < subframe {
-            tmp[j as usize] = 0.5f32 * tmp[j as usize];
+            tmp[j as usize] *= 0.5f32;
             j += 1;
         }
     }

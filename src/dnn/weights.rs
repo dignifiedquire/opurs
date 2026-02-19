@@ -26,6 +26,7 @@ pub fn compiled_weights() -> Vec<WeightArray> {
     {
         arrays.extend(super::osce_lace_data::lacelayers_arrays());
         arrays.extend(super::osce_nolace_data::nolacelayers_arrays());
+        arrays.extend(super::bbwenet_data::bbwenetlayers_arrays());
     }
     arrays
 }

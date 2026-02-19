@@ -59,7 +59,7 @@ pub fn silk_encode_pulses(
     /* Take the absolute value of the pulses */
     let mut abs_pulses = pulses_frame
         .iter()
-        .map(|&v| v.abs() as i32)
+        .map(|&v| (v as i32).abs())
         .collect::<Vec<_>>();
 
     /* Calc sum pulses per shell code frame */
@@ -198,7 +198,7 @@ pub fn silk_encode_pulses(
             let nLS = nRshifts - 1;
 
             for &q in pulse_frame {
-                let abs_q = q.abs() as i32;
+                let abs_q = (q as i32).abs();
 
                 for j in (1..=nLS).rev() {
                     let bit = abs_q >> j & 1;

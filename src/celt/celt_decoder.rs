@@ -980,7 +980,7 @@ fn celt_decode_lost(
                     i += 1;
                 }
             } else if S1 < S2 {
-                let ratio: opus_val16 = celt_sqrt((S1 + 1.0) / (S2 + 1.0));
+                let ratio: opus_val16 = celt_sqrt((0.5 * S1 + 1.0) / (S2 + 1.0));
                 let mut i = 0;
                 while i < overlap {
                     let tmp_g: opus_val16 = Q15ONE - window[i as usize] * (1.0f32 - ratio);

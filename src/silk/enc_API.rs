@@ -40,6 +40,7 @@ pub mod errors_h {
 use self::errors_h::SILK_NO_ERROR;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
+use crate::celt::float_cast::FLOAT2INT16;
 
 use crate::silk::check_control_input::check_control_input;
 use crate::silk::control_SNR::silk_control_SNR;
@@ -114,7 +115,7 @@ fn silk_QueryEncoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct
 pub fn silk_Encode(
     psEnc: &mut silk_encoder,
     encControl: &mut silk_EncControlStruct,
-    samplesIn: &[i16],
+    samplesIn: &[f32],
     nSamplesIn: i32,
     mut psRangeEnc: Option<&mut ec_enc>,
     nBytesOut: &mut i32,
@@ -265,7 +266,7 @@ pub fn silk_Encode(
             let id = psEnc.state_Fxx[0].sCmn.nFramesEncoded;
             // De-interleave left channel
             for k in 0..nSamplesFromInput as usize {
-                buf[k] = samplesIn[samplesIn_off + 2 * k];
+                buf[k] = FLOAT2INT16(samplesIn[samplesIn_off + 2 * k]);
             }
             // Making sure to start both resamplers from the same state when switching from mono to stereo
             if psEnc.nPrevChannelsInternal == 1 && id == 0 {
@@ -288,7 +289,7 @@ pub fn silk_Encode(
                 nSamplesToBuffer.min(10 * nBlocksOf10ms * psEnc.state_Fxx[1].sCmn.fs_kHz);
             // De-interleave right channel
             for k in 0..nSamplesFromInput as usize {
-                buf[k] = samplesIn[samplesIn_off + 2 * k + 1];
+                buf[k] = FLOAT2INT16(samplesIn[samplesIn_off + 2 * k + 1]);
             }
             {
                 let ix1 = psEnc.state_Fxx[1].sCmn.inputBufIx as usize;
@@ -303,8 +304,9 @@ pub fn silk_Encode(
         } else if encControl.nChannelsAPI == 2 && encControl.nChannelsInternal == 1 {
             // Downmix stereo to mono
             for k in 0..nSamplesFromInput as usize {
-                let sum = samplesIn[samplesIn_off + 2 * k] as i32
-                    + samplesIn[samplesIn_off + 2 * k + 1] as i32;
+                let sum = FLOAT2INT16(
+                    samplesIn[samplesIn_off + 2 * k] + samplesIn[samplesIn_off + 2 * k + 1],
+                ) as i32;
                 buf[k] = ((sum >> 1) + (sum & 1)) as i16;
             }
             {
@@ -341,9 +343,9 @@ pub fn silk_Encode(
             psEnc.state_Fxx[0].sCmn.inputBufIx += nSamplesToBuffer;
         } else {
             assert!(encControl.nChannelsAPI == 1 && encControl.nChannelsInternal == 1);
-            buf[..nSamplesFromInput as usize].copy_from_slice(
-                &samplesIn[samplesIn_off..samplesIn_off + nSamplesFromInput as usize],
-            );
+            for k in 0..nSamplesFromInput as usize {
+                buf[k] = FLOAT2INT16(samplesIn[samplesIn_off + k]);
+            }
             {
                 let ix0 = psEnc.state_Fxx[0].sCmn.inputBufIx as usize;
                 let [s0, _] = &mut psEnc.state_Fxx;
@@ -577,12 +579,11 @@ pub fn silk_Encode(
                 } else {
                     condCoding_0 = CODE_CONDITIONALLY;
                 }
-                let psRangeEnc = psRangeEnc.as_deref_mut();
-
+                let ps_range_enc = psRangeEnc.as_deref_mut();
                 ret = silk_encode_frame_FLP(
                     &mut psEnc.state_Fxx[n as usize],
                     nBytesOut,
-                    psRangeEnc,
+                    ps_range_enc,
                     condCoding_0,
                     maxBits,
                     useCBR,

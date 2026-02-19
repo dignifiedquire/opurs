@@ -1,6 +1,7 @@
 //! Fixed-point and floating-point math operations.
 //!
 //! Upstream C: `celt/mathops.c`
+#![allow(clippy::approx_constant, clippy::excessive_precision)]
 
 use crate::silk::macros::EC_CLZ0;
 
@@ -200,91 +201,20 @@ pub fn celt_log10(x: f32) -> f32 {
     (x as f64).log10() as f32
 }
 
-/// Base-2 log approximation using a 4th-degree polynomial with mantissa
-/// normalization and correction lookup tables.
+/// Upstream C: celt/mathops.h:celt_log2
 ///
-/// Upstream C: celt/mathops.h:celt_log2 (1.6.1 Remez approximation)
-///
-/// Note: special cases (denormals, inf, NaN, zero) are not handled — same as C.
+/// We match the default non-FLOAT_APPROX float path:
+/// `((float)(1.442695040888963387*log(x)))`.
 #[inline]
-#[allow(clippy::excessive_precision)]
 pub fn celt_log2(x: f32) -> f32 {
-    // Log2 x normalization coefficients: 1 / (1 + 0.125 * index)
-    const LOG2_X_NORM_COEFF: [f32; 8] = [
-        1.000000000000000000000000000f32,
-        8.88888895511627197265625e-01f32,
-        8.00000000000000000000000e-01f32,
-        7.27272748947143554687500e-01f32,
-        6.66666686534881591796875e-01f32,
-        6.15384638309478759765625e-01f32,
-        5.71428596973419189453125e-01f32,
-        5.33333361148834228515625e-01f32,
-    ];
-    // Log2 y normalization coefficients: log2(1 + 0.125 * index)
-    const LOG2_Y_NORM_COEFF: [f32; 8] = [
-        0.0000000000000000000000000000f32,
-        1.699250042438507080078125e-01f32,
-        3.219280838966369628906250e-01f32,
-        4.594316184520721435546875e-01f32,
-        5.849624872207641601562500e-01f32,
-        7.004396915435791015625000e-01f32,
-        8.073549270629882812500000e-01f32,
-        9.068905711174011230468750e-01f32,
-    ];
-
-    let bits = x.to_bits();
-    let integer = (bits >> 23) as i32 - 127;
-    let bits = bits.wrapping_sub((integer as u32) << 23);
-
-    // Normalize mantissa range from [1, 2] to [1, 1.125], then shift by -1.0625
-    let range_idx = ((bits >> 20) & 0x7) as usize;
-    let frac = f32::from_bits(bits) * LOG2_X_NORM_COEFF[range_idx] - 1.0625f32;
-
-    // 4th-degree polynomial (Lolremez on [-0.0625, 0.0625])
-    const LOG2_COEFF_A0: f32 = 8.74628424644470214843750000e-02;
-    const LOG2_COEFF_A1: f32 = 1.357829570770263671875000000000;
-    const LOG2_COEFF_A2: f32 = -6.3897705078125000000000000e-01;
-    const LOG2_COEFF_A3: f32 = 4.01971250772476196289062500e-01;
-    const LOG2_COEFF_A4: f32 = -2.8415444493293762207031250e-01;
-
-    let poly = LOG2_COEFF_A0
-        + frac
-            * (LOG2_COEFF_A1
-                + frac * (LOG2_COEFF_A2 + frac * (LOG2_COEFF_A3 + frac * LOG2_COEFF_A4)));
-
-    integer as f32 + poly + LOG2_Y_NORM_COEFF[range_idx]
+    (1.442695040888963387_f64 * (x as f64).ln()) as f32
 }
 
-/// Base-2 exponential approximation using a 5th-degree Remez polynomial
-/// with IEEE754 bit manipulation to apply the integer exponent.
+/// Upstream C: celt/mathops.h:celt_exp2
 ///
-/// Upstream C: celt/mathops.h:celt_exp2 (1.6.1 Remez approximation)
+/// We match the default non-FLOAT_APPROX float path:
+/// `((float)exp(0.6931471805599453094*(x)))`.
 #[inline]
-#[allow(clippy::excessive_precision)]
 pub fn celt_exp2(x: f32) -> f32 {
-    let integer = x.floor() as i32;
-    if integer < -50 {
-        return 0.0;
-    }
-    let frac = x - integer as f32;
-
-    // 5th-degree Remez polynomial on [0, 1]
-    const EXP2_COEFF_A0: f32 = 9.999999403953552246093750000000e-01;
-    const EXP2_COEFF_A1: f32 = 6.931530833244323730468750000000e-01;
-    const EXP2_COEFF_A2: f32 = 2.401536107063293457031250000000e-01;
-    const EXP2_COEFF_A3: f32 = 5.582631751894950866699218750000e-02;
-    const EXP2_COEFF_A4: f32 = 8.989339694380760192871093750000e-03;
-    const EXP2_COEFF_A5: f32 = 1.877576694823801517486572265625e-03;
-
-    let poly = EXP2_COEFF_A0
-        + frac
-            * (EXP2_COEFF_A1
-                + frac
-                    * (EXP2_COEFF_A2
-                        + frac * (EXP2_COEFF_A3 + frac * (EXP2_COEFF_A4 + frac * EXP2_COEFF_A5))));
-
-    // Combine polynomial result with integer exponent via IEEE754 bit manipulation
-    let bits = poly.to_bits();
-    let bits = ((bits as i32).wrapping_add((integer as u32 as i32) << 23) as u32) & 0x7fff_ffff;
-    f32::from_bits(bits)
+    (0.6931471805599453094_f64 * x as f64).exp() as f32
 }

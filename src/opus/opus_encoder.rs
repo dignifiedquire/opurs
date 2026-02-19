@@ -25,7 +25,6 @@ use crate::celt::celt_encoder::{celt_encode_with_ec, OpusCustomEncoder, SILKInfo
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::ec_enc;
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_done, ec_enc_init, ec_enc_shrink, ec_enc_uint};
-use crate::celt::float_cast::FLOAT2INT16;
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
 
@@ -318,6 +317,11 @@ impl OpusEncoder {
     pub fn set_bitrate(&mut self, bitrate: Bitrate) {
         let value: i32 = bitrate.into();
         if value != OPUS_AUTO && value != OPUS_BITRATE_MAX {
+            // Match upstream CTL semantics for invalid explicit bitrates:
+            // values <= 0 are rejected (no state change).
+            if value <= 0 {
+                return;
+            }
             let clamped = value.max(500).min(750000 * self.channels);
             self.user_bitrate_bps = clamped;
         } else {
@@ -364,7 +368,10 @@ impl OpusEncoder {
                 }
                 v
             }
-            None => OPUS_AUTO,
+            None => {
+                self.silk_mode.maxInternalSampleRate = 16000;
+                OPUS_AUTO
+            }
         };
         self.user_bandwidth = raw;
     }
@@ -1726,17 +1733,17 @@ pub fn opus_encode_native(
         }
     }
     // Track the peak signal energy
-    if analysis_info.valid == 0 || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD {
-        if is_silence == 0 {
-            let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
-            st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
-                > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-            {
-                0.999f32 * st.peak_signal_energy
-            } else {
-                compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-            };
-        }
+    if (analysis_info.valid == 0 || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD)
+        && is_silence == 0
+    {
+        let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
+        st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
+            > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
+        {
+            0.999f32 * st.peak_signal_energy
+        } else {
+            compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
+        };
     }
     if st.channels == 2 && st.force_channels != 1 {
         stereo_width = compute_stereo_width(
@@ -2290,7 +2297,7 @@ pub fn opus_encode_native(
         let mut total_bitRate: i32 = 0;
         let mut celt_rate: i32 = 0;
         let vla_0 = (st.channels * frame_size) as usize;
-        let mut pcm_silk: Vec<i16> = ::std::vec::from_elem(0, vla_0);
+        let mut pcm_silk: Vec<f32> = ::std::vec::from_elem(0.0, vla_0);
         total_bitRate = bits_to_bitrate(bits_target, st.Fs, frame_size);
         if st.mode == MODE_HYBRID {
             st.silk_mode.bitRate = compute_silk_rate_for_hybrid(
@@ -2463,7 +2470,7 @@ pub fn opus_encode_native(
             st.delay_buffer[..prefill_offset as usize].fill(0.0);
             i = 0;
             while i < st.encoder_buffer * st.channels {
-                pcm_silk[i as usize] = FLOAT2INT16(st.delay_buffer[i as usize]);
+                pcm_silk[i as usize] = st.delay_buffer[i as usize];
                 i += 1;
             }
             silk_Encode(
@@ -2480,7 +2487,7 @@ pub fn opus_encode_native(
         }
         i = 0;
         while i < frame_size * st.channels {
-            pcm_silk[i as usize] = FLOAT2INT16(pcm_buf[(total_buffer * st.channels + i) as usize]);
+            pcm_silk[i as usize] = pcm_buf[(total_buffer * st.channels + i) as usize];
             i += 1;
         }
         ret = silk_Encode(
