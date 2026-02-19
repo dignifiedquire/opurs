@@ -89,7 +89,7 @@ jobs:
           for f in fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h \
                    dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h \
                    dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h \
-                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h; do
+                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h bbwenet_data.c bbwenet_data.h dred_rdovae_constants.h; do
             cp "/tmp/opus-1.5.2/dnn/$f" "libopus-sys/opus/dnn/$f"
           done
           rm -rf /tmp/opus.tar.gz /tmp/opus-1.5.2
@@ -216,7 +216,7 @@ jobs:
           for f in fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h \
                    dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h \
                    dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h \
-                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h; do
+                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h bbwenet_data.c bbwenet_data.h dred_rdovae_constants.h; do
             cp "/tmp/opus-1.5.2/dnn/$f" "libopus-sys/opus/dnn/$f"
           done
           rm -rf /tmp/opus.tar.gz /tmp/opus-1.5.2
@@ -333,7 +333,7 @@ jobs:
           for f in fargan_data.c fargan_data.h plc_data.c plc_data.h pitchdnn_data.c pitchdnn_data.h \
                    dred_rdovae_enc_data.c dred_rdovae_enc_data.h dred_rdovae_dec_data.c dred_rdovae_dec_data.h \
                    dred_rdovae_stats_data.c dred_rdovae_stats_data.h lace_data.c lace_data.h \
-                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h dred_rdovae_constants.h; do
+                   nolace_data.c nolace_data.h lossgen_data.c lossgen_data.h bbwenet_data.c bbwenet_data.h dred_rdovae_constants.h; do
             cp "/tmp/opus-1.5.2/dnn/$f" "libopus-sys/opus/dnn/$f"
           done
           rm -rf /tmp/opus.tar.gz /tmp/opus-1.5.2
