@@ -158,3 +158,8 @@ issues.
 Each phase plan file contains a checklist. Mark items `[x]` as they are
 completed. Update the status column in the table above when a phase
 transitions between Not started / In progress / Complete.
+
+## Supplemental Plans
+
+- [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — maps
+  `diff_review.md` findings to targeted red→green parity tests and CI gates.

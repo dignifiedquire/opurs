@@ -3,6 +3,34 @@
 ## Scope
 Rust sources compared against upstream C in `libopus-sys/opus`.
 
+## Remaining Items (Grouped)
+Snapshot from the current findings list (excluding resolved item `238`):
+- Remaining findings: `238`
+- Severity split: `44 HIGH`, `63 MEDIUM`, `131 LOW`
+
+Priority groups for execution:
+
+1. QEXT correctness blockers (bitstream/PLC/sizing)
+IDs: `3,4,5,15,16,17,21,22,23,24,25,26,28,29,30,31,32,34,42,52,88,111,150,166,175,229`
+
+2. Extensions and repacketizer semantic parity
+IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
+
+3. Public API surface parity (core, custom, multistream/projection, 24-bit)
+IDs: `10,11,12,43,45,98,104,105,110,116,119,120,122,163,173,177,178,186,199`
+
+4. DNN/DRED/OSCE model loading and constant parity
+IDs: `12,45,76,94,135,136,137,175,176,177,178,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
+
+5. SIMD/arch-dispatch/build-flag parity
+IDs: `64,91,107,194,202,203,204,205,212,213,214,224,230,231,232,233,234,235,236,237`
+
+6. Documentation/version/metadata drift
+IDs: `95,96,108,131,133,134,217,223,228`
+
+7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
+IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`
+
 ## Findings
 
 1. [HIGH] CELT PLC attenuation ratio mismatch.
