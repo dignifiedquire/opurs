@@ -11,6 +11,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  OPUS_RELEASE_URL: https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-v1.6.1.tar.gz
 
 jobs:
   fmt:
@@ -72,6 +73,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: clippy-tools-dnn
+      - name: Cache DNN weight data
+        id: dnn-weights
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: dnn-weights-opus-1.6.1-v2
+      - name: Download DNN weight data
+        if: steps.dnn-weights.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          curl -sL "$OPUS_RELEASE_URL" -o /tmp/opus.tar.gz
+          src_root="$(tar -tzf /tmp/opus.tar.gz | head -1 | cut -d/ -f1)"
+          tar -xzf /tmp/opus.tar.gz -C /tmp
+          cp "/tmp/$src_root/dnn/"*_data.* libopus-sys/opus/dnn/
+          cp "/tmp/$src_root/dnn/dred_rdovae_constants.h" libopus-sys/opus/dnn/
+          rm -rf /tmp/opus.tar.gz "/tmp/$src_root"
       - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
   test:
@@ -179,6 +198,24 @@ jobs:
         with:
           key: test-dnn-weights
       - uses: taiki-e/install-action@nextest
+      - name: Cache DNN weight data
+        id: dnn-weights
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: dnn-weights-opus-1.6.1-v2
+      - name: Download DNN weight data
+        if: steps.dnn-weights.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          curl -sL "$OPUS_RELEASE_URL" -o /tmp/opus.tar.gz
+          src_root="$(tar -tzf /tmp/opus.tar.gz | head -1 | cut -d/ -f1)"
+          tar -xzf /tmp/opus.tar.gz -C /tmp
+          cp "/tmp/$src_root/dnn/"*_data.* libopus-sys/opus/dnn/
+          cp "/tmp/$src_root/dnn/dred_rdovae_constants.h" libopus-sys/opus/dnn/
+          rm -rf /tmp/opus.tar.gz "/tmp/$src_root"
       - name: Run weight verification and integration tests
         run: cargo nextest run --features tools-dnn --cargo-profile=release
 
@@ -275,6 +312,24 @@ jobs:
         uses: aminya/setup-cpp@v1
         with:
           compiler: llvm
+      - name: Cache DNN weight data
+        id: dnn-weights
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: dnn-weights-opus-1.6.1-v2
+      - name: Download DNN weight data
+        if: steps.dnn-weights.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          curl -sL "$OPUS_RELEASE_URL" -o /tmp/opus.tar.gz
+          src_root="$(tar -tzf /tmp/opus.tar.gz | head -1 | cut -d/ -f1)"
+          tar -xzf /tmp/opus.tar.gz -C /tmp
+          cp "/tmp/$src_root/dnn/"*_data.* libopus-sys/opus/dnn/
+          cp "/tmp/$src_root/dnn/dred_rdovae_constants.h" libopus-sys/opus/dnn/
+          rm -rf /tmp/opus.tar.gz "/tmp/$src_root"
       - name: Build (release)
         run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
       - name: Download test vectors
