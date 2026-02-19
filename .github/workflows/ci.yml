@@ -11,8 +11,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  OPUS_DNN_DATA_URL: https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-v1.6.1.tar.gz
-  OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-1.6.1-gitlab-v1
+  OPUS_DNN_DATA_SHA256: a5177ec6fb7d15058e99e57029746100121f68e4890b1467d4094aa336b6013e
+  OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v1
 
 jobs:
   fmt:
@@ -82,21 +82,15 @@ jobs:
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
           key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
-      - name: Download DNN weight data (Opus v1.6.1 tag)
+      - name: Download DNN weight data (upstream model bundle)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
-          test -n "$files"
-          while IFS= read -r f; do
-            tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
-          done <<< "$files"
-          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
-          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
-          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
+          pushd libopus-sys/opus >/dev/null
+          sh dnn/download_model.sh "$OPUS_DNN_DATA_SHA256"
+          rm -f "opus_data-${OPUS_DNN_DATA_SHA256}.tar.gz"
+          popd >/dev/null
       - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
   test:
@@ -212,21 +206,15 @@ jobs:
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
           key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
-      - name: Download DNN weight data (Opus v1.6.1 tag)
+      - name: Download DNN weight data (upstream model bundle)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
-          test -n "$files"
-          while IFS= read -r f; do
-            tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
-          done <<< "$files"
-          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
-          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
-          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
+          pushd libopus-sys/opus >/dev/null
+          sh dnn/download_model.sh "$OPUS_DNN_DATA_SHA256"
+          rm -f "opus_data-${OPUS_DNN_DATA_SHA256}.tar.gz"
+          popd >/dev/null
       - name: Run weight verification and integration tests
         run: cargo nextest run --features tools-dnn --cargo-profile=release
 
@@ -331,21 +319,15 @@ jobs:
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
           key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
-      - name: Download DNN weight data (Opus v1.6.1 tag)
+      - name: Download DNN weight data (upstream model bundle)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
-          test -n "$files"
-          while IFS= read -r f; do
-            tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
-          done <<< "$files"
-          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
-          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
-          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
+          pushd libopus-sys/opus >/dev/null
+          sh dnn/download_model.sh "$OPUS_DNN_DATA_SHA256"
+          rm -f "opus_data-${OPUS_DNN_DATA_SHA256}.tar.gz"
+          popd >/dev/null
       - name: Build (release)
         run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
       - name: Download test vectors
