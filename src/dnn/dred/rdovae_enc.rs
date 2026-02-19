@@ -9,30 +9,41 @@ use super::config::*;
 // --- Layer size constants from dred_rdovae_enc_data.h ---
 
 const ENC_DENSE1_OUT_SIZE: usize = 64;
-const ENC_ZDENSE_OUT_SIZE: usize = 24;
+const ENC_ZDENSE_OUT_SIZE: usize = 32;
+const GDENSE2_OUT_SIZE: usize = 56;
 const GDENSE1_OUT_SIZE: usize = 128;
+const ENC_CONV_DENSE1_OUT_SIZE: usize = 64;
+const ENC_CONV_DENSE2_OUT_SIZE: usize = 64;
+const ENC_CONV_DENSE3_OUT_SIZE: usize = 64;
+const ENC_CONV_DENSE4_OUT_SIZE: usize = 64;
+const ENC_CONV_DENSE5_OUT_SIZE: usize = 64;
 
-const ENC_GRU1_OUT_SIZE: usize = 64;
-const ENC_GRU1_STATE_SIZE: usize = 64;
-const ENC_GRU2_OUT_SIZE: usize = 64;
-const ENC_GRU2_STATE_SIZE: usize = 64;
-const ENC_GRU3_OUT_SIZE: usize = 64;
-const ENC_GRU3_STATE_SIZE: usize = 64;
-const ENC_GRU4_OUT_SIZE: usize = 64;
-const ENC_GRU4_STATE_SIZE: usize = 64;
-const ENC_GRU5_OUT_SIZE: usize = 64;
-const ENC_GRU5_STATE_SIZE: usize = 64;
+const ENC_GRU1_OUT_SIZE: usize = 32;
+const ENC_GRU1_STATE_SIZE: usize = 32;
+const ENC_GRU2_OUT_SIZE: usize = 32;
+const ENC_GRU2_STATE_SIZE: usize = 32;
+const ENC_GRU3_OUT_SIZE: usize = 32;
+const ENC_GRU3_STATE_SIZE: usize = 32;
+const ENC_GRU4_OUT_SIZE: usize = 32;
+const ENC_GRU4_STATE_SIZE: usize = 32;
+const ENC_GRU5_OUT_SIZE: usize = 32;
+const ENC_GRU5_STATE_SIZE: usize = 32;
 
-const ENC_CONV1_OUT_SIZE: usize = 96;
-const ENC_CONV1_STATE_SIZE: usize = 128;
-const ENC_CONV2_OUT_SIZE: usize = 96;
-const ENC_CONV2_STATE_SIZE: usize = 288;
-const ENC_CONV3_OUT_SIZE: usize = 96;
-const ENC_CONV3_STATE_SIZE: usize = 448;
-const ENC_CONV4_OUT_SIZE: usize = 96;
-const ENC_CONV4_STATE_SIZE: usize = 608;
-const ENC_CONV5_OUT_SIZE: usize = 96;
-const ENC_CONV5_STATE_SIZE: usize = 768;
+const ENC_CONV1_OUT_SIZE: usize = 64;
+const ENC_CONV1_IN_SIZE: usize = 64;
+const ENC_CONV1_STATE_SIZE: usize = 64;
+const ENC_CONV2_OUT_SIZE: usize = 64;
+const ENC_CONV2_IN_SIZE: usize = 64;
+const ENC_CONV2_STATE_SIZE: usize = 64;
+const ENC_CONV3_OUT_SIZE: usize = 64;
+const ENC_CONV3_IN_SIZE: usize = 64;
+const ENC_CONV3_STATE_SIZE: usize = 64;
+const ENC_CONV4_OUT_SIZE: usize = 64;
+const ENC_CONV4_IN_SIZE: usize = 64;
+const ENC_CONV4_STATE_SIZE: usize = 64;
+const ENC_CONV5_OUT_SIZE: usize = 64;
+const ENC_CONV5_IN_SIZE: usize = 64;
+const ENC_CONV5_STATE_SIZE: usize = 64;
 
 /// Total buffer size for concatenated layer outputs.
 const ENC_BUFFER_SIZE: usize = ENC_DENSE1_OUT_SIZE
@@ -56,8 +67,13 @@ const ENC_BUFFER_SIZE: usize = ENC_DENSE1_OUT_SIZE
 pub struct RDOVAEEnc {
     pub enc_dense1: LinearLayer,
     pub enc_zdense: LinearLayer,
-    pub gdense1: LinearLayer,
     pub gdense2: LinearLayer,
+    pub gdense1: LinearLayer,
+    pub enc_conv_dense1: LinearLayer,
+    pub enc_conv_dense2: LinearLayer,
+    pub enc_conv_dense3: LinearLayer,
+    pub enc_conv_dense4: LinearLayer,
+    pub enc_conv_dense5: LinearLayer,
     pub enc_gru1_input: LinearLayer,
     pub enc_gru1_recurrent: LinearLayer,
     pub enc_gru2_input: LinearLayer,
@@ -101,20 +117,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_zdense_scale",
-            864,
-            24,
-        )?,
-        gdense1: linear_init(
-            arrays,
-            "gdense1_bias",
-            "gdense1_subias",
-            "gdense1_weights_int8",
-            "gdense1_weights_float",
-            "",
-            "",
-            "gdense1_scale",
-            864,
-            128,
+            544,
+            32,
         )?,
         gdense2: linear_init(
             arrays,
@@ -126,7 +130,79 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "gdense2_scale",
             128,
-            24,
+            56,
+        )?,
+        gdense1: linear_init(
+            arrays,
+            "gdense1_bias",
+            "gdense1_subias",
+            "gdense1_weights_int8",
+            "gdense1_weights_float",
+            "gdense1_weights_idx",
+            "",
+            "gdense1_scale",
+            544,
+            128,
+        )?,
+        enc_conv_dense1: linear_init(
+            arrays,
+            "enc_conv_dense1_bias",
+            "enc_conv_dense1_subias",
+            "enc_conv_dense1_weights_int8",
+            "enc_conv_dense1_weights_float",
+            "enc_conv_dense1_weights_idx",
+            "",
+            "enc_conv_dense1_scale",
+            96,
+            64,
+        )?,
+        enc_conv_dense2: linear_init(
+            arrays,
+            "enc_conv_dense2_bias",
+            "enc_conv_dense2_subias",
+            "enc_conv_dense2_weights_int8",
+            "enc_conv_dense2_weights_float",
+            "enc_conv_dense2_weights_idx",
+            "",
+            "enc_conv_dense2_scale",
+            192,
+            64,
+        )?,
+        enc_conv_dense3: linear_init(
+            arrays,
+            "enc_conv_dense3_bias",
+            "enc_conv_dense3_subias",
+            "enc_conv_dense3_weights_int8",
+            "enc_conv_dense3_weights_float",
+            "enc_conv_dense3_weights_idx",
+            "",
+            "enc_conv_dense3_scale",
+            288,
+            64,
+        )?,
+        enc_conv_dense4: linear_init(
+            arrays,
+            "enc_conv_dense4_bias",
+            "enc_conv_dense4_subias",
+            "enc_conv_dense4_weights_int8",
+            "enc_conv_dense4_weights_float",
+            "enc_conv_dense4_weights_idx",
+            "",
+            "enc_conv_dense4_scale",
+            384,
+            64,
+        )?,
+        enc_conv_dense5: linear_init(
+            arrays,
+            "enc_conv_dense5_bias",
+            "enc_conv_dense5_subias",
+            "enc_conv_dense5_weights_int8",
+            "enc_conv_dense5_weights_float",
+            "enc_conv_dense5_weights_idx",
+            "",
+            "enc_conv_dense5_scale",
+            480,
+            64,
         )?,
         enc_gru1_input: linear_init(
             arrays,
@@ -138,7 +214,7 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "enc_gru1_input_scale",
             64,
-            192,
+            96,
         )?,
         enc_gru1_recurrent: linear_init(
             arrays,
@@ -149,8 +225,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_gru1_recurrent_scale",
-            64,
-            192,
+            32,
+            96,
         )?,
         enc_gru2_input: linear_init(
             arrays,
@@ -161,8 +237,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "enc_gru2_input_weights_idx",
             "",
             "enc_gru2_input_scale",
-            224,
-            192,
+            160,
+            96,
         )?,
         enc_gru2_recurrent: linear_init(
             arrays,
@@ -173,8 +249,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_gru2_recurrent_scale",
-            64,
-            192,
+            32,
+            96,
         )?,
         enc_gru3_input: linear_init(
             arrays,
@@ -185,8 +261,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "enc_gru3_input_weights_idx",
             "",
             "enc_gru3_input_scale",
-            384,
-            192,
+            256,
+            96,
         )?,
         enc_gru3_recurrent: linear_init(
             arrays,
@@ -197,8 +273,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_gru3_recurrent_scale",
-            64,
-            192,
+            32,
+            96,
         )?,
         enc_gru4_input: linear_init(
             arrays,
@@ -209,8 +285,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "enc_gru4_input_weights_idx",
             "",
             "enc_gru4_input_scale",
-            544,
-            192,
+            352,
+            96,
         )?,
         enc_gru4_recurrent: linear_init(
             arrays,
@@ -221,8 +297,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_gru4_recurrent_scale",
-            64,
-            192,
+            32,
+            96,
         )?,
         enc_gru5_input: linear_init(
             arrays,
@@ -233,8 +309,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "enc_gru5_input_weights_idx",
             "",
             "enc_gru5_input_scale",
-            704,
-            192,
+            448,
+            96,
         )?,
         enc_gru5_recurrent: linear_init(
             arrays,
@@ -245,8 +321,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_gru5_recurrent_scale",
-            64,
-            192,
+            32,
+            96,
         )?,
         enc_conv1: linear_init(
             arrays,
@@ -257,8 +333,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_conv1_scale",
-            256,
-            96,
+            128,
+            64,
         )?,
         enc_conv2: linear_init(
             arrays,
@@ -269,8 +345,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_conv2_scale",
-            576,
-            96,
+            128,
+            64,
         )?,
         enc_conv3: linear_init(
             arrays,
@@ -281,8 +357,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_conv3_scale",
-            896,
-            96,
+            128,
+            64,
         )?,
         enc_conv4: linear_init(
             arrays,
@@ -293,8 +369,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_conv4_scale",
-            1216,
-            96,
+            128,
+            64,
         )?,
         enc_conv5: linear_init(
             arrays,
@@ -305,8 +381,8 @@ pub fn init_rdovaeenc(arrays: &[WeightArray]) -> Option<RDOVAEEnc> {
             "",
             "",
             "enc_conv5_scale",
-            1536,
-            96,
+            128,
+            64,
         )?,
     })
 }
@@ -378,6 +454,7 @@ pub fn dred_rdovae_encode_dframe(
     input: &[f32],
 ) {
     let mut buffer = vec![0.0f32; ENC_BUFFER_SIZE];
+    let mut conv_tmp = [0.0f32; ENC_CONV_DENSE1_OUT_SIZE];
     let mut output_index = 0;
 
     // Dense1
@@ -398,19 +475,24 @@ pub fn dred_rdovae_encode_dframe(
     );
     buffer[output_index..output_index + ENC_GRU1_OUT_SIZE].copy_from_slice(&enc_state.gru1_state);
     output_index += ENC_GRU1_OUT_SIZE;
+    compute_generic_dense(
+        &model.enc_conv_dense1,
+        &mut conv_tmp[..ENC_CONV_DENSE1_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut enc_state.conv1_state,
-        output_index,
+        ENC_CONV1_IN_SIZE,
         1,
         &mut enc_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.enc_conv1,
         &mut buffer[output_index..output_index + ENC_CONV1_OUT_SIZE],
         &mut enc_state.conv1_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..ENC_CONV_DENSE1_OUT_SIZE],
+        ENC_CONV1_OUT_SIZE,
         ACTIVATION_TANH,
     );
     output_index += ENC_CONV1_OUT_SIZE;
@@ -424,19 +506,24 @@ pub fn dred_rdovae_encode_dframe(
     );
     buffer[output_index..output_index + ENC_GRU2_OUT_SIZE].copy_from_slice(&enc_state.gru2_state);
     output_index += ENC_GRU2_OUT_SIZE;
+    compute_generic_dense(
+        &model.enc_conv_dense2,
+        &mut conv_tmp[..ENC_CONV_DENSE2_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut enc_state.conv2_state,
-        output_index,
+        ENC_CONV2_IN_SIZE,
         2,
         &mut enc_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d_dilation(
         &model.enc_conv2,
         &mut buffer[output_index..output_index + ENC_CONV2_OUT_SIZE],
         &mut enc_state.conv2_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..ENC_CONV_DENSE2_OUT_SIZE],
+        ENC_CONV2_OUT_SIZE,
         2,
         ACTIVATION_TANH,
     );
@@ -451,19 +538,24 @@ pub fn dred_rdovae_encode_dframe(
     );
     buffer[output_index..output_index + ENC_GRU3_OUT_SIZE].copy_from_slice(&enc_state.gru3_state);
     output_index += ENC_GRU3_OUT_SIZE;
+    compute_generic_dense(
+        &model.enc_conv_dense3,
+        &mut conv_tmp[..ENC_CONV_DENSE3_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut enc_state.conv3_state,
-        output_index,
+        ENC_CONV3_IN_SIZE,
         2,
         &mut enc_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d_dilation(
         &model.enc_conv3,
         &mut buffer[output_index..output_index + ENC_CONV3_OUT_SIZE],
         &mut enc_state.conv3_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..ENC_CONV_DENSE3_OUT_SIZE],
+        ENC_CONV3_OUT_SIZE,
         2,
         ACTIVATION_TANH,
     );
@@ -478,19 +570,24 @@ pub fn dred_rdovae_encode_dframe(
     );
     buffer[output_index..output_index + ENC_GRU4_OUT_SIZE].copy_from_slice(&enc_state.gru4_state);
     output_index += ENC_GRU4_OUT_SIZE;
+    compute_generic_dense(
+        &model.enc_conv_dense4,
+        &mut conv_tmp[..ENC_CONV_DENSE4_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut enc_state.conv4_state,
-        output_index,
+        ENC_CONV4_IN_SIZE,
         2,
         &mut enc_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d_dilation(
         &model.enc_conv4,
         &mut buffer[output_index..output_index + ENC_CONV4_OUT_SIZE],
         &mut enc_state.conv4_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..ENC_CONV_DENSE4_OUT_SIZE],
+        ENC_CONV4_OUT_SIZE,
         2,
         ACTIVATION_TANH,
     );
@@ -505,19 +602,24 @@ pub fn dred_rdovae_encode_dframe(
     );
     buffer[output_index..output_index + ENC_GRU5_OUT_SIZE].copy_from_slice(&enc_state.gru5_state);
     output_index += ENC_GRU5_OUT_SIZE;
+    compute_generic_dense(
+        &model.enc_conv_dense5,
+        &mut conv_tmp[..ENC_CONV_DENSE5_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut enc_state.conv5_state,
-        output_index,
+        ENC_CONV5_IN_SIZE,
         2,
         &mut enc_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d_dilation(
         &model.enc_conv5,
         &mut buffer[output_index..output_index + ENC_CONV5_OUT_SIZE],
         &mut enc_state.conv5_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..ENC_CONV_DENSE5_OUT_SIZE],
+        ENC_CONV5_OUT_SIZE,
         2,
         ACTIVATION_TANH,
     );
@@ -535,10 +637,10 @@ pub fn dred_rdovae_encode_dframe(
     // Initial state for decoder
     let mut state_hidden = vec![0.0f32; GDENSE1_OUT_SIZE];
     compute_generic_dense(&model.gdense1, &mut state_hidden, &buffer, ACTIVATION_TANH);
-    let mut padded_state = [0.0f32; DRED_PADDED_STATE_DIM];
+    let mut padded_state = [0.0f32; GDENSE2_OUT_SIZE];
     compute_generic_dense(
         &model.gdense2,
-        &mut padded_state,
+        &mut padded_state[..GDENSE2_OUT_SIZE],
         &state_hidden,
         ACTIVATION_LINEAR,
     );

@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `dnn/nndsp.c`, `dnn/nndsp.h`
 
+use crate::celt::mathops::celt_log;
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::dnn::nnet::*;
 
@@ -397,6 +398,7 @@ pub fn adashape_process_frame(
     assert!(frame_size.is_multiple_of(interpolate_k));
     let hidden_dim = frame_size / interpolate_k;
     let tenv_size = frame_size / avg_pool_k;
+    let f = 1.0f32 / avg_pool_k as f32;
     assert!(feature_dim + tenv_size + 1 < ADASHAPE_MAX_INPUT_DIM);
 
     let mut in_buffer = vec![0.0f32; ADASHAPE_MAX_INPUT_DIM + ADASHAPE_MAX_FRAME_SIZE];
@@ -413,10 +415,7 @@ pub fn adashape_process_frame(
         for k in 0..avg_pool_k {
             tenv[i] += x_in[i * avg_pool_k + k].abs();
         }
-        // C uses double-precision log(): log(float_val) promotes to double
-        // black_box prevents LLVM auto-vectorization of ln() (see compute_overlap_window comment).
-        let val = (tenv[i] / avg_pool_k as f32 + 1.52587890625e-05f32) as f64;
-        tenv[i] = std::hint::black_box(val).ln() as f32;
+        tenv[i] = celt_log(tenv[i] * f + 1.52587890625e-05f32);
         mean += tenv[i];
     }
     mean /= tenv_size as f32;
@@ -443,8 +442,7 @@ pub fn adashape_process_frame(
         ACTIVATION_LINEAR,
     );
 
-    // Leaky ReLU — C uses `0.2 * tmp` where 0.2 is a double literal,
-    // so the multiply is in double precision before truncating to float
+    // Leaky ReLU
     for i in 0..hidden_dim {
         let tmp = out_buffer[i] + tmp_buffer[i];
         in_buffer[i] = if tmp >= 0.0 {
@@ -474,10 +472,10 @@ pub fn adashape_process_frame(
         state.interpolate_state[0] = tmp_buffer[i];
     }
 
-    // Shape signal — C uses double-precision exp() and the multiply stays in double
-    // before truncating: x_out[i] = (float)(exp((double)out_buffer[i]) * (double)x_in[i])
-    // black_box prevents LLVM auto-vectorization of exp() (see compute_overlap_window comment).
+    // Shape signal
+    let exp_in = out_buffer.clone();
+    compute_activation(&mut out_buffer, &exp_in, frame_size, ACTIVATION_EXP);
     for i in 0..frame_size {
-        x_out[i] = (std::hint::black_box(out_buffer[i] as f64).exp() * x_in[i] as f64) as f32;
+        x_out[i] = out_buffer[i] * x_in[i];
     }
 }

@@ -9,36 +9,46 @@ use super::config::*;
 // --- Layer size constants from dred_rdovae_dec_data.h ---
 
 const DEC_DENSE1_OUT_SIZE: usize = 96;
+const DEC_GLU1_OUT_SIZE: usize = 64;
+const DEC_GLU2_OUT_SIZE: usize = 64;
+const DEC_GLU3_OUT_SIZE: usize = 64;
+const DEC_GLU4_OUT_SIZE: usize = 64;
+const DEC_GLU5_OUT_SIZE: usize = 64;
 const DEC_OUTPUT_OUT_SIZE: usize = 80;
 const DEC_HIDDEN_INIT_OUT_SIZE: usize = 128;
+const DEC_CONV_DENSE1_OUT_SIZE: usize = 32;
+const DEC_CONV_DENSE2_OUT_SIZE: usize = 32;
+const DEC_CONV_DENSE3_OUT_SIZE: usize = 32;
+const DEC_CONV_DENSE4_OUT_SIZE: usize = 32;
+const DEC_CONV_DENSE5_OUT_SIZE: usize = 32;
+const DEC_GRU_INIT_OUT_SIZE: usize = 320;
 
-const DEC_GRU1_OUT_SIZE: usize = 96;
-const DEC_GRU1_STATE_SIZE: usize = 96;
-const DEC_GRU2_OUT_SIZE: usize = 96;
-const DEC_GRU2_STATE_SIZE: usize = 96;
-const DEC_GRU3_OUT_SIZE: usize = 96;
-const DEC_GRU3_STATE_SIZE: usize = 96;
-const DEC_GRU4_OUT_SIZE: usize = 96;
-const DEC_GRU4_STATE_SIZE: usize = 96;
-const DEC_GRU5_OUT_SIZE: usize = 96;
-const DEC_GRU5_STATE_SIZE: usize = 96;
+const DEC_GRU1_OUT_SIZE: usize = 64;
+const DEC_GRU1_STATE_SIZE: usize = 64;
+const DEC_GRU2_OUT_SIZE: usize = 64;
+const DEC_GRU2_STATE_SIZE: usize = 64;
+const DEC_GRU3_OUT_SIZE: usize = 64;
+const DEC_GRU3_STATE_SIZE: usize = 64;
+const DEC_GRU4_OUT_SIZE: usize = 64;
+const DEC_GRU4_STATE_SIZE: usize = 64;
+const DEC_GRU5_OUT_SIZE: usize = 64;
+const DEC_GRU5_STATE_SIZE: usize = 64;
 
 const DEC_CONV1_OUT_SIZE: usize = 32;
-const DEC_CONV1_STATE_SIZE: usize = 192;
+const DEC_CONV1_IN_SIZE: usize = 32;
+const DEC_CONV1_STATE_SIZE: usize = 32;
 const DEC_CONV2_OUT_SIZE: usize = 32;
-const DEC_CONV2_STATE_SIZE: usize = 320;
+const DEC_CONV2_IN_SIZE: usize = 32;
+const DEC_CONV2_STATE_SIZE: usize = 32;
 const DEC_CONV3_OUT_SIZE: usize = 32;
-const DEC_CONV3_STATE_SIZE: usize = 448;
+const DEC_CONV3_IN_SIZE: usize = 32;
+const DEC_CONV3_STATE_SIZE: usize = 32;
 const DEC_CONV4_OUT_SIZE: usize = 32;
-const DEC_CONV4_STATE_SIZE: usize = 576;
+const DEC_CONV4_IN_SIZE: usize = 32;
+const DEC_CONV4_STATE_SIZE: usize = 32;
 const DEC_CONV5_OUT_SIZE: usize = 32;
-const DEC_CONV5_STATE_SIZE: usize = 704;
-
-const DEC_GRU_INIT_OUT_SIZE: usize = DEC_GRU1_STATE_SIZE
-    + DEC_GRU2_STATE_SIZE
-    + DEC_GRU3_STATE_SIZE
-    + DEC_GRU4_STATE_SIZE
-    + DEC_GRU5_STATE_SIZE;
+const DEC_CONV5_IN_SIZE: usize = 32;
+const DEC_CONV5_STATE_SIZE: usize = 32;
 
 /// Total buffer size for concatenated layer outputs.
 const DEC_BUFFER_SIZE: usize = DEC_DENSE1_OUT_SIZE
@@ -66,8 +76,13 @@ pub struct RDOVAEDec {
     pub dec_glu3: LinearLayer,
     pub dec_glu4: LinearLayer,
     pub dec_glu5: LinearLayer,
-    pub dec_output: LinearLayer,
     pub dec_hidden_init: LinearLayer,
+    pub dec_output: LinearLayer,
+    pub dec_conv_dense1: LinearLayer,
+    pub dec_conv_dense2: LinearLayer,
+    pub dec_conv_dense3: LinearLayer,
+    pub dec_conv_dense4: LinearLayer,
+    pub dec_conv_dense5: LinearLayer,
     pub dec_gru_init: LinearLayer,
     pub dec_gru1_input: LinearLayer,
     pub dec_gru1_recurrent: LinearLayer,
@@ -100,7 +115,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "",
-            DRED_LATENT_DIM,
+            DRED_LATENT_DIM + 1,
             96,
         )?,
         dec_glu1: linear_init(
@@ -112,8 +127,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_glu1_scale",
-            96,
-            96,
+            64,
+            64,
         )?,
         dec_glu2: linear_init(
             arrays,
@@ -124,8 +139,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_glu2_scale",
-            96,
-            96,
+            64,
+            64,
         )?,
         dec_glu3: linear_init(
             arrays,
@@ -136,8 +151,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_glu3_scale",
-            96,
-            96,
+            64,
+            64,
         )?,
         dec_glu4: linear_init(
             arrays,
@@ -148,8 +163,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_glu4_scale",
-            96,
-            96,
+            64,
+            64,
         )?,
         dec_glu5: linear_init(
             arrays,
@@ -160,20 +175,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_glu5_scale",
-            96,
-            96,
-        )?,
-        dec_output: linear_init(
-            arrays,
-            "dec_output_bias",
-            "dec_output_subias",
-            "dec_output_weights_int8",
-            "dec_output_weights_float",
-            "",
-            "",
-            "dec_output_scale",
-            736,
-            80,
+            64,
+            64,
         )?,
         dec_hidden_init: linear_init(
             arrays,
@@ -187,17 +190,89 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             DRED_STATE_DIM,
             128,
         )?,
+        dec_output: linear_init(
+            arrays,
+            "dec_output_bias",
+            "dec_output_subias",
+            "dec_output_weights_int8",
+            "dec_output_weights_float",
+            "dec_output_weights_idx",
+            "",
+            "dec_output_scale",
+            576,
+            80,
+        )?,
+        dec_conv_dense1: linear_init(
+            arrays,
+            "dec_conv_dense1_bias",
+            "dec_conv_dense1_subias",
+            "dec_conv_dense1_weights_int8",
+            "dec_conv_dense1_weights_float",
+            "dec_conv_dense1_weights_idx",
+            "",
+            "dec_conv_dense1_scale",
+            160,
+            32,
+        )?,
+        dec_conv_dense2: linear_init(
+            arrays,
+            "dec_conv_dense2_bias",
+            "dec_conv_dense2_subias",
+            "dec_conv_dense2_weights_int8",
+            "dec_conv_dense2_weights_float",
+            "dec_conv_dense2_weights_idx",
+            "",
+            "dec_conv_dense2_scale",
+            256,
+            32,
+        )?,
+        dec_conv_dense3: linear_init(
+            arrays,
+            "dec_conv_dense3_bias",
+            "dec_conv_dense3_subias",
+            "dec_conv_dense3_weights_int8",
+            "dec_conv_dense3_weights_float",
+            "dec_conv_dense3_weights_idx",
+            "",
+            "dec_conv_dense3_scale",
+            352,
+            32,
+        )?,
+        dec_conv_dense4: linear_init(
+            arrays,
+            "dec_conv_dense4_bias",
+            "dec_conv_dense4_subias",
+            "dec_conv_dense4_weights_int8",
+            "dec_conv_dense4_weights_float",
+            "dec_conv_dense4_weights_idx",
+            "",
+            "dec_conv_dense4_scale",
+            448,
+            32,
+        )?,
+        dec_conv_dense5: linear_init(
+            arrays,
+            "dec_conv_dense5_bias",
+            "dec_conv_dense5_subias",
+            "dec_conv_dense5_weights_int8",
+            "dec_conv_dense5_weights_float",
+            "dec_conv_dense5_weights_idx",
+            "",
+            "dec_conv_dense5_scale",
+            544,
+            32,
+        )?,
         dec_gru_init: linear_init(
             arrays,
             "dec_gru_init_bias",
             "dec_gru_init_subias",
             "dec_gru_init_weights_int8",
             "dec_gru_init_weights_float",
-            "",
+            "dec_gru_init_weights_idx",
             "",
             "dec_gru_init_scale",
             128,
-            480,
+            320,
         )?,
         dec_gru1_input: linear_init(
             arrays,
@@ -209,7 +284,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "dec_gru1_input_scale",
             96,
-            288,
+            192,
         )?,
         dec_gru1_recurrent: linear_init(
             arrays,
@@ -220,8 +295,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_gru1_recurrent_scale",
-            96,
-            288,
+            64,
+            192,
         )?,
         dec_gru2_input: linear_init(
             arrays,
@@ -232,8 +307,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "dec_gru2_input_weights_idx",
             "",
             "dec_gru2_input_scale",
-            224,
-            288,
+            192,
+            192,
         )?,
         dec_gru2_recurrent: linear_init(
             arrays,
@@ -244,8 +319,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_gru2_recurrent_scale",
-            96,
-            288,
+            64,
+            192,
         )?,
         dec_gru3_input: linear_init(
             arrays,
@@ -256,8 +331,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "dec_gru3_input_weights_idx",
             "",
             "dec_gru3_input_scale",
-            352,
             288,
+            192,
         )?,
         dec_gru3_recurrent: linear_init(
             arrays,
@@ -268,8 +343,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_gru3_recurrent_scale",
-            96,
-            288,
+            64,
+            192,
         )?,
         dec_gru4_input: linear_init(
             arrays,
@@ -280,8 +355,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "dec_gru4_input_weights_idx",
             "",
             "dec_gru4_input_scale",
-            480,
-            288,
+            384,
+            192,
         )?,
         dec_gru4_recurrent: linear_init(
             arrays,
@@ -292,8 +367,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_gru4_recurrent_scale",
-            96,
-            288,
+            64,
+            192,
         )?,
         dec_gru5_input: linear_init(
             arrays,
@@ -304,8 +379,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "dec_gru5_input_weights_idx",
             "",
             "dec_gru5_input_scale",
-            608,
-            288,
+            480,
+            192,
         )?,
         dec_gru5_recurrent: linear_init(
             arrays,
@@ -316,8 +391,8 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_gru5_recurrent_scale",
-            96,
-            288,
+            64,
+            192,
         )?,
         dec_conv1: linear_init(
             arrays,
@@ -328,7 +403,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_conv1_scale",
-            384,
+            64,
             32,
         )?,
         dec_conv2: linear_init(
@@ -340,7 +415,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_conv2_scale",
-            640,
+            64,
             32,
         )?,
         dec_conv3: linear_init(
@@ -352,7 +427,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_conv3_scale",
-            896,
+            64,
             32,
         )?,
         dec_conv4: linear_init(
@@ -364,7 +439,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_conv4_scale",
-            1152,
+            64,
             32,
         )?,
         dec_conv5: linear_init(
@@ -376,7 +451,7 @@ pub fn init_rdovaedec(arrays: &[WeightArray]) -> Option<RDOVAEDec> {
             "",
             "",
             "dec_conv5_scale",
-            1408,
+            64,
             32,
         )?,
     })
@@ -487,6 +562,7 @@ pub fn dred_rdovae_decode_qframe(
     input: &[f32],
 ) {
     let mut buffer = vec![0.0f32; DEC_BUFFER_SIZE];
+    let mut conv_tmp = [0.0f32; DEC_CONV_DENSE1_OUT_SIZE];
     let mut output_index = 0;
 
     // Dense1
@@ -511,19 +587,24 @@ pub fn dred_rdovae_decode_qframe(
         &dec_state.gru1_state,
     );
     output_index += DEC_GRU1_OUT_SIZE;
+    compute_generic_dense(
+        &model.dec_conv_dense1,
+        &mut conv_tmp[..DEC_CONV_DENSE1_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut dec_state.conv1_state,
-        output_index,
+        DEC_CONV1_IN_SIZE,
         1,
         &mut dec_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.dec_conv1,
         &mut buffer[output_index..output_index + DEC_CONV1_OUT_SIZE],
         &mut dec_state.conv1_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..DEC_CONV_DENSE1_OUT_SIZE],
+        DEC_CONV1_OUT_SIZE,
         ACTIVATION_TANH,
     );
     output_index += DEC_CONV1_OUT_SIZE;
@@ -541,19 +622,24 @@ pub fn dred_rdovae_decode_qframe(
         &dec_state.gru2_state,
     );
     output_index += DEC_GRU2_OUT_SIZE;
+    compute_generic_dense(
+        &model.dec_conv_dense2,
+        &mut conv_tmp[..DEC_CONV_DENSE2_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut dec_state.conv2_state,
-        output_index,
+        DEC_CONV2_IN_SIZE,
         1,
         &mut dec_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.dec_conv2,
         &mut buffer[output_index..output_index + DEC_CONV2_OUT_SIZE],
         &mut dec_state.conv2_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..DEC_CONV_DENSE2_OUT_SIZE],
+        DEC_CONV2_OUT_SIZE,
         ACTIVATION_TANH,
     );
     output_index += DEC_CONV2_OUT_SIZE;
@@ -571,19 +657,24 @@ pub fn dred_rdovae_decode_qframe(
         &dec_state.gru3_state,
     );
     output_index += DEC_GRU3_OUT_SIZE;
+    compute_generic_dense(
+        &model.dec_conv_dense3,
+        &mut conv_tmp[..DEC_CONV_DENSE3_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut dec_state.conv3_state,
-        output_index,
+        DEC_CONV3_IN_SIZE,
         1,
         &mut dec_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.dec_conv3,
         &mut buffer[output_index..output_index + DEC_CONV3_OUT_SIZE],
         &mut dec_state.conv3_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..DEC_CONV_DENSE3_OUT_SIZE],
+        DEC_CONV3_OUT_SIZE,
         ACTIVATION_TANH,
     );
     output_index += DEC_CONV3_OUT_SIZE;
@@ -601,19 +692,24 @@ pub fn dred_rdovae_decode_qframe(
         &dec_state.gru4_state,
     );
     output_index += DEC_GRU4_OUT_SIZE;
+    compute_generic_dense(
+        &model.dec_conv_dense4,
+        &mut conv_tmp[..DEC_CONV_DENSE4_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut dec_state.conv4_state,
-        output_index,
+        DEC_CONV4_IN_SIZE,
         1,
         &mut dec_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.dec_conv4,
         &mut buffer[output_index..output_index + DEC_CONV4_OUT_SIZE],
         &mut dec_state.conv4_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..DEC_CONV_DENSE4_OUT_SIZE],
+        DEC_CONV4_OUT_SIZE,
         ACTIVATION_TANH,
     );
     output_index += DEC_CONV4_OUT_SIZE;
@@ -631,19 +727,24 @@ pub fn dred_rdovae_decode_qframe(
         &dec_state.gru5_state,
     );
     output_index += DEC_GRU5_OUT_SIZE;
+    compute_generic_dense(
+        &model.dec_conv_dense5,
+        &mut conv_tmp[..DEC_CONV_DENSE5_OUT_SIZE],
+        &buffer[..output_index],
+        ACTIVATION_TANH,
+    );
     conv1_cond_init(
         &mut dec_state.conv5_state,
-        output_index,
+        DEC_CONV5_IN_SIZE,
         1,
         &mut dec_state.initialized,
     );
-    let input_snap = buffer[..output_index].to_vec();
     compute_generic_conv1d(
         &model.dec_conv5,
         &mut buffer[output_index..output_index + DEC_CONV5_OUT_SIZE],
         &mut dec_state.conv5_state,
-        &input_snap,
-        output_index,
+        &conv_tmp[..DEC_CONV_DENSE5_OUT_SIZE],
+        DEC_CONV5_OUT_SIZE,
         ACTIVATION_TANH,
     );
 
@@ -674,7 +775,7 @@ pub fn dred_rdovae_decode_all(
             &mut dec,
             model,
             &mut features[2 * i * DRED_NUM_FEATURES..],
-            &latents[(i / 2) * DRED_LATENT_DIM..],
+            &latents[(i / 2) * (DRED_LATENT_DIM + 1)..],
         );
         i += 2;
     }

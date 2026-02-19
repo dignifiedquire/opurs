@@ -11,7 +11,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  OPUS_DNN_DATA_URL: https://media.xiph.org/opus/models/opus_data-a5177ec6fb7d15058e99e57029746100121f68e4890b1467d4094aa336b6013e.tar.gz
+  OPUS_DNN_DATA_URL: https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-v1.6.1.tar.gz
+  OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-1.6.1-gitlab-v1
 
 jobs:
   fmt:
@@ -80,20 +81,22 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.6.1-v2
-      - name: Download DNN weight data
+          key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
+      - name: Download DNN weight data (Opus v1.6.1 tag)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          curl -sL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '^dnn/.*_data\.(c|h)$|^dnn/dred_rdovae_constants\.h$' || true)"
+          set -euo pipefail
+          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
+          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
           test -n "$files"
           while IFS= read -r f; do
             tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
           done <<< "$files"
-          cp /tmp/dnn/*_data.* libopus-sys/opus/dnn/
-          cp /tmp/dnn/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz /tmp/dnn
+          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
+          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
+          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
+          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
       - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
   test:
@@ -208,20 +211,22 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.6.1-v2
-      - name: Download DNN weight data
+          key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
+      - name: Download DNN weight data (Opus v1.6.1 tag)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          curl -sL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '^dnn/.*_data\.(c|h)$|^dnn/dred_rdovae_constants\.h$' || true)"
+          set -euo pipefail
+          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
+          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
           test -n "$files"
           while IFS= read -r f; do
             tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
           done <<< "$files"
-          cp /tmp/dnn/*_data.* libopus-sys/opus/dnn/
-          cp /tmp/dnn/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz /tmp/dnn
+          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
+          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
+          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
+          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
       - name: Run weight verification and integration tests
         run: cargo nextest run --features tools-dnn --cargo-profile=release
 
@@ -325,20 +330,22 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.6.1-v2
-      - name: Download DNN weight data
+          key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
+      - name: Download DNN weight data (Opus v1.6.1 tag)
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          curl -sL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
-          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '^dnn/.*_data\.(c|h)$|^dnn/dred_rdovae_constants\.h$' || true)"
+          set -euo pipefail
+          curl -sSL "$OPUS_DNN_DATA_URL" -o /tmp/opus-data.tar.gz
+          files="$(tar -tzf /tmp/opus-data.tar.gz | grep -E '/dnn/.*_data\.(c|h)$|/dnn/dred_rdovae_constants\.h$' || true)"
           test -n "$files"
           while IFS= read -r f; do
             tar -xzf /tmp/opus-data.tar.gz -C /tmp "$f"
           done <<< "$files"
-          cp /tmp/dnn/*_data.* libopus-sys/opus/dnn/
-          cp /tmp/dnn/dred_rdovae_constants.h libopus-sys/opus/dnn/
-          rm -rf /tmp/opus-data.tar.gz /tmp/dnn
+          dnn_dir="/tmp/$(echo "$files" | head -n1 | sed -E 's#/[^/]+$##')"
+          cp "$dnn_dir"/*_data.* libopus-sys/opus/dnn/
+          cp "$dnn_dir"/dred_rdovae_constants.h libopus-sys/opus/dnn/
+          rm -rf /tmp/opus-data.tar.gz "${dnn_dir%/dnn}"
       - name: Build (release)
         run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
       - name: Download test vectors

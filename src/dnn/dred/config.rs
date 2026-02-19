@@ -25,8 +25,8 @@ pub const DRED_MAX_FRAMES: usize = 4 * DRED_MAX_LATENTS;
 // --- From dred_rdovae_constants.h (auto-generated from model checkpoint) ---
 
 pub const DRED_NUM_FEATURES: usize = 20;
-pub const DRED_LATENT_DIM: usize = 21;
-pub const DRED_STATE_DIM: usize = 19;
-pub const DRED_PADDED_LATENT_DIM: usize = 24;
-pub const DRED_PADDED_STATE_DIM: usize = 24;
+pub const DRED_LATENT_DIM: usize = 25;
+pub const DRED_STATE_DIM: usize = 50;
+pub const DRED_PADDED_LATENT_DIM: usize = 32;
+pub const DRED_PADDED_STATE_DIM: usize = 56;
 pub const DRED_NUM_QUANTIZATION_LEVELS: usize = 16;

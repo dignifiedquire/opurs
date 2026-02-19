@@ -119,6 +119,7 @@ pub fn compute_activation(output: &mut [f32], input: &[f32], n: usize, activatio
             // SOFTMAX_HACK: just copy (used as identity in practice)
             output[..n].copy_from_slice(&input[..n]);
         }
+        ACTIVATION_EXP => softmax(&mut output[..n], &input[..n]),
         ACTIVATION_LINEAR | _ => {
             if !std::ptr::eq(output.as_ptr(), input.as_ptr()) {
                 output[..n].copy_from_slice(&input[..n]);

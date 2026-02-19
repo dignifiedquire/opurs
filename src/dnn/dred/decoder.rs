@@ -35,7 +35,7 @@ impl OpusDRED {
         OpusDRED {
             fec_features: vec![0.0; 2 * DRED_NUM_REDUNDANCY_FRAMES * DRED_NUM_FEATURES],
             state: vec![0.0; DRED_STATE_DIM],
-            latents: vec![0.0; (DRED_NUM_REDUNDANCY_FRAMES / 2) * DRED_LATENT_DIM],
+            latents: vec![0.0; (DRED_NUM_REDUNDANCY_FRAMES / 2) * (DRED_LATENT_DIM + 1)],
             nb_latents: 0,
             process_stage: 0,
             dred_offset: 0,
@@ -174,14 +174,16 @@ pub fn dred_ec_decode(
         }
         let q_level = compute_quantizer(q0, dq, qmax, (i / 2) as i32);
         let offset = q_level as usize * DRED_LATENT_DIM;
+        let latent_offset = (i / 2) * (DRED_LATENT_DIM + 1);
         dred_decode_latents(
             &mut ec,
-            &mut dred.latents[(i / 2) * DRED_LATENT_DIM..],
+            &mut dred.latents[latent_offset..],
             &DRED_LATENT_QUANT_SCALES_Q8[offset..],
             &DRED_LATENT_R_Q8[offset..],
             &DRED_LATENT_P0_Q8[offset..],
             DRED_LATENT_DIM,
         );
+        dred.latents[latent_offset + DRED_LATENT_DIM] = q_level as f32 * 0.125 - 1.0;
         i += 2;
     }
     dred.process_stage = 1;
