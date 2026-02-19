@@ -35,6 +35,19 @@ Make every known upstream parity gap produce a deterministic failing test before
   - The expanded harness is now doing fail-first detection for non-baseline encode modes.
   - These failures should be converted into targeted parity tests, then fixed incrementally.
 
+### Baseline After Multiframe Budget/Repacketize Fix
+- Repro command:
+  - `CARGO_TARGET_DIR=target-local cargo run --release --features tools --example run_vectors2 -- --suite classic --matrix full --mode parity --report-json target-local/run_vectors2_full_all_after_multiframe_fix.json opus_newvectors`
+- Observed status:
+  - `passed=1246 failed=170 skipped=0 total=1416`
+- Remaining dominant fail groups:
+  - `ENC 045kbps app={audio,voip,rld} frame={40,60}ms` (12 vectors each)
+  - `ENC 180kbps app={audio,voip,rld} frame=60ms` (12 vectors each)
+  - `ENC 240kbps app={audio,voip,rld} frame=60ms` (12 vectors each)
+- Notes:
+  - The main 40/60ms multiframe gap dropped substantially (`604 -> 170` fails).
+  - Remaining drift is concentrated in long-frame encode parity and likely needs a closer `opus_encode_frame_native`-style path rather than recursive `opus_encode_native` calls.
+
 ## Workstreams
 
 ### 1) QEXT Fail-First Coverage (Highest Risk)

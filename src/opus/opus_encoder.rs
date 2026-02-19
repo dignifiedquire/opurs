@@ -1263,11 +1263,14 @@ fn encode_multiframe_packet(
     frame_size: i32,
     data: &mut [u8],
     out_data_bytes: i32,
+    max_data_bytes: i32,
     to_celt: i32,
     lsb_depth: i32,
     float_api: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
+    let mut dtx_count: i32 = 0;
+    let mut tot_size: i32 = 0;
 
     // Worst cases:
     // 2 frames: Code 2 with different compressed sizes
@@ -1286,13 +1289,16 @@ fn encode_multiframe_packet(
     let repacketize_len = if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
         out_data_bytes
     } else {
-        let cbr_bytes = 3 * st.bitrate_bps / (3 * 8 * st.Fs / (frame_size * nb_frames));
-        if cbr_bytes < out_data_bytes {
-            cbr_bytes
+        if max_data_bytes < out_data_bytes {
+            max_data_bytes
         } else {
             out_data_bytes
         }
     };
+    let max_len_sum = nb_frames + repacketize_len - max_header_bytes;
+    if max_len_sum <= 0 {
+        return OPUS_INTERNAL_ERROR;
+    }
     #[cfg(feature = "qext")]
     let frame_size_cap = if st.enable_qext != 0 {
         crate::celt::modes::data_96000::QEXT_PACKET_SIZE_CAP
@@ -1301,16 +1307,7 @@ fn encode_multiframe_packet(
     };
     #[cfg(not(feature = "qext"))]
     let frame_size_cap = 1276;
-    #[allow(unused_mut)]
-    let mut bytes_per_frame =
-        frame_size_cap.min(1 + (repacketize_len - max_header_bytes) / nb_frames);
-    // Leave room for signaling the extension size once we repacketize.
-    #[cfg(feature = "qext")]
-    if st.enable_qext != 0 {
-        bytes_per_frame -= bytes_per_frame / 254;
-    }
-    let vla = (nb_frames * bytes_per_frame) as usize;
-    let mut tmp_data: Vec<u8> = vec![0u8; vla];
+    let mut tmp_data: Vec<u8> = vec![0u8; max_len_sum as usize];
     let mut rp = OpusRepacketizer::default();
     let bak_mode = st.user_forced_mode;
     let bak_bandwidth = st.user_bandwidth;
@@ -1324,12 +1321,27 @@ fn encode_multiframe_packet(
     } else {
         st.prev_channels = st.stream_channels;
     }
+
+    let mut curr_pos = 0usize;
     let mut offsets = Vec::new();
     for i in 0..nb_frames {
+        let mut curr_max =
+            (bitrate_to_bits(st.bitrate_bps, st.Fs, frame_size) / 8).min(max_len_sum / nb_frames);
+
+        #[cfg(feature = "qext")]
+        if st.enable_qext != 0 {
+            // Leave room for signaling the extension size once we repacketize.
+            curr_max -= curr_max / 254;
+        }
+        curr_max = curr_max.min(max_len_sum - tot_size);
+        curr_max = curr_max.min(frame_size_cap);
+        if curr_max <= 0 {
+            return OPUS_INTERNAL_ERROR;
+        }
+
         st.silk_mode.toMono = 0;
         st.nonfinal_frame = (i < nb_frames - 1) as i32;
 
-        let start = (i * bytes_per_frame) as usize;
         let pcm_offset = (i * (st.channels * frame_size)) as usize;
 
         // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
@@ -1340,8 +1352,8 @@ fn encode_multiframe_packet(
             st,
             &pcm[pcm_offset..],
             frame_size,
-            &mut tmp_data[start..],
-            bytes_per_frame,
+            &mut tmp_data[curr_pos..(curr_pos + curr_max as usize)],
+            curr_max,
             lsb_depth,
             None,
             0,
@@ -1353,12 +1365,17 @@ fn encode_multiframe_packet(
         if tmp_len < 0 {
             return OPUS_INTERNAL_ERROR;
         }
+        if tmp_len == 1 {
+            dtx_count += 1;
+        }
 
-        ret = rp.cat(&tmp_data[start..start + tmp_len as usize]);
-        offsets.push((start, start + tmp_len as usize));
+        ret = rp.cat(&tmp_data[curr_pos..curr_pos + tmp_len as usize]);
+        offsets.push((curr_pos, curr_pos + tmp_len as usize));
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;
         }
+        tot_size += tmp_len;
+        curr_pos += tmp_len as usize;
     }
 
     let offsets = offsets
@@ -1370,7 +1387,7 @@ fn encode_multiframe_packet(
         nb_frames,
         &mut data[..repacketize_len as usize],
         false,
-        st.use_vbr == 0,
+        st.use_vbr == 0 && dtx_count != nb_frames,
         FrameSource::Slice { data: offsets },
     );
     if ret < 0 {
@@ -2150,6 +2167,7 @@ pub fn opus_encode_native(
             enc_frame_size,
             data,
             out_data_bytes,
+            max_data_bytes,
             to_celt,
             lsb_depth,
             float_api,
