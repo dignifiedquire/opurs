@@ -109,7 +109,9 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
 
     // pad samples with 0s to make it a multiple of frame_size
     let samples_len = samples.len();
-    let samples_len = samples_len + (frame_size * channels - (samples_len % frame_size * channels));
+    let frame_samples = frame_size * channels;
+    let pad = (frame_samples - (samples_len % frame_samples)) % frame_samples;
+    let samples_len = samples_len + pad;
     samples.resize(samples_len, 0);
 
     let mut output = Vec::<u8>::new();

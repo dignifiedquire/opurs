@@ -22,6 +22,19 @@ Make every known upstream parity gap produce a deterministic failing test before
 - `cargo run --release --features tools --example run_vectors2 -- opus_newvectors`
 - `cargo run --release --features tools-dnn --example run_vectors2 -- --dnn-only opus_newvectors`
 
+## Full-Matrix Fail-First Baseline (New)
+- Repro command:
+  - `CARGO_TARGET_DIR=target-local cargo run --release --features tools --example run_vectors2 -- --matrix full --report-json target-local/run_vectors2_full_all.json opus_newvectors`
+- Current observed status (before implementation fixes):
+  - `passed=812 failed=604 skipped=0 total=1416`
+- Failure concentration:
+  - frame sizes: `40ms` and `60ms` dominate (`300` failures each)
+  - applications: all affected (`rld=218`, `voip=194`, `audio=192`)
+  - outliers at `10ms/20ms` (4 total): `testvector01@90k voip 20ms`, `testvector02@20k rld 20ms`, `testvector02@120k voip 10ms`, `testvector12@240k rld 10ms`
+- Interpretation:
+  - The expanded harness is now doing fail-first detection for non-baseline encode modes.
+  - These failures should be converted into targeted parity tests, then fixed incrementally.
+
 ## Workstreams
 
 ### 1) QEXT Fail-First Coverage (Highest Risk)
