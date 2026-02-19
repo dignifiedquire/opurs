@@ -12,7 +12,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   OPUS_DNN_DATA_SHA256: a5177ec6fb7d15058e99e57029746100121f68e4890b1467d4094aa336b6013e
-  OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v1
+  OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v2
 
 jobs:
   fmt:
