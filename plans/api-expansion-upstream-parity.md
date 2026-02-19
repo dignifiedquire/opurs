@@ -20,6 +20,7 @@ Primary target headers:
   - `opus_demo`-equivalent tooling support for multichannel workflows
   - Upstream parity tests (fail-first then green)
   - Projection/ambisonics API and tests (phase after multistream)
+  - Benchmark expansion for new API/tooling paths
 - Out of scope for this plan:
   - New psychoacoustic tuning/performance optimization passes
   - API redesign unrelated to upstream parity
@@ -188,6 +189,61 @@ Acceptance criteria:
 
 - Projection lane is required and green before milestone close.
 
+## M4: Benchmark Expansion and Baselines
+
+Add benchmark coverage for the newly introduced multistream/projection and
+tooling paths so regressions are visible early.
+
+### M4.1 - Multistream benchmark suite
+
+- Add Criterion benches for multistream encode/decode:
+  - `benches/multistream.rs`
+- Cover representative matrix:
+  - channel counts: 1, 2, 6 (5.1 mapping)
+  - frame sizes: 10 ms, 20 ms
+  - bitrates: low/medium/high presets
+- Measure both:
+  - throughput (frames/s)
+  - per-frame latency distribution
+
+Acceptance criteria:
+
+- Bench binary runs locally via documented command.
+- Results are reproducible with fixed deterministic input fixtures.
+
+### M4.2 - Rust vs upstream comparison benches
+
+- Extend existing comparison benches (or add `benches/multistream_comparison.rs`)
+  to compare Rust backend and upstream backend on the same workload.
+- Use identical input corpus and encoder settings for both implementations.
+
+Acceptance criteria:
+
+- Benchmark output reports Rust vs upstream delta for each scenario.
+- Comparison bench is gated behind `tools` (or `tools-dnn` when required).
+
+### M4.3 - Projection/ambisonics benchmarks
+
+- Add targeted benches for projection encode/decode and mapping matrix steps:
+  - matrix apply cost
+  - end-to-end projection packet cost
+
+Acceptance criteria:
+
+- Bench coverage exists for all newly added projection public entry points.
+
+### M4.4 - CI perf smoke + reporting
+
+- Add non-blocking benchmark smoke job in CI:
+  - verifies benches build and run a short subset
+- Add artifact upload for benchmark summaries.
+- Keep hard perf gates optional until baseline variance is characterized.
+
+Acceptance criteria:
+
+- CI includes benchmark smoke visibility without flakiness.
+- Baseline report format is documented for follow-up optimization work.
+
 ## Issue Breakdown (PR-Sized)
 
 1. `M1.1` API scaffolding + exports
@@ -202,6 +258,10 @@ Acceptance criteria:
 10. `M3.2` mapping matrix port
 11. `M3.3` projection parity tests
 12. `M3.4` CI required lanes
+13. `M4.1` multistream benchmark suite
+14. `M4.2` Rust-vs-upstream benchmark comparisons
+15. `M4.3` projection/ambisonics benchmark coverage
+16. `M4.4` CI benchmark smoke + artifact reporting
 
 ## Definition of Done
 
@@ -211,3 +271,5 @@ Acceptance criteria:
   upstream backends.
 - Projection API and tests are no longer deferred.
 - CI includes parity checks that fail on behavior divergence before release.
+- Benchmark coverage exists for all newly added API surfaces and publishes
+  repeatable baselines for future optimization work.
