@@ -163,6 +163,9 @@ pub unsafe fn sigmoid_approx_avx2(x: f32) -> f32 {
 }
 
 /// Scalar tanh via SSE2 broadcast. Port of non-AVX `vec_avx.h:tanh_approx`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse2")]
 pub unsafe fn tanh_approx_sse2(x: f32) -> f32 {
     let xv = _mm_set1_ps(x);
@@ -171,6 +174,9 @@ pub unsafe fn tanh_approx_sse2(x: f32) -> f32 {
 }
 
 /// Scalar sigmoid via SSE2 broadcast. Port of non-AVX `vec_avx.h:sigmoid_approx`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse2")]
 pub unsafe fn sigmoid_approx_sse2(x: f32) -> f32 {
     let xv = _mm_set1_ps(x);
@@ -239,6 +245,9 @@ pub unsafe fn vec_sigmoid_avx2(y: &mut [f32], x: &[f32]) {
 }
 
 /// SSE2 batch tanh approximation. Port of non-AVX `vec_avx.h:vec_tanh`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse2")]
 pub unsafe fn vec_tanh_sse2(y: &mut [f32], x: &[f32]) {
     let n = x.len().min(y.len());
@@ -256,6 +265,9 @@ pub unsafe fn vec_tanh_sse2(y: &mut [f32], x: &[f32]) {
 }
 
 /// SSE2 batch sigmoid approximation. Port of non-AVX `vec_avx.h:vec_sigmoid`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse2")]
 pub unsafe fn vec_sigmoid_sse2(y: &mut [f32], x: &[f32]) {
     let n = x.len().min(y.len());
