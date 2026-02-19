@@ -85,6 +85,51 @@ unsafe fn sigmoid8_approx(x: __m256) -> __m256 {
     _mm256_max_ps(min_out, _mm256_min_ps(max_out, num))
 }
 
+/// SSE2 fast tanh approximation using Padé rational function.
+/// Port of non-AVX `vec_avx.h:tanh4_approx`.
+#[target_feature(enable = "sse2")]
+unsafe fn tanh4_approx_sse2(x: __m128) -> __m128 {
+    let n0 = _mm_set1_ps(952.52801514);
+    let n1 = _mm_set1_ps(96.39235687);
+    let n2 = _mm_set1_ps(0.60863042);
+    let d0 = _mm_set1_ps(952.72399902);
+    let d1 = _mm_set1_ps(413.36801147);
+    let d2 = _mm_set1_ps(11.88600922);
+    let max_out = _mm_set1_ps(1.0);
+    let min_out = _mm_set1_ps(-1.0);
+
+    let x2 = _mm_mul_ps(x, x);
+    let num = _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(n2, x2), n1), x2), n0);
+    let den = _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(d2, x2), d1), x2), d0);
+    let num = _mm_mul_ps(num, x);
+    let den = _mm_rcp_ps(den);
+    let num = _mm_mul_ps(num, den);
+    _mm_max_ps(min_out, _mm_min_ps(max_out, num))
+}
+
+/// SSE2 fast sigmoid approximation using Padé rational function.
+/// Port of non-AVX `vec_avx.h:sigmoid4_approx`.
+#[target_feature(enable = "sse2")]
+unsafe fn sigmoid4_approx_sse2(x: __m128) -> __m128 {
+    let n0 = _mm_set1_ps(238.13200378);
+    let n1 = _mm_set1_ps(6.02452230);
+    let n2 = _mm_set1_ps(0.00950985);
+    let d0 = _mm_set1_ps(952.72399902);
+    let d1 = _mm_set1_ps(103.34200287);
+    let d2 = _mm_set1_ps(0.74287558);
+    let half = _mm_set1_ps(0.5);
+    let max_out = _mm_set1_ps(1.0);
+    let min_out = _mm_set1_ps(0.0);
+
+    let x2 = _mm_mul_ps(x, x);
+    let num = _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(n2, x2), n1), x2), n0);
+    let den = _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(d2, x2), d1), x2), d0);
+    let num = _mm_mul_ps(num, x);
+    let den = _mm_rcp_ps(den);
+    let num = _mm_add_ps(_mm_mul_ps(num, den), half);
+    _mm_max_ps(min_out, _mm_min_ps(max_out, num))
+}
+
 // =========================================================================
 // Scalar activation via broadcast-and-extract (matching C vec_avx.h)
 // =========================================================================
@@ -115,6 +160,22 @@ pub unsafe fn sigmoid_approx_avx2(x: f32) -> f32 {
     let xv = _mm256_set1_ps(x);
     let yv = sigmoid8_approx(xv);
     _mm_cvtss_f32(_mm256_castps256_ps128(yv))
+}
+
+/// Scalar tanh via SSE2 broadcast. Port of non-AVX `vec_avx.h:tanh_approx`.
+#[target_feature(enable = "sse2")]
+pub unsafe fn tanh_approx_sse2(x: f32) -> f32 {
+    let xv = _mm_set1_ps(x);
+    let yv = tanh4_approx_sse2(xv);
+    _mm_cvtss_f32(yv)
+}
+
+/// Scalar sigmoid via SSE2 broadcast. Port of non-AVX `vec_avx.h:sigmoid_approx`.
+#[target_feature(enable = "sse2")]
+pub unsafe fn sigmoid_approx_sse2(x: f32) -> f32 {
+    let xv = _mm_set1_ps(x);
+    let yv = sigmoid4_approx_sse2(xv);
+    _mm_cvtss_f32(yv)
 }
 
 /// Scalar exp via AVX2 broadcast. Port of `vec_avx.h:lpcnet_exp` (AVX path).
@@ -173,6 +234,40 @@ pub unsafe fn vec_sigmoid_avx2(y: &mut [f32], x: &[f32]) {
     // Scalar tail: use broadcast-and-extract to match C's vec_avx.h.
     while i < n {
         y[i] = sigmoid_approx_avx2(x[i]);
+        i += 1;
+    }
+}
+
+/// SSE2 batch tanh approximation. Port of non-AVX `vec_avx.h:vec_tanh`.
+#[target_feature(enable = "sse2")]
+pub unsafe fn vec_tanh_sse2(y: &mut [f32], x: &[f32]) {
+    let n = x.len().min(y.len());
+    let mut i = 0;
+    while i + 4 <= n {
+        let xv = _mm_loadu_ps(x.as_ptr().add(i));
+        let yv = tanh4_approx_sse2(xv);
+        _mm_storeu_ps(y.as_mut_ptr().add(i), yv);
+        i += 4;
+    }
+    while i < n {
+        y[i] = tanh_approx_sse2(x[i]);
+        i += 1;
+    }
+}
+
+/// SSE2 batch sigmoid approximation. Port of non-AVX `vec_avx.h:vec_sigmoid`.
+#[target_feature(enable = "sse2")]
+pub unsafe fn vec_sigmoid_sse2(y: &mut [f32], x: &[f32]) {
+    let n = x.len().min(y.len());
+    let mut i = 0;
+    while i + 4 <= n {
+        let xv = _mm_loadu_ps(x.as_ptr().add(i));
+        let yv = sigmoid4_approx_sse2(xv);
+        _mm_storeu_ps(y.as_mut_ptr().add(i), yv);
+        i += 4;
+    }
+    while i < n {
+        y[i] = sigmoid_approx_sse2(x[i]);
         i += 1;
     }
 }

@@ -96,7 +96,8 @@ pub fn vec_sigmoid_scalar(y: &mut [f32], x: &[f32]) {
 /// Returns `true` when the active int8 GEMV path uses unsigned u8 quantization,
 /// meaning `subias` should be used instead of `bias` for int8 weight layers.
 ///
-/// Only x86 AVX2 uses unsigned quantization; all other paths use signed i8.
+/// Upstream C defines `USE_SU_BIAS` for all x86 `vec_avx.h` variants (AVX2 and
+/// SSE2/SSE4 emulation paths), not just AVX2.
 ///
 /// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
 #[cfg(feature = "simd")]
@@ -366,6 +367,99 @@ pub fn cgemv8x4_scalar(
     }
 }
 
+/// Dense int8 matrix-vector multiply (8x4 blocking), SU-bias variant.
+///
+/// Input `_x` is quantized to unsigned u8 via `127 + floor(0.5 + 127*x)`,
+/// matching x86 `USE_SU_BIAS` behavior in upstream C (`vec_avx.h` and `vec.h`).
+///
+/// Upstream C: dnn/vec.h:cgemv8x4 (USE_SU_BIAS path)
+pub fn cgemv8x4_scalar_su(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    _x: &[f32],
+) {
+    let mut x = [0u8; MAX_INPUTS];
+    for i in 0..cols {
+        x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
+    }
+    for i in 0..rows {
+        out[i] = 0.0;
+    }
+    let mut w_pos = 0;
+    for i in (0..rows).step_by(8) {
+        for j in (0..cols).step_by(4) {
+            let xj0 = x[j] as i32;
+            let xj1 = x[j + 1] as i32;
+            let xj2 = x[j + 2] as i32;
+            let xj3 = x[j + 3] as i32;
+            for k in 0..8 {
+                out[i + k] += (w[w_pos + k * 4] as i32 * xj0
+                    + w[w_pos + k * 4 + 1] as i32 * xj1
+                    + w[w_pos + k * 4 + 2] as i32 * xj2
+                    + w[w_pos + k * 4 + 3] as i32 * xj3) as f32;
+            }
+            w_pos += 32;
+        }
+    }
+    for i in 0..rows {
+        out[i] *= scale[i];
+    }
+}
+
+#[inline]
+fn sat_i16(v: i32) -> i32 {
+    v.clamp(i16::MIN as i32, i16::MAX as i32)
+}
+
+/// Dense int8 matrix-vector multiply (8x4 blocking), SU-bias + SSSE3 emulation.
+///
+/// Emulates `vec_avx.h` `opus_mm256_dpbusds_epi32` semantics when implemented via
+/// `_mm_maddubs_epi16`: pairwise unsigned*signed products are first summed with
+/// i16 saturation, then accumulated in i32.
+///
+/// Upstream C: dnn/vec_avx.h:cgemv8x4 (SSSE3/SSE4 path)
+pub fn cgemv8x4_scalar_su_ssse3(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    _x: &[f32],
+) {
+    let mut x = [0u8; MAX_INPUTS];
+    for i in 0..cols {
+        x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
+    }
+    for i in 0..rows {
+        out[i] = 0.0;
+    }
+    let mut w_pos = 0;
+    for i in (0..rows).step_by(8) {
+        for j in (0..cols).step_by(4) {
+            let xj0 = x[j] as i32;
+            let xj1 = x[j + 1] as i32;
+            let xj2 = x[j + 2] as i32;
+            let xj3 = x[j + 3] as i32;
+            for k in 0..8 {
+                let w0 = w[w_pos + k * 4] as i32;
+                let w1 = w[w_pos + k * 4 + 1] as i32;
+                let w2 = w[w_pos + k * 4 + 2] as i32;
+                let w3 = w[w_pos + k * 4 + 3] as i32;
+                let p01 = sat_i16(w0 * xj0 + w1 * xj1);
+                let p23 = sat_i16(w2 * xj2 + w3 * xj3);
+                out[i + k] += (p01 + p23) as f32;
+            }
+            w_pos += 32;
+        }
+    }
+    for i in 0..rows {
+        out[i] *= scale[i];
+    }
+}
+
 /// Sparse int8 matrix-vector multiply (8x4 block sparse) — scalar implementation.
 ///
 /// Same quantization as `cgemv8x4` but with sparse block indices.
@@ -405,6 +499,103 @@ pub fn sparse_cgemv8x4_scalar(
                     + w[w_pos + k * 4 + 1] as i32 * xj1
                     + w[w_pos + k * 4 + 2] as i32 * xj2
                     + w[w_pos + k * 4 + 3] as i32 * xj3) as f32;
+            }
+            w_pos += 32;
+        }
+    }
+    for i in 0..rows {
+        out[i] *= scale[i];
+    }
+}
+
+/// Sparse int8 matrix-vector multiply (8x4 block sparse), SU-bias variant.
+///
+/// Input `_x` is quantized to unsigned u8 via `127 + floor(0.5 + 127*x)`,
+/// matching x86 `USE_SU_BIAS` behavior in upstream C.
+///
+/// Upstream C: dnn/vec.h:sparse_cgemv8x4 (USE_SU_BIAS path)
+pub fn sparse_cgemv8x4_scalar_su(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    _x: &[f32],
+) {
+    let mut x = [0u8; MAX_INPUTS];
+    for i in 0..cols {
+        x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
+    }
+    for i in 0..rows {
+        out[i] = 0.0;
+    }
+    let mut w_pos = 0;
+    let mut idx_pos = 0;
+    for i in (0..rows).step_by(8) {
+        let colblocks = idx[idx_pos] as usize;
+        idx_pos += 1;
+        for _j in 0..colblocks {
+            let pos = idx[idx_pos] as usize;
+            idx_pos += 1;
+            let xj0 = x[pos] as i32;
+            let xj1 = x[pos + 1] as i32;
+            let xj2 = x[pos + 2] as i32;
+            let xj3 = x[pos + 3] as i32;
+            for k in 0..8 {
+                out[i + k] += (w[w_pos + k * 4] as i32 * xj0
+                    + w[w_pos + k * 4 + 1] as i32 * xj1
+                    + w[w_pos + k * 4 + 2] as i32 * xj2
+                    + w[w_pos + k * 4 + 3] as i32 * xj3) as f32;
+            }
+            w_pos += 32;
+        }
+    }
+    for i in 0..rows {
+        out[i] *= scale[i];
+    }
+}
+
+/// Sparse int8 matrix-vector multiply (8x4 block sparse), SU-bias + SSSE3 emulation.
+///
+/// Emulates `_mm_maddubs_epi16` pairwise i16 saturation semantics from upstream
+/// x86 SSE4/SSSE3 path in `vec_avx.h`.
+pub fn sparse_cgemv8x4_scalar_su_ssse3(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    _x: &[f32],
+) {
+    let mut x = [0u8; MAX_INPUTS];
+    for i in 0..cols {
+        x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
+    }
+    for i in 0..rows {
+        out[i] = 0.0;
+    }
+    let mut w_pos = 0;
+    let mut idx_pos = 0;
+    for i in (0..rows).step_by(8) {
+        let colblocks = idx[idx_pos] as usize;
+        idx_pos += 1;
+        for _j in 0..colblocks {
+            let pos = idx[idx_pos] as usize;
+            idx_pos += 1;
+            let xj0 = x[pos] as i32;
+            let xj1 = x[pos + 1] as i32;
+            let xj2 = x[pos + 2] as i32;
+            let xj3 = x[pos + 3] as i32;
+            for k in 0..8 {
+                let w0 = w[w_pos + k * 4] as i32;
+                let w1 = w[w_pos + k * 4 + 1] as i32;
+                let w2 = w[w_pos + k * 4 + 2] as i32;
+                let w3 = w[w_pos + k * 4 + 3] as i32;
+                let p01 = sat_i16(w0 * xj0 + w1 * xj1);
+                let p23 = sat_i16(w2 * xj2 + w3 * xj3);
+                out[i + k] += (p01 + p23) as f32;
             }
             w_pos += 32;
         }

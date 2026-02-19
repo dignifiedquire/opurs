@@ -18,6 +18,10 @@ pub mod aarch64;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 cpufeatures::new!(cpuid_avx2, "avx2", "fma");
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+cpufeatures::new!(cpuid_ssse3, "ssse3");
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+cpufeatures::new!(cpuid_sse2, "sse2");
 
 // -- Dispatch functions --
 // Each function selects the best available SIMD implementation at runtime,
@@ -103,6 +107,14 @@ pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usi
             }
             return;
         }
+        // Upstream x86 SSE4/SSSE3 path emulates dpbusds with maddubs i16 saturation.
+        if cpuid_ssse3::get() {
+            super::vec::cgemv8x4_scalar_su_ssse3(out, w, scale, rows, cols, x);
+            return;
+        }
+        // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+        super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
+        return;
     }
 
     #[allow(unreachable_code)]
@@ -138,6 +150,14 @@ pub fn sparse_cgemv8x4(
             }
             return;
         }
+        // Upstream x86 SSE4/SSSE3 path emulates dpbusds with maddubs i16 saturation.
+        if cpuid_ssse3::get() {
+            super::vec::sparse_cgemv8x4_scalar_su_ssse3(out, w, idx, scale, rows, cols, x);
+            return;
+        }
+        // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+        super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
+        return;
     }
 
     #[allow(unreachable_code)]
@@ -171,6 +191,9 @@ pub fn tanh_approx(x: f32) -> f32 {
         if cpuid_avx2::get() {
             return unsafe { x86::tanh_approx_avx2(x) };
         }
+        if cpuid_sse2::get() {
+            return unsafe { x86::tanh_approx_sse2(x) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -194,6 +217,9 @@ pub fn sigmoid_approx(x: f32) -> f32 {
     {
         if cpuid_avx2::get() {
             return unsafe { x86::sigmoid_approx_avx2(x) };
+        }
+        if cpuid_sse2::get() {
+            return unsafe { x86::sigmoid_approx_sse2(x) };
         }
     }
 
@@ -246,6 +272,12 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
             }
             return;
         }
+        if cpuid_sse2::get() {
+            unsafe {
+                x86::vec_tanh_sse2(y, x);
+            }
+            return;
+        }
     }
 
     #[allow(unreachable_code)]
@@ -273,6 +305,12 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
             }
             return;
         }
+        if cpuid_sse2::get() {
+            unsafe {
+                x86::vec_sigmoid_sse2(y, x);
+            }
+            return;
+        }
     }
 
     #[allow(unreachable_code)]
@@ -283,11 +321,12 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
 
 /// Returns `true` when the active int8 GEMV path uses unsigned u8 quantization.
 ///
-/// On x86 with AVX2+FMA, `cgemv8x4` uses `_mm256_maddubs_epi16` which requires
-/// unsigned×signed operands, so inputs are quantized as `127 + round(127*x)`.
-/// The `subias` in `LinearLayer` compensates for this +127 offset.
+/// On x86, upstream C defines `USE_SU_BIAS` for both AVX2 and SSE2/SSE4.1
+/// variants in `vec_avx.h`, so int8 GEMV uses unsigned input quantization and
+/// the `subias` correction path.
 ///
-/// On aarch64 NEON (signed i8) and scalar fallback, regular `bias` is used.
+/// On aarch64 NEON (signed i8) and non-x86 scalar fallback, regular `bias` is
+/// used.
 ///
 /// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
 #[inline]
@@ -299,7 +338,7 @@ pub fn use_su_bias() -> bool {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        return cpuid_avx2::get(); // AVX2 uses unsigned u8 quantization
+        return true; // x86 vec_avx.h paths use USE_SU_BIAS (AVX2 and SSE2/SSE4.1)
     }
 
     #[allow(unreachable_code)]

@@ -138,6 +138,7 @@ pub fn compute_activation(output: &mut [f32], input: &[f32], n: usize, activatio
 pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
     let m = linear.nb_inputs;
     let n = linear.nb_outputs;
+    let mut used_int8_path = false;
 
     if !linear.float_weights.is_empty() {
         if !linear.weights_idx.is_empty() {
@@ -146,6 +147,7 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
             sgemv(out, &linear.float_weights, n, m, n, input);
         }
     } else if !linear.weights.is_empty() {
+        used_int8_path = true;
         if !linear.weights_idx.is_empty() {
             sparse_cgemv8x4(
                 out,
@@ -165,7 +167,7 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
         }
     }
 
-    let bias = if use_su_bias() && !linear.subias.is_empty() && !linear.weights.is_empty() {
+    let bias = if used_int8_path && use_su_bias() && !linear.subias.is_empty() {
         // USE_SU_BIAS: x86 AVX2 cgemv8x4 uses unsigned u8 quantization,
         // so subias compensates for the +127 offset. NEON and scalar use
         // signed i8 quantization and need regular bias.
