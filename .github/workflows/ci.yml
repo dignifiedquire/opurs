@@ -80,7 +80,7 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.5.2
+          key: dnn-weights-opus-1.5.2-v2
       - name: Download DNN weight data
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         run: |
@@ -207,7 +207,7 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.5.2
+          key: dnn-weights-opus-1.5.2-v2
       - name: Download DNN weight data
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         run: |
@@ -323,7 +323,7 @@ jobs:
           path: |
             libopus-sys/opus/dnn/*_data.*
             libopus-sys/opus/dnn/dred_rdovae_constants.h
-          key: dnn-weights-opus-1.5.2
+          key: dnn-weights-opus-1.5.2-v2
       - name: Download DNN weight data
         if: steps.dnn-weights.outputs.cache-hit != 'true'
         shell: bash
