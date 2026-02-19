@@ -98,6 +98,10 @@ struct EncodeCliArgs {
     #[arg(long, default_value_t = 0)]
     loss: u32,
 
+    /// Ignore extensions found in packet padding.
+    #[arg(long)]
+    ignore_extensions: bool,
+
     /// DRED duration in frames (0 = disabled, max 100). Requires 'dred' feature.
     #[arg(long, default_value_t = 0)]
     dred_duration: i32,
@@ -133,6 +137,7 @@ impl EncodeCliArgs {
                 common: CommonOptions {
                     inbandfec: self.inbandfec,
                     loss: self.loss,
+                    ignore_extensions: false,
                 },
                 dred_duration: self.dred_duration,
                 qext: false,
@@ -163,6 +168,10 @@ struct DecodeCliArgs {
     #[arg(long, default_value_t = 0)]
     loss: u32,
 
+    /// Ignore extensions found in packet padding.
+    #[arg(long)]
+    ignore_extensions: bool,
+
     /// Decoder complexity (0-10). Controls Deep PLC (>=5) and OSCE (>=6) activation.
     #[arg(long)]
     decoder_complexity: Option<Complexity>,
@@ -182,6 +191,7 @@ impl DecodeCliArgs {
             options: CommonOptions {
                 inbandfec: self.inbandfec,
                 loss: self.loss,
+                ignore_extensions: self.ignore_extensions,
             },
             complexity: self.decoder_complexity,
         }

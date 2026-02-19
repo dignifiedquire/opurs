@@ -55,6 +55,7 @@ pub struct OpusDecoder {
     pub(crate) last_packet_duration: i32,
     pub(crate) softclip_mem: [opus_val16; 2],
     pub(crate) rangeFinal: u32,
+    pub(crate) ignore_extensions: bool,
 }
 impl OpusDecoder {
     pub fn channels(&self) -> i32 {
@@ -106,6 +107,7 @@ impl OpusDecoder {
             last_packet_duration: 0,
             softclip_mem: [0.0; 2],
             rangeFinal: 0,
+            ignore_extensions: false,
         };
 
         st.celt_dec.signalling = 0;
@@ -208,6 +210,14 @@ impl OpusDecoder {
         self.complexity
     }
 
+    pub fn set_ignore_extensions(&mut self, value: bool) {
+        self.ignore_extensions = value;
+    }
+
+    pub fn ignore_extensions(&self) -> bool {
+        self.ignore_extensions
+    }
+
     /// Enable or disable OSCE bandwidth extension (BWE).
     ///
     /// When enabled and conditions are met (complexity >= 4, 48kHz output,
@@ -276,6 +286,7 @@ impl OpusDecoder {
         self.last_packet_duration = 0;
         self.softclip_mem = [0.0; 2];
         self.rangeFinal = 0;
+        self.ignore_extensions = false;
     }
 }
 
@@ -1033,7 +1044,7 @@ pub fn opus_decode_native(
     st.stream_channels = packet_stream_channels;
     nb_samples = 0;
     #[cfg(feature = "qext")]
-    let mut iter = if !padding_data.is_empty() {
+    let mut iter = if !padding_data.is_empty() && !st.ignore_extensions {
         Some(crate::opus::extensions::OpusExtensionIterator::new(
             padding_data,
             count,

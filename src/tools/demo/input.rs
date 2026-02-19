@@ -254,6 +254,8 @@ pub struct CommonOptions {
     pub inbandfec: bool,
     /// Simulate packet loss, in percent (0-100)
     pub loss: u32,
+    /// Ignore extensions found in packet padding (decoder only).
+    pub ignore_extensions: bool,
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -180,6 +180,7 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
     if options.loss != 0 {
         panic!("packet loss simulation not supported")
     }
+    B::dec_set_ignore_extensions(&mut dec, options.ignore_extensions as i32);
 
     // DNN weight loading and decoder complexity
     if let Some(c) = complexity {

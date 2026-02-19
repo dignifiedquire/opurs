@@ -36,6 +36,7 @@ pub(crate) trait OpusBackendTrait {
     ) -> i32;
     fn dec_get_final_range(st: &mut Self::Decoder) -> u32;
     fn dec_set_complexity(st: &mut Self::Decoder, val: i32);
+    fn dec_set_ignore_extensions(st: &mut Self::Decoder, val: i32);
     fn dec_load_dnn_weights(st: &mut Self::Decoder) -> Result<(), i32>;
     fn dec_set_dnn_blob(st: &mut Self::Decoder, data: &[u8]) -> Result<(), i32>;
     fn opus_decoder_destroy(st: Self::Decoder);
@@ -178,6 +179,10 @@ mod rust_backend {
             st.set_complexity(val).unwrap();
         }
 
+        fn dec_set_ignore_extensions(st: &mut Box<OpusDecoder>, val: i32) {
+            st.set_ignore_extensions(val != 0);
+        }
+
         fn dec_load_dnn_weights(st: &mut Box<OpusDecoder>) -> Result<(), i32> {
             #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
             return st.load_dnn_weights();
@@ -218,6 +223,7 @@ mod libopus {
         OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
     };
     const OPUS_SET_QEXT_REQUEST: i32 = 4056;
+    const OPUS_SET_IGNORE_EXTENSIONS_REQUEST: i32 = 4058;
 
     pub struct UpstreamLibopusBackend;
 
@@ -363,6 +369,10 @@ mod libopus {
 
         fn dec_set_complexity(st: &mut *mut OpusDecoder, val: i32) {
             unsafe { opus_decoder_ctl(*st, OPUS_SET_COMPLEXITY_REQUEST, val) };
+        }
+
+        fn dec_set_ignore_extensions(st: &mut *mut OpusDecoder, val: i32) {
+            unsafe { opus_decoder_ctl(*st, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, val) };
         }
 
         fn dec_load_dnn_weights(_st: &mut *mut OpusDecoder) -> Result<(), i32> {

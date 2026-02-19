@@ -78,6 +78,32 @@ Acceptance criteria:
 
 - Differential tests against `libopus-sys` pass for pad/unpad edge cases.
 
+### M1.5 - Multistream API Surface Completion Checklist
+
+Close the remaining multistream surface gap explicitly against
+`opus_multistream.h`, not just the minimal lifecycle/encode path.
+
+- Encoder API coverage:
+  - `opus_multistream_encoder_get_size`
+  - `opus_multistream_encoder_create` / `init` / `destroy`
+  - `opus_multistream_encode` / `opus_multistream_encode_float`
+  - stream-state CTLs required by upstream docs
+- Decoder API coverage:
+  - `opus_multistream_decoder_get_size`
+  - `opus_multistream_decoder_create` / `init` / `destroy`
+  - `opus_multistream_decode` / `opus_multistream_decode_float`
+  - stream-state CTLs required by upstream docs
+- Error/validation parity:
+  - mapping length and index bounds
+  - stream/coupled-stream count invariants
+  - per-call frame-size validation parity
+
+Acceptance criteria:
+
+- A checklist-backed parity test file demonstrates every exposed multistream API
+  entry point roundtripping or failing with upstream-compatible error codes.
+- `cargo doc` clearly shows multistream APIs as first-class public surface.
+
 ### M1.4 - Tests (fail-first then green)
 
 - Add:
@@ -145,6 +171,22 @@ Acceptance criteria:
 
 - `cargo test --features tools` includes multistream tooling checks.
 
+### M2.5 - Vector Harness Expansion for Multistream/Projection Readiness
+
+- Extend `examples/run_vectors2.rs` planning to cover future multistream and
+  projection assets once available.
+- Add harness abstractions that separate:
+  - suite discovery/loading
+  - backend parity checks
+  - compliance checks
+  so multistream/projection suites can plug in without rewriting the tool.
+
+Acceptance criteria:
+
+- Adding a new suite (e.g. multistream/projection vectors) requires only a
+  loader and test-kind registration, not structural harness rewrites.
+- CI can enable/disable suites based on asset availability.
+
 ## M3: Projection / Ambisonics Parity
 
 Port and expose projection APIs after multistream base is stable.
@@ -178,6 +220,27 @@ Acceptance criteria:
 Acceptance criteria:
 
 - Core projection/ambisonics test scenarios are covered and passing.
+
+### M3.5 - Projection API Surface Completion Checklist
+
+Close the projection API gap explicitly against `opus_projection.h`.
+
+- Encoder coverage:
+  - `opus_projection_ambisonics_encoder_get_size`
+  - `opus_projection_encoder_create` / `init` / `destroy`
+  - `opus_projection_encode` / `opus_projection_encode_float`
+- Decoder coverage:
+  - `opus_projection_decoder_get_size`
+  - `opus_projection_decoder_create` / `init` / `destroy`
+  - `opus_projection_decode` / `opus_projection_decode_float`
+- Matrix helpers and metadata:
+  - demixing/mapping matrix getters and validation paths
+  - ambisonics channel-order/family handling
+
+Acceptance criteria:
+
+- Projection tests explicitly exercise each exported projection entry point.
+- Public docs include working projection setup examples with mapping details.
 
 ### M3.4 - CI expansion
 
@@ -262,6 +325,9 @@ Acceptance criteria:
 14. `M4.2` Rust-vs-upstream benchmark comparisons
 15. `M4.3` projection/ambisonics benchmark coverage
 16. `M4.4` CI benchmark smoke + artifact reporting
+17. `M1.5` multistream surface completion checklist
+18. `M2.5` vector harness readiness for multistream/projection suites
+19. `M3.5` projection surface completion checklist
 
 ## Definition of Done
 
