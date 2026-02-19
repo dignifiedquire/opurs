@@ -39,6 +39,7 @@ impl FromStr for Application {
 
 #[derive(Debug, Copy, Clone)]
 pub enum SampleRate {
+    R96000,
     R48000,
     R24000,
     R16000,
@@ -55,6 +56,7 @@ impl FromStr for SampleRate {
             .map_err(|_| "Cannot parse the sample rate as number")?;
 
         match s {
+            96000 => Ok(SampleRate::R96000),
             48000 => Ok(SampleRate::R48000),
             24000 => Ok(SampleRate::R24000),
             16000 => Ok(SampleRate::R16000),
@@ -68,6 +70,7 @@ impl FromStr for SampleRate {
 impl From<SampleRate> for usize {
     fn from(value: SampleRate) -> Self {
         match value {
+            SampleRate::R96000 => 96000,
             SampleRate::R48000 => 48000,
             SampleRate::R24000 => 24000,
             SampleRate::R16000 => 16000,
@@ -267,6 +270,8 @@ pub struct EncoderOptions {
     pub common: CommonOptions,
     /// DRED duration in frames (0 = disabled). Requires `dred` feature.
     pub dred_duration: i32,
+    /// Enable QEXT (96 kHz Opus HD path). Requires `qext` feature.
+    pub qext: bool,
     // TODO: do we need to support undocumented options?
     // there's a bunch of them:
     // -sweep, -random_framesize, -sweep_max, -random_fec
@@ -288,6 +293,7 @@ impl Default for EncoderOptions {
             dtx: false,
             common: CommonOptions::default(),
             dred_duration: 0,
+            qext: false,
         }
     }
 }

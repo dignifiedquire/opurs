@@ -16,6 +16,7 @@ pub(crate) trait OpusBackendTrait {
     fn enc_set_dtx(st: &mut Self::Encoder, val: i32);
     fn enc_set_lsb_depth(st: &mut Self::Encoder, val: i32);
     fn enc_set_expert_frame_duration(st: &mut Self::Encoder, val: i32);
+    fn enc_set_qext(st: &mut Self::Encoder, val: i32);
     fn enc_get_lookahead(st: &mut Self::Encoder) -> i32;
     fn enc_get_final_range(st: &mut Self::Encoder) -> u32;
     fn opus_encode(st: &mut Self::Encoder, pcm: &[i16], frame_size: i32, data: &mut [u8]) -> i32;
@@ -93,6 +94,17 @@ mod rust_backend {
         }
         fn enc_set_expert_frame_duration(st: &mut Box<OpusEncoder>, val: i32) {
             st.set_expert_frame_duration(val.try_into().unwrap());
+        }
+        fn enc_set_qext(st: &mut Box<OpusEncoder>, val: i32) {
+            #[cfg(feature = "qext")]
+            st.set_qext(val != 0);
+            #[cfg(not(feature = "qext"))]
+            {
+                let _ = st;
+                if val != 0 {
+                    panic!("QEXT support requires the 'qext' feature");
+                }
+            }
         }
         fn enc_get_lookahead(st: &mut Box<OpusEncoder>) -> i32 {
             st.lookahead()
@@ -205,6 +217,7 @@ mod libopus {
         OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
         OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
     };
+    const OPUS_SET_QEXT_REQUEST: i32 = 4056;
 
     pub struct UpstreamLibopusBackend;
 
@@ -252,6 +265,9 @@ mod libopus {
         }
         fn enc_set_expert_frame_duration(st: &mut *mut OpusEncoder, val: i32) {
             unsafe { opus_encoder_ctl(*st, OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, val) };
+        }
+        fn enc_set_qext(st: &mut *mut OpusEncoder, val: i32) {
+            unsafe { opus_encoder_ctl(*st, OPUS_SET_QEXT_REQUEST, val) };
         }
         fn enc_get_lookahead(st: &mut *mut OpusEncoder) -> i32 {
             let mut val: i32 = 0;

@@ -89,6 +89,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
     B::enc_set_complexity(&mut enc, i32::from(options.complexity));
     B::enc_set_force_channels(&mut enc, if options.forcemono { 1 } else { OPUS_AUTO });
     B::enc_set_dtx(&mut enc, options.dtx as i32);
+    B::enc_set_qext(&mut enc, options.qext as i32);
     let skip = B::enc_get_lookahead(&mut enc);
     B::enc_set_lsb_depth(&mut enc, 16);
     B::enc_set_expert_frame_duration(&mut enc, OPUS_FRAMESIZE_ARG);

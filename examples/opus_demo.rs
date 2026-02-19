@@ -135,6 +135,7 @@ impl EncodeCliArgs {
                     loss: self.loss,
                 },
                 dred_duration: self.dred_duration,
+                qext: false,
             },
         }
     }
