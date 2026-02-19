@@ -1,5 +1,9 @@
 # Deferred: Multistream / Ambisonics / Projection
 
+> Superseded by active plan:
+> [`plans/api-expansion-upstream-parity.md`](api-expansion-upstream-parity.md).
+> Keep this file as historical context only.
+
 ## What's Missing
 
 The upstream C test `test_opus_projection.c` (394 lines) exercises:
