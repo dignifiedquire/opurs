@@ -110,6 +110,14 @@ pub struct OpusEncoder {
     /// of recomputing it per subframe.
     pub(crate) multiframe_fixed_bitrate_bps: i32,
     pub(crate) multiframe_fixed_bitrate_valid: i32,
+    pub(crate) multiframe_fixed_mode: i32,
+    pub(crate) multiframe_fixed_bandwidth: i32,
+    pub(crate) multiframe_fixed_stream_channels: i32,
+    pub(crate) multiframe_fixed_equiv_rate: i32,
+    pub(crate) multiframe_fixed_prefill: i32,
+    pub(crate) multiframe_fixed_celt_to_silk: i32,
+    pub(crate) multiframe_frame_redundancy: i32,
+    pub(crate) multiframe_frame_to_celt: i32,
     #[cfg(feature = "dred")]
     pub(crate) dred_encoder: crate::dnn::dred::encoder::DREDEnc,
     #[cfg(feature = "dred")]
@@ -258,6 +266,14 @@ impl OpusEncoder {
             rangeFinal: 0,
             multiframe_fixed_bitrate_bps: 0,
             multiframe_fixed_bitrate_valid: 0,
+            multiframe_fixed_mode: 0,
+            multiframe_fixed_bandwidth: 0,
+            multiframe_fixed_stream_channels: 0,
+            multiframe_fixed_equiv_rate: 0,
+            multiframe_fixed_prefill: 0,
+            multiframe_fixed_celt_to_silk: 0,
+            multiframe_frame_redundancy: 0,
+            multiframe_frame_to_celt: 0,
             #[cfg(feature = "dred")]
             dred_encoder: crate::dnn::dred::encoder::DREDEnc::new(),
             #[cfg(feature = "dred")]
@@ -1270,6 +1286,10 @@ fn encode_multiframe_packet(
     data: &mut [u8],
     out_data_bytes: i32,
     max_data_bytes: i32,
+    redundancy: i32,
+    celt_to_silk: i32,
+    prefill: i32,
+    fixed_equiv_rate: i32,
     to_celt: i32,
     lsb_depth: i32,
     float_api: i32,
@@ -1320,11 +1340,27 @@ fn encode_multiframe_packet(
     let bak_channels = st.force_channels;
     let bak_fixed_bitrate_bps = st.multiframe_fixed_bitrate_bps;
     let bak_fixed_bitrate_valid = st.multiframe_fixed_bitrate_valid;
+    let bak_fixed_mode = st.multiframe_fixed_mode;
+    let bak_fixed_bandwidth = st.multiframe_fixed_bandwidth;
+    let bak_fixed_stream_channels = st.multiframe_fixed_stream_channels;
+    let bak_fixed_equiv_rate = st.multiframe_fixed_equiv_rate;
+    let bak_fixed_prefill = st.multiframe_fixed_prefill;
+    let bak_fixed_celt_to_silk = st.multiframe_fixed_celt_to_silk;
+    let bak_frame_redundancy = st.multiframe_frame_redundancy;
+    let bak_frame_to_celt = st.multiframe_frame_to_celt;
     st.user_forced_mode = st.mode;
     st.user_bandwidth = st.bandwidth;
     st.force_channels = st.stream_channels;
     st.multiframe_fixed_bitrate_bps = st.bitrate_bps;
     st.multiframe_fixed_bitrate_valid = 1;
+    st.multiframe_fixed_mode = st.mode;
+    st.multiframe_fixed_bandwidth = st.bandwidth;
+    st.multiframe_fixed_stream_channels = st.stream_channels;
+    st.multiframe_fixed_equiv_rate = fixed_equiv_rate;
+    st.multiframe_fixed_prefill = prefill;
+    st.multiframe_fixed_celt_to_silk = celt_to_silk;
+    st.multiframe_frame_redundancy = 0;
+    st.multiframe_frame_to_celt = 0;
     let bak_to_mono = st.silk_mode.toMono;
     if bak_to_mono != 0 {
         st.force_channels = 1;
@@ -1351,11 +1387,16 @@ fn encode_multiframe_packet(
 
         st.silk_mode.toMono = 0;
         st.nonfinal_frame = (i < nb_frames - 1) as i32;
+        let frame_to_celt = (to_celt != 0 && i == nb_frames - 1) as i32;
+        let frame_redundancy =
+            (redundancy != 0 && (frame_to_celt != 0 || (to_celt == 0 && i == 0))) as i32;
+        st.multiframe_frame_to_celt = frame_to_celt;
+        st.multiframe_frame_redundancy = frame_redundancy;
 
         let pcm_offset = (i * (st.channels * frame_size)) as usize;
 
         // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
-        if to_celt != 0 && i == nb_frames - 1 {
+        if frame_to_celt != 0 {
             st.user_forced_mode = MODE_CELT_ONLY;
         }
         let tmp_len = opus_encode_native(
@@ -1411,6 +1452,14 @@ fn encode_multiframe_packet(
     st.silk_mode.toMono = bak_to_mono;
     st.multiframe_fixed_bitrate_bps = bak_fixed_bitrate_bps;
     st.multiframe_fixed_bitrate_valid = bak_fixed_bitrate_valid;
+    st.multiframe_fixed_mode = bak_fixed_mode;
+    st.multiframe_fixed_bandwidth = bak_fixed_bandwidth;
+    st.multiframe_fixed_stream_channels = bak_fixed_stream_channels;
+    st.multiframe_fixed_equiv_rate = bak_fixed_equiv_rate;
+    st.multiframe_fixed_prefill = bak_fixed_prefill;
+    st.multiframe_fixed_celt_to_silk = bak_fixed_celt_to_silk;
+    st.multiframe_frame_redundancy = bak_frame_redundancy;
+    st.multiframe_frame_to_celt = bak_frame_to_celt;
 
     // Add DRED extension to the repacketized output
     #[cfg(feature = "dred")]
@@ -2183,6 +2232,10 @@ pub fn opus_encode_native(
             data,
             out_data_bytes,
             max_data_bytes,
+            redundancy,
+            celt_to_silk,
+            prefill,
+            equiv_rate,
             to_celt,
             lsb_depth,
             float_api,
@@ -2192,6 +2245,16 @@ pub fn opus_encode_native(
     // Match upstream frame-native behavior: single-frame payload encoding is
     // limited to 1276 bytes even when the top-level packet budget is larger.
     max_data_bytes = max_data_bytes.min(1276);
+    if st.multiframe_fixed_bitrate_valid != 0 {
+        st.mode = st.multiframe_fixed_mode;
+        st.bandwidth = st.multiframe_fixed_bandwidth;
+        st.stream_channels = st.multiframe_fixed_stream_channels;
+        redundancy = st.multiframe_frame_redundancy;
+        celt_to_silk = st.multiframe_fixed_celt_to_silk;
+        prefill = st.multiframe_fixed_prefill;
+        equiv_rate = st.multiframe_fixed_equiv_rate;
+        to_celt = st.multiframe_frame_to_celt;
+    }
     // Compute activity decision (in C 1.6.1 this is in opus_encode_frame_native,
     // after mode/bandwidth decisions have been made)
     let mut activity: i32 = VAD_NO_DECISION;
