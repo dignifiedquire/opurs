@@ -1,9 +1,9 @@
 #![cfg(feature = "tools")]
 
 use opurs::tools::demo::{
-    opus_demo_decode_multistream, opus_demo_encode_multistream, Application, CommonOptions,
-    EncoderOptions, MultistreamDecodeArgs, MultistreamEncodeArgs, MultistreamLayout, OpusBackend,
-    SampleRate,
+    opus_demo_decode_multistream, opus_demo_encode_multistream, Application, Bandwidth,
+    CommonOptions, EncoderOptions, MultistreamDecodeArgs, MultistreamEncodeArgs, MultistreamLayout,
+    OpusBackend, SampleRate,
 };
 
 fn build_pcm_bytes(channels: usize, frames: usize) -> Vec<u8> {
@@ -84,4 +84,48 @@ fn tools_multistream_cross_backend_decode() {
 
     assert!(!rust_from_upstream.is_empty());
     assert!(!upstream_from_rust.is_empty());
+}
+
+#[test]
+fn tools_multistream_encoder_option_smoke() {
+    let layout = MultistreamLayout {
+        channels: 3,
+        streams: 2,
+        coupled_streams: 1,
+        mapping: vec![0, 1, 2],
+    };
+    let options = EncoderOptions {
+        bandwidth: Some(Bandwidth::Wideband),
+        forcemono: true,
+        dtx: true,
+        ..EncoderOptions::default()
+    };
+
+    let encode_args = MultistreamEncodeArgs {
+        application: Application::Audio,
+        sample_rate: SampleRate::R48000,
+        layout: layout.clone(),
+        bitrate: 64000,
+        options,
+    };
+    let input_pcm = build_pcm_bytes(3, 960 * 2);
+
+    let (encoded_rust, _skip_rust) =
+        opus_demo_encode_multistream(OpusBackend::Rust, &input_pcm, encode_args.clone());
+    let (encoded_upstream, _skip_upstream) =
+        opus_demo_encode_multistream(OpusBackend::Upstream, &input_pcm, encode_args);
+
+    let decode_args = MultistreamDecodeArgs {
+        sample_rate: SampleRate::R48000,
+        layout: layout.clone(),
+        options: CommonOptions::default(),
+        complexity: None,
+    };
+    let rust_from_rust =
+        opus_demo_decode_multistream(OpusBackend::Rust, &encoded_rust, decode_args.clone());
+    let upstream_from_upstream =
+        opus_demo_decode_multistream(OpusBackend::Upstream, &encoded_upstream, decode_args);
+
+    assert!(!rust_from_rust.is_empty());
+    assert!(!upstream_from_upstream.is_empty());
 }
