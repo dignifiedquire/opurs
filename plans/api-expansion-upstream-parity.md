@@ -25,6 +25,32 @@ Primary target headers:
   - New psychoacoustic tuning/performance optimization passes
   - API redesign unrelated to upstream parity
 
+## Current Status Snapshot (2026-02-20)
+
+- Vector parity baseline:
+  - classic vectors: `228/228` passing
+  - classic full matrix parity: `1416/1416` passing
+  - DNN-only vectors: `264/264` passing
+- Current implementation focus:
+  - `M1.1` multistream layout/config scaffolding started
+  - `M1.3` multistream packet pad/unpad parity implementation started
+- Next ordered slices:
+  1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
+  2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.
+  3. Expand tooling/examples from M2 once core API passes parity tests.
+
+## Milestone Checklist
+
+- [x] Baseline vector parity stabilized before API expansion work
+- [ ] M1.1 Public API types and module wiring
+- [ ] M1.2 Encoder/decoder lifecycle + encode/decode parity
+- [ ] M1.3 Multistream packet helpers
+- [ ] M1.4 Tests (fail-first then green)
+- [ ] M1.5 Multistream API surface completion checklist
+- [ ] M2 Tooling and examples parity
+- [ ] M3 Projection / ambisonics parity
+- [ ] M4 Benchmark expansion and baselines
+
 ## Milestones
 
 ## M1: Multistream Core API

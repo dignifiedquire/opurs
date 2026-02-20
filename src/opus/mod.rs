@@ -13,6 +13,7 @@ pub mod extensions;
 pub mod mlp;
 pub mod opus_decoder;
 pub mod opus_encoder;
+pub mod opus_multistream;
 pub mod packet;
 pub mod repacketizer;
 // stuff for structs that do not have a clear home, named after the header files

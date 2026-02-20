@@ -28,6 +28,8 @@ pub mod dnn;
 
 // opus_encoder
 pub use crate::opus::opus_encoder::OpusEncoder;
+// opus_multistream (layout/config scaffolding + packet helpers)
+pub use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 // opus_decoder
 pub use crate::opus::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
@@ -39,7 +41,10 @@ pub use crate::opus::packet::{
     opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip,
 };
 // opus_repacketizer
-pub use crate::opus::repacketizer::{opus_packet_pad, opus_packet_unpad, OpusRepacketizer};
+pub use crate::opus::repacketizer::{
+    opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad,
+    OpusRepacketizer,
+};
 
 // =====
 // opus_defines.h

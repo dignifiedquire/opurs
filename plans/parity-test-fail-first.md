@@ -22,20 +22,20 @@ Make every known upstream parity gap produce a deterministic failing test before
 - `cargo run --release --features tools --example run_vectors2 -- opus_newvectors`
 - `cargo run --release --features tools-dnn --example run_vectors2 -- --dnn-only opus_newvectors`
 
-## Full-Matrix Fail-First Baseline (New)
+## Full-Matrix Fail-First Baseline (Historical)
 - Repro command:
   - `CARGO_TARGET_DIR=target-local cargo run --release --features tools --example run_vectors2 -- --matrix full --report-json target-local/run_vectors2_full_all.json opus_newvectors`
-- Current observed status (before implementation fixes):
+- Historical observed status (before implementation fixes):
   - `passed=812 failed=604 skipped=0 total=1416`
 - Failure concentration:
   - frame sizes: `40ms` and `60ms` dominate (`300` failures each)
   - applications: all affected (`rld=218`, `voip=194`, `audio=192`)
   - outliers at `10ms/20ms` (4 total): `testvector01@90k voip 20ms`, `testvector02@20k rld 20ms`, `testvector02@120k voip 10ms`, `testvector12@240k rld 10ms`
-- Interpretation:
+- Historical interpretation:
   - The expanded harness is now doing fail-first detection for non-baseline encode modes.
   - These failures should be converted into targeted parity tests, then fixed incrementally.
 
-### Baseline After Multiframe Budget/Repacketize Fix
+### Intermediate Baseline After Multiframe Budget/Repacketize Fix
 - Repro command:
   - `CARGO_TARGET_DIR=target-local cargo run --release --features tools --example run_vectors2 -- --suite classic --matrix full --mode parity --report-json target-local/run_vectors2_full_all_after_multiframe_fix.json opus_newvectors`
 - Observed status:
@@ -47,6 +47,16 @@ Make every known upstream parity gap produce a deterministic failing test before
 - Notes:
   - The main 40/60ms multiframe gap dropped substantially (`604 -> 170` fails).
   - Remaining drift is concentrated in long-frame encode parity and likely needs a closer `opus_encode_frame_native`-style path rather than recursive `opus_encode_native` calls.
+
+### Current Baseline (All Green)
+- Repro command:
+  - `CARGO_TARGET_DIR=target-local cargo run --release --features tools --example run_vectors2 -- --suite classic --matrix full --mode parity --report-json target-local/run_vectors2_full_all_green.json opus_newvectors`
+- Observed status:
+  - `passed=1416 failed=0 skipped=0 total=1416`
+- Additional suite checks:
+  - classic vectors: `228/228` passing
+  - dnn-only vectors: `264/264` passing
+- Use this as the regression baseline for upcoming API expansion and multistream/projection work.
 
 ## Workstreams
 
