@@ -106,6 +106,10 @@ pub struct OpusEncoder {
     pub(crate) peak_signal_energy: opus_val32,
     pub(crate) nonfinal_frame: i32,
     pub(crate) rangeFinal: u32,
+    /// When set, multiframes reuse the already-selected packet bitrate instead
+    /// of recomputing it per subframe.
+    pub(crate) multiframe_fixed_bitrate_bps: i32,
+    pub(crate) multiframe_fixed_bitrate_valid: i32,
     #[cfg(feature = "dred")]
     pub(crate) dred_encoder: crate::dnn::dred::encoder::DREDEnc,
     #[cfg(feature = "dred")]
@@ -252,6 +256,8 @@ impl OpusEncoder {
             peak_signal_energy: 0.0,
             nonfinal_frame: 0,
             rangeFinal: 0,
+            multiframe_fixed_bitrate_bps: 0,
+            multiframe_fixed_bitrate_valid: 0,
             #[cfg(feature = "dred")]
             dred_encoder: crate::dnn::dred::encoder::DREDEnc::new(),
             #[cfg(feature = "dred")]
@@ -1312,9 +1318,13 @@ fn encode_multiframe_packet(
     let bak_mode = st.user_forced_mode;
     let bak_bandwidth = st.user_bandwidth;
     let bak_channels = st.force_channels;
+    let bak_fixed_bitrate_bps = st.multiframe_fixed_bitrate_bps;
+    let bak_fixed_bitrate_valid = st.multiframe_fixed_bitrate_valid;
     st.user_forced_mode = st.mode;
     st.user_bandwidth = st.bandwidth;
     st.force_channels = st.stream_channels;
+    st.multiframe_fixed_bitrate_bps = st.bitrate_bps;
+    st.multiframe_fixed_bitrate_valid = 1;
     let bak_to_mono = st.silk_mode.toMono;
     if bak_to_mono != 0 {
         st.force_channels = 1;
@@ -1399,6 +1409,8 @@ fn encode_multiframe_packet(
     st.user_bandwidth = bak_bandwidth;
     st.force_channels = bak_channels;
     st.silk_mode.toMono = bak_to_mono;
+    st.multiframe_fixed_bitrate_bps = bak_fixed_bitrate_bps;
+    st.multiframe_fixed_bitrate_valid = bak_fixed_bitrate_valid;
 
     // Add DRED extension to the repacketized output
     #[cfg(feature = "dred")]
@@ -1772,7 +1784,11 @@ pub fn opus_encode_native(
         stereo_width = 0 as opus_val16;
     }
     total_buffer = delay_compensation;
-    st.bitrate_bps = user_bitrate_to_bitrate(&*st, frame_size, max_data_bytes);
+    if st.multiframe_fixed_bitrate_valid != 0 {
+        st.bitrate_bps = st.multiframe_fixed_bitrate_bps;
+    } else {
+        st.bitrate_bps = user_bitrate_to_bitrate(&*st, frame_size, max_data_bytes);
+    }
     frame_rate = st.Fs / frame_size;
     if st.use_vbr == 0 {
         let mut cbrBytes: i32 = 0;
