@@ -1,6 +1,6 @@
 # Benchmarks
 
-Last updated: ndarray removal, inline hints, stack allocations, FFT loop optimization, bench profile (LTO + codegen-units=1)
+Last updated: multistream Rust-vs-C benchmark results (February 20, 2026)
 
 ## End-to-End Codec: Rust vs C (both with SIMD)
 
@@ -41,6 +41,36 @@ All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 f
 Note: x86 numbers are from a previous run without the bench profile optimizations
 (LTO, codegen-units=1). Re-running on x86 with the new profile is expected to improve
 those ratios.
+
+## End-to-End Multistream: Rust vs C (both with SIMD)
+
+### aarch64 (Apple Silicon M4, NEON)
+
+Command:
+
+```bash
+CARGO_TARGET_DIR=target-local RUSTFLAGS="-C target-cpu=native" \
+  cargo bench --features tools --bench multistream
+```
+
+Configuration:
+- Sample rate: 48 kHz
+- Layout: 2 channels, 2 streams, 0 coupled, mapping `[0,1]`
+- Frame size: 20 ms (960 samples)
+- Complexity: 10
+- Input: deterministic synthetic signal, 50 frames
+
+| Operation | Bitrate | Rust | C (NEON) | Ratio |
+|-----------|---------|------|----------|-------|
+| Encode | 32 kbps | 6.005 ms | 7.254 ms | **0.83x (Rust faster)** |
+| Encode | 96 kbps | 3.670 ms | 3.495 ms | 1.05x |
+| Encode | 192 kbps | 4.694 ms | 4.486 ms | 1.05x |
+| Decode | 32 kbps | 1.282 ms | 1.006 ms | 1.27x |
+| Decode | 96 kbps | 1.360 ms | 1.054 ms | 1.29x |
+| Decode | 192 kbps | 1.840 ms | 1.485 ms | 1.24x |
+
+Rust multistream encode is near parity (and faster at 32 kbps). Decode remains
+~24-29% slower than C on this current 2-channel benchmark profile.
 
 ## Per-Function: Rust vs C (with SIMD)
 
