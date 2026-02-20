@@ -87,6 +87,11 @@ harness = false
 required-features = ["tools"]
 
 [[bench]]
+name = "multistream"
+harness = false
+required-features = ["tools"]
+
+[[bench]]
 name = "dnn"
 harness = false
 required-features = ["deep-plc"]

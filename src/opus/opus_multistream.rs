@@ -171,6 +171,17 @@ impl OpusMultistreamConfig {
         self.application
     }
 
+    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
+        let valid_application = application == OPUS_APPLICATION_VOIP
+            || application == OPUS_APPLICATION_AUDIO
+            || application == OPUS_APPLICATION_RESTRICTED_LOWDELAY;
+        if !valid_application {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.application = application;
+        Ok(())
+    }
+
     #[inline]
     pub fn layout(&self) -> &OpusMultistreamLayout {
         &self.layout

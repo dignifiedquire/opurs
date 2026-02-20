@@ -274,14 +274,57 @@ impl OpusMSDecoder {
         }
     }
 
+    pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
+        for decoder in &mut self.decoders {
+            decoder.set_phase_inversion_disabled(disabled);
+        }
+    }
+
+    pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, i32> {
+        if stream_id < 0 || stream_id >= self.layout.streams() {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.decoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
+    }
+
+    pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, i32> {
+        if stream_id < 0 || stream_id >= self.layout.streams() {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.decoders
+            .get_mut(stream_id as usize)
+            .ok_or(OPUS_BAD_ARG)
+    }
+
     pub fn gain(&self) -> i32 {
         self.decoders.first().map(OpusDecoder::gain).unwrap_or(0)
+    }
+
+    pub fn bandwidth(&self) -> i32 {
+        self.decoders
+            .first()
+            .map(OpusDecoder::get_bandwidth)
+            .unwrap_or(0)
     }
 
     pub fn complexity(&self) -> i32 {
         self.decoders
             .first()
             .map(OpusDecoder::complexity)
+            .unwrap_or(0)
+    }
+
+    pub fn phase_inversion_disabled(&self) -> bool {
+        self.decoders
+            .first()
+            .map(OpusDecoder::phase_inversion_disabled)
+            .unwrap_or(false)
+    }
+
+    pub fn last_packet_duration(&self) -> i32 {
+        self.decoders
+            .first()
+            .map(OpusDecoder::last_packet_duration)
             .unwrap_or(0)
     }
 

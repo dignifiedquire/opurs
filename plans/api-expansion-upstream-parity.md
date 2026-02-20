@@ -112,13 +112,15 @@ Close the remaining multistream surface gap explicitly against
 - Encoder API coverage:
   - `opus_multistream_encoder_get_size`
   - `opus_multistream_encoder_create` / `init` / `destroy`
-  - `opus_multistream_encode` / `opus_multistream_encode_float`
-  - stream-state CTLs required by upstream docs
+  - `opus_multistream_encode` / `opus_multistream_encode_float` / `opus_multistream_encode24`
+  - stream-state access (`OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST`) parity
 - Decoder API coverage:
   - `opus_multistream_decoder_get_size`
   - `opus_multistream_decoder_create` / `init` / `destroy`
-  - `opus_multistream_decode` / `opus_multistream_decode_float`
-  - stream-state CTLs required by upstream docs
+  - `opus_multistream_decode` / `opus_multistream_decode_float` / `opus_multistream_decode24`
+  - stream-state access (`OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST`) parity
+  - decoder CTL parity for `gain`, `complexity`, `phase inversion`, `bandwidth`,
+    `sample rate`, and `last packet duration`
 - Error/validation parity:
   - mapping length and index bounds
   - stream/coupled-stream count invariants

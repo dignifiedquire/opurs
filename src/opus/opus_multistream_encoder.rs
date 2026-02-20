@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_encoder.c`
 
-use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
@@ -151,6 +151,22 @@ impl OpusMSEncoder {
         }
     }
 
+    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, i32> {
+        if stream_id < 0 || stream_id >= self.layout().streams() {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.encoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
+    }
+
+    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, i32> {
+        if stream_id < 0 || stream_id >= self.layout().streams() {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.encoders
+            .get_mut(stream_id as usize)
+            .ok_or(OPUS_BAD_ARG)
+    }
+
     /// Apply bitrate to all stream encoders.
     ///
     /// Explicit bitrates are split approximately evenly across streams.
@@ -165,6 +181,15 @@ impl OpusMSEncoder {
         for encoder in &mut self.encoders {
             encoder.set_bitrate(per_stream);
         }
+    }
+
+    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
+        let app = Application::try_from(application).map_err(|_| OPUS_BAD_ARG)?;
+        for encoder in &mut self.encoders {
+            encoder.set_application(app)?;
+        }
+        self.config.set_application(application)?;
+        Ok(())
     }
 
     pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
