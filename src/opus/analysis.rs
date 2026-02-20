@@ -31,6 +31,7 @@ pub const LEAK_BANDS: i32 = 19;
 pub enum DownmixInput<'a> {
     Float(&'a [f32]),
     Int(&'a [i16]),
+    Int24(&'a [i32]),
 }
 
 impl<'a> DownmixInput<'a> {
@@ -101,6 +102,31 @@ impl<'a> DownmixInput<'a> {
                         j = 0;
                         while j < subframe {
                             y[j as usize] += x[((j + offset) * C + c) as usize] as i32 as f32;
+                            j += 1;
+                        }
+                        c += 1;
+                    }
+                }
+            }
+            DownmixInput::Int24(x) => {
+                let mut j = 0;
+                while j < subframe {
+                    y[j as usize] = x[((j + offset) * C + c1) as usize] as opus_val32 / 256.0;
+                    j += 1;
+                }
+                if c2 > -1 {
+                    j = 0;
+                    while j < subframe {
+                        y[j as usize] += x[((j + offset) * C + c2) as usize] as opus_val32 / 256.0;
+                        j += 1;
+                    }
+                } else if c2 == -2 {
+                    let mut c = 1;
+                    while c < C {
+                        j = 0;
+                        while j < subframe {
+                            y[j as usize] +=
+                                x[((j + offset) * C + c) as usize] as opus_val32 / 256.0;
                             j += 1;
                         }
                         c += 1;

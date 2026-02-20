@@ -393,12 +393,41 @@ impl OpusMSEncoder {
     }
 
     fn encode_impl_i24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
-        let mut pcm_i16 = Vec::with_capacity(pcm.len());
-        for &sample in pcm {
-            let sample = (sample >> 8).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
-            pcm_i16.push(sample);
+        let channels = self.layout().channels() as usize;
+        if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
+            return OPUS_BAD_ARG;
         }
-        self.encode_impl_i16(&pcm_i16, output)
+        let frame_size = pcm.len() / channels;
+        let mut write_offset = 0usize;
+        for stream_id in 0..self.layout().streams() {
+            let selected = match stream_input_channels(self.layout(), stream_id) {
+                Some(v) => v,
+                None => return OPUS_BAD_ARG,
+            };
+            let stream_pcm = extract_stream_pcm_i32(pcm, frame_size, channels, &selected);
+            let encoder = &mut self.encoders[stream_id as usize];
+            let mut stream_packet = vec![0u8; 1500];
+            let len = encoder.encode24(&stream_pcm, &mut stream_packet);
+            if len < 0 {
+                return len;
+            }
+            stream_packet.truncate(len as usize);
+            let stream_packet = if stream_id != self.layout().streams() - 1 {
+                match make_self_delimited(&stream_packet) {
+                    Ok(pkt) => pkt,
+                    Err(err) => return err,
+                }
+            } else {
+                stream_packet
+            };
+            if write_offset + stream_packet.len() > output.len() {
+                return OPUS_BUFFER_TOO_SMALL;
+            }
+            output[write_offset..write_offset + stream_packet.len()]
+                .copy_from_slice(&stream_packet);
+            write_offset += stream_packet.len();
+        }
+        write_offset as i32
     }
 }
 
@@ -614,6 +643,22 @@ fn extract_stream_pcm_f32(
 ) -> Vec<f32> {
     let stream_channels = selected_channels.len();
     let mut out = vec![0f32; frame_size * stream_channels];
+    for frame in 0..frame_size {
+        for (idx, &channel) in selected_channels.iter().enumerate() {
+            out[frame * stream_channels + idx] = pcm[frame * channels + channel];
+        }
+    }
+    out
+}
+
+fn extract_stream_pcm_i32(
+    pcm: &[i32],
+    frame_size: usize,
+    channels: usize,
+    selected_channels: &[usize],
+) -> Vec<i32> {
+    let stream_channels = selected_channels.len();
+    let mut out = vec![0i32; frame_size * stream_channels];
     for frame in 0..frame_size {
         for (idx, &channel) in selected_channels.iter().enumerate() {
             out[frame * stream_channels + idx] = pcm[frame * channels + channel];

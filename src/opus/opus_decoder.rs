@@ -21,7 +21,7 @@ use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCust
 use crate::celt::entcode::ec_tell;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
-use crate::celt::float_cast::celt_float2int16;
+use crate::celt::float_cast::{celt_float2int16, float2int};
 use crate::celt::mathops::celt_exp2;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
@@ -149,6 +149,17 @@ impl OpusDecoder {
         decode_fec: bool,
     ) -> i32 {
         opus_decode_float(self, data, pcm, frame_size, decode_fec as i32)
+    }
+
+    /// Decode an Opus packet into interleaved 24-bit PCM samples in `i32`.
+    pub fn decode24(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [i32],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        opus_decode24(self, data, pcm, frame_size, decode_fec as i32)
     }
 
     // -- Type-safe CTL getters and setters --
@@ -1163,6 +1174,37 @@ pub fn opus_decode_float(
         return OPUS_BAD_ARG;
     }
     opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0)
+}
+
+/// Upstream C: src/opus_decoder.c:opus_decode24
+pub fn opus_decode24(
+    st: &mut OpusDecoder,
+    data: &[u8],
+    pcm: &mut [i32],
+    mut frame_size: i32,
+    decode_fec: i32,
+) -> i32 {
+    if frame_size <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    if !data.is_empty() && decode_fec == 0 {
+        let nb_samples = opus_decoder_get_nb_samples(st, data);
+        if nb_samples > 0 {
+            frame_size = frame_size.min(nb_samples);
+        } else {
+            return OPUS_INVALID_PACKET;
+        }
+    }
+    assert!(st.channels == 1 || st.channels == 2);
+    let vla = (frame_size * st.channels) as usize;
+    let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
+    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 0);
+    if ret > 0 {
+        for i in 0..(ret * st.channels) as usize {
+            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+        }
+    }
+    ret
 }
 
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {

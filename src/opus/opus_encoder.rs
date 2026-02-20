@@ -321,6 +321,15 @@ impl OpusEncoder {
         opus_encode_float(self, pcm, frame_size, output)
     }
 
+    /// Encode an audio frame from interleaved 24-bit PCM samples in `i32`.
+    ///
+    /// Input samples are expected to represent 24-bit values (typically left-
+    /// aligned in i32 as in upstream `opus_encode24` APIs).
+    pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
+        let frame_size = pcm.len() as i32 / self.channels;
+        opus_encode24(self, pcm, frame_size, output)
+    }
+
     // -- Type-safe CTL getters and setters --
 
     pub fn set_application(&mut self, app: Application) -> Result<(), i32> {
@@ -3226,6 +3235,39 @@ fn opus_encode_float(
         data.len() as i32,
         24,
         Some(&DownmixInput::Float(pcm)),
+        analysis_frame_size,
+        0,
+        -2,
+        st.channels,
+        None,
+        1,
+    )
+}
+
+/// Upstream C: src/opus_encoder.c:opus_encode24
+fn opus_encode24(
+    st: &mut OpusEncoder,
+    pcm: &[i32],
+    analysis_frame_size: i32,
+    data: &mut [u8],
+) -> i32 {
+    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
+    if frame_size <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    let vla = (frame_size * st.channels) as usize;
+    let mut in_0: Vec<f32> = vec![0.0; vla];
+    for i in 0..(frame_size * st.channels) as usize {
+        in_0[i] = 1.0f32 / 32768.0f32 / 256.0f32 * pcm[i] as f32;
+    }
+    opus_encode_native(
+        st,
+        &in_0,
+        frame_size,
+        data,
+        data.len() as i32,
+        24,
+        Some(&DownmixInput::Int24(pcm)),
         analysis_frame_size,
         0,
         -2,

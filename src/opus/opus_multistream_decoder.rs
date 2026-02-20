@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_decoder.c`
 
-use crate::celt::float_cast::celt_float2int16;
+use crate::celt::float_cast::{celt_float2int16, float2int};
 use crate::opus::opus_decoder::{opus_decode_native, OpusDecoder};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET, OPUS_OK};
 use crate::opus::opus_multistream::OpusMultistreamLayout;
@@ -169,20 +169,23 @@ impl OpusMSDecoder {
             return OPUS_BAD_ARG;
         }
 
-        let mut tmp = vec![0i16; frame_size as usize * channels];
-        let decoded = self.decode(data, &mut tmp, frame_size, decode_fec);
-        if decoded < 0 {
-            return decoded;
+        let (stream_pcm, decoded_samples) =
+            match self.decode_streams_native(data, frame_size, decode_fec, 0) {
+                Ok(result) => result,
+                Err(err) => return err,
+            };
+
+        let mut stream_pcm_i32 = Vec::with_capacity(stream_pcm.len());
+        for stream in stream_pcm {
+            let mut out = vec![0i32; stream.len()];
+            for (dst, src) in out.iter_mut().zip(stream.iter()) {
+                *dst = float2int(32768.0f32 * 256.0f32 * *src);
+            }
+            stream_pcm_i32.push(out);
         }
 
-        for (dst, &src) in pcm
-            .iter_mut()
-            .zip(tmp.iter())
-            .take(decoded as usize * channels)
-        {
-            *dst = (src as i32) << 8;
-        }
-        decoded
+        map_output_i32(&self.layout, &stream_pcm_i32, pcm, decoded_samples);
+        decoded_samples as i32
     }
 
     fn decode_streams_native(
@@ -403,6 +406,31 @@ fn map_output_f32(
 ) {
     let channels = layout.channels() as usize;
     output[..decoded_samples * channels].fill(0.);
+    for out_channel in 0..channels {
+        let mapping = layout.mapping()[out_channel];
+        if let Some((stream_idx, stream_channel)) = mapping_to_stream_channel(layout, mapping) {
+            let stream_channels = if stream_idx < layout.coupled_streams() as usize {
+                2
+            } else {
+                1
+            };
+            let source = &stream_pcm[stream_idx];
+            for frame in 0..decoded_samples {
+                output[frame * channels + out_channel] =
+                    source[frame * stream_channels + stream_channel];
+            }
+        }
+    }
+}
+
+fn map_output_i32(
+    layout: &OpusMultistreamLayout,
+    stream_pcm: &[Vec<i32>],
+    output: &mut [i32],
+    decoded_samples: usize,
+) {
+    let channels = layout.channels() as usize;
+    output[..decoded_samples * channels].fill(0);
     for out_channel in 0..channels {
         let mapping = layout.mapping()[out_channel];
         if let Some((stream_idx, stream_channel)) = mapping_to_stream_channel(layout, mapping) {
