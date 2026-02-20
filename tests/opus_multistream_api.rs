@@ -12,10 +12,12 @@ use libopus_sys::{
 };
 use opurs::{
     opus_multistream_decode as rust_opus_multistream_decode,
+    opus_multistream_decode24 as rust_opus_multistream_decode24,
     opus_multistream_decode_float as rust_opus_multistream_decode_float,
     opus_multistream_decoder_create as rust_opus_multistream_decoder_create,
     opus_multistream_decoder_init as rust_opus_multistream_decoder_init,
     opus_multistream_encode as rust_opus_multistream_encode,
+    opus_multistream_encode24 as rust_opus_multistream_encode24,
     opus_multistream_encode_float as rust_opus_multistream_encode_float,
     opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
     opus_multistream_encoder_init as rust_opus_multistream_encoder_init,
@@ -26,9 +28,9 @@ use opurs::{
     OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_INVALID_PACKET, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
+    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
+    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -560,6 +562,59 @@ fn multistream_wrapper_entrypoints_smoke() {
         false,
     );
     assert_eq!(dec_f32, frame_size as i32);
+}
+
+#[test]
+fn multistream_24bit_wrapper_entrypoints_smoke() {
+    let _guard = test_guard();
+    let mut enc =
+        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .expect("encoder create");
+    let mut dec =
+        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("decoder create");
+
+    let frame_size = 960usize;
+    let mut pcm_i24 = vec![0i32; frame_size * 2];
+    for i in 0..frame_size {
+        pcm_i24[i * 2] = ((i as i32 * 257) - 12345) << 8;
+        pcm_i24[i * 2 + 1] = ((i as i32 * -311) + 7777) << 8;
+    }
+
+    let mut packet = vec![0u8; 4000];
+    let len = rust_opus_multistream_encode24(&mut enc, &pcm_i24, frame_size as i32, &mut packet);
+    assert!(len > 0);
+
+    let mut out = vec![0i32; frame_size * 2];
+    let decoded = rust_opus_multistream_decode24(
+        &mut dec,
+        &packet[..len as usize],
+        &mut out,
+        frame_size as i32,
+        false,
+    );
+    assert_eq!(decoded, frame_size as i32);
+    assert!(out.iter().any(|&x| x != 0));
+}
+
+#[test]
+fn multistream_24bit_bad_arg_and_invalid_packet_smoke() {
+    let _guard = test_guard();
+    let mut rust_enc =
+        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .expect("rust encoder create");
+    let mut rust_dec =
+        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
+
+    let pcm = vec![0i32; 100];
+    let mut packet = vec![0u8; 1000];
+    let rust_bad_arg = rust_opus_multistream_encode24(&mut rust_enc, &pcm, 60, &mut packet);
+    assert_eq!(rust_bad_arg, OPUS_BAD_ARG);
+
+    let bad_packet = [0xffu8];
+    let mut rust_out = vec![0i32; 960 * 2];
+    let rust_invalid =
+        rust_opus_multistream_decode24(&mut rust_dec, &bad_packet, &mut rust_out, 960, false);
+    assert_eq!(rust_invalid, OPUS_INVALID_PACKET);
 }
 
 #[test]

@@ -311,6 +311,11 @@ impl OpusMSEncoder {
         self.encode_impl_f32(pcm, output)
     }
 
+    /// Encode interleaved 24-bit PCM (stored in i32) into a multistream Opus packet.
+    pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
+        self.encode_impl_i24(pcm, output)
+    }
+
     fn encode_impl_i16(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
@@ -385,6 +390,15 @@ impl OpusMSEncoder {
             write_offset += stream_packet.len();
         }
         write_offset as i32
+    }
+
+    fn encode_impl_i24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
+        let mut pcm_i16 = Vec::with_capacity(pcm.len());
+        for &sample in pcm {
+            let sample = (sample >> 8).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+            pcm_i16.push(sample);
+        }
+        self.encode_impl_i16(&pcm_i16, output)
     }
 }
 
@@ -526,6 +540,20 @@ pub fn opus_multistream_encode_float(
         return OPUS_BAD_ARG;
     }
     st.encode_float(pcm, data)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encode24(
+    st: &mut OpusMSEncoder,
+    pcm: &[i32],
+    frame_size: i32,
+    data: &mut [u8],
+) -> i32 {
+    let channels = st.layout().channels() as usize;
+    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+        return OPUS_BAD_ARG;
+    }
+    st.encode24(pcm, data)
 }
 
 fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {

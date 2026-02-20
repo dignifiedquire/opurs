@@ -153,6 +153,38 @@ impl OpusMSDecoder {
         decoded_samples as i32
     }
 
+    /// Decode multistream packet into 24-bit PCM (stored in i32).
+    pub fn decode24(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [i32],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        if frame_size <= 0 {
+            return OPUS_BAD_ARG;
+        }
+        let channels = self.layout.channels() as usize;
+        if pcm.len() < frame_size as usize * channels {
+            return OPUS_BAD_ARG;
+        }
+
+        let mut tmp = vec![0i16; frame_size as usize * channels];
+        let decoded = self.decode(data, &mut tmp, frame_size, decode_fec);
+        if decoded < 0 {
+            return decoded;
+        }
+
+        for (dst, &src) in pcm
+            .iter_mut()
+            .zip(tmp.iter())
+            .take(decoded as usize * channels)
+        {
+            *dst = (src as i32) << 8;
+        }
+        decoded
+    }
+
     fn decode_streams_native(
         &mut self,
         data: &[u8],
@@ -309,6 +341,17 @@ pub fn opus_multistream_decode_float(
     decode_fec: bool,
 ) -> i32 {
     st.decode_float(data, pcm, frame_size, decode_fec)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decode24(
+    st: &mut OpusMSDecoder,
+    data: &[u8],
+    pcm: &mut [i32],
+    frame_size: i32,
+    decode_fec: bool,
+) -> i32 {
+    st.decode24(data, pcm, frame_size, decode_fec)
 }
 
 fn mapping_to_stream_channel(
