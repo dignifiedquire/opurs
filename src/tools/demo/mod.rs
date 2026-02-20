@@ -270,6 +270,35 @@ pub fn opus_demo_adjust_length(
     data.resize(final_len, 0);
 }
 
+/// Adjust decoded multistream output length after encode+decode roundtrip.
+pub fn opus_demo_adjust_length_multistream(
+    data: &mut Vec<u8>,
+    pre_skip_48k: usize,
+    orig_bytes_48k: usize,
+    sample_rate: SampleRate,
+    channels: i32,
+) {
+    let sample_rate: usize = sample_rate.into();
+    let channels = channels as usize;
+
+    let samples_48k_to_current =
+        |samples_48k: usize| samples_48k * sample_rate * channels / 48000 / 2;
+
+    data.drain(..2 * samples_48k_to_current(pre_skip_48k));
+
+    let final_len = samples_48k_to_current(orig_bytes_48k);
+
+    // sanity check: the length should not differ more than a one frame of audio
+    assert!(
+        data.len().abs_diff(final_len) < 48000 * channels * 2 / 50,
+        "length mismatch: {} vs {}",
+        data.len(),
+        final_len
+    );
+
+    data.resize(final_len, 0);
+}
+
 /// Encode an Opus multistream stream using the same simple mux format as `opus_demo_encode`.
 pub fn opus_demo_encode_multistream(
     backend: OpusBackend,

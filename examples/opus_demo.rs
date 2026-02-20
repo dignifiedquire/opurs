@@ -3,8 +3,10 @@
 use clap::{Parser, Subcommand};
 use opurs::opus_get_version_string;
 use opurs::tools::demo::{
-    opus_demo_adjust_length, opus_demo_decode, opus_demo_encode, Application, Bandwidth, Channels,
-    CommonOptions, Complexity, DecodeArgs, DnnOptions, EncodeArgs, EncoderOptions, FrameSize,
+    opus_demo_adjust_length, opus_demo_adjust_length_multistream, opus_demo_decode,
+    opus_demo_decode_multistream, opus_demo_encode, opus_demo_encode_multistream, Application,
+    Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions, EncodeArgs,
+    EncoderOptions, FrameSize, MultistreamDecodeArgs, MultistreamEncodeArgs, MultistreamLayout,
     OpusBackend, SampleRate, MAX_PACKET,
 };
 
@@ -38,6 +40,18 @@ enum Mode {
     /// Decode only (read bitstream)
     #[command(name = "dec")]
     DecodeOnly(DecodeCliArgs),
+
+    /// Multistream encode and decode (roundtrip)
+    #[command(name = "ms-enc-dec")]
+    MultistreamEncodeDecode(MultistreamEncodeCliArgs),
+
+    /// Multistream encode only (output bitstream)
+    #[command(name = "ms-enc")]
+    MultistreamEncodeOnly(MultistreamEncodeCliArgs),
+
+    /// Multistream decode only (read bitstream)
+    #[command(name = "ms-dec")]
+    MultistreamDecodeOnly(MultistreamDecodeCliArgs),
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -204,6 +218,161 @@ impl DecodeCliArgs {
     }
 }
 
+fn parse_mapping_arg(mapping: Option<&str>, channels: i32) -> Vec<u8> {
+    if let Some(mapping) = mapping {
+        let values: Vec<u8> = mapping
+            .split(',')
+            .map(|v| {
+                let v = v.trim().parse::<u16>().expect("invalid mapping value");
+                assert!(v <= 255, "mapping value must be <= 255");
+                v as u8
+            })
+            .collect();
+        assert_eq!(
+            values.len(),
+            channels as usize,
+            "mapping length must equal channel count"
+        );
+        values
+    } else {
+        (0..channels).map(|v| v as u8).collect()
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
+struct MultistreamEncodeCliArgs {
+    /// Application: voip, audio, or restricted-lowdelay
+    application: Application,
+
+    /// Sampling rate in Hz
+    sample_rate: SampleRate,
+
+    /// Number of output channels
+    channels: i32,
+
+    /// Number of Opus streams
+    streams: i32,
+
+    /// Number of coupled (stereo) streams
+    coupled_streams: i32,
+
+    /// Comma-separated channel mapping (defaults to identity if omitted)
+    #[arg(long)]
+    mapping: Option<String>,
+
+    /// Bitrate in bits per second
+    bitrate: u32,
+
+    /// Use constant bit-rate
+    #[arg(long)]
+    cbr: bool,
+
+    /// Enable constrained variable bitrate
+    #[arg(long)]
+    cvbr: bool,
+
+    /// Audio bandwidth (NB, MB, WB, SWB, FB)
+    #[arg(long)]
+    bandwidth: Option<Bandwidth>,
+
+    /// Frame size in ms (2.5, 5, 10, 20, 40, 60, 80, 100, 120)
+    #[arg(long, default_value = "20")]
+    framesize: FrameSize,
+
+    /// Maximum payload size in bytes
+    #[arg(long, default_value_t = 1024)]
+    max_payload: usize,
+
+    /// Complexity (0-10)
+    #[arg(long, default_value = "10")]
+    complexity: Complexity,
+
+    /// Enable SILK DTX
+    #[arg(long)]
+    dtx: bool,
+}
+
+impl MultistreamEncodeCliArgs {
+    fn into_encode_args(self) -> MultistreamEncodeArgs {
+        assert!(
+            self.max_payload <= MAX_PACKET,
+            "max_payload must be <= {MAX_PACKET}"
+        );
+
+        let mapping = parse_mapping_arg(self.mapping.as_deref(), self.channels);
+
+        MultistreamEncodeArgs {
+            application: self.application,
+            sample_rate: self.sample_rate,
+            layout: MultistreamLayout {
+                channels: self.channels,
+                streams: self.streams,
+                coupled_streams: self.coupled_streams,
+                mapping,
+            },
+            bitrate: self.bitrate,
+            options: EncoderOptions {
+                cbr: self.cbr,
+                cvbr: self.cvbr,
+                bandwidth: self.bandwidth,
+                framesize: self.framesize,
+                max_payload: self.max_payload,
+                complexity: self.complexity,
+                dtx: self.dtx,
+                ..EncoderOptions::default()
+            },
+        }
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
+struct MultistreamDecodeCliArgs {
+    /// Sampling rate in Hz
+    sample_rate: SampleRate,
+
+    /// Number of output channels
+    channels: i32,
+
+    /// Number of Opus streams
+    streams: i32,
+
+    /// Number of coupled (stereo) streams
+    coupled_streams: i32,
+
+    /// Comma-separated channel mapping (defaults to identity if omitted)
+    #[arg(long)]
+    mapping: Option<String>,
+
+    /// Ignore extensions found in packet padding.
+    #[arg(long)]
+    ignore_extensions: bool,
+
+    /// Decoder complexity (0-10)
+    #[arg(long)]
+    decoder_complexity: Option<Complexity>,
+}
+
+impl MultistreamDecodeCliArgs {
+    fn into_decode_args(self) -> MultistreamDecodeArgs {
+        let mapping = parse_mapping_arg(self.mapping.as_deref(), self.channels);
+
+        MultistreamDecodeArgs {
+            sample_rate: self.sample_rate,
+            layout: MultistreamLayout {
+                channels: self.channels,
+                streams: self.streams,
+                coupled_streams: self.coupled_streams,
+                mapping,
+            },
+            options: CommonOptions {
+                ignore_extensions: self.ignore_extensions,
+                ..CommonOptions::default()
+            },
+            complexity: self.decoder_complexity,
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -249,6 +418,41 @@ fn main() {
             let args = dec_cli.clone().into_decode_args();
             let fin = std::fs::read(&cli.input).expect("failed to read input file");
             let output = opus_demo_decode(backend, &fin, args, &dnn);
+            std::fs::write(&cli.output, &output).expect("failed to write output file");
+        }
+        Mode::MultistreamEncodeDecode(ref ms_enc_cli) => {
+            let args = ms_enc_cli.clone().into_encode_args();
+            let fin = std::fs::read(&cli.input).expect("failed to read input file");
+            let (encoded, pre_skip) = opus_demo_encode_multistream(backend, &fin, args.clone());
+            let mut decoded = opus_demo_decode_multistream(
+                backend,
+                &encoded,
+                MultistreamDecodeArgs {
+                    sample_rate: args.sample_rate,
+                    layout: args.layout.clone(),
+                    options: args.options.common,
+                    complexity: None,
+                },
+            );
+            opus_demo_adjust_length_multistream(
+                &mut decoded,
+                pre_skip,
+                fin.len(),
+                args.sample_rate,
+                args.layout.channels,
+            );
+            std::fs::write(&cli.output, &decoded).expect("failed to write output file");
+        }
+        Mode::MultistreamEncodeOnly(ref ms_enc_cli) => {
+            let args = ms_enc_cli.clone().into_encode_args();
+            let fin = std::fs::read(&cli.input).expect("failed to read input file");
+            let (output, _pre_skip) = opus_demo_encode_multistream(backend, &fin, args);
+            std::fs::write(&cli.output, &output).expect("failed to write output file");
+        }
+        Mode::MultistreamDecodeOnly(ref ms_dec_cli) => {
+            let args = ms_dec_cli.clone().into_decode_args();
+            let fin = std::fs::read(&cli.input).expect("failed to read input file");
+            let output = opus_demo_decode_multistream(backend, &fin, args);
             std::fs::write(&cli.output, &output).expect("failed to write output file");
         }
     }
