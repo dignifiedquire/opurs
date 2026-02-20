@@ -32,8 +32,8 @@ Primary target headers:
   - classic full matrix parity: `1416/1416` passing
   - DNN-only vectors: `264/264` passing
 - Current implementation focus:
-  - `M1.1` multistream layout/config scaffolding started
-  - `M1.3` multistream packet pad/unpad parity implementation started
+  - `M1.2` multistream lifecycle/encode/decode wrappers in progress
+  - `M1.4` multistream parity-test expansion in progress
 - Next ordered slices:
   1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
   2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.
@@ -42,9 +42,9 @@ Primary target headers:
 ## Milestone Checklist
 
 - [x] Baseline vector parity stabilized before API expansion work
-- [ ] M1.1 Public API types and module wiring
+- [x] M1.1 Public API types and module wiring
 - [ ] M1.2 Encoder/decoder lifecycle + encode/decode parity
-- [ ] M1.3 Multistream packet helpers
+- [x] M1.3 Multistream packet helpers
 - [ ] M1.4 Tests (fail-first then green)
 - [ ] M1.5 Multistream API surface completion checklist
 - [ ] M2 Tooling and examples parity
