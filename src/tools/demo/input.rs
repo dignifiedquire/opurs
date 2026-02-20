@@ -318,6 +318,52 @@ pub struct DecodeArgs {
     pub complexity: Option<Complexity>,
 }
 
+/// Multistream layout configuration.
+#[derive(Debug, Clone)]
+pub struct MultistreamLayout {
+    pub channels: i32,
+    pub streams: i32,
+    pub coupled_streams: i32,
+    pub mapping: Vec<u8>,
+}
+
+impl MultistreamLayout {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.channels < 1 {
+            return Err("channels must be >= 1");
+        }
+        if self.streams < 1 {
+            return Err("streams must be >= 1");
+        }
+        if self.coupled_streams < 0 || self.coupled_streams > self.streams {
+            return Err("invalid coupled_streams");
+        }
+        if self.mapping.len() != self.channels as usize {
+            return Err("mapping length must match channel count");
+        }
+        Ok(())
+    }
+}
+
+/// Arguments for multistream encode helper.
+#[derive(Debug, Clone)]
+pub struct MultistreamEncodeArgs {
+    pub application: Application,
+    pub sample_rate: SampleRate,
+    pub layout: MultistreamLayout,
+    pub bitrate: u32,
+    pub options: EncoderOptions,
+}
+
+/// Arguments for multistream decode helper.
+#[derive(Debug, Clone)]
+pub struct MultistreamDecodeArgs {
+    pub sample_rate: SampleRate,
+    pub layout: MultistreamLayout,
+    pub options: CommonOptions,
+    pub complexity: Option<Complexity>,
+}
+
 /// Options for DNN weight loading (shared between encode and decode).
 #[derive(Debug, Clone, Default)]
 pub struct DnnOptions {
