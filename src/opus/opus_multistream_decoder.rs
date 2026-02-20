@@ -20,11 +20,7 @@ impl OpusMSDecoder {
     ///
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
     pub fn get_size(streams: i32, coupled_streams: i32) -> i32 {
-        if streams < 1
-            || coupled_streams < 0
-            || coupled_streams > streams
-            || streams > 255 - coupled_streams
-        {
+        if streams < 1 || coupled_streams < 0 || coupled_streams > streams {
             0
         } else {
             core::mem::size_of::<Self>() as i32
