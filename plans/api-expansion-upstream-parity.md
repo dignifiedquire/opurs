@@ -34,6 +34,7 @@ Primary target headers:
 - Current implementation focus:
   - `M1.2` multistream lifecycle/encode/decode wrappers in progress
   - `M1.4` multistream parity-test expansion in progress
+  - `M4.1` multistream benchmark matrix scaffolding landed (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
 - Next ordered slices:
   1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
   2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.
