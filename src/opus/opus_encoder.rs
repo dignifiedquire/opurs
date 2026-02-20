@@ -1733,6 +1733,7 @@ pub fn opus_encode_native(
     // 1276-byte cap is applied in the frame encoder path.
     let orig_max_data_bytes = (packet_size_cap * 6).min(out_data_bytes);
     max_data_bytes = orig_max_data_bytes;
+    let multiframe_fixed = st.multiframe_fixed_bitrate_valid != 0;
     st.rangeFinal = 0;
     if frame_size <= 0 || max_data_bytes <= 0 {
         return OPUS_BAD_ARG;
@@ -1853,9 +1854,10 @@ pub fn opus_encode_native(
         st.bitrate_bps -= dbr;
         dbr
     };
-    if max_data_bytes < 3
-        || st.bitrate_bps < 3 * frame_rate * 8
-        || frame_rate < 50 && (max_data_bytes * frame_rate < 300 || st.bitrate_bps < 2400)
+    if !multiframe_fixed
+        && (max_data_bytes < 3
+            || st.bitrate_bps < 3 * frame_rate * 8
+            || frame_rate < 50 && (max_data_bytes * frame_rate < 300 || st.bitrate_bps < 2400))
     {
         let mut tocmode: i32 = st.mode;
         let mut bw: i32 = if st.bandwidth == 0 {
@@ -2045,7 +2047,6 @@ pub fn opus_encode_native(
         st.silk_mode.complexity,
         st.silk_mode.packetLossPercentage,
     );
-    let multiframe_fixed = st.multiframe_fixed_bitrate_valid != 0;
     if !multiframe_fixed && st.mode != MODE_CELT_ONLY && st.prev_mode == MODE_CELT_ONLY {
         let mut dummy: silk_EncControlStruct = silk_EncControlStruct {
             nChannelsAPI: 0,
