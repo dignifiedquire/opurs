@@ -29,8 +29,9 @@ pub use input::{
 use crate::{
     opus_strerror, Bitrate, OPUS_AUTO, OPUS_FRAMESIZE_ARG, OPUS_GET_FINAL_RANGE_REQUEST,
     OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST, OPUS_SET_BITRATE_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
-    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
+    OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
@@ -342,15 +343,6 @@ fn opus_demo_encode_multistream_rust(
     if options.common.loss != 0 {
         panic!("packet loss simulation not supported")
     }
-    if options.bandwidth.is_some() {
-        panic!("multistream demo does not support explicit bandwidth yet")
-    }
-    if options.forcemono {
-        panic!("multistream demo does not support forcemono")
-    }
-    if options.qext {
-        panic!("multistream demo does not support qext yet")
-    }
 
     let mut samples = Vec::new();
     for data in data.chunks_exact(2) {
@@ -368,12 +360,30 @@ fn opus_demo_encode_multistream_rust(
     .expect("opus_multistream_encoder_create failed");
 
     enc.set_bitrate(Bitrate::Bits(bitrate as i32));
+    enc.set_bandwidth(
+        options
+            .bandwidth
+            .map(|v| crate::Bandwidth::try_from(v.into_opus()).unwrap()),
+    );
     enc.set_vbr(!options.cbr);
     enc.set_vbr_constraint(options.cvbr);
     enc.set_complexity(i32::from(options.complexity)).unwrap();
     enc.set_inband_fec(options.common.inbandfec as i32).unwrap();
     enc.set_packet_loss_perc(options.common.loss as i32)
         .unwrap();
+    enc.set_force_channels(if options.forcemono {
+        Some(crate::Channels::Mono)
+    } else {
+        None
+    })
+    .unwrap();
+    enc.set_dtx(options.dtx);
+    #[cfg(feature = "qext")]
+    enc.set_qext(options.qext);
+    #[cfg(not(feature = "qext"))]
+    if options.qext {
+        panic!("QEXT support requires the 'qext' feature");
+    }
     let skip = enc.lookahead();
 
     let frame_size = options.framesize.samples_for_rate(sample_rate);
@@ -416,9 +426,6 @@ fn opus_demo_encode_multistream_upstream(
     }
     if options.common.loss != 0 {
         panic!("packet loss simulation not supported")
-    }
-    if options.forcemono {
-        panic!("multistream demo does not support forcemono")
     }
 
     let mut samples = Vec::new();
@@ -472,6 +479,11 @@ fn opus_demo_encode_multistream_upstream(
             enc,
             OPUS_SET_PACKET_LOSS_PERC_REQUEST,
             options.common.loss as i32,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            enc,
+            OPUS_SET_FORCE_CHANNELS_REQUEST,
+            if options.forcemono { 1 } else { OPUS_AUTO },
         );
         libopus_sys::opus_multistream_encoder_ctl(enc, OPUS_SET_DTX_REQUEST, options.dtx as i32);
         if options.qext {

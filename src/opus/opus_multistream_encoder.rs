@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_encoder.c`
 
-use crate::enums::Bitrate;
+use crate::enums::{Bandwidth, Bitrate, Channels};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
@@ -135,6 +135,12 @@ impl OpusMSEncoder {
         }
     }
 
+    pub fn set_bandwidth(&mut self, bandwidth: Option<Bandwidth>) {
+        for encoder in &mut self.encoders {
+            encoder.set_bandwidth(bandwidth);
+        }
+    }
+
     pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_inband_fec(value)?;
@@ -147,6 +153,26 @@ impl OpusMSEncoder {
             encoder.set_packet_loss_perc(pct)?;
         }
         Ok(())
+    }
+
+    pub fn set_dtx(&mut self, enabled: bool) {
+        for encoder in &mut self.encoders {
+            encoder.set_dtx(enabled);
+        }
+    }
+
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+        for encoder in &mut self.encoders {
+            encoder.set_force_channels(channels)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "qext")]
+    pub fn set_qext(&mut self, enabled: bool) {
+        for encoder in &mut self.encoders {
+            encoder.set_qext(enabled);
+        }
     }
 
     /// Return the XOR of child encoder final ranges.
@@ -183,6 +209,13 @@ impl OpusMSEncoder {
             .unwrap_or(false)
     }
 
+    pub fn bandwidth(&self) -> i32 {
+        self.encoders
+            .first()
+            .map(OpusEncoder::get_bandwidth)
+            .unwrap_or(0)
+    }
+
     pub fn inband_fec(&self) -> i32 {
         self.encoders
             .first()
@@ -195,6 +228,22 @@ impl OpusMSEncoder {
             .first()
             .map(OpusEncoder::packet_loss_perc)
             .unwrap_or(0)
+    }
+
+    pub fn dtx(&self) -> bool {
+        self.encoders.first().map(OpusEncoder::dtx).unwrap_or(false)
+    }
+
+    pub fn force_channels(&self) -> Option<Channels> {
+        self.encoders.first().and_then(OpusEncoder::force_channels)
+    }
+
+    #[cfg(feature = "qext")]
+    pub fn qext(&self) -> bool {
+        self.encoders
+            .first()
+            .map(OpusEncoder::qext)
+            .unwrap_or(false)
     }
 
     pub fn bitrate(&self) -> i32 {
@@ -331,6 +380,9 @@ pub fn opus_multistream_encoder_init(
         application,
     )
 }
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encoder_destroy(_st: OpusMSEncoder) {}
 
 /// Upstream-style free function wrapper.
 pub fn opus_multistream_encode(

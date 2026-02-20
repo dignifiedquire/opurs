@@ -32,11 +32,13 @@ pub use crate::opus::opus_encoder::OpusEncoder;
 pub use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 pub use crate::opus::opus_multistream_decoder::{
     opus_multistream_decode, opus_multistream_decode_float, opus_multistream_decoder_create,
-    opus_multistream_decoder_get_size, opus_multistream_decoder_init, OpusMSDecoder,
+    opus_multistream_decoder_destroy, opus_multistream_decoder_get_size,
+    opus_multistream_decoder_init, OpusMSDecoder,
 };
 pub use crate::opus::opus_multistream_encoder::{
     opus_multistream_encode, opus_multistream_encode_float, opus_multistream_encoder_create,
-    opus_multistream_encoder_get_size, opus_multistream_encoder_init, OpusMSEncoder,
+    opus_multistream_encoder_destroy, opus_multistream_encoder_get_size,
+    opus_multistream_encoder_init, OpusMSEncoder,
 };
 // opus_decoder
 pub use crate::opus::opus_decoder::{

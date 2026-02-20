@@ -287,6 +287,9 @@ pub fn opus_multistream_decoder_init(
 }
 
 /// Upstream-style free function wrapper.
+pub fn opus_multistream_decoder_destroy(_st: OpusMSDecoder) {}
+
+/// Upstream-style free function wrapper.
 pub fn opus_multistream_decode(
     st: &mut OpusMSDecoder,
     data: &[u8],

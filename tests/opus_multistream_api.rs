@@ -16,12 +16,14 @@ use opurs::{
     opus_multistream_encode as rust_opus_multistream_encode,
     opus_multistream_encode_float as rust_opus_multistream_encode_float,
     opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
-    opus_multistream_encoder_init as rust_opus_multistream_encoder_init, Bitrate, OpusMSDecoder,
-    OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_BAD_ARG,
-    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
+    opus_multistream_encoder_init as rust_opus_multistream_encoder_init, Bitrate, Channels,
+    OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO,
+    OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
+    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
-    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
+    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
 
 #[test]
@@ -606,6 +608,8 @@ fn multistream_encoder_ctl_value_parity_with_c() {
     rust.set_packet_loss_perc(11).unwrap();
     rust.set_vbr(true);
     rust.set_vbr_constraint(true);
+    rust.set_dtx(true);
+    rust.set_force_channels(Some(Channels::Mono)).unwrap();
 
     unsafe {
         libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_COMPLEXITY_REQUEST, 6i32);
@@ -613,6 +617,8 @@ fn multistream_encoder_ctl_value_parity_with_c() {
         libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_PACKET_LOSS_PERC_REQUEST, 11i32);
         libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_VBR_REQUEST, 1i32);
         libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_VBR_CONSTRAINT_REQUEST, 1i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_DTX_REQUEST, 1i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_FORCE_CHANNELS_REQUEST, 1i32);
     }
 
     let mut c_complexity = 0i32;
@@ -620,6 +626,8 @@ fn multistream_encoder_ctl_value_parity_with_c() {
     let mut c_loss = 0i32;
     let mut c_vbr = 0i32;
     let mut c_cvbr = 0i32;
+    let mut c_dtx = 0i32;
+    let mut c_force_channels = OPUS_AUTO;
     unsafe {
         libopus_sys::opus_multistream_encoder_ctl(
             c_ptr,
@@ -646,6 +654,16 @@ fn multistream_encoder_ctl_value_parity_with_c() {
             OPUS_GET_VBR_CONSTRAINT_REQUEST,
             &mut c_cvbr as *mut _,
         );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_DTX_REQUEST,
+            &mut c_dtx as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_FORCE_CHANNELS_REQUEST,
+            &mut c_force_channels as *mut _,
+        );
     }
 
     assert_eq!(rust.complexity(), c_complexity);
@@ -653,6 +671,11 @@ fn multistream_encoder_ctl_value_parity_with_c() {
     assert_eq!(rust.packet_loss_perc(), c_loss);
     assert_eq!(rust.vbr() as i32, c_vbr);
     assert_eq!(rust.vbr_constraint() as i32, c_cvbr);
+    assert_eq!(rust.dtx() as i32, c_dtx);
+    assert_eq!(
+        rust.force_channels().map_or(OPUS_AUTO, i32::from),
+        c_force_channels
+    );
 
     unsafe { opus_multistream_encoder_destroy(c_ptr) };
 }
