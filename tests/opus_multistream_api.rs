@@ -18,6 +18,10 @@ use opurs::{
     opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
     opus_multistream_encoder_init as rust_opus_multistream_encoder_init, Bitrate, OpusMSDecoder,
     OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_BAD_ARG,
+    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST, OPUS_SET_COMPLEXITY_REQUEST,
+    OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
 
 #[test]
@@ -577,4 +581,78 @@ fn multistream_wrapper_init_reinitializes_state() {
         OPUS_APPLICATION_AUDIO,
     );
     assert_eq!(bad, OPUS_BAD_ARG);
+}
+
+#[test]
+fn multistream_encoder_ctl_value_parity_with_c() {
+    let mut rust =
+        OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO).expect("rust create");
+    let mut c_error = 0i32;
+    let c_ptr = unsafe {
+        opus_multistream_encoder_create(
+            48000,
+            2,
+            2,
+            0,
+            [0u8, 1u8].as_ptr(),
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_ptr.is_null(), "c create failed: {c_error}");
+
+    rust.set_complexity(6).unwrap();
+    rust.set_inband_fec(1).unwrap();
+    rust.set_packet_loss_perc(11).unwrap();
+    rust.set_vbr(true);
+    rust.set_vbr_constraint(true);
+
+    unsafe {
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_COMPLEXITY_REQUEST, 6i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_INBAND_FEC_REQUEST, 1i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_PACKET_LOSS_PERC_REQUEST, 11i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_VBR_REQUEST, 1i32);
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_VBR_CONSTRAINT_REQUEST, 1i32);
+    }
+
+    let mut c_complexity = 0i32;
+    let mut c_fec = 0i32;
+    let mut c_loss = 0i32;
+    let mut c_vbr = 0i32;
+    let mut c_cvbr = 0i32;
+    unsafe {
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_COMPLEXITY_REQUEST,
+            &mut c_complexity as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_INBAND_FEC_REQUEST,
+            &mut c_fec as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PACKET_LOSS_PERC_REQUEST,
+            &mut c_loss as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_VBR_REQUEST,
+            &mut c_vbr as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_VBR_CONSTRAINT_REQUEST,
+            &mut c_cvbr as *mut _,
+        );
+    }
+
+    assert_eq!(rust.complexity(), c_complexity);
+    assert_eq!(rust.inband_fec(), c_fec);
+    assert_eq!(rust.packet_loss_perc(), c_loss);
+    assert_eq!(rust.vbr() as i32, c_vbr);
+    assert_eq!(rust.vbr_constraint() as i32, c_cvbr);
+
+    unsafe { opus_multistream_encoder_destroy(c_ptr) };
 }
