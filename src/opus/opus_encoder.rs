@@ -31,8 +31,8 @@ use crate::celt::pitch::celt_inner_prod;
 #[cfg(feature = "dred")]
 use crate::dnn::dred::config::DRED_MAX_FRAMES;
 use crate::opus::analysis::{
-    run_analysis, tonality_analysis_init, tonality_analysis_reset, AnalysisInfo, DownmixInput,
-    TonalityAnalysisState,
+    run_analysis, tonality_analysis_init, tonality_analysis_reset, tonality_get_info, AnalysisInfo,
+    DownmixInput, TonalityAnalysisState,
 };
 use crate::opus::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
@@ -1292,6 +1292,7 @@ fn encode_multiframe_packet(
     fixed_equiv_rate: i32,
     to_celt: i32,
     lsb_depth: i32,
+    analysis_available: bool,
     float_api: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
@@ -1337,7 +1338,6 @@ fn encode_multiframe_packet(
     let mut rp = OpusRepacketizer::default();
     let bak_mode = st.user_forced_mode;
     let bak_bandwidth = st.user_bandwidth;
-    let bak_channels = st.force_channels;
     let bak_fixed_bitrate_bps = st.multiframe_fixed_bitrate_bps;
     let bak_fixed_bitrate_valid = st.multiframe_fixed_bitrate_valid;
     let bak_fixed_mode = st.multiframe_fixed_mode;
@@ -1350,7 +1350,6 @@ fn encode_multiframe_packet(
     let bak_frame_to_celt = st.multiframe_frame_to_celt;
     st.user_forced_mode = st.mode;
     st.user_bandwidth = st.bandwidth;
-    st.force_channels = st.stream_channels;
     st.multiframe_fixed_bitrate_bps = st.bitrate_bps;
     st.multiframe_fixed_bitrate_valid = 1;
     st.multiframe_fixed_mode = st.mode;
@@ -1394,6 +1393,10 @@ fn encode_multiframe_packet(
         st.multiframe_frame_redundancy = frame_redundancy;
 
         let pcm_offset = (i * (st.channels * frame_size)) as usize;
+        let mut frame_analysis_info = AnalysisInfo::default();
+        if analysis_available {
+            tonality_get_info(&mut st.analysis, &mut frame_analysis_info, frame_size);
+        }
 
         // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
         if frame_to_celt != 0 {
@@ -1411,6 +1414,11 @@ fn encode_multiframe_packet(
             0,
             0,
             0,
+            if analysis_available {
+                Some(&frame_analysis_info)
+            } else {
+                None
+            },
             float_api,
         );
         if tmp_len < 0 {
@@ -1448,7 +1456,6 @@ fn encode_multiframe_packet(
     // Discard configs that were forced locally for the purpose of repacketization
     st.user_forced_mode = bak_mode;
     st.user_bandwidth = bak_bandwidth;
-    st.force_channels = bak_channels;
     st.silk_mode.toMono = bak_to_mono;
     st.multiframe_fixed_bitrate_bps = bak_fixed_bitrate_bps;
     st.multiframe_fixed_bitrate_valid = bak_fixed_bitrate_valid;
@@ -1664,6 +1671,7 @@ pub fn opus_encode_native(
     c1: i32,
     c2: i32,
     analysis_channels: i32,
+    precomputed_analysis_info: Option<&AnalysisInfo>,
     float_api: i32,
 ) -> i32 {
     let mut i: i32 = 0;
@@ -1759,7 +1767,10 @@ pub fn opus_encode_native(
         lsb_depth,
     );
     analysis_info.valid = 0;
-    if st.silk_mode.complexity >= 7 && st.Fs >= 16000 && st.Fs <= 48000 {
+    if let Some(info) = precomputed_analysis_info {
+        analysis_info = *info;
+    } else if !multiframe_fixed && st.silk_mode.complexity >= 7 && st.Fs >= 16000 && st.Fs <= 48000
+    {
         analysis_read_pos_bak = st.analysis.read_pos;
         analysis_read_subframe_bak = st.analysis.read_subframe;
         run_analysis(
@@ -1775,16 +1786,18 @@ pub fn opus_encode_native(
             lsb_depth,
             &mut analysis_info,
         );
-    } else if st.analysis.initialized != 0 {
+    } else if !multiframe_fixed && st.analysis.initialized != 0 {
         tonality_analysis_reset(&mut st.analysis);
     }
     // Reset voice_ratio if this frame is not silent or if analysis is disabled.
     // Otherwise, preserve voice_ratio from the last non-silent frame.
-    if is_silence == 0 {
+    if !multiframe_fixed && is_silence == 0 {
         st.voice_ratio = -1;
     }
-    st.detected_bandwidth = 0;
-    if analysis_info.valid != 0 {
+    if !multiframe_fixed {
+        st.detected_bandwidth = 0;
+    }
+    if !multiframe_fixed && analysis_info.valid != 0 {
         let mut analysis_bandwidth: i32 = 0;
         if st.signal_type == OPUS_AUTO {
             let mut prob: f32 = 0.;
@@ -1811,7 +1824,8 @@ pub fn opus_encode_native(
         }
     }
     // Track the peak signal energy
-    if (analysis_info.valid == 0 || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD)
+    if !multiframe_fixed
+        && (analysis_info.valid == 0 || analysis_info.activity_probability > DTX_ACTIVITY_THRESHOLD)
         && is_silence == 0
     {
         let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
@@ -1823,7 +1837,7 @@ pub fn opus_encode_native(
             compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
         };
     }
-    if st.channels == 2 && st.force_channels != 1 {
+    if !multiframe_fixed && st.channels == 2 && st.force_channels != 1 {
         stereo_width = compute_stereo_width(
             &pcm[..(frame_size * 2) as usize],
             frame_size,
@@ -1840,7 +1854,7 @@ pub fn opus_encode_native(
         st.bitrate_bps = user_bitrate_to_bitrate(&*st, frame_size, max_data_bytes);
     }
     frame_rate = st.Fs / frame_size;
-    if st.use_vbr == 0 {
+    if !multiframe_fixed && st.use_vbr == 0 {
         let mut cbrBytes: i32 = 0;
         cbrBytes =
             ((bitrate_to_bits(st.bitrate_bps, st.Fs, frame_size) + 4) / 8).min(max_data_bytes);
@@ -1916,103 +1930,118 @@ pub fn opus_encode_native(
         }
         return ret;
     }
-    max_rate = bits_to_bitrate(max_data_bytes * 8, st.Fs, frame_size);
-    equiv_rate = compute_equiv_rate(
-        st.bitrate_bps,
-        st.channels,
-        st.Fs / frame_size,
-        st.use_vbr,
-        0,
-        st.silk_mode.complexity,
-        st.silk_mode.packetLossPercentage,
-    );
-    if st.signal_type == OPUS_SIGNAL_VOICE {
-        voice_est = 127;
-    } else if st.signal_type == OPUS_SIGNAL_MUSIC {
-        voice_est = 0;
-    } else if st.voice_ratio >= 0 {
-        voice_est = (st.voice_ratio * 327) >> 8;
-        if st.application == OPUS_APPLICATION_AUDIO {
-            voice_est = if voice_est < 115 { voice_est } else { 115 };
-        }
-    } else if st.application == OPUS_APPLICATION_VOIP {
-        voice_est = 115;
-    } else {
-        voice_est = 48;
-    }
-    if st.force_channels != OPUS_AUTO && st.channels == 2 {
-        st.stream_channels = st.force_channels;
-    } else if st.channels == 2 {
-        let mut stereo_threshold: i32 = STEREO_MUSIC_THRESHOLD
-            + ((voice_est * voice_est * (STEREO_VOICE_THRESHOLD - STEREO_MUSIC_THRESHOLD)) >> 14);
-        if st.stream_channels == 2 {
-            stereo_threshold -= 1000;
+    if !multiframe_fixed {
+        max_rate = bits_to_bitrate(max_data_bytes * 8, st.Fs, frame_size);
+        equiv_rate = compute_equiv_rate(
+            st.bitrate_bps,
+            st.channels,
+            st.Fs / frame_size,
+            st.use_vbr,
+            0,
+            st.silk_mode.complexity,
+            st.silk_mode.packetLossPercentage,
+        );
+        if st.signal_type == OPUS_SIGNAL_VOICE {
+            voice_est = 127;
+        } else if st.signal_type == OPUS_SIGNAL_MUSIC {
+            voice_est = 0;
+        } else if st.voice_ratio >= 0 {
+            voice_est = (st.voice_ratio * 327) >> 8;
+            if st.application == OPUS_APPLICATION_AUDIO {
+                voice_est = if voice_est < 115 { voice_est } else { 115 };
+            }
+        } else if st.application == OPUS_APPLICATION_VOIP {
+            voice_est = 115;
         } else {
-            stereo_threshold += 1000;
+            voice_est = 48;
         }
-        st.stream_channels = if equiv_rate > stereo_threshold { 2 } else { 1 };
-    } else {
-        st.stream_channels = st.channels;
-    }
-    equiv_rate = compute_equiv_rate(
-        st.bitrate_bps,
-        st.stream_channels,
-        st.Fs / frame_size,
-        st.use_vbr,
-        0,
-        st.silk_mode.complexity,
-        st.silk_mode.packetLossPercentage,
-    );
-    st.silk_mode.useDTX =
-        (st.use_dtx != 0 && !(analysis_info.valid != 0 || is_silence != 0)) as i32;
-    if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
-        st.mode = MODE_CELT_ONLY;
-    } else if st.user_forced_mode == OPUS_AUTO {
-        let mut mode_voice: i32 = 0;
-        let mut mode_music: i32 = 0;
-        let mut threshold: i32 = 0;
-        mode_voice = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[0][0] as f32
-            + stereo_width * MODE_THRESHOLDS[1][0] as f32) as i32;
-        mode_music = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[1][1] as f32
-            + stereo_width * MODE_THRESHOLDS[1][1] as f32) as i32;
-        threshold = mode_music + ((voice_est * voice_est * (mode_voice - mode_music)) >> 14);
-        if st.application == OPUS_APPLICATION_VOIP {
-            threshold += 8000;
-        }
-        if st.prev_mode == MODE_CELT_ONLY {
-            threshold -= 4000;
-        } else if st.prev_mode > 0 {
-            threshold += 4000;
-        }
-        st.mode = if equiv_rate >= threshold {
-            MODE_CELT_ONLY
+        if st.force_channels != OPUS_AUTO && st.channels == 2 {
+            st.stream_channels = st.force_channels;
+        } else if st.channels == 2 {
+            let mut stereo_threshold: i32 = STEREO_MUSIC_THRESHOLD
+                + ((voice_est * voice_est * (STEREO_VOICE_THRESHOLD - STEREO_MUSIC_THRESHOLD))
+                    >> 14);
+            if st.stream_channels == 2 {
+                stereo_threshold -= 1000;
+            } else {
+                stereo_threshold += 1000;
+            }
+            st.stream_channels = if equiv_rate > stereo_threshold { 2 } else { 1 };
         } else {
-            MODE_SILK_ONLY
-        };
-        if st.silk_mode.useInBandFEC != 0
-            && st.silk_mode.packetLossPercentage > (128 - voice_est) >> 4
-            && (st.fec_config != 2 || voice_est > 25)
-        {
-            st.mode = MODE_SILK_ONLY;
+            st.stream_channels = st.channels;
         }
-        if st.silk_mode.useDTX != 0 && voice_est > 100 {
-            st.mode = MODE_SILK_ONLY;
+        equiv_rate = compute_equiv_rate(
+            st.bitrate_bps,
+            st.stream_channels,
+            st.Fs / frame_size,
+            st.use_vbr,
+            0,
+            st.silk_mode.complexity,
+            st.silk_mode.packetLossPercentage,
+        );
+        st.silk_mode.useDTX =
+            (st.use_dtx != 0 && !(analysis_info.valid != 0 || is_silence != 0)) as i32;
+        if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
+            st.mode = MODE_CELT_ONLY;
+        } else if st.user_forced_mode == OPUS_AUTO {
+            let mut mode_voice: i32 = 0;
+            let mut mode_music: i32 = 0;
+            let mut threshold: i32 = 0;
+            mode_voice = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[0][0] as f32
+                + stereo_width * MODE_THRESHOLDS[1][0] as f32) as i32;
+            mode_music = ((1.0f32 - stereo_width) * MODE_THRESHOLDS[1][1] as f32
+                + stereo_width * MODE_THRESHOLDS[1][1] as f32) as i32;
+            threshold = mode_music + ((voice_est * voice_est * (mode_voice - mode_music)) >> 14);
+            if st.application == OPUS_APPLICATION_VOIP {
+                threshold += 8000;
+            }
+            if st.prev_mode == MODE_CELT_ONLY {
+                threshold -= 4000;
+            } else if st.prev_mode > 0 {
+                threshold += 4000;
+            }
+            st.mode = if equiv_rate >= threshold {
+                MODE_CELT_ONLY
+            } else {
+                MODE_SILK_ONLY
+            };
+            if st.silk_mode.useInBandFEC != 0
+                && st.silk_mode.packetLossPercentage > (128 - voice_est) >> 4
+                && (st.fec_config != 2 || voice_est > 25)
+            {
+                st.mode = MODE_SILK_ONLY;
+            }
+            if st.silk_mode.useDTX != 0 && voice_est > 100 {
+                st.mode = MODE_SILK_ONLY;
+            }
+            if max_data_bytes
+                < bitrate_to_bits(if frame_rate > 50 { 9000 } else { 6000 }, st.Fs, frame_size) / 8
+            {
+                st.mode = MODE_CELT_ONLY;
+            }
+        } else {
+            st.mode = st.user_forced_mode;
         }
-        if max_data_bytes
-            < bitrate_to_bits(if frame_rate > 50 { 9000 } else { 6000 }, st.Fs, frame_size) / 8
-        {
+        if st.mode != MODE_CELT_ONLY && frame_size < st.Fs / 100 {
+            st.mode = MODE_CELT_ONLY;
+        }
+        if st.lfe != 0 {
             st.mode = MODE_CELT_ONLY;
         }
     } else {
-        st.mode = st.user_forced_mode;
+        frame_rate = st.Fs / frame_size;
+        max_rate = bits_to_bitrate(max_data_bytes * 8, st.Fs, frame_size);
+        st.mode = st.multiframe_fixed_mode;
+        st.bandwidth = st.multiframe_fixed_bandwidth;
+        st.stream_channels = st.multiframe_fixed_stream_channels;
+        redundancy = st.multiframe_frame_redundancy;
+        celt_to_silk = st.multiframe_fixed_celt_to_silk;
+        prefill = st.multiframe_fixed_prefill;
+        equiv_rate = st.multiframe_fixed_equiv_rate;
+        to_celt = st.multiframe_frame_to_celt;
     }
-    if st.mode != MODE_CELT_ONLY && frame_size < st.Fs / 100 {
-        st.mode = MODE_CELT_ONLY;
-    }
-    if st.lfe != 0 {
-        st.mode = MODE_CELT_ONLY;
-    }
-    if st.prev_mode > 0
+    if !multiframe_fixed
+        && st.prev_mode > 0
         && (st.mode != MODE_CELT_ONLY && st.prev_mode == MODE_CELT_ONLY
             || st.mode == MODE_CELT_ONLY && st.prev_mode != MODE_CELT_ONLY)
     {
@@ -2027,16 +2056,18 @@ pub fn opus_encode_native(
             }
         }
     }
-    if st.stream_channels == 1
-        && st.prev_channels == 2
-        && st.silk_mode.toMono == 0
-        && st.mode != MODE_CELT_ONLY
-        && st.prev_mode != MODE_CELT_ONLY
-    {
-        st.silk_mode.toMono = 1;
-        st.stream_channels = 2;
-    } else {
-        st.silk_mode.toMono = 0;
+    if !multiframe_fixed {
+        if st.stream_channels == 1
+            && st.prev_channels == 2
+            && st.silk_mode.toMono == 0
+            && st.mode != MODE_CELT_ONLY
+            && st.prev_mode != MODE_CELT_ONLY
+        {
+            st.silk_mode.toMono = 1;
+            st.stream_channels = 2;
+        } else {
+            st.silk_mode.toMono = 0;
+        }
     }
     equiv_rate = compute_equiv_rate(
         st.bitrate_bps,
@@ -2248,6 +2279,7 @@ pub fn opus_encode_native(
             equiv_rate,
             to_celt,
             lsb_depth,
+            analysis_read_pos_bak != -1,
             float_api,
         );
         return ret;
@@ -2306,6 +2338,9 @@ pub fn opus_encode_native(
         st.Fs,
         frame_size,
     )) - 8;
+    // Reserve/clear TOC byte before arithmetic coding so any carry into this
+    // prefix byte is preserved.
+    data[0] = 0;
     enc = ec_enc_init(&mut data[1..orig_max_data_bytes as usize]);
     let vla = ((total_buffer + frame_size) * st.channels) as usize;
     let mut pcm_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
@@ -3007,7 +3042,7 @@ pub fn opus_encode_native(
         let rb = redundancy_bytes as usize;
         data[redundancy_copy_off..redundancy_copy_off + rb].copy_from_slice(&redundancy_tmp[..rb]);
     }
-    data[0] = gen_toc(
+    data[0] |= gen_toc(
         st.mode,
         st.Fs / frame_size,
         curr_bandwidth,
@@ -3163,6 +3198,7 @@ fn opus_encode(
         0,
         -2,
         st.channels,
+        None,
         0,
     )
 }
@@ -3186,6 +3222,7 @@ fn opus_encode_float(
         0,
         -2,
         st.channels,
+        None,
         1,
     )
 }
