@@ -1315,12 +1315,10 @@ fn encode_multiframe_packet(
     }
     let repacketize_len = if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
         out_data_bytes
+    } else if max_data_bytes < out_data_bytes {
+        max_data_bytes
     } else {
-        if max_data_bytes < out_data_bytes {
-            max_data_bytes
-        } else {
-            out_data_bytes
-        }
+        out_data_bytes
     };
     let max_len_sum = nb_frames + repacketize_len - max_header_bytes;
     if max_len_sum <= 0 {
@@ -2237,14 +2235,10 @@ pub fn opus_encode_native(
     }
     curr_bandwidth = st.bandwidth;
     if st.mode == MODE_SILK_ONLY && curr_bandwidth > OPUS_BANDWIDTH_WIDEBAND {
-        if !multiframe_fixed {
-            st.mode = MODE_HYBRID;
-        }
+        st.mode = MODE_HYBRID;
     }
     if st.mode == MODE_HYBRID && curr_bandwidth <= OPUS_BANDWIDTH_WIDEBAND {
-        if !multiframe_fixed {
-            st.mode = MODE_SILK_ONLY;
-        }
+        st.mode = MODE_SILK_ONLY;
     }
     if frame_size > st.Fs / 50 && st.mode != MODE_SILK_ONLY || frame_size > 3 * st.Fs / 50 {
         let mut enc_frame_size: i32 = 0;
@@ -2296,6 +2290,20 @@ pub fn opus_encode_native(
         prefill = st.multiframe_fixed_prefill;
         equiv_rate = st.multiframe_fixed_equiv_rate;
         to_celt = st.multiframe_frame_to_celt;
+        // Keep fixed multiframe settings internally consistent with Opus mode/bandwidth constraints.
+        if st.mode == MODE_CELT_ONLY && st.bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
+            st.bandwidth = OPUS_BANDWIDTH_WIDEBAND;
+        }
+        if st.lfe != 0 {
+            st.bandwidth = OPUS_BANDWIDTH_NARROWBAND;
+        }
+        if st.mode == MODE_SILK_ONLY && st.bandwidth > OPUS_BANDWIDTH_WIDEBAND {
+            st.mode = MODE_HYBRID;
+        }
+        if st.mode == MODE_HYBRID && st.bandwidth <= OPUS_BANDWIDTH_WIDEBAND {
+            st.mode = MODE_SILK_ONLY;
+        }
+        curr_bandwidth = st.bandwidth;
     }
     // Compute activity decision (in C 1.6.1 this is in opus_encode_frame_native,
     // after mode/bandwidth decisions have been made)

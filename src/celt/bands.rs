@@ -1899,7 +1899,6 @@ pub fn quant_all_bands<'a>(
         theta_rdo = 0;
     }
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
-
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;
     let mut _norm = [0.0f32; 1920];
@@ -2285,6 +2284,33 @@ pub fn quant_all_bands<'a>(
                     _Y_save[..n].copy_from_slice(&y_band[..n]);
                     // Try theta_round = -1
                     ctx.theta_round = -1;
+                    let (lowband_ref, lowband_out_ref_theta): (
+                        Option<&mut [f32]>,
+                        Option<&mut [f32]>,
+                    ) = if last != 0 {
+                        (
+                            if effective_lowband != -1 {
+                                Some(&mut _norm[effective_lowband as usize..])
+                            } else {
+                                None
+                            },
+                            None,
+                        )
+                    } else {
+                        debug_assert!(
+                            effective_lowband == -1
+                                || (effective_lowband as usize + n <= norm_band_out_off)
+                        );
+                        let (norm_low, norm_out) = _norm.split_at_mut(norm_band_out_off);
+                        (
+                            if effective_lowband != -1 {
+                                Some(&mut norm_low[effective_lowband as usize..])
+                            } else {
+                                None
+                            },
+                            Some(norm_out),
+                        )
+                    };
                     x_cm = quant_band_stereo(
                         &mut ctx,
                         x_band,
@@ -2292,13 +2318,9 @@ pub fn quant_all_bands<'a>(
                         N,
                         b,
                         B,
-                        if effective_lowband != -1 {
-                            Some(&mut lowband_buf[..n])
-                        } else {
-                            None
-                        },
+                        lowband_ref,
                         LM,
-                        lowband_out_ref,
+                        lowband_out_ref_theta,
                         scratch,
                         cm as i32,
                         ec,
@@ -2328,16 +2350,31 @@ pub fn quant_all_bands<'a>(
                         let (norm_part, norm2_part) = _norm.split_at_mut(norm_size);
                         special_hybrid_folding(m, norm_part, norm2_part, start, M, dual_stereo);
                     }
-                    // Re-copy lowband for second try (after state restore).
-                    if effective_lowband != -1 {
-                        let lb_start = effective_lowband as usize;
-                        lowband_buf[..n].copy_from_slice(&_norm[lb_start..lb_start + n]);
-                    }
-                    let lowband_out_ref2: Option<&mut [f32]> = if last != 0 {
-                        None
-                    } else {
-                        Some(&mut _norm[norm_band_out_off..])
-                    };
+                    let (lowband_ref2, lowband_out_ref2): (Option<&mut [f32]>, Option<&mut [f32]>) =
+                        if last != 0 {
+                            (
+                                if effective_lowband != -1 {
+                                    Some(&mut _norm[effective_lowband as usize..])
+                                } else {
+                                    None
+                                },
+                                None,
+                            )
+                        } else {
+                            debug_assert!(
+                                effective_lowband == -1
+                                    || (effective_lowband as usize + n <= norm_band_out_off)
+                            );
+                            let (norm_low, norm_out) = _norm.split_at_mut(norm_band_out_off);
+                            (
+                                if effective_lowband != -1 {
+                                    Some(&mut norm_low[effective_lowband as usize..])
+                                } else {
+                                    None
+                                },
+                                Some(norm_out),
+                            )
+                        };
                     let scratch2: Option<&mut [f32]> = if have_scratch {
                         if use_alloc_scratch {
                             Some(&mut _lowband_scratch)
@@ -2359,11 +2396,7 @@ pub fn quant_all_bands<'a>(
                         N,
                         b,
                         B,
-                        if effective_lowband != -1 {
-                            Some(&mut lowband_buf[..n])
-                        } else {
-                            None
-                        },
+                        lowband_ref2,
                         LM,
                         lowband_out_ref2,
                         scratch2,

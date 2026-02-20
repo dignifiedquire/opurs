@@ -1,7 +1,7 @@
 //! Temporary debug tool for comparing Rust vs C decode/encode outputs
 use opurs::tools::demo::{
     opus_demo_decode, opus_demo_encode, Application, Channels, DecodeArgs, DnnOptions, EncodeArgs,
-    EncoderOptions, OpusBackend, SampleRate,
+    EncoderOptions, FrameSize, OpusBackend, SampleRate,
 };
 
 fn main() {
@@ -111,19 +111,43 @@ fn run_encode_compare() {
         .unwrap_or_else(|_| "60000".to_string())
         .parse()
         .unwrap();
+    let app = std::env::var("APP").unwrap_or_else(|_| "audio".to_string());
+    let fs = std::env::var("FS").unwrap_or_else(|_| "20".to_string());
 
     let data = std::fs::read(format!("opus_newvectors/{}.dec", tv)).unwrap();
 
+    let application = match app.as_str() {
+        "audio" => Application::Audio,
+        "voip" => Application::Voip,
+        "rld" | "restricted-lowdelay" => Application::RestrictedLowDelay,
+        _ => panic!("Unknown APP: {app} (expected audio|voip|rld)"),
+    };
+    let framesize = match fs.as_str() {
+        "2.5" => FrameSize::Ms2_5,
+        "5" => FrameSize::Ms5,
+        "10" => FrameSize::Ms10,
+        "20" => FrameSize::Ms20,
+        "40" => FrameSize::Ms40,
+        "60" => FrameSize::Ms60,
+        _ => panic!("Unknown FS: {fs} (expected 2.5|5|10|20|40|60)"),
+    };
+
     let encode_args = EncodeArgs {
-        application: Application::Audio,
+        application,
         sample_rate: SampleRate::R48000,
         channels: Channels::Stereo,
         bitrate: br,
-        options: EncoderOptions::default(),
+        options: EncoderOptions {
+            framesize,
+            ..Default::default()
+        },
     };
     let no_dnn = DnnOptions::default();
 
-    eprintln!("=== Encoding {} at {}bps ===", tv, br);
+    eprintln!(
+        "=== Encoding {} at {}bps app={} frame={}ms ===",
+        tv, br, app, fs
+    );
     let (rust_encoded, _) = opus_demo_encode(OpusBackend::Rust, &data, encode_args, &no_dnn);
     let (c_encoded, _) = opus_demo_encode(OpusBackend::Upstream, &data, encode_args, &no_dnn);
 

@@ -203,10 +203,13 @@ pub use self::cpu_support_h::opus_select_arch;
 pub use self::math_h::M_PI;
 use crate::celt::float_cast::{float2int, CELT_SIG_SCALE};
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
-use crate::celt::mathops::{celt_log, celt_log10, celt_sqrt, fast_atan2f};
+use crate::celt::mathops::{celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
 
 use crate::opus::mlp::analysis_mlp::run_analysis_mlp;
+
+#[allow(clippy::approx_constant)]
+const LOG2_E_UPSTREAM: f32 = 1.442695f32;
 use crate::opus::opus_encoder::is_digital_silence;
 
 static dct_table: [f32; 128] = [
@@ -1191,7 +1194,8 @@ fn tonality_analysis(
         i += 1;
     }
     E *= 1.0f32 / 32768.0 / 32768.0;
-    band_log2[0_usize] = 0.5f32 * std::f32::consts::LOG2_E * celt_log(E + 1e-10f32);
+    let mut loge0: f32 = ((E + 1e-10f32) as f64).ln() as f32;
+    band_log2[0_usize] = 0.5f32 * LOG2_E_UPSTREAM * loge0;
     b = 0;
     while b < NB_TBANDS {
         let mut E_0: f32 = 0 as f32;
@@ -1225,8 +1229,9 @@ fn tonality_analysis(
         tonal.E[tonal.E_count as usize][b as usize] = E_0;
         frame_noisiness += nE / (1e-15f32 + E_0);
         frame_loudness += celt_sqrt(E_0 + 1e-10f32);
-        logE[b as usize] = celt_log(E_0 + 1e-10f32);
-        band_log2[(b + 1) as usize] = 0.5f32 * std::f32::consts::LOG2_E * celt_log(E_0 + 1e-10f32);
+        loge0 = ((E_0 + 1e-10f32) as f64).ln() as f32;
+        logE[b as usize] = loge0;
+        band_log2[(b + 1) as usize] = 0.5f32 * LOG2_E_UPSTREAM * loge0;
         tonal.logE[tonal.E_count as usize][b as usize] = logE[b as usize];
         if tonal.count == 0 {
             tonal.lowE[b as usize] = logE[b as usize];
