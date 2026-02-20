@@ -3,7 +3,7 @@
 //! Upstream C: `src/opus_multistream_decoder.c`
 
 use crate::opus::opus_decoder::OpusDecoder;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET, OPUS_OK};
 use crate::opus::opus_multistream::OpusMultistreamLayout;
 use crate::opus::packet::opus_packet_parse_impl;
 
@@ -50,6 +50,24 @@ impl OpusMSDecoder {
             layout,
             decoders,
         })
+    }
+
+    /// Reinitialize an existing multistream decoder instance.
+    pub fn init(
+        &mut self,
+        sample_rate: i32,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        mapping: &[u8],
+    ) -> i32 {
+        match Self::new(sample_rate, channels, streams, coupled_streams, mapping) {
+            Ok(st) => {
+                *self = st;
+                OPUS_OK
+            }
+            Err(err) => err,
+        }
     }
 
     #[inline]
@@ -199,6 +217,24 @@ impl OpusMSDecoder {
         }
     }
 
+    pub fn gain(&self) -> i32 {
+        self.decoders.first().map(OpusDecoder::gain).unwrap_or(0)
+    }
+
+    pub fn complexity(&self) -> i32 {
+        self.decoders
+            .first()
+            .map(OpusDecoder::complexity)
+            .unwrap_or(0)
+    }
+
+    pub fn ignore_extensions(&self) -> bool {
+        self.decoders
+            .first()
+            .map(OpusDecoder::ignore_extensions)
+            .unwrap_or(false)
+    }
+
     fn decode_packet_loss_i16(
         &mut self,
         pcm: &mut [i16],
@@ -266,6 +302,56 @@ impl OpusMSDecoder {
         map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
         decoded_samples
     }
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decoder_get_size(streams: i32, coupled_streams: i32) -> i32 {
+    OpusMSDecoder::get_size(streams, coupled_streams)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decoder_create(
+    sample_rate: i32,
+    channels: i32,
+    streams: i32,
+    coupled_streams: i32,
+    mapping: &[u8],
+) -> Result<OpusMSDecoder, i32> {
+    OpusMSDecoder::new(sample_rate, channels, streams, coupled_streams, mapping)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decoder_init(
+    st: &mut OpusMSDecoder,
+    sample_rate: i32,
+    channels: i32,
+    streams: i32,
+    coupled_streams: i32,
+    mapping: &[u8],
+) -> i32 {
+    st.init(sample_rate, channels, streams, coupled_streams, mapping)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decode(
+    st: &mut OpusMSDecoder,
+    data: &[u8],
+    pcm: &mut [i16],
+    frame_size: i32,
+    decode_fec: bool,
+) -> i32 {
+    st.decode(data, pcm, frame_size, decode_fec)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_decode_float(
+    st: &mut OpusMSDecoder,
+    data: &[u8],
+    pcm: &mut [f32],
+    frame_size: i32,
+    decode_fec: bool,
+) -> i32 {
+    st.decode_float(data, pcm, frame_size, decode_fec)
 }
 
 fn split_stream_packets(data: &[u8], streams: i32) -> Result<Vec<&[u8]>, i32> {

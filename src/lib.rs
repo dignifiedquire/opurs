@@ -30,8 +30,14 @@ pub mod dnn;
 pub use crate::opus::opus_encoder::OpusEncoder;
 // opus_multistream (layout/config scaffolding + packet helpers)
 pub use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
-pub use crate::opus::opus_multistream_decoder::OpusMSDecoder;
-pub use crate::opus::opus_multistream_encoder::OpusMSEncoder;
+pub use crate::opus::opus_multistream_decoder::{
+    opus_multistream_decode, opus_multistream_decode_float, opus_multistream_decoder_create,
+    opus_multistream_decoder_get_size, opus_multistream_decoder_init, OpusMSDecoder,
+};
+pub use crate::opus::opus_multistream_encoder::{
+    opus_multistream_encode, opus_multistream_encode_float, opus_multistream_encoder_create,
+    opus_multistream_encoder_get_size, opus_multistream_encoder_init, OpusMSEncoder,
+};
 // opus_decoder
 pub use crate::opus::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,

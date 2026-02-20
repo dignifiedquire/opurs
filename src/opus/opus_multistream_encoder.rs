@@ -3,7 +3,7 @@
 //! Upstream C: `src/opus_multistream_encoder.c`
 
 use crate::enums::Bitrate;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
@@ -50,6 +50,32 @@ impl OpusMSEncoder {
         }
 
         Ok(Self { config, encoders })
+    }
+
+    /// Reinitialize an existing multistream encoder instance.
+    pub fn init(
+        &mut self,
+        sample_rate: i32,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        mapping: &[u8],
+        application: i32,
+    ) -> i32 {
+        match Self::new(
+            sample_rate,
+            channels,
+            streams,
+            coupled_streams,
+            mapping,
+            application,
+        ) {
+            Ok(st) => {
+                *self = st;
+                OPUS_OK
+            }
+            Err(err) => err,
+        }
     }
 
     #[inline]
@@ -139,6 +165,42 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    pub fn complexity(&self) -> i32 {
+        self.encoders
+            .first()
+            .map(OpusEncoder::complexity)
+            .unwrap_or(0)
+    }
+
+    pub fn vbr(&self) -> bool {
+        self.encoders.first().map(OpusEncoder::vbr).unwrap_or(false)
+    }
+
+    pub fn vbr_constraint(&self) -> bool {
+        self.encoders
+            .first()
+            .map(OpusEncoder::vbr_constraint)
+            .unwrap_or(false)
+    }
+
+    pub fn inband_fec(&self) -> i32 {
+        self.encoders
+            .first()
+            .map(OpusEncoder::inband_fec)
+            .unwrap_or(0)
+    }
+
+    pub fn packet_loss_perc(&self) -> i32 {
+        self.encoders
+            .first()
+            .map(OpusEncoder::packet_loss_perc)
+            .unwrap_or(0)
+    }
+
+    pub fn bitrate(&self) -> i32 {
+        self.encoders.iter().map(OpusEncoder::bitrate).sum()
+    }
+
     /// Encode interleaved i16 PCM into a multistream Opus packet.
     pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         self.encode_impl_i16(pcm, output)
@@ -224,6 +286,78 @@ impl OpusMSEncoder {
         }
         write_offset as i32
     }
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encoder_get_size(streams: i32, coupled_streams: i32) -> i32 {
+    OpusMSEncoder::get_size(streams, coupled_streams)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encoder_create(
+    sample_rate: i32,
+    channels: i32,
+    streams: i32,
+    coupled_streams: i32,
+    mapping: &[u8],
+    application: i32,
+) -> Result<OpusMSEncoder, i32> {
+    OpusMSEncoder::new(
+        sample_rate,
+        channels,
+        streams,
+        coupled_streams,
+        mapping,
+        application,
+    )
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encoder_init(
+    st: &mut OpusMSEncoder,
+    sample_rate: i32,
+    channels: i32,
+    streams: i32,
+    coupled_streams: i32,
+    mapping: &[u8],
+    application: i32,
+) -> i32 {
+    st.init(
+        sample_rate,
+        channels,
+        streams,
+        coupled_streams,
+        mapping,
+        application,
+    )
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encode(
+    st: &mut OpusMSEncoder,
+    pcm: &[i16],
+    frame_size: i32,
+    data: &mut [u8],
+) -> i32 {
+    let channels = st.layout().channels() as usize;
+    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+        return OPUS_BAD_ARG;
+    }
+    st.encode(pcm, data)
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_encode_float(
+    st: &mut OpusMSEncoder,
+    pcm: &[f32],
+    frame_size: i32,
+    data: &mut [u8],
+) -> i32 {
+    let channels = st.layout().channels() as usize;
+    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+        return OPUS_BAD_ARG;
+    }
+    st.encode_float(pcm, data)
 }
 
 fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
