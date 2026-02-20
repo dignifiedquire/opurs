@@ -95,6 +95,9 @@ impl OpusMSDecoder {
         if pcm.len() < frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
+        if data.is_empty() {
+            return self.decode_packet_loss_i16(pcm, frame_size, decode_fec);
+        }
         let packets = match split_stream_packets(data, self.layout.streams()) {
             Ok(packets) => packets,
             Err(err) => return err,
@@ -142,6 +145,9 @@ impl OpusMSDecoder {
         let channels = self.layout.channels() as usize;
         if pcm.len() < frame_size as usize * channels {
             return OPUS_BAD_ARG;
+        }
+        if data.is_empty() {
+            return self.decode_packet_loss_f32(pcm, frame_size, decode_fec);
         }
         let packets = match split_stream_packets(data, self.layout.streams()) {
             Ok(packets) => packets,
@@ -195,6 +201,74 @@ impl OpusMSDecoder {
         for decoder in &mut self.decoders {
             decoder.set_ignore_extensions(ignore);
         }
+    }
+
+    fn decode_packet_loss_i16(
+        &mut self,
+        pcm: &mut [i16],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
+        let mut decoded_samples = -1i32;
+        for stream_id in 0..self.layout.streams() as usize {
+            let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
+                2usize
+            } else {
+                1usize
+            };
+            let mut tmp = vec![0i16; frame_size as usize * stream_channels];
+            let ret = self.decoders[stream_id].decode(&[], &mut tmp, frame_size, decode_fec);
+            if ret < 0 {
+                return ret;
+            }
+            if decoded_samples < 0 {
+                decoded_samples = ret;
+            } else if decoded_samples != ret {
+                return OPUS_INVALID_PACKET;
+            }
+            tmp.truncate(ret as usize * stream_channels);
+            stream_pcm.push(tmp);
+        }
+        if decoded_samples < 0 {
+            return OPUS_INVALID_PACKET;
+        }
+        map_output_i16(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
+        decoded_samples
+    }
+
+    fn decode_packet_loss_f32(
+        &mut self,
+        pcm: &mut [f32],
+        frame_size: i32,
+        decode_fec: bool,
+    ) -> i32 {
+        let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
+        let mut decoded_samples = -1i32;
+        for stream_id in 0..self.layout.streams() as usize {
+            let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
+                2usize
+            } else {
+                1usize
+            };
+            let mut tmp = vec![0f32; frame_size as usize * stream_channels];
+            let ret = self.decoders[stream_id].decode_float(&[], &mut tmp, frame_size, decode_fec);
+            if ret < 0 {
+                return ret;
+            }
+            if decoded_samples < 0 {
+                decoded_samples = ret;
+            } else if decoded_samples != ret {
+                return OPUS_INVALID_PACKET;
+            }
+            tmp.truncate(ret as usize * stream_channels);
+            stream_pcm.push(tmp);
+        }
+        if decoded_samples < 0 {
+            return OPUS_INVALID_PACKET;
+        }
+        map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
+        decoded_samples
     }
 }
 

@@ -4,7 +4,7 @@
 #![cfg(feature = "tools")]
 
 use libopus_sys::{
-    opus_multistream_decoder_create, opus_multistream_decoder_destroy,
+    opus_multistream_decode, opus_multistream_decoder_create, opus_multistream_decoder_destroy,
     opus_multistream_encoder_create, opus_multistream_encoder_destroy,
 };
 use opurs::{
@@ -246,4 +246,23 @@ fn multistream_float_roundtrip_two_mono_streams() {
         out.iter().any(|&x| x != 0.0),
         "decoded output should not be all zeros"
     );
+}
+
+#[test]
+fn multistream_decoder_packet_loss_parity_with_c() {
+    let mut rust_dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).unwrap();
+    let mut rust_out = vec![0i16; 960 * 2];
+    let rust_ret = rust_dec.decode(&[], &mut rust_out, 960, false);
+
+    let mut c_error = 0i32;
+    let c_ptr = unsafe {
+        opus_multistream_decoder_create(48000, 2, 2, 0, [0u8, 1u8].as_ptr(), &mut c_error)
+    };
+    assert!(!c_ptr.is_null(), "C decoder create failed: {c_error}");
+    let mut c_out = vec![0i16; 960 * 2];
+    let c_ret =
+        unsafe { opus_multistream_decode(c_ptr, core::ptr::null(), 0, c_out.as_mut_ptr(), 960, 0) };
+    unsafe { opus_multistream_decoder_destroy(c_ptr) };
+
+    assert_eq!(rust_ret, c_ret, "PLC return mismatch");
 }
