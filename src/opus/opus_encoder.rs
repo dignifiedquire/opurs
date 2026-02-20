@@ -1668,11 +1668,10 @@ pub fn opus_encode_native(
     };
     #[cfg(not(feature = "qext"))]
     let packet_size_cap = 1276;
-    // orig_max_data_bytes: the actual buffer limit (uncapped by standard 1276).
-    // In the C reference, opus_encode_native passes this to opus_encode_frame_native
-    // as orig_max_data_bytes.
+    // orig_max_data_bytes: the actual packet buffer limit before the per-frame
+    // 1276-byte cap is applied in the frame encoder path.
     let orig_max_data_bytes = (packet_size_cap * 6).min(out_data_bytes);
-    max_data_bytes = orig_max_data_bytes.min(1276);
+    max_data_bytes = orig_max_data_bytes;
     st.rangeFinal = 0;
     if frame_size <= 0 || max_data_bytes <= 0 {
         return OPUS_BAD_ARG;
@@ -2174,6 +2173,9 @@ pub fn opus_encode_native(
         );
         return ret;
     }
+    // Match upstream frame-native behavior: single-frame payload encoding is
+    // limited to 1276 bytes even when the top-level packet budget is larger.
+    max_data_bytes = max_data_bytes.min(1276);
     // Compute activity decision (in C 1.6.1 this is in opus_encode_frame_native,
     // after mode/bandwidth decisions have been made)
     let mut activity: i32 = VAD_NO_DECISION;
