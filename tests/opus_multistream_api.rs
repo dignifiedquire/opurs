@@ -24,13 +24,17 @@ use opurs::{
     opus_multistream_surround_encoder_create as rust_opus_multistream_surround_encoder_create,
     opus_multistream_surround_encoder_get_size as rust_opus_multistream_surround_encoder_get_size,
     opus_multistream_surround_encoder_init as rust_opus_multistream_surround_encoder_init, Bitrate,
-    Channels, OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
+    Channels, OpusMSDecoder, OpusMSEncoder, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
     OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
-    OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
+    OPUS_GET_LSB_DEPTH_REQUEST, OPUS_GET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PREDICTION_DISABLED_REQUEST,
+    OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST,
+    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
+    OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_VOICE,
 };
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -1060,6 +1064,84 @@ fn multistream_encoder_ctl_value_parity_with_c() {
         rust.force_channels().map_or(OPUS_AUTO, i32::from),
         c_force_channels
     );
+
+    unsafe { opus_multistream_encoder_destroy(c_ptr) };
+}
+
+#[test]
+fn multistream_encoder_extra_ctl_value_parity_with_c() {
+    let _guard = test_guard();
+    let mut rust =
+        OpusMSEncoder::new(48000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).expect("rust create");
+    let mut c_error = 0i32;
+    let c_ptr = unsafe {
+        opus_multistream_encoder_create(
+            48000,
+            2,
+            1,
+            1,
+            [0u8, 1u8].as_ptr(),
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_ptr.is_null(), "c create failed: {c_error}");
+
+    rust.set_lsb_depth(18).unwrap();
+    rust.set_signal(Some(Signal::Voice));
+    rust.set_prediction_disabled(true);
+    rust.set_phase_inversion_disabled(true);
+
+    unsafe {
+        libopus_sys::opus_multistream_encoder_ctl(c_ptr, OPUS_SET_LSB_DEPTH_REQUEST, 18i32);
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_SET_SIGNAL_REQUEST,
+            OPUS_SIGNAL_VOICE,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_SET_PREDICTION_DISABLED_REQUEST,
+            1i32,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+            1i32,
+        );
+    }
+
+    let mut c_lsb_depth = 0i32;
+    let mut c_signal = 0i32;
+    let mut c_pred_disabled = 0i32;
+    let mut c_phase_inv_disabled = 0i32;
+    unsafe {
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_LSB_DEPTH_REQUEST,
+            &mut c_lsb_depth as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_SIGNAL_REQUEST,
+            &mut c_signal as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PREDICTION_DISABLED_REQUEST,
+            &mut c_pred_disabled as *mut _,
+        );
+        libopus_sys::opus_multistream_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+            &mut c_phase_inv_disabled as *mut _,
+        );
+    }
+
+    assert_eq!(rust.lsb_depth(), c_lsb_depth);
+    assert_eq!(rust.signal().map_or(OPUS_AUTO, i32::from), c_signal);
+    assert_eq!(rust.prediction_disabled() as i32, c_pred_disabled);
+    assert_eq!(rust.phase_inversion_disabled() as i32, c_phase_inv_disabled);
 
     unsafe { opus_multistream_encoder_destroy(c_ptr) };
 }

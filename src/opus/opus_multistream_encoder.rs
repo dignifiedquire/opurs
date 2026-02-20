@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_encoder.c`
 
-use crate::enums::{Bandwidth, Bitrate, Channels};
+use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
@@ -192,6 +192,18 @@ impl OpusMSEncoder {
         }
     }
 
+    pub fn set_max_bandwidth(&mut self, bandwidth: Bandwidth) {
+        for encoder in &mut self.encoders {
+            encoder.set_max_bandwidth(bandwidth);
+        }
+    }
+
+    pub fn set_signal(&mut self, signal: Option<Signal>) {
+        for encoder in &mut self.encoders {
+            encoder.set_signal(signal);
+        }
+    }
+
     pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_inband_fec(value)?;
@@ -217,6 +229,31 @@ impl OpusMSEncoder {
             encoder.set_force_channels(channels)?;
         }
         Ok(())
+    }
+
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+        for encoder in &mut self.encoders {
+            encoder.set_lsb_depth(depth)?;
+        }
+        Ok(())
+    }
+
+    pub fn set_expert_frame_duration(&mut self, fs: FrameSize) {
+        for encoder in &mut self.encoders {
+            encoder.set_expert_frame_duration(fs);
+        }
+    }
+
+    pub fn set_prediction_disabled(&mut self, disabled: bool) {
+        for encoder in &mut self.encoders {
+            encoder.set_prediction_disabled(disabled);
+        }
+    }
+
+    pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
+        for encoder in &mut self.encoders {
+            encoder.set_phase_inversion_disabled(disabled);
+        }
     }
 
     #[cfg(feature = "qext")]
@@ -267,6 +304,17 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    pub fn max_bandwidth(&self) -> Bandwidth {
+        self.encoders
+            .first()
+            .map(OpusEncoder::max_bandwidth)
+            .unwrap_or(Bandwidth::Fullband)
+    }
+
+    pub fn signal(&self) -> Option<Signal> {
+        self.encoders.first().and_then(OpusEncoder::signal)
+    }
+
     pub fn inband_fec(&self) -> i32 {
         self.encoders
             .first()
@@ -287,6 +335,34 @@ impl OpusMSEncoder {
 
     pub fn force_channels(&self) -> Option<Channels> {
         self.encoders.first().and_then(OpusEncoder::force_channels)
+    }
+
+    pub fn lsb_depth(&self) -> i32 {
+        self.encoders
+            .first()
+            .map(OpusEncoder::lsb_depth)
+            .unwrap_or(0)
+    }
+
+    pub fn expert_frame_duration(&self) -> FrameSize {
+        self.encoders
+            .first()
+            .map(OpusEncoder::expert_frame_duration)
+            .unwrap_or(FrameSize::Arg)
+    }
+
+    pub fn prediction_disabled(&self) -> bool {
+        self.encoders
+            .first()
+            .map(OpusEncoder::prediction_disabled)
+            .unwrap_or(false)
+    }
+
+    pub fn phase_inversion_disabled(&self) -> bool {
+        self.encoders
+            .first()
+            .map(OpusEncoder::phase_inversion_disabled)
+            .unwrap_or(false)
     }
 
     #[cfg(feature = "qext")]
