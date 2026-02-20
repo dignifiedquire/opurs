@@ -2045,7 +2045,8 @@ pub fn opus_encode_native(
         st.silk_mode.complexity,
         st.silk_mode.packetLossPercentage,
     );
-    if st.mode != MODE_CELT_ONLY && st.prev_mode == MODE_CELT_ONLY {
+    let multiframe_fixed = st.multiframe_fixed_bitrate_valid != 0;
+    if !multiframe_fixed && st.mode != MODE_CELT_ONLY && st.prev_mode == MODE_CELT_ONLY {
         let mut dummy: silk_EncControlStruct = silk_EncControlStruct {
             nChannelsAPI: 0,
             nChannelsInternal: 0,
@@ -2077,7 +2078,9 @@ pub fn opus_encode_native(
         silk_InitEncoder(&mut st.silk_enc, st.arch, &mut dummy);
         prefill = 1;
     }
-    if st.mode == MODE_CELT_ONLY || st.first != 0 || st.silk_mode.allowBandwidthSwitch != 0 {
+    if !multiframe_fixed
+        && (st.mode == MODE_CELT_ONLY || st.first != 0 || st.silk_mode.allowBandwidthSwitch != 0)
+    {
         let voice_bandwidth_thresholds: &[i32];
         let music_bandwidth_thresholds: &[i32];
         let mut bandwidth_thresholds: [i32; 8] = [0; 8];
@@ -2200,10 +2203,14 @@ pub fn opus_encode_native(
     }
     curr_bandwidth = st.bandwidth;
     if st.mode == MODE_SILK_ONLY && curr_bandwidth > OPUS_BANDWIDTH_WIDEBAND {
-        st.mode = MODE_HYBRID;
+        if !multiframe_fixed {
+            st.mode = MODE_HYBRID;
+        }
     }
     if st.mode == MODE_HYBRID && curr_bandwidth <= OPUS_BANDWIDTH_WIDEBAND {
-        st.mode = MODE_SILK_ONLY;
+        if !multiframe_fixed {
+            st.mode = MODE_SILK_ONLY;
+        }
     }
     if frame_size > st.Fs / 50 && st.mode != MODE_SILK_ONLY || frame_size > 3 * st.Fs / 50 {
         let mut enc_frame_size: i32 = 0;
