@@ -2,10 +2,10 @@
 //!
 //! Upstream C: `src/opus_multistream_decoder.c`
 
-use crate::opus::opus_decoder::OpusDecoder;
+use crate::celt::float_cast::celt_float2int16;
+use crate::opus::opus_decoder::{opus_decode_native, OpusDecoder};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET, OPUS_OK};
 use crate::opus::opus_multistream::OpusMultistreamLayout;
-use crate::opus::packet::opus_packet_parse_impl;
 
 /// Pure-Rust multistream decoder.
 #[derive(Clone)]
@@ -109,40 +109,22 @@ impl OpusMSDecoder {
         if pcm.len() < frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
-        if data.is_empty() {
-            return self.decode_packet_loss_i16(pcm, frame_size, decode_fec);
-        }
-        let packets = match split_stream_packets(data, self.layout.streams()) {
-            Ok(packets) => packets,
-            Err(err) => return err,
-        };
 
-        let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
-        let mut decoded_samples = -1i32;
-        for (stream_id, packet) in packets.into_iter().enumerate() {
-            let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
-                2usize
-            } else {
-                1usize
+        let (stream_pcm_f32, decoded_samples) =
+            match self.decode_streams_native(data, frame_size, decode_fec, 1) {
+                Ok(result) => result,
+                Err(err) => return err,
             };
-            let mut tmp = vec![0i16; frame_size as usize * stream_channels];
-            let ret = self.decoders[stream_id].decode(packet, &mut tmp, frame_size, decode_fec);
-            if ret < 0 {
-                return ret;
-            }
-            if decoded_samples < 0 {
-                decoded_samples = ret;
-            } else if decoded_samples != ret {
-                return OPUS_INVALID_PACKET;
-            }
-            tmp.truncate(ret as usize * stream_channels);
-            stream_pcm.push(tmp);
+
+        let mut stream_pcm_i16 = Vec::with_capacity(stream_pcm_f32.len());
+        for stream in stream_pcm_f32 {
+            let mut out = vec![0i16; stream.len()];
+            celt_float2int16(&stream, &mut out, stream.len());
+            stream_pcm_i16.push(out);
         }
-        if decoded_samples < 0 {
-            return OPUS_INVALID_PACKET;
-        }
-        map_output_i16(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
-        decoded_samples
+
+        map_output_i16(&self.layout, &stream_pcm_i16, pcm, decoded_samples);
+        decoded_samples as i32
     }
 
     /// Decode multistream packet into interleaved f32 PCM.
@@ -160,41 +142,81 @@ impl OpusMSDecoder {
         if pcm.len() < frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
-        if data.is_empty() {
-            return self.decode_packet_loss_f32(pcm, frame_size, decode_fec);
-        }
-        let packets = match split_stream_packets(data, self.layout.streams()) {
-            Ok(packets) => packets,
-            Err(err) => return err,
-        };
 
+        let (stream_pcm, decoded_samples) =
+            match self.decode_streams_native(data, frame_size, decode_fec, 0) {
+                Ok(result) => result,
+                Err(err) => return err,
+            };
+
+        map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples);
+        decoded_samples as i32
+    }
+
+    fn decode_streams_native(
+        &mut self,
+        data: &[u8],
+        frame_size: i32,
+        decode_fec: bool,
+        soft_clip: i32,
+    ) -> Result<(Vec<Vec<f32>>, usize), i32> {
         let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
         let mut decoded_samples = -1i32;
-        for (stream_id, packet) in packets.into_iter().enumerate() {
+        let mut payload = data;
+        let mut remaining = data.len() as i32;
+
+        for stream_id in 0..self.layout.streams() as usize {
             let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
                 2usize
             } else {
                 1usize
             };
             let mut tmp = vec![0f32; frame_size as usize * stream_channels];
-            let ret =
-                self.decoders[stream_id].decode_float(packet, &mut tmp, frame_size, decode_fec);
+            let self_delimited = stream_id + 1 != self.layout.streams() as usize;
+            let mut packet_offset = 0i32;
+            let ret = opus_decode_native(
+                &mut self.decoders[stream_id],
+                payload,
+                &mut tmp,
+                frame_size,
+                decode_fec as i32,
+                self_delimited,
+                if data.is_empty() {
+                    None
+                } else {
+                    Some(&mut packet_offset)
+                },
+                soft_clip,
+            );
             if ret < 0 {
-                return ret;
+                return Err(ret);
             }
             if decoded_samples < 0 {
                 decoded_samples = ret;
             } else if decoded_samples != ret {
-                return OPUS_INVALID_PACKET;
+                return Err(OPUS_INVALID_PACKET);
             }
+
+            if !data.is_empty() {
+                if packet_offset <= 0 || packet_offset > remaining {
+                    return Err(OPUS_INVALID_PACKET);
+                }
+                payload = &payload[packet_offset as usize..];
+                remaining -= packet_offset;
+            }
+
             tmp.truncate(ret as usize * stream_channels);
             stream_pcm.push(tmp);
         }
+
         if decoded_samples < 0 {
-            return OPUS_INVALID_PACKET;
+            return Err(OPUS_INVALID_PACKET);
         }
-        map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
-        decoded_samples
+        if !data.is_empty() && remaining != 0 {
+            return Err(OPUS_INVALID_PACKET);
+        }
+
+        Ok((stream_pcm, decoded_samples as usize))
     }
 
     pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
@@ -233,74 +255,6 @@ impl OpusMSDecoder {
             .first()
             .map(OpusDecoder::ignore_extensions)
             .unwrap_or(false)
-    }
-
-    fn decode_packet_loss_i16(
-        &mut self,
-        pcm: &mut [i16],
-        frame_size: i32,
-        decode_fec: bool,
-    ) -> i32 {
-        let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
-        let mut decoded_samples = -1i32;
-        for stream_id in 0..self.layout.streams() as usize {
-            let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
-                2usize
-            } else {
-                1usize
-            };
-            let mut tmp = vec![0i16; frame_size as usize * stream_channels];
-            let ret = self.decoders[stream_id].decode(&[], &mut tmp, frame_size, decode_fec);
-            if ret < 0 {
-                return ret;
-            }
-            if decoded_samples < 0 {
-                decoded_samples = ret;
-            } else if decoded_samples != ret {
-                return OPUS_INVALID_PACKET;
-            }
-            tmp.truncate(ret as usize * stream_channels);
-            stream_pcm.push(tmp);
-        }
-        if decoded_samples < 0 {
-            return OPUS_INVALID_PACKET;
-        }
-        map_output_i16(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
-        decoded_samples
-    }
-
-    fn decode_packet_loss_f32(
-        &mut self,
-        pcm: &mut [f32],
-        frame_size: i32,
-        decode_fec: bool,
-    ) -> i32 {
-        let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
-        let mut decoded_samples = -1i32;
-        for stream_id in 0..self.layout.streams() as usize {
-            let stream_channels = if stream_id < self.layout.coupled_streams() as usize {
-                2usize
-            } else {
-                1usize
-            };
-            let mut tmp = vec![0f32; frame_size as usize * stream_channels];
-            let ret = self.decoders[stream_id].decode_float(&[], &mut tmp, frame_size, decode_fec);
-            if ret < 0 {
-                return ret;
-            }
-            if decoded_samples < 0 {
-                decoded_samples = ret;
-            } else if decoded_samples != ret {
-                return OPUS_INVALID_PACKET;
-            }
-            tmp.truncate(ret as usize * stream_channels);
-            stream_pcm.push(tmp);
-        }
-        if decoded_samples < 0 {
-            return OPUS_INVALID_PACKET;
-        }
-        map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples as usize);
-        decoded_samples
     }
 }
 
@@ -352,44 +306,6 @@ pub fn opus_multistream_decode_float(
     decode_fec: bool,
 ) -> i32 {
     st.decode_float(data, pcm, frame_size, decode_fec)
-}
-
-fn split_stream_packets(data: &[u8], streams: i32) -> Result<Vec<&[u8]>, i32> {
-    if streams < 1 || data.is_empty() {
-        return Err(OPUS_BAD_ARG);
-    }
-    let mut packets = Vec::with_capacity(streams as usize);
-    let mut offset = 0usize;
-    let mut remaining = data.len() as i32;
-    for stream in 0..streams {
-        if remaining <= 0 {
-            return Err(OPUS_INVALID_PACKET);
-        }
-        let self_delimited = stream != streams - 1;
-        let mut toc = 0u8;
-        let mut size = [0i16; 48];
-        let mut packet_offset = 0i32;
-        let ret = opus_packet_parse_impl(
-            &data[offset..offset + remaining as usize],
-            self_delimited,
-            Some(&mut toc),
-            None,
-            &mut size,
-            None,
-            Some(&mut packet_offset),
-            None,
-        );
-        if ret < 0 {
-            return Err(ret);
-        }
-        if packet_offset <= 0 || packet_offset > remaining {
-            return Err(OPUS_INVALID_PACKET);
-        }
-        packets.push(&data[offset..offset + packet_offset as usize]);
-        offset += packet_offset as usize;
-        remaining -= packet_offset;
-    }
-    Ok(packets)
 }
 
 fn mapping_to_stream_channel(
