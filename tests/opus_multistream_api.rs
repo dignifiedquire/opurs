@@ -12,10 +12,12 @@ use opurs::{
     opus_multistream_decode as rust_opus_multistream_decode,
     opus_multistream_decode_float as rust_opus_multistream_decode_float,
     opus_multistream_decoder_create as rust_opus_multistream_decoder_create,
+    opus_multistream_decoder_init as rust_opus_multistream_decoder_init,
     opus_multistream_encode as rust_opus_multistream_encode,
     opus_multistream_encode_float as rust_opus_multistream_encode_float,
-    opus_multistream_encoder_create as rust_opus_multistream_encoder_create, Bitrate,
-    OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_BAD_ARG,
+    opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
+    opus_multistream_encoder_init as rust_opus_multistream_encoder_init, Bitrate, OpusMSDecoder,
+    OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_BAD_ARG,
 };
 
 #[test]
@@ -530,4 +532,49 @@ fn multistream_encoder_constructor_matrix_parity_sampled() {
             }
         }
     }
+}
+
+#[test]
+fn multistream_wrapper_encode_rejects_frame_size_mismatch() {
+    let mut enc =
+        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .unwrap();
+    let pcm = vec![0i16; 100];
+    let mut packet = vec![0u8; 1000];
+    let ret = rust_opus_multistream_encode(&mut enc, &pcm, 60, &mut packet);
+    assert_eq!(ret, OPUS_BAD_ARG);
+}
+
+#[test]
+fn multistream_wrapper_init_reinitializes_state() {
+    let mut enc =
+        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .unwrap();
+    let mut dec = rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).unwrap();
+
+    let enc_ret = rust_opus_multistream_encoder_init(
+        &mut enc,
+        48000,
+        3,
+        2,
+        1,
+        &[0, 1, 2],
+        OPUS_APPLICATION_AUDIO,
+    );
+    assert_eq!(enc_ret, 0);
+
+    let dec_ret = rust_opus_multistream_decoder_init(&mut dec, 48000, 3, 2, 1, &[0, 1, 2]);
+    assert_eq!(dec_ret, 0);
+
+    // Re-init with invalid layout should fail with BAD_ARG.
+    let bad = rust_opus_multistream_encoder_init(
+        &mut enc,
+        48000,
+        2,
+        1,
+        1,
+        &[0, 2],
+        OPUS_APPLICATION_AUDIO,
+    );
+    assert_eq!(bad, OPUS_BAD_ARG);
 }
