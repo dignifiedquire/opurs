@@ -102,6 +102,36 @@ impl VectorSuite {
     }
 }
 
+#[derive(Clone, Copy)]
+struct SuiteDefinition {
+    suite: VectorSuite,
+    arg: SuiteArg,
+    discover: fn(&Path) -> Vec<TestVector>,
+}
+
+const SUITE_DEFINITIONS: [SuiteDefinition; 4] = [
+    SuiteDefinition {
+        suite: VectorSuite::Classic,
+        arg: SuiteArg::Classic,
+        discover: load_classic_vectors,
+    },
+    SuiteDefinition {
+        suite: VectorSuite::Qext,
+        arg: SuiteArg::Qext,
+        discover: load_qext_vectors_main,
+    },
+    SuiteDefinition {
+        suite: VectorSuite::QextFuzz,
+        arg: SuiteArg::QextFuzz,
+        discover: load_qext_vectors_fuzz,
+    },
+    SuiteDefinition {
+        suite: VectorSuite::DredOpus,
+        arg: SuiteArg::DredOpus,
+        discover: load_dred_opus_vectors,
+    },
+];
+
 #[derive(Debug, Clone)]
 struct TestVector {
     suite: VectorSuite,
@@ -426,6 +456,14 @@ fn load_qext_vectors(vector_dir: &Path, fuzz: bool) -> Vec<TestVector> {
     vectors
 }
 
+fn load_qext_vectors_main(vector_dir: &Path) -> Vec<TestVector> {
+    load_qext_vectors(vector_dir, false)
+}
+
+fn load_qext_vectors_fuzz(vector_dir: &Path) -> Vec<TestVector> {
+    load_qext_vectors(vector_dir, true)
+}
+
 fn load_dred_opus_vectors(vector_dir: &Path) -> Vec<TestVector> {
     let mut stems = BTreeSet::new();
 
@@ -477,27 +515,21 @@ fn load_dred_opus_vectors(vector_dir: &Path) -> Vec<TestVector> {
 fn load_vectors_by_suite(vector_dir: &Path) -> BTreeMap<VectorSuite, Vec<TestVector>> {
     let mut suites = BTreeMap::new();
 
-    let classic = load_classic_vectors(vector_dir);
-    if !classic.is_empty() {
-        suites.insert(VectorSuite::Classic, classic);
-    }
-
-    let qext = load_qext_vectors(vector_dir, false);
-    if !qext.is_empty() {
-        suites.insert(VectorSuite::Qext, qext);
-    }
-
-    let qext_fuzz = load_qext_vectors(vector_dir, true);
-    if !qext_fuzz.is_empty() {
-        suites.insert(VectorSuite::QextFuzz, qext_fuzz);
-    }
-
-    let dred_opus = load_dred_opus_vectors(vector_dir);
-    if !dred_opus.is_empty() {
-        suites.insert(VectorSuite::DredOpus, dred_opus);
+    for definition in SUITE_DEFINITIONS {
+        let vectors = (definition.discover)(vector_dir);
+        if !vectors.is_empty() {
+            suites.insert(definition.suite, vectors);
+        }
     }
 
     suites
+}
+
+fn suite_from_arg(suite_arg: SuiteArg) -> Option<VectorSuite> {
+    SUITE_DEFINITIONS
+        .iter()
+        .find(|definition| definition.arg == suite_arg)
+        .map(|definition| definition.suite)
 }
 
 fn resolve_selected_suites(
@@ -512,12 +544,10 @@ fn resolve_selected_suites(
 
     let mut output = Vec::new();
     for &suite in requested {
-        let suite = match suite {
-            SuiteArg::Classic => Some(VectorSuite::Classic),
-            SuiteArg::Qext => Some(VectorSuite::Qext),
-            SuiteArg::QextFuzz => Some(VectorSuite::QextFuzz),
-            SuiteArg::DredOpus => Some(VectorSuite::DredOpus),
-            SuiteArg::All => None,
+        let suite = if suite == SuiteArg::All {
+            None
+        } else {
+            suite_from_arg(suite)
         };
         if let Some(suite) = suite {
             output.push(suite);
@@ -646,6 +676,45 @@ fn build_dnn_kinds(ignore_extensions: bool) -> Vec<TestKind> {
     );
 
     kinds
+}
+
+fn build_suite_kinds(
+    suite: VectorSuite,
+    args: &Cli,
+    run_standard: bool,
+    classic_standard_kinds: &[TestKind],
+    dnn_kinds: &[TestKind],
+) -> Vec<TestKind> {
+    let mut suite_kinds = Vec::new();
+    if run_standard {
+        match suite {
+            VectorSuite::Classic => {
+                suite_kinds.extend(classic_standard_kinds.iter().copied());
+            }
+            VectorSuite::Qext | VectorSuite::QextFuzz => {
+                if matches!(args.mode, RunMode::Parity | RunMode::Both) {
+                    suite_kinds.push(TestKind::ParityDecode {
+                        sample_rate: SampleRate::R96000,
+                        channels: Channels::Stereo,
+                        ignore_extensions: args.ignore_extensions,
+                    });
+                }
+            }
+            VectorSuite::DredOpus => {
+                if matches!(args.mode, RunMode::Parity | RunMode::Both) {
+                    suite_kinds.push(TestKind::ParityDecode {
+                        sample_rate: SampleRate::R16000,
+                        channels: Channels::Mono,
+                        ignore_extensions: args.ignore_extensions,
+                    });
+                }
+            }
+        }
+    }
+    if (args.dnn || args.dnn_only) && suite == VectorSuite::Classic {
+        suite_kinds.extend(dnn_kinds.iter().copied());
+    }
+    suite_kinds
 }
 
 fn run_test(
@@ -1094,36 +1163,13 @@ fn main() {
             continue;
         };
 
-        let mut suite_kinds = Vec::new();
-        if run_standard {
-            match suite {
-                VectorSuite::Classic => {
-                    suite_kinds.extend(classic_standard_kinds.iter().copied());
-                }
-                VectorSuite::Qext | VectorSuite::QextFuzz => {
-                    if matches!(args.mode, RunMode::Parity | RunMode::Both) {
-                        suite_kinds.push(TestKind::ParityDecode {
-                            sample_rate: SampleRate::R96000,
-                            channels: Channels::Stereo,
-                            ignore_extensions: args.ignore_extensions,
-                        });
-                    }
-                }
-                VectorSuite::DredOpus => {
-                    if matches!(args.mode, RunMode::Parity | RunMode::Both) {
-                        suite_kinds.push(TestKind::ParityDecode {
-                            sample_rate: SampleRate::R16000,
-                            channels: Channels::Mono,
-                            ignore_extensions: args.ignore_extensions,
-                        });
-                    }
-                }
-            }
-        }
-
-        if (args.dnn || args.dnn_only) && suite == VectorSuite::Classic {
-            suite_kinds.extend(dnn_kinds.iter().copied());
-        }
+        let suite_kinds = build_suite_kinds(
+            suite,
+            &args,
+            run_standard,
+            &classic_standard_kinds,
+            &dnn_kinds,
+        );
 
         if suite_kinds.is_empty() {
             continue;
