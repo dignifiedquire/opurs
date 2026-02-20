@@ -7,6 +7,7 @@ use libopus_sys::{
     opus_multistream_decode, opus_multistream_decoder_create, opus_multistream_decoder_destroy,
     opus_multistream_decoder_get_size, opus_multistream_encoder_create,
     opus_multistream_encoder_destroy, opus_multistream_encoder_get_size,
+    opus_multistream_surround_encoder_create, opus_multistream_surround_encoder_get_size,
 };
 use opurs::{
     opus_multistream_decode as rust_opus_multistream_decode,
@@ -16,9 +17,11 @@ use opurs::{
     opus_multistream_encode as rust_opus_multistream_encode,
     opus_multistream_encode_float as rust_opus_multistream_encode_float,
     opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
-    opus_multistream_encoder_init as rust_opus_multistream_encoder_init, Bitrate, Channels,
-    OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO,
-    OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
+    opus_multistream_encoder_init as rust_opus_multistream_encoder_init,
+    opus_multistream_surround_encoder_create as rust_opus_multistream_surround_encoder_create,
+    opus_multistream_surround_encoder_get_size as rust_opus_multistream_surround_encoder_get_size,
+    Bitrate, Channels, OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
+    OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
@@ -292,6 +295,99 @@ fn multistream_get_size_zero_nonzero_parity() {
         let c_dec = unsafe { opus_multistream_decoder_get_size(streams, coupled) };
         assert_eq!(rust_enc == 0, c_enc == 0, "encoder size validity mismatch");
         assert_eq!(rust_dec == 0, c_dec == 0, "decoder size validity mismatch");
+    }
+}
+
+#[test]
+fn multistream_surround_get_size_zero_nonzero_parity() {
+    let cases = [
+        (1, 0),
+        (2, 0),
+        (3, 0),
+        (3, 1),
+        (8, 1),
+        (9, 1),
+        (4, 255),
+        (6, 2),
+        (5, 2),
+    ];
+    for (channels, mapping_family) in cases {
+        let rust = rust_opus_multistream_surround_encoder_get_size(channels, mapping_family);
+        let c = unsafe { opus_multistream_surround_encoder_get_size(channels, mapping_family) };
+        assert_eq!(
+            rust == 0,
+            c == 0,
+            "surround get_size validity mismatch (channels={channels}, family={mapping_family})"
+        );
+    }
+}
+
+#[test]
+fn multistream_surround_create_parity_with_c() {
+    let cases = [
+        (1, 0),
+        (2, 0),
+        (3, 0),
+        (3, 1),
+        (8, 1),
+        (9, 1),
+        (4, 255),
+        (6, 2),
+        (5, 2),
+    ];
+
+    for (channels, mapping_family) in cases {
+        let mut rust_streams = -1i32;
+        let mut rust_coupled = -1i32;
+        let mut rust_mapping = vec![0u8; channels.max(0) as usize];
+        let rust = rust_opus_multistream_surround_encoder_create(
+            48000,
+            channels,
+            mapping_family,
+            &mut rust_streams,
+            &mut rust_coupled,
+            &mut rust_mapping,
+            OPUS_APPLICATION_AUDIO,
+        );
+
+        let mut c_streams = -1i32;
+        let mut c_coupled = -1i32;
+        let mut c_mapping = vec![0u8; channels.max(0) as usize];
+        let mut c_error = 0i32;
+        let c_ptr = unsafe {
+            opus_multistream_surround_encoder_create(
+                48000,
+                channels,
+                mapping_family,
+                &mut c_streams as *mut _,
+                &mut c_coupled as *mut _,
+                c_mapping.as_mut_ptr(),
+                OPUS_APPLICATION_AUDIO,
+                &mut c_error as *mut _,
+            )
+        };
+        let c_ok = !c_ptr.is_null();
+        if !c_ptr.is_null() {
+            unsafe { opus_multistream_encoder_destroy(c_ptr) };
+        }
+
+        assert_eq!(
+            rust.is_ok(),
+            c_ok,
+            "surround create parity mismatch (channels={channels}, family={mapping_family})"
+        );
+        match rust {
+            Ok(enc) => {
+                drop(enc);
+                assert_eq!(rust_streams, c_streams);
+                assert_eq!(rust_coupled, c_coupled);
+                assert_eq!(
+                    &rust_mapping[..channels as usize],
+                    &c_mapping[..channels as usize]
+                );
+            }
+            Err(err) => assert_eq!(err, c_error),
+        }
     }
 }
 

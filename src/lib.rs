@@ -38,7 +38,9 @@ pub use crate::opus::opus_multistream_decoder::{
 pub use crate::opus::opus_multistream_encoder::{
     opus_multistream_encode, opus_multistream_encode_float, opus_multistream_encoder_create,
     opus_multistream_encoder_destroy, opus_multistream_encoder_get_size,
-    opus_multistream_encoder_init, OpusMSEncoder,
+    opus_multistream_encoder_init, opus_multistream_surround_encoder_create,
+    opus_multistream_surround_encoder_get_size, opus_multistream_surround_encoder_init,
+    OpusMSEncoder,
 };
 // opus_decoder
 pub use crate::opus::opus_decoder::{

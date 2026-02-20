@@ -3,7 +3,7 @@
 //! Upstream C: `src/opus_multistream_encoder.c`
 
 use crate::enums::{Bandwidth, Bitrate, Channels};
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
@@ -14,6 +14,57 @@ pub struct OpusMSEncoder {
     config: OpusMultistreamConfig,
     encoders: Vec<OpusEncoder>,
 }
+
+#[derive(Clone, Copy)]
+struct VorbisLayout {
+    streams: i32,
+    coupled_streams: i32,
+    mapping: [u8; 8],
+}
+
+// Index is channels-1.
+const VORBIS_MAPPINGS: [VorbisLayout; 8] = [
+    VorbisLayout {
+        streams: 1,
+        coupled_streams: 0,
+        mapping: [0, 0, 0, 0, 0, 0, 0, 0],
+    },
+    VorbisLayout {
+        streams: 1,
+        coupled_streams: 1,
+        mapping: [0, 1, 0, 0, 0, 0, 0, 0],
+    },
+    VorbisLayout {
+        streams: 2,
+        coupled_streams: 1,
+        mapping: [0, 2, 1, 0, 0, 0, 0, 0],
+    },
+    VorbisLayout {
+        streams: 2,
+        coupled_streams: 2,
+        mapping: [0, 1, 2, 3, 0, 0, 0, 0],
+    },
+    VorbisLayout {
+        streams: 3,
+        coupled_streams: 2,
+        mapping: [0, 4, 1, 2, 3, 0, 0, 0],
+    },
+    VorbisLayout {
+        streams: 4,
+        coupled_streams: 2,
+        mapping: [0, 4, 1, 2, 3, 5, 0, 0],
+    },
+    VorbisLayout {
+        streams: 4,
+        coupled_streams: 3,
+        mapping: [0, 4, 1, 2, 3, 5, 6, 0],
+    },
+    VorbisLayout {
+        streams: 5,
+        coupled_streams: 3,
+        mapping: [0, 6, 1, 2, 3, 4, 5, 7],
+    },
+];
 
 impl OpusMSEncoder {
     /// Upstream-style sizing helper.
@@ -343,6 +394,26 @@ pub fn opus_multistream_encoder_get_size(streams: i32, coupled_streams: i32) -> 
 }
 
 /// Upstream-style free function wrapper.
+pub fn opus_multistream_surround_encoder_get_size(channels: i32, mapping_family: i32) -> i32 {
+    let mut streams = 0i32;
+    let mut coupled_streams = 0i32;
+    let mut mapping = vec![0u8; channels.max(0) as usize];
+    if surround_layout(
+        channels,
+        mapping_family,
+        &mut streams,
+        &mut coupled_streams,
+        &mut mapping,
+    )
+    .is_ok()
+    {
+        OpusMSEncoder::get_size(streams, coupled_streams)
+    } else {
+        0
+    }
+}
+
+/// Upstream-style free function wrapper.
 pub fn opus_multistream_encoder_create(
     sample_rate: i32,
     channels: i32,
@@ -357,6 +428,27 @@ pub fn opus_multistream_encoder_create(
         streams,
         coupled_streams,
         mapping,
+        application,
+    )
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_surround_encoder_create(
+    sample_rate: i32,
+    channels: i32,
+    mapping_family: i32,
+    streams: &mut i32,
+    coupled_streams: &mut i32,
+    mapping: &mut [u8],
+    application: i32,
+) -> Result<OpusMSEncoder, i32> {
+    surround_layout(channels, mapping_family, streams, coupled_streams, mapping)?;
+    OpusMSEncoder::new(
+        sample_rate,
+        channels,
+        *streams,
+        *coupled_streams,
+        &mapping[..channels as usize],
         application,
     )
 }
@@ -379,6 +471,30 @@ pub fn opus_multistream_encoder_init(
         mapping,
         application,
     )
+}
+
+/// Upstream-style free function wrapper.
+pub fn opus_multistream_surround_encoder_init(
+    st: &mut OpusMSEncoder,
+    sample_rate: i32,
+    channels: i32,
+    mapping_family: i32,
+    streams: &mut i32,
+    coupled_streams: &mut i32,
+    mapping: &mut [u8],
+    application: i32,
+) -> i32 {
+    match surround_layout(channels, mapping_family, streams, coupled_streams, mapping) {
+        Ok(()) => st.init(
+            sample_rate,
+            channels,
+            *streams,
+            *coupled_streams,
+            &mapping[..channels as usize],
+            application,
+        ),
+        Err(err) => err,
+    }
 }
 
 /// Upstream-style free function wrapper.
@@ -476,4 +592,91 @@ fn extract_stream_pcm_f32(
         }
     }
     out
+}
+
+fn surround_layout(
+    channels: i32,
+    mapping_family: i32,
+    streams: &mut i32,
+    coupled_streams: &mut i32,
+    mapping: &mut [u8],
+) -> Result<(), i32> {
+    if !(1..=255).contains(&channels) || mapping.len() < channels as usize {
+        return Err(OPUS_BAD_ARG);
+    }
+
+    match mapping_family {
+        0 => match channels {
+            1 => {
+                *streams = 1;
+                *coupled_streams = 0;
+                mapping[0] = 0;
+                Ok(())
+            }
+            2 => {
+                *streams = 1;
+                *coupled_streams = 1;
+                mapping[0] = 0;
+                mapping[1] = 1;
+                Ok(())
+            }
+            _ => Err(OPUS_UNIMPLEMENTED),
+        },
+        1 if channels <= 8 => {
+            let layout = VORBIS_MAPPINGS[(channels - 1) as usize];
+            *streams = layout.streams;
+            *coupled_streams = layout.coupled_streams;
+            mapping[..channels as usize].copy_from_slice(&layout.mapping[..channels as usize]);
+            Ok(())
+        }
+        255 => {
+            *streams = channels;
+            *coupled_streams = 0;
+            for (idx, v) in mapping[..channels as usize].iter_mut().enumerate() {
+                *v = idx as u8;
+            }
+            Ok(())
+        }
+        2 => {
+            let (s, c) = validate_ambisonics(channels).ok_or(OPUS_BAD_ARG)?;
+            *streams = s;
+            *coupled_streams = c;
+
+            let mono_streams = (*streams - *coupled_streams) as usize;
+            let coupled_channels = (*coupled_streams * 2) as u8;
+            for (idx, slot) in mapping.iter_mut().take(mono_streams).enumerate() {
+                *slot = coupled_channels + idx as u8;
+            }
+            for (idx, slot) in mapping
+                .iter_mut()
+                .skip(mono_streams)
+                .take(coupled_channels as usize)
+                .enumerate()
+            {
+                *slot = idx as u8;
+            }
+            Ok(())
+        }
+        _ => Err(OPUS_UNIMPLEMENTED),
+    }
+}
+
+fn validate_ambisonics(channels: i32) -> Option<(i32, i32)> {
+    if !(1..=227).contains(&channels) {
+        return None;
+    }
+
+    let mut order_plus_one = 0i32;
+    while (order_plus_one + 1) * (order_plus_one + 1) <= channels {
+        order_plus_one += 1;
+    }
+    let acn_channels = order_plus_one * order_plus_one;
+    let nondiegetic_channels = channels - acn_channels;
+    if nondiegetic_channels != 0 && nondiegetic_channels != 2 {
+        return None;
+    }
+
+    let coupled_streams = (nondiegetic_channels != 0) as i32;
+    let streams = acn_channels + coupled_streams;
+    Some((streams, coupled_streams))
 }
