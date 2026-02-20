@@ -2162,7 +2162,7 @@ pub fn opus_encode_native(
     if st.Fs <= 8000 && st.bandwidth > OPUS_BANDWIDTH_NARROWBAND {
         st.bandwidth = OPUS_BANDWIDTH_NARROWBAND;
     }
-    if st.detected_bandwidth != 0 && st.user_bandwidth == OPUS_AUTO {
+    if !multiframe_fixed && st.detected_bandwidth != 0 && st.user_bandwidth == OPUS_AUTO {
         let mut min_detected_bandwidth: i32 = 0;
         if equiv_rate <= 18000 * st.stream_channels && st.mode == MODE_CELT_ONLY {
             min_detected_bandwidth = OPUS_BANDWIDTH_NARROWBAND;
@@ -2186,14 +2186,16 @@ pub fn opus_encode_native(
             st.detected_bandwidth
         };
     }
-    st.silk_mode.LBRR_coded = decide_fec(
-        st.silk_mode.useInBandFEC,
-        st.silk_mode.packetLossPercentage,
-        st.silk_mode.LBRR_coded,
-        st.mode,
-        &mut st.bandwidth,
-        equiv_rate,
-    );
+    if !multiframe_fixed {
+        st.silk_mode.LBRR_coded = decide_fec(
+            st.silk_mode.useInBandFEC,
+            st.silk_mode.packetLossPercentage,
+            st.silk_mode.LBRR_coded,
+            st.mode,
+            &mut st.bandwidth,
+            equiv_rate,
+        );
+    }
     st.celt_enc.lsb_depth = lsb_depth;
     if st.mode == MODE_CELT_ONLY && st.bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
         st.bandwidth = OPUS_BANDWIDTH_WIDEBAND;
