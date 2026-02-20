@@ -1062,6 +1062,15 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn opus_multistream_encode24(
+        st: *mut OpusMSEncoder,
+        pcm: *const opus_int32,
+        frame_size: ::std::os::raw::c_int,
+        data: *mut ::std::os::raw::c_uchar,
+        max_data_bytes: opus_int32,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     #[doc = " Encodes a multistream Opus frame from floating point input.\n @param st <tt>OpusMSEncoder*</tt>: Multistream encoder state.\n @param[in] pcm <tt>const float*</tt>: The input signal as interleaved\n                                       samples with a normal range of\n                                       +/-1.0.\n                                       Samples with a range beyond +/-1.0\n                                       are supported but will be clipped by\n                                       decoders using the integer API and\n                                       should only be used if it is known\n                                       that the far end supports extended\n                                       dynamic range.\n                                       This must contain\n                                       <code>frame_size*channels</code>\n                                       samples.\n @param frame_size <tt>int</tt>: Number of samples per channel in the input\n                                 signal.\n                                 This must be an Opus frame size for the\n                                 encoder's sampling rate.\n                                 For example, at 48 kHz the permitted values\n                                 are 120, 240, 480, 960, 1920, and 2880.\n                                 Passing in a duration of less than 10 ms\n                                 (480 samples at 48 kHz) will prevent the\n                                 encoder from using the LPC or hybrid modes.\n @param[out] data <tt>unsigned char*</tt>: Output payload.\n                                           This must contain storage for at\n                                           least \\a max_data_bytes.\n @param [in] max_data_bytes <tt>opus_int32</tt>: Size of the allocated\n                                                 memory for the output\n                                                 payload. This may be\n                                                 used to impose an upper limit on\n                                                 the instant bitrate, but should\n                                                 not be used as the only bitrate\n                                                 control. Use #OPUS_SET_BITRATE to\n                                                 control the bitrate.\n @returns The length of the encoded packet (in bytes) on success or a\n          negative error code (see @ref opus_errorcodes) on failure."]
     pub fn opus_multistream_encode_float(
         st: *mut OpusMSEncoder,
@@ -1119,6 +1128,16 @@ extern "C" {
         data: *const ::std::os::raw::c_uchar,
         len: opus_int32,
         pcm: *mut opus_int16,
+        frame_size: ::std::os::raw::c_int,
+        decode_fec: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn opus_multistream_decode24(
+        st: *mut OpusMSDecoder,
+        data: *const ::std::os::raw::c_uchar,
+        len: opus_int32,
+        pcm: *mut opus_int32,
         frame_size: ::std::os::raw::c_int,
         decode_fec: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;

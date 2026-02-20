@@ -4,11 +4,11 @@
 #![cfg(feature = "tools")]
 
 use libopus_sys::{
-    opus_multistream_decode, opus_multistream_decoder_create, opus_multistream_decoder_destroy,
-    opus_multistream_decoder_get_size, opus_multistream_encoder_create,
-    opus_multistream_encoder_destroy, opus_multistream_encoder_get_size,
-    opus_multistream_surround_encoder_create, opus_multistream_surround_encoder_get_size,
-    opus_multistream_surround_encoder_init,
+    opus_multistream_decode, opus_multistream_decode24, opus_multistream_decoder_create,
+    opus_multistream_decoder_destroy, opus_multistream_decoder_get_size, opus_multistream_encode24,
+    opus_multistream_encoder_create, opus_multistream_encoder_destroy,
+    opus_multistream_encoder_get_size, opus_multistream_surround_encoder_create,
+    opus_multistream_surround_encoder_get_size, opus_multistream_surround_encoder_init,
 };
 use opurs::{
     opus_multistream_decode as rust_opus_multistream_decode,
@@ -28,9 +28,9 @@ use opurs::{
     OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
-    OPUS_INVALID_PACKET, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
-    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
-    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
+    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -597,7 +597,7 @@ fn multistream_24bit_wrapper_entrypoints_smoke() {
 }
 
 #[test]
-fn multistream_24bit_bad_arg_and_invalid_packet_smoke() {
+fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
     let _guard = test_guard();
     let mut rust_enc =
         rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
@@ -605,16 +605,61 @@ fn multistream_24bit_bad_arg_and_invalid_packet_smoke() {
     let mut rust_dec =
         rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
 
+    let mut c_error = 0i32;
+    let c_enc = unsafe {
+        opus_multistream_encoder_create(
+            48000,
+            2,
+            2,
+            0,
+            [0u8, 1u8].as_ptr(),
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error as *mut _,
+        )
+    };
+    assert!(!c_enc.is_null(), "c encoder create failed: {c_error}");
+
+    let c_dec = unsafe {
+        opus_multistream_decoder_create(48000, 2, 2, 0, [0u8, 1u8].as_ptr(), &mut c_error as *mut _)
+    };
+    assert!(!c_dec.is_null(), "c decoder create failed: {c_error}");
+
     let pcm = vec![0i32; 100];
     let mut packet = vec![0u8; 1000];
     let rust_bad_arg = rust_opus_multistream_encode24(&mut rust_enc, &pcm, 60, &mut packet);
-    assert_eq!(rust_bad_arg, OPUS_BAD_ARG);
+    let c_bad_arg = unsafe {
+        opus_multistream_encode24(
+            c_enc,
+            pcm.as_ptr(),
+            60,
+            packet.as_mut_ptr(),
+            packet.len() as i32,
+        )
+    };
+    assert_eq!(rust_bad_arg, c_bad_arg, "encode24 bad-arg mismatch");
 
     let bad_packet = [0xffu8];
     let mut rust_out = vec![0i32; 960 * 2];
     let rust_invalid =
         rust_opus_multistream_decode24(&mut rust_dec, &bad_packet, &mut rust_out, 960, false);
-    assert_eq!(rust_invalid, OPUS_INVALID_PACKET);
+
+    let mut c_out = vec![0i32; 960 * 2];
+    let c_invalid = unsafe {
+        opus_multistream_decode24(
+            c_dec,
+            bad_packet.as_ptr(),
+            bad_packet.len() as i32,
+            c_out.as_mut_ptr(),
+            960,
+            0,
+        )
+    };
+    assert_eq!(rust_invalid, c_invalid, "decode24 invalid packet mismatch");
+
+    unsafe {
+        opus_multistream_encoder_destroy(c_enc);
+        opus_multistream_decoder_destroy(c_dec);
+    }
 }
 
 #[test]
