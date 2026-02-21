@@ -13,6 +13,7 @@ use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
 pub struct OpusMSEncoder {
     config: OpusMultistreamConfig,
     encoders: Vec<OpusEncoder>,
+    requested_bitrate: Bitrate,
 }
 
 #[derive(Clone, Copy)]
@@ -100,7 +101,11 @@ impl OpusMSEncoder {
             encoders.push(OpusEncoder::new(sample_rate, stream_channels, application)?);
         }
 
-        Ok(Self { config, encoders })
+        Ok(Self {
+            config,
+            encoders,
+            requested_bitrate: Bitrate::Auto,
+        })
     }
 
     /// Reinitialize an existing multistream encoder instance.
@@ -171,6 +176,7 @@ impl OpusMSEncoder {
     ///
     /// Explicit bitrates are split approximately evenly across streams.
     pub fn set_bitrate(&mut self, bitrate: Bitrate) {
+        self.requested_bitrate = bitrate;
         let stream_count = self.encoders.len() as i32;
         let per_stream = match bitrate {
             Bitrate::Bits(bps) if stream_count > 0 => {
@@ -448,6 +454,65 @@ impl OpusMSEncoder {
         }
     }
 
+    fn target_bitrate_bps(&self, frame_size: usize) -> i32 {
+        match self.requested_bitrate {
+            Bitrate::Bits(bits) => bits,
+            Bitrate::Max => {
+                let nb_normal = self.layout().streams() + self.layout().coupled_streams();
+                nb_normal * 750_000
+            }
+            Bitrate::Auto => {
+                let frame_size = frame_size as i32;
+                let fs = self.sample_rate();
+                let nb_normal = self.layout().streams() + self.layout().coupled_streams();
+                let channel_offset = 40 * (fs / frame_size).max(50);
+                nb_normal * (channel_offset + fs + 10_000)
+            }
+        }
+    }
+
+    fn stream_target_bitrates(&self, frame_size: usize) -> Vec<i32> {
+        let fs = self.sample_rate();
+        let streams = self.layout().streams();
+        let coupled = self.layout().coupled_streams();
+        let uncoupled = streams - coupled;
+        let normal_channels = streams + coupled;
+        let bitrate = self.target_bitrate_bps(frame_size);
+
+        let channel_offset = 40 * (fs / frame_size as i32).max(50);
+        let mut stream_offset = if normal_channels > 0 {
+            (bitrate - channel_offset * normal_channels) / normal_channels / 2
+        } else {
+            0
+        };
+        stream_offset = stream_offset.clamp(0, 20_000);
+
+        let total = (uncoupled << 8) + 512 * coupled;
+        let channel_rate = if total > 0 {
+            (256 * (bitrate - stream_offset * streams - channel_offset * normal_channels)) / total
+        } else {
+            0
+        };
+
+        let mut rates = Vec::with_capacity(streams as usize);
+        for stream_id in 0..streams {
+            let rate = if stream_id < coupled {
+                2 * channel_offset + (stream_offset + ((channel_rate * 512) >> 8)).max(0)
+            } else {
+                channel_offset + (stream_offset + channel_rate).max(0)
+            };
+            rates.push(rate.max(500));
+        }
+        rates
+    }
+
+    fn apply_stream_target_bitrates(&mut self, frame_size: usize) {
+        let rates = self.stream_target_bitrates(frame_size);
+        for (encoder, rate) in self.encoders.iter_mut().zip(rates.into_iter()) {
+            encoder.set_bitrate(Bitrate::Bits(rate));
+        }
+    }
+
     fn encode_impl_i16(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
@@ -458,6 +523,7 @@ impl OpusMSEncoder {
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
         let sample_rate = self.sample_rate();
+        self.apply_stream_target_bitrates(frame_size);
         let mut max_data_bytes = output.len();
         let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
         if sample_rate / frame_size as i32 == 10 {
@@ -467,7 +533,7 @@ impl OpusMSEncoder {
             return OPUS_BUFFER_TOO_SMALL;
         }
         if !vbr_enabled {
-            let bitrate = self.bitrate();
+            let bitrate = self.target_bitrate_bps(frame_size);
             let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
                 .max(smallest_packet as i32) as usize;
             max_data_bytes = max_data_bytes.min(target);
@@ -529,6 +595,7 @@ impl OpusMSEncoder {
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
         let sample_rate = self.sample_rate();
+        self.apply_stream_target_bitrates(frame_size);
         let mut max_data_bytes = output.len();
         let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
         if sample_rate / frame_size as i32 == 10 {
@@ -538,7 +605,7 @@ impl OpusMSEncoder {
             return OPUS_BUFFER_TOO_SMALL;
         }
         if !vbr_enabled {
-            let bitrate = self.bitrate();
+            let bitrate = self.target_bitrate_bps(frame_size);
             let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
                 .max(smallest_packet as i32) as usize;
             max_data_bytes = max_data_bytes.min(target);
@@ -600,6 +667,7 @@ impl OpusMSEncoder {
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
         let sample_rate = self.sample_rate();
+        self.apply_stream_target_bitrates(frame_size);
         let mut max_data_bytes = output.len();
         let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
         if sample_rate / frame_size as i32 == 10 {
@@ -609,7 +677,7 @@ impl OpusMSEncoder {
             return OPUS_BUFFER_TOO_SMALL;
         }
         if !vbr_enabled {
-            let bitrate = self.bitrate();
+            let bitrate = self.target_bitrate_bps(frame_size);
             let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
                 .max(smallest_packet as i32) as usize;
             max_data_bytes = max_data_bytes.min(target);
