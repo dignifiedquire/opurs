@@ -1,9 +1,9 @@
 #![cfg(feature = "tools")]
 
 use opurs::tools::demo::{
-    opus_demo_decode_multistream, opus_demo_encode_multistream, Application, Bandwidth,
-    CommonOptions, EncoderOptions, MultistreamDecodeArgs, MultistreamEncodeArgs, MultistreamLayout,
-    OpusBackend, SampleRate,
+    opus_demo_decode_multistream, opus_demo_encode_multistream, parse_multistream_mapping,
+    Application, Bandwidth, CommonOptions, EncoderOptions, MultistreamDecodeArgs,
+    MultistreamEncodeArgs, MultistreamLayout, OpusBackend, SampleRate,
 };
 
 fn build_pcm_bytes(channels: usize, frames: usize) -> Vec<u8> {
@@ -15,6 +15,25 @@ fn build_pcm_bytes(channels: usize, frames: usize) -> Vec<u8> {
         }
     }
     bytes
+}
+
+#[test]
+fn tools_multistream_mapping_parse_identity_and_explicit() {
+    let identity = parse_multistream_mapping(None, 3).expect("identity mapping");
+    assert_eq!(identity, vec![0, 1, 2]);
+
+    let explicit =
+        parse_multistream_mapping(Some("2, 1,0"), 3).expect("explicit mapping should parse");
+    assert_eq!(explicit, vec![2, 1, 0]);
+}
+
+#[test]
+fn tools_multistream_mapping_parse_rejects_bad_inputs() {
+    assert!(parse_multistream_mapping(None, 0).is_err());
+    assert!(parse_multistream_mapping(Some("0,1"), 3).is_err());
+    assert!(parse_multistream_mapping(Some("0,1,2,3"), 3).is_err());
+    assert!(parse_multistream_mapping(Some("0,256,2"), 3).is_err());
+    assert!(parse_multistream_mapping(Some("0,x,2"), 3).is_err());
 }
 
 #[test]

@@ -4,10 +4,10 @@ use clap::{Parser, Subcommand};
 use opurs::opus_get_version_string;
 use opurs::tools::demo::{
     opus_demo_adjust_length, opus_demo_adjust_length_multistream, opus_demo_decode,
-    opus_demo_decode_multistream, opus_demo_encode, opus_demo_encode_multistream, Application,
-    Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions, EncodeArgs,
-    EncoderOptions, FrameSize, MultistreamDecodeArgs, MultistreamEncodeArgs, MultistreamLayout,
-    OpusBackend, SampleRate, MAX_PACKET,
+    opus_demo_decode_multistream, opus_demo_encode, opus_demo_encode_multistream,
+    parse_multistream_mapping, Application, Bandwidth, Channels, CommonOptions, Complexity,
+    DecodeArgs, DnnOptions, EncodeArgs, EncoderOptions, FrameSize, MultistreamDecodeArgs,
+    MultistreamEncodeArgs, MultistreamLayout, OpusBackend, SampleRate, MAX_PACKET,
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -218,27 +218,6 @@ impl DecodeCliArgs {
     }
 }
 
-fn parse_mapping_arg(mapping: Option<&str>, channels: i32) -> Vec<u8> {
-    if let Some(mapping) = mapping {
-        let values: Vec<u8> = mapping
-            .split(',')
-            .map(|v| {
-                let v = v.trim().parse::<u16>().expect("invalid mapping value");
-                assert!(v <= 255, "mapping value must be <= 255");
-                v as u8
-            })
-            .collect();
-        assert_eq!(
-            values.len(),
-            channels as usize,
-            "mapping length must equal channel count"
-        );
-        values
-    } else {
-        (0..channels).map(|v| v as u8).collect()
-    }
-}
-
 #[derive(Parser, Debug, Clone)]
 struct MultistreamEncodeCliArgs {
     /// Application: voip, audio, or restricted-lowdelay
@@ -299,7 +278,8 @@ impl MultistreamEncodeCliArgs {
             "max_payload must be <= {MAX_PACKET}"
         );
 
-        let mapping = parse_mapping_arg(self.mapping.as_deref(), self.channels);
+        let mapping = parse_multistream_mapping(self.mapping.as_deref(), self.channels)
+            .expect("invalid multistream mapping");
 
         MultistreamEncodeArgs {
             application: self.application,
@@ -354,7 +334,8 @@ struct MultistreamDecodeCliArgs {
 
 impl MultistreamDecodeCliArgs {
     fn into_decode_args(self) -> MultistreamDecodeArgs {
-        let mapping = parse_mapping_arg(self.mapping.as_deref(), self.channels);
+        let mapping = parse_multistream_mapping(self.mapping.as_deref(), self.channels)
+            .expect("invalid multistream mapping");
 
         MultistreamDecodeArgs {
             sample_rate: self.sample_rate,

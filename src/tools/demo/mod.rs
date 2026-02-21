@@ -21,9 +21,9 @@ pub use self::backend::OpusBackend;
 use self::backend::{OpusBackendTrait, RustLibopusBackend, UpstreamLibopusBackend};
 
 pub use input::{
-    Application, Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions,
-    EncodeArgs, EncoderOptions, FrameSize, MultistreamDecodeArgs, MultistreamEncodeArgs,
-    MultistreamLayout, SampleRate,
+    parse_multistream_mapping, Application, Bandwidth, Channels, CommonOptions, Complexity,
+    DecodeArgs, DnnOptions, EncodeArgs, EncoderOptions, FrameSize, MultistreamDecodeArgs,
+    MultistreamEncodeArgs, MultistreamLayout, SampleRate,
 };
 
 use crate::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};

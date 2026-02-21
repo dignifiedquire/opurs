@@ -345,6 +345,39 @@ impl MultistreamLayout {
     }
 }
 
+/// Parse a multistream channel mapping string, or generate identity mapping.
+pub fn parse_multistream_mapping(
+    mapping: Option<&str>,
+    channels: i32,
+) -> Result<Vec<u8>, &'static str> {
+    if channels < 1 {
+        return Err("channels must be >= 1");
+    }
+    if channels > 255 {
+        return Err("channels must be <= 255");
+    }
+
+    if let Some(mapping) = mapping {
+        let mut values = Vec::with_capacity(channels as usize);
+        for raw in mapping.split(',') {
+            let value = raw
+                .trim()
+                .parse::<u16>()
+                .map_err(|_| "invalid mapping value")?;
+            if value > 255 {
+                return Err("mapping value must be <= 255");
+            }
+            values.push(value as u8);
+        }
+        if values.len() != channels as usize {
+            return Err("mapping length must equal channel count");
+        }
+        Ok(values)
+    } else {
+        Ok((0..channels).map(|v| v as u8).collect())
+    }
+}
+
 /// Arguments for multistream encode helper.
 #[derive(Debug, Clone)]
 pub struct MultistreamEncodeArgs {
