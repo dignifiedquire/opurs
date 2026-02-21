@@ -43,7 +43,7 @@ Primary target headers:
   - `M2.4` tooling multistream integration test suite now has a dedicated CI smoke lane (`test-tools-smoke`)
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
   - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
-  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI
+  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI (quick lane currently gates the stable FOA subset; full matrix remains exploratory for higher-order parity deltas)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)

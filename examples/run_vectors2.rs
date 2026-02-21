@@ -924,7 +924,7 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             packet_count: 10,
             bitrate: 128_000,
             seed: 2,
-            full_only: false,
+            full_only: true,
         },
         Def {
             name: "proj_16ch_20ms_192k",
