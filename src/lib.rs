@@ -44,6 +44,12 @@ pub use crate::opus::opus_multistream_encoder::{
     opus_multistream_surround_encoder_get_size, opus_multistream_surround_encoder_init,
     OpusMSEncoder,
 };
+pub use crate::opus::opus_projection_decoder::{
+    opus_projection_decode, opus_projection_decode24, opus_projection_decode_float,
+    opus_projection_decoder_create, opus_projection_decoder_destroy,
+    opus_projection_decoder_get_decoder_state, opus_projection_decoder_get_size,
+    opus_projection_decoder_init, OpusProjectionDecoder,
+};
 // opus_decoder
 pub use crate::opus::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
@@ -79,11 +85,13 @@ pub use crate::opus::opus_defines::{
     OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_GET_SIGNAL_REQUEST,
     OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
     OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
-    OPUS_RESET_STATE, OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,
-    OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DNN_BLOB_REQUEST,
-    OPUS_SET_DRED_DURATION_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_EXPERT_FRAME_DURATION_REQUEST,
-    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
-    OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_MAX_BANDWIDTH_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_PROJECTION_GET_DEMIXING_MATRIX_GAIN_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
+    OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_RESET_STATE,
+    OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BANDWIDTH_REQUEST, OPUS_SET_BITRATE_REQUEST,
+    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DNN_BLOB_REQUEST, OPUS_SET_DRED_DURATION_REQUEST,
+    OPUS_SET_DTX_REQUEST, OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
+    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST,
+    OPUS_SET_MAX_BANDWIDTH_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
     OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
     OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
 };
@@ -111,6 +119,7 @@ pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 pub use crate::opus::opus_private;
 
 // Public API types
+pub use crate::opus::mapping_matrix::MappingMatrix;
 pub use enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 pub use error::{ErrorCode, Result as OpusResult};
 

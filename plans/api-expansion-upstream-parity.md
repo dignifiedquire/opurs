@@ -45,9 +45,11 @@ Primary target headers:
   - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
+  - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
+  - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks
 - Next ordered slices:
-  1. Start `M3.1` projection encoder/decoder wrapper scaffolding and public exports.
-  2. Implement `M3.2` mapping-matrix support used by projection decode path.
+  1. Add `M3.1` projection encoder scaffolding (`OpusProjectionEncoder`) and public exports.
+  2. Wire `M3.2` precomputed ambisonics mixing/demixing matrices for encoder-side family-3 init.
   3. Port and stabilize `M3.3` projection parity tests against upstream.
 
 ## Milestone Checklist
