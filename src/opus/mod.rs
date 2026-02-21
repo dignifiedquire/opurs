@@ -18,6 +18,7 @@ pub mod opus_multistream;
 pub mod opus_multistream_decoder;
 pub mod opus_multistream_encoder;
 pub mod opus_projection_decoder;
+pub mod opus_projection_encoder;
 pub mod packet;
 pub mod repacketizer;
 // stuff for structs that do not have a clear home, named after the header files

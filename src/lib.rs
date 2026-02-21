@@ -50,6 +50,11 @@ pub use crate::opus::opus_projection_decoder::{
     opus_projection_decoder_get_decoder_state, opus_projection_decoder_get_size,
     opus_projection_decoder_init, OpusProjectionDecoder,
 };
+pub use crate::opus::opus_projection_encoder::{
+    opus_projection_ambisonics_encoder_create, opus_projection_ambisonics_encoder_get_size,
+    opus_projection_ambisonics_encoder_init, opus_projection_encode, opus_projection_encode24,
+    opus_projection_encode_float, opus_projection_encoder_destroy, OpusProjectionEncoder,
+};
 // opus_decoder
 pub use crate::opus::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
