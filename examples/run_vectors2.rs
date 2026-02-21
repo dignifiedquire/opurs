@@ -1572,6 +1572,20 @@ fn write_json_report(path: &Path, elapsed: Duration, results: &[TestExecution]) 
     std::fs::write(path, json).expect("writing JSON report");
 }
 
+fn should_include_vector_kind(vector: &TestVector, kind: TestKind) -> bool {
+    match kind {
+        TestKind::ParityMultistream {
+            matrix: MatrixMode::Quick,
+            ..
+        } => vector
+            .multistream_case
+            .as_ref()
+            .map(|case| !case.full_only)
+            .unwrap_or(true),
+        _ => true,
+    }
+}
+
 fn main() {
     let args = Cli::parse();
 
@@ -1638,6 +1652,9 @@ fn main() {
 
         for vector in vectors {
             for &kind in &suite_kinds {
+                if !should_include_vector_kind(vector, kind) {
+                    continue;
+                }
                 tests.push((vector, kind));
             }
         }
