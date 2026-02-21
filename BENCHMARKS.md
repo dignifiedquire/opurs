@@ -253,6 +253,12 @@ cargo bench --features tools --bench comparison
 
 # End-to-end codec comparison: Rust vs C (with SIMD)
 cargo bench --features tools --bench codec_comparison
+
+# Multistream comparison matrix: Rust vs C
+cargo bench --features tools --bench multistream
+
+# Summarize Criterion multistream outputs to Markdown
+./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-summary.md
 ```
 
 ## Notes

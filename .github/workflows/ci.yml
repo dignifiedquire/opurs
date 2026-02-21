@@ -104,16 +104,26 @@ jobs:
           key: bench-smoke
       - name: Build multistream bench
         run: cargo bench --features tools --bench multistream --no-run
-      - name: Run short multistream encode bench slice
+      - name: Run short multistream encode bench slices
         run: cargo bench --features tools --bench multistream -- multistream_encode_cmp/rust/1ch_10ms_32000
+      - name: Run short multistream encode C slice
+        run: cargo bench --features tools --bench multistream -- multistream_encode_cmp/c/1ch_10ms_32000
       - name: Run short multistream decode bench slice
+        run: cargo bench --features tools --bench multistream -- multistream_decode_cmp/rust/1ch_10ms_32000
+      - name: Run short multistream decode C slice
         run: cargo bench --features tools --bench multistream -- multistream_decode_cmp/c/1ch_10ms_32000
+      - name: Generate benchmark summary
+        run: |
+          ./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-smoke-summary.md
+          cat target/criterion/multistream-smoke-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload benchmark artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bench-smoke-criterion
-          path: target/criterion/multistream_*
+          path: |
+            target/criterion/multistream_*
+            target/criterion/multistream-smoke-summary.md
           if-no-files-found: warn
 
   test:
