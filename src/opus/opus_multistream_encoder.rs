@@ -3,8 +3,9 @@
 //! Upstream C: `src/opus_multistream_encoder.c`
 
 use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::opus::analysis::DownmixInput;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
-use crate::opus::opus_encoder::OpusEncoder;
+use crate::opus::opus_encoder::{frame_size_select, opus_encode_native, OpusEncoder};
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
 
@@ -518,7 +519,20 @@ impl OpusMSEncoder {
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
             return OPUS_BAD_ARG;
         }
-        let frame_size = pcm.len() / channels;
+        let analysis_frame_size = (pcm.len() / channels) as i32;
+        let Some(first_encoder) = self.encoders.first() else {
+            return OPUS_BAD_ARG;
+        };
+        let frame_size_i32 = frame_size_select(
+            analysis_frame_size,
+            first_encoder.variable_duration,
+            self.sample_rate(),
+        );
+        if frame_size_i32 <= 0 {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = frame_size_i32 as usize;
+        let analysis_channels = self.layout().channels();
         let mut write_offset = 0usize;
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
@@ -539,7 +553,7 @@ impl OpusMSEncoder {
             max_data_bytes = max_data_bytes.min(target);
         }
         for stream_id in 0..streams {
-            let selected = match stream_input_channels(self.layout(), stream_id) {
+            let (selected, c1, c2) = match stream_channel_selection(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
@@ -562,7 +576,26 @@ impl OpusMSEncoder {
                 )));
             }
             let mut stream_packet = vec![0u8; curr_max];
-            let len = encoder.encode(&stream_pcm, &mut stream_packet);
+            let mut in_f32 = vec![0.0f32; stream_pcm.len()];
+            for (dst, &src) in in_f32.iter_mut().zip(stream_pcm.iter()) {
+                *dst = src as f32 * (1.0 / 32768.0);
+            }
+            let analysis_input = DownmixInput::Int(pcm);
+            let len = opus_encode_native(
+                encoder,
+                &in_f32,
+                frame_size_i32,
+                &mut stream_packet,
+                curr_max as i32,
+                16,
+                Some(&analysis_input),
+                analysis_frame_size,
+                c1,
+                c2,
+                analysis_channels,
+                None,
+                0,
+            );
             if len < 0 {
                 return len;
             }
@@ -590,7 +623,20 @@ impl OpusMSEncoder {
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
             return OPUS_BAD_ARG;
         }
-        let frame_size = pcm.len() / channels;
+        let analysis_frame_size = (pcm.len() / channels) as i32;
+        let Some(first_encoder) = self.encoders.first() else {
+            return OPUS_BAD_ARG;
+        };
+        let frame_size_i32 = frame_size_select(
+            analysis_frame_size,
+            first_encoder.variable_duration,
+            self.sample_rate(),
+        );
+        if frame_size_i32 <= 0 {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = frame_size_i32 as usize;
+        let analysis_channels = self.layout().channels();
         let mut write_offset = 0usize;
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
@@ -611,7 +657,7 @@ impl OpusMSEncoder {
             max_data_bytes = max_data_bytes.min(target);
         }
         for stream_id in 0..streams {
-            let selected = match stream_input_channels(self.layout(), stream_id) {
+            let (selected, c1, c2) = match stream_channel_selection(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
@@ -634,7 +680,22 @@ impl OpusMSEncoder {
                 )));
             }
             let mut stream_packet = vec![0u8; curr_max];
-            let len = encoder.encode_float(&stream_pcm, &mut stream_packet);
+            let analysis_input = DownmixInput::Float(pcm);
+            let len = opus_encode_native(
+                encoder,
+                &stream_pcm,
+                frame_size_i32,
+                &mut stream_packet,
+                curr_max as i32,
+                24,
+                Some(&analysis_input),
+                analysis_frame_size,
+                c1,
+                c2,
+                analysis_channels,
+                None,
+                1,
+            );
             if len < 0 {
                 return len;
             }
@@ -662,7 +723,20 @@ impl OpusMSEncoder {
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
             return OPUS_BAD_ARG;
         }
-        let frame_size = pcm.len() / channels;
+        let analysis_frame_size = (pcm.len() / channels) as i32;
+        let Some(first_encoder) = self.encoders.first() else {
+            return OPUS_BAD_ARG;
+        };
+        let frame_size_i32 = frame_size_select(
+            analysis_frame_size,
+            first_encoder.variable_duration,
+            self.sample_rate(),
+        );
+        if frame_size_i32 <= 0 {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = frame_size_i32 as usize;
+        let analysis_channels = self.layout().channels();
         let mut write_offset = 0usize;
         let streams = self.layout().streams();
         let vbr_enabled = self.vbr();
@@ -683,7 +757,7 @@ impl OpusMSEncoder {
             max_data_bytes = max_data_bytes.min(target);
         }
         for stream_id in 0..streams {
-            let selected = match stream_input_channels(self.layout(), stream_id) {
+            let (selected, c1, c2) = match stream_channel_selection(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
@@ -706,7 +780,26 @@ impl OpusMSEncoder {
                 )));
             }
             let mut stream_packet = vec![0u8; curr_max];
-            let len = encoder.encode24(&stream_pcm, &mut stream_packet);
+            let mut in_f32 = vec![0.0f32; stream_pcm.len()];
+            for (dst, &src) in in_f32.iter_mut().zip(stream_pcm.iter()) {
+                *dst = src as f32 * (1.0 / (32768.0 * 256.0));
+            }
+            let analysis_input = DownmixInput::Int24(pcm);
+            let len = opus_encode_native(
+                encoder,
+                &in_f32,
+                frame_size_i32,
+                &mut stream_packet,
+                curr_max as i32,
+                24,
+                Some(&analysis_input),
+                analysis_frame_size,
+                c1,
+                c2,
+                analysis_channels,
+                None,
+                1,
+            );
             if len < 0 {
                 return len;
             }
@@ -925,14 +1018,17 @@ fn bitrate_to_bits(bitrate: i32, fs: i32, frame_size: i32) -> i32 {
     ((bitrate as i64 * frame_size as i64) / fs as i64) as i32
 }
 
-fn stream_input_channels(layout: &OpusMultistreamLayout, stream_id: i32) -> Option<Vec<usize>> {
+fn stream_channel_selection(
+    layout: &OpusMultistreamLayout,
+    stream_id: i32,
+) -> Option<(Vec<usize>, i32, i32)> {
     if stream_id < layout.coupled_streams() {
-        Some(vec![
-            layout.left_channel(stream_id, -1)?,
-            layout.right_channel(stream_id, -1)?,
-        ])
+        let left = layout.left_channel(stream_id, -1)? as i32;
+        let right = layout.right_channel(stream_id, -1)? as i32;
+        Some((vec![left as usize, right as usize], left, right))
     } else {
-        Some(vec![layout.mono_channel(stream_id, -1)?])
+        let mono = layout.mono_channel(stream_id, -1)? as i32;
+        Some((vec![mono as usize], mono, -1))
     }
 }
 
