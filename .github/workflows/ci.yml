@@ -93,6 +93,29 @@ jobs:
           popd >/dev/null
       - run: cargo clippy --all --all-targets --features tools-dnn -- -D warnings
 
+  bench-smoke:
+    name: Bench smoke (linux-x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bench-smoke
+      - name: Build multistream bench
+        run: cargo bench --features tools --bench multistream --no-run
+      - name: Run short multistream encode bench slice
+        run: cargo bench --features tools --bench multistream -- multistream_encode_cmp/rust/1ch_10ms_32000
+      - name: Run short multistream decode bench slice
+        run: cargo bench --features tools --bench multistream -- multistream_decode_cmp/c/1ch_10ms_32000
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-smoke-criterion
+          path: target/criterion/multistream_*
+          if-no-files-found: warn
+
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
