@@ -56,7 +56,7 @@ pub fn silk_stereo_MS_to_LR(
     for n in 0..STEREO_INTERP_LEN_MS * fs_kHz {
         pred0_Q13 += delta0_Q13;
         pred1_Q13 += delta1_Q13;
-        let sum = (x1[n] as i32 + x1[n + 2] as i32 + (x1[n + 1] << 1) as i32) << 9; /* Q11 */
+        let sum = (x1[n] as i32 + x1[n + 2] as i32 + ((x1[n + 1] as i32) << 1)) << 9; /* Q11 */
         let sum = silk_SMLAWB((x2[n + 1] as i32) << 8, sum, pred0_Q13); /* Q8  */
         let sum = silk_SMLAWB(sum, (x1[n + 1] as i32) << 11, pred1_Q13); /* Q8  */
         x2[n + 1] = silk_SAT16(silk_RSHIFT_ROUND(sum, 8)) as i16;

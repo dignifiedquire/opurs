@@ -3,9 +3,12 @@
 //! Upstream C: `src/opus_multistream_decoder.c`
 
 use crate::celt::float_cast::{celt_float2int16, float2int};
-use crate::opus::opus_decoder::{opus_decode_native, OpusDecoder};
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET, OPUS_OK};
+use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples, OpusDecoder};
+use crate::opus::opus_defines::{
+    OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
+};
 use crate::opus::opus_multistream::OpusMultistreamLayout;
+use crate::opus::packet::opus_packet_parse_impl;
 
 /// Pure-Rust multistream decoder.
 #[derive(Clone)]
@@ -16,6 +19,11 @@ pub struct OpusMSDecoder {
 }
 
 impl OpusMSDecoder {
+    #[inline]
+    fn max_decode_frame_size(&self) -> i32 {
+        self.sample_rate / 25 * 3
+    }
+
     /// Upstream-style sizing helper.
     ///
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
@@ -105,13 +113,14 @@ impl OpusMSDecoder {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
+        let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
-        if pcm.len() < frame_size as usize * channels {
+        if pcm.len() < effective_frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
 
         let (stream_pcm_f32, decoded_samples) =
-            match self.decode_streams_native(data, frame_size, decode_fec, 1) {
+            match self.decode_streams_native(data, effective_frame_size, decode_fec, 1) {
                 Ok(result) => result,
                 Err(err) => return err,
             };
@@ -138,13 +147,14 @@ impl OpusMSDecoder {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
+        let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
-        if pcm.len() < frame_size as usize * channels {
+        if pcm.len() < effective_frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
 
         let (stream_pcm, decoded_samples) =
-            match self.decode_streams_native(data, frame_size, decode_fec, 0) {
+            match self.decode_streams_native(data, effective_frame_size, decode_fec, 0) {
                 Ok(result) => result,
                 Err(err) => return err,
             };
@@ -164,13 +174,14 @@ impl OpusMSDecoder {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
+        let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
-        if pcm.len() < frame_size as usize * channels {
+        if pcm.len() < effective_frame_size as usize * channels {
             return OPUS_BAD_ARG;
         }
 
         let (stream_pcm, decoded_samples) =
-            match self.decode_streams_native(data, frame_size, decode_fec, 0) {
+            match self.decode_streams_native(data, effective_frame_size, decode_fec, 0) {
                 Ok(result) => result,
                 Err(err) => return err,
             };
@@ -195,8 +206,24 @@ impl OpusMSDecoder {
         decode_fec: bool,
         soft_clip: i32,
     ) -> Result<(Vec<Vec<f32>>, usize), i32> {
+        if frame_size <= 0 {
+            return Err(OPUS_BAD_ARG);
+        }
+
+        let do_plc = data.is_empty();
+        let mut frame_size = frame_size;
+        if !do_plc && data.len() < (2 * self.layout.streams() - 1) as usize {
+            return Err(OPUS_INVALID_PACKET);
+        }
+        if !do_plc {
+            let samples =
+                multistream_packet_validate(data, self.layout.streams(), self.sample_rate)?;
+            if samples > frame_size {
+                return Err(OPUS_BUFFER_TOO_SMALL);
+            }
+        }
+
         let mut stream_pcm = Vec::with_capacity(self.layout.streams() as usize);
-        let mut decoded_samples = -1i32;
         let mut payload = data;
         let mut remaining = data.len() as i32;
 
@@ -206,6 +233,9 @@ impl OpusMSDecoder {
             } else {
                 1usize
             };
+            if !do_plc && remaining <= 0 {
+                return Err(OPUS_INTERNAL_ERROR);
+            }
             let mut tmp = vec![0f32; frame_size as usize * stream_channels];
             let self_delimited = stream_id + 1 != self.layout.streams() as usize;
             let mut packet_offset = 0i32;
@@ -223,16 +253,11 @@ impl OpusMSDecoder {
                 },
                 soft_clip,
             );
-            if ret < 0 {
+            if ret <= 0 {
                 return Err(ret);
             }
-            if decoded_samples < 0 {
-                decoded_samples = ret;
-            } else if decoded_samples != ret {
-                return Err(OPUS_INVALID_PACKET);
-            }
 
-            if !data.is_empty() {
+            if !do_plc {
                 if packet_offset <= 0 || packet_offset > remaining {
                     return Err(OPUS_INVALID_PACKET);
                 }
@@ -240,18 +265,11 @@ impl OpusMSDecoder {
                 remaining -= packet_offset;
             }
 
-            tmp.truncate(ret as usize * stream_channels);
+            frame_size = ret;
+            tmp.truncate(frame_size as usize * stream_channels);
             stream_pcm.push(tmp);
         }
-
-        if decoded_samples < 0 {
-            return Err(OPUS_INVALID_PACKET);
-        }
-        if !data.is_empty() && remaining != 0 {
-            return Err(OPUS_INVALID_PACKET);
-        }
-
-        Ok((stream_pcm, decoded_samples as usize))
+        Ok((stream_pcm, frame_size as usize))
     }
 
     pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
@@ -334,6 +352,48 @@ impl OpusMSDecoder {
             .map(OpusDecoder::ignore_extensions)
             .unwrap_or(false)
     }
+}
+
+fn multistream_packet_validate(data: &[u8], nb_streams: i32, fs: i32) -> Result<i32, i32> {
+    let mut payload = data;
+    let mut remaining = data.len() as i32;
+    let mut samples = 0i32;
+
+    for stream_idx in 0..nb_streams {
+        if remaining <= 0 {
+            return Err(OPUS_INVALID_PACKET);
+        }
+
+        let mut toc = 0u8;
+        let mut size = [0i16; 48];
+        let mut packet_offset = 0i32;
+        let count = opus_packet_parse_impl(
+            payload,
+            stream_idx != nb_streams - 1,
+            Some(&mut toc),
+            None,
+            &mut size,
+            None,
+            Some(&mut packet_offset),
+            None,
+        );
+        if count < 0 {
+            return Err(count);
+        }
+        if packet_offset <= 0 || packet_offset > remaining {
+            return Err(OPUS_INVALID_PACKET);
+        }
+
+        let tmp_samples = opus_packet_get_nb_samples(&payload[..packet_offset as usize], fs);
+        if stream_idx != 0 && samples != tmp_samples {
+            return Err(OPUS_INVALID_PACKET);
+        }
+        samples = tmp_samples;
+        payload = &payload[packet_offset as usize..];
+        remaining -= packet_offset;
+    }
+
+    Ok(samples)
 }
 
 /// Upstream-style free function wrapper.

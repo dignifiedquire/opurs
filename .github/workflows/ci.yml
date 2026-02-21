@@ -153,6 +153,14 @@ jobs:
           key: test-tools-smoke
       - name: Run multistream tooling tests
         run: cargo test --features tools --test tools_multistream
+      - name: Run multistream API parity tests
+        run: cargo test --features tools --test opus_multistream_api
+      - name: Download test vectors
+        run: |
+          curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+          tar -xzf vectors.tar.gz
+      - name: Run multistream full-matrix vector parity
+        run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full
 
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})

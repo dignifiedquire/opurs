@@ -124,14 +124,14 @@ pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
     }
 }
 
-fn parse_size(data: &[u8], size: &mut i16) -> i32 {
-    if data.is_empty() {
+fn parse_size(data: &[u8], len: i32, size: &mut i16) -> i32 {
+    if len < 1 {
         *size = -1;
         -1
     } else if data[0] < 252 {
         *size = data[0] as _;
         1
-    } else if data.len() < 2 {
+    } else if len < 2 {
         *size = -1;
         -1
     } else {
@@ -231,7 +231,7 @@ pub fn opus_packet_parse_impl(
         2 => {
             // Two VBR frames
             count = 2;
-            let bytes = parse_size(data, &mut size[0]);
+            let bytes = parse_size(data, len, &mut size[0]);
             len -= bytes;
             if size[0] < 0 || size[0] as i32 > len {
                 return OPUS_INVALID_PACKET;
@@ -287,7 +287,7 @@ pub fn opus_packet_parse_impl(
                 // VBR case
                 last_size = len;
                 for i in 0..count - 1 {
-                    let bytes = parse_size(data, &mut size[i as usize]);
+                    let bytes = parse_size(data, len, &mut size[i as usize]);
                     len -= bytes;
                     if (size[i as usize] as i32) < 0 || size[i as usize] as i32 > len {
                         return OPUS_INVALID_PACKET;
@@ -314,7 +314,7 @@ pub fn opus_packet_parse_impl(
 
     // Self-delimited framing has an extra size for the last frame.
     if self_delimited {
-        let bytes = parse_size(data, &mut size[count as usize - 1]);
+        let bytes = parse_size(data, len, &mut size[count as usize - 1]);
         len -= bytes;
         if size[count as usize - 1] < 0 || size[(count - 1) as usize] as i32 > len {
             return OPUS_INVALID_PACKET;
