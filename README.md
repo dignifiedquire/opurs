@@ -66,6 +66,20 @@ cargo run --release --features tools --example opus_demo -- enc audio 48000 2 12
 
 # Decode only
 cargo run --release --features tools --example opus_demo -- dec 48000 2 input.opus output.raw
+
+# Multistream roundtrip (3 channels, 2 streams, 1 coupled stream)
+cargo run --release --features tools --example opus_demo -- ms-enc-dec audio 48000 3 2 1 96000 input.raw output.raw
+
+# Multistream roundtrip with explicit channel mapping
+cargo run --release --features tools --example opus_demo -- ms-enc-dec audio 48000 3 2 1 --mapping 0,1,2 96000 input.raw output.raw
+```
+
+### multistream_demo
+
+Minimal in-memory multistream encode/decode example.
+
+```bash
+cargo run --release --features tools --example multistream_demo
 ```
 
 ### opus_compare

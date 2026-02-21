@@ -126,6 +126,22 @@ jobs:
             target/criterion/multistream-smoke-summary.md
           if-no-files-found: warn
 
+  examples-smoke:
+    name: Examples smoke (linux-x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: examples-smoke
+      - name: Check opus_demo top-level help
+        run: cargo run --release --features tools --example opus_demo -- --help
+      - name: Check opus_demo multistream help
+        run: cargo run --release --features tools --example opus_demo -- ms-enc-dec --help
+      - name: Run multistream demo example
+        run: cargo run --release --features tools --example multistream_demo
+
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
