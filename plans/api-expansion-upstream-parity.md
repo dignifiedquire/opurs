@@ -36,6 +36,7 @@ Primary target headers:
   - `M1.4` multistream parity-test expansion in progress
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.4` benchmark smoke lane with artifact upload added to CI
+  - `M2.5` `run_vectors2` suite registry now drives suite discovery and kind selection
 - Next ordered slices:
   1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
   2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.

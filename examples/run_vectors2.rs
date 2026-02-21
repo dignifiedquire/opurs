@@ -107,6 +107,8 @@ struct SuiteDefinition {
     suite: VectorSuite,
     arg: SuiteArg,
     discover: fn(&Path) -> Vec<TestVector>,
+    build_standard_kinds: fn(&Cli, bool, &[TestKind]) -> Vec<TestKind>,
+    include_dnn_kinds: bool,
 }
 
 const SUITE_DEFINITIONS: [SuiteDefinition; 4] = [
@@ -114,21 +116,29 @@ const SUITE_DEFINITIONS: [SuiteDefinition; 4] = [
         suite: VectorSuite::Classic,
         arg: SuiteArg::Classic,
         discover: load_classic_vectors,
+        build_standard_kinds: build_standard_kinds_classic,
+        include_dnn_kinds: true,
     },
     SuiteDefinition {
         suite: VectorSuite::Qext,
         arg: SuiteArg::Qext,
         discover: load_qext_vectors_main,
+        build_standard_kinds: build_standard_kinds_qext,
+        include_dnn_kinds: false,
     },
     SuiteDefinition {
         suite: VectorSuite::QextFuzz,
         arg: SuiteArg::QextFuzz,
         discover: load_qext_vectors_fuzz,
+        build_standard_kinds: build_standard_kinds_qext,
+        include_dnn_kinds: false,
     },
     SuiteDefinition {
         suite: VectorSuite::DredOpus,
         arg: SuiteArg::DredOpus,
         discover: load_dred_opus_vectors,
+        build_standard_kinds: build_standard_kinds_dred_opus,
+        include_dnn_kinds: false,
     },
 ];
 
@@ -532,6 +542,13 @@ fn suite_from_arg(suite_arg: SuiteArg) -> Option<VectorSuite> {
         .map(|definition| definition.suite)
 }
 
+fn suite_definition_for_suite(suite: VectorSuite) -> Option<SuiteDefinition> {
+    SUITE_DEFINITIONS
+        .iter()
+        .copied()
+        .find(|definition| definition.suite == suite)
+}
+
 fn resolve_selected_suites(
     requested: &[SuiteArg],
     discovered: &BTreeMap<VectorSuite, Vec<TestVector>>,
@@ -678,40 +695,60 @@ fn build_dnn_kinds(ignore_extensions: bool) -> Vec<TestKind> {
     kinds
 }
 
+fn build_standard_kinds_classic(
+    _args: &Cli,
+    run_standard: bool,
+    classic_standard_kinds: &[TestKind],
+) -> Vec<TestKind> {
+    if run_standard {
+        classic_standard_kinds.to_vec()
+    } else {
+        Vec::new()
+    }
+}
+
+fn build_standard_kinds_qext(
+    args: &Cli,
+    run_standard: bool,
+    _unused: &[TestKind],
+) -> Vec<TestKind> {
+    if run_standard && matches!(args.mode, RunMode::Parity | RunMode::Both) {
+        vec![TestKind::ParityDecode {
+            sample_rate: SampleRate::R96000,
+            channels: Channels::Stereo,
+            ignore_extensions: args.ignore_extensions,
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
+fn build_standard_kinds_dred_opus(
+    args: &Cli,
+    run_standard: bool,
+    _unused: &[TestKind],
+) -> Vec<TestKind> {
+    if run_standard && matches!(args.mode, RunMode::Parity | RunMode::Both) {
+        vec![TestKind::ParityDecode {
+            sample_rate: SampleRate::R16000,
+            channels: Channels::Mono,
+            ignore_extensions: args.ignore_extensions,
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
 fn build_suite_kinds(
-    suite: VectorSuite,
+    suite_definition: SuiteDefinition,
     args: &Cli,
     run_standard: bool,
     classic_standard_kinds: &[TestKind],
     dnn_kinds: &[TestKind],
 ) -> Vec<TestKind> {
-    let mut suite_kinds = Vec::new();
-    if run_standard {
-        match suite {
-            VectorSuite::Classic => {
-                suite_kinds.extend(classic_standard_kinds.iter().copied());
-            }
-            VectorSuite::Qext | VectorSuite::QextFuzz => {
-                if matches!(args.mode, RunMode::Parity | RunMode::Both) {
-                    suite_kinds.push(TestKind::ParityDecode {
-                        sample_rate: SampleRate::R96000,
-                        channels: Channels::Stereo,
-                        ignore_extensions: args.ignore_extensions,
-                    });
-                }
-            }
-            VectorSuite::DredOpus => {
-                if matches!(args.mode, RunMode::Parity | RunMode::Both) {
-                    suite_kinds.push(TestKind::ParityDecode {
-                        sample_rate: SampleRate::R16000,
-                        channels: Channels::Mono,
-                        ignore_extensions: args.ignore_extensions,
-                    });
-                }
-            }
-        }
-    }
-    if (args.dnn || args.dnn_only) && suite == VectorSuite::Classic {
+    let mut suite_kinds =
+        (suite_definition.build_standard_kinds)(args, run_standard, classic_standard_kinds);
+    if (args.dnn || args.dnn_only) && suite_definition.include_dnn_kinds {
         suite_kinds.extend(dnn_kinds.iter().copied());
     }
     suite_kinds
@@ -1162,9 +1199,13 @@ fn main() {
             eprintln!("Requested suite '{}' was not discovered", suite.as_str());
             continue;
         };
+        let Some(suite_definition) = suite_definition_for_suite(suite) else {
+            eprintln!("No suite definition for '{}'", suite.as_str());
+            continue;
+        };
 
         let suite_kinds = build_suite_kinds(
-            suite,
+            suite_definition,
             &args,
             run_standard,
             &classic_standard_kinds,
