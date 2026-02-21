@@ -4,11 +4,13 @@
 #![cfg(feature = "tools")]
 
 use libopus_sys::{
-    opus_multistream_decode, opus_multistream_decode24, opus_multistream_decoder_create,
-    opus_multistream_decoder_destroy, opus_multistream_decoder_get_size, opus_multistream_encode24,
-    opus_multistream_encoder_create, opus_multistream_encoder_destroy,
-    opus_multistream_encoder_get_size, opus_multistream_surround_encoder_create,
-    opus_multistream_surround_encoder_get_size, opus_multistream_surround_encoder_init,
+    opus_multistream_decode, opus_multistream_decode24, opus_multistream_decode_float,
+    opus_multistream_decoder_create, opus_multistream_decoder_destroy,
+    opus_multistream_decoder_get_size, opus_multistream_encode, opus_multistream_encode24,
+    opus_multistream_encode_float, opus_multistream_encoder_create,
+    opus_multistream_encoder_destroy, opus_multistream_encoder_get_size,
+    opus_multistream_surround_encoder_create, opus_multistream_surround_encoder_get_size,
+    opus_multistream_surround_encoder_init,
 };
 use opurs::{
     opus_multistream_decode as rust_opus_multistream_decode,
@@ -937,6 +939,196 @@ fn multistream_wrapper_encode_rejects_frame_size_mismatch() {
     let mut packet = vec![0u8; 1000];
     let ret = rust_opus_multistream_encode(&mut enc, &pcm, 60, &mut packet);
     assert_eq!(ret, OPUS_BAD_ARG);
+}
+
+#[test]
+fn multistream_frame_size_validation_parity_with_c() {
+    let _guard = test_guard();
+
+    let mut rust_enc =
+        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .expect("rust encoder create");
+    let mut c_error = 0i32;
+    let c_enc = unsafe {
+        opus_multistream_encoder_create(
+            48000,
+            2,
+            2,
+            0,
+            [0u8, 1u8].as_ptr(),
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_enc.is_null(), "c encoder create failed: {c_error}");
+
+    for frame_size in [-1i32, 0, 1, 121, 1000, 6000] {
+        let samples = frame_size.max(1) as usize * 2;
+
+        let pcm_i16 = vec![0i16; samples];
+        let mut rust_packet = vec![0u8; 4000];
+        let rust_i16 =
+            rust_opus_multistream_encode(&mut rust_enc, &pcm_i16, frame_size, &mut rust_packet);
+        let mut c_packet = vec![0u8; 4000];
+        let c_i16 = unsafe {
+            opus_multistream_encode(
+                c_enc,
+                pcm_i16.as_ptr(),
+                frame_size,
+                c_packet.as_mut_ptr(),
+                c_packet.len() as i32,
+            )
+        };
+        assert_eq!(
+            rust_i16, c_i16,
+            "i16 encode frame-size mismatch ({frame_size})"
+        );
+
+        let pcm_f32 = vec![0f32; samples];
+        let mut rust_packet = vec![0u8; 4000];
+        let rust_f32 = rust_opus_multistream_encode_float(
+            &mut rust_enc,
+            &pcm_f32,
+            frame_size,
+            &mut rust_packet,
+        );
+        let mut c_packet = vec![0u8; 4000];
+        let c_f32 = unsafe {
+            opus_multistream_encode_float(
+                c_enc,
+                pcm_f32.as_ptr(),
+                frame_size,
+                c_packet.as_mut_ptr(),
+                c_packet.len() as i32,
+            )
+        };
+        assert_eq!(
+            rust_f32, c_f32,
+            "float encode frame-size mismatch ({frame_size})"
+        );
+
+        let pcm_i24 = vec![0i32; samples];
+        let mut rust_packet = vec![0u8; 4000];
+        let rust_i24 =
+            rust_opus_multistream_encode24(&mut rust_enc, &pcm_i24, frame_size, &mut rust_packet);
+        let mut c_packet = vec![0u8; 4000];
+        let c_i24 = unsafe {
+            opus_multistream_encode24(
+                c_enc,
+                pcm_i24.as_ptr(),
+                frame_size,
+                c_packet.as_mut_ptr(),
+                c_packet.len() as i32,
+            )
+        };
+        assert_eq!(
+            rust_i24, c_i24,
+            "24-bit encode frame-size mismatch ({frame_size})"
+        );
+    }
+
+    let frame_size = 960usize;
+    let mut pcm = vec![0i16; frame_size * 2];
+    for i in 0..frame_size {
+        pcm[i * 2] = (i as i16).wrapping_mul(13);
+        pcm[i * 2 + 1] = (i as i16).wrapping_mul(-9);
+    }
+    let mut packet = vec![0u8; 4000];
+    let packet_len = unsafe {
+        opus_multistream_encode(
+            c_enc,
+            pcm.as_ptr(),
+            frame_size as i32,
+            packet.as_mut_ptr(),
+            packet.len() as i32,
+        )
+    };
+    assert!(packet_len > 0, "c encode failed: {packet_len}");
+    unsafe { opus_multistream_encoder_destroy(c_enc) };
+
+    for frame_size in [-1i32, 0] {
+        let mut rust_dec =
+            rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder");
+        let mut c_error = 0i32;
+        let c_dec = unsafe {
+            opus_multistream_decoder_create(48000, 2, 2, 0, [0u8, 1u8].as_ptr(), &mut c_error)
+        };
+        assert!(!c_dec.is_null(), "c decoder create failed: {c_error}");
+
+        let mut out_i16 = vec![0i16; 960 * 2];
+        let rust_i16 = rust_opus_multistream_decode(
+            &mut rust_dec,
+            &packet[..packet_len as usize],
+            &mut out_i16,
+            frame_size,
+            false,
+        );
+        let mut c_i16 = vec![0i16; 960 * 2];
+        let c_i16 = unsafe {
+            opus_multistream_decode(
+                c_dec,
+                packet.as_ptr(),
+                packet_len,
+                c_i16.as_mut_ptr(),
+                frame_size,
+                0,
+            )
+        };
+        assert_eq!(
+            rust_i16, c_i16,
+            "i16 decode frame-size mismatch ({frame_size})"
+        );
+
+        let mut out_f32 = vec![0f32; 960 * 2];
+        let rust_f32 = rust_opus_multistream_decode_float(
+            &mut rust_dec,
+            &packet[..packet_len as usize],
+            &mut out_f32,
+            frame_size,
+            false,
+        );
+        let mut c_f32 = vec![0f32; 960 * 2];
+        let c_f32 = unsafe {
+            opus_multistream_decode_float(
+                c_dec,
+                packet.as_ptr(),
+                packet_len,
+                c_f32.as_mut_ptr(),
+                frame_size,
+                0,
+            )
+        };
+        assert_eq!(
+            rust_f32, c_f32,
+            "float decode frame-size mismatch ({frame_size})"
+        );
+
+        let mut out_i24 = vec![0i32; 960 * 2];
+        let rust_i24 = rust_opus_multistream_decode24(
+            &mut rust_dec,
+            &packet[..packet_len as usize],
+            &mut out_i24,
+            frame_size,
+            false,
+        );
+        let mut c_i24 = vec![0i32; 960 * 2];
+        let c_i24 = unsafe {
+            opus_multistream_decode24(
+                c_dec,
+                packet.as_ptr(),
+                packet_len,
+                c_i24.as_mut_ptr(),
+                frame_size,
+                0,
+            )
+        };
+        assert_eq!(
+            rust_i24, c_i24,
+            "24-bit decode frame-size mismatch ({frame_size})"
+        );
+
+        unsafe { opus_multistream_decoder_destroy(c_dec) };
+    }
 }
 
 #[test]

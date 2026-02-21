@@ -48,6 +48,7 @@ Primary target headers:
   - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI (quick lane currently gates the stable FOA subset; full matrix remains exploratory for higher-order parity deltas)
   - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
+  - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
   - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks
@@ -58,6 +59,8 @@ Primary target headers:
   - `M3.3` projection decoder CTL parity expanded (`complexity`, `gain`, `phase inversion`, `bandwidth`, `sample rate`, `last packet duration`) plus stream-state access parity via `OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST`
   - `M3.3` upstream-style creation-argument matrix sweep added for projection (`channels 0..254`) with C parity on encoder/decoder create behavior
   - `M3.3` projection decode parity matrix expanded across frame sizes + output formats, including PLC/FEC parity checks against upstream C
+  - `M3.3` projection encoder API parity expanded with C-backed init/reinit checks (including matrix parity after reinit) and i16/f32/i24 encode smoke coverage
+  - `M3.3` projection encoder now exports a child-state helper wrapper (`opus_projection_encoder_get_encoder_state`) mirroring decoder-side state access
   - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
 - Next ordered slices:
   1. Add asset-backed projection vector suite loading once upstream projection vector assets are available.

@@ -502,5 +502,13 @@ pub fn opus_projection_encode24(
     st.encode24(pcm, frame_size, data)
 }
 
+/// Upstream-style helper for `OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST`.
+pub fn opus_projection_encoder_get_encoder_state(
+    st: &mut OpusProjectionEncoder,
+    stream_id: i32,
+) -> Result<&mut OpusEncoder, i32> {
+    st.encoder_state_mut(stream_id)
+}
+
 /// Upstream-style free function wrapper.
 pub fn opus_projection_encoder_destroy(_st: OpusProjectionEncoder) {}
