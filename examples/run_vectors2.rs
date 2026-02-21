@@ -580,6 +580,8 @@ fn synth_multistream_pcm(channels: usize, samples_per_channel: usize, seed: u32)
 }
 
 fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
+    const FULL_MATRIX_SEED_SWEEP: [u32; 4] = [7, 17, 42, 97];
+
     struct Def {
         name: &'static str,
         application: Application,
@@ -594,6 +596,36 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
         options: EncoderOptions,
         seed: u32,
         full_only: bool,
+    }
+
+    fn build_multistream_vector(def: &Def, name: String, seed: u32, full_only: bool) -> TestVector {
+        let samples_per_channel =
+            def.frame_size.samples_for_rate(def.sample_rate) * def.packet_count;
+        let pcm = synth_multistream_pcm(def.channels as usize, samples_per_channel, seed);
+        let encode_args = MultistreamEncodeArgs {
+            application: def.application,
+            sample_rate: def.sample_rate,
+            layout: MultistreamLayout {
+                channels: def.channels,
+                streams: def.streams,
+                coupled_streams: def.coupled_streams,
+                mapping: def.mapping.to_vec(),
+            },
+            bitrate: def.bitrate,
+            options: def.options,
+        };
+        TestVector {
+            suite: VectorSuite::Multistream,
+            name,
+            encoded: Vec::new(),
+            decoded_stereo: None,
+            decoded_mono: None,
+            multistream_case: Some(MultistreamVectorCase {
+                encode_args,
+                pcm,
+                full_only,
+            }),
+        }
     }
 
     let defs = [
@@ -718,37 +750,27 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
         },
     ];
 
-    defs.into_iter()
-        .map(|def| {
-            let samples_per_channel =
-                def.frame_size.samples_for_rate(def.sample_rate) * def.packet_count;
-            let pcm = synth_multistream_pcm(def.channels as usize, samples_per_channel, def.seed);
-            let encode_args = MultistreamEncodeArgs {
-                application: def.application,
-                sample_rate: def.sample_rate,
-                layout: MultistreamLayout {
-                    channels: def.channels,
-                    streams: def.streams,
-                    coupled_streams: def.coupled_streams,
-                    mapping: def.mapping.to_vec(),
-                },
-                bitrate: def.bitrate,
-                options: def.options,
-            };
-            TestVector {
-                suite: VectorSuite::Multistream,
-                name: def.name.to_string(),
-                encoded: Vec::new(),
-                decoded_stereo: None,
-                decoded_mono: None,
-                multistream_case: Some(MultistreamVectorCase {
-                    encode_args,
-                    pcm,
-                    full_only: def.full_only,
-                }),
+    let mut vectors = Vec::new();
+    for def in defs {
+        vectors.push(build_multistream_vector(
+            &def,
+            def.name.to_string(),
+            def.seed,
+            def.full_only,
+        ));
+        for seed in FULL_MATRIX_SEED_SWEEP {
+            if seed == def.seed {
+                continue;
             }
-        })
-        .collect()
+            vectors.push(build_multistream_vector(
+                &def,
+                format!("{}_seed_{seed}", def.name),
+                seed,
+                true,
+            ));
+        }
+    }
+    vectors
 }
 
 fn load_vectors_by_suite(vector_dir: &Path) -> BTreeMap<VectorSuite, Vec<TestVector>> {

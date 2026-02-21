@@ -25,7 +25,7 @@ Primary target headers:
   - New psychoacoustic tuning/performance optimization passes
   - API redesign unrelated to upstream parity
 
-## Current Status Snapshot (2026-02-20)
+## Current Status Snapshot (2026-02-21)
 
 - Vector parity baseline:
   - classic vectors: `228/228` passing
@@ -42,7 +42,7 @@ Primary target headers:
   - `M2.4` multistream mapping parser is now shared in `tools::demo` and covered by deterministic integration tests
   - `M2.4` tooling multistream integration test suite now has a dedicated CI smoke lane (`test-tools-smoke`)
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
-  - `M2.5` `run_vectors2` now includes a deterministic multistream suite (quick matrix is green; full matrix keeps stress vectors that currently expose known decode-divergence gaps)
+  - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
 - Next ordered slices:
