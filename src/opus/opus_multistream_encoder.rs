@@ -417,6 +417,37 @@ impl OpusMSEncoder {
         self.encode_impl_i24(pcm, output)
     }
 
+    fn stream_payload_budget(
+        &self,
+        frame_size: usize,
+        stream_id: i32,
+        output_len: usize,
+        written: usize,
+    ) -> Result<usize, i32> {
+        let streams = self.layout().streams();
+        let remaining_streams = streams - stream_id - 1;
+        let mut curr_max = output_len as i32 - written as i32;
+
+        // Reserve bytes for future stream packet headers.
+        curr_max -= (2 * remaining_streams - 1).max(0);
+
+        // 100ms packets reserve one extra ToC byte per remaining stream.
+        if self.sample_rate() / frame_size as i32 == 10 {
+            curr_max -= remaining_streams;
+        }
+
+        // Non-last streams need self-delimited length bytes.
+        if stream_id != streams - 1 {
+            curr_max -= if curr_max > 253 { 2 } else { 1 };
+        }
+
+        if curr_max <= 0 {
+            Err(OPUS_BUFFER_TOO_SMALL)
+        } else {
+            Ok(curr_max as usize)
+        }
+    }
+
     fn encode_impl_i16(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
@@ -424,20 +455,53 @@ impl OpusMSEncoder {
         }
         let frame_size = pcm.len() / channels;
         let mut write_offset = 0usize;
-        for stream_id in 0..self.layout().streams() {
+        let streams = self.layout().streams();
+        let vbr_enabled = self.vbr();
+        let sample_rate = self.sample_rate();
+        let mut max_data_bytes = output.len();
+        let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
+        if sample_rate / frame_size as i32 == 10 {
+            smallest_packet += streams.max(0) as usize;
+        }
+        if max_data_bytes < smallest_packet {
+            return OPUS_BUFFER_TOO_SMALL;
+        }
+        if !vbr_enabled {
+            let bitrate = self.bitrate();
+            let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
+                .max(smallest_packet as i32) as usize;
+            max_data_bytes = max_data_bytes.min(target);
+        }
+        for stream_id in 0..streams {
             let selected = match stream_input_channels(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
             let stream_pcm = extract_stream_pcm_i16(pcm, frame_size, channels, &selected);
+            let curr_max = match self.stream_payload_budget(
+                frame_size,
+                stream_id,
+                max_data_bytes,
+                write_offset,
+            ) {
+                Ok(v) => v,
+                Err(err) => return err,
+            };
             let encoder = &mut self.encoders[stream_id as usize];
-            let mut stream_packet = vec![0u8; 1500];
+            if !vbr_enabled && stream_id == streams - 1 {
+                encoder.set_bitrate(Bitrate::Bits(bits_to_bitrate(
+                    (curr_max as i32) * 8,
+                    sample_rate,
+                    frame_size as i32,
+                )));
+            }
+            let mut stream_packet = vec![0u8; curr_max];
             let len = encoder.encode(&stream_pcm, &mut stream_packet);
             if len < 0 {
                 return len;
             }
             stream_packet.truncate(len as usize);
-            let stream_packet = if stream_id != self.layout().streams() - 1 {
+            let stream_packet = if stream_id != streams - 1 {
                 match make_self_delimited(&stream_packet) {
                     Ok(pkt) => pkt,
                     Err(err) => return err,
@@ -462,20 +526,53 @@ impl OpusMSEncoder {
         }
         let frame_size = pcm.len() / channels;
         let mut write_offset = 0usize;
-        for stream_id in 0..self.layout().streams() {
+        let streams = self.layout().streams();
+        let vbr_enabled = self.vbr();
+        let sample_rate = self.sample_rate();
+        let mut max_data_bytes = output.len();
+        let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
+        if sample_rate / frame_size as i32 == 10 {
+            smallest_packet += streams.max(0) as usize;
+        }
+        if max_data_bytes < smallest_packet {
+            return OPUS_BUFFER_TOO_SMALL;
+        }
+        if !vbr_enabled {
+            let bitrate = self.bitrate();
+            let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
+                .max(smallest_packet as i32) as usize;
+            max_data_bytes = max_data_bytes.min(target);
+        }
+        for stream_id in 0..streams {
             let selected = match stream_input_channels(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
             let stream_pcm = extract_stream_pcm_f32(pcm, frame_size, channels, &selected);
+            let curr_max = match self.stream_payload_budget(
+                frame_size,
+                stream_id,
+                max_data_bytes,
+                write_offset,
+            ) {
+                Ok(v) => v,
+                Err(err) => return err,
+            };
             let encoder = &mut self.encoders[stream_id as usize];
-            let mut stream_packet = vec![0u8; 1500];
+            if !vbr_enabled && stream_id == streams - 1 {
+                encoder.set_bitrate(Bitrate::Bits(bits_to_bitrate(
+                    (curr_max as i32) * 8,
+                    sample_rate,
+                    frame_size as i32,
+                )));
+            }
+            let mut stream_packet = vec![0u8; curr_max];
             let len = encoder.encode_float(&stream_pcm, &mut stream_packet);
             if len < 0 {
                 return len;
             }
             stream_packet.truncate(len as usize);
-            let stream_packet = if stream_id != self.layout().streams() - 1 {
+            let stream_packet = if stream_id != streams - 1 {
                 match make_self_delimited(&stream_packet) {
                     Ok(pkt) => pkt,
                     Err(err) => return err,
@@ -500,20 +597,53 @@ impl OpusMSEncoder {
         }
         let frame_size = pcm.len() / channels;
         let mut write_offset = 0usize;
-        for stream_id in 0..self.layout().streams() {
+        let streams = self.layout().streams();
+        let vbr_enabled = self.vbr();
+        let sample_rate = self.sample_rate();
+        let mut max_data_bytes = output.len();
+        let mut smallest_packet = (streams * 2 - 1).max(0) as usize;
+        if sample_rate / frame_size as i32 == 10 {
+            smallest_packet += streams.max(0) as usize;
+        }
+        if max_data_bytes < smallest_packet {
+            return OPUS_BUFFER_TOO_SMALL;
+        }
+        if !vbr_enabled {
+            let bitrate = self.bitrate();
+            let target = ((bitrate_to_bits(bitrate, sample_rate, frame_size as i32) + 4) / 8)
+                .max(smallest_packet as i32) as usize;
+            max_data_bytes = max_data_bytes.min(target);
+        }
+        for stream_id in 0..streams {
             let selected = match stream_input_channels(self.layout(), stream_id) {
                 Some(v) => v,
                 None => return OPUS_BAD_ARG,
             };
             let stream_pcm = extract_stream_pcm_i32(pcm, frame_size, channels, &selected);
+            let curr_max = match self.stream_payload_budget(
+                frame_size,
+                stream_id,
+                max_data_bytes,
+                write_offset,
+            ) {
+                Ok(v) => v,
+                Err(err) => return err,
+            };
             let encoder = &mut self.encoders[stream_id as usize];
-            let mut stream_packet = vec![0u8; 1500];
+            if !vbr_enabled && stream_id == streams - 1 {
+                encoder.set_bitrate(Bitrate::Bits(bits_to_bitrate(
+                    (curr_max as i32) * 8,
+                    sample_rate,
+                    frame_size as i32,
+                )));
+            }
+            let mut stream_packet = vec![0u8; curr_max];
             let len = encoder.encode24(&stream_pcm, &mut stream_packet);
             if len < 0 {
                 return len;
             }
             stream_packet.truncate(len as usize);
-            let stream_packet = if stream_id != self.layout().streams() - 1 {
+            let stream_packet = if stream_id != streams - 1 {
                 match make_self_delimited(&stream_packet) {
                     Ok(pkt) => pkt,
                     Err(err) => return err,
@@ -715,6 +845,16 @@ fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
     }
     buffer.truncate(ret as usize);
     Ok(buffer)
+}
+
+#[inline]
+fn bits_to_bitrate(bits: i32, fs: i32, frame_size: i32) -> i32 {
+    ((bits as i64 * fs as i64) / frame_size as i64) as i32
+}
+
+#[inline]
+fn bitrate_to_bits(bitrate: i32, fs: i32, frame_size: i32) -> i32 {
+    ((bitrate as i64 * frame_size as i64) / fs as i64) as i32
 }
 
 fn stream_input_channels(layout: &OpusMultistreamLayout, stream_id: i32) -> Option<Vec<usize>> {
