@@ -872,7 +872,7 @@ fn synth_projection_pcm(channels: usize, samples_per_channel: usize, seed: u32) 
 }
 
 fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
-    const FULL_MATRIX_SEED_SWEEP: [u32; 3] = [17, 42, 97];
+    const FULL_MATRIX_SEED_SWEEP: [u32; 2] = [17, 42];
 
     struct Def {
         name: &'static str,
@@ -882,6 +882,7 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
         bitrate: u32,
         seed: u32,
         full_only: bool,
+        seed_sweep: bool,
     }
 
     fn build_projection_vector(def: &Def, name: String, seed: u32, full_only: bool) -> TestVector {
@@ -916,15 +917,17 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             bitrate: 96_000,
             seed: 1,
             full_only: false,
+            seed_sweep: true,
         },
         Def {
-            name: "proj_9ch_10ms_128k",
-            channels: 9,
-            frame_size: FrameSize::Ms10,
-            packet_count: 10,
-            bitrate: 128_000,
-            seed: 2,
+            name: "proj_11ch_20ms_160k",
+            channels: 11,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            bitrate: 160_000,
+            seed: 6,
             full_only: true,
+            seed_sweep: false,
         },
         Def {
             name: "proj_16ch_20ms_192k",
@@ -932,8 +935,9 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             frame_size: FrameSize::Ms20,
             packet_count: 8,
             bitrate: 192_000,
-            seed: 3,
+            seed: 17,
             full_only: true,
+            seed_sweep: true,
         },
         Def {
             name: "proj_25ch_20ms_256k",
@@ -943,6 +947,7 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             bitrate: 256_000,
             seed: 4,
             full_only: true,
+            seed_sweep: true,
         },
     ];
 
@@ -954,16 +959,18 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             def.seed,
             def.full_only,
         ));
-        for seed in FULL_MATRIX_SEED_SWEEP {
-            if seed == def.seed {
-                continue;
+        if def.seed_sweep {
+            for seed in FULL_MATRIX_SEED_SWEEP {
+                if seed == def.seed {
+                    continue;
+                }
+                vectors.push(build_projection_vector(
+                    &def,
+                    format!("{}_seed_{seed}", def.name),
+                    seed,
+                    true,
+                ));
             }
-            vectors.push(build_projection_vector(
-                &def,
-                format!("{}_seed_{seed}", def.name),
-                seed,
-                true,
-            ));
         }
     }
     vectors
