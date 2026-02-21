@@ -49,6 +49,7 @@ Primary target headers:
   - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI (quick lane currently gates the stable FOA subset; full matrix remains exploratory for higher-order parity deltas)
   - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
+  - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts

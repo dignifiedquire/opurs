@@ -70,6 +70,10 @@ struct Cli {
     #[arg(long, value_enum, default_value = "quick")]
     matrix: MatrixMode,
 
+    /// Fail parity tests when encoded bitstreams are not exactly identical.
+    #[arg(long)]
+    strict_bitexact: bool,
+
     /// Restrict suites. Repeat `--suite` or pass none for auto-discovery.
     #[arg(long = "suite", value_enum)]
     suites: Vec<SuiteArg>,
@@ -1284,6 +1288,7 @@ fn run_test(
     test_vector: &TestVector,
     test_kind: TestKind,
     dump_directory: Option<&Path>,
+    strict_bitexact: bool,
 ) -> TestResult {
     match test_kind {
         TestKind::ParityDecode {
@@ -1762,7 +1767,7 @@ fn run_test(
                 }
             };
 
-            TestResult::pass(format!(
+            let detail = format!(
                 "decoder parity on both bitstreams; bitexact={} {} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.2} diff_rust(max/mean)={}/{:.2}",
                 bitstream_exact,
                 mismatch_detail,
@@ -1772,7 +1777,13 @@ fn run_test(
                 mean_diff_up,
                 max_diff_rust,
                 mean_diff_rust
-            ))
+            );
+
+            if strict_bitexact && !bitstream_exact {
+                TestResult::fail(format!("strict-bitexact: {detail}"))
+            } else {
+                TestResult::pass(detail)
+            }
         }
         TestKind::ParityProjection { matrix } => {
             let Some(projection_case) = test_vector.projection_case.as_ref() else {
@@ -2174,7 +2185,7 @@ fn run_test(
                     }
                 };
 
-                TestResult::pass(format!(
+                let detail = format!(
                     "projection parity packets={} bitexact={} {} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.3} diff_rust(max/mean)={}/{:.3}",
                     projection_case.packet_count,
                     bitstream_exact,
@@ -2185,7 +2196,13 @@ fn run_test(
                     mean_diff_upstream,
                     max_diff_rust,
                     mean_diff_rust
-                ))
+                );
+
+                if strict_bitexact && !bitstream_exact {
+                    TestResult::fail(format!("strict-bitexact: {detail}"))
+                } else {
+                    TestResult::pass(detail)
+                }
             })();
 
             if !c_dec_upstream.is_null() {
@@ -2377,7 +2394,12 @@ fn main() {
         .progress()
         .map(|(test_vector, test_kind)| {
             let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                run_test(test_vector, test_kind, args.dump_dir.as_deref())
+                run_test(
+                    test_vector,
+                    test_kind,
+                    args.dump_dir.as_deref(),
+                    args.strict_bitexact,
+                )
             }))
             .unwrap_or_else(|_| TestResult::fail("panic while running test"));
 
