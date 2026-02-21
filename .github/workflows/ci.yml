@@ -177,6 +177,30 @@ jobs:
       - name: Run multistream quick-matrix vector parity
         run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix quick
 
+  test-projection-parity:
+    name: Projection parity (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+          - name: macos-arm64
+            os: macos-15
+          - name: windows-x86_64
+            os: windows-latest
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-projection-parity-${{ matrix.name }}
+      - name: Run projection decoder API parity tests
+        run: cargo test --features tools --test opus_projection_decoder_api
+      - name: Run projection encoder API parity tests
+        run: cargo test --features tools --test opus_projection_encoder_api
+
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}

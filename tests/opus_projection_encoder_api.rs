@@ -2,8 +2,19 @@
 
 use opurs::{
     opus_projection_ambisonics_encoder_create as rust_opus_projection_encoder_create,
-    opus_projection_encode as rust_opus_projection_encode, OPUS_APPLICATION_AUDIO, OPUS_OK,
+    opus_projection_encode as rust_opus_projection_encode, Channels, Signal,
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
+    OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
+    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
+    OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST,
+    OPUS_GET_VBR_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
+    OPUS_SET_APPLICATION_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
+    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
+    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
+    OPUS_SET_VBR_REQUEST,
 };
 use std::ffi::c_void;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -185,4 +196,240 @@ fn projection_encoder_foa_encode_smoke_against_c() {
     assert!(c_len > 0, "c projection encode failed: {c_len}");
 
     unsafe { opus_projection_encoder_destroy(c_enc) };
+}
+
+#[test]
+fn projection_encoder_ctl_value_parity_with_c() {
+    let _guard = test_guard();
+
+    let mut rust_streams = -1i32;
+    let mut rust_coupled = -1i32;
+    let mut rust = rust_opus_projection_encoder_create(
+        48000,
+        4,
+        3,
+        &mut rust_streams,
+        &mut rust_coupled,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("rust create");
+
+    let mut c_streams = -1i32;
+    let mut c_coupled = -1i32;
+    let mut c_error = 0i32;
+    let c_ptr = unsafe {
+        opus_projection_ambisonics_encoder_create(
+            48000,
+            4,
+            3,
+            &mut c_streams,
+            &mut c_coupled,
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_ptr.is_null(), "c create failed: {c_error}");
+
+    rust.set_complexity(6).unwrap();
+    rust.set_application(OPUS_APPLICATION_VOIP).unwrap();
+    rust.set_inband_fec(1).unwrap();
+    rust.set_packet_loss_perc(11).unwrap();
+    rust.set_vbr(true);
+    rust.set_vbr_constraint(true);
+    rust.set_dtx(true);
+    rust.set_force_channels(Some(Channels::Mono)).unwrap();
+    rust.set_signal(Some(Signal::Voice));
+    rust.set_prediction_disabled(true);
+    rust.set_phase_inversion_disabled(true);
+
+    unsafe {
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_COMPLEXITY_REQUEST, 6i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_APPLICATION_REQUEST, OPUS_APPLICATION_VOIP);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_INBAND_FEC_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_PACKET_LOSS_PERC_REQUEST, 11i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_VBR_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_VBR_CONSTRAINT_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_DTX_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_FORCE_CHANNELS_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_SIGNAL_REQUEST, opurs::OPUS_SIGNAL_VOICE);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_PREDICTION_DISABLED_REQUEST, 1i32);
+        opus_projection_encoder_ctl(c_ptr, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, 1i32);
+    }
+
+    let mut c_complexity = 0i32;
+    let mut c_application = 0i32;
+    let mut c_fec = 0i32;
+    let mut c_loss = 0i32;
+    let mut c_vbr = 0i32;
+    let mut c_cvbr = 0i32;
+    let mut c_dtx = 0i32;
+    let mut c_force_channels = OPUS_AUTO;
+    let mut c_signal = 0i32;
+    let mut c_pred_disabled = 0i32;
+    let mut c_phase_inv_disabled = 0i32;
+    unsafe {
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_COMPLEXITY_REQUEST,
+            &mut c_complexity as *mut _,
+        );
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_APPLICATION_REQUEST,
+            &mut c_application as *mut _,
+        );
+        opus_projection_encoder_ctl(c_ptr, OPUS_GET_INBAND_FEC_REQUEST, &mut c_fec as *mut _);
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PACKET_LOSS_PERC_REQUEST,
+            &mut c_loss as *mut _,
+        );
+        opus_projection_encoder_ctl(c_ptr, OPUS_GET_VBR_REQUEST, &mut c_vbr as *mut _);
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_VBR_CONSTRAINT_REQUEST,
+            &mut c_cvbr as *mut _,
+        );
+        opus_projection_encoder_ctl(c_ptr, OPUS_GET_DTX_REQUEST, &mut c_dtx as *mut _);
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_FORCE_CHANNELS_REQUEST,
+            &mut c_force_channels as *mut _,
+        );
+        opus_projection_encoder_ctl(c_ptr, OPUS_GET_SIGNAL_REQUEST, &mut c_signal as *mut _);
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PREDICTION_DISABLED_REQUEST,
+            &mut c_pred_disabled as *mut _,
+        );
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+            &mut c_phase_inv_disabled as *mut _,
+        );
+    }
+
+    assert_eq!(rust.complexity(), c_complexity);
+    assert_eq!(rust.application(), c_application);
+    assert_eq!(rust.inband_fec(), c_fec);
+    assert_eq!(rust.packet_loss_perc(), c_loss);
+    assert_eq!(rust.vbr() as i32, c_vbr);
+    assert_eq!(rust.vbr_constraint() as i32, c_cvbr);
+    assert_eq!(rust.dtx() as i32, c_dtx);
+    assert_eq!(
+        rust.force_channels().map_or(OPUS_AUTO, i32::from),
+        c_force_channels
+    );
+    assert_eq!(rust.signal().map_or(OPUS_AUTO, i32::from), c_signal);
+    assert_eq!(rust.prediction_disabled() as i32, c_pred_disabled);
+    assert_eq!(rust.phase_inversion_disabled() as i32, c_phase_inv_disabled);
+
+    unsafe { opus_projection_encoder_destroy(c_ptr) };
+}
+
+#[test]
+fn projection_encoder_state_access_parity_with_c() {
+    let _guard = test_guard();
+
+    let mut rust_streams = -1i32;
+    let mut rust_coupled = -1i32;
+    let mut rust = rust_opus_projection_encoder_create(
+        48000,
+        4,
+        3,
+        &mut rust_streams,
+        &mut rust_coupled,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("rust create");
+
+    let mut c_streams = -1i32;
+    let mut c_coupled = -1i32;
+    let mut c_error = 0i32;
+    let c_ptr = unsafe {
+        opus_projection_ambisonics_encoder_create(
+            48000,
+            4,
+            3,
+            &mut c_streams,
+            &mut c_coupled,
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_ptr.is_null(), "c create failed: {c_error}");
+
+    assert_eq!(rust.encoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.encoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
+
+    let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
+    let c_bad_neg = unsafe {
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
+            -1i32,
+            &mut c_state as *mut _,
+        )
+    };
+    let c_bad_high = unsafe {
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
+            2i32,
+            &mut c_state as *mut _,
+        )
+    };
+    assert_eq!(c_bad_neg, OPUS_BAD_ARG);
+    assert_eq!(c_bad_high, OPUS_BAD_ARG);
+
+    let mut c_state0: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
+    let mut c_state1: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
+    let c_ret0 = unsafe {
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
+            0i32,
+            &mut c_state0 as *mut _,
+        )
+    };
+    let c_ret1 = unsafe {
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
+            1i32,
+            &mut c_state1 as *mut _,
+        )
+    };
+    assert_eq!(c_ret0, OPUS_OK);
+    assert_eq!(c_ret1, OPUS_OK);
+    assert!(!c_state0.is_null());
+    assert!(!c_state1.is_null());
+
+    rust.encoder_state_mut(1)
+        .expect("rust stream1")
+        .set_complexity(3)
+        .expect("set complexity");
+    unsafe {
+        libopus_sys::opus_encoder_ctl(c_state1, OPUS_SET_COMPLEXITY_REQUEST, 3i32);
+    }
+
+    let rust_c0 = rust
+        .encoder_state_mut(0)
+        .expect("rust stream0")
+        .complexity();
+    let rust_c1 = rust
+        .encoder_state_mut(1)
+        .expect("rust stream1")
+        .complexity();
+    let mut c_c0 = 0i32;
+    let mut c_c1 = 0i32;
+    unsafe {
+        libopus_sys::opus_encoder_ctl(c_state0, OPUS_GET_COMPLEXITY_REQUEST, &mut c_c0 as *mut _);
+        libopus_sys::opus_encoder_ctl(c_state1, OPUS_GET_COMPLEXITY_REQUEST, &mut c_c1 as *mut _);
+    }
+    assert_eq!(rust_c0, c_c0);
+    assert_eq!(rust_c1, c_c1);
+    assert_ne!(rust_c0, rust_c1);
+
+    unsafe { opus_projection_encoder_destroy(c_ptr) };
 }

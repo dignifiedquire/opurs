@@ -3,8 +3,10 @@
 //! Upstream C: `src/opus_projection_encoder.c`
 
 use crate::enums::Application;
+use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::mapping_matrix::MappingMatrix;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
+use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream_encoder::OpusMSEncoder;
 use crate::opus::projection_matrices::projection_matrices_for_order_plus_one;
 
@@ -275,6 +277,154 @@ impl OpusProjectionEncoder {
             }
         }
         Ok(())
+    }
+
+    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
+        self.encoder.set_application(application)
+    }
+
+    pub fn set_bitrate(&mut self, bitrate: Bitrate) {
+        self.encoder.set_bitrate(bitrate);
+    }
+
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+        self.encoder.set_complexity(complexity)
+    }
+
+    pub fn set_vbr(&mut self, enabled: bool) {
+        self.encoder.set_vbr(enabled);
+    }
+
+    pub fn set_vbr_constraint(&mut self, enabled: bool) {
+        self.encoder.set_vbr_constraint(enabled);
+    }
+
+    pub fn set_bandwidth(&mut self, bandwidth: Option<Bandwidth>) {
+        self.encoder.set_bandwidth(bandwidth);
+    }
+
+    pub fn set_max_bandwidth(&mut self, bandwidth: Bandwidth) {
+        self.encoder.set_max_bandwidth(bandwidth);
+    }
+
+    pub fn set_signal(&mut self, signal: Option<Signal>) {
+        self.encoder.set_signal(signal);
+    }
+
+    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
+        self.encoder.set_inband_fec(value)
+    }
+
+    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
+        self.encoder.set_packet_loss_perc(pct)
+    }
+
+    pub fn set_dtx(&mut self, enabled: bool) {
+        self.encoder.set_dtx(enabled);
+    }
+
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+        self.encoder.set_force_channels(channels)
+    }
+
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+        self.encoder.set_lsb_depth(depth)
+    }
+
+    pub fn set_expert_frame_duration(&mut self, fs: FrameSize) {
+        self.encoder.set_expert_frame_duration(fs);
+    }
+
+    pub fn set_prediction_disabled(&mut self, disabled: bool) {
+        self.encoder.set_prediction_disabled(disabled);
+    }
+
+    pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
+        self.encoder.set_phase_inversion_disabled(disabled);
+    }
+
+    pub fn reset(&mut self) {
+        self.encoder.reset();
+    }
+
+    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, i32> {
+        self.encoder.encoder_state(stream_id)
+    }
+
+    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, i32> {
+        self.encoder.encoder_state_mut(stream_id)
+    }
+
+    pub fn application(&self) -> i32 {
+        self.encoder.application()
+    }
+
+    pub fn bitrate(&self) -> i32 {
+        self.encoder.bitrate()
+    }
+
+    pub fn complexity(&self) -> i32 {
+        self.encoder.complexity()
+    }
+
+    pub fn vbr(&self) -> bool {
+        self.encoder.vbr()
+    }
+
+    pub fn vbr_constraint(&self) -> bool {
+        self.encoder.vbr_constraint()
+    }
+
+    pub fn bandwidth(&self) -> i32 {
+        self.encoder.bandwidth()
+    }
+
+    pub fn max_bandwidth(&self) -> Bandwidth {
+        self.encoder.max_bandwidth()
+    }
+
+    pub fn signal(&self) -> Option<Signal> {
+        self.encoder.signal()
+    }
+
+    pub fn inband_fec(&self) -> i32 {
+        self.encoder.inband_fec()
+    }
+
+    pub fn packet_loss_perc(&self) -> i32 {
+        self.encoder.packet_loss_perc()
+    }
+
+    pub fn dtx(&self) -> bool {
+        self.encoder.dtx()
+    }
+
+    pub fn force_channels(&self) -> Option<Channels> {
+        self.encoder.force_channels()
+    }
+
+    pub fn lsb_depth(&self) -> i32 {
+        self.encoder.lsb_depth()
+    }
+
+    pub fn expert_frame_duration(&self) -> FrameSize {
+        self.encoder.expert_frame_duration()
+    }
+
+    pub fn prediction_disabled(&self) -> bool {
+        self.encoder.prediction_disabled()
+    }
+
+    pub fn phase_inversion_disabled(&self) -> bool {
+        self.encoder.phase_inversion_disabled()
+    }
+
+    pub fn lookahead(&self) -> i32 {
+        self.encoder.lookahead()
+    }
+
+    pub fn final_range(&self) -> u32 {
+        self.encoder.final_range()
     }
 }
 

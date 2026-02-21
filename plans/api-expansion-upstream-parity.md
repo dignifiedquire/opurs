@@ -50,10 +50,15 @@ Primary target headers:
   - `M3.1` projection encoder path now supports ambisonics orders 1..5 (`4/6/9/11/16/18/25/27/36/38ch`) with upstream precomputed matrices
   - `M3.3` projection decoder and projection encoder C-parity integration tests added under `--features tools`
   - `M3.3` projection decoder higher-order parity now exercises C projection-encoded packets for `4/9/16/25/36ch`
+  - `M3.3` projection encoder CTL passthrough parity added (generic encoder CTLs + stream-state access via projection wrapper)
+  - `M3.3` projection decoder CTL parity expanded (`complexity`, `gain`, `phase inversion`, `bandwidth`, `sample rate`, `last packet duration`) plus stream-state access parity via `OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST`
+  - `M3.3` upstream-style creation-argument matrix sweep added for projection (`channels 0..254`) with C parity on encoder/decoder create behavior
+  - `M3.3` projection decode parity matrix expanded across frame sizes + output formats, including PLC/FEC parity checks against upstream C
+  - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
 - Next ordered slices:
-  1. Align projection encoder/decoder CTL behavior with upstream edge-case semantics.
-  2. Port the remaining `test_opus_projection.c` encode/decode argument matrix scenarios.
-  3. Add projection-specific vector-harness coverage once assets are available.
+  1. Add projection-specific vector-harness coverage once assets are available.
+  2. Expand projection encode/decode parity matrix beyond current smoke set (frame sizes, PLC/FEC paths, i16/f32/i24).
+  3. Fold projection parity lanes into CI matrix for major targets once runtime budget is validated.
 
 ## Milestone Checklist
 

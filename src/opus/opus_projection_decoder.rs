@@ -263,6 +263,10 @@ impl OpusProjectionDecoder {
         self.decoder.gain()
     }
 
+    pub fn sample_rate(&self) -> i32 {
+        self.decoder.sample_rate()
+    }
+
     pub fn complexity(&self) -> i32 {
         self.decoder.complexity()
     }
