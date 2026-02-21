@@ -47,12 +47,12 @@ Primary target headers:
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
   - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks
-  - `M3.1` projection encoder FOA path added (`OpusProjectionEncoder` create/init/encode + demixing-matrix export helpers for 4/6 channels)
-  - `M3.3` projection decoder and FOA encoder C-parity integration tests added under `--features tools`
+  - `M3.1` projection encoder path now supports ambisonics orders 1..5 (`4/6/9/11/16/18/25/27/36/38ch`) with upstream precomputed matrices
+  - `M3.3` projection decoder and projection encoder C-parity integration tests added under `--features tools`
 - Next ordered slices:
-  1. Extend `M3.2` precomputed ambisonics mixing/demixing matrices beyond FOA (SOA/TOA/4OA/5OA).
-  2. Expand `M3.3` parity tests from FOA-only to all supported projection orders.
-  3. Align projection encoder behavior/CTL parity with upstream edge-case semantics.
+  1. Expand `M3.3` decode parity coverage to higher-order projection channel sets (not just identity-matrix decoder checks).
+  2. Align projection encoder/decoder CTL behavior with upstream edge-case semantics.
+  3. Port the remaining `test_opus_projection.c` encode/decode argument matrix scenarios.
 
 ## Milestone Checklist
 

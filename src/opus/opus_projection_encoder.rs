@@ -4,18 +4,9 @@
 
 use crate::enums::Application;
 use crate::opus::mapping_matrix::MappingMatrix;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
 use crate::opus::opus_multistream_encoder::OpusMSEncoder;
-
-const FOA_MIXING_DATA: [i16; 36] = [
-    16384, 0, -16384, 23170, 0, 0, 16384, 23170, 16384, 0, 0, 0, 16384, 0, -16384, -23170, 0, 0,
-    16384, -23170, 16384, 0, 0, 0, 0, 0, 0, 0, 32767, 0, 0, 0, 0, 0, 0, 32767,
-];
-
-const FOA_DEMIXING_DATA: [i16; 36] = [
-    16384, 16384, 16384, 16384, 0, 0, 0, 23170, 0, -23170, 0, 0, -16384, 16384, -16384, 16384, 0,
-    0, 23170, 0, -23170, 0, 0, 0, 0, 0, 0, 0, 32767, 0, 0, 0, 0, 0, 0, 32767,
-];
+use crate::opus::projection_matrices::projection_matrices_for_order_plus_one;
 
 /// Pure-Rust projection encoder.
 #[derive(Clone)]
@@ -58,14 +49,23 @@ fn get_streams_from_channels(channels: i32, mapping_family: i32) -> Result<(i32,
 impl OpusProjectionEncoder {
     /// Upstream-style sizing helper.
     ///
-    /// For now this wrapper supports FOA (order+1=2) only.
     pub fn get_size(channels: i32, mapping_family: i32) -> i32 {
         let Ok((streams, coupled_streams, order_plus_one)) =
             get_streams_from_channels(channels, mapping_family)
         else {
             return 0;
         };
-        if order_plus_one != 2 {
+        let Some((mixing_matrix, demixing_matrix)) =
+            projection_matrices_for_order_plus_one(order_plus_one)
+        else {
+            return 0;
+        };
+        let input_channels = streams + coupled_streams;
+        if input_channels > mixing_matrix.rows
+            || channels > mixing_matrix.cols
+            || channels > demixing_matrix.rows
+            || input_channels > demixing_matrix.cols
+        {
             return 0;
         }
         if OpusMSEncoder::get_size(streams, coupled_streams) == 0 {
@@ -86,12 +86,23 @@ impl OpusProjectionEncoder {
         *streams = s;
         *coupled_streams = c;
 
-        if order_plus_one != 2 {
-            return Err(OPUS_UNIMPLEMENTED);
-        }
-
-        let mixing_matrix = MappingMatrix::new(6, 6, 0, &FOA_MIXING_DATA)?;
-        let demixing_matrix = MappingMatrix::new(6, 6, 0, &FOA_DEMIXING_DATA)?;
+        let Some((mixing_matrix_def, demixing_matrix_def)) =
+            projection_matrices_for_order_plus_one(order_plus_one)
+        else {
+            return Err(OPUS_BAD_ARG);
+        };
+        let mixing_matrix = MappingMatrix::new(
+            mixing_matrix_def.rows,
+            mixing_matrix_def.cols,
+            mixing_matrix_def.gain,
+            mixing_matrix_def.data,
+        )?;
+        let demixing_matrix = MappingMatrix::new(
+            demixing_matrix_def.rows,
+            demixing_matrix_def.cols,
+            demixing_matrix_def.gain,
+            demixing_matrix_def.data,
+        )?;
 
         let input_channels = s + c;
         if input_channels > mixing_matrix.rows() as i32

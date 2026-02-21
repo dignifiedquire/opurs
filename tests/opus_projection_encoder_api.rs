@@ -9,6 +9,7 @@ use std::ffi::c_void;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 unsafe extern "C" {
+    fn opus_projection_ambisonics_encoder_get_size(channels: i32, mapping_family: i32) -> i32;
     fn opus_projection_ambisonics_encoder_create(
         Fs: i32,
         channels: i32,
@@ -37,70 +38,90 @@ fn test_guard() -> MutexGuard<'static, ()> {
 }
 
 #[test]
-fn projection_encoder_foa_create_and_matrix_parity_with_c() {
+fn projection_encoder_get_size_zero_nonzero_parity() {
+    let _guard = test_guard();
+    let cases = [(4, 3), (9, 3), (36, 3), (49, 3), (4, 1)];
+    for (channels, mapping_family) in cases {
+        let rust = opurs::opus_projection_ambisonics_encoder_get_size(channels, mapping_family);
+        let c = unsafe { opus_projection_ambisonics_encoder_get_size(channels, mapping_family) };
+        assert_eq!(
+            rust == 0,
+            c == 0,
+            "projection encoder get_size validity mismatch (channels={channels}, mapping_family={mapping_family})"
+        );
+    }
+}
+
+#[test]
+fn projection_encoder_create_and_matrix_parity_with_c() {
     let _guard = test_guard();
 
-    let mut rust_streams = -1i32;
-    let mut rust_coupled = -1i32;
-    let rust_enc = rust_opus_projection_encoder_create(
-        48000,
-        4,
-        3,
-        &mut rust_streams,
-        &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
-    )
-    .expect("rust projection encoder create");
-
-    let mut c_streams = -1i32;
-    let mut c_coupled = -1i32;
-    let mut c_error = 0i32;
-    let c_enc = unsafe {
-        opus_projection_ambisonics_encoder_create(
+    for channels in [4, 9, 16, 25, 36] {
+        let mut rust_streams = -1i32;
+        let mut rust_coupled = -1i32;
+        let rust_enc = rust_opus_projection_encoder_create(
             48000,
-            4,
+            channels,
             3,
-            &mut c_streams,
-            &mut c_coupled,
+            &mut rust_streams,
+            &mut rust_coupled,
             OPUS_APPLICATION_AUDIO,
-            &mut c_error,
         )
-    };
-    assert!(
-        !c_enc.is_null(),
-        "c projection encoder create failed: {c_error}"
-    );
+        .expect("rust projection encoder create");
 
-    assert_eq!(rust_streams, c_streams);
-    assert_eq!(rust_coupled, c_coupled);
+        let mut c_streams = -1i32;
+        let mut c_coupled = -1i32;
+        let mut c_error = 0i32;
+        let c_enc = unsafe {
+            opus_projection_ambisonics_encoder_create(
+                48000,
+                channels,
+                3,
+                &mut c_streams,
+                &mut c_coupled,
+                OPUS_APPLICATION_AUDIO,
+                &mut c_error,
+            )
+        };
+        assert!(
+            !c_enc.is_null(),
+            "c projection encoder create failed (channels={channels}): {c_error}"
+        );
 
-    let rust_matrix_size = rust_enc.demixing_matrix_size();
-    let mut c_matrix_size = 0i32;
-    let ret = unsafe {
-        opus_projection_encoder_ctl(
-            c_enc,
-            OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
-            &mut c_matrix_size,
-        )
-    };
-    assert_eq!(ret, OPUS_OK);
-    assert_eq!(rust_matrix_size, c_matrix_size);
+        assert_eq!(rust_streams, c_streams);
+        assert_eq!(rust_coupled, c_coupled);
 
-    let mut rust_matrix = vec![0u8; rust_matrix_size as usize];
-    let mut c_matrix = vec![0u8; c_matrix_size as usize];
-    rust_enc.copy_demixing_matrix(&mut rust_matrix).unwrap();
-    let ret = unsafe {
-        opus_projection_encoder_ctl(
-            c_enc,
-            OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
-            c_matrix.as_mut_ptr(),
-            c_matrix_size,
-        )
-    };
-    assert_eq!(ret, OPUS_OK);
-    assert_eq!(rust_matrix, c_matrix, "demixing matrix bytes mismatch");
+        let rust_matrix_size = rust_enc.demixing_matrix_size();
+        let mut c_matrix_size = 0i32;
+        let ret = unsafe {
+            opus_projection_encoder_ctl(
+                c_enc,
+                OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
+                &mut c_matrix_size,
+            )
+        };
+        assert_eq!(ret, OPUS_OK);
+        assert_eq!(rust_matrix_size, c_matrix_size);
 
-    unsafe { opus_projection_encoder_destroy(c_enc) };
+        let mut rust_matrix = vec![0u8; rust_matrix_size as usize];
+        let mut c_matrix = vec![0u8; c_matrix_size as usize];
+        rust_enc.copy_demixing_matrix(&mut rust_matrix).unwrap();
+        let ret = unsafe {
+            opus_projection_encoder_ctl(
+                c_enc,
+                OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
+                c_matrix.as_mut_ptr(),
+                c_matrix_size,
+            )
+        };
+        assert_eq!(ret, OPUS_OK);
+        assert_eq!(
+            rust_matrix, c_matrix,
+            "demixing matrix bytes mismatch (channels={channels})"
+        );
+
+        unsafe { opus_projection_encoder_destroy(c_enc) };
+    }
 }
 
 #[test]

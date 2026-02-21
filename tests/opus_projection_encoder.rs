@@ -5,7 +5,7 @@ use opurs::{
     opus_projection_encode as rust_opus_projection_encode,
     opus_projection_encode24 as rust_opus_projection_encode24,
     opus_projection_encode_float as rust_opus_projection_encode_float, OPUS_APPLICATION_AUDIO,
-    OPUS_UNIMPLEMENTED,
+    OPUS_BAD_ARG,
 };
 
 #[test]
@@ -26,20 +26,37 @@ fn projection_encoder_foa_create_smoke() {
 }
 
 #[test]
-fn projection_encoder_higher_order_currently_unimplemented() {
+fn projection_encoder_soa_create_smoke() {
     let mut streams = 0i32;
     let mut coupled = 0i32;
-    let err = rust_opus_projection_encoder_create(
+    let enc = rust_opus_projection_encoder_create(
         48000,
         9,
         3,
         &mut streams,
         &mut coupled,
         OPUS_APPLICATION_AUDIO,
+    );
+    assert!(enc.is_ok());
+    assert_eq!(streams, 5);
+    assert_eq!(coupled, 4);
+}
+
+#[test]
+fn projection_encoder_unsupported_order_returns_bad_arg() {
+    let mut streams = 0i32;
+    let mut coupled = 0i32;
+    let err = rust_opus_projection_encoder_create(
+        48000,
+        49,
+        3,
+        &mut streams,
+        &mut coupled,
+        OPUS_APPLICATION_AUDIO,
     )
     .err()
-    .expect("higher order should not be implemented yet");
-    assert_eq!(err, OPUS_UNIMPLEMENTED);
+    .expect("order beyond available matrices should fail");
+    assert_eq!(err, OPUS_BAD_ARG);
 }
 
 #[test]
