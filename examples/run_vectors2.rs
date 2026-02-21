@@ -1655,6 +1655,23 @@ fn run_test(
                 ));
             }
             let bitstream_exact = upstream_encoded == rust_encoded;
+            let first_mismatch_byte = upstream_encoded
+                .iter()
+                .zip(rust_encoded.iter())
+                .position(|(a, b)| a != b)
+                .or_else(|| {
+                    if upstream_encoded.len() != rust_encoded.len() {
+                        Some(upstream_encoded.len().min(rust_encoded.len()))
+                    } else {
+                        None
+                    }
+                });
+            let mut bit_mismatch_bytes = upstream_encoded
+                .iter()
+                .zip(rust_encoded.iter())
+                .filter(|(a, b)| a != b)
+                .count();
+            bit_mismatch_bytes += upstream_encoded.len().abs_diff(rust_encoded.len());
 
             let upstream_decoded = opus_demo_decode_multistream(
                 OpusBackend::Upstream,
@@ -1733,9 +1750,22 @@ fn run_test(
                 pcm_i16_diff_stats(&upstream_decoded_from_rust, &rust_decoded_from_rust)
                     .unwrap_or((0, 0.0));
 
+            let mismatch_detail = if bitstream_exact {
+                "bit_mismatch_bytes=0".to_string()
+            } else {
+                match first_mismatch_byte {
+                    Some(byte) => format!(
+                        "bit_mismatch_bytes={} first_mismatch_byte={}",
+                        bit_mismatch_bytes, byte
+                    ),
+                    None => format!("bit_mismatch_bytes={}", bit_mismatch_bytes),
+                }
+            };
+
             TestResult::pass(format!(
-                "decoder parity on both bitstreams; bitexact={} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.2} diff_rust(max/mean)={}/{:.2}",
+                "decoder parity on both bitstreams; bitexact={} {} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.2} diff_rust(max/mean)={}/{:.2}",
                 bitstream_exact,
+                mismatch_detail,
                 upstream_encoded.len(),
                 rust_encoded.len(),
                 max_diff_up,
@@ -1928,6 +1958,9 @@ fn run_test(
                 }
 
                 let mut bitstream_exact = true;
+                let mut bitstream_mismatch_packets = 0usize;
+                let mut first_mismatch_packet: Option<usize> = None;
+                let mut first_mismatch_byte: Option<usize> = None;
                 let mut max_diff_upstream = 0i32;
                 let mut max_diff_rust = 0i32;
                 let mut sum_diff_upstream = 0f64;
@@ -1981,6 +2014,21 @@ fn run_test(
 
                     if upstream_packet != rust_packet {
                         bitstream_exact = false;
+                        bitstream_mismatch_packets += 1;
+                        if first_mismatch_packet.is_none() {
+                            first_mismatch_packet = Some(packet_idx);
+                            first_mismatch_byte = upstream_packet
+                                .iter()
+                                .zip(rust_packet.iter())
+                                .position(|(a, b)| a != b)
+                                .or_else(|| {
+                                    if upstream_packet.len() != rust_packet.len() {
+                                        Some(upstream_packet.len().min(rust_packet.len()))
+                                    } else {
+                                        None
+                                    }
+                                });
+                        }
                     }
 
                     let mut c_out_upstream = vec![0i16; samples_per_packet];
@@ -2114,10 +2162,23 @@ fn run_test(
                     sum_diff_rust / diff_samples_rust as f64
                 };
 
+                let mismatch_detail = if bitstream_exact {
+                    "bit_mismatch_packets=0".to_string()
+                } else {
+                    match (first_mismatch_packet, first_mismatch_byte) {
+                        (Some(pkt), Some(byte)) => format!(
+                            "bit_mismatch_packets={} first_mismatch_packet={} first_mismatch_byte={}",
+                            bitstream_mismatch_packets, pkt, byte
+                        ),
+                        _ => format!("bit_mismatch_packets={}", bitstream_mismatch_packets),
+                    }
+                };
+
                 TestResult::pass(format!(
-                    "projection parity packets={} bitexact={} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.3} diff_rust(max/mean)={}/{:.3}",
+                    "projection parity packets={} bitexact={} {} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.3} diff_rust(max/mean)={}/{:.3}",
                     projection_case.packet_count,
                     bitstream_exact,
+                    mismatch_detail,
                     upstream_total_bytes,
                     rust_total_bytes,
                     max_diff_upstream,
