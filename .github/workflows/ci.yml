@@ -129,7 +129,9 @@ jobs:
       - name: Generate benchmark summary
         run: |
           ./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-smoke-summary.md
+          ./scripts/criterion_projection_summary.sh target/criterion target/criterion/projection-smoke-summary.md
           cat target/criterion/multistream-smoke-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat target/criterion/projection-smoke-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload benchmark artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,6 +141,7 @@ jobs:
             target/criterion/multistream_*
             target/criterion/projection_*
             target/criterion/multistream-smoke-summary.md
+            target/criterion/projection-smoke-summary.md
           if-no-files-found: warn
 
   examples-smoke:

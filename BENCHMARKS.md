@@ -276,6 +276,9 @@ cargo bench --features tools --bench projection
 
 # Summarize Criterion multistream outputs to Markdown
 ./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-summary.md
+
+# Summarize Criterion projection outputs to Markdown
+./scripts/criterion_projection_summary.sh target/criterion target/criterion/projection-summary.md
 ```
 
 ## Notes

@@ -37,6 +37,7 @@ Primary target headers:
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.3` projection benchmark suite added (`projection_encode_cmp`, `projection_decode_cmp`, `projection_matrix_apply`) with `tools` bench target
   - `M4.4` benchmark smoke lane with artifact upload added to CI
+  - `M4.4` CI benchmark summaries now include projection tables via `criterion_projection_summary.sh`
   - `M2.5` `run_vectors2` suite registry now drives suite discovery and kind selection
   - `M2.2` demo multistream encode/decode now runs through the backend trait for both Rust and upstream libopus implementations (no duplicated per-backend code path in `tools::demo`)
   - `M2.3` multistream example smoke coverage added to CI (`opus_demo` multistream help + `multistream_demo` run)
