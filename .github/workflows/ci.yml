@@ -165,6 +165,8 @@ jobs:
         run: cargo test --features tools --test tools_multistream
       - name: Run multistream API parity tests
         run: cargo test --features tools --test opus_multistream_api
+      - name: Run projection decoder API parity tests
+        run: cargo test --features tools --test opus_projection_decoder_api
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |
