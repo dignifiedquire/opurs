@@ -202,22 +202,28 @@ jobs:
           - name: linux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            major_platform: true
           - name: linux-i686
             os: ubuntu-latest
             target: i686-unknown-linux-gnu
             packages: gcc-multilib
+            major_platform: false
           - name: macos-arm64
             os: macos-15
             target: aarch64-apple-darwin
+            major_platform: true
           - name: macos-x86_64
             os: macos-15-intel
             target: x86_64-apple-darwin
+            major_platform: true
           - name: windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            major_platform: true
           - name: windows-i686
             os: windows-latest
             target: i686-pc-windows-msvc
+            major_platform: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -364,11 +370,12 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
-      - name: Run test vectors
+      - name: Run test vectors (full matrix on major platforms)
+        if: matrix.major_platform
+        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- --matrix full opus_newvectors
+      - name: Run test vectors (quick matrix on non-major platforms)
+        if: ${{ !matrix.major_platform }}
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
-      - name: Run multistream full-matrix vector parity (linux-x86_64 only)
-        if: matrix.name == 'linux-x86_64'
-        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full
 
   test-vectors-dnn:
     name: DNN Vectors (${{ matrix.name }})
