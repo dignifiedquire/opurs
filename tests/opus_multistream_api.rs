@@ -41,6 +41,7 @@ use opurs::{
     OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
     OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_VOICE,
 };
+use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 fn test_guard() -> MutexGuard<'static, ()> {
@@ -434,6 +435,8 @@ fn multistream_surround_init_parity_with_c() {
         (6, 2),
         (5, 2),
     ];
+    let c_max_size = unsafe { opus_multistream_surround_encoder_get_size(255, 255) };
+    assert!(c_max_size > 0, "unexpected zero max surround encoder size");
 
     for (channels, mapping_family) in cases {
         let mut rust = OpusMSEncoder::new(48000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
@@ -451,19 +454,13 @@ fn multistream_surround_init_parity_with_c() {
             OPUS_APPLICATION_AUDIO,
         );
 
-        let mut c_error = 0i32;
-        let c_ptr = unsafe {
-            opus_multistream_encoder_create(
-                48000,
-                2,
-                1,
-                1,
-                [0u8, 1u8].as_ptr(),
-                OPUS_APPLICATION_AUDIO,
-                &mut c_error as *mut _,
-            )
-        };
-        assert!(!c_ptr.is_null(), "c create failed: {c_error}");
+        let c_case_size =
+            unsafe { opus_multistream_surround_encoder_get_size(channels, mapping_family) };
+        let c_alloc_size = c_case_size.max(c_max_size) as usize;
+        let c_layout = Layout::from_size_align(c_alloc_size, 64).expect("valid C encoder layout");
+        let c_storage = unsafe { alloc_zeroed(c_layout) };
+        assert!(!c_storage.is_null(), "c allocation failed");
+        let c_ptr = c_storage.cast();
         let mut c_streams = -1i32;
         let mut c_coupled = -1i32;
         let mut c_mapping = vec![0u8; channels.max(0) as usize];
@@ -479,11 +476,7 @@ fn multistream_surround_init_parity_with_c() {
                 OPUS_APPLICATION_AUDIO,
             )
         };
-        // Upstream may leave state partially initialized on failing surround init
-        // paths; avoid destroy-on-error to keep parity tests deterministic under CI.
-        if c_ret == 0 {
-            unsafe { opus_multistream_encoder_destroy(c_ptr) };
-        }
+        unsafe { dealloc(c_storage, c_layout) };
 
         assert_eq!(
             rust_ret, c_ret,
