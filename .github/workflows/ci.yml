@@ -106,6 +106,8 @@ jobs:
           key: bench-smoke
       - name: Build multistream bench
         run: cargo bench --features tools --bench multistream --no-run
+      - name: Build projection bench
+        run: cargo bench --features tools --bench projection --no-run
       - name: Run short multistream encode bench slices
         run: cargo bench --features tools --bench multistream -- multistream_encode_cmp/rust/1ch_10ms_32000
       - name: Run short multistream encode C slice
@@ -114,6 +116,16 @@ jobs:
         run: cargo bench --features tools --bench multistream -- multistream_decode_cmp/rust/1ch_10ms_32000
       - name: Run short multistream decode C slice
         run: cargo bench --features tools --bench multistream -- multistream_decode_cmp/c/1ch_10ms_32000
+      - name: Run short projection encode bench slices
+        run: cargo bench --features tools --bench projection -- projection_encode_cmp/rust/4ch_10ms_96000
+      - name: Run short projection encode C slice
+        run: cargo bench --features tools --bench projection -- projection_encode_cmp/c/4ch_10ms_96000
+      - name: Run short projection decode bench slice
+        run: cargo bench --features tools --bench projection -- projection_decode_cmp/rust/4ch_10ms_96000
+      - name: Run short projection decode C slice
+        run: cargo bench --features tools --bench projection -- projection_decode_cmp/c/4ch_10ms_96000
+      - name: Run short projection matrix-apply bench slice
+        run: cargo bench --features tools --bench projection -- projection_matrix_apply/4ch_10ms
       - name: Generate benchmark summary
         run: |
           ./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-smoke-summary.md
@@ -125,6 +137,7 @@ jobs:
           name: bench-smoke-criterion
           path: |
             target/criterion/multistream_*
+            target/criterion/projection_*
             target/criterion/multistream-smoke-summary.md
           if-no-files-found: warn
 

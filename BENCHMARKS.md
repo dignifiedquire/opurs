@@ -94,6 +94,20 @@ Selected low-bitrate (32 kbps) points:
 
 Raw Criterion outputs for the full matrix are in `target-local/criterion/multistream_*`.
 
+## Projection Benchmark Coverage
+
+Projection benchmark suite (`benches/projection.rs`) now covers:
+- End-to-end encode throughput (`projection_encode_cmp`) for Rust vs upstream C
+- End-to-end decode throughput (`projection_decode_cmp`) for Rust vs upstream C
+- Matrix apply hot path (`projection_matrix_apply`) on Rust demixing path
+
+Run:
+
+```bash
+CARGO_TARGET_DIR=target-local RUSTFLAGS="-C target-cpu=native" \
+  cargo bench --features tools --bench projection
+```
+
 ## Per-Function: Rust vs C (with SIMD)
 
 ### celt_pitch_xcorr — aarch64 (NEON)
@@ -256,6 +270,9 @@ cargo bench --features tools --bench codec_comparison
 
 # Multistream comparison matrix: Rust vs C
 cargo bench --features tools --bench multistream
+
+# Projection comparison matrix + matrix apply
+cargo bench --features tools --bench projection
 
 # Summarize Criterion multistream outputs to Markdown
 ./scripts/criterion_multistream_summary.sh target/criterion target/criterion/multistream-summary.md

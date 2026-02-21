@@ -92,6 +92,11 @@ harness = false
 required-features = ["tools"]
 
 [[bench]]
+name = "projection"
+harness = false
+required-features = ["tools"]
+
+[[bench]]
 name = "dnn"
 harness = false
 required-features = ["deep-plc"]
