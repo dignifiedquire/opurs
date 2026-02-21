@@ -9,8 +9,10 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use indicatif::ParallelProgressIterator;
 use opurs::tools::demo::{
-    opus_demo_decode, opus_demo_encode, Application, Channels, CommonOptions, Complexity,
-    DecodeArgs, DnnOptions, EncodeArgs, EncoderOptions, FrameSize, OpusBackend, SampleRate,
+    opus_demo_decode, opus_demo_decode_multistream, opus_demo_encode, opus_demo_encode_multistream,
+    Application, Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions,
+    EncodeArgs, EncoderOptions, FrameSize, MultistreamDecodeArgs, MultistreamEncodeArgs,
+    MultistreamLayout, OpusBackend, SampleRate,
 };
 use opurs::tools::{opus_compare, CompareParams};
 use std::collections::{BTreeMap, BTreeSet};
@@ -37,6 +39,7 @@ enum SuiteArg {
     Qext,
     QextFuzz,
     DredOpus,
+    Multistream,
     All,
 }
 
@@ -89,6 +92,7 @@ enum VectorSuite {
     Qext,
     QextFuzz,
     DredOpus,
+    Multistream,
 }
 
 impl VectorSuite {
@@ -98,6 +102,7 @@ impl VectorSuite {
             VectorSuite::Qext => "qext",
             VectorSuite::QextFuzz => "qext-fuzz",
             VectorSuite::DredOpus => "dred-opus",
+            VectorSuite::Multistream => "multistream",
         }
     }
 }
@@ -111,7 +116,7 @@ struct SuiteDefinition {
     include_dnn_kinds: bool,
 }
 
-const SUITE_DEFINITIONS: [SuiteDefinition; 4] = [
+const SUITE_DEFINITIONS: [SuiteDefinition; 5] = [
     SuiteDefinition {
         suite: VectorSuite::Classic,
         arg: SuiteArg::Classic,
@@ -140,7 +145,21 @@ const SUITE_DEFINITIONS: [SuiteDefinition; 4] = [
         build_standard_kinds: build_standard_kinds_dred_opus,
         include_dnn_kinds: false,
     },
+    SuiteDefinition {
+        suite: VectorSuite::Multistream,
+        arg: SuiteArg::Multistream,
+        discover: load_multistream_vectors,
+        build_standard_kinds: build_standard_kinds_multistream,
+        include_dnn_kinds: false,
+    },
 ];
+
+#[derive(Debug, Clone)]
+struct MultistreamVectorCase {
+    encode_args: MultistreamEncodeArgs,
+    pcm: Vec<u8>,
+    full_only: bool,
+}
 
 #[derive(Debug, Clone)]
 struct TestVector {
@@ -149,6 +168,7 @@ struct TestVector {
     encoded: Vec<u8>,
     decoded_stereo: Option<Vec<u8>>,
     decoded_mono: Option<Vec<u8>>,
+    multistream_case: Option<MultistreamVectorCase>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -177,6 +197,11 @@ enum TestKind {
         sample_rate: SampleRate,
         complexity: Complexity,
         ignore_extensions: bool,
+    },
+    /// Multistream encode+decode differential parity.
+    ParityMultistream {
+        ignore_extensions: bool,
+        matrix: MatrixMode,
     },
 }
 
@@ -335,6 +360,20 @@ fn kind_label(kind: TestKind) -> String {
                 )
             }
         }
+        TestKind::ParityMultistream {
+            ignore_extensions,
+            matrix,
+        } => {
+            let matrix = match matrix {
+                MatrixMode::Quick => "quick",
+                MatrixMode::Full => "full",
+            };
+            if ignore_extensions {
+                format!("MS ENC+DEC parity ({matrix}, ignore-ext)")
+            } else {
+                format!("MS ENC+DEC parity ({matrix})")
+            }
+        }
     }
 }
 
@@ -391,6 +430,7 @@ fn load_classic_vectors(vector_dir: &Path) -> Vec<TestVector> {
             decoded_mono: Some(
                 std::fs::read(decoded_mono_path).expect("reading decoded mono file"),
             ),
+            multistream_case: None,
         });
     }
 
@@ -460,6 +500,7 @@ fn load_qext_vectors(vector_dir: &Path, fuzz: bool) -> Vec<TestVector> {
             encoded: std::fs::read(encoded_path).expect("reading qext bitstream"),
             decoded_stereo: None,
             decoded_mono: None,
+            multistream_case: None,
         });
     }
 
@@ -516,10 +557,198 @@ fn load_dred_opus_vectors(vector_dir: &Path) -> Vec<TestVector> {
             encoded: std::fs::read(encoded_path).expect("reading dred-opus bitstream"),
             decoded_stereo: None,
             decoded_mono: None,
+            multistream_case: None,
         });
     }
 
     vectors
+}
+
+fn synth_multistream_pcm(channels: usize, samples_per_channel: usize, seed: u32) -> Vec<u8> {
+    let mut out = Vec::with_capacity(channels * samples_per_channel * 2);
+    let mut state = seed;
+    for i in 0..samples_per_channel {
+        for ch in 0..channels {
+            state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+            let noise = ((state >> 16) & 0x7fff) as i16 - 16384;
+            let tone = ((i as i32 * 29 + ch as i32 * 113) & 0x7fff) as i16 - 16384;
+            let sample = noise.wrapping_add(tone.wrapping_shr(1));
+            out.extend_from_slice(&sample.to_le_bytes());
+        }
+    }
+    out
+}
+
+fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
+    struct Def {
+        name: &'static str,
+        application: Application,
+        sample_rate: SampleRate,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        mapping: &'static [u8],
+        bitrate: u32,
+        frame_size: FrameSize,
+        packet_count: usize,
+        options: EncoderOptions,
+        seed: u32,
+        full_only: bool,
+    }
+
+    let defs = [
+        Def {
+            name: "ms_3ch_2s1c_default",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 3,
+            streams: 2,
+            coupled_streams: 1,
+            mapping: &[0, 1, 2],
+            bitrate: 64_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 1,
+            full_only: false,
+        },
+        Def {
+            name: "ms_4ch_4s0c_cbr_wb",
+            application: Application::Voip,
+            sample_rate: SampleRate::R48000,
+            channels: 4,
+            streams: 4,
+            coupled_streams: 0,
+            mapping: &[0, 1, 2, 3],
+            bitrate: 96_000,
+            frame_size: FrameSize::Ms10,
+            packet_count: 10,
+            options: EncoderOptions {
+                cbr: true,
+                bandwidth: Some(Bandwidth::Wideband),
+                framesize: FrameSize::Ms10,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 2,
+            full_only: false,
+        },
+        Def {
+            name: "ms_5ch_3s2c_cvbr_dtx",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 5,
+            streams: 3,
+            coupled_streams: 2,
+            mapping: &[0, 4, 1, 2, 3],
+            bitrate: 128_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                cvbr: true,
+                dtx: true,
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 3,
+            full_only: true,
+        },
+        Def {
+            name: "ms_6ch_4s2c_rld_fb",
+            application: Application::RestrictedLowDelay,
+            sample_rate: SampleRate::R48000,
+            channels: 6,
+            streams: 4,
+            coupled_streams: 2,
+            mapping: &[0, 4, 1, 2, 3, 5],
+            bitrate: 192_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            options: EncoderOptions {
+                bandwidth: Some(Bandwidth::Fullband),
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 4,
+            full_only: false,
+        },
+        Def {
+            name: "ms_4ch_with_silent_mapping",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 4,
+            streams: 2,
+            coupled_streams: 1,
+            mapping: &[0, 1, 255, 2],
+            bitrate: 80_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 5,
+            full_only: true,
+        },
+        Def {
+            name: "ms_2ch_dual_mono_swapped",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 2,
+            streams: 2,
+            coupled_streams: 0,
+            mapping: &[1, 0],
+            bitrate: 48_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 6,
+            full_only: false,
+        },
+    ];
+
+    defs.into_iter()
+        .map(|def| {
+            let samples_per_channel =
+                def.frame_size.samples_for_rate(def.sample_rate) * def.packet_count;
+            let pcm = synth_multistream_pcm(def.channels as usize, samples_per_channel, def.seed);
+            let encode_args = MultistreamEncodeArgs {
+                application: def.application,
+                sample_rate: def.sample_rate,
+                layout: MultistreamLayout {
+                    channels: def.channels,
+                    streams: def.streams,
+                    coupled_streams: def.coupled_streams,
+                    mapping: def.mapping.to_vec(),
+                },
+                bitrate: def.bitrate,
+                options: def.options,
+            };
+            TestVector {
+                suite: VectorSuite::Multistream,
+                name: def.name.to_string(),
+                encoded: Vec::new(),
+                decoded_stereo: None,
+                decoded_mono: None,
+                multistream_case: Some(MultistreamVectorCase {
+                    encode_args,
+                    pcm,
+                    full_only: def.full_only,
+                }),
+            }
+        })
+        .collect()
 }
 
 fn load_vectors_by_suite(vector_dir: &Path) -> BTreeMap<VectorSuite, Vec<TestVector>> {
@@ -739,6 +968,21 @@ fn build_standard_kinds_dred_opus(
     }
 }
 
+fn build_standard_kinds_multistream(
+    args: &Cli,
+    run_standard: bool,
+    _unused: &[TestKind],
+) -> Vec<TestKind> {
+    if run_standard && matches!(args.mode, RunMode::Parity | RunMode::Both) {
+        vec![TestKind::ParityMultistream {
+            ignore_extensions: args.ignore_extensions,
+            matrix: args.matrix,
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
 fn build_suite_kinds(
     suite_definition: SuiteDefinition,
     args: &Cli,
@@ -752,6 +996,31 @@ fn build_suite_kinds(
         suite_kinds.extend(dnn_kinds.iter().copied());
     }
     suite_kinds
+}
+
+fn pcm_i16_diff_stats(lhs: &[u8], rhs: &[u8]) -> Option<(i32, f64)> {
+    if lhs.len() != rhs.len() || !lhs.len().is_multiple_of(2) {
+        return None;
+    }
+
+    let mut max_abs_diff = 0i32;
+    let mut sum_abs_diff = 0f64;
+    let mut count = 0usize;
+
+    for (l, r) in lhs.chunks_exact(2).zip(rhs.chunks_exact(2)) {
+        let l = i16::from_le_bytes([l[0], l[1]]) as i32;
+        let r = i16::from_le_bytes([r[0], r[1]]) as i32;
+        let diff = (l - r).abs();
+        max_abs_diff = max_abs_diff.max(diff);
+        sum_abs_diff += diff as f64;
+        count += 1;
+    }
+
+    if count == 0 {
+        Some((0, 0.0))
+    } else {
+        Some((max_abs_diff, sum_abs_diff / count as f64))
+    }
 }
 
 fn run_test(
@@ -1088,6 +1357,135 @@ fn run_test(
             } else {
                 TestResult::fail("different decoded audio")
             }
+        }
+        TestKind::ParityMultistream {
+            ignore_extensions,
+            matrix,
+        } => {
+            let Some(multistream_case) = test_vector.multistream_case.as_ref() else {
+                return TestResult::skip("missing multistream vector definition");
+            };
+            if matches!(matrix, MatrixMode::Quick) && multistream_case.full_only {
+                return TestResult::skip("multistream stress vector (enabled in --matrix full)");
+            }
+
+            let encode_args = multistream_case.encode_args.clone();
+            let decode_args = MultistreamDecodeArgs {
+                sample_rate: encode_args.sample_rate,
+                layout: encode_args.layout.clone(),
+                options: CommonOptions {
+                    ignore_extensions,
+                    ..Default::default()
+                },
+                complexity: None,
+            };
+
+            let (upstream_encoded, upstream_pre_skip) = opus_demo_encode_multistream(
+                OpusBackend::Upstream,
+                &multistream_case.pcm,
+                encode_args.clone(),
+            );
+            let (rust_encoded, rust_pre_skip) = opus_demo_encode_multistream(
+                OpusBackend::Rust,
+                &multistream_case.pcm,
+                encode_args.clone(),
+            );
+
+            if rust_pre_skip != upstream_pre_skip {
+                return TestResult::fail(format!(
+                    "different pre-skip: rust={} upstream={}",
+                    rust_pre_skip, upstream_pre_skip
+                ));
+            }
+            let bitstream_exact = upstream_encoded == rust_encoded;
+
+            let upstream_decoded = opus_demo_decode_multistream(
+                OpusBackend::Upstream,
+                &upstream_encoded,
+                decode_args.clone(),
+            );
+            let rust_decoded = opus_demo_decode_multistream(
+                OpusBackend::Rust,
+                &upstream_encoded,
+                decode_args.clone(),
+            );
+            if upstream_decoded != rust_decoded {
+                let Some((max_diff, mean_diff)) =
+                    pcm_i16_diff_stats(&upstream_decoded, &rust_decoded)
+                else {
+                    return TestResult::fail(
+                        "decoded size mismatch on upstream multistream bitstream",
+                    );
+                };
+                if max_diff > 512 {
+                    return TestResult::fail(format!(
+                        "decoded mismatch on upstream multistream bitstream: max_diff={} mean_diff={:.2}",
+                        max_diff, mean_diff
+                    ));
+                }
+            }
+
+            let upstream_decoded_from_rust = opus_demo_decode_multistream(
+                OpusBackend::Upstream,
+                &rust_encoded,
+                decode_args.clone(),
+            );
+            let rust_decoded_from_rust =
+                opus_demo_decode_multistream(OpusBackend::Rust, &rust_encoded, decode_args);
+            if upstream_decoded_from_rust != rust_decoded_from_rust {
+                let Some((max_diff, mean_diff)) =
+                    pcm_i16_diff_stats(&upstream_decoded_from_rust, &rust_decoded_from_rust)
+                else {
+                    return TestResult::fail("decoded size mismatch on rust multistream bitstream");
+                };
+                if max_diff > 512 {
+                    return TestResult::fail(format!(
+                        "decoded mismatch on rust multistream bitstream: max_diff={} mean_diff={:.2}",
+                        max_diff, mean_diff
+                    ));
+                }
+            }
+
+            if let Some(dump_directory) = dump_directory {
+                let name_base = format!("{}_ms_{}", test_vector.suite.as_str(), test_vector.name);
+                std::fs::write(
+                    dump_directory.join(format!("{}_upstream.enc", &name_base)),
+                    &upstream_encoded,
+                )
+                .expect("writing upstream multistream encode dump");
+                std::fs::write(
+                    dump_directory.join(format!("{}_rust.enc", &name_base)),
+                    &rust_encoded,
+                )
+                .expect("writing rust multistream encode dump");
+                std::fs::write(
+                    dump_directory.join(format!("{}_upstream.dec", &name_base)),
+                    &upstream_decoded,
+                )
+                .expect("writing upstream multistream decode dump");
+                std::fs::write(
+                    dump_directory.join(format!("{}_rust.dec", &name_base)),
+                    &rust_decoded,
+                )
+                .expect("writing rust multistream decode dump");
+            }
+
+            let (max_diff_up, mean_diff_up) =
+                pcm_i16_diff_stats(&upstream_decoded, &rust_decoded).unwrap_or((0, 0.0));
+            let (max_diff_rust, mean_diff_rust) =
+                pcm_i16_diff_stats(&upstream_decoded_from_rust, &rust_decoded_from_rust)
+                    .unwrap_or((0, 0.0));
+
+            TestResult::pass(format!(
+                "decoder parity on both bitstreams; bitexact={} bytes(upstream/rust)={}/{} diff_up(max/mean)={}/{:.2} diff_rust(max/mean)={}/{:.2}",
+                bitstream_exact,
+                upstream_encoded.len(),
+                rust_encoded.len(),
+                max_diff_up,
+                mean_diff_up,
+                max_diff_rust,
+                mean_diff_rust
+            ))
         }
     }
 }

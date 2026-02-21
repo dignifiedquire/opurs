@@ -104,6 +104,9 @@ Run the IETF bit-exact vector test suite, comparing Rust output against the C re
 
 ```bash
 cargo run --release --features tools --example run_vectors2 -- opus_newvectors
+
+# Multistream parity vectors (deterministic synthetic suite)
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --matrix quick
 ```
 
 ## Testing

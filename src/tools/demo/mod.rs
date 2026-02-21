@@ -427,6 +427,9 @@ fn opus_demo_decode_multistream_impl<B: OpusBackendTrait>(
     while cursor.position() < len as u64 {
         let data_bytes = cursor.read_u32::<BigEndian>().unwrap();
         let _enc_final_range = cursor.read_u32::<BigEndian>().unwrap();
+        if data_bytes as usize > packet.len() {
+            packet.resize(data_bytes as usize, 0);
+        }
         let packet_slice = &mut packet[..data_bytes as usize];
         cursor.read_exact(packet_slice).unwrap();
 
