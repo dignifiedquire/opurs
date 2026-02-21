@@ -43,6 +43,7 @@ Primary target headers:
   - `M2.4` tooling multistream integration test suite now has a dedicated CI smoke lane (`test-tools-smoke`)
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
   - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
+  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
@@ -56,9 +57,9 @@ Primary target headers:
   - `M3.3` projection decode parity matrix expanded across frame sizes + output formats, including PLC/FEC parity checks against upstream C
   - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
 - Next ordered slices:
-  1. Add projection-specific vector-harness coverage once assets are available.
-  2. Expand projection encode/decode parity matrix beyond current smoke set (frame sizes, PLC/FEC paths, i16/f32/i24).
-  3. Fold projection parity lanes into CI matrix for major targets once runtime budget is validated.
+  1. Add asset-backed projection vector suite loading once upstream projection vector assets are available.
+  2. Expand projection vector suite parameter matrix (frame sizes, channels, bitrate/application combinations) and tune quick/full runtime envelopes.
+  3. Fold projection vector parity lanes into additional CI targets once runtime budget is validated.
 
 ## Milestone Checklist
 

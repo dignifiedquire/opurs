@@ -176,6 +176,8 @@ jobs:
           tar -xzf vectors.tar.gz
       - name: Run multistream quick-matrix vector parity
         run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix quick
+      - name: Run projection quick-matrix vector parity
+        run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite projection --mode parity --matrix quick
 
   test-projection-parity:
     name: Projection parity (${{ matrix.name }})
