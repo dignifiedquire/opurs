@@ -50,7 +50,7 @@ Primary target headers:
   - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
-  - `M3.3` projection synthetic parity improved after upstream-aligned self-delimited packetization fix (`4ch`/`11ch` vectors now bitexact in full matrix; higher-order `16ch`/`25ch` residual deltas remain)
+  - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`9/9`, including `--strict-bitexact`)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing

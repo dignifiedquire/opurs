@@ -624,6 +624,35 @@ impl OpusMSEncoder {
             return OPUS_BAD_ARG;
         }
         let analysis_frame_size = (pcm.len() / channels) as i32;
+        let analysis_input = DownmixInput::Float(pcm);
+        self.encode_float_with_analysis(
+            pcm,
+            analysis_frame_size,
+            24,
+            1,
+            Some(&analysis_input),
+            output,
+        )
+    }
+
+    pub(crate) fn encode_float_with_analysis(
+        &mut self,
+        pcm: &[f32],
+        analysis_frame_size: i32,
+        lsb_depth: i32,
+        float_api: i32,
+        analysis_input: Option<&DownmixInput<'_>>,
+        output: &mut [u8],
+    ) -> i32 {
+        let channels = self.layout().channels() as usize;
+        if channels == 0
+            || pcm.is_empty()
+            || !pcm.len().is_multiple_of(channels)
+            || analysis_frame_size <= 0
+            || pcm.len() != analysis_frame_size as usize * channels
+        {
+            return OPUS_BAD_ARG;
+        }
         let Some(first_encoder) = self.encoders.first() else {
             return OPUS_BAD_ARG;
         };
@@ -680,21 +709,20 @@ impl OpusMSEncoder {
                 )));
             }
             let mut stream_packet = vec![0u8; curr_max];
-            let analysis_input = DownmixInput::Float(pcm);
             let len = opus_encode_native(
                 encoder,
                 &stream_pcm,
                 frame_size_i32,
                 &mut stream_packet,
                 curr_max as i32,
-                24,
-                Some(&analysis_input),
+                lsb_depth,
+                analysis_input,
                 analysis_frame_size,
                 c1,
                 c2,
                 analysis_channels,
                 None,
-                1,
+                float_api,
             );
             if len < 0 {
                 return len;

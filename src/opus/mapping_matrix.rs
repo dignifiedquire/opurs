@@ -180,13 +180,13 @@ impl MappingMatrix {
         }
 
         for i in 0..frame_size {
-            let mut tmp = 0i32;
+            let mut tmp = 0f32;
             for col in 0..input_rows {
-                let coeff = self.data[matrix_index(self.rows, output_row, col)] as i32;
-                let sample = input[matrix_index(input_rows, col, i)] as i32;
+                let coeff = self.data[matrix_index(self.rows, output_row, col)] as f32;
+                let sample = input[matrix_index(input_rows, col, i)] as f32;
                 tmp += coeff * sample;
             }
-            output[output_rows * i] = (1.0 / (32768.0 * 32768.0)) * tmp as f32;
+            output[output_rows * i] = (1.0 / (32768.0 * 32768.0)) * tmp;
         }
         Ok(())
     }
@@ -276,13 +276,13 @@ impl MappingMatrix {
         }
 
         for i in 0..frame_size {
-            let mut tmp = 0i64;
+            let mut tmp = 0f32;
             for col in 0..input_rows {
-                let coeff = self.data[matrix_index(self.rows, output_row, col)] as i64;
-                let sample = input[matrix_index(input_rows, col, i)] as i64;
+                let coeff = self.data[matrix_index(self.rows, output_row, col)] as f32;
+                let sample = input[matrix_index(input_rows, col, i)] as f32;
                 tmp += coeff * sample;
             }
-            output[output_rows * i] = (1.0 / (32768.0 * 32768.0 * 256.0)) * tmp as f32;
+            output[output_rows * i] = (1.0 / (32768.0 * 32768.0 * 256.0)) * tmp;
         }
         Ok(())
     }

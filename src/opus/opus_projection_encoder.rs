@@ -4,6 +4,7 @@
 
 use crate::enums::Application;
 use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::opus::analysis::DownmixInput;
 use crate::opus::mapping_matrix::MappingMatrix;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
 use crate::opus::opus_encoder::OpusEncoder;
@@ -159,7 +160,8 @@ impl OpusProjectionEncoder {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
-        let frame_size = frame_size as usize;
+        let analysis_frame_size = frame_size;
+        let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
             return OPUS_BAD_ARG;
@@ -178,14 +180,23 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        self.encoder.encode_float(&mixed, data)
+        let analysis_input = DownmixInput::Int(pcm);
+        self.encoder.encode_float_with_analysis(
+            &mixed,
+            analysis_frame_size,
+            16,
+            0,
+            Some(&analysis_input),
+            data,
+        )
     }
 
     pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, data: &mut [u8]) -> i32 {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
-        let frame_size = frame_size as usize;
+        let analysis_frame_size = frame_size;
+        let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
             return OPUS_BAD_ARG;
@@ -204,14 +215,23 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        self.encoder.encode_float(&mixed, data)
+        let analysis_input = DownmixInput::Float(pcm);
+        self.encoder.encode_float_with_analysis(
+            &mixed,
+            analysis_frame_size,
+            24,
+            1,
+            Some(&analysis_input),
+            data,
+        )
     }
 
     pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, data: &mut [u8]) -> i32 {
         if frame_size <= 0 {
             return OPUS_BAD_ARG;
         }
-        let frame_size = frame_size as usize;
+        let analysis_frame_size = frame_size;
+        let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
             return OPUS_BAD_ARG;
@@ -230,7 +250,15 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        self.encoder.encode_float(&mixed, data)
+        let analysis_input = DownmixInput::Int24(pcm);
+        self.encoder.encode_float_with_analysis(
+            &mixed,
+            analysis_frame_size,
+            24,
+            0,
+            Some(&analysis_input),
+            data,
+        )
     }
 
     pub fn demixing_matrix_gain(&self) -> i32 {
