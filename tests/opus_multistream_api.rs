@@ -479,7 +479,11 @@ fn multistream_surround_init_parity_with_c() {
                 OPUS_APPLICATION_AUDIO,
             )
         };
-        unsafe { opus_multistream_encoder_destroy(c_ptr) };
+        // Upstream may leave state partially initialized on failing surround init
+        // paths; avoid destroy-on-error to keep parity tests deterministic under CI.
+        if c_ret == 0 {
+            unsafe { opus_multistream_encoder_destroy(c_ptr) };
+        }
 
         assert_eq!(
             rust_ret, c_ret,
