@@ -23,7 +23,7 @@ pub struct MappingMatrix {
 impl MappingMatrix {
     /// Upstream C: src/mapping_matrix.c:mapping_matrix_get_size
     pub fn get_size(rows: i32, cols: i32) -> i32 {
-        if rows <= 0 || cols <= 0 || rows > 255 || cols > 255 {
+        if rows < 0 || cols < 0 || rows > 255 || cols > 255 {
             return 0;
         }
         let cell_size = rows.saturating_mul(cols).saturating_mul(2);
@@ -309,8 +309,10 @@ mod tests {
     #[test]
     fn mapping_matrix_get_size_limits() {
         assert!(MappingMatrix::get_size(4, 3) > 0);
-        assert_eq!(MappingMatrix::get_size(0, 3), 0);
-        assert_eq!(MappingMatrix::get_size(3, 0), 0);
+        assert!(MappingMatrix::get_size(0, 3) > 0);
+        assert!(MappingMatrix::get_size(3, 0) > 0);
+        assert_eq!(MappingMatrix::get_size(-1, 3), 0);
+        assert_eq!(MappingMatrix::get_size(3, -1), 0);
         assert_eq!(MappingMatrix::get_size(256, 3), 0);
         assert_eq!(MappingMatrix::get_size(3, 256), 0);
         // 181*181*2 > 65004
