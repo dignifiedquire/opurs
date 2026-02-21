@@ -107,7 +107,14 @@ cargo run --release --features tools --example run_vectors2 -- opus_newvectors
 
 # Multistream parity vectors (deterministic synthetic suite)
 cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --matrix quick
+
+# Projection parity vectors (synthetic by default; manifest-backed when available)
+cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite projection --matrix full --strict-bitexact
 ```
+
+`run_vectors2` auto-loads projection assets from `projection_vectors.csv` inside the vector directory when present.
+CSV format: `name,pcm_path,sample_rate,channels,frame_size_ms,bitrate,full_only`.
+If no manifest exists, the built-in deterministic synthetic projection suite is used.
 
 ## Testing
 

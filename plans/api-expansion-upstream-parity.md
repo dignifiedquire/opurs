@@ -46,12 +46,14 @@ Primary target headers:
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
   - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
   - `M2.5` multistream parity reporting now emits bitstream mismatch diagnostics (mismatched-byte count + first mismatch byte) for faster root-cause analysis of non-bitexact outputs
-  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating; projection full-matrix strict-bitexact parity is now stable (`9/9`)
-  - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
+  - `M2.5` `run_vectors2` projection suite now supports asset-backed loading via `projection_vectors.csv` (auto-discovered when present) with synthetic fallback vectors
+  - `M2.5` projection synthetic vector matrix now covers broader channel/frame-size/sample-rate combinations (`4/9/11/16/25/36ch`, `10/20/40ms`, `48k/24k`) with tuned full-matrix seed sweeps (`17/42`)
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
-  - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`9/9`, including `--strict-bitexact`)
+  - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`14/14`, including `--strict-bitexact`)
   - `M2.5` CI now gates multistream/projection full-matrix strict-bitexact parity in `test-tools-smoke`, and runs strict full-matrix multistream/projection vector parity on major-platform vector jobs
+  - `M2.5` `test-tools-smoke` now includes an optional manifest-backed projection strict-bitexact lane (auto-enabled when `${OPUS_PROJECTION_VECTORS_DIR}/projection_vectors.csv` is present from cache/download)
+  - `M2.5` major-platform `test-vectors` jobs now include an optional manifest-backed projection strict-bitexact lane (auto-enabled when `${OPUS_PROJECTION_VECTORS_DIR}/projection_vectors.csv` is present from cache/download)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing
@@ -71,8 +73,8 @@ Primary target headers:
   - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
   - `M3.3` projection encoder error-path parity now covers invalid frame-size and tiny-buffer return codes across i16/f32/i24 encode entrypoints
 - Next ordered slices:
-  1. Add asset-backed projection vector suite loading once upstream projection vector assets are available.
-  2. Expand projection vector suite parameter matrix (frame sizes, channels, bitrate/application combinations) and tune quick/full runtime envelopes.
+  1. Validate and wire real upstream projection assets into `projection_vectors.csv` once those assets are published.
+  2. Validate runtime/cache-hit behavior with real projection assets, then decide when to make manifest-backed projection parity required on major platforms.
   3. Fold projection vector parity lanes into additional CI targets once runtime budget is validated.
 
 ## Milestone Checklist

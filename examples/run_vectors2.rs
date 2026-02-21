@@ -875,11 +875,186 @@ fn synth_projection_pcm(channels: usize, samples_per_channel: usize, seed: u32) 
     out
 }
 
-fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
+fn parse_projection_sample_rate(token: &str) -> Option<SampleRate> {
+    match token.trim().to_ascii_lowercase().as_str() {
+        "48000" | "48000hz" | "48k" | "48khz" | "r48000" => Some(SampleRate::R48000),
+        "24000" | "24000hz" | "24k" | "24khz" | "r24000" => Some(SampleRate::R24000),
+        "16000" | "16000hz" | "16k" | "16khz" | "r16000" => Some(SampleRate::R16000),
+        "12000" | "12000hz" | "12k" | "12khz" | "r12000" => Some(SampleRate::R12000),
+        "8000" | "8000hz" | "8k" | "8khz" | "r8000" => Some(SampleRate::R8000),
+        _ => None,
+    }
+}
+
+fn parse_projection_frame_size(token: &str) -> Option<FrameSize> {
+    match token.trim().to_ascii_lowercase().as_str() {
+        "2.5" | "2.5ms" | "ms2.5" => Some(FrameSize::Ms2_5),
+        "5" | "5ms" | "ms5" => Some(FrameSize::Ms5),
+        "10" | "10ms" | "ms10" => Some(FrameSize::Ms10),
+        "20" | "20ms" | "ms20" => Some(FrameSize::Ms20),
+        "40" | "40ms" | "ms40" => Some(FrameSize::Ms40),
+        "60" | "60ms" | "ms60" => Some(FrameSize::Ms60),
+        "80" | "80ms" | "ms80" => Some(FrameSize::Ms80),
+        "100" | "100ms" | "ms100" => Some(FrameSize::Ms100),
+        "120" | "120ms" | "ms120" => Some(FrameSize::Ms120),
+        _ => None,
+    }
+}
+
+fn parse_projection_full_only(token: &str) -> bool {
+    matches!(
+        token.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "y" | "full" | "full_only"
+    )
+}
+
+fn load_projection_vectors_from_manifest(vector_dir: &Path) -> Option<Vec<TestVector>> {
+    let manifest_path = vector_dir.join("projection_vectors.csv");
+    if !manifest_path.exists() {
+        return None;
+    }
+
+    let manifest = std::fs::read_to_string(&manifest_path).unwrap_or_else(|err| {
+        panic!(
+            "reading projection vector manifest {} failed: {err}",
+            manifest_path.display()
+        )
+    });
+
+    let mut vectors = Vec::new();
+    for (line_idx, raw_line) in manifest.lines().enumerate() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Allow an optional header row:
+        // name,pcm_path,sample_rate,channels,frame_size_ms,bitrate,full_only
+        if line_idx == 0 && line.to_ascii_lowercase().starts_with("name,") {
+            continue;
+        }
+
+        let cols = line.split(',').map(str::trim).collect::<Vec<_>>();
+        assert!(
+            cols.len() == 7,
+            "invalid projection manifest row {} in {}: expected 7 columns, got {}",
+            line_idx + 1,
+            manifest_path.display(),
+            cols.len()
+        );
+
+        let name = cols[0];
+        let pcm_path = vector_dir.join(cols[1]);
+        let sample_rate = parse_projection_sample_rate(cols[2]).unwrap_or_else(|| {
+            panic!(
+                "invalid sample_rate '{}' at {}:{}",
+                cols[2],
+                manifest_path.display(),
+                line_idx + 1
+            )
+        });
+        let channels: i32 = cols[3].parse::<i32>().unwrap_or_else(|_| {
+            panic!(
+                "invalid channels '{}' at {}:{}",
+                cols[3],
+                manifest_path.display(),
+                line_idx + 1
+            )
+        });
+        let frame_size = parse_projection_frame_size(cols[4]).unwrap_or_else(|| {
+            panic!(
+                "invalid frame_size_ms '{}' at {}:{}",
+                cols[4],
+                manifest_path.display(),
+                line_idx + 1
+            )
+        });
+        let bitrate: u32 = cols[5].parse::<u32>().unwrap_or_else(|_| {
+            panic!(
+                "invalid bitrate '{}' at {}:{}",
+                cols[5],
+                manifest_path.display(),
+                line_idx + 1
+            )
+        });
+        let full_only = parse_projection_full_only(cols[6]);
+
+        let pcm = std::fs::read(&pcm_path).unwrap_or_else(|err| {
+            panic!(
+                "reading projection PCM '{}' ({}:{}) failed: {err}",
+                pcm_path.display(),
+                manifest_path.display(),
+                line_idx + 1
+            )
+        });
+        assert!(
+            pcm.len().is_multiple_of(2),
+            "projection PCM '{}' must be 16-bit LE ({}:{})",
+            pcm_path.display(),
+            manifest_path.display(),
+            line_idx + 1
+        );
+        assert!(
+            channels > 0,
+            "projection channels must be > 0 ({}:{})",
+            manifest_path.display(),
+            line_idx + 1
+        );
+
+        let samples_per_packet =
+            frame_size.samples_for_rate(sample_rate) * usize::try_from(channels).unwrap_or(0);
+        assert!(
+            samples_per_packet > 0,
+            "invalid projection packet geometry ({}:{})",
+            manifest_path.display(),
+            line_idx + 1
+        );
+        assert!(
+            (pcm.len() / 2).is_multiple_of(samples_per_packet),
+            "projection PCM length for '{}' is not a whole number of packets ({}:{})",
+            name,
+            manifest_path.display(),
+            line_idx + 1
+        );
+        let packet_count = (pcm.len() / 2) / samples_per_packet;
+
+        vectors.push(TestVector {
+            suite: VectorSuite::Projection,
+            name: name.to_string(),
+            encoded: Vec::new(),
+            decoded_stereo: None,
+            decoded_mono: None,
+            multistream_case: None,
+            projection_case: Some(ProjectionVectorCase {
+                channels,
+                sample_rate,
+                frame_size,
+                packet_count,
+                bitrate,
+                pcm,
+                full_only,
+            }),
+        });
+    }
+
+    assert!(
+        !vectors.is_empty(),
+        "projection vector manifest '{}' was found but no usable rows were parsed",
+        manifest_path.display()
+    );
+    Some(vectors)
+}
+
+fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
+    if let Some(vectors) = load_projection_vectors_from_manifest(vector_dir) {
+        return vectors;
+    }
+
     const FULL_MATRIX_SEED_SWEEP: [u32; 2] = [17, 42];
 
     struct Def {
         name: &'static str,
+        sample_rate: SampleRate,
         channels: i32,
         frame_size: FrameSize,
         packet_count: usize,
@@ -890,8 +1065,8 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
     }
 
     fn build_projection_vector(def: &Def, name: String, seed: u32, full_only: bool) -> TestVector {
-        let sample_rate = SampleRate::R48000;
-        let samples_per_channel = def.frame_size.samples_for_rate(sample_rate) * def.packet_count;
+        let samples_per_channel =
+            def.frame_size.samples_for_rate(def.sample_rate) * def.packet_count;
         let pcm = synth_projection_pcm(def.channels as usize, samples_per_channel, seed);
         TestVector {
             suite: VectorSuite::Projection,
@@ -902,7 +1077,7 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             multistream_case: None,
             projection_case: Some(ProjectionVectorCase {
                 channels: def.channels,
-                sample_rate,
+                sample_rate: def.sample_rate,
                 frame_size: def.frame_size,
                 packet_count: def.packet_count,
                 bitrate: def.bitrate,
@@ -914,17 +1089,30 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
 
     let defs = [
         Def {
-            name: "proj_4ch_20ms_96k",
+            name: "proj_4ch_10ms_96k_sr48",
+            sample_rate: SampleRate::R48000,
             channels: 4,
-            frame_size: FrameSize::Ms20,
-            packet_count: 8,
+            frame_size: FrameSize::Ms10,
+            packet_count: 10,
             bitrate: 96_000,
             seed: 1,
             full_only: false,
             seed_sweep: true,
         },
         Def {
-            name: "proj_11ch_20ms_160k",
+            name: "proj_9ch_20ms_128k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 9,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            bitrate: 128_000,
+            seed: 9,
+            full_only: false,
+            seed_sweep: true,
+        },
+        Def {
+            name: "proj_11ch_20ms_160k_sr48",
+            sample_rate: SampleRate::R48000,
             channels: 11,
             frame_size: FrameSize::Ms20,
             packet_count: 6,
@@ -934,7 +1122,8 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: false,
         },
         Def {
-            name: "proj_16ch_20ms_192k",
+            name: "proj_16ch_20ms_192k_sr48",
+            sample_rate: SampleRate::R48000,
             channels: 16,
             frame_size: FrameSize::Ms20,
             packet_count: 8,
@@ -944,7 +1133,8 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: true,
         },
         Def {
-            name: "proj_25ch_20ms_256k",
+            name: "proj_25ch_20ms_256k_sr48",
+            sample_rate: SampleRate::R48000,
             channels: 25,
             frame_size: FrameSize::Ms20,
             packet_count: 6,
@@ -952,6 +1142,28 @@ fn load_projection_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             seed: 4,
             full_only: true,
             seed_sweep: true,
+        },
+        Def {
+            name: "proj_36ch_20ms_320k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 36,
+            frame_size: FrameSize::Ms20,
+            packet_count: 4,
+            bitrate: 320_000,
+            seed: 5,
+            full_only: true,
+            seed_sweep: false,
+        },
+        Def {
+            name: "proj_4ch_40ms_80k_sr24",
+            sample_rate: SampleRate::R24000,
+            channels: 4,
+            frame_size: FrameSize::Ms40,
+            packet_count: 6,
+            bitrate: 80_000,
+            seed: 10,
+            full_only: false,
+            seed_sweep: false,
         },
     ];
 

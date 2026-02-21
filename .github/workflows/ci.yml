@@ -15,6 +15,9 @@ env:
   OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v2
   OPUS_TEST_VECTORS_URL: https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz
   OPUS_TEST_VECTORS_CACHE_KEY: opus-newvectors-materials98-v1
+  OPUS_PROJECTION_VECTORS_URL: ""
+  OPUS_PROJECTION_VECTORS_CACHE_KEY: opus-projection-vectors-v1
+  OPUS_PROJECTION_VECTORS_DIR: opus_projection_vectors
 
 jobs:
   fmt:
@@ -177,6 +180,14 @@ jobs:
             opus_newvectors
             vectors.tar.gz
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
+      - name: Cache projection vector assets (optional)
+        id: projection-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.OPUS_PROJECTION_VECTORS_DIR }}
+            projection_vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_PROJECTION_VECTORS_CACHE_KEY }}
       - name: Run multistream tooling tests
         run: cargo test --features tools --test tools_multistream
       - name: Run multistream API parity tests
@@ -190,10 +201,21 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Download projection vector assets (optional)
+        if: env.OPUS_PROJECTION_VECTORS_URL != '' && steps.projection-vectors-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OPUS_PROJECTION_VECTORS_DIR"
+          curl -L "$OPUS_PROJECTION_VECTORS_URL" -o projection_vectors.tar.gz
+          tar -xzf projection_vectors.tar.gz -C "$OPUS_PROJECTION_VECTORS_DIR"
       - name: Run multistream strict full-matrix vector parity
         run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full --strict-bitexact
       - name: Run projection strict full-matrix vector parity
         run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite projection --mode parity --matrix full --strict-bitexact
+      - name: Run projection strict full-matrix asset parity (optional)
+        if: hashFiles(format('{0}/projection_vectors.csv', env.OPUS_PROJECTION_VECTORS_DIR)) != ''
+        run: cargo run --release --features tools --example run_vectors2 -- ${{ env.OPUS_PROJECTION_VECTORS_DIR }} --suite projection --mode parity --matrix full --strict-bitexact
 
   test-projection-parity:
     name: Projection parity (${{ matrix.name }})
@@ -410,6 +432,14 @@ jobs:
             opus_newvectors
             vectors.tar.gz
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
+      - name: Cache projection vector assets (optional)
+        id: projection-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.OPUS_PROJECTION_VECTORS_DIR }}
+            projection_vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_PROJECTION_VECTORS_CACHE_KEY }}
       - name: Install multilib (Linux i686)
         if: matrix.packages
         run: |
@@ -427,6 +457,14 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Download projection vector assets (optional)
+        if: env.OPUS_PROJECTION_VECTORS_URL != '' && steps.projection-vectors-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OPUS_PROJECTION_VECTORS_DIR"
+          curl -L "$OPUS_PROJECTION_VECTORS_URL" -o projection_vectors.tar.gz
+          tar -xzf projection_vectors.tar.gz -C "$OPUS_PROJECTION_VECTORS_DIR"
       - name: Run test vectors (full matrix on major platforms)
         if: matrix.major_platform
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- --matrix full opus_newvectors
@@ -436,6 +474,9 @@ jobs:
       - name: Run projection strict full-matrix vectors (major platforms)
         if: matrix.major_platform
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite projection --mode parity --matrix full --strict-bitexact
+      - name: Run projection strict full-matrix asset vectors (major platforms, optional)
+        if: matrix.major_platform && hashFiles(format('{0}/projection_vectors.csv', env.OPUS_PROJECTION_VECTORS_DIR)) != ''
+        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- ${{ env.OPUS_PROJECTION_VECTORS_DIR }} --suite projection --mode parity --matrix full --strict-bitexact
       - name: Run test vectors (quick matrix on non-major platforms)
         if: ${{ !matrix.major_platform }}
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
