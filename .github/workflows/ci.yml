@@ -13,6 +13,8 @@ env:
   CARGO_TERM_COLOR: always
   OPUS_DNN_DATA_SHA256: a5177ec6fb7d15058e99e57029746100121f68e4890b1467d4094aa336b6013e
   OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v2
+  OPUS_TEST_VECTORS_URL: https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz
+  OPUS_TEST_VECTORS_CACHE_KEY: opus-newvectors-materials98-v1
 
 jobs:
   fmt:
@@ -151,16 +153,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: test-tools-smoke
+      - name: Cache test vectors
+        id: test-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            opus_newvectors
+            vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Run multistream tooling tests
         run: cargo test --features tools --test tools_multistream
       - name: Run multistream API parity tests
         run: cargo test --features tools --test opus_multistream_api
       - name: Download test vectors
+        if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |
-          curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+          curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
-      - name: Run multistream full-matrix vector parity
-        run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full
+      - name: Run multistream quick-matrix vector parity
+        run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix quick
 
   test:
     name: Test (${{ matrix.name }}, ${{ matrix.profile }})
@@ -328,6 +339,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: vectors-${{ matrix.target }}
+      - name: Cache test vectors
+        id: test-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            opus_newvectors
+            vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Install multilib (Linux i686)
         if: matrix.packages
         run: |
@@ -341,11 +360,15 @@ jobs:
       - name: Build (release)
         run: cargo build --release --features tools --target ${{ matrix.target }}
       - name: Download test vectors
+        if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |
-          curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+          curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
       - name: Run test vectors
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors
+      - name: Run multistream full-matrix vector parity (linux-x86_64 only)
+        if: matrix.name == 'linux-x86_64'
+        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full
 
   test-vectors-dnn:
     name: DNN Vectors (${{ matrix.name }})
@@ -375,6 +398,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: vectors-dnn-${{ matrix.target }}
+      - name: Cache test vectors
+        id: test-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            opus_newvectors
+            vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Setup clang
         if: runner.os != 'macos'
         uses: aminya/setup-cpp@v1
@@ -401,8 +432,9 @@ jobs:
         run: cargo build --release --features tools-dnn --target ${{ matrix.target }}
       - name: Download test vectors
         shell: bash
+        if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |
-          curl https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz -o vectors.tar.gz
+          curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
       - name: Run DNN vector tests (72 DRED encode + 192 DNN decode)
         run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- --dnn-only opus_newvectors
