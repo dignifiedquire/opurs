@@ -37,6 +37,7 @@ Primary target headers:
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.4` benchmark smoke lane with artifact upload added to CI
   - `M2.5` `run_vectors2` suite registry now drives suite discovery and kind selection
+  - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
 - Next ordered slices:
   1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
   2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.

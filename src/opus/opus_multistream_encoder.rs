@@ -686,6 +686,14 @@ pub fn opus_multistream_encode24(
     st.encode24(pcm, data)
 }
 
+/// Upstream-style helper for `OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST`.
+pub fn opus_multistream_encoder_get_encoder_state(
+    st: &mut OpusMSEncoder,
+    stream_id: i32,
+) -> Result<&mut OpusEncoder, i32> {
+    st.encoder_state_mut(stream_id)
+}
+
 fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
     let mut rp = OpusRepacketizer::default();
     let ret = rp.cat(packet);

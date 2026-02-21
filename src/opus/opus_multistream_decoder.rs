@@ -400,6 +400,14 @@ pub fn opus_multistream_decode24(
     st.decode24(data, pcm, frame_size, decode_fec)
 }
 
+/// Upstream-style helper for `OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST`.
+pub fn opus_multistream_decoder_get_decoder_state(
+    st: &mut OpusMSDecoder,
+    stream_id: i32,
+) -> Result<&mut OpusDecoder, i32> {
+    st.decoder_state_mut(stream_id)
+}
+
 fn mapping_to_stream_channel(
     layout: &OpusMultistreamLayout,
     map_index: u8,

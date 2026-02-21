@@ -15,11 +15,13 @@ use opurs::{
     opus_multistream_decode24 as rust_opus_multistream_decode24,
     opus_multistream_decode_float as rust_opus_multistream_decode_float,
     opus_multistream_decoder_create as rust_opus_multistream_decoder_create,
+    opus_multistream_decoder_get_decoder_state as rust_opus_multistream_decoder_get_decoder_state,
     opus_multistream_decoder_init as rust_opus_multistream_decoder_init,
     opus_multistream_encode as rust_opus_multistream_encode,
     opus_multistream_encode24 as rust_opus_multistream_encode24,
     opus_multistream_encode_float as rust_opus_multistream_encode_float,
     opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
+    opus_multistream_encoder_get_encoder_state as rust_opus_multistream_encoder_get_encoder_state,
     opus_multistream_encoder_init as rust_opus_multistream_encoder_init,
     opus_multistream_surround_encoder_create as rust_opus_multistream_surround_encoder_create,
     opus_multistream_surround_encoder_get_size as rust_opus_multistream_surround_encoder_get_size,
@@ -1286,8 +1288,14 @@ fn multistream_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.encoder_state(-1).err(), Some(OPUS_BAD_ARG));
-    assert_eq!(rust.encoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(
+        rust_opus_multistream_encoder_get_encoder_state(&mut rust, -1).err(),
+        Some(OPUS_BAD_ARG)
+    );
+    assert_eq!(
+        rust_opus_multistream_encoder_get_encoder_state(&mut rust, 2).err(),
+        Some(OPUS_BAD_ARG)
+    );
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1332,7 +1340,7 @@ fn multistream_encoder_state_access_parity_with_c() {
     assert!(!c_state0.is_null());
     assert!(!c_state1.is_null());
 
-    rust.encoder_state_mut(1)
+    rust_opus_multistream_encoder_get_encoder_state(&mut rust, 1)
         .expect("rust stream1")
         .set_complexity(3)
         .expect("set complexity");
@@ -1340,8 +1348,12 @@ fn multistream_encoder_state_access_parity_with_c() {
         libopus_sys::opus_encoder_ctl(c_state1, OPUS_SET_COMPLEXITY_REQUEST, 3i32);
     }
 
-    let rust_c0 = rust.encoder_state(0).expect("rust stream0").complexity();
-    let rust_c1 = rust.encoder_state(1).expect("rust stream1").complexity();
+    let rust_c0 = rust_opus_multistream_encoder_get_encoder_state(&mut rust, 0)
+        .expect("rust stream0")
+        .complexity();
+    let rust_c1 = rust_opus_multistream_encoder_get_encoder_state(&mut rust, 1)
+        .expect("rust stream1")
+        .complexity();
     let mut c_c0 = 0i32;
     let mut c_c1 = 0i32;
     unsafe {
@@ -1366,8 +1378,14 @@ fn multistream_decoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.decoder_state(-1).err(), Some(OPUS_BAD_ARG));
-    assert_eq!(rust.decoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(
+        rust_opus_multistream_decoder_get_decoder_state(&mut rust, -1).err(),
+        Some(OPUS_BAD_ARG)
+    );
+    assert_eq!(
+        rust_opus_multistream_decoder_get_decoder_state(&mut rust, 2).err(),
+        Some(OPUS_BAD_ARG)
+    );
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1412,11 +1430,11 @@ fn multistream_decoder_state_access_parity_with_c() {
     assert!(!c_state0.is_null());
     assert!(!c_state1.is_null());
 
-    rust.decoder_state_mut(1)
+    rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
         .expect("rust stream1")
         .set_gain(123)
         .expect("set gain");
-    rust.decoder_state_mut(1)
+    rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
         .expect("rust stream1")
         .set_phase_inversion_disabled(true);
     unsafe {
@@ -1424,14 +1442,16 @@ fn multistream_decoder_state_access_parity_with_c() {
         libopus_sys::opus_decoder_ctl(c_state1, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, 1i32);
     }
 
-    let rust_gain0 = rust.decoder_state(0).expect("rust stream0").gain();
-    let rust_gain1 = rust.decoder_state(1).expect("rust stream1").gain();
-    let rust_phase0 = rust
-        .decoder_state(0)
+    let rust_gain0 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 0)
+        .expect("rust stream0")
+        .gain();
+    let rust_gain1 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
+        .expect("rust stream1")
+        .gain();
+    let rust_phase0 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 0)
         .expect("rust stream0")
         .phase_inversion_disabled();
-    let rust_phase1 = rust
-        .decoder_state(1)
+    let rust_phase1 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
         .expect("rust stream1")
         .phase_inversion_disabled();
     let mut c_gain0 = 0i32;
