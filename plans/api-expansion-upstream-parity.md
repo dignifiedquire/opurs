@@ -49,10 +49,11 @@ Primary target headers:
   - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks
   - `M3.1` projection encoder path now supports ambisonics orders 1..5 (`4/6/9/11/16/18/25/27/36/38ch`) with upstream precomputed matrices
   - `M3.3` projection decoder and projection encoder C-parity integration tests added under `--features tools`
+  - `M3.3` projection decoder higher-order parity now exercises C projection-encoded packets for `4/9/16/25/36ch`
 - Next ordered slices:
-  1. Expand `M3.3` decode parity coverage to higher-order projection channel sets (not just identity-matrix decoder checks).
-  2. Align projection encoder/decoder CTL behavior with upstream edge-case semantics.
-  3. Port the remaining `test_opus_projection.c` encode/decode argument matrix scenarios.
+  1. Align projection encoder/decoder CTL behavior with upstream edge-case semantics.
+  2. Port the remaining `test_opus_projection.c` encode/decode argument matrix scenarios.
+  3. Add projection-specific vector-harness coverage once assets are available.
 
 ## Milestone Checklist
 

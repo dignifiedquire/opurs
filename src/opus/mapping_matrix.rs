@@ -224,6 +224,40 @@ impl MappingMatrix {
         Ok(())
     }
 
+    /// Same math as `multiply_channel_out_short`, but with pre-quantized
+    /// `opus_int16`-equivalent input samples.
+    pub fn multiply_channel_out_short_i16(
+        &self,
+        input: &[i16],
+        input_row: usize,
+        input_rows: usize,
+        output: &mut [i16],
+        output_rows: usize,
+        frame_size: usize,
+    ) -> Result<(), i32> {
+        if input_row >= self.cols {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.validate_multiply_dims(input_rows, output_rows, frame_size, 0)?;
+        if input.len() <= input_rows.saturating_mul(frame_size.saturating_sub(1))
+            || output.len() < output_rows * frame_size
+        {
+            return Err(OPUS_BAD_ARG);
+        }
+
+        for i in 0..frame_size {
+            let input_sample = input[input_rows * i] as i32;
+            for row in 0..output_rows {
+                let coeff = self.data[matrix_index(self.rows, row, input_row)] as i32;
+                let tmp = coeff * input_sample;
+                let add = (tmp + 16384) >> 15;
+                let idx = matrix_index(output_rows, row, i);
+                output[idx] = output[idx].wrapping_add(add as i16);
+            }
+        }
+        Ok(())
+    }
+
     /// Upstream C: src/mapping_matrix.c:mapping_matrix_multiply_channel_in_int24
     pub fn multiply_channel_in_int24(
         &self,
