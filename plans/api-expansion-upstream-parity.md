@@ -41,12 +41,13 @@ Primary target headers:
   - `M2.3` multistream example smoke coverage added to CI (`opus_demo` multistream help + `multistream_demo` run)
   - `M2.4` multistream mapping parser is now shared in `tools::demo` and covered by deterministic integration tests
   - `M2.4` tooling multistream integration test suite now has a dedicated CI smoke lane (`test-tools-smoke`)
+  - `M2` tooling/examples parity milestone is now green for the planned multistream scope
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
 - Next ordered slices:
-  1. Land and stabilize M1.1 + M1.3 (module wiring + tests).
-  2. Implement M1.2 lifecycle/encode/decode wrappers with strict validation parity.
-  3. Expand tooling/examples from M2 once core API passes parity tests.
+  1. Start `M3.1` projection encoder/decoder wrapper scaffolding and public exports.
+  2. Implement `M3.2` mapping-matrix support used by projection decode path.
+  3. Port and stabilize `M3.3` projection parity tests against upstream.
 
 ## Milestone Checklist
 
@@ -56,7 +57,7 @@ Primary target headers:
 - [x] M1.3 Multistream packet helpers
 - [ ] M1.4 Tests (fail-first then green)
 - [ ] M1.5 Multistream API surface completion checklist
-- [ ] M2 Tooling and examples parity
+- [x] M2 Tooling and examples parity
 - [ ] M3 Projection / ambisonics parity
 - [ ] M4 Benchmark expansion and baselines
 
