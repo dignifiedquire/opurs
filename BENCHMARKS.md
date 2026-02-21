@@ -55,22 +55,44 @@ CARGO_TARGET_DIR=target-local RUSTFLAGS="-C target-cpu=native" \
 
 Configuration:
 - Sample rate: 48 kHz
-- Layout: 2 channels, 2 streams, 0 coupled, mapping `[0,1]`
-- Frame size: 20 ms (960 samples)
+- Layout matrix:
+  - `1ch` => streams=1, coupled=0, mapping `[0]`
+  - `2ch` => streams=2, coupled=0, mapping `[0,1]`
+  - `6ch` => streams=4, coupled=2, mapping `[0,4,1,2,3,5]` (5.1-style)
+- Frame sizes: 10 ms and 20 ms
+- Bitrates: 32 kbps, 96 kbps, 192 kbps
 - Complexity: 10
 - Input: deterministic synthetic signal, 50 frames
 
-| Operation | Bitrate | Rust | C (NEON) | Ratio |
-|-----------|---------|------|----------|-------|
-| Encode | 32 kbps | 6.005 ms | 7.254 ms | **0.83x (Rust faster)** |
-| Encode | 96 kbps | 3.670 ms | 3.495 ms | 1.05x |
-| Encode | 192 kbps | 4.694 ms | 4.486 ms | 1.05x |
-| Decode | 32 kbps | 1.282 ms | 1.006 ms | 1.27x |
-| Decode | 96 kbps | 1.360 ms | 1.054 ms | 1.29x |
-| Decode | 192 kbps | 1.840 ms | 1.485 ms | 1.24x |
+Representative 96 kbps points (median):
 
-Rust multistream encode is near parity (and faster at 32 kbps). Decode remains
-~24-29% slower than C on this current 2-channel benchmark profile.
+| Operation | Scenario | Rust | C (NEON) | Ratio |
+|-----------|----------|------|----------|-------|
+| Encode | 1ch 10ms | 1.196 ms | 1.000 ms | 1.20x |
+| Encode | 1ch 20ms | 2.233 ms | 2.046 ms | 1.09x |
+| Encode | 2ch 10ms | 1.841 ms | 1.695 ms | 1.09x |
+| Encode | 2ch 20ms | 3.669 ms | 3.508 ms | 1.05x |
+| Encode | 6ch 10ms | 9.999 ms | 15.016 ms | **0.67x (Rust faster)** |
+| Encode | 6ch 20ms | 14.402 ms | 17.704 ms | **0.81x (Rust faster)** |
+| Decode | 1ch 10ms | 0.429 ms | 0.309 ms | 1.39x |
+| Decode | 1ch 20ms | 0.768 ms | 0.627 ms | 1.22x |
+| Decode | 2ch 10ms | 0.763 ms | 0.518 ms | 1.47x |
+| Decode | 2ch 20ms | 1.329 ms | 1.058 ms | 1.26x |
+| Decode | 6ch 10ms | 1.989 ms | 1.488 ms | 1.34x |
+| Decode | 6ch 20ms | 2.828 ms | 2.307 ms | 1.23x |
+
+Selected low-bitrate (32 kbps) points:
+
+| Operation | Scenario | Rust | C (NEON) | Ratio |
+|-----------|----------|------|----------|-------|
+| Encode | 2ch 10ms | 4.780 ms | 7.214 ms | **0.66x (Rust faster)** |
+| Encode | 2ch 20ms | 5.220 ms | 6.646 ms | **0.79x (Rust faster)** |
+| Encode | 6ch 10ms | 5.091 ms | 6.900 ms | **0.74x (Rust faster)** |
+| Encode | 6ch 20ms | 9.796 ms | 18.623 ms | **0.53x (Rust faster)** |
+| Decode | 2ch 20ms | 0.947 ms | 0.742 ms | 1.28x |
+| Decode | 6ch 20ms | 1.178 ms | 1.217 ms | ~matched |
+
+Raw Criterion outputs for the full matrix are in `target-local/criterion/multistream_*`.
 
 ## Per-Function: Rust vs C (with SIMD)
 
