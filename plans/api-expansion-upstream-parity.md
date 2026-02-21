@@ -50,10 +50,11 @@ Primary target headers:
   - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
+  - `M3.3` projection synthetic parity improved after upstream-aligned self-delimited packetization fix (`4ch`/`11ch` vectors now bitexact in full matrix; higher-order `16ch`/`25ch` residual deltas remain)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing
-  - `M1.2` multistream encode now applies upstream-style per-frame stream-rate allocation; synthetic multistream full-matrix runs now match upstream total encoded byte counts across vectors, with only small residual non-bitexact payload deltas
+  - `M1.2` multistream encode now applies upstream-style per-frame stream-rate allocation and upstream-aligned self-delimited repacketization; synthetic multistream full-matrix runs are now bitexact against upstream (`30/30`, including `--strict-bitexact`)
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
   - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks

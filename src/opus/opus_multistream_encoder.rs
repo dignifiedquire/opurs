@@ -999,7 +999,9 @@ fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
         &mut buffer,
         true,
         false,
-        FrameSource::Data { offset: 0 },
+        FrameSource::Slice {
+            data: vec![packet; rp.get_nb_frames() as usize],
+        },
     );
     if ret < 0 {
         return Err(ret);
