@@ -26,19 +26,12 @@ pub use input::{
     MultistreamLayout, SampleRate,
 };
 
-use crate::{
-    opus_strerror, Bitrate, OPUS_AUTO, OPUS_FRAMESIZE_ARG, OPUS_GET_FINAL_RANGE_REQUEST,
-    OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST, OPUS_SET_BITRATE_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-    OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
-};
+use crate::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 
 pub const MAX_PACKET: usize = 1500;
 const MAX_FRAME_SIZE: usize = 48000 * 2;
-const OPUS_SET_IGNORE_EXTENSIONS_REQUEST: i32 = 4058;
 
 /// Encode an opus stream, like `opus_demo -e`
 ///
@@ -307,8 +300,10 @@ pub fn opus_demo_encode_multistream(
     args: MultistreamEncodeArgs,
 ) -> (Vec<u8>, usize) {
     match backend {
-        OpusBackend::Rust => opus_demo_encode_multistream_rust(data, args),
-        OpusBackend::Upstream => opus_demo_encode_multistream_upstream(data, args),
+        OpusBackend::Rust => opus_demo_encode_multistream_impl::<RustLibopusBackend>(data, args),
+        OpusBackend::Upstream => {
+            opus_demo_encode_multistream_impl::<UpstreamLibopusBackend>(data, args)
+        }
     }
 }
 
@@ -319,12 +314,14 @@ pub fn opus_demo_decode_multistream(
     args: MultistreamDecodeArgs,
 ) -> Vec<u8> {
     match backend {
-        OpusBackend::Rust => opus_demo_decode_multistream_rust(data, args),
-        OpusBackend::Upstream => opus_demo_decode_multistream_upstream(data, args),
+        OpusBackend::Rust => opus_demo_decode_multistream_impl::<RustLibopusBackend>(data, args),
+        OpusBackend::Upstream => {
+            opus_demo_decode_multistream_impl::<UpstreamLibopusBackend>(data, args)
+        }
     }
 }
 
-fn opus_demo_encode_multistream_rust(
+fn opus_demo_encode_multistream_impl<B: OpusBackendTrait>(
     data: &[u8],
     MultistreamEncodeArgs {
         application,
@@ -349,7 +346,7 @@ fn opus_demo_encode_multistream_rust(
         samples.push(i16::from_le_bytes(data.try_into().unwrap()));
     }
 
-    let mut enc = crate::opus_multistream_encoder_create(
+    let mut enc = B::opus_multistream_encoder_create(
         usize::from(sample_rate) as i32,
         layout.channels,
         layout.streams,
@@ -359,32 +356,20 @@ fn opus_demo_encode_multistream_rust(
     )
     .expect("opus_multistream_encoder_create failed");
 
-    enc.set_bitrate(Bitrate::Bits(bitrate as i32));
-    enc.set_bandwidth(
-        options
-            .bandwidth
-            .map(|v| crate::Bandwidth::try_from(v.into_opus()).unwrap()),
+    B::ms_enc_set_bitrate(&mut enc, bitrate as i32);
+    B::ms_enc_set_bandwidth(
+        &mut enc,
+        options.bandwidth.map_or(OPUS_AUTO, |v| v.into_opus()),
     );
-    enc.set_vbr(!options.cbr);
-    enc.set_vbr_constraint(options.cvbr);
-    enc.set_complexity(i32::from(options.complexity)).unwrap();
-    enc.set_inband_fec(options.common.inbandfec as i32).unwrap();
-    enc.set_packet_loss_perc(options.common.loss as i32)
-        .unwrap();
-    enc.set_force_channels(if options.forcemono {
-        Some(crate::Channels::Mono)
-    } else {
-        None
-    })
-    .unwrap();
-    enc.set_dtx(options.dtx);
-    #[cfg(feature = "qext")]
-    enc.set_qext(options.qext);
-    #[cfg(not(feature = "qext"))]
-    if options.qext {
-        panic!("QEXT support requires the 'qext' feature");
-    }
-    let skip = enc.lookahead();
+    B::ms_enc_set_vbr(&mut enc, (!options.cbr) as i32);
+    B::ms_enc_set_vbr_constraint(&mut enc, options.cvbr as i32);
+    B::ms_enc_set_complexity(&mut enc, i32::from(options.complexity));
+    B::ms_enc_set_inband_fec(&mut enc, options.common.inbandfec as i32);
+    B::ms_enc_set_packet_loss_perc(&mut enc, options.common.loss as i32);
+    B::ms_enc_set_force_channels(&mut enc, if options.forcemono { 1 } else { OPUS_AUTO });
+    B::ms_enc_set_dtx(&mut enc, options.dtx as i32);
+    B::ms_enc_set_qext(&mut enc, options.qext as i32);
+    let skip = B::ms_enc_get_lookahead(&mut enc);
 
     let frame_size = options.framesize.samples_for_rate(sample_rate);
     let frame_samples = frame_size * channels;
@@ -394,152 +379,23 @@ fn opus_demo_encode_multistream_rust(
     let mut output = Vec::<u8>::new();
     let mut buffer = vec![0u8; options.max_payload];
     for frame in samples.chunks_exact(frame_size * channels) {
-        let res = crate::opus_multistream_encode(&mut enc, frame, frame_size as i32, &mut buffer);
+        let res = B::opus_multistream_encode(&mut enc, frame, frame_size as i32, &mut buffer);
         if res < 0 {
             panic!("opus_multistream_encode failed: {}", opus_strerror(res));
         }
         let packet = &buffer[..res as usize];
-        let enc_final_range = enc.final_range();
+        let enc_final_range = B::ms_enc_get_final_range(&mut enc);
         output.write_i32::<BigEndian>(packet.len() as i32).unwrap();
         output.write_u32::<BigEndian>(enc_final_range).unwrap();
         output.write_all(packet).unwrap();
     }
 
-    (output, skip as usize)
-}
-
-fn opus_demo_encode_multistream_upstream(
-    data: &[u8],
-    MultistreamEncodeArgs {
-        application,
-        sample_rate,
-        layout,
-        bitrate,
-        options,
-    }: MultistreamEncodeArgs,
-) -> (Vec<u8>, usize) {
-    layout.validate().expect("invalid multistream layout");
-    let channels = layout.channels as usize;
-
-    if options.common.inbandfec {
-        panic!("inbandfec not supported")
-    }
-    if options.common.loss != 0 {
-        panic!("packet loss simulation not supported")
-    }
-
-    let mut samples = Vec::new();
-    for data in data.chunks_exact(2) {
-        samples.push(i16::from_le_bytes(data.try_into().unwrap()));
-    }
-
-    let mut error = 0i32;
-    let enc = unsafe {
-        libopus_sys::opus_multistream_encoder_create(
-            usize::from(sample_rate) as i32,
-            layout.channels,
-            layout.streams,
-            layout.coupled_streams,
-            layout.mapping.as_ptr(),
-            application.into_opus(),
-            &mut error as *mut _,
-        )
-    };
-    if enc.is_null() {
-        panic!(
-            "opus_multistream_encoder_create failed: {}",
-            opus_strerror(error)
-        );
-    }
-
-    unsafe {
-        libopus_sys::opus_multistream_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate as i32);
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_BANDWIDTH_REQUEST,
-            options.bandwidth.map_or(OPUS_AUTO, |v| v.into_opus()),
-        );
-        libopus_sys::opus_multistream_encoder_ctl(enc, OPUS_SET_VBR_REQUEST, (!options.cbr) as i32);
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_VBR_CONSTRAINT_REQUEST,
-            options.cvbr as i32,
-        );
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_COMPLEXITY_REQUEST,
-            i32::from(options.complexity),
-        );
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_INBAND_FEC_REQUEST,
-            options.common.inbandfec as i32,
-        );
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_PACKET_LOSS_PERC_REQUEST,
-            options.common.loss as i32,
-        );
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_SET_FORCE_CHANNELS_REQUEST,
-            if options.forcemono { 1 } else { OPUS_AUTO },
-        );
-        libopus_sys::opus_multistream_encoder_ctl(enc, OPUS_SET_DTX_REQUEST, options.dtx as i32);
-        if options.qext {
-            const OPUS_SET_QEXT_REQUEST: i32 = 4056;
-            libopus_sys::opus_multistream_encoder_ctl(enc, OPUS_SET_QEXT_REQUEST, 1i32);
-        }
-    }
-    let mut skip = 0i32;
-    unsafe {
-        libopus_sys::opus_multistream_encoder_ctl(
-            enc,
-            OPUS_GET_LOOKAHEAD_REQUEST,
-            &mut skip as *mut _,
-        )
-    };
-
-    let frame_size = options.framesize.samples_for_rate(sample_rate);
-    let frame_samples = frame_size * channels;
-    let pad = (frame_samples - (samples.len() % frame_samples)) % frame_samples;
-    samples.resize(samples.len() + pad, 0);
-
-    let mut output = Vec::<u8>::new();
-    let mut buffer = vec![0u8; options.max_payload];
-    for frame in samples.chunks_exact(frame_size * channels) {
-        let res = unsafe {
-            libopus_sys::opus_multistream_encode(
-                enc,
-                frame.as_ptr(),
-                frame_size as i32,
-                buffer.as_mut_ptr(),
-                buffer.len() as i32,
-            )
-        };
-        if res < 0 {
-            unsafe { libopus_sys::opus_multistream_encoder_destroy(enc) };
-            panic!("opus_multistream_encode failed: {}", opus_strerror(res));
-        }
-        let packet = &buffer[..res as usize];
-        let mut enc_final_range = 0u32;
-        unsafe {
-            libopus_sys::opus_multistream_encoder_ctl(
-                enc,
-                OPUS_GET_FINAL_RANGE_REQUEST,
-                &mut enc_final_range as *mut _,
-            )
-        };
-        output.write_i32::<BigEndian>(packet.len() as i32).unwrap();
-        output.write_u32::<BigEndian>(enc_final_range).unwrap();
-        output.write_all(packet).unwrap();
-    }
-    unsafe { libopus_sys::opus_multistream_encoder_destroy(enc) };
+    B::opus_multistream_encoder_destroy(enc);
 
     (output, skip as usize)
 }
 
-fn opus_demo_decode_multistream_rust(
+fn opus_demo_decode_multistream_impl<B: OpusBackendTrait>(
     data: &[u8],
     MultistreamDecodeArgs {
         sample_rate,
@@ -549,7 +405,7 @@ fn opus_demo_decode_multistream_rust(
     }: MultistreamDecodeArgs,
 ) -> Vec<u8> {
     layout.validate().expect("invalid multistream layout");
-    let mut dec = crate::opus_multistream_decoder_create(
+    let mut dec = B::opus_multistream_decoder_create(
         usize::from(sample_rate) as i32,
         layout.channels,
         layout.streams,
@@ -558,9 +414,9 @@ fn opus_demo_decode_multistream_rust(
     )
     .expect("opus_multistream_decoder_create failed");
     if let Some(c) = complexity {
-        dec.set_complexity(i32::from(c)).unwrap();
+        B::ms_dec_set_complexity(&mut dec, i32::from(c));
     }
-    dec.set_ignore_extensions(options.ignore_extensions);
+    B::ms_dec_set_ignore_extensions(&mut dec, options.ignore_extensions as i32);
 
     let mut cursor = Cursor::new(data);
     let len = cursor.get_ref().len();
@@ -574,12 +430,12 @@ fn opus_demo_decode_multistream_rust(
         let packet_slice = &mut packet[..data_bytes as usize];
         cursor.read_exact(packet_slice).unwrap();
 
-        let decoded = crate::opus_multistream_decode(
+        let decoded = B::opus_multistream_decode(
             &mut dec,
             packet_slice,
             &mut samples,
             MAX_FRAME_SIZE as i32,
-            false,
+            0,
         );
         if decoded < 0 {
             panic!("opus_multistream_decode failed: {}", opus_strerror(decoded));
@@ -588,86 +444,7 @@ fn opus_demo_decode_multistream_rust(
             output.extend_from_slice(&sample.to_le_bytes());
         }
     }
-    output
-}
+    B::opus_multistream_decoder_destroy(dec);
 
-fn opus_demo_decode_multistream_upstream(
-    data: &[u8],
-    MultistreamDecodeArgs {
-        sample_rate,
-        layout,
-        options,
-        complexity,
-    }: MultistreamDecodeArgs,
-) -> Vec<u8> {
-    layout.validate().expect("invalid multistream layout");
-
-    let mut error = 0i32;
-    let dec = unsafe {
-        libopus_sys::opus_multistream_decoder_create(
-            usize::from(sample_rate) as i32,
-            layout.channels,
-            layout.streams,
-            layout.coupled_streams,
-            layout.mapping.as_ptr(),
-            &mut error as *mut _,
-        )
-    };
-    if dec.is_null() {
-        panic!(
-            "opus_multistream_decoder_create failed: {}",
-            opus_strerror(error)
-        );
-    }
-
-    if let Some(c) = complexity {
-        unsafe {
-            libopus_sys::opus_multistream_decoder_ctl(
-                dec,
-                OPUS_SET_COMPLEXITY_REQUEST,
-                i32::from(c),
-            )
-        };
-    }
-    unsafe {
-        libopus_sys::opus_multistream_decoder_ctl(
-            dec,
-            OPUS_SET_IGNORE_EXTENSIONS_REQUEST,
-            options.ignore_extensions as i32,
-        )
-    };
-
-    let mut cursor = Cursor::new(data);
-    let len = cursor.get_ref().len();
-    let channels = layout.channels as usize;
-    let mut packet = vec![0u8; MAX_PACKET];
-    let mut samples = vec![0i16; MAX_FRAME_SIZE * channels];
-    let mut output = Vec::<u8>::new();
-    while cursor.position() < len as u64 {
-        let data_bytes = cursor.read_u32::<BigEndian>().unwrap();
-        let _enc_final_range = cursor.read_u32::<BigEndian>().unwrap();
-        let packet_slice = &mut packet[..data_bytes as usize];
-        cursor.read_exact(packet_slice).unwrap();
-
-        let decoded = unsafe {
-            libopus_sys::opus_multistream_decode(
-                dec,
-                packet_slice.as_ptr(),
-                packet_slice.len() as i32,
-                samples.as_mut_ptr(),
-                MAX_FRAME_SIZE as i32,
-                0,
-            )
-        };
-        if decoded < 0 {
-            unsafe { libopus_sys::opus_multistream_decoder_destroy(dec) };
-            panic!("opus_multistream_decode failed: {}", opus_strerror(decoded));
-        }
-        for sample in &samples[..decoded as usize * channels] {
-            output.extend_from_slice(&sample.to_le_bytes());
-        }
-    }
-
-    unsafe { libopus_sys::opus_multistream_decoder_destroy(dec) };
     output
 }

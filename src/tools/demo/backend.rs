@@ -5,6 +5,8 @@ use std::str::FromStr;
 pub(crate) trait OpusBackendTrait {
     type Encoder;
     type Decoder;
+    type MSEncoder;
+    type MSDecoder;
 
     fn opus_encoder_create(Fs: i32, channels: i32, application: i32) -> Result<Self::Encoder, i32>;
     fn enc_set_bitrate(st: &mut Self::Encoder, val: i32);
@@ -40,16 +42,64 @@ pub(crate) trait OpusBackendTrait {
     fn dec_load_dnn_weights(st: &mut Self::Decoder) -> Result<(), i32>;
     fn dec_set_dnn_blob(st: &mut Self::Decoder, data: &[u8]) -> Result<(), i32>;
     fn opus_decoder_destroy(st: Self::Decoder);
+
+    fn opus_multistream_encoder_create(
+        Fs: i32,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        mapping: &[u8],
+        application: i32,
+    ) -> Result<Self::MSEncoder, i32>;
+    fn ms_enc_set_bitrate(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_bandwidth(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_vbr(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_vbr_constraint(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_complexity(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_inband_fec(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_packet_loss_perc(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_force_channels(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_dtx(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_set_qext(st: &mut Self::MSEncoder, val: i32);
+    fn ms_enc_get_lookahead(st: &mut Self::MSEncoder) -> i32;
+    fn ms_enc_get_final_range(st: &mut Self::MSEncoder) -> u32;
+    fn opus_multistream_encode(
+        st: &mut Self::MSEncoder,
+        pcm: &[i16],
+        frame_size: i32,
+        data: &mut [u8],
+    ) -> i32;
+    fn opus_multistream_encoder_destroy(st: Self::MSEncoder);
+
+    fn opus_multistream_decoder_create(
+        Fs: i32,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        mapping: &[u8],
+    ) -> Result<Self::MSDecoder, i32>;
+    fn opus_multistream_decode(
+        st: &mut Self::MSDecoder,
+        data: &[u8],
+        pcm: &mut [i16],
+        frame_size: i32,
+        decode_fec: i32,
+    ) -> i32;
+    fn ms_dec_set_complexity(st: &mut Self::MSDecoder, val: i32);
+    fn ms_dec_set_ignore_extensions(st: &mut Self::MSDecoder, val: i32);
+    fn opus_multistream_decoder_destroy(st: Self::MSDecoder);
 }
 
 mod rust_backend {
-    use crate::{Bitrate, OpusDecoder, OpusEncoder};
+    use crate::{Bitrate, OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder};
 
     pub struct RustLibopusBackend;
 
     impl super::OpusBackendTrait for RustLibopusBackend {
         type Encoder = Box<OpusEncoder>;
         type Decoder = Box<OpusDecoder>;
+        type MSEncoder = Box<OpusMSEncoder>;
+        type MSDecoder = Box<OpusMSDecoder>;
 
         fn opus_encoder_create(
             Fs: i32,
@@ -204,6 +254,126 @@ mod rust_backend {
         }
 
         fn opus_decoder_destroy(_st: Box<OpusDecoder>) {}
+
+        fn opus_multistream_encoder_create(
+            Fs: i32,
+            channels: i32,
+            streams: i32,
+            coupled_streams: i32,
+            mapping: &[u8],
+            application: i32,
+        ) -> Result<Self::MSEncoder, i32> {
+            OpusMSEncoder::new(Fs, channels, streams, coupled_streams, mapping, application)
+                .map(Box::new)
+        }
+
+        fn ms_enc_set_bitrate(st: &mut Self::MSEncoder, val: i32) {
+            st.set_bitrate(Bitrate::from(val));
+        }
+
+        fn ms_enc_set_bandwidth(st: &mut Self::MSEncoder, val: i32) {
+            let bw = if val == crate::OPUS_AUTO {
+                None
+            } else {
+                Some(val.try_into().unwrap())
+            };
+            st.set_bandwidth(bw);
+        }
+
+        fn ms_enc_set_vbr(st: &mut Self::MSEncoder, val: i32) {
+            st.set_vbr(val != 0);
+        }
+
+        fn ms_enc_set_vbr_constraint(st: &mut Self::MSEncoder, val: i32) {
+            st.set_vbr_constraint(val != 0);
+        }
+
+        fn ms_enc_set_complexity(st: &mut Self::MSEncoder, val: i32) {
+            st.set_complexity(val).unwrap();
+        }
+
+        fn ms_enc_set_inband_fec(st: &mut Self::MSEncoder, val: i32) {
+            st.set_inband_fec(val).unwrap();
+        }
+
+        fn ms_enc_set_packet_loss_perc(st: &mut Self::MSEncoder, val: i32) {
+            st.set_packet_loss_perc(val).unwrap();
+        }
+
+        fn ms_enc_set_force_channels(st: &mut Self::MSEncoder, val: i32) {
+            let ch = if val == crate::OPUS_AUTO {
+                None
+            } else {
+                Some(val.try_into().unwrap())
+            };
+            st.set_force_channels(ch).unwrap();
+        }
+
+        fn ms_enc_set_dtx(st: &mut Self::MSEncoder, val: i32) {
+            st.set_dtx(val != 0);
+        }
+
+        fn ms_enc_set_qext(st: &mut Self::MSEncoder, val: i32) {
+            #[cfg(feature = "qext")]
+            st.set_qext(val != 0);
+            #[cfg(not(feature = "qext"))]
+            {
+                let _ = st;
+                if val != 0 {
+                    panic!("QEXT support requires the 'qext' feature");
+                }
+            }
+        }
+
+        fn ms_enc_get_lookahead(st: &mut Self::MSEncoder) -> i32 {
+            st.lookahead()
+        }
+
+        fn ms_enc_get_final_range(st: &mut Self::MSEncoder) -> u32 {
+            st.final_range()
+        }
+
+        fn opus_multistream_encode(
+            st: &mut Self::MSEncoder,
+            pcm: &[i16],
+            frame_size: i32,
+            data: &mut [u8],
+        ) -> i32 {
+            let frame_samples = frame_size as usize * st.layout().channels() as usize;
+            crate::opus_multistream_encode(st, &pcm[..frame_samples], frame_size, data)
+        }
+
+        fn opus_multistream_encoder_destroy(_st: Self::MSEncoder) {}
+
+        fn opus_multistream_decoder_create(
+            Fs: i32,
+            channels: i32,
+            streams: i32,
+            coupled_streams: i32,
+            mapping: &[u8],
+        ) -> Result<Self::MSDecoder, i32> {
+            OpusMSDecoder::new(Fs, channels, streams, coupled_streams, mapping).map(Box::new)
+        }
+
+        fn opus_multistream_decode(
+            st: &mut Self::MSDecoder,
+            data: &[u8],
+            pcm: &mut [i16],
+            frame_size: i32,
+            decode_fec: i32,
+        ) -> i32 {
+            crate::opus_multistream_decode(st, data, pcm, frame_size, decode_fec != 0)
+        }
+
+        fn ms_dec_set_complexity(st: &mut Self::MSDecoder, val: i32) {
+            st.set_complexity(val).unwrap();
+        }
+
+        fn ms_dec_set_ignore_extensions(st: &mut Self::MSDecoder, val: i32) {
+            st.set_ignore_extensions(val != 0);
+        }
+
+        fn opus_multistream_decoder_destroy(_st: Self::MSDecoder) {}
     }
 }
 pub(crate) use rust_backend::RustLibopusBackend;
@@ -211,16 +381,20 @@ pub(crate) use rust_backend::RustLibopusBackend;
 mod libopus {
     use libopus_sys::{
         opus_decode, opus_decoder_create, opus_decoder_ctl, opus_decoder_destroy, opus_encode,
-        opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy,
+        opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy, opus_multistream_decode,
+        opus_multistream_decoder_create, opus_multistream_decoder_ctl,
+        opus_multistream_decoder_destroy, opus_multistream_encode, opus_multistream_encoder_create,
+        opus_multistream_encoder_ctl, opus_multistream_encoder_destroy,
     };
-    use libopus_sys::{OpusDecoder, OpusEncoder};
+    use libopus_sys::{OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder};
 
     use crate::{
         OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST,
         OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DNN_BLOB_REQUEST,
         OPUS_SET_DRED_DURATION_REQUEST, OPUS_SET_DTX_REQUEST,
         OPUS_SET_EXPERT_FRAME_DURATION_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-        OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+        OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+        OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
     };
     const OPUS_SET_QEXT_REQUEST: i32 = 4056;
     const OPUS_SET_IGNORE_EXTENSIONS_REQUEST: i32 = 4058;
@@ -230,6 +404,8 @@ mod libopus {
     impl super::OpusBackendTrait for UpstreamLibopusBackend {
         type Encoder = *mut OpusEncoder;
         type Decoder = *mut OpusDecoder;
+        type MSEncoder = *mut OpusMSEncoder;
+        type MSDecoder = *mut OpusMSDecoder;
 
         fn opus_encoder_create(
             Fs: i32,
@@ -398,6 +574,166 @@ mod libopus {
 
         fn opus_decoder_destroy(st: *mut OpusDecoder) {
             unsafe { opus_decoder_destroy(st) }
+        }
+
+        fn opus_multistream_encoder_create(
+            Fs: i32,
+            channels: i32,
+            streams: i32,
+            coupled_streams: i32,
+            mapping: &[u8],
+            application: i32,
+        ) -> Result<Self::MSEncoder, i32> {
+            let mut error = 0;
+            let res = unsafe {
+                opus_multistream_encoder_create(
+                    Fs,
+                    channels,
+                    streams,
+                    coupled_streams,
+                    mapping.as_ptr(),
+                    application,
+                    &mut error,
+                )
+            };
+            if res.is_null() {
+                Err(error)
+            } else {
+                Ok(res)
+            }
+        }
+
+        fn ms_enc_set_bitrate(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_BITRATE_REQUEST, val) };
+        }
+
+        fn ms_enc_set_bandwidth(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_BANDWIDTH_REQUEST, val) };
+        }
+
+        fn ms_enc_set_vbr(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_VBR_REQUEST, val) };
+        }
+
+        fn ms_enc_set_vbr_constraint(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_VBR_CONSTRAINT_REQUEST, val) };
+        }
+
+        fn ms_enc_set_complexity(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_COMPLEXITY_REQUEST, val) };
+        }
+
+        fn ms_enc_set_inband_fec(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_INBAND_FEC_REQUEST, val) };
+        }
+
+        fn ms_enc_set_packet_loss_perc(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_PACKET_LOSS_PERC_REQUEST, val) };
+        }
+
+        fn ms_enc_set_force_channels(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_FORCE_CHANNELS_REQUEST, val) };
+        }
+
+        fn ms_enc_set_dtx(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_DTX_REQUEST, val) };
+        }
+
+        fn ms_enc_set_qext(st: &mut Self::MSEncoder, val: i32) {
+            unsafe { opus_multistream_encoder_ctl(*st, OPUS_SET_QEXT_REQUEST, val) };
+        }
+
+        fn ms_enc_get_lookahead(st: &mut Self::MSEncoder) -> i32 {
+            let mut val: i32 = 0;
+            unsafe {
+                opus_multistream_encoder_ctl(*st, OPUS_GET_LOOKAHEAD_REQUEST, &mut val as *mut _)
+            };
+            val
+        }
+
+        fn ms_enc_get_final_range(st: &mut Self::MSEncoder) -> u32 {
+            let mut val: u32 = 0;
+            unsafe {
+                opus_multistream_encoder_ctl(*st, OPUS_GET_FINAL_RANGE_REQUEST, &mut val as *mut _)
+            };
+            val
+        }
+
+        fn opus_multistream_encode(
+            st: &mut Self::MSEncoder,
+            pcm: &[i16],
+            frame_size: i32,
+            data: &mut [u8],
+        ) -> i32 {
+            unsafe {
+                opus_multistream_encode(
+                    *st,
+                    pcm.as_ptr(),
+                    frame_size,
+                    data.as_mut_ptr(),
+                    data.len() as i32,
+                )
+            }
+        }
+
+        fn opus_multistream_encoder_destroy(st: Self::MSEncoder) {
+            unsafe { opus_multistream_encoder_destroy(st) }
+        }
+
+        fn opus_multistream_decoder_create(
+            Fs: i32,
+            channels: i32,
+            streams: i32,
+            coupled_streams: i32,
+            mapping: &[u8],
+        ) -> Result<Self::MSDecoder, i32> {
+            let mut error = 0;
+            let res = unsafe {
+                opus_multistream_decoder_create(
+                    Fs,
+                    channels,
+                    streams,
+                    coupled_streams,
+                    mapping.as_ptr(),
+                    &mut error,
+                )
+            };
+            if res.is_null() {
+                Err(error)
+            } else {
+                Ok(res)
+            }
+        }
+
+        fn opus_multistream_decode(
+            st: &mut Self::MSDecoder,
+            data: &[u8],
+            pcm: &mut [i16],
+            frame_size: i32,
+            decode_fec: i32,
+        ) -> i32 {
+            unsafe {
+                opus_multistream_decode(
+                    *st,
+                    data.as_ptr(),
+                    data.len() as i32,
+                    pcm.as_mut_ptr(),
+                    frame_size,
+                    decode_fec,
+                )
+            }
+        }
+
+        fn ms_dec_set_complexity(st: &mut Self::MSDecoder, val: i32) {
+            unsafe { opus_multistream_decoder_ctl(*st, OPUS_SET_COMPLEXITY_REQUEST, val) };
+        }
+
+        fn ms_dec_set_ignore_extensions(st: &mut Self::MSDecoder, val: i32) {
+            unsafe { opus_multistream_decoder_ctl(*st, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, val) };
+        }
+
+        fn opus_multistream_decoder_destroy(st: Self::MSDecoder) {
+            unsafe { opus_multistream_decoder_destroy(st) }
         }
     }
 }

@@ -37,6 +37,7 @@ Primary target headers:
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.4` benchmark smoke lane with artifact upload added to CI
   - `M2.5` `run_vectors2` suite registry now drives suite discovery and kind selection
+  - `M2.2` demo multistream encode/decode now runs through the backend trait for both Rust and upstream libopus implementations (no duplicated per-backend code path in `tools::demo`)
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
 - Next ordered slices:
