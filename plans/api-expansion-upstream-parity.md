@@ -46,11 +46,12 @@ Primary target headers:
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
   - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
   - `M2.5` multistream parity reporting now emits bitstream mismatch diagnostics (mismatched-byte count + first mismatch byte) for faster root-cause analysis of non-bitexact outputs
-  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating, plus projection quick-matrix smoke coverage in CI (quick lane currently gates the stable FOA subset; full matrix remains exploratory for higher-order parity deltas)
+  - `M2.5` `run_vectors2` projection suite added with deterministic synthetic vectors and quick/full seed-matrix gating; projection full-matrix strict-bitexact parity is now stable (`9/9`)
   - `M2.5` projection synthetic vector matrix expanded with a stable nondiegetic ambisonics case (`11ch`) and tuned full-matrix seed sweeps (`17/42`) to preserve CI runtime and parity stability
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
   - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`9/9`, including `--strict-bitexact`)
+  - `M2.5` CI now gates multistream/projection full-matrix strict-bitexact parity in `test-tools-smoke`, and runs strict full-matrix multistream/projection vector parity on major-platform vector jobs
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing
