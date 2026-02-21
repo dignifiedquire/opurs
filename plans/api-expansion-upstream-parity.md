@@ -62,6 +62,7 @@ Primary target headers:
   - `M3.3` projection encoder API parity expanded with C-backed init/reinit checks (including matrix parity after reinit) and i16/f32/i24 encode smoke coverage
   - `M3.3` projection encoder now exports a child-state helper wrapper (`opus_projection_encoder_get_encoder_state`) mirroring decoder-side state access
   - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
+  - `M3.3` projection encoder error-path parity now covers invalid frame-size and tiny-buffer return codes across i16/f32/i24 encode entrypoints
 - Next ordered slices:
   1. Add asset-backed projection vector suite loading once upstream projection vector assets are available.
   2. Expand projection vector suite parameter matrix (frame sizes, channels, bitrate/application combinations) and tune quick/full runtime envelopes.

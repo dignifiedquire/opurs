@@ -5,7 +5,7 @@
 use crate::enums::Application;
 use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::mapping_matrix::MappingMatrix;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK};
+use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
 use crate::opus::opus_encoder::OpusEncoder;
 use crate::opus::opus_multistream_encoder::OpusMSEncoder;
 use crate::opus::projection_matrices::projection_matrices_for_order_plus_one;
@@ -178,12 +178,7 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        let ret = self.encoder.encode_float(&mixed, data);
-        if ret > 0 {
-            ret
-        } else {
-            OPUS_BUFFER_TOO_SMALL
-        }
+        self.encoder.encode_float(&mixed, data)
     }
 
     pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, data: &mut [u8]) -> i32 {
@@ -209,12 +204,7 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        let ret = self.encoder.encode_float(&mixed, data);
-        if ret > 0 {
-            ret
-        } else {
-            OPUS_BUFFER_TOO_SMALL
-        }
+        self.encoder.encode_float(&mixed, data)
     }
 
     pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, data: &mut [u8]) -> i32 {
@@ -240,12 +230,7 @@ impl OpusProjectionEncoder {
                 return err;
             }
         }
-        let ret = self.encoder.encode_float(&mixed, data);
-        if ret > 0 {
-            ret
-        } else {
-            OPUS_BUFFER_TOO_SMALL
-        }
+        self.encoder.encode_float(&mixed, data)
     }
 
     pub fn demixing_matrix_gain(&self) -> i32 {

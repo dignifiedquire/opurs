@@ -8,8 +8,8 @@ use opurs::{
     opus_projection_encode_float as rust_opus_projection_encode_float,
     opus_projection_encoder_get_encoder_state as rust_opus_projection_encoder_get_encoder_state,
     Channels, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
-    OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
-    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
+    OPUS_BUFFER_TOO_SMALL, OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST,
+    OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
     OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST,
     OPUS_GET_VBR_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
@@ -521,6 +521,122 @@ fn projection_encoder_format_encode_smoke_against_c() {
             unsafe { opus_projection_encoder_destroy(c_enc) };
         }
     }
+}
+
+#[test]
+fn projection_encoder_error_code_parity_with_c() {
+    let _guard = test_guard();
+
+    let channels = 4i32;
+    let frame_size = 960usize;
+
+    let mut rust_streams = -1i32;
+    let mut rust_coupled = -1i32;
+    let mut rust_enc = rust_opus_projection_encoder_create(
+        48000,
+        channels,
+        3,
+        &mut rust_streams,
+        &mut rust_coupled,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("rust create");
+
+    let mut c_streams = -1i32;
+    let mut c_coupled = -1i32;
+    let mut c_error = 0i32;
+    let c_enc = unsafe {
+        opus_projection_ambisonics_encoder_create(
+            48000,
+            channels,
+            3,
+            &mut c_streams,
+            &mut c_coupled,
+            OPUS_APPLICATION_AUDIO,
+            &mut c_error,
+        )
+    };
+    assert!(!c_enc.is_null(), "c create failed: {c_error}");
+
+    let mut pcm_i16 = vec![0i16; frame_size * channels as usize];
+    let mut pcm_f32 = vec![0f32; frame_size * channels as usize];
+    let mut pcm_i24 = vec![0i32; frame_size * channels as usize];
+    for i in 0..frame_size {
+        for ch in 0..channels as usize {
+            let base = (i as i32 * (ch as i32 + 3) * 17) - 1024;
+            pcm_i16[i * channels as usize + ch] = base as i16;
+            pcm_f32[i * channels as usize + ch] = base as f32 / 32768.0;
+            pcm_i24[i * channels as usize + ch] = base << 8;
+        }
+    }
+
+    for bad_frame in [-1i32, 0i32] {
+        let mut rust_packet = vec![0u8; 4000];
+        let rust_ret =
+            rust_opus_projection_encode(&mut rust_enc, &pcm_i16, bad_frame, &mut rust_packet);
+        let mut c_packet = vec![0u8; 4000];
+        let c_ret = unsafe {
+            opus_projection_encode(
+                c_enc,
+                pcm_i16.as_ptr(),
+                bad_frame,
+                c_packet.as_mut_ptr(),
+                c_packet.len() as i32,
+            )
+        };
+        assert_eq!(
+            rust_ret, c_ret,
+            "i16 frame-size error mismatch ({bad_frame})"
+        );
+        assert_eq!(rust_ret, OPUS_BAD_ARG);
+    }
+
+    let mut tiny = vec![0u8; 1];
+    let rust_ret =
+        rust_opus_projection_encode(&mut rust_enc, &pcm_i16, frame_size as i32, &mut tiny);
+    let c_ret = unsafe {
+        opus_projection_encode(
+            c_enc,
+            pcm_i16.as_ptr(),
+            frame_size as i32,
+            tiny.as_mut_ptr(),
+            tiny.len() as i32,
+        )
+    };
+    assert_eq!(rust_ret, c_ret, "i16 tiny-buffer mismatch");
+    assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
+
+    let mut tiny = vec![0u8; 1];
+    let rust_ret =
+        rust_opus_projection_encode_float(&mut rust_enc, &pcm_f32, frame_size as i32, &mut tiny);
+    let c_ret = unsafe {
+        opus_projection_encode_float(
+            c_enc,
+            pcm_f32.as_ptr(),
+            frame_size as i32,
+            tiny.as_mut_ptr(),
+            tiny.len() as i32,
+        )
+    };
+    assert_eq!(rust_ret, c_ret, "float tiny-buffer mismatch");
+    assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
+
+    let mut tiny = vec![0u8; 1];
+    let rust_ret =
+        rust_opus_projection_encode24(&mut rust_enc, &pcm_i24, frame_size as i32, &mut tiny);
+    let c_ret = unsafe {
+        opus_projection_encode24(
+            c_enc,
+            pcm_i24.as_ptr(),
+            frame_size as i32,
+            tiny.as_mut_ptr(),
+            tiny.len() as i32,
+        )
+    };
+    assert_eq!(rust_ret, c_ret, "24-bit tiny-buffer mismatch");
+    assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
+
+    unsafe { opus_projection_encoder_destroy(c_enc) };
 }
 
 #[test]
