@@ -325,15 +325,16 @@ pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
 /// Requires AVX2 and nStatesDelayedDecision == 3 or 4.
 #[inline]
 pub fn use_nsq_del_dec_avx2(n_states: i32) -> bool {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        return cpuid_avx2::get() && (n_states == 3 || n_states == 4);
-    }
-    #[allow(unreachable_code)]
-    {
-        let _ = n_states;
-        false
-    }
+    // Temporarily disable AVX2 NSQ del_dec dispatch.
+    //
+    // Rationale: full classic vectors currently show deterministic x86_64-only
+    // bitstream mismatches (testvector11, 10 kbps RLD, 20/40/60 ms) when this
+    // path is enabled. Scalar/SSE paths are bit-exact for these cases.
+    //
+    // Keep the implementation in-tree for further parity work, but force
+    // runtime dispatch to the non-AVX2 implementations for correctness.
+    let _ = n_states;
+    false
 }
 
 /// Run the AVX2 NSQ del_dec complete outer function.
