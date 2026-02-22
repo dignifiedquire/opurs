@@ -224,11 +224,11 @@ pub fn silk_LPC_inverse_pred_gain(A_Q12: &[i16]) -> i32 {
 /// Requires SSE4.1 and the common LPC order combination (shaping=10, predict=16).
 #[inline]
 pub fn use_nsq_sse4_1() -> bool {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        return cpuid_sse4_1::get();
-    }
-    #[allow(unreachable_code)]
+    // Temporarily disable SSE4.1 NSQ dispatch for parity.
+    //
+    // Full classic vectors on x86_64 still fail 3 cases in testvector11
+    // (10 kbps RLD, 20/40/60 ms) even with AVX2 NSQ-del-dec disabled.
+    // This keeps NSQ on scalar code paths until the SIMD parity issue is fixed.
     false
 }
 
