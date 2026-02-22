@@ -188,10 +188,10 @@ pub unsafe fn celt_pitch_xcorr_avx2(x: &[f32], y: &[f32], xcorr: &mut [f32], len
         xcorr[i + 7] = sum[7];
         i += 8;
     }
-    // Handle remaining 1-7 entries.
-    // Keep this scalar to avoid cross-target SIMD-tail drift in rare parity cases.
+    // Handle remaining 1-7 with SSE celt_inner_prod, matching C's
+    // `celt_inner_prod(_x, _y+i, len, arch)` which dispatches to SSE.
     while i < max_pitch {
-        xcorr[i] = crate::celt::pitch::celt_inner_prod_scalar(x, &y[i..], len);
+        xcorr[i] = celt_inner_prod_sse(x, &y[i..], len);
         i += 1;
     }
 }
