@@ -119,21 +119,46 @@ unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize
         i += 8;
     }
 
-    // Handle remaining 1-7 elements with masked loads
+    // Handle remaining 1-7 elements with zero-padded vectors.
+    // This keeps the same arithmetic shape as the masked AVX2 path while
+    // avoiding maskload-specific behavior differences across targets/toolchains.
     if i < len {
-        // Create mask: -1 for valid elements, 0 for padding
-        static MASK_TABLE: [i32; 15] = [-1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0];
         let remaining = len - i;
-        let m = _mm256_loadu_si256(MASK_TABLE.as_ptr().add(7 - remaining) as *const __m256i);
-        let x0 = _mm256_maskload_ps(x.as_ptr().add(i), m);
-        xsum0 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i), m), xsum0);
-        xsum1 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 1), m), xsum1);
-        xsum2 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 2), m), xsum2);
-        xsum3 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 3), m), xsum3);
-        xsum4 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 4), m), xsum4);
-        xsum5 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 5), m), xsum5);
-        xsum6 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 6), m), xsum6);
-        xsum7 = _mm256_fmadd_ps(x0, _mm256_maskload_ps(y.as_ptr().add(i + 7), m), xsum7);
+        let mut x_tail = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(x.as_ptr().add(i), x_tail.as_mut_ptr(), remaining);
+        let x0 = _mm256_loadu_ps(x_tail.as_ptr());
+
+        let mut y0 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i), y0.as_mut_ptr(), remaining);
+        xsum0 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y0.as_ptr()), xsum0);
+
+        let mut y1 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 1), y1.as_mut_ptr(), remaining);
+        xsum1 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y1.as_ptr()), xsum1);
+
+        let mut y2 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 2), y2.as_mut_ptr(), remaining);
+        xsum2 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y2.as_ptr()), xsum2);
+
+        let mut y3 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 3), y3.as_mut_ptr(), remaining);
+        xsum3 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y3.as_ptr()), xsum3);
+
+        let mut y4 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 4), y4.as_mut_ptr(), remaining);
+        xsum4 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y4.as_ptr()), xsum4);
+
+        let mut y5 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 5), y5.as_mut_ptr(), remaining);
+        xsum5 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y5.as_ptr()), xsum5);
+
+        let mut y6 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 6), y6.as_mut_ptr(), remaining);
+        xsum6 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y6.as_ptr()), xsum6);
+
+        let mut y7 = [0.0f32; 8];
+        std::ptr::copy_nonoverlapping(y.as_ptr().add(i + 7), y7.as_mut_ptr(), remaining);
+        xsum7 = _mm256_fmadd_ps(x0, _mm256_loadu_ps(y7.as_ptr()), xsum7);
     }
 
     // 8 horizontal sums
