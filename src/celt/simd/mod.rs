@@ -112,7 +112,10 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2_fma::get() {
+        // Upstream AVX2 handles non-8 tails via scalar inner products.
+        // We observed rare parity drift in that tail region on some x86_64 hosts,
+        // so keep AVX2 for 8-aligned batches and fall back to the SSE path otherwise.
+        if cpuid_avx2_fma::get() && xcorr.len().is_multiple_of(8) {
             unsafe {
                 x86::celt_pitch_xcorr_avx2(x, y, xcorr, len);
             }

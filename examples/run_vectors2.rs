@@ -1502,6 +1502,91 @@ fn pcm_i16_slice_diff_stats(lhs: &[i16], rhs: &[i16]) -> Option<(i32, f64)> {
     }
 }
 
+fn first_mux_packet_diff(upstream: &[u8], rust: &[u8]) -> Option<String> {
+    let mut upos = 0usize;
+    let mut rpos = 0usize;
+    let mut packet = 0usize;
+
+    while upos + 8 <= upstream.len() && rpos + 8 <= rust.len() {
+        let upstream_len = i32::from_be_bytes([
+            upstream[upos],
+            upstream[upos + 1],
+            upstream[upos + 2],
+            upstream[upos + 3],
+        ]);
+        let rust_len =
+            i32::from_be_bytes([rust[rpos], rust[rpos + 1], rust[rpos + 2], rust[rpos + 3]]);
+        let upstream_range = u32::from_be_bytes([
+            upstream[upos + 4],
+            upstream[upos + 5],
+            upstream[upos + 6],
+            upstream[upos + 7],
+        ]);
+        let rust_range = u32::from_be_bytes([
+            rust[rpos + 4],
+            rust[rpos + 5],
+            rust[rpos + 6],
+            rust[rpos + 7],
+        ]);
+
+        if upstream_len != rust_len {
+            return Some(format!(
+                "pkt={} len upstream/rust={}/{}",
+                packet, upstream_len, rust_len
+            ));
+        }
+        if upstream_range != rust_range {
+            return Some(format!(
+                "pkt={} range upstream/rust={:#010x}/{:#010x}",
+                packet, upstream_range, rust_range
+            ));
+        }
+        if upstream_len <= 0 {
+            return Some(format!("pkt={} invalid length={}", packet, upstream_len));
+        }
+        let payload_len = upstream_len as usize;
+        if upos + 8 + payload_len > upstream.len() || rpos + 8 + payload_len > rust.len() {
+            return Some(format!(
+                "pkt={} truncated payload len={} upstream_rem={} rust_rem={}",
+                packet,
+                payload_len,
+                upstream.len().saturating_sub(upos + 8),
+                rust.len().saturating_sub(rpos + 8)
+            ));
+        }
+
+        let upstream_payload = &upstream[upos + 8..upos + 8 + payload_len];
+        let rust_payload = &rust[rpos + 8..rpos + 8 + payload_len];
+        if upstream_payload != rust_payload {
+            let first_byte = upstream_payload
+                .iter()
+                .zip(rust_payload.iter())
+                .position(|(u, r)| u != r)
+                .unwrap_or(0);
+            return Some(format!(
+                "pkt={} byte={} upstream/rust={:#04x}/{:#04x}",
+                packet, first_byte, upstream_payload[first_byte], rust_payload[first_byte]
+            ));
+        }
+
+        upos += 8 + payload_len;
+        rpos += 8 + payload_len;
+        packet += 1;
+    }
+
+    if upos != upstream.len() || rpos != rust.len() {
+        return Some(format!(
+            "container length mismatch upstream/rust={}/{} parsed_upstream/rust={}/{}",
+            upstream.len(),
+            rust.len(),
+            upos,
+            rpos
+        ));
+    }
+
+    None
+}
+
 fn run_test(
     test_vector: &TestVector,
     test_kind: TestKind,
@@ -1720,7 +1805,11 @@ fn run_test(
             if upstream_encoded == rust_encoded {
                 TestResult::pass("exact bitstream")
             } else {
-                TestResult::fail("different bitstream")
+                let detail = first_mux_packet_diff(&upstream_encoded, &rust_encoded).map_or_else(
+                    || "different bitstream".to_string(),
+                    |d| format!("different bitstream: {d}"),
+                );
+                TestResult::fail(detail)
             }
         }
         TestKind::ParityEncodeDred {
@@ -1778,7 +1867,11 @@ fn run_test(
             if upstream_encoded == rust_encoded {
                 TestResult::pass("exact bitstream")
             } else {
-                TestResult::fail("different bitstream")
+                let detail = first_mux_packet_diff(&upstream_encoded, &rust_encoded).map_or_else(
+                    || "different bitstream".to_string(),
+                    |d| format!("different bitstream: {d}"),
+                );
+                TestResult::fail(detail)
             }
         }
         TestKind::ParityDecodeDnn {
