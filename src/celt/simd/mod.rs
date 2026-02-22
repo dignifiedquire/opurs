@@ -112,9 +112,12 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // Keep AVX2 implementation available but disabled for runtime dispatch
-        // until strict-bitexact parity is proven across all vector lanes.
-        let _ = cpuid_avx2_fma::get();
+        if cpuid_avx2_fma::get() {
+            unsafe {
+                x86::celt_pitch_xcorr_avx2(x, y, xcorr, len);
+            }
+            return;
+        }
         if cpuid_sse::get() {
             unsafe {
                 x86::celt_pitch_xcorr_sse(x, y, xcorr, len);
