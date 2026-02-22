@@ -46,14 +46,12 @@ pub fn silk_noise_shape_quantizer_short_prediction(
         };
     }
 
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if cpuid_sse4_1::get() {
-            return unsafe {
-                x86::silk_noise_shape_quantizer_short_prediction_sse4_1(buf32, coef16, order)
-            };
-        }
-    }
+    // Temporarily keep x86/x86_64 on scalar for parity.
+    //
+    // Full classic vectors on x86_64 still fail deterministic
+    // testvector11 10 kbps RLD cases. This short-prediction kernel is used by
+    // both NSQ paths, so we force the scalar implementation until parity work
+    // for the SSE4.1 port is complete.
 
     #[allow(unreachable_code)]
     {
