@@ -467,9 +467,7 @@ jobs:
           tar -xzf projection_vectors.tar.gz -C "$OPUS_PROJECTION_VECTORS_DIR"
       - name: Run test vectors (full matrix on major platforms)
         if: matrix.major_platform
-        env:
-          RAYON_NUM_THREADS: 1
-        run: cargo run --release --no-default-features --features tools --target ${{ matrix.target }} --example run_vectors2 -- --suite classic --matrix full opus_newvectors
+        run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- --suite classic --matrix full --jobs 1 opus_newvectors
       - name: Run multistream strict full-matrix vectors (major platforms)
         if: matrix.major_platform
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full --strict-bitexact

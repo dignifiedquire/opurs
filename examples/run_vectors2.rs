@@ -6,6 +6,7 @@
 use clap::{Parser, ValueEnum};
 use itertools::iproduct;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::ThreadPoolBuilder;
 
 use indicatif::ParallelProgressIterator;
 use opurs::tools::demo::{
@@ -69,6 +70,11 @@ struct Cli {
     /// Matrix size for parity encode configurations.
     #[arg(long, value_enum, default_value = "quick")]
     matrix: MatrixMode,
+
+    /// Number of worker threads for test execution.
+    /// Use `--jobs 1` for deterministic serial execution.
+    #[arg(long)]
+    jobs: Option<usize>,
 
     /// Fail parity tests when encoded bitstreams are not exactly identical.
     #[arg(long)]
@@ -2516,6 +2522,11 @@ fn should_include_vector_kind(vector: &TestVector, kind: TestKind) -> bool {
 fn main() {
     let args = Cli::parse();
 
+    if args.jobs == Some(0) {
+        eprintln!("--jobs must be >= 1");
+        std::process::exit(2);
+    }
+
     let mut vectors_by_suite = load_vectors_by_suite(&args.vector_path);
 
     if let Some(limit) = args.vector_limit {
@@ -2592,7 +2603,11 @@ fn main() {
         std::process::exit(1);
     }
 
-    println!("Running {} tests in parallel", tests.len());
+    match args.jobs {
+        Some(1) => println!("Running {} tests serially", tests.len()),
+        Some(workers) => println!("Running {} tests in parallel (jobs={workers})", tests.len()),
+        None => println!("Running {} tests in parallel", tests.len()),
+    }
     for &suite in &selected_suites {
         if let Some(vectors) = vectors_by_suite.get(&suite) {
             println!("  suite={} vectors={}", suite.as_str(), vectors.len());
@@ -2601,28 +2616,44 @@ fn main() {
 
     let start_time = Instant::now();
 
-    let results = tests
-        .into_par_iter()
-        .progress()
-        .map(|(test_vector, test_kind)| {
-            let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                run_test(
-                    test_vector,
-                    test_kind,
-                    args.dump_dir.as_deref(),
-                    args.strict_bitexact,
-                )
-            }))
-            .unwrap_or_else(|_| TestResult::fail("panic while running test"));
+    let run_one = |(test_vector, test_kind): (&TestVector, TestKind)| {
+        let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_test(
+                test_vector,
+                test_kind,
+                args.dump_dir.as_deref(),
+                args.strict_bitexact,
+            )
+        }))
+        .unwrap_or_else(|_| TestResult::fail("panic while running test"));
 
-            TestExecution {
-                suite: test_vector.suite,
-                vector: test_vector.name.clone(),
-                kind: test_kind,
-                result: test_result,
-            }
-        })
-        .collect::<Vec<_>>();
+        TestExecution {
+            suite: test_vector.suite,
+            vector: test_vector.name.clone(),
+            kind: test_kind,
+            result: test_result,
+        }
+    };
+
+    let results = match args.jobs {
+        Some(1) => tests.into_iter().map(run_one).collect::<Vec<_>>(),
+        Some(workers) => ThreadPoolBuilder::new()
+            .num_threads(workers)
+            .build()
+            .expect("building Rayon thread pool")
+            .install(|| {
+                tests
+                    .into_par_iter()
+                    .progress()
+                    .map(run_one)
+                    .collect::<Vec<_>>()
+            }),
+        None => tests
+            .into_par_iter()
+            .progress()
+            .map(run_one)
+            .collect::<Vec<_>>(),
+    };
 
     let elapsed = start_time.elapsed();
     println!("Ran {} tests in {:?}", results.len(), elapsed);
