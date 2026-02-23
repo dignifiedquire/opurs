@@ -77,9 +77,19 @@ fn float2int_impl(x: f32) -> i32 {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn float2int_impl(x: f32) -> i32 {
+    unsafe {
+        use core::arch::aarch64::vcvtns_s32_f32;
+        vcvtns_s32_f32(x)
+    }
+}
+
 #[cfg(not(any(
     target_arch = "x86_64",
-    all(target_arch = "x86", target_feature = "sse")
+    all(target_arch = "x86", target_feature = "sse"),
+    target_arch = "aarch64"
 )))]
 #[inline]
 fn float2int_impl(x: f32) -> i32 {

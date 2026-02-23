@@ -120,10 +120,10 @@ impl OpusProjectionDecoder {
             return OPUS_BAD_ARG;
         }
 
-        let mut input_pcm = vec![0i16; frame_size * input_channels];
-        let decoded = self
-            .decoder
-            .decode(data, &mut input_pcm, frame_size as i32, decode_fec);
+        let mut input_pcm = vec![0f32; frame_size * input_channels];
+        let decoded =
+            self.decoder
+                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec);
         if decoded <= 0 {
             return decoded;
         }
@@ -132,7 +132,7 @@ impl OpusProjectionDecoder {
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);
         for input_row in 0..input_channels {
-            if let Err(err) = self.demixing_matrix.multiply_channel_out_short_i16(
+            if let Err(err) = self.demixing_matrix.multiply_channel_out_short(
                 &input_pcm[input_row..],
                 input_row,
                 input_channels,

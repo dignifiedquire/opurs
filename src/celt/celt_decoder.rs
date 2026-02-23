@@ -108,7 +108,7 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert!(st.start < st.end);
     assert!(st.end <= 21);
     assert!(st.arch >= 0);
-    assert!(st.arch <= 0);
+    assert!(st.arch <= 4);
     assert!(st.last_pitch_index <= 720);
     assert!(st.last_pitch_index >= 100 || st.last_pitch_index == 0);
     assert!(st.postfilter_period < 1024);

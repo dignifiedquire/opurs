@@ -141,7 +141,7 @@ fn compare_encoder_low_bitrate() {
     let mut pcm = vec![0i16; pcm_samples];
     let mut rust_out = vec![0u8; 4000];
     let mut c_out = vec![0u8; 4000];
-    let mut diffs = 0;
+    let mut first_diff = None;
 
     for frame in 0..num_frames {
         for s in pcm.iter_mut() {
@@ -160,15 +160,16 @@ fn compare_encoder_low_bitrate() {
         };
 
         if rust_len != c_len || rust_out[..rust_len] != c_out[..c_len] {
-            if diffs == 0 {
-                eprintln!("Low bitrate: first diff at frame {frame}");
+            if first_diff.is_none() {
+                first_diff = Some(frame);
             }
-            diffs += 1;
         }
     }
 
     unsafe {
         opus_encoder_destroy(c_enc);
     }
-    eprintln!("Low bitrate (10kbps mono): {diffs}/{num_frames} frames differ");
+    if let Some(frame) = first_diff {
+        panic!("Low bitrate (10kbps mono): first encoder divergence at frame {frame}");
+    }
 }

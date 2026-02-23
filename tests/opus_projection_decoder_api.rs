@@ -232,8 +232,8 @@ fn projection_decoder_decode_parity_with_c() {
 
     assert_eq!(rust_ret, c_ret, "projection decode return mismatch");
     for (idx, (&a, &b)) in rust_out.iter().zip(c_out.iter()).enumerate() {
-        assert!(
-            (a as i32 - b as i32).abs() <= 1,
+        assert_eq!(
+            a, b,
             "projection decode mismatch at index {idx}: rust={a}, c={b}"
         );
     }
@@ -356,8 +356,8 @@ fn projection_decoder_higher_order_parity_with_c() {
             "decode return mismatch (channels={channels})"
         );
         for (idx, (&a, &b)) in rust_out.iter().zip(c_out.iter()).enumerate() {
-            assert!(
-                (a as i32 - b as i32).abs() <= 1,
+            assert_eq!(
+                a, b,
                 "decode mismatch (channels={channels}) at index {idx}: rust={a}, c={b}"
             );
         }
@@ -871,8 +871,8 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                 )
             };
             assert_eq!(rust_ret, c_ret);
-            for (&a, &b) in rust_i16.iter().zip(c_i16.iter()) {
-                assert!((a as i32 - b as i32).abs() <= 1);
+            for (idx, (&a, &b)) in rust_i16.iter().zip(c_i16.iter()).enumerate() {
+                assert_eq!(a, b, "decode i16 mismatch at index {idx}: rust={a} c={b}");
             }
 
             let mut rust_f32 = vec![0f32; frame_size * channels as usize];
@@ -895,8 +895,14 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                 )
             };
             assert_eq!(rust_ret, c_ret);
-            for (&a, &b) in rust_f32.iter().zip(c_f32.iter()) {
-                assert!((a - b).abs() <= (2.0f32 / 32768.0f32));
+            for (idx, (&a, &b)) in rust_f32.iter().zip(c_f32.iter()).enumerate() {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "decode float mismatch at index {idx}: rust={a:e} (0x{:08x}) c={b:e} (0x{:08x})",
+                    a.to_bits(),
+                    b.to_bits()
+                );
             }
 
             let mut rust_i24 = vec![0i32; frame_size * channels as usize];
@@ -919,8 +925,8 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                 )
             };
             assert_eq!(rust_ret, c_ret);
-            for (&a, &b) in rust_i24.iter().zip(c_i24.iter()) {
-                assert!((a - b).abs() <= 256);
+            for (idx, (&a, &b)) in rust_i24.iter().zip(c_i24.iter()).enumerate() {
+                assert_eq!(a, b, "decode i24 mismatch at index {idx}: rust={a} c={b}");
             }
 
             unsafe { opus_projection_decoder_destroy(c_dec) };
@@ -1040,8 +1046,8 @@ fn projection_plc_and_fec_parity_with_c() {
     let c_plc_ret =
         unsafe { opus_projection_decode(c_dec, core::ptr::null(), 0, c_plc.as_mut_ptr(), 960, 0) };
     assert_eq!(rust_plc_ret, c_plc_ret);
-    for (&a, &b) in rust_plc.iter().zip(c_plc.iter()) {
-        assert!((a as i32 - b as i32).abs() <= 1);
+    for (idx, (&a, &b)) in rust_plc.iter().zip(c_plc.iter()).enumerate() {
+        assert_eq!(a, b, "PLC decode mismatch at index {idx}: rust={a} c={b}");
     }
 
     unsafe { opus_projection_decoder_destroy(c_dec) };
@@ -1085,8 +1091,8 @@ fn projection_plc_and_fec_parity_with_c() {
         )
     };
     assert_eq!(rust_fec_ret, c_fec_ret);
-    for (&a, &b) in rust_fec.iter().zip(c_fec.iter()) {
-        assert!((a as i32 - b as i32).abs() <= 1);
+    for (idx, (&a, &b)) in rust_fec.iter().zip(c_fec.iter()).enumerate() {
+        assert_eq!(a, b, "FEC decode mismatch at index {idx}: rust={a} c={b}");
     }
 
     unsafe { opus_projection_decoder_destroy(c_fec_dec) };

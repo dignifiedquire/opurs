@@ -41,6 +41,26 @@ unsafe extern "C" {
     );
 }
 
+#[inline]
+fn test_arch_level() -> i32 {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+            return 4;
+        }
+        if std::is_x86_feature_detected!("sse4.1") {
+            return 3;
+        }
+        if std::is_x86_feature_detected!("sse2") {
+            return 2;
+        }
+        if std::is_x86_feature_detected!("sse") {
+            return 1;
+        }
+    }
+    0
+}
+
 struct Rng(u64);
 impl Rng {
     fn new(seed: u64) -> Self {
@@ -62,6 +82,7 @@ impl Rng {
 #[test]
 fn pitch_primitives_match_c_scalar() {
     let mut rng = Rng::new(0xdecafbad_u64);
+    let c_arch = test_arch_level();
 
     for _ in 0..200 {
         let c = if (rng.next_u32() & 1) == 0 {
@@ -100,16 +121,18 @@ fn pitch_primitives_match_c_scalar() {
                 (len >> 1) as i32,
                 c as i32,
                 2,
-                0,
+                c_arch,
             );
         }
 
         for i in 0..half {
             assert!(
-                (x_lp_r[i] - x_lp_c[i]).abs() <= 1e-6,
-                "pitch_downsample mismatch at {i}: rust={} c={}",
+                x_lp_r[i].to_bits() == x_lp_c[i].to_bits(),
+                "pitch_downsample mismatch at {i}: rust={} (0x{:08x}) c={} (0x{:08x})",
                 x_lp_r[i],
-                x_lp_c[i]
+                x_lp_r[i].to_bits(),
+                x_lp_c[i],
+                x_lp_c[i].to_bits()
             );
         }
 
@@ -129,7 +152,7 @@ fn pitch_primitives_match_c_scalar() {
                 n,
                 max_pitch,
                 &mut pitch_c,
-                0,
+                c_arch,
             );
         }
         assert_eq!(
@@ -160,15 +183,18 @@ fn pitch_primitives_match_c_scalar() {
                 &mut t0_c,
                 prev_period,
                 prev_gain,
-                0,
+                c_arch,
             )
         };
 
-        assert!(
-            (g_r - g_c).abs() <= 1e-6,
-            "remove_doubling gain mismatch rust={} c={}",
+        assert_eq!(
+            g_r.to_bits(),
+            g_c.to_bits(),
+            "remove_doubling gain mismatch rust={} (0x{:08x}) c={} (0x{:08x})",
             g_r,
-            g_c
+            g_r.to_bits(),
+            g_c,
+            g_c.to_bits()
         );
         assert_eq!(
             t0_r, t0_c,
@@ -182,6 +208,7 @@ fn comb_filter_matches_c_scalar() {
     use opurs::celt::common::comb_filter as rust_comb_filter;
 
     let mut rng = Rng::new(0x1234_5678_9abc_def0);
+    let c_arch = test_arch_level();
     for _ in 0..500 {
         let n = 60 + (rng.next_u32() % 120) as i32;
         let overlap = (rng.next_u32() % 60) as i32;
@@ -231,16 +258,18 @@ fn comb_filter_matches_c_scalar() {
                     std::ptr::null()
                 },
                 overlap,
-                0,
+                c_arch,
             );
         }
 
         for i in 0..n as usize {
             assert!(
-                (y_r[i] - y_c[i]).abs() <= 1e-6,
-                "comb_filter mismatch at {i}: rust={} c={} params n={n} overlap={overlap} t0={t0} t1={t1} g0={g0} g1={g1} tap0={tapset0} tap1={tapset1}",
+                y_r[i].to_bits() == y_c[i].to_bits(),
+                "comb_filter mismatch at {i}: rust={} (0x{:08x}) c={} (0x{:08x}) params n={n} overlap={overlap} t0={t0} t1={t1} g0={g0} g1={g1} tap0={tapset0} tap1={tapset1}",
                 y_r[i],
-                y_c[i]
+                y_r[i].to_bits(),
+                y_c[i],
+                y_c[i].to_bits()
             );
         }
     }

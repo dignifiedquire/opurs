@@ -60,8 +60,8 @@ fn projection_decoder_identity_matches_multistream_decode_i16() {
     let ms_ret = ms_dec.decode(packet, &mut ms_out, frame_size as i32, false);
     assert_eq!(proj_ret, ms_ret);
     for (idx, (&a, &b)) in proj_out.iter().zip(ms_out.iter()).enumerate() {
-        assert!(
-            (a as i32 - b as i32).abs() <= 1,
+        assert_eq!(
+            a, b,
             "projection/ms mismatch at index {idx}: projection={a}, ms={b}"
         );
     }

@@ -7,6 +7,27 @@ pub mod arch_h {
     pub type opus_val32 = f32;
 }
 pub mod stddef_h {}
+pub mod cpu_support_h {
+    #[inline]
+    pub fn opus_select_arch() -> i32 {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                return 4;
+            }
+            if std::is_x86_feature_detected!("sse4.1") {
+                return 3;
+            }
+            if std::is_x86_feature_detected!("sse2") {
+                return 2;
+            }
+            if std::is_x86_feature_detected!("sse") {
+                return 1;
+            }
+        }
+        0
+    }
+}
 pub mod stack_alloc_h {
     pub const ALLOC_NONE: i32 = 1;
     #[inline]
@@ -15,6 +36,7 @@ pub mod stack_alloc_h {
     }
 }
 pub use self::arch_h::{opus_val16, opus_val32};
+pub use self::cpu_support_h::opus_select_arch;
 pub use self::stack_alloc_h::{_opus_false, ALLOC_NONE};
 
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
@@ -111,6 +133,7 @@ impl OpusDecoder {
         };
 
         st.celt_dec.signalling = 0;
+        st.celt_dec.arch = opus_select_arch();
 
         Ok(st)
     }
