@@ -51,9 +51,20 @@ pub fn celt_float2int16(input: &[f32], output: &mut [i16], cnt: usize) {
 
 /// Upstream C: celt/float_cast.h:float2int
 ///
-/// Uses round-to-nearest-even (IEEE 754 default), matching the C implementation
-/// which uses `lrintf()`, SSE `cvtss2si`, or aarch64 `vcvtns_s32_f32`.
+/// Matches upstream conversion semantics by target:
+/// - x86/x86_64: use SSE `cvtss2si` (honors current MXCSR rounding mode)
+/// - other targets: round-to-nearest-even
 #[inline]
 pub fn float2int(x: f32) -> i32 {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        use core::arch::x86_64::{_mm_cvtss_si32, _mm_set_ss};
+        return _mm_cvtss_si32(_mm_set_ss(x));
+    }
+    #[cfg(all(target_arch = "x86", target_feature = "sse"))]
+    unsafe {
+        use core::arch::x86::{_mm_cvtss_si32, _mm_set_ss};
+        return _mm_cvtss_si32(_mm_set_ss(x));
+    }
     x.round_ties_even() as i32
 }

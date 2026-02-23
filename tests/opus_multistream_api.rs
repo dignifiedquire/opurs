@@ -678,17 +678,10 @@ fn multistream_24bit_encode_decode_parity_with_c() {
         )
     };
     assert_eq!(c_decoded_from_c, frame_size as i32);
-    if let Some((idx, (&rust, &c))) = rust_out_from_c
-        .iter()
-        .zip(c_out_from_c.iter())
-        .enumerate()
-        .find(|(_, (&rust, &c))| (i64::from(rust) - i64::from(c)).abs() > 1)
-    {
-        panic!(
-            "decode24 PCM mismatch on C packet at sample {idx}: rust={rust} c={c} abs_diff={}",
-            (i64::from(rust) - i64::from(c)).abs()
-        );
-    }
+    assert_eq!(
+        rust_out_from_c, c_out_from_c,
+        "decode24 PCM mismatch on C packet"
+    );
 
     unsafe {
         opus_multistream_encoder_destroy(c_enc);
