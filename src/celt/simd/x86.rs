@@ -534,6 +534,7 @@ pub unsafe fn comb_filter_const_sse(
 ///
 /// # Safety
 /// Requires SSE support (checked by caller via cpufeatures).
+#[allow(dead_code)]
 #[target_feature(enable = "sse")]
 pub unsafe fn celt_pitch_xcorr_sse(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
