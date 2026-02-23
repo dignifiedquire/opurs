@@ -159,10 +159,8 @@ fn compare_encoder_low_bitrate() {
             ) as usize
         };
 
-        if rust_len != c_len || rust_out[..rust_len] != c_out[..c_len] {
-            if first_diff.is_none() {
-                first_diff = Some(frame);
-            }
+        if (rust_len != c_len || rust_out[..rust_len] != c_out[..c_len]) && first_diff.is_none() {
+            first_diff = Some(frame);
         }
     }
 

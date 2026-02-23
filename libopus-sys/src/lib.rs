@@ -4,7 +4,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-
 pub const __WORDSIZE: u32 = 64;
 pub const __has_safe_buffers: u32 = 1;
 pub const __DARWIN_ONLY_64_BIT_INO_T: u32 = 1;
@@ -686,7 +685,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[doc = " Gets the bandwidth of an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet\n @retval OPUS_BANDWIDTH_NARROWBAND Narrowband (4kHz bandpass)\n @retval OPUS_BANDWIDTH_MEDIUMBAND Mediumband (6kHz bandpass)\n @retval OPUS_BANDWIDTH_WIDEBAND Wideband (8kHz bandpass)\n @retval OPUS_BANDWIDTH_SUPERWIDEBAND Superwideband (12kHz bandpass)\n @retval OPUS_BANDWIDTH_FULLBAND Fullband (20kHz bandpass)\n @retval OPUS_INVALID_PACKET The compressed data passed is corrupted or of an unsupported type"]
     pub fn opus_packet_get_bandwidth(data: *const ::std::os::raw::c_uchar)
-    -> ::std::os::raw::c_int;
+        -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     #[doc = " Gets the number of samples per frame from an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet.\n                                  This must contain at least one byte of\n                                  data.\n @param [in] Fs <tt>opus_int32</tt>: Sampling rate in Hz.\n                                     This must be a multiple of 400, or\n                                     inaccurate results will be returned.\n @returns Number of samples per frame."]

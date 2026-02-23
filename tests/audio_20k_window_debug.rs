@@ -18,7 +18,8 @@ fn first_mux_packet_diff(upstream: &[u8], rust: &[u8]) -> Option<(usize, String)
             upstream[upos + 2],
             upstream[upos + 3],
         ]);
-        let rust_len = i32::from_be_bytes([rust[rpos], rust[rpos + 1], rust[rpos + 2], rust[rpos + 3]]);
+        let rust_len =
+            i32::from_be_bytes([rust[rpos], rust[rpos + 1], rust[rpos + 2], rust[rpos + 3]]);
         if upstream_len != rust_len {
             return Some((packet, format!("len {upstream_len}/{rust_len}")));
         }
@@ -29,7 +30,11 @@ fn first_mux_packet_diff(upstream: &[u8], rust: &[u8]) -> Option<(usize, String)
         let up = &upstream[upos + 8..upos + 8 + l];
         let rp = &rust[rpos + 8..rpos + 8 + l];
         if up != rp {
-            let b = up.iter().zip(rp.iter()).position(|(a, b)| a != b).unwrap_or(0);
+            let b = up
+                .iter()
+                .zip(rp.iter())
+                .position(|(a, b)| a != b)
+                .unwrap_or(0);
             return Some((packet, format!("byte {b} {:02x}/{:02x}", up[b], rp[b])));
         }
         upos += 8 + l;
