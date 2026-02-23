@@ -6,6 +6,15 @@ use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
 
+#[inline]
+fn celt_max32(a: f32, b: f32) -> f32 {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
 // -- Dispatch wrappers --
 // When the `simd` feature is enabled, these route through the SIMD dispatch layer.
 // Otherwise, they call the scalar implementations directly.
@@ -227,8 +236,10 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
                 }
             }
         }
-        Syy += y[i + len] * y[i + len] - y[i] * y[i];
-        Syy = 1.0f32.max(Syy);
+        // Match C left-associative evaluation: (Syy + add) - sub.
+        Syy += y[i + len] * y[i + len];
+        Syy -= y[i] * y[i];
+        Syy = celt_max32(1.0f32, Syy);
     }
     best_pitch
 }
@@ -379,7 +390,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32) -> i32 {
         xcorr[i] = 0.0;
         if !((i as i32 - 2 * best_pitch[0]).abs() > 2 && (i as i32 - 2 * best_pitch[1]).abs() > 2) {
             let sum = celt_inner_prod(x_lp, &y[i..], (len >> 1) as usize);
-            xcorr[i] = (-1.0f32).max(sum);
+            xcorr[i] = celt_max32(-1.0f32, sum);
         }
     }
 
@@ -468,8 +479,10 @@ pub fn remove_doubling(
     yy_lookup[0] = xx;
     yy = xx;
     for i in 1..=maxperiod as usize {
-        yy += x[x_off - i] * x[x_off - i] - x[x_off + N as usize - i] * x[x_off + N as usize - i];
-        yy_lookup[i] = 0.0f32.max(yy);
+        // Match C left-associative evaluation: (yy + add) - sub.
+        yy += x[x_off - i] * x[x_off - i];
+        yy -= x[x_off + N as usize - i] * x[x_off + N as usize - i];
+        yy_lookup[i] = celt_max32(0.0f32, yy);
     }
     yy = yy_lookup[T0 as usize];
     best_xy = xy;
@@ -509,11 +522,11 @@ pub fn remove_doubling(
         } else if (T1 - prev_period).abs() <= 2 && 5 * k * k < T0 {
             cont = 0.5f32 * prev_gain;
         }
-        let mut thresh = 0.3f32.max(0.7f32 * g0 - cont);
+        let mut thresh = celt_max32(0.3f32, 0.7f32 * g0 - cont);
         if T1 < 3 * minperiod {
-            thresh = 0.4f32.max(0.85f32 * g0 - cont);
+            thresh = celt_max32(0.4f32, 0.85f32 * g0 - cont);
         } else if T1 < 2 * minperiod {
-            thresh = 0.5f32.max(0.9f32 * g0 - cont);
+            thresh = celt_max32(0.5f32, 0.9f32 * g0 - cont);
         }
         if g1 > thresh {
             best_xy = xy;
@@ -522,7 +535,7 @@ pub fn remove_doubling(
             g = g1;
         }
     }
-    best_xy = 0.0f32.max(best_xy);
+    best_xy = celt_max32(0.0f32, best_xy);
     if best_yy <= best_xy {
         pg = 1.0;
     } else {

@@ -136,7 +136,7 @@ fn pitch_primitives_match_c_scalar() {
             );
         }
 
-        let mut y_r = x_lp_r.clone();
+        let y_r = x_lp_r.clone();
         let mut y_c = x_lp_c.clone();
         let mut pitch_c = 0i32;
         let pitch_r = rust_pitch_search(
