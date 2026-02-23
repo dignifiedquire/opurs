@@ -120,14 +120,30 @@ impl OpusProjectionDecoder {
             return OPUS_BAD_ARG;
         }
 
-        let mut input_pcm = vec![0f32; frame_size * input_channels];
-        let decoded =
-            self.decoder
-                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec);
-        if decoded <= 0 {
-            return decoded;
+        // Match upstream short-decode behavior: decode native streams with soft clipping enabled.
+        let (stream_pcm, decoded) =
+            match self
+                .decoder
+                .decode_streams_native(data, frame_size as i32, decode_fec, 1)
+            {
+                Ok(v) => v,
+                Err(err) => return err,
+            };
+
+        let mut input_pcm = vec![0f32; decoded * input_channels];
+        let coupled = self.coupled_streams as usize;
+        for input_row in 0..input_channels {
+            let (stream_idx, stream_ch, stream_channels) = if input_row < coupled * 2 {
+                (input_row / 2, input_row & 1, 2usize)
+            } else {
+                (coupled + input_row - coupled * 2, 0usize, 1usize)
+            };
+            let src = &stream_pcm[stream_idx];
+            for frame in 0..decoded {
+                input_pcm[frame * input_channels + input_row] =
+                    src[frame * stream_channels + stream_ch];
+            }
         }
-        let decoded = decoded as usize;
 
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);

@@ -30,7 +30,7 @@ fn projection_decoder_create_rejects_wrong_matrix_size() {
 }
 
 #[test]
-fn projection_decoder_identity_matches_multistream_decode_i16() {
+fn projection_decoder_identity_matrix_matches_expected_fixed_point_mix() {
     let mut enc = OpusMSEncoder::new(48000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
     let matrix = identity_demixing_matrix_le(2);
     let mut proj_dec = rust_opus_projection_decoder_create(48000, 2, 1, 1, &matrix).unwrap();
@@ -59,10 +59,14 @@ fn projection_decoder_identity_matches_multistream_decode_i16() {
     );
     let ms_ret = ms_dec.decode(packet, &mut ms_out, frame_size as i32, false);
     assert_eq!(proj_ret, ms_ret);
-    for (idx, (&a, &b)) in proj_out.iter().zip(ms_out.iter()).enumerate() {
+    for (idx, (&proj, &ms)) in proj_out.iter().zip(ms_out.iter()).enumerate() {
+        // Matrix diagonal is 32767, so projection output follows
+        // mapping_matrix_multiply_channel_out_short:
+        // out = (32767 * sample + 16384) >> 15
+        let expected = (((32767_i32 * ms as i32) + 16384) >> 15) as i16;
         assert_eq!(
-            a, b,
-            "projection/ms mismatch at index {idx}: projection={a}, ms={b}"
+            proj, expected,
+            "projection output mismatch at index {idx}: projection={proj}, expected={expected}, ms={ms}"
         );
     }
 }

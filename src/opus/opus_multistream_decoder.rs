@@ -199,7 +199,7 @@ impl OpusMSDecoder {
         decoded_samples as i32
     }
 
-    fn decode_streams_native(
+    pub(crate) fn decode_streams_native(
         &mut self,
         data: &[u8],
         frame_size: i32,
