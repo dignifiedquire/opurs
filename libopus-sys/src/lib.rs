@@ -198,6 +198,7 @@ pub union __mbstate_t {
     pub _mbstateL: ::std::os::raw::c_longlong,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __mbstate_t"][::std::mem::size_of::<__mbstate_t>() - 128usize];
     ["Alignment of __mbstate_t"][::std::mem::align_of::<__mbstate_t>() - 8usize];
@@ -245,6 +246,7 @@ pub struct __darwin_pthread_handler_rec {
     pub __next: *mut __darwin_pthread_handler_rec,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __darwin_pthread_handler_rec"]
         [::std::mem::size_of::<__darwin_pthread_handler_rec>() - 24usize];
@@ -264,6 +266,7 @@ pub struct _opaque_pthread_attr_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_attr_t"][::std::mem::size_of::<_opaque_pthread_attr_t>() - 64usize];
     ["Alignment of _opaque_pthread_attr_t"]
@@ -280,6 +283,7 @@ pub struct _opaque_pthread_cond_t {
     pub __opaque: [::std::os::raw::c_char; 40usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_cond_t"][::std::mem::size_of::<_opaque_pthread_cond_t>() - 48usize];
     ["Alignment of _opaque_pthread_cond_t"]
@@ -296,6 +300,7 @@ pub struct _opaque_pthread_condattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_condattr_t"]
         [::std::mem::size_of::<_opaque_pthread_condattr_t>() - 16usize];
@@ -313,6 +318,7 @@ pub struct _opaque_pthread_mutex_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutex_t"][::std::mem::size_of::<_opaque_pthread_mutex_t>() - 64usize];
     ["Alignment of _opaque_pthread_mutex_t"]
@@ -329,6 +335,7 @@ pub struct _opaque_pthread_mutexattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutexattr_t"]
         [::std::mem::size_of::<_opaque_pthread_mutexattr_t>() - 16usize];
@@ -346,6 +353,7 @@ pub struct _opaque_pthread_once_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_once_t"][::std::mem::size_of::<_opaque_pthread_once_t>() - 16usize];
     ["Alignment of _opaque_pthread_once_t"]
@@ -362,6 +370,7 @@ pub struct _opaque_pthread_rwlock_t {
     pub __opaque: [::std::os::raw::c_char; 192usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlock_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlock_t>() - 200usize];
@@ -379,6 +388,7 @@ pub struct _opaque_pthread_rwlockattr_t {
     pub __opaque: [::std::os::raw::c_char; 16usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlockattr_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlockattr_t>() - 24usize];
@@ -397,6 +407,7 @@ pub struct _opaque_pthread_t {
     pub __opaque: [::std::os::raw::c_char; 8176usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_t"][::std::mem::size_of::<_opaque_pthread_t>() - 8192usize];
     ["Alignment of _opaque_pthread_t"][::std::mem::align_of::<_opaque_pthread_t>() - 8usize];
@@ -1006,4 +1017,100 @@ unsafe extern "C" {
     #[doc = " Frees an <code>OpusMSDecoder</code> allocated by\n opus_multistream_decoder_create().\n @param st <tt>OpusMSDecoder</tt>: Multistream decoder state to be freed."]
     pub fn opus_multistream_decoder_destroy(st: *mut OpusMSDecoder);
 }
+
+#[cfg(feature = "deep-plc")]
+unsafe extern "C" {
+    pub fn opus_dnn_weights_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_write_weights_blob(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "dred")]
+unsafe extern "C" {
+    pub fn opus_dnn_rdovaeenc_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaeenc_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "osce")]
+unsafe extern "C" {
+    pub fn opus_dnn_lace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_lace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_libm_values(out: *mut f32);
+    pub fn osce_test_adaconv(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adacomb(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adashape(
+        out: *mut f32,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_dense_tanh(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_gain(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_tanh_approx(out: *mut f32, value: f32) -> ::std::os::raw::c_int;
+    pub fn osce_test_adashape_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_nolace_tdshape(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_nolace_af2(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_celt_pitch_xcorr(
+        out: *mut f32,
+        max_pitch: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_int8(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_gru_lace_fnet(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_dense_tanh_lace_tconv(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adacomb_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+}
+
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
