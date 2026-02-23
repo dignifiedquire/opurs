@@ -248,8 +248,8 @@ fn compare_op_pvq_search_sse2() {
     let mut rng = Rng::new(999);
     let mut mismatches = 0;
 
-    for N in [4, 8, 12, 16, 20, 24, 32, 48, 64] {
-        for K in [1, 2, 4, 8, 16, 32] {
+    for N in [4, 8, 12, 16, 20, 24, 32, 48, 64, 80, 96, 120, 160, 192, 240] {
+        for K in [1, 2, 4, 8, 16, 32, 48, 64, 96, 120] {
             for trial in 0..10 {
                 let mut rust_X: Vec<f32> = (0..N).map(|_| rng.next_f32()).collect();
                 let mut c_X = rust_X.clone();
