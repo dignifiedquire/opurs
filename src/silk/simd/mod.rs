@@ -1,7 +1,8 @@
 //! SIMD-accelerated SILK functions.
 //!
 //! This module provides SIMD dispatch for performance-critical SILK functions.
-//! On x86/x86_64, runtime CPU feature detection selects SSE4.1/AVX2 paths.
+//! On x86/x86_64, runtime CPU feature detection can select SSE4.1/AVX2 paths.
+//! (Currently forced to scalar at runtime for parity.)
 //! On aarch64, NEON is always available and selected at compile time.
 //! On other architectures (or with the `simd` feature disabled), falls through to scalar.
 
@@ -27,6 +28,16 @@ cpufeatures::new!(cpuid_avx2_fma, "avx2", "fma");
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 cpufeatures::new!(cpuid_avx2, "avx2");
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[inline]
+fn x86_runtime_simd_enabled() -> bool {
+    // Keep x86 SIMD implementations compiled, but force scalar runtime behavior for parity.
+    //
+    // Rationale: runtime dispatch currently follows host CPUID while codec arch selection is
+    // still hardcoded to arch=0 in multiple paths, which causes deterministic x86 vector drift.
+    false
+}
 
 // -- Dispatch functions --
 // Placeholder dispatchers — implementations are added in later phases.
@@ -83,7 +94,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32]) -> f64 {
     {
         // C reference only dispatches to AVX2 for this function (not SSE2).
         // SSE2 would change float accumulation order vs scalar, causing bit-inexactness.
-        if cpuid_avx2_fma::get() {
+        if x86_runtime_simd_enabled() && cpuid_avx2_fma::get() {
             return unsafe { x86::silk_inner_product_flp_avx2(data1, data2) };
         }
     }
@@ -99,7 +110,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32]) -> f64 {
 pub fn silk_vad_energy(x: &[i16]) -> i32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse2::get() {
+        if x86_runtime_simd_enabled() && cpuid_sse2::get() {
             return unsafe { x86::silk_vad_energy_sse2(x) };
         }
     }
@@ -163,7 +174,7 @@ pub fn silk_VQ_WMat_EC(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse4_1::get() {
+        if x86_runtime_simd_enabled() && cpuid_sse4_1::get() {
             unsafe {
                 x86::silk_VQ_WMat_EC_sse4_1(
                     ind,
