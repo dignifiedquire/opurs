@@ -452,6 +452,9 @@ jobs:
           compiler: llvm
       - name: Build (release)
         run: cargo build --release --features tools --target ${{ matrix.target }}
+      - name: Run focused classic vector regressions (major platforms)
+        if: matrix.major_platform
+        run: cargo test --release --features tools --target ${{ matrix.target }} --test vector_regressions
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |

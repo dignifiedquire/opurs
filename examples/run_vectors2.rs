@@ -84,6 +84,14 @@ struct Cli {
     #[arg(long = "suite", value_enum)]
     suites: Vec<SuiteArg>,
 
+    /// Restrict vectors by substring match on vector name (repeatable).
+    #[arg(long = "vector-name")]
+    vector_names: Vec<String>,
+
+    /// Restrict test kinds by substring match on rendered kind label (repeatable).
+    #[arg(long = "kind-name")]
+    kind_names: Vec<String>,
+
     /// Maximum number of vectors per suite (deterministic first-N by name).
     #[arg(long)]
     vector_limit: Option<usize>,
@@ -2612,6 +2620,18 @@ fn should_include_vector_kind(vector: &TestVector, kind: TestKind) -> bool {
     }
 }
 
+fn should_include_vector_name(name: &str, filters: &[String]) -> bool {
+    filters.is_empty() || filters.iter().any(|f| name.contains(f))
+}
+
+fn should_include_kind_name(kind: TestKind, filters: &[String]) -> bool {
+    if filters.is_empty() {
+        return true;
+    }
+    let label = kind_label(kind);
+    filters.iter().any(|f| label.contains(f))
+}
+
 fn main() {
     let args = Cli::parse();
 
@@ -2682,8 +2702,14 @@ fn main() {
         }
 
         for vector in vectors {
+            if !should_include_vector_name(&vector.name, &args.vector_names) {
+                continue;
+            }
             for &kind in &suite_kinds {
                 if !should_include_vector_kind(vector, kind) {
+                    continue;
+                }
+                if !should_include_kind_name(kind, &args.kind_names) {
                     continue;
                 }
                 tests.push((vector, kind));

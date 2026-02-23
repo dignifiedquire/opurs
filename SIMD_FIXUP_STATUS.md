@@ -106,3 +106,14 @@ via direct dereference, which panics in debug mode when the i16 pointer isn't
 - DNN `test_vec_tanh_dispatch_matches_scalar` fails on all platforms
 - DNN OSCE vector tests: 60 decode failures on x86_64 due to FP ordering
   differences in neural net inference (scalar, not SIMD)
+
+## Open TODOs (SIMD parity follow-up)
+- SILK SSE4.1 NSQ dispatch remains disabled by `9c86ede` (`src/silk/simd/mod.rs:224`)
+  because it is not bit-exact yet.
+- Repro status (x86_64): re-enabling `use_nsq_sse4_1()` causes broad classic
+  vector parity regressions (example: `testvector11` full parity run produced
+  `72` failures in `ENC` kinds).
+- Repro command:
+  `CARGO_TARGET_DIR=target-local cargo run --release --features tools --target x86_64-apple-darwin --example run_vectors2 -- --suite classic --mode parity --matrix full --vector-name testvector11 opus_newvectors`
+- Action item: isolate non-bitexact SSE4.1 NSQ kernels and re-enable dispatch
+  incrementally with vector-guarded tests.

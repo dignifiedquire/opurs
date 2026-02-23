@@ -115,12 +115,16 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2_fma::get() {
-            unsafe {
-                x86::celt_pitch_xcorr_avx2(x, y, xcorr, len);
-            }
-            return;
-        }
+        // Keep AVX2 implementation available but disabled for runtime dispatch.
+        //
+        // Rationale: major-platform vector CI shows deterministic x86_64-only
+        // bitstream mismatches in classic/testvector11 (RLD 10 kbps, 20/40/60 ms)
+        // when this path is active.
+        //
+        // This mirrors the correctness-first approach used for known non-bitexact
+        // SILK SIMD paths: keep implementation in-tree for direct comparison work,
+        // but force scalar dispatch until strict parity is restored.
+        let _ = cpuid_avx2_fma::get();
     }
 
     #[allow(unreachable_code)]
