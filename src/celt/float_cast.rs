@@ -56,15 +56,32 @@ pub fn celt_float2int16(input: &[f32], output: &mut [i16], cnt: usize) {
 /// - other targets: round-to-nearest-even
 #[inline]
 pub fn float2int(x: f32) -> i32 {
-    #[cfg(target_arch = "x86_64")]
+    float2int_impl(x)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+fn float2int_impl(x: f32) -> i32 {
     unsafe {
         use core::arch::x86_64::{_mm_cvtss_si32, _mm_set_ss};
-        return _mm_cvtss_si32(_mm_set_ss(x));
+        _mm_cvtss_si32(_mm_set_ss(x))
     }
-    #[cfg(all(target_arch = "x86", target_feature = "sse"))]
+}
+
+#[cfg(all(target_arch = "x86", target_feature = "sse"))]
+#[inline]
+fn float2int_impl(x: f32) -> i32 {
     unsafe {
         use core::arch::x86::{_mm_cvtss_si32, _mm_set_ss};
-        return _mm_cvtss_si32(_mm_set_ss(x));
+        _mm_cvtss_si32(_mm_set_ss(x))
     }
+}
+
+#[cfg(not(any(
+    target_arch = "x86_64",
+    all(target_arch = "x86", target_feature = "sse")
+)))]
+#[inline]
+fn float2int_impl(x: f32) -> i32 {
     x.round_ties_even() as i32
 }

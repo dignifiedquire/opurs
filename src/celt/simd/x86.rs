@@ -511,23 +511,8 @@ pub unsafe fn comb_filter_const_sse(
         i += 4;
     }
 
-    // Scalar tail for remaining 0-3 samples (N is typically a multiple of 4,
-    // but handle the general case for correctness like CUSTOM_MODES in C)
-    if i < n {
-        let mut xv4 = x[x_start + i - t - 2];
-        let mut xv3 = x[x_start + i - t - 1];
-        let mut xv2 = x[x_start + i - t];
-        let mut xv1 = x[x_start + i - t + 1];
-        while i < n {
-            let xv0 = x[x_start + i - t + 2];
-            y[y_start + i] = x[x_start + i] + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
-            xv4 = xv3;
-            xv3 = xv2;
-            xv2 = xv1;
-            xv1 = xv0;
-            i += 1;
-        }
-    }
+    // Intentionally no scalar tail: upstream SSE path only processes i < N-3.
+    // Tail handling exists in C only under CUSTOM_MODES.
 }
 
 /// SSE implementation of `celt_pitch_xcorr`.
@@ -555,5 +540,297 @@ pub unsafe fn celt_pitch_xcorr_sse(x: &[f32], y: &[f32], xcorr: &mut [f32], len:
     while (i as usize) < max_pitch {
         xcorr[i as usize] = celt_inner_prod_sse(x, &y[i as usize..], len);
         i += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        celt_inner_prod_sse as rust_celt_inner_prod_sse,
+        celt_pitch_xcorr_avx2 as rust_celt_pitch_xcorr_avx2,
+        comb_filter_const_sse as rust_comb_filter_const_sse,
+        dual_inner_prod_sse as rust_dual_inner_prod_sse,
+        op_pvq_search_sse2 as rust_op_pvq_search_sse2, xcorr_kernel_sse as rust_xcorr_kernel_sse,
+    };
+
+    type OpPvqSearchFn =
+        unsafe extern "C" fn(x: *mut f32, iy: *mut i32, k: i32, n: i32, arch: i32) -> f32;
+    type XcorrKernelFn =
+        unsafe extern "C" fn(x: *const f32, y: *const f32, sum: *mut f32, len: i32);
+    type CeltInnerProdFn = unsafe extern "C" fn(x: *const f32, y: *const f32, n: i32) -> f32;
+    type DualInnerProdFn = unsafe extern "C" fn(
+        x: *const f32,
+        y01: *const f32,
+        y02: *const f32,
+        n: i32,
+        xy1: *mut f32,
+        xy2: *mut f32,
+    );
+    type CombFilterConstFn = unsafe extern "C" fn(
+        y: *mut f32,
+        x: *mut f32,
+        t: i32,
+        n: i32,
+        g10: f32,
+        g11: f32,
+        g12: f32,
+    );
+    type PitchXcorrFn = unsafe extern "C" fn(
+        x: *const f32,
+        y: *const f32,
+        xcorr: *mut f32,
+        len: i32,
+        max_pitch: i32,
+        arch: i32,
+    );
+    unsafe extern "C" {
+        fn opus_select_arch() -> i32;
+        static OP_PVQ_SEARCH_IMPL: [Option<OpPvqSearchFn>; 5];
+        static XCORR_KERNEL_IMPL: [Option<XcorrKernelFn>; 5];
+        static CELT_INNER_PROD_IMPL: [Option<CeltInnerProdFn>; 5];
+        static DUAL_INNER_PROD_IMPL: [Option<DualInnerProdFn>; 5];
+        static COMB_FILTER_CONST_IMPL: [Option<CombFilterConstFn>; 5];
+        static PITCH_XCORR_IMPL: [Option<PitchXcorrFn>; 5];
+    }
+
+    struct Rng(u64);
+    impl Rng {
+        fn new(seed: u64) -> Self {
+            Self(seed)
+        }
+        fn next_u32(&mut self) -> u32 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (self.0 >> 32) as u32
+        }
+        fn next_f32(&mut self) -> f32 {
+            let v = self.next_u32() as f32 / (u32::MAX as f32);
+            2.0 * v - 1.0
+        }
+    }
+
+    #[test]
+    fn op_pvq_search_sse2_matches_upstream_c() {
+        let mut rng = Rng::new(0x1234_9876_dead_beef);
+        let c_arch = unsafe { opus_select_arch() } as usize;
+
+        for n in 4..=1024 {
+            for _ in 0..24 {
+                let k = 1 + (rng.next_u32() % 220) as i32;
+                let mut x_c = vec![0.0f32; n];
+                for v in &mut x_c {
+                    *v = rng.next_f32();
+                }
+                let mut x_r = x_c.clone();
+                let mut iy_c = vec![0i32; n + 4];
+                let mut iy_r = vec![0i32; n + 4];
+
+                let c_fn = unsafe { OP_PVQ_SEARCH_IMPL[c_arch] }.expect("C pvq fn");
+                let yy_c = unsafe {
+                    c_fn(
+                        x_c.as_mut_ptr(),
+                        iy_c.as_mut_ptr(),
+                        k,
+                        n as i32,
+                        c_arch as i32,
+                    )
+                };
+                let yy_r = unsafe { rust_op_pvq_search_sse2(&mut x_r, &mut iy_r, k, n as i32) };
+
+                assert_eq!(yy_r.to_bits(), yy_c.to_bits(), "yy mismatch n={n} k={k}");
+                assert_eq!(&iy_r[..n], &iy_c[..n], "iy mismatch n={n} k={k}");
+            }
+        }
+    }
+
+    #[test]
+    fn xcorr_inner_dual_comb_match_upstream_c_simd() {
+        let mut rng = Rng::new(0x1337_cafe_f00d_beef);
+        let c_arch = unsafe { opus_select_arch() } as usize;
+        let c_xcorr = unsafe { XCORR_KERNEL_IMPL[c_arch] }.expect("C xcorr impl");
+        let c_inner = unsafe { CELT_INNER_PROD_IMPL[c_arch] }.expect("C inner impl");
+        let c_dual = unsafe { DUAL_INNER_PROD_IMPL[c_arch] }.expect("C dual impl");
+        let c_comb = unsafe { COMB_FILTER_CONST_IMPL[c_arch] }.expect("C comb impl");
+
+        for len in 4..=1536 {
+            let x_len = len + 64;
+            let mut x = vec![0.0f32; x_len];
+            let mut y = vec![0.0f32; x_len + 64];
+            let mut y2 = vec![0.0f32; x_len + 64];
+            for v in &mut x {
+                *v = rng.next_f32();
+            }
+            for v in &mut y {
+                *v = rng.next_f32();
+            }
+            for v in &mut y2 {
+                *v = rng.next_f32();
+            }
+
+            let mut sum_c = [
+                rng.next_f32(),
+                rng.next_f32(),
+                rng.next_f32(),
+                rng.next_f32(),
+            ];
+            let mut sum_r = sum_c;
+            unsafe {
+                c_xcorr(x.as_ptr(), y.as_ptr(), sum_c.as_mut_ptr(), len as i32);
+                rust_xcorr_kernel_sse(&x[..len], &y, &mut sum_r, len);
+            }
+            for i in 0..4 {
+                assert_eq!(
+                    sum_r[i].to_bits(),
+                    sum_c[i].to_bits(),
+                    "xcorr len={len} lane={i}"
+                );
+            }
+
+            let in_c = unsafe { c_inner(x.as_ptr(), y.as_ptr(), len as i32) };
+            let in_r = unsafe { rust_celt_inner_prod_sse(&x, &y, len) };
+            assert_eq!(in_r.to_bits(), in_c.to_bits(), "inner len={len}");
+
+            let mut d1_c = 0.0f32;
+            let mut d2_c = 0.0f32;
+            let (d1_r, d2_r) = unsafe { rust_dual_inner_prod_sse(&x, &y, &y2, len) };
+            unsafe {
+                c_dual(
+                    x.as_ptr(),
+                    y.as_ptr(),
+                    y2.as_ptr(),
+                    len as i32,
+                    &mut d1_c,
+                    &mut d2_c,
+                );
+            }
+            assert_eq!(d1_r.to_bits(), d1_c.to_bits(), "dual1 len={len}");
+            assert_eq!(d2_r.to_bits(), d2_c.to_bits(), "dual2 len={len}");
+
+            if len >= 24 {
+                let t = 17;
+                let n = len as i32 - 8;
+                let x_start = t as usize + 8;
+                let mut src_c = vec![0.0f32; x_start + n as usize + 8];
+                let mut src_r = vec![0.0f32; x_start + n as usize + 8];
+                let mut out_c = vec![0.0f32; n as usize + 8];
+                let mut out_r = vec![0.0f32; n as usize + 8];
+                for i in 0..src_c.len() {
+                    let v = rng.next_f32();
+                    src_c[i] = v;
+                    src_r[i] = v;
+                }
+                let g10 = 0.75 * rng.next_f32();
+                let g11 = 0.75 * rng.next_f32();
+                let g12 = 0.75 * rng.next_f32();
+
+                unsafe {
+                    c_comb(
+                        out_c.as_mut_ptr(),
+                        src_c.as_mut_ptr().add(x_start),
+                        t,
+                        n,
+                        g10,
+                        g11,
+                        g12,
+                    );
+                    rust_comb_filter_const_sse(&mut out_r, 0, &src_r, x_start, t, n, g10, g11, g12);
+                }
+                for i in 0..n as usize {
+                    assert_eq!(
+                        out_r[i].to_bits(),
+                        out_c[i].to_bits(),
+                        "comb len={len} i={i} g10={g10} g11={g11} g12={g12}"
+                    );
+                }
+
+                // In-place/alias scenario used by comb_filter_inplace.
+                let mut buf_c = vec![0.0f32; x_start + n as usize + 8];
+                let mut buf_r = vec![0.0f32; x_start + n as usize + 8];
+                for i in 0..buf_c.len() {
+                    let v = rng.next_f32();
+                    buf_c[i] = v;
+                    buf_r[i] = v;
+                }
+                unsafe {
+                    let x_ptr = buf_r.as_ptr();
+                    let x_len = buf_r.len();
+                    let x_alias = core::slice::from_raw_parts(x_ptr, x_len);
+                    c_comb(
+                        buf_c.as_mut_ptr().add(x_start),
+                        buf_c.as_mut_ptr().add(x_start),
+                        t,
+                        n,
+                        g10,
+                        g11,
+                        g12,
+                    );
+                    rust_comb_filter_const_sse(
+                        &mut buf_r, x_start, x_alias, x_start, t, n, g10, g11, g12,
+                    );
+                }
+                for i in 0..n as usize {
+                    assert_eq!(
+                        buf_r[x_start + i].to_bits(),
+                        buf_c[x_start + i].to_bits(),
+                        "comb-inplace len={len} i={i} g10={g10} g11={g11} g12={g12}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn pitch_xcorr_avx2_matches_upstream_c_avx2() {
+        let c_arch = unsafe { opus_select_arch() } as usize;
+        if c_arch != 4 {
+            return;
+        }
+        let c_pitch = unsafe { PITCH_XCORR_IMPL[c_arch] }.expect("C avx2 pitch xcorr impl");
+        let mut rng = Rng::new(0xabcdef01_12345678);
+
+        for len in [16usize, 32, 64, 96, 120, 240, 320, 480, 640, 960] {
+            for max_pitch in [32usize, 64, 96, 128, 192, 256, 512] {
+                let mut x = vec![0.0f32; len];
+                let mut y = vec![0.0f32; len + max_pitch + 8];
+                let mut out_c = vec![0.0f32; max_pitch];
+                let mut out_r = vec![0.0f32; max_pitch];
+                for v in &mut x {
+                    *v = rng.next_f32();
+                }
+                for v in &mut y {
+                    *v = rng.next_f32();
+                }
+                unsafe {
+                    c_pitch(
+                        x.as_ptr(),
+                        y.as_ptr(),
+                        out_c.as_mut_ptr(),
+                        len as i32,
+                        max_pitch as i32,
+                        c_arch as i32,
+                    );
+                    rust_celt_pitch_xcorr_avx2(&x, &y, &mut out_r, len);
+                }
+                for i in 0..max_pitch {
+                    assert_eq!(
+                        out_r[i].to_bits(),
+                        out_c[i].to_bits(),
+                        "pitch_xcorr len={len} max_pitch={max_pitch} i={i}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn report_c_arch_selection() {
+        let c_arch = unsafe { opus_select_arch() };
+        let avx2 = std::is_x86_feature_detected!("avx2");
+        let fma = std::is_x86_feature_detected!("fma");
+        let sse = std::is_x86_feature_detected!("sse");
+        let sse2 = std::is_x86_feature_detected!("sse2");
+        eprintln!("c_arch={c_arch} avx2={avx2} fma={fma} sse={sse} sse2={sse2}");
     }
 }

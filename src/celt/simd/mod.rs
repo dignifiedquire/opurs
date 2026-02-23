@@ -40,13 +40,9 @@ cpufeatures::new!(cpuid_avx2_fma, "avx2", "fma");
 pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // Keep x86 SIMD implementations compiled, but do not dispatch to them yet.
-        //
-        // Rationale: runtime SIMD dispatch currently uses host CPUID while encoder/decoder
-        // architecture selection is still hardcoded to arch=0. This mismatch causes
-        // x86-only vector parity regressions in CI. Force scalar behavior here until
-        // arch plumbing is aligned with upstream RTCD semantics.
-        let _ = cpuid_sse::get();
+        if cpuid_sse::get() {
+            return unsafe { x86::xcorr_kernel_sse(x, y, sum, len) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -66,7 +62,9 @@ pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        let _ = cpuid_sse::get();
+        if cpuid_sse::get() {
+            return unsafe { x86::celt_inner_prod_sse(x, y, n) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -86,7 +84,9 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        let _ = cpuid_sse::get();
+        if cpuid_sse::get() {
+            return unsafe { x86::dual_inner_prod_sse(x, y01, y02, n) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -112,16 +112,9 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // Keep AVX2 implementation available but disabled for runtime dispatch.
-        //
-        // Rationale: major-platform vector CI shows deterministic x86_64-only
-        // bitstream mismatches in classic/testvector11 (RLD 10 kbps, 20/40/60 ms)
-        // when this path is active.
-        //
-        // This mirrors the correctness-first approach used for known non-bitexact
-        // SILK SIMD paths: keep implementation in-tree for direct comparison work,
-        // but force scalar dispatch until strict parity is restored.
-        let _ = cpuid_avx2_fma::get();
+        if cpuid_avx2_fma::get() {
+            return unsafe { x86::celt_pitch_xcorr_avx2(x, y, xcorr, len) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -146,7 +139,11 @@ pub fn comb_filter_const(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        let _ = cpuid_sse::get();
+        if cpuid_sse::get() {
+            return unsafe {
+                x86::comb_filter_const_sse(y, y_start, x, x_start, T, N, g10, g11, g12)
+            };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -163,7 +160,9 @@ pub fn comb_filter_const(
 pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        let _ = cpuid_sse2::get();
+        if cpuid_sse2::get() {
+            return unsafe { x86::op_pvq_search_sse2(X, iy, K, N) };
+        }
     }
 
     #[allow(unreachable_code)]
