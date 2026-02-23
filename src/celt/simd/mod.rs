@@ -99,7 +99,10 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f
 }
 
 /// SIMD-accelerated pitch cross-correlation.
-/// Dispatches to SSE on x86 or NEON on aarch64, with scalar fallback.
+/// Dispatches to AVX2 on x86 (otherwise scalar) or NEON on aarch64.
+///
+/// Upstream x86 RTCD maps `celt_pitch_xcorr` to scalar for non-AVX2 arches,
+/// unlike other pitch helpers that use SSE. Keep this behavior for parity.
 #[inline]
 pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     #[cfg(target_arch = "aarch64")]
@@ -115,12 +118,6 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
         if cpuid_avx2_fma::get() {
             unsafe {
                 x86::celt_pitch_xcorr_avx2(x, y, xcorr, len);
-            }
-            return;
-        }
-        if cpuid_sse::get() {
-            unsafe {
-                x86::celt_pitch_xcorr_sse(x, y, xcorr, len);
             }
             return;
         }
