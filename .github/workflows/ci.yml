@@ -357,6 +357,19 @@ jobs:
         with:
           key: test-dnn-weights
       - uses: taiki-e/install-action@nextest
+      - name: Cache test vectors
+        id: test-vectors-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            opus_newvectors
+            vectors.tar.gz
+          key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
+      - name: Download test vectors
+        if: steps.test-vectors-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
+          tar -xzf vectors.tar.gz
       - name: Cache DNN weight data
         id: dnn-weights
         uses: actions/cache@v4
