@@ -40,12 +40,13 @@ cpufeatures::new!(cpuid_avx2_fma, "avx2", "fma");
 pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse::get() {
-            unsafe {
-                x86::xcorr_kernel_sse(x, y, sum, len);
-            }
-            return;
-        }
+        // Keep x86 SIMD implementations compiled, but do not dispatch to them yet.
+        //
+        // Rationale: runtime SIMD dispatch currently uses host CPUID while encoder/decoder
+        // architecture selection is still hardcoded to arch=0. This mismatch causes
+        // x86-only vector parity regressions in CI. Force scalar behavior here until
+        // arch plumbing is aligned with upstream RTCD semantics.
+        let _ = cpuid_sse::get();
     }
 
     #[allow(unreachable_code)]
@@ -65,9 +66,7 @@ pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse::get() {
-            return unsafe { x86::celt_inner_prod_sse(x, y, n) };
-        }
+        let _ = cpuid_sse::get();
     }
 
     #[allow(unreachable_code)]
@@ -87,9 +86,7 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse::get() {
-            return unsafe { x86::dual_inner_prod_sse(x, y01, y02, n) };
-        }
+        let _ = cpuid_sse::get();
     }
 
     #[allow(unreachable_code)]
@@ -149,12 +146,7 @@ pub fn comb_filter_const(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse::get() {
-            unsafe {
-                x86::comb_filter_const_sse(y, y_start, x, x_start, T, N, g10, g11, g12);
-            }
-            return;
-        }
+        let _ = cpuid_sse::get();
     }
 
     #[allow(unreachable_code)]
@@ -171,9 +163,7 @@ pub fn comb_filter_const(
 pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_sse2::get() {
-            return unsafe { x86::op_pvq_search_sse2(X, iy, K, N) };
-        }
+        let _ = cpuid_sse2::get();
     }
 
     #[allow(unreachable_code)]

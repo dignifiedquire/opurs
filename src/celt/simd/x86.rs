@@ -4,6 +4,7 @@
 //! All functions require `#[target_feature]` and are called only after cpufeatures detection.
 
 #![allow(non_camel_case_types)]
+#![allow(dead_code)]
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
