@@ -43,3 +43,13 @@ int osce_test_gru_lace_fnet(float *out, unsigned int seed);
 int osce_test_dense_tanh_lace_tconv(float *out, unsigned int seed);
 int osce_test_adacomb_intermediates(float *out, unsigned int seed);
 #endif
+
+#ifdef OPUS_X86_MAY_HAVE_SSE
+int opus_select_arch(void);
+float celt_inner_prod_sse(const float *x, const float *y, int N);
+void dual_inner_prod_sse(const float *x, const float *y01, const float *y02, int N, float *xy1, float *xy2);
+void xcorr_kernel_sse(const float *x, const float *y, float *sum, int len);
+void comb_filter_const_sse(float *y, float *x, int T, int N, float g10, float g11, float g12);
+float op_pvq_search_sse2(float *X, int *iy, int K, int N, int arch);
+void celt_pitch_xcorr_avx2(const float *_x, const float *_y, float *xcorr, int len, int max_pitch, int arch);
+#endif

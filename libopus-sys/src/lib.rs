@@ -1113,4 +1113,48 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 
+#[cfg(feature = "simd")]
+unsafe extern "C" {
+    pub fn opus_select_arch() -> ::std::os::raw::c_int;
+    pub fn celt_inner_prod_sse(x: *const f32, y: *const f32, N: ::std::os::raw::c_int) -> f32;
+    pub fn dual_inner_prod_sse(
+        x: *const f32,
+        y01: *const f32,
+        y02: *const f32,
+        N: ::std::os::raw::c_int,
+        xy1: *mut f32,
+        xy2: *mut f32,
+    );
+    pub fn xcorr_kernel_sse(
+        x: *const f32,
+        y: *const f32,
+        sum: *mut f32,
+        len: ::std::os::raw::c_int,
+    );
+    pub fn comb_filter_const_sse(
+        y: *mut f32,
+        x: *mut f32,
+        T: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        g10: f32,
+        g11: f32,
+        g12: f32,
+    );
+    pub fn op_pvq_search_sse2(
+        X: *mut f32,
+        iy: *mut ::std::os::raw::c_int,
+        K: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    ) -> f32;
+    pub fn celt_pitch_xcorr_avx2(
+        _x: *const f32,
+        _y: *const f32,
+        xcorr: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+}
+
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
