@@ -1,3 +1,8 @@
+#[cfg(all(feature = "tools", feature = "qext"))]
+use opurs::internals::{
+    ec_dec_bit_logp as r_ec_dec_bit_logp, ec_dec_init as r_ec_dec_init,
+    ec_dec_uint as r_ec_dec_uint, ec_tell_frac as r_ec_tell_frac,
+};
 #[cfg(feature = "qext")]
 use opurs::internals::{
     opus_packet_extensions_generate, opus_packet_extensions_parse, opus_packet_parse_impl,
@@ -31,7 +36,51 @@ use libopus_sys::{
 };
 
 #[cfg(all(feature = "tools", feature = "qext"))]
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct COpusExtensionData {
+    id: i32,
+    frame: i32,
+    data: *const u8,
+    len: i32,
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct CEcCtx {
+    buf: *mut u8,
+    storage: u32,
+    end_offs: u32,
+    end_window: u32,
+    nend_bits: i32,
+    nbits_total: i32,
+    offs: u32,
+    rng: u32,
+    val: u32,
+    ext: u32,
+    rem: i32,
+    error: i32,
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
 unsafe extern "C" {
+    #[link_name = "opus_packet_extensions_parse"]
+    fn c_opus_packet_extensions_parse(
+        data: *const u8,
+        len: i32,
+        extensions: *mut COpusExtensionData,
+        nb_extensions: *mut i32,
+        nb_frames: i32,
+    ) -> i32;
+    #[link_name = "ec_dec_init"]
+    fn c_ec_dec_init(dec: *mut CEcCtx, buf: *mut u8, storage: u32);
+    #[link_name = "ec_dec_bit_logp"]
+    fn c_ec_dec_bit_logp(dec: *mut CEcCtx, logp: u32) -> i32;
+    #[link_name = "ec_dec_uint"]
+    fn c_ec_dec_uint(dec: *mut CEcCtx, ft: u32) -> u32;
+    #[link_name = "ec_tell_frac"]
+    fn c_ec_tell_frac(dec: *mut CEcCtx) -> u32;
     fn opus_projection_decoder_create(
         Fs: i32,
         channels: i32,
@@ -110,6 +159,149 @@ fn parse_padding_extensions(packet: &[u8]) -> Vec<i32> {
         .expect("failed to parse packet extensions");
 
     exts.into_iter().map(|e| e.id).collect()
+}
+
+#[cfg(feature = "qext")]
+fn first_qext_payload(packet: &[u8]) -> Option<Vec<u8>> {
+    let mut toc = 0u8;
+    let mut sizes = [0i16; 48];
+    let mut packet_offset = 0i32;
+    let mut padding_len = 0i32;
+    let nb_frames = opus_packet_parse_impl(
+        packet,
+        false,
+        Some(&mut toc),
+        None,
+        &mut sizes,
+        None,
+        Some(&mut packet_offset),
+        Some(&mut padding_len),
+    );
+    if nb_frames <= 0 || padding_len <= 0 {
+        return None;
+    }
+    let padding_start = (packet_offset - padding_len) as usize;
+    let padding_end = packet_offset as usize;
+    let exts =
+        opus_packet_extensions_parse(&packet[padding_start..padding_end], 64, nb_frames).ok()?;
+    exts.into_iter()
+        .find(|e| e.id == QEXT_EXTENSION_ID && e.frame == 0)
+        .map(|e| e.data)
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn first_qext_payload_c(packet: &[u8]) -> Option<Vec<u8>> {
+    let mut toc = 0u8;
+    let mut sizes = [0i16; 48];
+    let mut packet_offset = 0i32;
+    let mut padding_len = 0i32;
+    let nb_frames = opus_packet_parse_impl(
+        packet,
+        false,
+        Some(&mut toc),
+        None,
+        &mut sizes,
+        None,
+        Some(&mut packet_offset),
+        Some(&mut padding_len),
+    );
+    if nb_frames <= 0 || padding_len <= 0 {
+        return None;
+    }
+    let padding_start = (packet_offset - padding_len) as usize;
+    let padding_end = packet_offset as usize;
+    let padding = &packet[padding_start..padding_end];
+    let mut exts = [COpusExtensionData::default(); 64];
+    let mut nb_exts = exts.len() as i32;
+    let ret = unsafe {
+        c_opus_packet_extensions_parse(
+            padding.as_ptr(),
+            padding.len() as i32,
+            exts.as_mut_ptr(),
+            &mut nb_exts,
+            nb_frames,
+        )
+    };
+    if ret != 0 || nb_exts < 0 {
+        return None;
+    }
+    for ext in exts.iter().take(nb_exts as usize) {
+        if ext.id == QEXT_EXTENSION_ID && ext.frame == 0 && !ext.data.is_null() && ext.len >= 0 {
+            let bytes = unsafe { std::slice::from_raw_parts(ext.data, ext.len as usize) }.to_vec();
+            return Some(bytes);
+        }
+    }
+    None
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn ilog_u32(v: u32) -> i32 {
+    32 - v.leading_zeros() as i32
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn decode_qext_header_rust(payload: &[u8]) -> (i32, i32, i32, i32, i32, u32) {
+    let mut buf = payload.to_vec();
+    let mut dec = r_ec_dec_init(&mut buf);
+    let qext_end = if r_ec_dec_bit_logp(&mut dec, 1) != 0 {
+        14
+    } else {
+        2
+    };
+    let qext_intensity = r_ec_dec_uint(&mut dec, (qext_end + 1) as u32) as i32;
+    let qext_dual = if qext_intensity != 0 {
+        r_ec_dec_bit_logp(&mut dec, 1)
+    } else {
+        0
+    };
+    let tell = dec.nbits_total - ilog_u32(dec.rng);
+    let qext_intra = if tell + 3 <= payload.len() as i32 * 8 {
+        r_ec_dec_bit_logp(&mut dec, 3)
+    } else {
+        0
+    };
+    (
+        qext_end,
+        qext_intensity,
+        qext_dual,
+        qext_intra,
+        r_ec_tell_frac(&dec) as i32,
+        dec.rng,
+    )
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn decode_qext_header_c(payload: &[u8]) -> (i32, i32, i32, i32, i32, u32) {
+    let mut buf = payload.to_vec();
+    let mut dec = CEcCtx::default();
+    unsafe {
+        c_ec_dec_init(&mut dec, buf.as_mut_ptr(), buf.len() as u32);
+    }
+    let qext_end = if unsafe { c_ec_dec_bit_logp(&mut dec, 1) } != 0 {
+        14
+    } else {
+        2
+    };
+    let qext_intensity = unsafe { c_ec_dec_uint(&mut dec, (qext_end + 1) as u32) } as i32;
+    let qext_dual = if qext_intensity != 0 {
+        unsafe { c_ec_dec_bit_logp(&mut dec, 1) }
+    } else {
+        0
+    };
+    let tell = dec.nbits_total - ilog_u32(dec.rng);
+    let qext_intra = if tell + 3 <= payload.len() as i32 * 8 {
+        unsafe { c_ec_dec_bit_logp(&mut dec, 3) }
+    } else {
+        0
+    };
+    (
+        qext_end,
+        qext_intensity,
+        qext_dual,
+        qext_intra,
+        unsafe { c_ec_tell_frac(&mut dec) } as i32,
+        dec.rng,
+    )
 }
 
 #[cfg(feature = "qext")]
@@ -557,12 +749,30 @@ first_diff={first_diff}, rust_sample={}, c_sample={}, \
 diff_count={diff_count}, max_abs_diff={max_abs_diff}, \
 rust_with_ext_eq_ignore={}, rust_with_ext_eq_unpadded={}, \
 c_with_ext_eq_ignore={}, rust_rng_with_ext={rng_with_ext}, c_rng_with_ext={c_rng_with_ext}, \
-rust_rng_ignore={rng_ignored}, c_rng_ignore={c_rng_ignore}",
+rust_rng_ignore={rng_ignored}, c_rng_ignore={c_rng_ignore}, seed={seed}, \
+qext_payload_len={qext_len}, qext_payload_head={qext_head:?}, \
+c_qext_payload_len={c_qext_len}, c_qext_payload_head={c_qext_head:?}, payloads_equal={payloads_equal}, \
+rust_qext_hdr={rust_hdr:?}, c_qext_hdr={c_hdr:?}",
                     pcm_with_ext.get(first_diff).copied().unwrap_or(0),
                     c_pcm_with_ext.get(first_diff).copied().unwrap_or(0),
                     pcm_with_ext == pcm_ignored,
                     pcm_with_ext == pcm_unpadded,
                     c_pcm_with_ext == c_pcm_ignore,
+                    qext_len = first_qext_payload(&packet).as_ref().map_or(0, |p| p.len()),
+                    qext_head = first_qext_payload(&packet)
+                        .map(|p| p.into_iter().take(16).collect::<Vec<_>>())
+                        .unwrap_or_default(),
+                    c_qext_len = first_qext_payload_c(&packet).as_ref().map_or(0, |p| p.len()),
+                    c_qext_head = first_qext_payload_c(&packet)
+                        .map(|p| p.into_iter().take(16).collect::<Vec<_>>())
+                        .unwrap_or_default(),
+                    payloads_equal = first_qext_payload(&packet) == first_qext_payload_c(&packet),
+                    rust_hdr = first_qext_payload(&packet)
+                        .map(|p| decode_qext_header_rust(&p))
+                        .unwrap_or((0, 0, 0, 0, 0, 0)),
+                    c_hdr = first_qext_payload_c(&packet)
+                        .map(|p| decode_qext_header_c(&p))
+                        .unwrap_or((0, 0, 0, 0, 0, 0)),
                 );
             }
             assert_eq!(rng_with_ext, c_rng_with_ext);

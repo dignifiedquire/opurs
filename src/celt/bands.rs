@@ -1720,12 +1720,16 @@ fn quant_band_stereo(
         let saved_ext_b = ctx.ext_b;
         if mbits >= sbits {
             #[cfg(feature = "qext")]
-            {
+            let qext_extra = {
                 let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && ctx.ext_b != 0 {
+                if !ctx.cap.is_null() && saved_ext_b != 0 {
                     let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
-                    qext_extra = 0.max((ctx.ext_b / 2).min(mbits - cap_val / 2));
+                    qext_extra = 0.max((saved_ext_b / 2).min(mbits - cap_val / 2));
                 }
+                qext_extra
+            };
+            #[cfg(feature = "qext")]
+            {
                 ctx.ext_b = saved_ext_b / 2 + qext_extra;
             }
             cm = quant_band(
@@ -1752,11 +1756,6 @@ fn quant_band_stereo(
             }
             #[cfg(feature = "qext")]
             {
-                let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && ctx.ext_b != 0 {
-                    let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
-                    qext_extra = 0.max((ctx.ext_b / 2).min(mbits - cap_val / 2));
-                }
                 ctx.ext_b = saved_ext_b / 2 - qext_extra;
             }
             cm |= quant_band(
@@ -1775,13 +1774,17 @@ fn quant_band_stereo(
             );
         } else {
             #[cfg(feature = "qext")]
-            {
+            let qext_extra = {
                 let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && ctx.ext_b != 0 {
+                if !ctx.cap.is_null() && saved_ext_b != 0 {
                     let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
-                    qext_extra = 0.max((ctx.ext_b / 2).min(sbits - cap_val / 2));
+                    qext_extra = 0.max((saved_ext_b / 2).min(sbits - cap_val / 2));
                 }
-                ctx.ext_b = saved_ext_b / 2 - qext_extra;
+                qext_extra
+            };
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = saved_ext_b / 2 + qext_extra;
             }
             cm = quant_band(
                 ctx,
@@ -1806,12 +1809,7 @@ fn quant_band_stereo(
                 if ctx.extra_bands {
                     mbits = mbits.min(ctx.remaining_bits);
                 }
-                let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && ctx.ext_b != 0 {
-                    let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
-                    qext_extra = 0.max((ctx.ext_b / 2).min(sbits - cap_val / 2));
-                }
-                ctx.ext_b = saved_ext_b / 2 + qext_extra;
+                ctx.ext_b = saved_ext_b / 2 - qext_extra;
             }
             cm |= quant_band(
                 ctx,
@@ -1972,7 +1970,11 @@ pub fn quant_all_bands<'a>(
         #[cfg(feature = "qext")]
         ext_b: 0,
         #[cfg(feature = "qext")]
-        cap: cap.as_ptr(),
+        cap: if cap.is_empty() {
+            std::ptr::null()
+        } else {
+            cap.as_ptr()
+        },
         #[cfg(feature = "qext")]
         cap_len: cap.len() as i32,
     };
