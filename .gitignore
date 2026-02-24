@@ -1,6 +1,5 @@
 /target
-/target-local
-/target-nosimd
+/target-*
 /Cargo.lock
 .idea
 
