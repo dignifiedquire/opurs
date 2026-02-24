@@ -97,6 +97,12 @@ fn qext_scale_for_mode(mode: &OpusCustomMode) -> i32 {
     }
 }
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_trace_enabled() -> bool {
+    std::env::var_os("OPURS_QEXT_TRACE").is_some()
+}
+
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
@@ -1520,6 +1526,8 @@ fn celt_decode_body(
         C,
         LM,
     );
+    #[cfg(feature = "qext")]
+    let qext_trace = qext_trace_enabled();
 
     // QEXT: Set up extension decoder and decode QEXT band energies
     #[cfg(feature = "qext")]
@@ -1553,6 +1561,14 @@ fn celt_decode_body(
             ext_dec_buf = Vec::new();
             ext_dec = ec_dec_init(&mut ext_dec_buf);
             qext_bytes = 0;
+        }
+        if qext_trace && qext_bytes > 0 {
+            eprintln!(
+                "[rust qext] init bytes={} tell_frac={} rng={}",
+                qext_bytes,
+                ec_tell_frac(&ext_dec),
+                ext_dec.rng
+            );
         }
 
         if qext_bytes > 0
@@ -1588,6 +1604,16 @@ fn celt_decode_body(
                 C,
                 LM,
             );
+            if qext_trace {
+                eprintln!(
+                    "[rust qext] after coarse end={} intensity={} dual={} tell_frac={} rng={}",
+                    qext_end,
+                    qext_intensity,
+                    qext_dual_stereo,
+                    ec_tell_frac(&ext_dec),
+                    ext_dec.rng
+                );
+            }
             qext_mode = Some(qext_mode_struct);
         } else {
             qext_mode = None;
@@ -1721,6 +1747,15 @@ fn celt_decode_body(
             0.0, // tone_freq (encoder only)
             0.0, // toneishness (encoder only)
         );
+        if qext_trace && qext_bytes > 0 {
+            eprintln!(
+                "[rust qext] after extra alloc tell_frac={} rng={} p0={} q0={}",
+                ec_tell_frac(&ext_dec),
+                ext_dec.rng,
+                extra_pulses.get(start as usize).copied().unwrap_or(0),
+                extra_quant.get(start as usize).copied().unwrap_or(0)
+            );
+        }
         if qext_bytes > 0 {
             unquant_fine_energy(
                 mode,
@@ -1732,6 +1767,13 @@ fn celt_decode_body(
                 &mut ext_dec,
                 C,
             );
+            if qext_trace {
+                eprintln!(
+                    "[rust qext] after base fine tell_frac={} rng={}",
+                    ec_tell_frac(&ext_dec),
+                    ext_dec.rng
+                );
+            }
         }
     }
 
@@ -1818,6 +1860,15 @@ fn celt_decode_body(
             &cap,
         );
     }
+    #[cfg(feature = "qext")]
+    if qext_trace && qext_bytes > 0 {
+        eprintln!(
+            "[rust qext] after base bands tell_frac={} rng={} st_rng={}",
+            ec_tell_frac(&ext_dec),
+            ext_dec.rng,
+            st.rng
+        );
+    }
     // QEXT: Decode high-frequency band residuals
     #[cfg(feature = "qext")]
     {
@@ -1846,6 +1897,13 @@ fn celt_decode_body(
                 &mut ext_dec,
                 C,
             );
+            if qext_trace {
+                eprintln!(
+                    "[rust qext] after qext fine tell_frac={} rng={}",
+                    ec_tell_frac(&ext_dec),
+                    ext_dec.rng
+                );
+            }
             if C == 2 {
                 let (x_part, y_part) = X.split_at_mut(N as usize);
                 quant_all_bands(
@@ -1914,6 +1972,14 @@ fn celt_decode_body(
                     0,
                     #[cfg(feature = "qext")]
                     &[],
+                );
+            }
+            if qext_trace {
+                eprintln!(
+                    "[rust qext] after qext bands tell_frac={} rng={} st_rng={}",
+                    ec_tell_frac(&ext_dec),
+                    ext_dec.rng,
+                    st.rng
                 );
             }
         }
@@ -2140,6 +2206,12 @@ fn celt_decode_body(
     st.rng = dec.rng;
     #[cfg(feature = "qext")]
     if qext_bytes > 0 {
+        if qext_trace {
+            eprintln!(
+                "[rust qext] final prexor dec_rng={} ext_rng={} st_rng_before={}",
+                dec.rng, ext_dec.rng, st.rng
+            );
+        }
         st.rng ^= ext_dec.rng;
     }
     {

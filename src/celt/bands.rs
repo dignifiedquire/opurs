@@ -1978,6 +1978,10 @@ pub fn quant_all_bands<'a>(
         #[cfg(feature = "qext")]
         cap_len: cap.len() as i32,
     };
+    #[cfg(feature = "qext")]
+    let qext_band_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some()
+        && m.nbEBands == crate::celt::modes::data_96000::NB_QEXT_BANDS
+        && ext_total_bits > 0;
 
     let mut i = start;
     while i < end {
@@ -2057,6 +2061,18 @@ pub fn quant_all_bands<'a>(
                 ext_b = 0;
             }
             ctx.ext_b = ext_b;
+            if qext_band_trace {
+                eprintln!(
+                    "[rust qext bands] pre i={} b={} ext_b={} ec_tell={} ext_tell={} rem={} tf={}",
+                    i,
+                    b,
+                    ext_b,
+                    ec_tell_frac(ec),
+                    ec_tell_frac(ext_ec),
+                    ctx.remaining_bits,
+                    tf_res[i as usize]
+                );
+            }
         }
         if resynth != 0
             && (M * eBands[i as usize] as i32 - N >= M * eBands[start as usize] as i32
@@ -2485,6 +2501,18 @@ pub fn quant_all_bands<'a>(
         }
         collapse_masks[(i * C) as usize] = x_cm as u8;
         collapse_masks[(i * C + C - 1) as usize] = y_cm as u8;
+        #[cfg(feature = "qext")]
+        if qext_band_trace {
+            eprintln!(
+                "[rust qext bands] post i={} ec_tell={} ext_tell={} x_cm={} y_cm={} seed={}",
+                i,
+                ec_tell_frac(ec),
+                ec_tell_frac(ext_ec),
+                x_cm,
+                y_cm,
+                ctx.seed
+            );
+        }
         balance += pulses[i as usize] + tell;
         update_lowband = (b > N << BITRES) as i32;
         ctx.avoid_split_noise = 0;

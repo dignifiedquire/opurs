@@ -48,6 +48,8 @@
 #include "mathops.h"
 #include "float_cast.h"
 #include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "celt_lpc.h"
 #include "vq.h"
 
@@ -70,6 +72,28 @@
 #define FRAME_PLC_PERIODIC 3
 #define FRAME_PLC_NEURAL   4
 #define FRAME_DRED         5
+
+#ifdef ENABLE_QEXT
+static int qext_trace_enabled(void) {
+   static int init = 0;
+   static int enabled = 0;
+   if (!init) {
+      enabled = getenv("OPURS_QEXT_TRACE") != NULL;
+      init = 1;
+   }
+   return enabled;
+}
+
+static void qext_tracef(const char *fmt, ...) {
+   va_list ap;
+   if (!qext_trace_enabled()) return;
+   va_start(ap, fmt);
+   fprintf(stderr, "[c qext] ");
+   vfprintf(stderr, fmt, ap);
+   fprintf(stderr, "\n");
+   va_end(ap);
+}
+#endif
 
 /**********************************************************************/
 /*                                                                    */
@@ -1192,6 +1216,10 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    } else {
       ec_dec_init(&ext_dec, NULL, 0);
    }
+   if (qext_bytes > 0) {
+      qext_tracef("init bytes=%d tell_frac=%d rng=%u",
+            qext_bytes, ec_tell_frac(&ext_dec), ext_dec.rng);
+   }
 #endif
 #if defined(CUSTOM_MODES) || defined(ENABLE_OPUS_CUSTOM_API)
    if (st->signalling && data!=NULL)
@@ -1468,6 +1496,8 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
       qext_intra_ener = ec_tell(&ext_dec)+3<=qext_bytes*8 ? ec_dec_bit_logp(&ext_dec, 3) : 0;
       unquant_coarse_energy(qext_mode, 0, qext_end, st->qext_oldBandE,
             qext_intra_ener, &ext_dec, C, LM);
+      qext_tracef("after coarse end=%d intensity=%d dual=%d tell_frac=%d rng=%u",
+            qext_end, qext_intensity, qext_dual_stereo, ec_tell_frac(&ext_dec), ext_dec.rng);
    }
    ALLOC(extra_quant, nbEBands+NB_QEXT_BANDS, int);
    ALLOC(extra_pulses, nbEBands+NB_QEXT_BANDS, int);
@@ -1475,7 +1505,13 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    clt_compute_extra_allocation(mode, qext_mode, start, end, qext_end, NULL, NULL,
          qext_bits, extra_pulses, extra_quant, C, LM, &ext_dec, 0, 0, 0);
    if (qext_bytes > 0) {
+      qext_tracef("after extra alloc tell_frac=%d rng=%u p0=%d q0=%d",
+            ec_tell_frac(&ext_dec), ext_dec.rng, extra_pulses[start], extra_quant[start]);
+   }
+   if (qext_bytes > 0) {
       unquant_fine_energy(mode, start, end, oldBandE, fine_quant, extra_quant, &ext_dec, C);
+      qext_tracef("after base fine tell_frac=%d rng=%u",
+            ec_tell_frac(&ext_dec), ext_dec.rng);
    }
 #endif
 
@@ -1492,6 +1528,10 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
          st->arch, st->disable_inv
          ARG_QEXT(&ext_dec) ARG_QEXT(extra_pulses)
          ARG_QEXT(qext_bytes*(8<<BITRES)) ARG_QEXT(cap));
+   if (qext_bytes > 0) {
+      qext_tracef("after base bands tell_frac=%d rng=%u st_rng=%u",
+            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng);
+   }
 
 #ifdef ENABLE_QEXT
    if (qext_mode) {
@@ -1506,10 +1546,14 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
       ext_balance = qext_bytes*(8<<BITRES) - ec_tell_frac(&ext_dec);
       for (i=0;i<qext_end;i++) ext_balance -= extra_pulses[nbEBands+i] + C*(extra_quant[nbEBands+1]<<BITRES);
       unquant_fine_energy(qext_mode, 0, qext_end, st->qext_oldBandE, NULL, &extra_quant[nbEBands], &ext_dec, C);
+      qext_tracef("after qext fine tell_frac=%d rng=%u",
+            ec_tell_frac(&ext_dec), ext_dec.rng);
       quant_all_bands(0, qext_mode, 0, qext_end, X, C==2 ? X+N : NULL, qext_collapse_masks,
             NULL, &extra_pulses[nbEBands], shortBlocks, spread_decision, qext_dual_stereo, qext_intensity, zeros,
             qext_bytes*(8<<BITRES), ext_balance, &ext_dec, LM, qext_end, &st->rng, 0,
             st->arch, st->disable_inv, &dummy_dec, zeros, 0, NULL);
+      qext_tracef("after qext bands tell_frac=%d rng=%u st_rng=%u",
+            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng);
    }
 #endif
 
@@ -1592,7 +1636,11 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    } while (++c<2);
    st->rng = dec->rng;
 #ifdef ENABLE_QEXT
-   if (qext_bytes) st->rng = st->rng ^ ext_dec.rng;
+   if (qext_bytes) {
+      qext_tracef("final prexor dec_rng=%u ext_rng=%u st_rng_before=%u",
+            dec->rng, ext_dec.rng, st->rng);
+      st->rng = st->rng ^ ext_dec.rng;
+   }
 #endif
 
    deemphasis(out_syn, pcm, N, CC, st->downsample, mode->preemph, st->preemph_memD, accum);
