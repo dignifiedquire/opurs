@@ -41,26 +41,6 @@ unsafe extern "C" {
     );
 }
 
-#[inline]
-fn test_arch_level() -> i32 {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
-            return 4;
-        }
-        if std::is_x86_feature_detected!("sse4.1") {
-            return 3;
-        }
-        if std::is_x86_feature_detected!("sse2") {
-            return 2;
-        }
-        if std::is_x86_feature_detected!("sse") {
-            return 1;
-        }
-    }
-    0
-}
-
 struct Rng(u64);
 impl Rng {
     fn new(seed: u64) -> Self {
@@ -81,8 +61,11 @@ impl Rng {
 
 #[test]
 fn pitch_primitives_match_c_scalar() {
+    use opurs::arch::Arch;
+
     let mut rng = Rng::new(0xdecafbad_u64);
-    let c_arch = test_arch_level();
+    let c_arch = 0;
+    let arch = Arch::Scalar;
 
     for _ in 0..200 {
         let c = if (rng.next_u32() & 1) == 0 {
@@ -105,12 +88,11 @@ fn pitch_primitives_match_c_scalar() {
             ch1[i] = rng.next_f32();
         }
 
-        let arch = opurs::arch::opus_select_arch();
         let mut x_lp_r = vec![0.0f32; half];
         if c == 2 {
-            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, len, 2, arch);
+            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, half, 2, arch);
         } else {
-            rust_pitch_downsample(&[&ch0], &mut x_lp_r, len, 2, arch);
+            rust_pitch_downsample(&[&ch0], &mut x_lp_r, half, 2, arch);
         }
 
         let mut x_lp_c = vec![0.0f32; half];
@@ -212,7 +194,7 @@ fn comb_filter_matches_c_scalar() {
     use opurs::celt::common::comb_filter as rust_comb_filter;
 
     let mut rng = Rng::new(0x1234_5678_9abc_def0);
-    let c_arch = test_arch_level();
+    let c_arch = 0;
     for _ in 0..500 {
         let n = 60 + (rng.next_u32() % 120) as i32;
         let overlap = (rng.next_u32() % 60) as i32;
