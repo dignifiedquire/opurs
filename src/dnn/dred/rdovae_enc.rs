@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `dnn/dred_rdovae_enc.c`, `dnn/dred_rdovae_enc.h`, `dnn/dred_rdovae_enc_data.h`
 
+use crate::arch::Arch;
 use crate::dnn::nnet::*;
 
 use super::config::*;
@@ -452,6 +453,7 @@ pub fn dred_rdovae_encode_dframe(
     latents: &mut [f32],
     initial_state: &mut [f32],
     input: &[f32],
+    arch: Arch,
 ) {
     let mut buffer = vec![0.0f32; ENC_BUFFER_SIZE];
     let mut conv_tmp = [0.0f32; ENC_CONV_DENSE1_OUT_SIZE];
@@ -463,6 +465,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut buffer[output_index..output_index + ENC_DENSE1_OUT_SIZE],
         input,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += ENC_DENSE1_OUT_SIZE;
 
@@ -472,6 +475,7 @@ pub fn dred_rdovae_encode_dframe(
         &model.enc_gru1_recurrent,
         &mut enc_state.gru1_state,
         &buffer,
+        arch,
     );
     buffer[output_index..output_index + ENC_GRU1_OUT_SIZE].copy_from_slice(&enc_state.gru1_state);
     output_index += ENC_GRU1_OUT_SIZE;
@@ -480,6 +484,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut conv_tmp[..ENC_CONV_DENSE1_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut enc_state.conv1_state,
@@ -494,6 +499,7 @@ pub fn dred_rdovae_encode_dframe(
         &conv_tmp[..ENC_CONV_DENSE1_OUT_SIZE],
         ENC_CONV1_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += ENC_CONV1_OUT_SIZE;
 
@@ -503,6 +509,7 @@ pub fn dred_rdovae_encode_dframe(
         &model.enc_gru2_recurrent,
         &mut enc_state.gru2_state,
         &buffer,
+        arch,
     );
     buffer[output_index..output_index + ENC_GRU2_OUT_SIZE].copy_from_slice(&enc_state.gru2_state);
     output_index += ENC_GRU2_OUT_SIZE;
@@ -511,6 +518,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut conv_tmp[..ENC_CONV_DENSE2_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut enc_state.conv2_state,
@@ -526,6 +534,7 @@ pub fn dred_rdovae_encode_dframe(
         ENC_CONV2_OUT_SIZE,
         2,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += ENC_CONV2_OUT_SIZE;
 
@@ -535,6 +544,7 @@ pub fn dred_rdovae_encode_dframe(
         &model.enc_gru3_recurrent,
         &mut enc_state.gru3_state,
         &buffer,
+        arch,
     );
     buffer[output_index..output_index + ENC_GRU3_OUT_SIZE].copy_from_slice(&enc_state.gru3_state);
     output_index += ENC_GRU3_OUT_SIZE;
@@ -543,6 +553,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut conv_tmp[..ENC_CONV_DENSE3_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut enc_state.conv3_state,
@@ -558,6 +569,7 @@ pub fn dred_rdovae_encode_dframe(
         ENC_CONV3_OUT_SIZE,
         2,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += ENC_CONV3_OUT_SIZE;
 
@@ -567,6 +579,7 @@ pub fn dred_rdovae_encode_dframe(
         &model.enc_gru4_recurrent,
         &mut enc_state.gru4_state,
         &buffer,
+        arch,
     );
     buffer[output_index..output_index + ENC_GRU4_OUT_SIZE].copy_from_slice(&enc_state.gru4_state);
     output_index += ENC_GRU4_OUT_SIZE;
@@ -575,6 +588,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut conv_tmp[..ENC_CONV_DENSE4_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut enc_state.conv4_state,
@@ -590,6 +604,7 @@ pub fn dred_rdovae_encode_dframe(
         ENC_CONV4_OUT_SIZE,
         2,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += ENC_CONV4_OUT_SIZE;
 
@@ -599,6 +614,7 @@ pub fn dred_rdovae_encode_dframe(
         &model.enc_gru5_recurrent,
         &mut enc_state.gru5_state,
         &buffer,
+        arch,
     );
     buffer[output_index..output_index + ENC_GRU5_OUT_SIZE].copy_from_slice(&enc_state.gru5_state);
     output_index += ENC_GRU5_OUT_SIZE;
@@ -607,6 +623,7 @@ pub fn dred_rdovae_encode_dframe(
         &mut conv_tmp[..ENC_CONV_DENSE5_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut enc_state.conv5_state,
@@ -622,6 +639,7 @@ pub fn dred_rdovae_encode_dframe(
         ENC_CONV5_OUT_SIZE,
         2,
         ACTIVATION_TANH,
+        arch,
     );
 
     // Latent vector
@@ -631,18 +649,26 @@ pub fn dred_rdovae_encode_dframe(
         &mut padded_latents,
         &buffer,
         ACTIVATION_LINEAR,
+        arch,
     );
     latents[..DRED_LATENT_DIM].copy_from_slice(&padded_latents[..DRED_LATENT_DIM]);
 
     // Initial state for decoder
     let mut state_hidden = vec![0.0f32; GDENSE1_OUT_SIZE];
-    compute_generic_dense(&model.gdense1, &mut state_hidden, &buffer, ACTIVATION_TANH);
+    compute_generic_dense(
+        &model.gdense1,
+        &mut state_hidden,
+        &buffer,
+        ACTIVATION_TANH,
+        arch,
+    );
     let mut padded_state = [0.0f32; GDENSE2_OUT_SIZE];
     compute_generic_dense(
         &model.gdense2,
         &mut padded_state[..GDENSE2_OUT_SIZE],
         &state_hidden,
         ACTIVATION_LINEAR,
+        arch,
     );
     initial_state[..DRED_STATE_DIM].copy_from_slice(&padded_state[..DRED_STATE_DIM]);
 }

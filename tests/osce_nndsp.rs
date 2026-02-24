@@ -242,6 +242,7 @@ fn rust_adacomb(lace: &LACE, num_frames: usize, seed: u32) -> Vec<f32> {
 
 /// Run Rust adashape with same PRNG inputs as C harness.
 fn rust_adashape(nolace: &NoLACE, num_frames: usize, seed: u32) -> Vec<f32> {
+    let arch = opurs::arch::opus_select_arch();
     let mut state = AdaShapeState::default();
     let mut prng = Prng::new(seed);
     let frame_size = NOLACE_TDSHAPE1_FRAME_SIZE;
@@ -265,6 +266,7 @@ fn rust_adashape(nolace: &NoLACE, num_frames: usize, seed: u32) -> Vec<f32> {
             frame_size,
             NOLACE_TDSHAPE1_AVG_POOL_K,
             1,
+            arch,
         );
         all_out.extend_from_slice(&x_out);
     }
@@ -374,6 +376,7 @@ fn test_adashape_nolace_tdshape1() {
 fn test_compute_linear_lace_af1_kernel() {
     use opurs::dnn::nnet::compute_linear;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -390,7 +393,7 @@ fn test_compute_linear_lace_af1_kernel() {
 
     // Run Rust compute_linear
     let mut rust_out = vec![0.0f32; nb_outputs];
-    compute_linear(&lace.layers.af1_kernel, &mut rust_out, &input);
+    compute_linear(&lace.layers.af1_kernel, &mut rust_out, &input, arch);
 
     compare_outputs("compute_linear_lace_af1_kernel", &rust_out, &c_out);
 }
@@ -400,6 +403,7 @@ fn test_compute_linear_lace_af1_kernel() {
 fn test_dense_tanh_lace_af1_gain() {
     use opurs::dnn::nnet::compute_generic_dense;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -417,6 +421,7 @@ fn test_dense_tanh_lace_af1_gain() {
         &mut rust_out,
         &input,
         opurs::dnn::nnet::ACTIVATION_TANH,
+        arch,
     );
 
     compare_outputs("dense_tanh_lace_af1_gain", &rust_out, &c_out);
@@ -457,6 +462,7 @@ fn test_celt_pitch_xcorr_neon() {
 fn test_compute_linear_nolace_tdshape() {
     use opurs::dnn::nnet::compute_linear;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let nolace = init_nolace(&arrays).expect("NoLACE init failed");
 
@@ -476,7 +482,7 @@ fn test_compute_linear_nolace_tdshape() {
     let mut prng = Prng::new(SEED);
     let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
     let mut rust_out = vec![0.0f32; nb_outputs];
-    compute_linear(layer, &mut rust_out, &input);
+    compute_linear(layer, &mut rust_out, &input, arch);
 
     compare_outputs("compute_linear_nolace_tdshape", &rust_out, &c_out);
 }
@@ -487,6 +493,7 @@ fn test_compute_linear_nolace_tdshape() {
 fn test_compute_linear_nolace_af2() {
     use opurs::dnn::nnet::compute_linear;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let nolace = init_nolace(&arrays).expect("NoLACE init failed");
 
@@ -506,7 +513,7 @@ fn test_compute_linear_nolace_af2() {
     let mut prng = Prng::new(SEED);
     let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
     let mut rust_out = vec![0.0f32; nb_outputs];
-    compute_linear(layer, &mut rust_out, &input);
+    compute_linear(layer, &mut rust_out, &input, arch);
 
     compare_outputs("compute_linear_nolace_af2", &rust_out, &c_out);
 }
@@ -517,6 +524,7 @@ fn test_tanh_approx() {
     use opurs::dnn::nnet::compute_linear;
     use opurs::dnn::simd::tanh_approx;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -525,13 +533,13 @@ fn test_tanh_approx() {
     let mut prng = Prng::new(SEED);
     let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
     let mut linear_out = vec![0.0f32; lace.layers.af1_gain.nb_outputs];
-    compute_linear(&lace.layers.af1_gain, &mut linear_out, &input);
+    compute_linear(&lace.layers.af1_gain, &mut linear_out, &input, arch);
 
     // Compare Rust tanh_approx against C tanh_approx for the computed value
     let exact_val = linear_out[0];
     let mut c_tanh = [0.0f32; 2];
     unsafe { libopus_sys::osce_test_tanh_approx(c_tanh.as_mut_ptr(), exact_val) };
-    let rust_tanh = tanh_approx(exact_val);
+    let rust_tanh = tanh_approx(exact_val, arch);
 
     assert_eq!(
         rust_tanh.to_bits(),
@@ -548,6 +556,7 @@ fn test_tanh_approx() {
 fn test_compute_linear_int8_lace_fnet_conv2() {
     use opurs::dnn::nnet::compute_linear;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -561,7 +570,7 @@ fn test_compute_linear_int8_lace_fnet_conv2() {
     let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
 
     let mut rust_out = vec![0.0f32; nb_outputs];
-    compute_linear(&lace.layers.fnet_conv2, &mut rust_out, &input);
+    compute_linear(&lace.layers.fnet_conv2, &mut rust_out, &input, arch);
 
     compare_outputs("compute_linear_int8_lace_fnet_conv2", &rust_out, &c_out);
 }
@@ -572,6 +581,7 @@ fn test_gru_lace_fnet() {
     use opurs::dnn::nnet::compute_generic_gru;
     use opurs::dnn::osce::LACE_COND_DIM;
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -590,6 +600,7 @@ fn test_gru_lace_fnet() {
         &lace.layers.fnet_gru_recurrent,
         &mut state,
         &input1,
+        arch,
     );
     compare_outputs("gru_lace_fnet_step1", &state, &c_out[..LACE_COND_DIM]);
 
@@ -602,6 +613,7 @@ fn test_gru_lace_fnet() {
         &lace.layers.fnet_gru_recurrent,
         &mut state,
         &input2,
+        arch,
     );
     compare_outputs("gru_lace_fnet_step2", &state, &c_out[LACE_COND_DIM..]);
 }
@@ -611,6 +623,7 @@ fn test_gru_lace_fnet() {
 fn test_dense_tanh_lace_tconv() {
     use opurs::dnn::nnet::{compute_generic_dense, ACTIVATION_TANH};
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -629,6 +642,7 @@ fn test_dense_tanh_lace_tconv() {
         &mut rust_out,
         &input,
         ACTIVATION_TANH,
+        arch,
     );
 
     compare_outputs("dense_tanh_lace_tconv", &rust_out, &c_out);
@@ -643,6 +657,7 @@ fn test_adacomb_intermediates() {
         compute_generic_dense, ACTIVATION_LINEAR, ACTIVATION_RELU, ACTIVATION_TANH,
     };
 
+    let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();
     let lace = init_lace(&arrays).expect("LACE init failed");
 
@@ -683,6 +698,7 @@ fn test_adacomb_intermediates() {
         &mut rust_kernel,
         &features,
         ACTIVATION_LINEAR,
+        arch,
     );
     for i in 0..16 {
         if rust_kernel[i] != c_buf[i] {
@@ -701,6 +717,7 @@ fn test_adacomb_intermediates() {
         &mut rust_gain,
         &features,
         ACTIVATION_RELU,
+        arch,
     );
     if rust_gain[0] != c_buf[16] {
         diffs.push(format!(
@@ -717,6 +734,7 @@ fn test_adacomb_intermediates() {
         &mut rust_ggain,
         &features,
         ACTIVATION_TANH,
+        arch,
     );
     if rust_ggain[0] != c_buf[17] {
         diffs.push(format!(

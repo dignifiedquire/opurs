@@ -6,6 +6,7 @@
 //! Upstream C: `dnn/nnet.h`, `dnn/nnet.c`, `dnn/nnet_arch.h`, `dnn/parse_lpcnet_weights.c`
 
 use super::vec::*;
+use crate::arch::Arch;
 
 // --- Activation types ---
 
@@ -93,10 +94,10 @@ pub struct Conv2dLayer {
 
 const MAX_ACTIVATIONS: usize = 4096;
 
-fn vec_swish(y: &mut [f32], x: &[f32], n: usize) {
+fn vec_swish(y: &mut [f32], x: &[f32], n: usize, arch: Arch) {
     let mut tmp = [0.0f32; MAX_ACTIVATIONS];
     assert!(n <= MAX_ACTIVATIONS);
-    vec_sigmoid(&mut tmp[..n], &x[..n]);
+    vec_sigmoid(&mut tmp[..n], &x[..n], arch);
     for i in 0..n {
         y[i] = x[i] * tmp[i];
     }
@@ -105,11 +106,17 @@ fn vec_swish(y: &mut [f32], x: &[f32], n: usize) {
 /// Apply activation function in-place or from input to output.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_activation_c
-pub fn compute_activation(output: &mut [f32], input: &[f32], n: usize, activation: i32) {
+pub fn compute_activation(
+    output: &mut [f32],
+    input: &[f32],
+    n: usize,
+    activation: i32,
+    arch: Arch,
+) {
     match activation {
-        ACTIVATION_SIGMOID => vec_sigmoid(&mut output[..n], &input[..n]),
-        ACTIVATION_TANH => vec_tanh(&mut output[..n], &input[..n]),
-        ACTIVATION_SWISH => vec_swish(&mut output[..n], &input[..n], n),
+        ACTIVATION_SIGMOID => vec_sigmoid(&mut output[..n], &input[..n], arch),
+        ACTIVATION_TANH => vec_tanh(&mut output[..n], &input[..n], arch),
+        ACTIVATION_SWISH => vec_swish(&mut output[..n], &input[..n], n, arch),
         ACTIVATION_RELU => {
             for i in 0..n {
                 output[i] = if input[i] < 0.0 { 0.0 } else { input[i] };
@@ -119,7 +126,7 @@ pub fn compute_activation(output: &mut [f32], input: &[f32], n: usize, activatio
             // SOFTMAX_HACK: just copy (used as identity in practice)
             output[..n].copy_from_slice(&input[..n]);
         }
-        ACTIVATION_EXP => softmax(&mut output[..n], &input[..n]),
+        ACTIVATION_EXP => softmax(&mut output[..n], &input[..n], arch),
         ACTIVATION_LINEAR | _ => {
             if !std::ptr::eq(output.as_ptr(), input.as_ptr()) {
                 output[..n].copy_from_slice(&input[..n]);
@@ -135,16 +142,23 @@ pub fn compute_activation(output: &mut [f32], input: &[f32], n: usize, activatio
 /// Dispatches to float sgemv or int8 cgemv depending on which weights are present.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_linear_c
-pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
+pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
     let m = linear.nb_inputs;
     let n = linear.nb_outputs;
     let mut used_int8_path = false;
 
     if !linear.float_weights.is_empty() {
         if !linear.weights_idx.is_empty() {
-            sparse_sgemv8x4(out, &linear.float_weights, &linear.weights_idx, n, input);
+            sparse_sgemv8x4(
+                out,
+                &linear.float_weights,
+                &linear.weights_idx,
+                n,
+                input,
+                arch,
+            );
         } else {
-            sgemv(out, &linear.float_weights, n, m, n, input);
+            sgemv(out, &linear.float_weights, n, m, n, input, arch);
         }
     } else if !linear.weights.is_empty() {
         used_int8_path = true;
@@ -157,9 +171,10 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
                 n,
                 m,
                 input,
+                arch,
             );
         } else {
-            cgemv8x4(out, &linear.weights, &linear.scale, n, m, input);
+            cgemv8x4(out, &linear.weights, &linear.scale, n, m, input, arch);
         }
     } else {
         for i in 0..n {
@@ -167,7 +182,7 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32]) {
         }
     }
 
-    let bias = if used_int8_path && use_su_bias() && !linear.subias.is_empty() {
+    let bias = if used_int8_path && use_su_bias(arch) && !linear.subias.is_empty() {
         // USE_SU_BIAS: x86 AVX2 cgemv8x4 uses unsigned u8 quantization,
         // so subias compensates for the +127 offset. NEON and scalar use
         // signed i8 quantization and need regular bias.
@@ -202,11 +217,12 @@ pub fn compute_generic_dense(
     output: &mut [f32],
     input: &[f32],
     activation: i32,
+    arch: Arch,
 ) {
-    compute_linear(layer, output, input);
+    compute_linear(layer, output, input, arch);
     let n = layer.nb_outputs;
     let tmp = output[..n].to_vec();
-    compute_activation(&mut output[..n], &tmp, n, activation);
+    compute_activation(&mut output[..n], &tmp, n, activation, arch);
 }
 
 /// GRU layer: standard z/r/h gated recurrent unit.
@@ -219,6 +235,7 @@ pub fn compute_generic_gru(
     recurrent_weights: &LinearLayer,
     state: &mut [f32],
     input: &[f32],
+    arch: Arch,
 ) {
     assert!(3 * recurrent_weights.nb_inputs == recurrent_weights.nb_outputs);
     assert!(input_weights.nb_outputs == recurrent_weights.nb_outputs);
@@ -227,22 +244,22 @@ pub fn compute_generic_gru(
     let mut zrh = vec![0.0f32; 3 * n];
     let mut recur = vec![0.0f32; 3 * n];
 
-    compute_linear(input_weights, &mut zrh, input);
-    compute_linear(recurrent_weights, &mut recur, state);
+    compute_linear(input_weights, &mut zrh, input, arch);
+    compute_linear(recurrent_weights, &mut recur, state, arch);
 
     // z and r: add recurrent, then sigmoid
     for i in 0..2 * n {
         zrh[i] += recur[i];
     }
     let tmp_zr = zrh[..2 * n].to_vec();
-    compute_activation(&mut zrh[..2 * n], &tmp_zr, 2 * n, ACTIVATION_SIGMOID);
+    compute_activation(&mut zrh[..2 * n], &tmp_zr, 2 * n, ACTIVATION_SIGMOID, arch);
 
     // h: add r-gated recurrent, then tanh
     for i in 0..n {
         zrh[2 * n + i] += recur[2 * n + i] * zrh[n + i]; // r[i] gates recurrent
     }
     let mut h = vec![0.0f32; n];
-    compute_activation(&mut h, &zrh[2 * n..], n, ACTIVATION_TANH);
+    compute_activation(&mut h, &zrh[2 * n..], n, ACTIVATION_TANH, arch);
 
     // state = z*state + (1-z)*h
     for i in 0..n {
@@ -253,13 +270,13 @@ pub fn compute_generic_gru(
 /// Gated Linear Unit: out = input * sigmoid(W*input)
 ///
 /// Upstream C: dnn/nnet.c:compute_glu
-pub fn compute_glu(layer: &LinearLayer, output: &mut [f32], input: &[f32]) {
+pub fn compute_glu(layer: &LinearLayer, output: &mut [f32], input: &[f32], arch: Arch) {
     assert!(layer.nb_inputs == layer.nb_outputs);
     let n = layer.nb_outputs;
     let mut act = vec![0.0f32; n];
-    compute_linear(layer, &mut act, input);
+    compute_linear(layer, &mut act, input, arch);
     let tmp = act.clone();
-    compute_activation(&mut act, &tmp, n, ACTIVATION_SIGMOID);
+    compute_activation(&mut act, &tmp, n, ACTIVATION_SIGMOID, arch);
     for i in 0..n {
         output[i] = input[i] * act[i];
     }
@@ -279,6 +296,7 @@ pub fn compute_generic_conv1d(
     input: &[f32],
     input_size: usize,
     activation: i32,
+    arch: Arch,
 ) {
     let mut tmp = vec![0.0f32; MAX_CONV_INPUTS_ALL];
     assert!(layer.nb_inputs <= MAX_CONV_INPUTS_ALL);
@@ -287,10 +305,10 @@ pub fn compute_generic_conv1d(
         tmp[..hist_size].copy_from_slice(&mem[..hist_size]);
     }
     tmp[hist_size..hist_size + input_size].copy_from_slice(&input[..input_size]);
-    compute_linear(layer, output, &tmp);
+    compute_linear(layer, output, &tmp, arch);
     let n = layer.nb_outputs;
     let out_tmp = output[..n].to_vec();
-    compute_activation(&mut output[..n], &out_tmp, n, activation);
+    compute_activation(&mut output[..n], &out_tmp, n, activation, arch);
     if hist_size > 0 {
         mem[..hist_size].copy_from_slice(&tmp[input_size..input_size + hist_size]);
     }
@@ -307,6 +325,7 @@ pub fn compute_generic_conv1d_dilation(
     input_size: usize,
     dilation: usize,
     activation: i32,
+    arch: Arch,
 ) {
     let mut tmp = vec![0.0f32; MAX_CONV_INPUTS_ALL];
     let ksize = layer.nb_inputs / input_size;
@@ -324,13 +343,14 @@ pub fn compute_generic_conv1d_dilation(
     }
     tmp[(ksize - 1) * input_size..ksize * input_size].copy_from_slice(&input[..input_size]);
 
-    compute_linear(layer, output, &tmp);
+    compute_linear(layer, output, &tmp, arch);
     let mut out_copy = output[..layer.nb_outputs].to_vec();
     compute_activation(
         &mut out_copy,
         &output[..layer.nb_outputs],
         layer.nb_outputs,
         activation,
+        arch,
     );
     output[..layer.nb_outputs].copy_from_slice(&out_copy);
 
@@ -394,6 +414,7 @@ pub fn compute_conv2d(
     height: usize,
     hstride: usize,
     activation: i32,
+    arch: Arch,
 ) {
     let time_stride = conv.in_channels * (height + conv.kheight - 1);
     assert!(conv.ktime * time_stride <= MAX_CONV2D_INPUTS);
@@ -429,7 +450,13 @@ pub fn compute_conv2d(
     for i in 0..conv.out_channels {
         let start = i * hstride;
         let mut tmp = out[start..start + height].to_vec();
-        compute_activation(&mut tmp, &out[start..start + height], height, activation);
+        compute_activation(
+            &mut tmp,
+            &out[start..start + height],
+            height,
+            activation,
+            arch,
+        );
         out[start..start + height].copy_from_slice(&tmp);
     }
 }

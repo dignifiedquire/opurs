@@ -25,6 +25,7 @@ fn generate_weights_i8(n: usize, seed: u32) -> Vec<i8> {
 }
 
 fn bench_vec_tanh(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("dnn_vec_tanh");
     for &n in &[64, 128, 256, 512, 1024] {
         let x = generate_signal(n, 42);
@@ -40,7 +41,7 @@ fn bench_vec_tanh(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
             let mut y = vec![0.0f32; n];
             b.iter(|| {
-                opurs::internals::vec_tanh(&mut y, black_box(&x));
+                opurs::internals::vec_tanh(&mut y, black_box(&x), arch);
                 black_box(&y);
             })
         });
@@ -49,6 +50,7 @@ fn bench_vec_tanh(c: &mut Criterion) {
 }
 
 fn bench_vec_sigmoid(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("dnn_vec_sigmoid");
     for &n in &[64, 128, 256, 512, 1024] {
         let x = generate_signal(n, 123);
@@ -64,7 +66,7 @@ fn bench_vec_sigmoid(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
             let mut y = vec![0.0f32; n];
             b.iter(|| {
-                opurs::internals::vec_sigmoid(&mut y, black_box(&x));
+                opurs::internals::vec_sigmoid(&mut y, black_box(&x), arch);
                 black_box(&y);
             })
         });
@@ -73,6 +75,7 @@ fn bench_vec_sigmoid(c: &mut Criterion) {
 }
 
 fn bench_softmax(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("dnn_softmax");
     for &n in &[64, 128, 256, 512, 1024] {
         let x = generate_signal(n, 77);
@@ -88,7 +91,7 @@ fn bench_softmax(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &n| {
             let mut y = vec![0.0f32; n];
             b.iter(|| {
-                opurs::internals::softmax(&mut y, black_box(&x));
+                opurs::internals::softmax(&mut y, black_box(&x), arch);
                 black_box(&y);
             })
         });
@@ -97,6 +100,7 @@ fn bench_softmax(c: &mut Criterion) {
 }
 
 fn bench_sgemv(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("dnn_sgemv");
     for &(rows, cols) in &[(64, 64), (128, 64), (256, 128), (512, 256)] {
         let weights = generate_signal(rows * cols, 42);
@@ -135,6 +139,7 @@ fn bench_sgemv(c: &mut Criterion) {
                         cols,
                         rows,
                         black_box(&x),
+                        arch,
                     );
                     black_box(&out);
                 })
@@ -145,6 +150,7 @@ fn bench_sgemv(c: &mut Criterion) {
 }
 
 fn bench_cgemv8x4(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("dnn_cgemv8x4");
     for &(rows, cols) in &[(64, 64), (128, 64), (256, 128), (512, 256)] {
         let w = generate_weights_i8(rows * cols, 42);
@@ -184,6 +190,7 @@ fn bench_cgemv8x4(c: &mut Criterion) {
                         rows,
                         cols,
                         black_box(&x),
+                        arch,
                     );
                     black_box(&out);
                 })

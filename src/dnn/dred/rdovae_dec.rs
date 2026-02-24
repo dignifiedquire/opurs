@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `dnn/dred_rdovae_dec.c`, `dnn/dred_rdovae_dec.h`, `dnn/dred_rdovae_dec_data.h`
 
+use crate::arch::Arch;
 use crate::dnn::nnet::*;
 
 use super::config::*;
@@ -517,6 +518,7 @@ pub fn dred_rdovae_dec_init_states(
     h: &mut RDOVAEDecState,
     model: &RDOVAEDec,
     initial_state: &[f32],
+    arch: Arch,
 ) {
     let mut hidden = vec![0.0f32; DEC_HIDDEN_INIT_OUT_SIZE];
     compute_generic_dense(
@@ -524,6 +526,7 @@ pub fn dred_rdovae_dec_init_states(
         &mut hidden,
         initial_state,
         ACTIVATION_TANH,
+        arch,
     );
 
     let mut state_init = vec![0.0f32; DEC_GRU_INIT_OUT_SIZE];
@@ -532,6 +535,7 @@ pub fn dred_rdovae_dec_init_states(
         &mut state_init,
         &hidden,
         ACTIVATION_TANH,
+        arch,
     );
 
     let mut counter = 0;
@@ -560,6 +564,7 @@ pub fn dred_rdovae_decode_qframe(
     model: &RDOVAEDec,
     qframe: &mut [f32],
     input: &[f32],
+    arch: Arch,
 ) {
     let mut buffer = vec![0.0f32; DEC_BUFFER_SIZE];
     let mut conv_tmp = [0.0f32; DEC_CONV_DENSE1_OUT_SIZE];
@@ -571,6 +576,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut buffer[output_index..output_index + DEC_DENSE1_OUT_SIZE],
         input,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += DEC_DENSE1_OUT_SIZE;
 
@@ -580,11 +586,13 @@ pub fn dred_rdovae_decode_qframe(
         &model.dec_gru1_recurrent,
         &mut dec_state.gru1_state,
         &buffer,
+        arch,
     );
     compute_glu(
         &model.dec_glu1,
         &mut buffer[output_index..output_index + DEC_GRU1_OUT_SIZE],
         &dec_state.gru1_state,
+        arch,
     );
     output_index += DEC_GRU1_OUT_SIZE;
     compute_generic_dense(
@@ -592,6 +600,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut conv_tmp[..DEC_CONV_DENSE1_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut dec_state.conv1_state,
@@ -606,6 +615,7 @@ pub fn dred_rdovae_decode_qframe(
         &conv_tmp[..DEC_CONV_DENSE1_OUT_SIZE],
         DEC_CONV1_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += DEC_CONV1_OUT_SIZE;
 
@@ -615,11 +625,13 @@ pub fn dred_rdovae_decode_qframe(
         &model.dec_gru2_recurrent,
         &mut dec_state.gru2_state,
         &buffer,
+        arch,
     );
     compute_glu(
         &model.dec_glu2,
         &mut buffer[output_index..output_index + DEC_GRU2_OUT_SIZE],
         &dec_state.gru2_state,
+        arch,
     );
     output_index += DEC_GRU2_OUT_SIZE;
     compute_generic_dense(
@@ -627,6 +639,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut conv_tmp[..DEC_CONV_DENSE2_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut dec_state.conv2_state,
@@ -641,6 +654,7 @@ pub fn dred_rdovae_decode_qframe(
         &conv_tmp[..DEC_CONV_DENSE2_OUT_SIZE],
         DEC_CONV2_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += DEC_CONV2_OUT_SIZE;
 
@@ -650,11 +664,13 @@ pub fn dred_rdovae_decode_qframe(
         &model.dec_gru3_recurrent,
         &mut dec_state.gru3_state,
         &buffer,
+        arch,
     );
     compute_glu(
         &model.dec_glu3,
         &mut buffer[output_index..output_index + DEC_GRU3_OUT_SIZE],
         &dec_state.gru3_state,
+        arch,
     );
     output_index += DEC_GRU3_OUT_SIZE;
     compute_generic_dense(
@@ -662,6 +678,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut conv_tmp[..DEC_CONV_DENSE3_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut dec_state.conv3_state,
@@ -676,6 +693,7 @@ pub fn dred_rdovae_decode_qframe(
         &conv_tmp[..DEC_CONV_DENSE3_OUT_SIZE],
         DEC_CONV3_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += DEC_CONV3_OUT_SIZE;
 
@@ -685,11 +703,13 @@ pub fn dred_rdovae_decode_qframe(
         &model.dec_gru4_recurrent,
         &mut dec_state.gru4_state,
         &buffer,
+        arch,
     );
     compute_glu(
         &model.dec_glu4,
         &mut buffer[output_index..output_index + DEC_GRU4_OUT_SIZE],
         &dec_state.gru4_state,
+        arch,
     );
     output_index += DEC_GRU4_OUT_SIZE;
     compute_generic_dense(
@@ -697,6 +717,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut conv_tmp[..DEC_CONV_DENSE4_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut dec_state.conv4_state,
@@ -711,6 +732,7 @@ pub fn dred_rdovae_decode_qframe(
         &conv_tmp[..DEC_CONV_DENSE4_OUT_SIZE],
         DEC_CONV4_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
     output_index += DEC_CONV4_OUT_SIZE;
 
@@ -720,11 +742,13 @@ pub fn dred_rdovae_decode_qframe(
         &model.dec_gru5_recurrent,
         &mut dec_state.gru5_state,
         &buffer,
+        arch,
     );
     compute_glu(
         &model.dec_glu5,
         &mut buffer[output_index..output_index + DEC_GRU5_OUT_SIZE],
         &dec_state.gru5_state,
+        arch,
     );
     output_index += DEC_GRU5_OUT_SIZE;
     compute_generic_dense(
@@ -732,6 +756,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut conv_tmp[..DEC_CONV_DENSE5_OUT_SIZE],
         &buffer[..output_index],
         ACTIVATION_TANH,
+        arch,
     );
     conv1_cond_init(
         &mut dec_state.conv5_state,
@@ -746,6 +771,7 @@ pub fn dred_rdovae_decode_qframe(
         &conv_tmp[..DEC_CONV_DENSE5_OUT_SIZE],
         DEC_CONV5_OUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
 
     // Output
@@ -754,6 +780,7 @@ pub fn dred_rdovae_decode_qframe(
         &mut qframe[..DEC_OUTPUT_OUT_SIZE],
         &buffer,
         ACTIVATION_LINEAR,
+        arch,
     );
 }
 
@@ -766,9 +793,10 @@ pub fn dred_rdovae_decode_all(
     state: &[f32],
     latents: &[f32],
     nb_latents: usize,
+    arch: Arch,
 ) {
     let mut dec = RDOVAEDecState::new();
-    dred_rdovae_dec_init_states(&mut dec, model, state);
+    dred_rdovae_dec_init_states(&mut dec, model, state, arch);
     let mut i = 0;
     while i < 2 * nb_latents {
         dred_rdovae_decode_qframe(
@@ -776,6 +804,7 @@ pub fn dred_rdovae_decode_all(
             model,
             &mut features[2 * i * DRED_NUM_FEATURES..],
             &latents[(i / 2) * (DRED_LATENT_DIM + 1)..],
+            arch,
         );
         i += 2;
     }

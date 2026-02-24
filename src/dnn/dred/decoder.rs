@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `dnn/dred_decoder.c`, `dnn/dred_decoder.h`
 
+use crate::arch::opus_select_arch;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entdec::{ec_dec, ec_dec_init, ec_dec_uint, ec_dec_update, ec_decode};
 use crate::celt::laplace::ec_laplace_decode_p0;
@@ -205,6 +206,7 @@ pub fn opus_dred_process(dred_dec: &OpusDREDDecoder, dred: &mut OpusDRED) {
         &dred.state,
         &dred.latents,
         dred.nb_latents as usize,
+        opus_select_arch(),
     );
     dred.process_stage = 2;
 }

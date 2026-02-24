@@ -8,20 +8,13 @@
 //! Unlike CELT/SILK (which require bit-exactness), DNN inference is approximate,
 //! so FMA instructions are used freely.
 
+use crate::arch::Arch;
+
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod x86;
 
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64;
-
-// -- CPU feature detection (x86/x86_64) --
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-cpufeatures::new!(cpuid_avx2, "avx2", "fma");
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-cpufeatures::new!(cpuid_ssse3, "ssse3");
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-cpufeatures::new!(cpuid_sse2, "sse2");
 
 // -- Dispatch functions --
 // Each function selects the best available SIMD implementation at runtime,
@@ -36,7 +29,10 @@ pub fn sgemv(
     cols: usize,
     col_stride: usize,
     x: &[f32],
+    arch: Arch,
 ) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
@@ -47,7 +43,7 @@ pub fn sgemv(
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::sgemv_avx2(out, weights, rows, cols, col_stride, x);
             }
@@ -63,7 +59,16 @@ pub fn sgemv(
 
 /// SIMD-accelerated sparse float matrix-vector multiply (8x4 block sparse).
 #[inline]
-pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
+pub fn sparse_sgemv8x4(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+    arch: Arch,
+) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
@@ -74,7 +79,7 @@ pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: 
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::sparse_sgemv8x4_avx2(out, w, idx, rows, x);
             }
@@ -90,30 +95,48 @@ pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: 
 
 /// SIMD-accelerated dense int8 matrix-vector multiply (8x4 blocking).
 #[inline]
-pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, x: &[f32]) {
+pub fn cgemv8x4(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+    arch: Arch,
+) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
-            aarch64::cgemv8x4_neon(out, w, scale, rows, cols, x);
+            if arch.has_dotprod() {
+                aarch64::cgemv8x4_dotprod(out, w, scale, rows, cols, x);
+            } else {
+                aarch64::cgemv8x4_neon(out, w, scale, rows, cols, x);
+            }
         }
         return;
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::cgemv8x4_avx2(out, w, scale, rows, cols, x);
             }
             return;
         }
-        // Upstream x86 SSE4/SSSE3 path emulates dpbusds with maddubs i16 saturation.
-        if cpuid_ssse3::get() {
+        // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
+        if arch.has_sse4_1() {
             super::vec::cgemv8x4_scalar_su_ssse3(out, w, scale, rows, cols, x);
             return;
         }
-        // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
-        super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
+        if arch.has_sse2() {
+            // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+            super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
+            return;
+        }
+        super::vec::cgemv8x4_scalar(out, w, scale, rows, cols, x);
         return;
     }
 
@@ -133,30 +156,41 @@ pub fn sparse_cgemv8x4(
     rows: usize,
     cols: usize,
     x: &[f32],
+    arch: Arch,
 ) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
-            aarch64::sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
+            if arch.has_dotprod() {
+                aarch64::sparse_cgemv8x4_dotprod(out, w, idx, scale, rows, cols, x);
+            } else {
+                aarch64::sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
+            }
         }
         return;
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::sparse_cgemv8x4_avx2(out, w, idx, scale, rows, cols, x);
             }
             return;
         }
-        // Upstream x86 SSE4/SSSE3 path emulates dpbusds with maddubs i16 saturation.
-        if cpuid_ssse3::get() {
+        // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
+        if arch.has_sse4_1() {
             super::vec::sparse_cgemv8x4_scalar_su_ssse3(out, w, idx, scale, rows, cols, x);
             return;
         }
-        // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
-        super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
+        if arch.has_sse2() {
+            // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+            super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
+            return;
+        }
+        super::vec::sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x);
         return;
     }
 
@@ -180,7 +214,9 @@ pub fn sparse_cgemv8x4(
 /// This matches C's `vec_avx.h:tanh_approx` which uses `_mm256_rcp_ps` (approximate
 /// reciprocal) rather than true division, producing slightly different results.
 #[inline]
-pub fn tanh_approx(x: f32) -> f32 {
+pub fn tanh_approx(x: f32, arch: Arch) -> f32 {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::tanh_approx_neon(x) };
@@ -188,10 +224,10 @@ pub fn tanh_approx(x: f32) -> f32 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             return unsafe { x86::tanh_approx_avx2(x) };
         }
-        if cpuid_sse2::get() {
+        if arch.has_sse2() {
             return unsafe { x86::tanh_approx_sse2(x) };
         }
     }
@@ -207,7 +243,9 @@ pub fn tanh_approx(x: f32) -> f32 {
 /// On aarch64: broadcasts into NEON, calls sigmoid4_approx, extracts lane 0.
 /// On x86 with AVX2: broadcasts into __m256, calls sigmoid8_approx, extracts lane 0.
 #[inline]
-pub fn sigmoid_approx(x: f32) -> f32 {
+pub fn sigmoid_approx(x: f32, arch: Arch) -> f32 {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::sigmoid_approx_neon(x) };
@@ -215,10 +253,10 @@ pub fn sigmoid_approx(x: f32) -> f32 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             return unsafe { x86::sigmoid_approx_avx2(x) };
         }
-        if cpuid_sse2::get() {
+        if arch.has_sse2() {
             return unsafe { x86::sigmoid_approx_sse2(x) };
         }
     }
@@ -234,7 +272,9 @@ pub fn sigmoid_approx(x: f32) -> f32 {
 /// On aarch64: broadcasts into NEON, calls exp4_approx, extracts lane 0.
 /// On x86 with AVX2: broadcasts into __m256, calls exp8_approx, extracts lane 0.
 #[inline]
-pub fn lpcnet_exp(x: f32) -> f32 {
+pub fn lpcnet_exp(x: f32, arch: Arch) -> f32 {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         return unsafe { aarch64::lpcnet_exp_neon(x) };
@@ -242,7 +282,7 @@ pub fn lpcnet_exp(x: f32) -> f32 {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             return unsafe { x86::lpcnet_exp_avx2(x) };
         }
     }
@@ -255,7 +295,9 @@ pub fn lpcnet_exp(x: f32) -> f32 {
 
 /// SIMD-accelerated batch tanh approximation.
 #[inline]
-pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
+pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
@@ -266,13 +308,13 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::vec_tanh_avx2(y, x);
             }
             return;
         }
-        if cpuid_sse2::get() {
+        if arch.has_sse2() {
             unsafe {
                 x86::vec_tanh_sse2(y, x);
             }
@@ -288,7 +330,9 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
 
 /// SIMD-accelerated batch sigmoid approximation.
 #[inline]
-pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32], arch: Arch) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
@@ -299,13 +343,13 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::vec_sigmoid_avx2(y, x);
             }
             return;
         }
-        if cpuid_sse2::get() {
+        if arch.has_sse2() {
             unsafe {
                 x86::vec_sigmoid_sse2(y, x);
             }
@@ -330,7 +374,9 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
 ///
 /// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
 #[inline]
-pub fn use_su_bias() -> bool {
+pub fn use_su_bias(arch: Arch) -> bool {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         return false; // NEON uses signed i8 quantization
@@ -338,7 +384,7 @@ pub fn use_su_bias() -> bool {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        return true; // x86 vec_avx.h paths use USE_SU_BIAS (AVX2 and SSE2/SSE4.1)
+        return arch.has_sse2(); // x86 vec_avx.h paths use USE_SU_BIAS for SSE2+
     }
 
     #[allow(unreachable_code)]
@@ -349,7 +395,9 @@ pub fn use_su_bias() -> bool {
 
 /// SIMD-accelerated batch softmax (unnormalized exp).
 #[inline]
-pub fn softmax(y: &mut [f32], x: &[f32]) {
+pub fn softmax(y: &mut [f32], x: &[f32], arch: Arch) {
+    let _ = arch;
+
     #[cfg(target_arch = "aarch64")]
     {
         unsafe {
@@ -360,7 +408,7 @@ pub fn softmax(y: &mut [f32], x: &[f32]) {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if cpuid_avx2::get() {
+        if arch.has_avx2() {
             unsafe {
                 x86::softmax_avx2(y, x);
             }

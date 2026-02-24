@@ -32,17 +32,17 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D3 - DNN API arch-threading differs from upstream
 
 - Severity: Medium
-- Status: OPEN
+- Status: FIXED
 - Upstream: DNN compute entrypoints are `(..., arch)` (`libopus-sys/opus/dnn/nnet.c:60`, `libopus-sys/opus/dnn/nnet.c:76`)
-- Rust: no `arch` parameter on core DNN compute functions (`src/dnn/nnet.rs:108`, `src/dnn/nnet.rs:138`)
+- Rust: core DNN compute entrypoints now thread `arch` (`src/dnn/nnet.rs`)
 - Impact: semantic mismatch vs upstream RTCD API model
 
 ### D4 - AArch64 DNN DOTPROD dispatch model differs
 
 - Severity: Medium
-- Status: OPEN
+- Status: IN_PROGRESS
 - Upstream: separate DOTPROD source and RTCD mapping (`libopus-sys/opus/lpcnet_sources.mk:44`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:39`)
-- Rust: NEON implementation path with dotprod emulation helper; no `Arch::DotProd` dispatch split (`src/dnn/simd/aarch64.rs:364`)
+- Rust: DOTPROD runtime branch added for aarch64 int8 GEMV dispatch, but implementation currently reuses NEON kernels (`src/dnn/simd/mod.rs`, `src/dnn/simd/aarch64.rs`)
 - Impact: dispatch topology differs even if numerics are close
 
 ### D5 - Standalone CELT custom decoder initializes scalar arch in Rust
@@ -90,3 +90,5 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Created baseline divergence inventory (D1-D9).
 - 2026-02-24: Fixed D1/D2 by setting SILK decoder arch via `opus_select_arch()` in `silk_reset_decoder` (`src/silk/init_decoder.rs`).
 - 2026-02-24: Fixed D5 by initializing CELT custom decoder arch via `opus_select_arch()` (`src/celt/celt_decoder.rs`).
+- 2026-02-24: Fixed D3 by threading `Arch` through DNN nnet compute entrypoints and call graph (`src/dnn/nnet.rs` plus DNN callers).
+- 2026-02-24: Progressed D4 by adding explicit aarch64 DOTPROD dispatch entries/branching for DNN int8 GEMV (`src/dnn/simd/mod.rs`, `src/dnn/simd/aarch64.rs`).

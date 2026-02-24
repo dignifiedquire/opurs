@@ -6,6 +6,7 @@
 //! Upstream C: `dnn/pitchdnn.c`, `dnn/pitchdnn.h`, `dnn/pitchdnn_data.h`
 
 use super::nnet::*;
+use crate::arch::Arch;
 
 // --- Constants from pitchdnn_data.h ---
 
@@ -175,6 +176,7 @@ pub fn compute_pitchdnn(
     st: &mut PitchDNNState,
     if_features: &[f32],
     xcorr_features: &[f32],
+    arch: Arch,
 ) -> f32 {
     let model = &st.model;
 
@@ -185,6 +187,7 @@ pub fn compute_pitchdnn(
         &mut if1_out,
         if_features,
         ACTIVATION_TANH,
+        arch,
     );
 
     let mut downsampler_in = vec![0.0f32; NB_XCORR_FEATURES + DENSE_IF_UPSAMPLER_2_OUT_SIZE];
@@ -193,6 +196,7 @@ pub fn compute_pitchdnn(
         &mut downsampler_in[NB_XCORR_FEATURES..],
         &if1_out,
         ACTIVATION_TANH,
+        arch,
     );
 
     // Xcorr path: two conv2d layers
@@ -208,6 +212,7 @@ pub fn compute_pitchdnn(
         NB_XCORR_FEATURES,
         NB_XCORR_FEATURES + 2,
         ACTIVATION_TANH,
+        arch,
     );
     compute_conv2d(
         &model.conv2d_2,
@@ -217,6 +222,7 @@ pub fn compute_pitchdnn(
         NB_XCORR_FEATURES,
         NB_XCORR_FEATURES,
         ACTIVATION_TANH,
+        arch,
     );
 
     // Merge -> downsampler -> GRU -> upsampler
@@ -226,6 +232,7 @@ pub fn compute_pitchdnn(
         &mut downsampler_out,
         &downsampler_in,
         ACTIVATION_TANH,
+        arch,
     );
 
     compute_generic_gru(
@@ -233,6 +240,7 @@ pub fn compute_pitchdnn(
         &model.gru_1_recurrent,
         &mut st.gru_state,
         &downsampler_out,
+        arch,
     );
 
     let mut output = vec![0.0f32; DENSE_FINAL_UPSAMPLER_OUT_SIZE];
@@ -241,6 +249,7 @@ pub fn compute_pitchdnn(
         &mut output,
         &st.gru_state,
         ACTIVATION_LINEAR,
+        arch,
     );
 
     // Soft argmax: find peak in output, then weighted average around it

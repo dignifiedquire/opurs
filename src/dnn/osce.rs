@@ -1911,6 +1911,7 @@ pub fn lace_feature_net(
     features: &[f32],
     numbits: &[f32],
     periods: &[i32],
+    arch: Arch,
 ) {
     let max_dim = LACE_COND_DIM.max(LACE_HIDDEN_FEATURE_DIM);
     let mut input_buffer = vec![0.0f32; 4 * max_dim];
@@ -1963,6 +1964,7 @@ pub fn lace_feature_net(
             &input_buffer[..input_size],
             input_size,
             ACTIVATION_TANH,
+            arch,
         );
     }
 
@@ -1976,6 +1978,7 @@ pub fn lace_feature_net(
         &input_buffer,
         4 * LACE_HIDDEN_FEATURE_DIM,
         ACTIVATION_TANH,
+        arch,
     );
 
     // Tconv upsampling (dense)
@@ -1985,6 +1988,7 @@ pub fn lace_feature_net(
         &mut output_buffer,
         &input_buffer,
         ACTIVATION_TANH,
+        arch,
     );
 
     // GRU per subframe
@@ -1995,6 +1999,7 @@ pub fn lace_feature_net(
             &lace.layers.fnet_gru_recurrent,
             &mut state.feature_net_gru_state,
             &input_buffer[sf * LACE_COND_DIM..(sf + 1) * LACE_COND_DIM],
+            arch,
         );
         output[sf * LACE_COND_DIM..(sf + 1) * LACE_COND_DIM]
             .copy_from_slice(&state.feature_net_gru_state);
@@ -2024,7 +2029,15 @@ pub fn lace_process_20ms_frame(
     }
 
     // Feature network
-    lace_feature_net(lace, state, &mut feature_buffer, features, numbits, periods);
+    lace_feature_net(
+        lace,
+        state,
+        &mut feature_buffer,
+        features,
+        numbits,
+        periods,
+        arch,
+    );
 
     // 1st comb filtering
     for sf in 0..4 {
@@ -2123,6 +2136,7 @@ fn nolace_feature_net(
     features: &[f32],
     numbits: &[f32],
     periods: &[i32],
+    arch: Arch,
 ) {
     let max_dim = NOLACE_COND_DIM.max(NOLACE_HIDDEN_FEATURE_DIM);
     let mut input_buffer = vec![0.0f32; 4 * max_dim];
@@ -2175,6 +2189,7 @@ fn nolace_feature_net(
             &input_buffer[..input_size],
             input_size,
             ACTIVATION_TANH,
+            arch,
         );
     }
 
@@ -2187,6 +2202,7 @@ fn nolace_feature_net(
         &input_buffer,
         4 * NOLACE_HIDDEN_FEATURE_DIM,
         ACTIVATION_TANH,
+        arch,
     );
 
     input_buffer[..4 * NOLACE_COND_DIM].copy_from_slice(&output_buffer[..4 * NOLACE_COND_DIM]);
@@ -2195,6 +2211,7 @@ fn nolace_feature_net(
         &mut output_buffer,
         &input_buffer,
         ACTIVATION_TANH,
+        arch,
     );
 
     input_buffer[..4 * NOLACE_COND_DIM].copy_from_slice(&output_buffer[..4 * NOLACE_COND_DIM]);
@@ -2204,6 +2221,7 @@ fn nolace_feature_net(
             &nolace.layers.fnet_gru_recurrent,
             &mut state.feature_net_gru_state,
             &input_buffer[sf * NOLACE_COND_DIM..(sf + 1) * NOLACE_COND_DIM],
+            arch,
         );
         output[sf * NOLACE_COND_DIM..(sf + 1) * NOLACE_COND_DIM]
             .copy_from_slice(&state.feature_net_gru_state);
@@ -2242,6 +2260,7 @@ pub fn nolace_process_20ms_frame(
         features,
         numbits,
         periods,
+        arch,
     );
 
     // 1st comb filtering + post conv
@@ -2275,6 +2294,7 @@ pub fn nolace_process_20ms_frame(
             &feature_buffer[sf * NOLACE_COND_DIM..],
             NOLACE_COND_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     feature_buffer[..4 * NOLACE_COND_DIM]
@@ -2311,6 +2331,7 @@ pub fn nolace_process_20ms_frame(
             &feature_buffer[sf * NOLACE_COND_DIM..],
             NOLACE_COND_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     feature_buffer[..4 * NOLACE_COND_DIM]
@@ -2348,6 +2369,7 @@ pub fn nolace_process_20ms_frame(
             &feature_buffer[sf * NOLACE_COND_DIM..],
             NOLACE_COND_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     feature_buffer[..4 * NOLACE_COND_DIM]
@@ -2369,6 +2391,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_TDSHAPE1_FRAME_SIZE,
             NOLACE_TDSHAPE1_AVG_POOL_K,
             1,
+            arch,
         );
 
         let in_start = sf * NOLACE_FRAME_SIZE * NOLACE_AF2_IN_CHANNELS;
@@ -2402,6 +2425,7 @@ pub fn nolace_process_20ms_frame(
             &feature_buffer[sf * NOLACE_COND_DIM..],
             NOLACE_COND_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     feature_buffer[..4 * NOLACE_COND_DIM]
@@ -2423,6 +2447,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_TDSHAPE2_FRAME_SIZE,
             NOLACE_TDSHAPE2_AVG_POOL_K,
             1,
+            arch,
         );
 
         let in_start = sf * NOLACE_FRAME_SIZE * NOLACE_AF3_IN_CHANNELS;
@@ -2456,6 +2481,7 @@ pub fn nolace_process_20ms_frame(
             &feature_buffer[sf * NOLACE_COND_DIM..],
             NOLACE_COND_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     feature_buffer[..4 * NOLACE_COND_DIM]
@@ -2477,6 +2503,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_TDSHAPE3_FRAME_SIZE,
             NOLACE_TDSHAPE3_AVG_POOL_K,
             1,
+            arch,
         );
 
         let in_start = sf * NOLACE_FRAME_SIZE * NOLACE_AF4_IN_CHANNELS;
@@ -2928,6 +2955,7 @@ fn bbwe_feature_net(
     output: &mut [f32],
     features: &[f32],
     num_frames: usize,
+    arch: Arch,
 ) {
     use crate::dnn::nnet::{
         compute_generic_conv1d, compute_generic_dense, compute_generic_gru, ACTIVATION_TANH,
@@ -2950,6 +2978,7 @@ fn bbwe_feature_net(
             &features[i_frame * BBWENET_FEATURE_DIM..(i_frame + 1) * BBWENET_FEATURE_DIM],
             BBWENET_FEATURE_DIM,
             ACTIVATION_TANH,
+            arch,
         );
     }
     input_buffer[..num_frames * BBWENET_FNET_CONV1_OUT_SIZE]
@@ -2966,6 +2995,7 @@ fn bbwe_feature_net(
                 ..(i_frame + 1) * BBWENET_FNET_CONV1_OUT_SIZE],
             BBWENET_FNET_CONV1_OUT_SIZE,
             ACTIVATION_TANH,
+            arch,
         );
     }
     let tconv_out_len = num_frames * BBWENET_FNET_TCONV_OUT_CHANNELS * BBWENET_FNET_TCONV_STRIDE;
@@ -2982,6 +3012,7 @@ fn bbwe_feature_net(
                 ..out_offset + BBWENET_FNET_TCONV_OUT_CHANNELS * BBWENET_FNET_TCONV_STRIDE],
             &input_buffer[in_offset..in_offset + BBWENET_FNET_CONV2_OUT_SIZE],
             ACTIVATION_TANH,
+            arch,
         );
     }
     input_buffer[..tconv_out_len].copy_from_slice(&output_buffer[..tconv_out_len]);
@@ -2996,6 +3027,7 @@ fn bbwe_feature_net(
             &model.layers.fnet_gru_recurrent,
             &mut state.feature_net_gru_state,
             &input_buffer[in_offset..in_offset + BBWENET_FNET_TCONV_OUT_CHANNELS],
+            arch,
         );
         let out_offset = i_subframe * BBWENET_FNET_GRU_STATE_SIZE;
         output[out_offset..out_offset + BBWENET_FNET_GRU_STATE_SIZE]
@@ -3025,7 +3057,14 @@ fn bbwenet_process_frames(
     let mut x_buffer2 = vec![0.0f32; buf_size];
 
     // Feature net
-    bbwe_feature_net(model, state, &mut latent_features, features, num_frames);
+    bbwe_feature_net(
+        model,
+        state,
+        &mut latent_features,
+        features,
+        num_frames,
+        arch,
+    );
 
     // Stage 1: Adaptive filtering (1ch → 3ch at 16kHz)
     for i_sub in 0..num_subframes {
@@ -3094,6 +3133,7 @@ fn bbwenet_process_frames(
             BBWENET_TDSHAPE1_FRAME_SIZE,
             BBWENET_TDSHAPE1_AVG_POOL_K,
             BBWENET_TDSHAPE1_INTERPOLATE_K,
+            arch,
         );
 
         // Valin activation on third channel (in place)
@@ -3170,6 +3210,7 @@ fn bbwenet_process_frames(
             BBWENET_TDSHAPE2_FRAME_SIZE,
             BBWENET_TDSHAPE2_AVG_POOL_K,
             BBWENET_TDSHAPE2_INTERPOLATE_K,
+            arch,
         );
 
         // Valin activation on third channel (in place)

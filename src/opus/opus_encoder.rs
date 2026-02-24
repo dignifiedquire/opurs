@@ -1503,6 +1503,7 @@ fn encode_multiframe_packet(
                     st.dred_dQ,
                     st.dred_qmax,
                     &st.activity_mem,
+                    st.arch,
                 );
                 if dred_bytes > 0 {
                     let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;
@@ -3145,6 +3146,7 @@ pub fn opus_encode_native(
                     st.dred_dQ,
                     st.dred_qmax,
                     &st.activity_mem,
+                    st.arch,
                 );
                 if dred_bytes > 0 {
                     let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;

@@ -201,8 +201,15 @@ pub fn adaconv_process_frame(
         &mut kernel_buffer,
         features,
         ACTIVATION_LINEAR,
+        arch,
     );
-    compute_generic_dense(gain_layer, &mut gain_buffer, features, ACTIVATION_TANH);
+    compute_generic_dense(
+        gain_layer,
+        &mut gain_buffer,
+        features,
+        ACTIVATION_TANH,
+        arch,
+    );
     transform_gains(&mut gain_buffer, out_channels, filter_gain_a, filter_gain_b);
     scale_kernel(
         &mut kernel_buffer,
@@ -310,6 +317,7 @@ pub fn adacomb_process_frame(
         &mut kernel_buffer,
         features,
         ACTIVATION_LINEAR,
+        arch,
     );
     let mut gain = 0.0f32;
     compute_generic_dense(
@@ -317,6 +325,7 @@ pub fn adacomb_process_frame(
         std::slice::from_mut(&mut gain),
         features,
         ACTIVATION_RELU,
+        arch,
     );
     let mut global_gain = 0.0f32;
     compute_generic_dense(
@@ -324,6 +333,7 @@ pub fn adacomb_process_frame(
         std::slice::from_mut(&mut global_gain),
         features,
         ACTIVATION_TANH,
+        arch,
     );
 
     // C uses double-precision exp() and log()
@@ -400,6 +410,7 @@ pub fn adashape_process_frame(
     frame_size: usize,
     avg_pool_k: usize,
     interpolate_k: usize,
+    arch: Arch,
 ) {
     assert!(frame_size.is_multiple_of(avg_pool_k));
     assert!(frame_size.is_multiple_of(interpolate_k));
@@ -439,6 +450,7 @@ pub fn adashape_process_frame(
         &in_buffer,
         feature_dim,
         ACTIVATION_LINEAR,
+        arch,
     );
     compute_generic_conv1d(
         alpha1t,
@@ -447,6 +459,7 @@ pub fn adashape_process_frame(
         &in_buffer[feature_dim..],
         tenv_size + 1,
         ACTIVATION_LINEAR,
+        arch,
     );
 
     // Leaky ReLU
@@ -466,6 +479,7 @@ pub fn adashape_process_frame(
         &in_buffer,
         hidden_dim,
         ACTIVATION_LINEAR,
+        arch,
     );
 
     // Interpolation stage (new in 1.6.1)
@@ -481,7 +495,7 @@ pub fn adashape_process_frame(
 
     // Shape signal
     let exp_in = out_buffer.clone();
-    compute_activation(&mut out_buffer, &exp_in, frame_size, ACTIVATION_EXP);
+    compute_activation(&mut out_buffer, &exp_in, frame_size, ACTIVATION_EXP, arch);
     for i in 0..frame_size {
         x_out[i] = out_buffer[i] * x_in[i];
     }

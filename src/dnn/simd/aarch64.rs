@@ -461,6 +461,25 @@ pub unsafe fn cgemv8x4_neon(
     }
 }
 
+/// DOTPROD dispatch entry for dense int8 GEMV on aarch64.
+///
+/// Upstream has distinct RTCD slots for NEON vs DOTPROD. The Rust path keeps
+/// a dedicated dispatch target and currently reuses the same implementation.
+///
+/// # Safety
+/// Requires aarch64 DOTPROD support at runtime.
+#[target_feature(enable = "dotprod")]
+pub unsafe fn cgemv8x4_dotprod(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    cgemv8x4_neon(out, w, scale, rows, cols, x);
+}
+
 // =========================================================================
 // Sparse int8 GEMV
 // =========================================================================
@@ -527,4 +546,24 @@ pub unsafe fn sparse_cgemv8x4_neon(
             vmulq_f32(vld1q_f32(scale.as_ptr().add(i + 4)), vcvtq_f32_s32(acc1)),
         );
     }
+}
+
+/// DOTPROD dispatch entry for sparse int8 GEMV on aarch64.
+///
+/// Upstream has distinct RTCD slots for NEON vs DOTPROD. The Rust path keeps
+/// a dedicated dispatch target and currently reuses the same implementation.
+///
+/// # Safety
+/// Requires aarch64 DOTPROD support at runtime.
+#[target_feature(enable = "dotprod")]
+pub unsafe fn sparse_cgemv8x4_dotprod(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
 }

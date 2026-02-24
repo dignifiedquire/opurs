@@ -8,6 +8,7 @@
 use super::freq::{FRAME_SIZE as LPCNET_FRAME_SIZE, NB_BANDS};
 use super::nnet::*;
 use super::pitchdnn::PITCH_MAX_PERIOD;
+use crate::arch::Arch;
 
 // --- Constants from fargan_data.h ---
 
@@ -390,7 +391,13 @@ impl FARGANState {
 /// Compute conditioning vector from features and pitch period.
 ///
 /// Upstream C: dnn/fargan.c:compute_fargan_cond
-fn compute_fargan_cond(st: &mut FARGANState, cond: &mut [f32], features: &[f32], period: i32) {
+fn compute_fargan_cond(
+    st: &mut FARGANState,
+    cond: &mut [f32],
+    features: &[f32],
+    period: i32,
+    arch: Arch,
+) {
     let model = &st.model;
 
     // Build input: features + pitch embedding
@@ -408,6 +415,7 @@ fn compute_fargan_cond(st: &mut FARGANState, cond: &mut [f32], features: &[f32],
         &mut conv1_in,
         &dense_in,
         ACTIVATION_TANH,
+        arch,
     );
 
     let mut fdense2_in = vec![0.0f32; COND_NET_FCONV1_OUT_SIZE];
@@ -418,9 +426,16 @@ fn compute_fargan_cond(st: &mut FARGANState, cond: &mut [f32], features: &[f32],
         &conv1_in,
         COND_NET_FCONV1_IN_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
 
-    compute_generic_dense(&model.cond_net_fdense2, cond, &fdense2_in, ACTIVATION_TANH);
+    compute_generic_dense(
+        &model.cond_net_fdense2,
+        cond,
+        &fdense2_in,
+        ACTIVATION_TANH,
+        arch,
+    );
 }
 
 // --- De-emphasis ---
@@ -437,7 +452,13 @@ fn fargan_deemphasis(pcm: &mut [f32], deemph_mem: &mut f32) {
 /// Run signal network for one subframe (40 samples).
 ///
 /// Upstream C: dnn/fargan.c:run_fargan_subframe
-fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], period: i32) {
+fn run_fargan_subframe(
+    st: &mut FARGANState,
+    pcm: &mut [f32],
+    cond: &[f32],
+    period: i32,
+    arch: Arch,
+) {
     assert!(st.cont_initialized);
     let model = &st.model;
 
@@ -448,6 +469,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &mut gain,
         cond,
         ACTIVATION_LINEAR,
+        arch,
     );
     // C: gain = exp(gain) — float promoted to double, result truncated to float.
     let gain = (gain[0] as f64).exp() as f32;
@@ -486,13 +508,20 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &fwc0_in,
         SIG_NET_INPUT_SIZE,
         ACTIVATION_TANH,
+        arch,
     );
-    compute_glu(&model.sig_net_fwc0_glu_gate, &mut gru1_in.clone(), &gru1_in);
+    compute_glu(
+        &model.sig_net_fwc0_glu_gate,
+        &mut gru1_in.clone(),
+        &gru1_in,
+        arch,
+    );
     let gru1_in_glu = gru1_in.clone();
     compute_glu(
         &model.sig_net_fwc0_glu_gate,
         &mut gru1_in[..SIG_NET_FWC0_CONV_OUT_SIZE],
         &gru1_in_glu[..SIG_NET_FWC0_CONV_OUT_SIZE],
+        arch,
     );
 
     // Pitch gate
@@ -502,6 +531,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &mut pitch_gate,
         &gru1_in,
         ACTIVATION_SIGMOID,
+        arch,
     );
 
     // GRU1
@@ -516,6 +546,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru1_recurrent,
         &mut st.gru1_state,
         &gru1_in,
+        arch,
     );
 
     let mut gru2_in = vec![0.0f32; SIG_NET_GRU1_OUT_SIZE + 2 * FARGAN_SUBFRAME_SIZE];
@@ -523,6 +554,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru1_glu_gate,
         &mut gru2_in[..SIG_NET_GRU1_OUT_SIZE],
         &st.gru1_state,
+        arch,
     );
 
     // GRU2
@@ -537,6 +569,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru2_recurrent,
         &mut st.gru2_state,
         &gru2_in,
+        arch,
     );
 
     let mut gru3_in = vec![0.0f32; SIG_NET_GRU2_OUT_SIZE + 2 * FARGAN_SUBFRAME_SIZE];
@@ -544,6 +577,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru2_glu_gate,
         &mut gru3_in[..SIG_NET_GRU2_OUT_SIZE],
         &st.gru2_state,
+        arch,
     );
 
     // GRU3
@@ -558,6 +592,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru3_recurrent,
         &mut st.gru3_state,
         &gru3_in,
+        arch,
     );
 
     // Skip connections: cat(gru1_glu, gru2_glu, gru3_glu, fwc0_glu, pitch_gate*pred, prev)
@@ -576,6 +611,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &model.sig_net_gru3_glu_gate,
         &mut skip_cat[gru3_glu_start..gru3_glu_start + SIG_NET_GRU3_OUT_SIZE],
         &st.gru3_state,
+        arch,
     );
 
     let fwc0_start = gru3_glu_start + SIG_NET_GRU3_OUT_SIZE;
@@ -595,9 +631,10 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         &mut skip_out,
         &skip_cat,
         ACTIVATION_TANH,
+        arch,
     );
     let skip_tmp = skip_out.clone();
-    compute_glu(&model.sig_net_skip_glu_gate, &mut skip_out, &skip_tmp);
+    compute_glu(&model.sig_net_skip_glu_gate, &mut skip_out, &skip_tmp, arch);
 
     // Final output
     compute_generic_dense(
@@ -605,6 +642,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
         pcm,
         &skip_out,
         ACTIVATION_TANH,
+        arch,
     );
     for i in 0..FARGAN_SUBFRAME_SIZE {
         pcm[i] *= gain;
@@ -621,7 +659,7 @@ fn run_fargan_subframe(st: &mut FARGANState, pcm: &mut [f32], cond: &[f32], peri
 /// Initialize FARGAN from continuation context (5 feature frames + PCM).
 ///
 /// Upstream C: dnn/fargan.c:fargan_cont
-pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32]) {
+pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32], arch: Arch) {
     let mut cond = vec![0.0f32; COND_NET_FDENSE2_OUT_SIZE];
     let mut period = 0i32;
 
@@ -632,7 +670,7 @@ pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32]) {
         period = (0.5
             + 256.0 / 2.0f64.powf((1.0 / 60.0) * ((features[NB_BANDS] as f64 + 1.5) * 60.0)))
         .floor() as i32;
-        compute_fargan_cond(st, &mut cond, features, period);
+        compute_fargan_cond(st, &mut cond, features, period, arch);
     }
 
     // Pre-emphasis on continuation PCM
@@ -654,6 +692,7 @@ pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32]) {
             &mut dummy,
             &cond[i * FARGAN_COND_SIZE..],
             st.last_period,
+            arch,
         );
         // Override pitch buffer with actual continuation data
         st.pitch_buf[PITCH_MAX_PERIOD - FARGAN_SUBFRAME_SIZE..].copy_from_slice(
@@ -667,19 +706,20 @@ pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32]) {
 /// Synthesize one frame (160 samples) of float PCM from features.
 ///
 /// Upstream C: dnn/fargan.c:fargan_synthesize
-pub fn fargan_synthesize(st: &mut FARGANState, pcm: &mut [f32], features: &[f32]) {
+pub fn fargan_synthesize(st: &mut FARGANState, pcm: &mut [f32], features: &[f32], arch: Arch) {
     assert!(st.cont_initialized);
     let mut cond = vec![0.0f32; COND_NET_FDENSE2_OUT_SIZE];
     let period = (0.5
         + 256.0 / 2.0f64.powf((1.0 / 60.0) * ((features[NB_BANDS] as f64 + 1.5) * 60.0)))
     .floor() as i32;
-    compute_fargan_cond(st, &mut cond, features, period);
+    compute_fargan_cond(st, &mut cond, features, period, arch);
     for subframe in 0..FARGAN_NB_SUBFRAMES {
         run_fargan_subframe(
             st,
             &mut pcm[subframe * FARGAN_SUBFRAME_SIZE..],
             &cond[subframe * FARGAN_COND_SIZE..],
             st.last_period,
+            arch,
         );
     }
     st.last_period = period;
@@ -688,9 +728,9 @@ pub fn fargan_synthesize(st: &mut FARGANState, pcm: &mut [f32], features: &[f32]
 /// Synthesize one frame (160 samples) of int16 PCM from features.
 ///
 /// Upstream C: dnn/fargan.c:fargan_synthesize_int
-pub fn fargan_synthesize_int(st: &mut FARGANState, pcm: &mut [i16], features: &[f32]) {
+pub fn fargan_synthesize_int(st: &mut FARGANState, pcm: &mut [i16], features: &[f32], arch: Arch) {
     let mut fpcm = vec![0.0f32; FARGAN_FRAME_SIZE];
-    fargan_synthesize(st, &mut fpcm, features);
+    fargan_synthesize(st, &mut fpcm, features, arch);
     for i in 0..LPCNET_FRAME_SIZE {
         pcm[i] = (0.5 + (32768.0 * fpcm[i]).clamp(-32767.0, 32767.0)).floor() as i16;
     }

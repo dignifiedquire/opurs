@@ -399,7 +399,7 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch
     }
 
     // Neural pitch estimation
-    st.dnn_pitch = compute_pitchdnn(&mut st.pitchdnn, &st.if_features, &st.xcorr_features);
+    st.dnn_pitch = compute_pitchdnn(&mut st.pitchdnn, &st.if_features, &st.xcorr_features, arch);
 
     let pitch = (0.5 + 256.0 / 2.0f64.powf((1.0 / 60.0) * ((st.dnn_pitch as f64 + 1.5) * 60.0)))
         .floor() as i32;
@@ -628,34 +628,43 @@ pub fn lpcnet_plc_fec_clear(st: &mut LPCNetPLCState) {
 }
 
 /// Compute PLC prediction from features.
-fn compute_plc_pred(st: &mut LPCNetPLCState, out: &mut [f32], input: &[f32]) {
+fn compute_plc_pred(st: &mut LPCNetPLCState, out: &mut [f32], input: &[f32], arch: Arch) {
     assert!(st.loaded);
     let mut tmp = vec![0.0f32; PLC_DENSE_IN_OUT_SIZE];
-    compute_generic_dense(&st.model.plc_dense_in, &mut tmp, input, ACTIVATION_TANH);
+    compute_generic_dense(
+        &st.model.plc_dense_in,
+        &mut tmp,
+        input,
+        ACTIVATION_TANH,
+        arch,
+    );
     compute_generic_gru(
         &st.model.plc_gru1_input,
         &st.model.plc_gru1_recurrent,
         &mut st.plc_net.gru1_state,
         &tmp,
+        arch,
     );
     compute_generic_gru(
         &st.model.plc_gru2_input,
         &st.model.plc_gru2_recurrent,
         &mut st.plc_net.gru2_state,
         &st.plc_net.gru1_state.clone(),
+        arch,
     );
     compute_generic_dense(
         &st.model.plc_dense_out,
         out,
         &st.plc_net.gru2_state,
         ACTIVATION_LINEAR,
+        arch,
     );
 }
 
 /// Try to get FEC features, or fall back to prediction.
 ///
 /// Returns true if FEC was available.
-fn get_fec_or_pred(st: &mut LPCNetPLCState, out: &mut [f32]) -> bool {
+fn get_fec_or_pred(st: &mut LPCNetPLCState, out: &mut [f32], arch: Arch) -> bool {
     if st.fec_read_pos != st.fec_fill_pos && st.fec_skip == 0 {
         out[..NB_FEATURES].copy_from_slice(&st.fec[st.fec_read_pos][..NB_FEATURES]);
         st.fec_read_pos += 1;
@@ -664,11 +673,11 @@ fn get_fec_or_pred(st: &mut LPCNetPLCState, out: &mut [f32]) -> bool {
         plc_features[2 * NB_BANDS..2 * NB_BANDS + NB_FEATURES].copy_from_slice(&out[..NB_FEATURES]);
         plc_features[2 * NB_BANDS + NB_FEATURES] = -1.0;
         let mut discard = vec![0.0f32; NB_FEATURES];
-        compute_plc_pred(st, &mut discard, &plc_features);
+        compute_plc_pred(st, &mut discard, &plc_features, arch);
         true
     } else {
         let zeros = vec![0.0f32; 2 * NB_BANDS + NB_FEATURES + 1];
-        compute_plc_pred(st, out, &zeros);
+        compute_plc_pred(st, out, &zeros, arch);
         if st.fec_skip > 0 {
             st.fec_skip -= 1;
         }
@@ -759,7 +768,7 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
                 st.plc_bak[1] = st.plc_net.clone();
                 // C: compute_plc_pred(st, st->features, plc_features) — output to st->features, but discarded
                 let mut feat_discard = vec![0.0f32; NB_FEATURES];
-                compute_plc_pred(st, &mut feat_discard, &plc_features);
+                compute_plc_pred(st, &mut feat_discard, &plc_features, arch);
             }
             st.analysis_pos += FRAME_SIZE;
             count += 1;
@@ -769,28 +778,28 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
         st.plc_bak[0] = st.plc_bak[1].clone();
         st.plc_bak[1] = st.plc_net.clone();
         let mut feat_tmp = vec![0.0f32; NB_FEATURES];
-        get_fec_or_pred(st, &mut feat_tmp);
+        get_fec_or_pred(st, &mut feat_tmp, arch);
         st.features[..NB_FEATURES].copy_from_slice(&feat_tmp);
         let features_copy = st.features.clone();
         queue_features(st, &features_copy);
 
         st.plc_bak[0] = st.plc_bak[1].clone();
         st.plc_bak[1] = st.plc_net.clone();
-        get_fec_or_pred(st, &mut feat_tmp);
+        get_fec_or_pred(st, &mut feat_tmp, arch);
         st.features[..NB_FEATURES].copy_from_slice(&feat_tmp);
         let features_copy = st.features.clone();
         queue_features(st, &features_copy);
 
         let pcm_slice = st.pcm[PLC_BUF_SIZE - FARGAN_CONT_SAMPLES..].to_vec();
         let cont_features = st.cont_features.clone();
-        fargan_cont(&mut st.fargan, &pcm_slice, &cont_features);
+        fargan_cont(&mut st.fargan, &pcm_slice, &cont_features, arch);
         st.analysis_gap = false;
     }
 
     st.plc_bak[0] = st.plc_bak[1].clone();
     st.plc_bak[1] = st.plc_net.clone();
     let mut feat_tmp = vec![0.0f32; NB_FEATURES];
-    if get_fec_or_pred(st, &mut feat_tmp) {
+    if get_fec_or_pred(st, &mut feat_tmp, arch) {
         st.loss_count = 0;
     } else {
         st.loss_count += 1;
@@ -806,7 +815,7 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
     }
 
     let features_copy = st.features.clone();
-    fargan_synthesize_int(&mut st.fargan, pcm, &features_copy);
+    fargan_synthesize_int(&mut st.fargan, pcm, &features_copy, arch);
     let features_copy = st.features.clone();
     queue_features(st, &features_copy);
 

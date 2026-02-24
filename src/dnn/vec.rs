@@ -5,6 +5,8 @@
 //!
 //! Upstream C: `dnn/vec.h` (generic/no-optimization path)
 
+use crate::arch::Arch;
+
 /// Scale factor for int8 quantized weights: `128.0 * 127.0`
 pub const SCALE: f32 = 128.0 * 127.0;
 /// Inverse scale factor: `1.0 / (128.0 * 127.0)`
@@ -102,56 +104,56 @@ pub fn vec_sigmoid_scalar(y: &mut [f32], x: &[f32]) {
 /// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
 #[cfg(feature = "simd")]
 #[inline]
-pub fn use_su_bias() -> bool {
-    super::simd::use_su_bias()
+pub fn use_su_bias(arch: Arch) -> bool {
+    super::simd::use_su_bias(arch)
 }
 
 /// Scalar-only build: always `false` (scalar cgemv8x4 uses signed i8 quantization).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn use_su_bias() -> bool {
+pub fn use_su_bias(_arch: Arch) -> bool {
     false
 }
 
 /// Dispatch wrapper for `softmax`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn softmax(y: &mut [f32], x: &[f32]) {
-    super::simd::softmax(y, x)
+pub fn softmax(y: &mut [f32], x: &[f32], arch: Arch) {
+    super::simd::softmax(y, x, arch)
 }
 
 /// Dispatch wrapper for `softmax` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn softmax(y: &mut [f32], x: &[f32]) {
+pub fn softmax(y: &mut [f32], x: &[f32], _arch: Arch) {
     softmax_scalar(y, x)
 }
 
 /// Dispatch wrapper for `vec_tanh`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
-    super::simd::vec_tanh(y, x)
+pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
+    super::simd::vec_tanh(y, x, arch)
 }
 
 /// Dispatch wrapper for `vec_tanh` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn vec_tanh(y: &mut [f32], x: &[f32]) {
+pub fn vec_tanh(y: &mut [f32], x: &[f32], _arch: Arch) {
     vec_tanh_scalar(y, x)
 }
 
 /// Dispatch wrapper for `vec_sigmoid`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
-    super::simd::vec_sigmoid(y, x)
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32], arch: Arch) {
+    super::simd::vec_sigmoid(y, x, arch)
 }
 
 /// Dispatch wrapper for `vec_sigmoid` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn vec_sigmoid(y: &mut [f32], x: &[f32]) {
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
     vec_sigmoid_scalar(y, x)
 }
 
@@ -165,8 +167,9 @@ pub fn sgemv(
     cols: usize,
     col_stride: usize,
     x: &[f32],
+    arch: Arch,
 ) {
-    super::simd::sgemv(out, weights, rows, cols, col_stride, x)
+    super::simd::sgemv(out, weights, rows, cols, col_stride, x, arch)
 }
 
 /// Dispatch wrapper for `sgemv` (scalar-only build).
@@ -179,6 +182,7 @@ pub fn sgemv(
     cols: usize,
     col_stride: usize,
     x: &[f32],
+    _arch: Arch,
 ) {
     sgemv_scalar(out, weights, rows, cols, col_stride, x)
 }
@@ -186,28 +190,58 @@ pub fn sgemv(
 /// Dispatch wrapper for `sparse_sgemv8x4`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
-    super::simd::sparse_sgemv8x4(out, w, idx, rows, x)
+pub fn sparse_sgemv8x4(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+    arch: Arch,
+) {
+    super::simd::sparse_sgemv8x4(out, w, idx, rows, x, arch)
 }
 
 /// Dispatch wrapper for `sparse_sgemv8x4` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn sparse_sgemv8x4(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
+pub fn sparse_sgemv8x4(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+    _arch: Arch,
+) {
     sparse_sgemv8x4_scalar(out, w, idx, rows, x)
 }
 
 /// Dispatch wrapper for `cgemv8x4`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, x: &[f32]) {
-    super::simd::cgemv8x4(out, w, scale, rows, cols, x)
+pub fn cgemv8x4(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+    arch: Arch,
+) {
+    super::simd::cgemv8x4(out, w, scale, rows, cols, x, arch)
 }
 
 /// Dispatch wrapper for `cgemv8x4` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn cgemv8x4(out: &mut [f32], w: &[i8], scale: &[f32], rows: usize, cols: usize, x: &[f32]) {
+pub fn cgemv8x4(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+    _arch: Arch,
+) {
     cgemv8x4_scalar(out, w, scale, rows, cols, x)
 }
 
@@ -222,8 +256,9 @@ pub fn sparse_cgemv8x4(
     rows: usize,
     cols: usize,
     x: &[f32],
+    arch: Arch,
 ) {
-    super::simd::sparse_cgemv8x4(out, w, idx, scale, rows, cols, x)
+    super::simd::sparse_cgemv8x4(out, w, idx, scale, rows, cols, x, arch)
 }
 
 /// Dispatch wrapper for `sparse_cgemv8x4` (scalar-only build).
@@ -237,6 +272,7 @@ pub fn sparse_cgemv8x4(
     rows: usize,
     cols: usize,
     x: &[f32],
+    _arch: Arch,
 ) {
     sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x)
 }
@@ -608,6 +644,11 @@ pub fn sparse_cgemv8x4_scalar_su_ssse3(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::arch::{opus_select_arch, Arch};
+
+    fn select_arch() -> Arch {
+        opus_select_arch()
+    }
 
     fn gen_signal(len: usize, seed: u32) -> Vec<f32> {
         let mut v = Vec::with_capacity(len);
@@ -660,9 +701,10 @@ mod tests {
         // true division. x86 _mm256_rcp_ps gives ~12-bit precision (max err ~3e-4),
         // ARM vrecpeq_f32 gives ~8-bit precision (max err ~2e-3).
         for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let arch = select_arch();
             let x = gen_signal(n, 42);
             let mut y_dispatch = vec![0.0f32; n];
-            vec_tanh(&mut y_dispatch, &x);
+            vec_tanh(&mut y_dispatch, &x, arch);
             for i in 0..n {
                 let reference = (x[i] as f64).tanh() as f32;
                 assert!(
@@ -703,9 +745,10 @@ mod tests {
         // SIMD sigmoid uses approximate reciprocal: max error ~2e-4 (x86),
         // ~1e-3 (ARM vrecpeq_f32 with ~8-bit precision).
         for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let arch = select_arch();
             let x = gen_signal(n, 123);
             let mut y_dispatch = vec![0.0f32; n];
-            vec_sigmoid(&mut y_dispatch, &x);
+            vec_sigmoid(&mut y_dispatch, &x, arch);
             for i in 0..n {
                 let reference = (1.0 / (1.0 + (-(x[i] as f64)).exp())) as f32;
                 assert!(
@@ -723,11 +766,12 @@ mod tests {
     #[test]
     fn test_softmax_dispatch_matches_scalar() {
         for &n in &[1, 4, 7, 8, 15, 16, 64, 256] {
+            let arch = select_arch();
             let x = gen_signal(n, 77);
             let mut y_scalar = vec![0.0f32; n];
             let mut y_dispatch = vec![0.0f32; n];
             softmax_scalar(&mut y_scalar, &x);
-            softmax(&mut y_dispatch, &x);
+            softmax(&mut y_dispatch, &x, arch);
             for i in 0..n {
                 let tol = y_scalar[i].abs() * 1e-4 + 1e-6;
                 assert!(
@@ -745,12 +789,13 @@ mod tests {
     #[test]
     fn test_sgemv_dispatch_matches_scalar() {
         for &(rows, cols) in &[(8, 8), (16, 8), (16, 16), (64, 32), (128, 64)] {
+            let arch = select_arch();
             let weights = gen_weights_f32(rows * cols, 42);
             let x = gen_signal(cols, 123);
             let mut out_scalar = vec![0.0f32; rows];
             let mut out_dispatch = vec![0.0f32; rows];
             sgemv_scalar(&mut out_scalar, &weights, rows, cols, rows, &x);
-            sgemv(&mut out_dispatch, &weights, rows, cols, rows, &x);
+            sgemv(&mut out_dispatch, &weights, rows, cols, rows, &x, arch);
             for i in 0..rows {
                 let tol = out_scalar[i].abs() * 1e-4 + 1e-4;
                 assert!(
@@ -773,11 +818,12 @@ mod tests {
         // results intentionally — the subias in LinearLayer compensates at the bias step.
         // Here we just verify the dispatch runs without error and produces finite results.
         for &(rows, cols) in &[(8, 8), (16, 16), (64, 32)] {
+            let arch = select_arch();
             let w = gen_weights_i8(rows * cols, 42);
             let scale: Vec<f32> = (0..rows).map(|i| 0.01 + 0.001 * i as f32).collect();
             let x = gen_signal(cols, 99);
             let mut out = vec![0.0f32; rows];
-            cgemv8x4(&mut out, &w, &scale, rows, cols, &x);
+            cgemv8x4(&mut out, &w, &scale, rows, cols, &x, arch);
             for i in 0..rows {
                 assert!(
                     out[i].is_finite(),
@@ -794,6 +840,7 @@ mod tests {
     #[test]
     fn test_sparse_sgemv8x4_dispatch_matches_scalar() {
         // 16 output rows, 2 blocks of 8. Each block has 2 column-blocks of 4 cols.
+        let arch = select_arch();
         let rows = 16;
         let idx = vec![
             2i32, 0, 4, // block 0: 2 col-blocks at positions 0, 4
@@ -804,7 +851,7 @@ mod tests {
         let mut out_scalar = vec![0.0f32; rows];
         let mut out_dispatch = vec![0.0f32; rows];
         sparse_sgemv8x4_scalar(&mut out_scalar, &w, &idx, rows, &x);
-        sparse_sgemv8x4(&mut out_dispatch, &w, &idx, rows, &x);
+        sparse_sgemv8x4(&mut out_dispatch, &w, &idx, rows, &x, arch);
         for i in 0..rows {
             let tol = out_scalar[i].abs() * 1e-4 + 1e-4;
             assert!(
@@ -821,6 +868,7 @@ mod tests {
     fn test_sparse_cgemv8x4_dispatch_runs_without_error() {
         // Same note as cgemv8x4: SIMD uses u8 quantization, scalar uses i8.
         // Just verify the dispatch runs and produces finite results.
+        let arch = select_arch();
         let rows = 8;
         let cols = 8;
         let idx = vec![2i32, 0, 4]; // 2 col-blocks at positions 0 and 4
@@ -828,7 +876,7 @@ mod tests {
         let scale: Vec<f32> = (0..rows).map(|i| 0.01 + 0.001 * i as f32).collect();
         let x = gen_signal(cols, 99);
         let mut out = vec![0.0f32; rows];
-        sparse_cgemv8x4(&mut out, &w, &idx, &scale, rows, cols, &x);
+        sparse_cgemv8x4(&mut out, &w, &idx, &scale, rows, cols, &x, arch);
         for i in 0..rows {
             assert!(
                 out[i].is_finite(),

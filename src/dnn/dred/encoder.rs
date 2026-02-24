@@ -326,6 +326,7 @@ fn dred_process_frame(enc: &mut DREDEnc, arch: Arch) {
         &mut enc.latents_buffer[..DRED_LATENT_DIM],
         &mut enc.state_buffer[..DRED_STATE_DIM],
         &input_buffer,
+        arch,
     );
     enc.latents_buffer_fill = (enc.latents_buffer_fill + 1).min(DRED_NUM_REDUNDANCY_FRAMES);
 }
@@ -391,6 +392,7 @@ fn dred_encode_latents(
     r: &[u8],
     p0: &[u8],
     dim: usize,
+    arch: Arch,
 ) {
     let eps = 0.1f32;
     let mut xq = vec![0.0f32; dim];
@@ -402,7 +404,7 @@ fn dred_encode_latents(
         deadzone[i] = xq[i] / (delta + eps);
     }
     let input_copy = deadzone.clone();
-    compute_activation(&mut deadzone, &input_copy, dim, ACTIVATION_TANH);
+    compute_activation(&mut deadzone, &input_copy, dim, ACTIVATION_TANH, arch);
     for i in 0..dim {
         let delta = dzone[i] as f32 * (1.0 / 256.0);
         xq[i] -= delta * deadzone[i];
@@ -444,6 +446,7 @@ pub fn dred_encode_silk_frame(
     dq: i32,
     qmax: i32,
     activity_mem: &[u8],
+    arch: Arch,
 ) -> usize {
     let mut latent_offset = enc.latent_offset;
     let mut extra_dred_offset = 0i32;
@@ -502,6 +505,7 @@ pub fn dred_encode_silk_frame(
         &DRED_STATE_R_Q8[state_qoffset..],
         &DRED_STATE_P0_Q8[state_qoffset..],
         DRED_STATE_DIM,
+        arch,
     );
     if ec_tell(&ec_encoder) > 8 * max_bytes as i32 {
         return 0;
@@ -523,6 +527,7 @@ pub fn dred_encode_silk_frame(
             &DRED_LATENT_R_Q8[offset..],
             &DRED_LATENT_P0_Q8[offset..],
             DRED_LATENT_DIM,
+            arch,
         );
         if ec_tell(&ec_encoder) > 8 * max_bytes as i32 {
             if i == 0 {
