@@ -412,14 +412,14 @@ pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
 
 pub fn opus_strerror(error: i32) -> &'static str {
     static error_strings: [&str; 8] = [
-        "success (0)",
-        "invalid argument (-1)",
-        "buffer too small (-2)",
-        "internal error (-3)",
-        "corrupted stream (-4)",
-        "request not implemented (-5)",
-        "invalid state (-6)",
-        "memory allocation failed (-7)",
+        "success",
+        "invalid argument",
+        "buffer too small",
+        "internal error",
+        "corrupted stream",
+        "request not implemented",
+        "invalid state",
+        "memory allocation failed",
     ];
     if !(-7..=0).contains(&error) {
         "unknown error"

@@ -10,6 +10,7 @@ Close remaining public API coverage gaps versus upstream core/custom/multistream
 - DRED public decoder/aux APIs and state lifecycle entry points.
 - Missing CTL constants and request coverage.
 - Multistream/projection API surface and required support modules.
+- Excludes introducing C-ABI-specific entry points solely for pointer-style lifecycle parity.
 
 ## Execution Order
 1. Add compile-time API presence tests for all missing entry points and constants.

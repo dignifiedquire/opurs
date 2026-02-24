@@ -23,3 +23,6 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 
 ## Definition Of Done
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
+
+## Progress
+- 2026-02-24: Aligned `opus_strerror()` output strings in `src/celt/common.rs` to upstream canonical text (removed numeric suffix decorations).
