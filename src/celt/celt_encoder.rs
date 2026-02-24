@@ -58,7 +58,7 @@ use crate::silk::macros::EC_CLZ0;
 /// The C version uses a flexible array member (`in_mem[1]`) at the end of the struct
 /// to store overlap memory, prefilter memory, and band energy arrays in a contiguous
 /// allocation. This Rust version uses fixed-size arrays sized for the maximum case
-/// (2 channels, overlap=120, nbEBands=21, COMBFILTER_MAXPERIOD=1024).
+/// (2 channels, overlap=240 with QEXT 96 kHz, nbEBands=21, COMBFILTER_MAXPERIOD=1024).
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusCustomEncoder {
@@ -108,8 +108,8 @@ pub struct OpusCustomEncoder {
     pub energy_mask: [opus_val16; 2 * 21],
     pub energy_mask_len: usize,
     pub spec_avg: opus_val16,
-    /// Overlap memory, size = channels * overlap (max 2*120 = 240)
-    pub in_mem: [celt_sig; 2 * 120],
+    /// Overlap memory, size = channels * overlap (max 2*240 = 480)
+    pub in_mem: [celt_sig; 2 * 240],
     /// Prefilter memory, size = channels * COMBFILTER_MAXPERIOD (max 2*1024 = 2048)
     pub prefilter_mem: [celt_sig; 2 * COMBFILTER_MAXPERIOD as usize],
     /// Old band energies, size = channels * nbEBands (max 2*21 = 42)
@@ -131,6 +131,16 @@ pub struct OpusCustomEncoder {
     pub qext_oldBandE: [opus_val16; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_scale_for_mode(mode: &OpusCustomMode) -> i32 {
+    if mode.Fs == 96000 && (mode.shortMdctSize == 240 || mode.shortMdctSize == 180) {
+        2
+    } else {
+        1
+    }
+}
+
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
     pub fn new(sampling_rate: i32, channels: i32, arch: Arch) -> Result<Self, i32> {
@@ -148,6 +158,9 @@ impl OpusCustomEncoder {
             opus_custom_mode_create(48000, 960, None).unwrap(),
             resampling_factor(sampling_rate),
         );
+        #[cfg(feature = "qext")]
+        let qext_scale = qext_scale_for_mode(mode);
+
         let mut st = OpusCustomEncoder {
             mode,
             channels,
@@ -209,7 +222,7 @@ impl OpusCustomEncoder {
             energy_mask: [0.0; 2 * 21],
             energy_mask_len: 0,
             spec_avg: 0.0,
-            in_mem: [0.0; 2 * 120],
+            in_mem: [0.0; 2 * 240],
             prefilter_mem: [0.0; 2 * COMBFILTER_MAXPERIOD as usize],
             oldBandE: [0.0; 2 * 21],
             oldLogE: [0.0; 2 * 21],
@@ -218,7 +231,7 @@ impl OpusCustomEncoder {
             #[cfg(feature = "qext")]
             enable_qext: 0,
             #[cfg(feature = "qext")]
-            qext_scale: 1,
+            qext_scale,
             #[cfg(feature = "qext")]
             qext_oldBandE: [0.0; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
         };
@@ -280,6 +293,31 @@ impl OpusCustomEncoder {
         (&mut self.oldLogE)[..cc * nbEBands].fill(-28.0);
         (&mut self.oldLogE2)[..cc * nbEBands].fill(-28.0);
         (&mut self.energyError)[..cc * nbEBands].fill(0.0);
+        #[cfg(feature = "qext")]
+        self.qext_oldBandE.fill(0.0);
+    }
+}
+
+#[cfg(all(test, feature = "qext"))]
+mod tests {
+    use super::*;
+    use crate::arch::Arch;
+
+    #[test]
+    fn encoder_sets_qext_scale_from_mode() {
+        let enc_96k = OpusCustomEncoder::new(96000, 2, Arch::Scalar).unwrap();
+        assert_eq!(enc_96k.qext_scale, 2);
+
+        let enc_48k = OpusCustomEncoder::new(48000, 2, Arch::Scalar).unwrap();
+        assert_eq!(enc_48k.qext_scale, 1);
+    }
+
+    #[test]
+    fn encoder_reset_clears_qext_history() {
+        let mut enc = OpusCustomEncoder::new(96000, 2, Arch::Scalar).unwrap();
+        enc.qext_oldBandE.fill(1.0);
+        enc.reset();
+        assert!(enc.qext_oldBandE.iter().all(|&v| v == 0.0));
     }
 }
 

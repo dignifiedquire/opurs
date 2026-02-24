@@ -87,6 +87,16 @@ pub struct OpusCustomDecoder {
     pub qext_oldBandE: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_scale_for_mode(mode: &OpusCustomMode) -> i32 {
+    if mode.Fs == 96000 && (mode.shortMdctSize == 240 || mode.shortMdctSize == 180) {
+        2
+    } else {
+        1
+    }
+}
+
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
@@ -100,20 +110,27 @@ const FRAME_PLC_NEURAL: i32 = 4;
 #[cfg(feature = "deep-plc")]
 const FRAME_DRED: i32 = 5;
 pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
-    assert_eq!(st.mode, opus_custom_mode_create(48000, 960, None).unwrap());
-    assert_eq!(st.overlap, 120);
+    #[cfg(feature = "qext")]
+    assert!(st.mode.Fs == 48000 || st.mode.Fs == 96000);
+    #[cfg(not(feature = "qext"))]
+    assert_eq!(st.mode.Fs, 48000);
+    assert_eq!(st.overlap, st.mode.overlap);
     assert!(st.channels == 1 || st.channels == 2);
     assert!(st.stream_channels == 1 || st.stream_channels == 2);
     assert!(st.downsample > 0);
     assert!(st.start == 0 || st.start == 17);
     assert!(st.start < st.end);
-    assert!(st.end <= 21);
+    assert!(st.end <= st.mode.effEBands);
     // arch is now an enum — no range check needed
     assert!(st.last_pitch_index <= 720);
     assert!(st.last_pitch_index >= 100 || st.last_pitch_index == 0);
-    assert!(st.postfilter_period < 1024);
+    #[cfg(feature = "qext")]
+    let max_period = MAX_PERIOD * st.qext_scale;
+    #[cfg(not(feature = "qext"))]
+    let max_period = MAX_PERIOD;
+    assert!(st.postfilter_period < max_period);
     assert!(st.postfilter_period >= 15 || st.postfilter_period == 0);
-    assert!(st.postfilter_period_old < 1024);
+    assert!(st.postfilter_period_old < max_period);
     assert!(st.postfilter_period_old >= 15 || st.postfilter_period_old == 0);
     assert!(st.postfilter_tapset <= 2);
     assert!(st.postfilter_tapset >= 0);
@@ -151,6 +168,9 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
             channels
         );
     }
+    #[cfg(feature = "qext")]
+    let qext_scale = qext_scale_for_mode(mode);
+
     let mut st = OpusCustomDecoder {
         mode,
         overlap: mode.overlap,
@@ -187,7 +207,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         oldLogE2: [0.0; 2 * 21],
         backgroundLogE: [0.0; 2 * 21],
         #[cfg(feature = "qext")]
-        qext_scale: 1,
+        qext_scale,
         #[cfg(feature = "qext")]
         qext_oldBandE: [0.0; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
     };
@@ -225,6 +245,8 @@ impl OpusCustomDecoder {
         self.oldLogE.fill(-28.0);
         self.oldLogE2.fill(-28.0);
         self.backgroundLogE.fill(0.0);
+        #[cfg(feature = "qext")]
+        self.qext_oldBandE.fill(0.0);
     }
 }
 
@@ -1961,4 +1983,36 @@ fn celt_decode_body(
         st.error = 1;
     }
     frame_size / st.downsample
+}
+
+#[cfg(all(test, feature = "qext"))]
+mod tests {
+    use super::*;
+    use crate::celt::modes::opus_custom_mode_create;
+
+    #[test]
+    fn decoder_sets_qext_scale_from_mode() {
+        let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
+        let dec_96k = opus_custom_decoder_init(mode_96k, 2);
+        assert_eq!(dec_96k.qext_scale, 2);
+
+        let mode_48k = opus_custom_mode_create(48000, 960, None).unwrap();
+        let dec_48k = opus_custom_decoder_init(mode_48k, 2);
+        assert_eq!(dec_48k.qext_scale, 1);
+    }
+
+    #[test]
+    fn decoder_reset_clears_qext_history() {
+        let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
+        let mut dec = opus_custom_decoder_init(mode_96k, 2);
+        dec.qext_oldBandE.fill(1.0);
+        dec.reset();
+        assert!(dec.qext_oldBandE.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn validate_accepts_96k_qext_decoder_state() {
+        let dec = celt_decoder_init(96000, 2);
+        validate_celt_decoder(&dec);
+    }
 }

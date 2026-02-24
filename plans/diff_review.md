@@ -6,12 +6,12 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `10,11,18,64,65,91,105,112,214,224,236`.
+Resolved/removed in this refresh (now implemented in Rust): `10,11,18,26,27,28,29,64,65,91,105,112,214,224,236`.
 
 Priority groups for execution:
 
 1. QEXT correctness blockers (bitstream/PLC/sizing)
-IDs: `3,4,5,15,16,17,21,22,23,24,25,26,28,29,30,31,32,34,42,52,88,111,150,166,175,229`
+IDs: `3,4,5,15,16,17,21,22,23,24,25,30,31,32,34,42,52,88,111,150,166,175,229`
 
 2. Extensions and repacketizer semantic parity
 IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
@@ -147,26 +147,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/celt/pitch.rs:271-314`
 - Upstream: `libopus-sys/opus/celt/pitch.c:140-142` (takes `C`, `factor`, `arch`), call-site uses `QEXT_SCALE(2)` in QEXT decode path (`libopus-sys/opus/celt/celt_decoder.c:567-571`)
 - Detail: Rust downsampler infers channels from slice count and hardcodes stride/filtering for factor 2 (`2*i±1` indexing). Upstream uses a parameterized factor and explicitly passes scaled factor under QEXT. This creates a structural mismatch in PLC pitch preprocessing at 96 kHz.
-
-26. [HIGH][QEXT] `qext_scale` state is not updated from mode/frame configuration in Rust CELT encoder/decoder.
-- Rust: `src/celt/celt_encoder.rs:127`, `src/celt/celt_encoder.rs:220`, `src/celt/celt_decoder.rs:83`, `src/celt/celt_decoder.rs:190` (defaulted to 1; no matching init/update path found)
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:224-225`, `libopus-sys/opus/celt/celt_decoder.c:268-269`
-- Detail: Upstream sets `st->qext_scale = 2` for 96 kHz-compatible short MDCT modes and 1 otherwise. Rust code consumes `qext_scale` in multiple QEXT decisions but appears to leave it at default 1, causing wrong scaling/mode decisions for 96 kHz QEXT paths.
-
-27. [MEDIUM][QEXT] CELT reset paths do not clear QEXT old-band history arrays in Rust.
-- Rust: `src/celt/celt_encoder.rs:233-282`, `src/celt/celt_decoder.rs:206-228`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:3074-3085`, `libopus-sys/opus/celt/celt_decoder.c:1790-1806`
-- Detail: Upstream `OPUS_RESET_STATE` clears full runtime state from `ENCODER_RESET_START` / `DECODER_RESET_START`, which includes QEXT runtime histories. Rust reset methods currently clear core band histories but do not reset `qext_oldBandE`, leaving stale QEXT energy history across resets.
-
-28. [HIGH][QEXT] CELT decoder validation hardcodes 48 kHz mode and rejects 96 kHz QEXT mode.
-- Rust: `src/celt/celt_decoder.rs:101-103`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c` validation permits configured mode/state (including QEXT mode paths), not a fixed 48 kHz assertion.
-- Detail: Rust `validate_celt_decoder()` asserts `st.mode == opus_custom_mode_create(48000, 960, ...)`, which is incompatible with 96 kHz/QEXT decoder operation and can trip asserts during decode on valid 96 kHz state.
-
-29. [HIGH][QEXT] CELT encoder overlap history buffer is fixed-size instead of mode-overlap-sized.
-- Rust: `src/celt/celt_encoder.rs:111`, `src/celt/celt_encoder.rs:276`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:136` and size computation in `libopus-sys/opus/celt/celt_encoder.c:167`
-- Detail: Upstream allocates `in_mem` as `channels*mode->overlap` in the variable tail of the encoder state. Rust fixes `in_mem` to `2*120`, which does not scale with 96 kHz overlap (`240`) and diverges from upstream state layout/behavior.
 
 30. [HIGH][QEXT] CELT decoder uses fixed-size synthesis/prefilter scratch buffers where upstream is runtime-sized.
 - Rust: `src/celt/celt_decoder.rs:369`, `src/celt/celt_decoder.rs:394`, `src/celt/celt_decoder.rs:437`, `src/celt/celt_decoder.rs:604`
