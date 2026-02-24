@@ -45,3 +45,6 @@ Close remaining public API coverage gaps versus upstream core/custom/multistream
 - 2026-02-24: Upstream parity review for qext decoder paths fixed two concrete divergences:
   - `src/celt/celt_decoder.rs`: allocate `X` as `C*N` (matching upstream) instead of fixed 1920.
   - `src/celt/cwrs.rs`: added safe PVQ-U lookup fallback equivalent to upstream SMALL_FOOTPRINT recurrence when compact table rows are exceeded (qext/cwrs-extra-row cases).
+- 2026-02-24: Added C-vs-Rust parity coverage for restricted-application encoder control flow in `tests/restricted_application_parity.rs` (`--features tools`):
+  - restricted-SILK 5 ms encode rejection parity (`OPUS_BAD_ARG`)
+  - `OPUS_SET_APPLICATION_REQUEST` parity for restricted application values and restricted-instance application-change rejection

@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `1,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,52,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,52,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
 
 Priority groups for execution:
 
@@ -33,10 +33,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 
 ## Findings
 
-2. [HIGH] Missing restricted application mode parity in encoder.
-- Rust: `src/opus/opus_encoder.rs:162`, `src/opus/opus_encoder.rs:1878`
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:219`, `libopus-sys/opus/src/opus_encoder.c:1467`, `libopus-sys/opus/src/opus_encoder.c:1470`
-- Detail: Rust path does not mirror `OPUS_APPLICATION_RESTRICTED_SILK` and `OPUS_APPLICATION_RESTRICTED_CELT` control-flow branches present upstream.
+2. [RESOLVED][Encoder] Restricted application mode parity in encoder.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
+- Upstream: `libopus-sys/opus/src/opus_encoder.c`
+- Detail: Rust now mirrors restricted SILK/CELT control-flow behavior; C-vs-Rust parity tests cover restricted-SILK sub-10 ms encode rejection and `OPUS_SET_APPLICATION_REQUEST` rejection semantics for restricted modes.
 
 6. [RESOLVED][QEXT] QEXT payload is now wired in the main encoder CELT call path.
 - Rust: `src/opus/opus_encoder.rs`
