@@ -6,6 +6,7 @@
 //! Port of `dnn/vec_neon.h` from libopus 1.5.2.
 
 use core::arch::aarch64::*;
+use core::arch::asm;
 
 // =========================================================================
 // Activation helpers
@@ -366,7 +367,7 @@ pub unsafe fn sparse_sgemv8x4_neon(
 /// Port of `vec_neon.h:vdotprod` (non-DOTPROD path).
 #[inline]
 #[target_feature(enable = "neon")]
-unsafe fn vdotprod(acc: int32x4_t, a: int8x16_t, b: int8x16_t) -> int32x4_t {
+unsafe fn vdotprod_emulated(acc: int32x4_t, a: int8x16_t, b: int8x16_t) -> int32x4_t {
     vpadalq_s16(
         acc,
         vpaddq_s16(
@@ -374,6 +375,22 @@ unsafe fn vdotprod(acc: int32x4_t, a: int8x16_t, b: int8x16_t) -> int32x4_t {
             vmull_high_s8(a, b),
         ),
     )
+}
+
+/// DOTPROD native implementation of int8x16 dot product accumulate.
+/// Port of `vec_neon.h:vdotprod` under `__ARM_FEATURE_DOTPROD`.
+#[inline]
+#[target_feature(enable = "dotprod")]
+unsafe fn vdotprod_native(acc: int32x4_t, a: int8x16_t, b: int8x16_t) -> int32x4_t {
+    let mut out = acc;
+    asm!(
+        "sdot {out:v}.4s, {a:v}.16b, {b:v}.16b",
+        out = inout(vreg) out,
+        a = in(vreg) a,
+        b = in(vreg) b,
+        options(pure, nomem, nostack)
+    );
+    out
 }
 
 /// NEON dense int8 matrix-vector multiply (8x4 blocking).
@@ -422,15 +439,15 @@ pub unsafe fn cgemv8x4_neon(
                 vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j) as *const i32));
             let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
             let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
-            acc0 = vdotprod(acc0, vw0, vx0);
-            acc1 = vdotprod(acc1, vw1, vx0);
+            acc0 = vdotprod_emulated(acc0, vw0, vx0);
+            acc1 = vdotprod_emulated(acc1, vw1, vx0);
 
             let vx1: int8x16_t =
                 vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j + 4) as *const i32));
             let vw2 = vld1q_s8(w.as_ptr().add(w_pos + 32));
             let vw3 = vld1q_s8(w.as_ptr().add(w_pos + 48));
-            acc2 = vdotprod(acc2, vw2, vx1);
-            acc3 = vdotprod(acc3, vw3, vx1);
+            acc2 = vdotprod_emulated(acc2, vw2, vx1);
+            acc3 = vdotprod_emulated(acc3, vw3, vx1);
 
             w_pos += 64;
             j += 8;
@@ -444,8 +461,8 @@ pub unsafe fn cgemv8x4_neon(
                 vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j) as *const i32));
             let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
             let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
-            acc0 = vdotprod(acc0, vw0, vx);
-            acc1 = vdotprod(acc1, vw1, vx);
+            acc0 = vdotprod_emulated(acc0, vw0, vx);
+            acc1 = vdotprod_emulated(acc1, vw1, vx);
             w_pos += 32;
             j += 4;
         }
@@ -475,9 +492,74 @@ pub unsafe fn cgemv8x4_dotprod(
     scale: &[f32],
     rows: usize,
     cols: usize,
-    x: &[f32],
+    _x: &[f32],
 ) {
-    cgemv8x4_neon(out, w, scale, rows, cols, x);
+    const MAX_INPUTS: usize = 2048;
+    let mut x = [0i8; MAX_INPUTS];
+    let const127 = vdupq_n_f32(127.0);
+    let mut qi = 0;
+    while qi + 8 <= cols {
+        let xi0 = vcvtnq_s32_f32(vmulq_f32(const127, vld1q_f32(_x.as_ptr().add(qi))));
+        let xi4 = vcvtnq_s32_f32(vmulq_f32(const127, vld1q_f32(_x.as_ptr().add(qi + 4))));
+        let x_short = vcombine_s16(vmovn_s32(xi0), vmovn_s32(xi4));
+        vst1_s8(x.as_mut_ptr().add(qi), vmovn_s16(x_short));
+        qi += 8;
+    }
+    while qi < cols {
+        x[qi] = (0.5f64 + 127.0f64 * _x[qi] as f64).floor() as i8;
+        qi += 1;
+    }
+
+    let mut w_pos = 0;
+    for i in (0..rows).step_by(8) {
+        let mut acc0 = vdupq_n_s32(0);
+        let mut acc1 = vdupq_n_s32(0);
+        let mut acc2 = vdupq_n_s32(0);
+        let mut acc3 = vdupq_n_s32(0);
+        let mut j = 0;
+
+        while j + 8 <= cols {
+            let vx0: int8x16_t =
+                vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j) as *const i32));
+            let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
+            let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
+            acc0 = vdotprod_native(acc0, vw0, vx0);
+            acc1 = vdotprod_native(acc1, vw1, vx0);
+
+            let vx1: int8x16_t =
+                vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j + 4) as *const i32));
+            let vw2 = vld1q_s8(w.as_ptr().add(w_pos + 32));
+            let vw3 = vld1q_s8(w.as_ptr().add(w_pos + 48));
+            acc2 = vdotprod_native(acc2, vw2, vx1);
+            acc3 = vdotprod_native(acc3, vw3, vx1);
+
+            w_pos += 64;
+            j += 8;
+        }
+
+        acc0 = vaddq_s32(acc0, acc2);
+        acc1 = vaddq_s32(acc1, acc3);
+
+        while j < cols {
+            let vx: int8x16_t =
+                vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(j) as *const i32));
+            let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
+            let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
+            acc0 = vdotprod_native(acc0, vw0, vx);
+            acc1 = vdotprod_native(acc1, vw1, vx);
+            w_pos += 32;
+            j += 4;
+        }
+
+        vst1q_f32(
+            out.as_mut_ptr().add(i),
+            vmulq_f32(vld1q_f32(scale.as_ptr().add(i)), vcvtq_f32_s32(acc0)),
+        );
+        vst1q_f32(
+            out.as_mut_ptr().add(i + 4),
+            vmulq_f32(vld1q_f32(scale.as_ptr().add(i + 4)), vcvtq_f32_s32(acc1)),
+        );
+    }
 }
 
 // =========================================================================
@@ -532,8 +614,8 @@ pub unsafe fn sparse_cgemv8x4_neon(
                 vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(pos) as *const i32));
             let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
             let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
-            acc0 = vdotprod(acc0, vw0, vx);
-            acc1 = vdotprod(acc1, vw1, vx);
+            acc0 = vdotprod_emulated(acc0, vw0, vx);
+            acc1 = vdotprod_emulated(acc1, vw1, vx);
             w_pos += 32;
         }
 
@@ -563,7 +645,143 @@ pub unsafe fn sparse_cgemv8x4_dotprod(
     scale: &[f32],
     rows: usize,
     cols: usize,
-    x: &[f32],
+    _x: &[f32],
 ) {
-    sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
+    const MAX_INPUTS: usize = 2048;
+    let mut x = [0i8; MAX_INPUTS];
+    let const127 = vdupq_n_f32(127.0);
+    let mut qi = 0;
+    while qi + 8 <= cols {
+        let xi0 = vcvtnq_s32_f32(vmulq_f32(const127, vld1q_f32(_x.as_ptr().add(qi))));
+        let xi4 = vcvtnq_s32_f32(vmulq_f32(const127, vld1q_f32(_x.as_ptr().add(qi + 4))));
+        let x_short = vcombine_s16(vmovn_s32(xi0), vmovn_s32(xi4));
+        vst1_s8(x.as_mut_ptr().add(qi), vmovn_s16(x_short));
+        qi += 8;
+    }
+    while qi < cols {
+        x[qi] = (0.5f64 + 127.0f64 * _x[qi] as f64).floor() as i8;
+        qi += 1;
+    }
+
+    let mut w_pos = 0;
+    let mut idx_pos = 0;
+
+    for i in (0..rows).step_by(8) {
+        let colblocks = idx[idx_pos] as usize;
+        idx_pos += 1;
+        let mut acc0 = vdupq_n_s32(0);
+        let mut acc1 = vdupq_n_s32(0);
+
+        for _j in 0..colblocks {
+            let pos = idx[idx_pos] as usize;
+            idx_pos += 1;
+
+            let vx: int8x16_t =
+                vreinterpretq_s8_s32(vld1q_dup_s32(x.as_ptr().add(pos) as *const i32));
+            let vw0 = vld1q_s8(w.as_ptr().add(w_pos));
+            let vw1 = vld1q_s8(w.as_ptr().add(w_pos + 16));
+            acc0 = vdotprod_native(acc0, vw0, vx);
+            acc1 = vdotprod_native(acc1, vw1, vx);
+            w_pos += 32;
+        }
+
+        vst1q_f32(
+            out.as_mut_ptr().add(i),
+            vmulq_f32(vld1q_f32(scale.as_ptr().add(i)), vcvtq_f32_s32(acc0)),
+        );
+        vst1q_f32(
+            out.as_mut_ptr().add(i + 4),
+            vmulq_f32(vld1q_f32(scale.as_ptr().add(i + 4)), vcvtq_f32_s32(acc1)),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dnn::vec;
+
+    fn gen_f32(len: usize, seed: u32) -> Vec<f32> {
+        let mut v = Vec::with_capacity(len);
+        let mut state = seed;
+        for _ in 0..len {
+            state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+            let x = ((state >> 8) & 0xffff) as i32 - 32768;
+            v.push((x as f32) / 32768.0);
+        }
+        v
+    }
+
+    fn gen_i8(len: usize, seed: u32) -> Vec<i8> {
+        let mut v = Vec::with_capacity(len);
+        let mut state = seed;
+        for _ in 0..len {
+            state = state.wrapping_mul(1103515245).wrapping_add(12345);
+            v.push(((state >> 16) as i32 as i8).wrapping_sub(64));
+        }
+        v
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn dotprod_dense_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("dotprod") {
+            return;
+        }
+
+        let rows = 16usize;
+        let cols = 24usize;
+        let w = gen_i8(rows * cols, 1);
+        let scale = gen_f32(rows, 2);
+        let x = gen_f32(cols, 3);
+
+        let mut out_scalar = vec![0.0f32; rows];
+        let mut out_dotprod = vec![0.0f32; rows];
+
+        vec::cgemv8x4_scalar(&mut out_scalar, &w, &scale, rows, cols, &x);
+        unsafe {
+            cgemv8x4_dotprod(&mut out_dotprod, &w, &scale, rows, cols, &x);
+        }
+
+        for i in 0..rows {
+            assert!(
+                (out_scalar[i] - out_dotprod[i]).abs() <= 1e-3,
+                "dense mismatch at {i}: scalar={} dotprod={}",
+                out_scalar[i],
+                out_dotprod[i]
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn dotprod_sparse_matches_scalar_reference() {
+        if !std::arch::is_aarch64_feature_detected!("dotprod") {
+            return;
+        }
+
+        let rows = 16usize;
+        let cols = 24usize;
+        let idx = vec![3, 0, 4, 8, 3, 4, 12, 16];
+        let w = gen_i8(3 * 32 * 2, 11);
+        let scale = gen_f32(rows, 12);
+        let x = gen_f32(cols, 13);
+
+        let mut out_scalar = vec![0.0f32; rows];
+        let mut out_dotprod = vec![0.0f32; rows];
+
+        vec::sparse_cgemv8x4_scalar(&mut out_scalar, &w, &idx, &scale, rows, cols, &x);
+        unsafe {
+            sparse_cgemv8x4_dotprod(&mut out_dotprod, &w, &idx, &scale, rows, cols, &x);
+        }
+
+        for i in 0..rows {
+            assert!(
+                (out_scalar[i] - out_dotprod[i]).abs() <= 1e-3,
+                "sparse mismatch at {i}: scalar={} dotprod={}",
+                out_scalar[i],
+                out_dotprod[i]
+            );
+        }
+    }
 }
