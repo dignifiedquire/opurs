@@ -119,6 +119,12 @@ fn qext_hash_slice(x: &[f32]) -> u64 {
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
+const SIG_SAT: f32 = 536_870_911.0;
+
+#[inline]
+fn saturate_sig(x: f32) -> f32 {
+    x.clamp(-SIG_SAT, SIG_SAT)
+}
 
 #[inline]
 fn decoder_qext_scale(st: &OpusCustomDecoder) -> i32 {
@@ -307,8 +313,8 @@ fn deemphasis_stereo_simple(
     let mut j = 0;
     while j < N {
         let ju = j as usize;
-        let tmp0: celt_sig = ch0[ju] + VERY_SMALL + m0;
-        let tmp1: celt_sig = ch1[ju] + VERY_SMALL + m1;
+        let tmp0: celt_sig = saturate_sig(ch0[ju] + VERY_SMALL + m0);
+        let tmp1: celt_sig = saturate_sig(ch1[ju] + VERY_SMALL + m1);
         m0 = coef0 * tmp0;
         m1 = coef0 * tmp1;
         pcm[2 * ju] = tmp0 * (1_f32 / CELT_SIG_SCALE);
@@ -361,7 +367,7 @@ fn deemphasis(
             let coef3: opus_val16 = coef.get(3).copied().unwrap_or(0.0);
             j = 0;
             while j < N {
-                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp - coef1 * x[j as usize];
                 scratch[j as usize] = 4.0 * (coef3 * tmp);
                 j += 1;
@@ -370,7 +376,7 @@ fn deemphasis(
         } else if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = x[j as usize] + VERY_SMALL + m;
+                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp;
                 scratch[j as usize] = tmp;
                 j += 1;
@@ -379,7 +385,7 @@ fn deemphasis(
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp;
                 pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -387,7 +393,7 @@ fn deemphasis(
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = x[j as usize] + VERY_SMALL + m;
+                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp_0;
                 pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -397,7 +403,7 @@ fn deemphasis(
         if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = x[j as usize] + VERY_SMALL + m;
+                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp;
                 scratch[j as usize] = tmp;
                 j += 1;
@@ -406,7 +412,7 @@ fn deemphasis(
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp;
                 pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -414,7 +420,7 @@ fn deemphasis(
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = x[j as usize] + VERY_SMALL + m;
+                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp_0;
                 pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -476,6 +482,8 @@ fn celt_synthesis(
     let M: i32 = (1) << LM;
     #[cfg(feature = "qext")]
     let qext_stride = crate::celt::modes::data_96000::NB_QEXT_BANDS;
+    #[cfg(feature = "qext")]
+    let synth_trace = qext_trace_enabled() && qext_mode.is_some();
     #[cfg(feature = "qext")]
     if mode.Fs != 96000 {
         qext_end = 2;
@@ -636,6 +644,13 @@ fn celt_synthesis(
             silence,
         );
         #[cfg(feature = "qext")]
+        if synth_trace {
+            eprintln!(
+                "[rust synth] ch0 base_h={:016x}",
+                qext_hash_slice(&freq[..n])
+            );
+        }
+        #[cfg(feature = "qext")]
         if let Some(qm) = qext_mode {
             denormalise_bands(
                 qm,
@@ -648,6 +663,12 @@ fn celt_synthesis(
                 downsample,
                 silence,
             );
+            if synth_trace {
+                eprintln!(
+                    "[rust synth] ch0 qext_h={:016x}",
+                    qext_hash_slice(&freq[..n])
+                );
+            }
         }
         b = 0;
         while b < B {
@@ -663,6 +684,13 @@ fn celt_synthesis(
             );
             b += 1;
         }
+        #[cfg(feature = "qext")]
+        if synth_trace {
+            eprintln!(
+                "[rust synth] ch0 out_h={:016x}",
+                qext_hash_slice(&out_syn_ch0[..n])
+            );
+        }
         // Process channel 1 (if stereo)
         if CC >= 2 {
             denormalise_bands(
@@ -677,6 +705,13 @@ fn celt_synthesis(
                 silence,
             );
             #[cfg(feature = "qext")]
+            if synth_trace {
+                eprintln!(
+                    "[rust synth] ch1 base_h={:016x}",
+                    qext_hash_slice(&freq[..n])
+                );
+            }
+            #[cfg(feature = "qext")]
             if let Some(qm) = qext_mode {
                 denormalise_bands(
                     qm,
@@ -689,6 +724,12 @@ fn celt_synthesis(
                     downsample,
                     silence,
                 );
+                if synth_trace {
+                    eprintln!(
+                        "[rust synth] ch1 qext_h={:016x}",
+                        qext_hash_slice(&freq[..n])
+                    );
+                }
             }
             b = 0;
             while b < B {
@@ -704,9 +745,23 @@ fn celt_synthesis(
                 );
                 b += 1;
             }
+            #[cfg(feature = "qext")]
+            if synth_trace {
+                eprintln!(
+                    "[rust synth] ch1 out_h={:016x}",
+                    qext_hash_slice(&out_syn_ch1[..n])
+                );
+            }
         }
     }
-    // Note: removed no-op loop (out_syn[c][i] = out_syn[c][i]) that was a c2rust artifact
+    for v in &mut out_syn_ch0[..n] {
+        *v = saturate_sig(*v);
+    }
+    if CC >= 2 {
+        for v in &mut out_syn_ch1[..n] {
+            *v = saturate_sig(*v);
+        }
+    }
 }
 /// Upstream C: celt/celt_decoder.c:tf_decode
 fn tf_decode(
@@ -2079,9 +2134,14 @@ fn celt_decode_body(
         let out_syn_len = n + overlap as usize;
         #[cfg(feature = "qext")]
         if qext_trace && qext_bytes > 0 {
+            let old_h = qext_hash_slice(&st.oldEBands[..(2 * nbEBands) as usize]);
+            let qext_h = qext_hash_slice(&st.qext_oldBandE[..]);
             eprintln!(
-                "[rust qext] pre synth x_hash={:016x}",
-                qext_hash_slice(&X[..(C * N) as usize])
+                "[rust qext] pre synth x_hash={:016x} old_h={:016x} qext_h={:016x} qext_end={}",
+                qext_hash_slice(&X[..(C * N) as usize]),
+                old_h,
+                qext_h,
+                qext_end
             );
         }
         let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);

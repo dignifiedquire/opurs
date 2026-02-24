@@ -531,12 +531,24 @@ void celt_synthesis(const CELTMode *mode, celt_norm *X, celt_sig * out_syn[],
          denormalise_bands(mode, X+c*N, freq, oldBandE+c*nbEBands, start, effEnd, M,
                downsample, silence);
 #ifdef ENABLE_QEXT
-         if (qext_mode)
+         if (qext_trace_enabled() && qext_mode) {
+            qext_tracef("synth ch%d base_h=%016llx", c, qext_hash_sig(freq, N));
+         }
+         if (qext_mode) {
             denormalise_bands(qext_mode, X+c*N, freq, qext_bandLogE+c*NB_QEXT_BANDS, 0, qext_end, M,
                            downsample, silence);
+            if (qext_trace_enabled()) {
+               qext_tracef("synth ch%d qext_h=%016llx", c, qext_hash_sig(freq, N));
+            }
+         }
 #endif
          for (b=0;b<B;b++)
             clt_mdct_backward(&mode->mdct, &freq[b], out_syn[c]+NB*b, mode->window, overlap, shift, B, arch);
+#ifdef ENABLE_QEXT
+         if (qext_trace_enabled() && qext_mode) {
+            qext_tracef("synth ch%d out_h=%016llx", c, qext_hash_sig(out_syn[c], N));
+         }
+#endif
       } while (++c<CC);
    }
    /* Saturate IMDCT output so that we can't overflow in the pitch postfilter
@@ -1590,7 +1602,11 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
       prefilter_and_fold(st, N);
    }
    if (qext_bytes > 0) {
-      qext_tracef("pre synth x_hash=%016llx", qext_hash_sig(X, C*N));
+      qext_tracef("pre synth x_hash=%016llx old_h=%016llx qext_h=%016llx qext_end=%d",
+            qext_hash_sig(X, C*N),
+            qext_hash_sig((const celt_sig *)oldBandE, 2*nbEBands),
+            qext_hash_sig((const celt_sig *)st->qext_oldBandE, 2*NB_QEXT_BANDS),
+            qext_end);
    }
    celt_synthesis(mode, X, out_syn, oldBandE, start, effEnd,
                   C, CC, isTransient, LM, st->downsample, silence, st->arch ARG_QEXT(qext_mode) ARG_QEXT(st->qext_oldBandE) ARG_QEXT(qext_end));

@@ -848,6 +848,12 @@ static void cubic_synthesis(celt_norm *X, int *iy, int N, int K, int face, int s
    for (i=0;i<N;i++) {
       sum += PSHR32(MULT16_16(X[i],X[i]), 2*shift);
    }
+#ifdef ENABLE_QEXT
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("cubic synth pre N=%d K=%d face=%d sign=%d sum=%f iyh=%016llx",
+            N, K, face, sign, (double)sum, qext_vq_hash_i32(iy, N));
+   }
+#endif
 #ifdef FIXED_POINT
    sum_shift = (29-celt_ilog2(sum))>>1;
    mag = celt_rsqrt_norm32(SHL32(sum, 2*sum_shift+1));
@@ -858,6 +864,13 @@ static void cubic_synthesis(celt_norm *X, int *iy, int N, int K, int face, int s
    mag = 1.f/sqrt(sum);
    for (i=0;i<N;i++) {
       X[i] *= mag*gain;
+   }
+#endif
+#ifdef ENABLE_QEXT
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("cubic synth post N=%d K=%d xh=%016llx x0=%.9f x1=%.9f x2=%.9f x3=%.9f",
+            N, K, qext_vq_hash_norm(X, N),
+            (double)X[0], N>1?(double)X[1]:0.0, N>2?(double)X[2]:0.0, N>3?(double)X[3]:0.0);
    }
 #endif
 }
@@ -939,7 +952,19 @@ unsigned cubic_unquant(celt_norm *X, int N, int res, int B, ec_dec *dec, opus_va
       if (i != face) iy[i] = ec_dec_bits(dec, res);
    }
    iy[face]=0;
+#ifdef ENABLE_QEXT
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("cubic unq pre N=%d res=%d B=%d K=%d tell=%d face=%d sign=%d iyh=%016llx",
+            N, res, B, K, ec_tell(dec), face, sign, qext_vq_hash_i32(iy, N));
+   }
+#endif
    cubic_synthesis(X, iy, N, K, face, sign, gain);
+#ifdef ENABLE_QEXT
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("cubic unq post N=%d res=%d B=%d K=%d tell=%d xh=%016llx",
+            N, res, B, K, ec_tell(dec), qext_vq_hash_norm(X, N));
+   }
+#endif
    RESTORE_STACK;
    return (1<<B)-1;
 }

@@ -127,7 +127,7 @@ fn quad_pcm(seed: u32) -> Vec<i16> {
         .map(|i| {
             let x = seed
                 .wrapping_mul(1664525)
-                .wrapping_add(i as u32 * 1013904223);
+                .wrapping_add((i as u32).wrapping_mul(1013904223));
             ((x >> 8) as i16).wrapping_sub(8192)
         })
         .collect()

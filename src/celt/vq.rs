@@ -428,6 +428,8 @@ fn ec_dec_refine(dec: &mut ec_dec, up: i32, extra_bits: i32, use_entropy: bool) 
 fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign: bool, gain: f32) {
     let n = N as usize;
     let mut sum: f32 = 0.0;
+    #[cfg(feature = "qext")]
+    let trace = qext_trace_enabled_vq();
     for i in 0..n {
         X[i] = (1 + 2 * iy[i]) as f32 - K as f32;
     }
@@ -435,9 +437,37 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
     for i in 0..n {
         sum += X[i] * X[i];
     }
-    let mag = 1.0f32 / sum.sqrt();
+    // Match upstream float path semantics: C computes `1.f/sqrt(sum)` with `sqrt`
+    // operating in double precision before rounding back to float.
+    let mag = (1.0f64 / (sum as f64).sqrt()) as f32;
+    #[cfg(feature = "qext")]
+    if trace {
+        eprintln!(
+            "[rust cubic] synth pre N={} K={} face={} sign={} sum={:.9} mag={:.9} iyh={:016x}",
+            N,
+            K,
+            face,
+            if sign { 1 } else { 0 },
+            sum,
+            mag,
+            qext_hash_i32(&iy[..n]),
+        );
+    }
     for i in 0..n {
         X[i] *= mag * gain;
+    }
+    #[cfg(feature = "qext")]
+    if trace {
+        eprintln!(
+            "[rust cubic] synth post N={} K={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9}",
+            N,
+            K,
+            qext_hash_f32(&X[..n]),
+            X[0],
+            if N > 1 { X[1] } else { 0.0 },
+            if N > 2 { X[2] } else { 0.0 },
+            if N > 3 { X[3] } else { 0.0 },
+        );
     }
 }
 
@@ -502,6 +532,8 @@ pub fn cubic_quant(
 pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, gain: f32) -> u32 {
     let n = N as usize;
     let mut K = 1 << res;
+    #[cfg(feature = "qext")]
+    let trace = qext_trace_enabled_vq();
     if B != 1 {
         K = 1.max(K - 1);
     }
@@ -518,7 +550,33 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
         }
     }
     iy[face] = 0;
+    #[cfg(feature = "qext")]
+    if trace {
+        eprintln!(
+            "[rust cubic] unq pre N={} res={} B={} K={} tell={} face={} sign={} iyh={:016x}",
+            N,
+            res,
+            B,
+            K,
+            ec_tell(dec),
+            face,
+            if sign { 1 } else { 0 },
+            qext_hash_i32(&iy[..n]),
+        );
+    }
     cubic_synthesis(X, &iy, N, K, face, sign, gain);
+    #[cfg(feature = "qext")]
+    if trace {
+        eprintln!(
+            "[rust cubic] unq post N={} res={} B={} K={} tell={} xh={:016x}",
+            N,
+            res,
+            B,
+            K,
+            ec_tell(dec),
+            qext_hash_f32(&X[..n]),
+        );
+    }
     (1u32 << B) - 1
 }
 
