@@ -977,6 +977,7 @@ pub fn opus_decode_native(
     packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.Fs);
     packet_stream_channels = opus_packet_get_nb_channels(data[0]);
     let mut padding_len: i32 = 0;
+    let mut parsed_packet_offset: i32 = 0;
     count = opus_packet_parse_impl(
         data,
         self_delimited,
@@ -984,17 +985,29 @@ pub fn opus_decode_native(
         None,
         &mut size,
         Some(&mut offset),
-        packet_offset,
+        Some(&mut parsed_packet_offset),
         Some(&mut padding_len),
     );
+    if let Some(out_offset) = packet_offset {
+        *out_offset = parsed_packet_offset;
+    }
     if count < 0 {
         return count;
     }
-    // Padding data is at the end of the original packet.
+    // For self-delimited multistream packets, extensions belong to the current
+    // sub-packet, not the whole remaining payload.
     #[cfg(feature = "qext")]
-    let padding_data = if padding_len > 0 {
-        let pkt_len = data.len();
-        &data[pkt_len - padding_len as usize..]
+    let padding_data = if padding_len > 0 && !st.ignore_extensions {
+        let packet_len = if self_delimited && parsed_packet_offset > 0 {
+            parsed_packet_offset as usize
+        } else {
+            data.len()
+        };
+        if packet_len >= padding_len as usize && packet_len <= data.len() {
+            &data[packet_len - padding_len as usize..packet_len]
+        } else {
+            &[] as &[u8]
+        }
     } else {
         &[] as &[u8]
     };

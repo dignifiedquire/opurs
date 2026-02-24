@@ -1554,10 +1554,12 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
          st->arch, st->disable_inv
          ARG_QEXT(&ext_dec) ARG_QEXT(extra_pulses)
          ARG_QEXT(qext_bytes*(8<<BITRES)) ARG_QEXT(cap));
+#ifdef ENABLE_QEXT
    if (qext_bytes > 0) {
       qext_tracef("after base bands tell_frac=%d rng=%u st_rng=%u x_hash=%016llx",
             ec_tell_frac(&ext_dec), ext_dec.rng, st->rng, qext_hash_sig(X, C*N));
    }
+#endif
 
 #ifdef ENABLE_QEXT
    if (qext_mode) {
@@ -1601,6 +1603,7 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    if (st->prefilter_and_fold) {
       prefilter_and_fold(st, N);
    }
+#ifdef ENABLE_QEXT
    if (qext_bytes > 0) {
       qext_tracef("pre synth x_hash=%016llx old_h=%016llx qext_h=%016llx qext_end=%d",
             qext_hash_sig(X, C*N),
@@ -1608,8 +1611,10 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
             qext_hash_sig((const celt_sig *)st->qext_oldBandE, 2*NB_QEXT_BANDS),
             qext_end);
    }
+#endif
    celt_synthesis(mode, X, out_syn, oldBandE, start, effEnd,
                   C, CC, isTransient, LM, st->downsample, silence, st->arch ARG_QEXT(qext_mode) ARG_QEXT(st->qext_oldBandE) ARG_QEXT(qext_end));
+#ifdef ENABLE_QEXT
    if (qext_bytes > 0) {
       if (CC >= 2) {
          qext_tracef("post synth ch0_hash=%016llx ch1_hash=%016llx",
@@ -1618,10 +1623,12 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
          qext_tracef("post synth ch0_hash=%016llx", qext_hash_sig(out_syn[0], N));
       }
    }
+#endif
 
    c=0; do {
       st->postfilter_period=IMAX(st->postfilter_period, COMBFILTER_MINPERIOD);
       st->postfilter_period_old=IMAX(st->postfilter_period_old, COMBFILTER_MINPERIOD);
+#ifdef ENABLE_QEXT
       if (qext_bytes > 0) {
          qext_tracef("pf pre ch=%d h=%016llx p0=%d p1=%d n0=%d g0=%.9f g1=%.9f t0=%d t1=%d",
                c, qext_hash_sig(out_syn[c], N),
@@ -1629,17 +1636,21 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
                (double)st->postfilter_gain_old, (double)st->postfilter_gain,
                st->postfilter_tapset_old, st->postfilter_tapset);
       }
+#endif
       comb_filter(out_syn[c], out_syn[c], st->postfilter_period_old, st->postfilter_period, mode->shortMdctSize,
             st->postfilter_gain_old, st->postfilter_gain, st->postfilter_tapset_old, st->postfilter_tapset,
             mode->window, overlap, st->arch);
+#ifdef ENABLE_QEXT
       if (qext_bytes > 0) {
          qext_tracef("pf post0 ch=%d h=%016llx", c, qext_hash_sig(out_syn[c], N));
       }
+#endif
       if (LM!=0)
       {
          comb_filter(out_syn[c]+mode->shortMdctSize, out_syn[c]+mode->shortMdctSize, st->postfilter_period, postfilter_pitch, N-mode->shortMdctSize,
                st->postfilter_gain, postfilter_gain, st->postfilter_tapset, postfilter_tapset,
                mode->window, overlap, st->arch);
+#ifdef ENABLE_QEXT
          if (qext_bytes > 0) {
             qext_tracef("pf post1 ch=%d h=%016llx p0=%d p1=%d n1=%d g0=%.9f g1=%.9f t0=%d t1=%d",
                   c, qext_hash_sig(out_syn[c], N),
@@ -1647,6 +1658,7 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
                   (double)st->postfilter_gain, (double)postfilter_gain,
                   st->postfilter_tapset, postfilter_tapset);
          }
+#endif
       }
 
    } while (++c<CC);

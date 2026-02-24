@@ -1581,16 +1581,20 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
 #endif
          /* In stereo mode, we do not apply a scaling to the mid because we need the normalized
             mid for folding later. */
+#ifdef ENABLE_QEXT
          if (qext_trace_enabled() && !encode && ctx->i == 20) {
             qext_bands_tracef("mid call i=%d N=%d mbits=%d sbits=%d ext_b=%d xh_pre=%016llx",
                   ctx->i, N, mbits, sbits, ext_b/2+qext_extra, qext_bands_hash(X, N));
          }
+#endif
          cm = quant_band(ctx, X, N, mbits, B, lowband, LM, lowband_out, Q31ONE,
                lowband_scratch, fill ARG_QEXT(ext_b/2+qext_extra));
+#ifdef ENABLE_QEXT
          if (qext_trace_enabled() && !encode && ctx->i == 20) {
             qext_bands_tracef("mid done i=%d N=%d xh_post=%016llx",
                   ctx->i, N, qext_bands_hash(X, N));
          }
+#endif
          rebalance = mbits - (rebalance-ctx->remaining_bits);
          if (rebalance > 3<<BITRES && itheta!=0)
             sbits += rebalance - (3<<BITRES);
@@ -1601,10 +1605,12 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
          /* For a stereo split, the high bits of fill are always zero, so no
             folding will be done to the side. */
          cm |= quant_band(ctx, Y, N, sbits, B, NULL, LM, NULL, side, NULL, fill>>B ARG_QEXT(ext_b/2-qext_extra));
+#ifdef ENABLE_QEXT
          if (qext_trace_enabled() && !encode && ctx->i == 20) {
             qext_bands_tracef("side done i=%d N=%d yh_post=%016llx",
                   ctx->i, N, qext_bands_hash(Y, N));
          }
+#endif
       } else {
 #ifdef ENABLE_QEXT
          int qext_extra = 0;
@@ -1632,10 +1638,12 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
    /* This code is used by the decoder and by the resynthesis-enabled encoder */
    if (ctx->resynth)
    {
+#ifdef ENABLE_QEXT
       if (qext_trace_enabled() && !encode && ctx->i == 20) {
          qext_bands_tracef("stereo pre i=%d N=%d itheta=%d mid=%f inv=%d xh=%016llx yh=%016llx",
                ctx->i, N, itheta, (double)mid, inv, qext_bands_hash(X, N), qext_bands_hash(Y, N));
       }
+#endif
       if (N!=2)
          stereo_merge(X, Y, mid, N, ctx->arch);
       if (inv)
@@ -1644,10 +1652,12 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
          for (j=0;j<N;j++)
             Y[j] = -Y[j];
       }
+#ifdef ENABLE_QEXT
       if (qext_trace_enabled() && !encode && ctx->i == 20) {
          qext_bands_tracef("stereo post i=%d N=%d itheta=%d mid=%f inv=%d xh=%016llx yh=%016llx",
                ctx->i, N, itheta, (double)mid, inv, qext_bands_hash(X, N), qext_bands_hash(Y, N));
       }
+#endif
    }
    return cm;
 }

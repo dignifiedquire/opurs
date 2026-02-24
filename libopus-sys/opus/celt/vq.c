@@ -746,24 +746,30 @@ unsigned alg_unquant(celt_norm *X, int N, int K, int spread, int B,
 #endif
    }
 #endif
+#ifdef ENABLE_QEXT
    if (qext_vq_trace_enabled()) {
       qext_vq_tracef("pre N=%d K=%d B=%d extra=%d tell=%d iyh=%016llx ryy=%f gain=%.9f iy0=%d iy1=%d iy2=%d iy3=%d",
             N, K, B, extra_bits, ec_tell(dec), qext_vq_hash_i32(iy, N), (double)Ryy, (double)gain,
             iy[0], N>1?iy[1]:0, N>2?iy[2]:0, N>3?iy[3]:0);
    }
+#endif
    normalise_residual(iy, X, N, Ryy, gain, yy_shift);
+#ifdef ENABLE_QEXT
    if (qext_vq_trace_enabled()) {
       qext_vq_tracef("norm N=%d K=%d B=%d extra=%d xh=%016llx x0=%.9f x1=%.9f x2=%.9f x3=%.9f b0=%08x b1=%08x b2=%08x b3=%08x",
             N, K, B, extra_bits, qext_vq_hash_norm(X, N),
             (double)X[0], N>1?(double)X[1]:0.0, N>2?(double)X[2]:0.0, N>3?(double)X[3]:0.0,
             qext_vq_bits_f32(X[0]), N>1?qext_vq_bits_f32(X[1]):0, N>2?qext_vq_bits_f32(X[2]):0, N>3?qext_vq_bits_f32(X[3]):0);
    }
+#endif
    exp_rotation(X, N, -1, B, K, spread);
    collapse_mask = extract_collapse_mask(iy, N, B);
+#ifdef ENABLE_QEXT
    if (qext_vq_trace_enabled()) {
       qext_vq_tracef("post N=%d K=%d B=%d extra=%d xh=%016llx cm=%u",
             N, K, B, extra_bits, qext_vq_hash_norm(X, N), collapse_mask);
    }
+#endif
    RESTORE_STACK;
    return collapse_mask;
 }
