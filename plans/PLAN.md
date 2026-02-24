@@ -161,6 +161,8 @@ transitions between Not started / In progress / Complete.
 
 ## Supplemental Plans
 
+- [Parity Diff Review](diff_review.md) — current open parity findings and
+  grouped priorities.
 - [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — maps
   `diff_review.md` findings to targeted red→green parity tests and CI gates.
 - [SIMD Dispatch Alignment Diff](simd_diff.md) — detailed upstream-vs-Rust
@@ -168,3 +170,17 @@ transitions between Not started / In progress / Complete.
   trace.
 - [API Expansion: Upstream Parity](api-expansion-upstream-parity.md) — milestone
   plan for multistream/projection API coverage plus tooling/examples parity.
+- [Fix Plan G1: QEXT Correctness](fix-g1-qext-correctness.md) — closes QEXT
+  bitstream/PLC/sizing blockers.
+- [Fix Plan G2: Extensions/Repacketizer](fix-g2-extensions-repacketizer.md) —
+  extension parse/generate/repacketizer parity.
+- [Fix Plan G3: Public API Parity](fix-g3-public-api-parity.md) — missing
+  public APIs/constants and multistream/projection surface.
+- [Fix Plan G4: DNN/DRED/OSCE](fix-g4-dnn-dred-osce.md) — model path,
+  signature, and behavior parity for DNN features.
+- [Fix Plan G5: SIMD/Dispatch/Build](fix-g5-simd-dispatch-build.md) —
+  remaining SIMD semantic and build-flag parity.
+- [Fix Plan G6: Docs/Version Metadata](fix-g6-docs-version-metadata.md) —
+  documentation and metadata drift cleanup.
+- [Fix Plan G7: Runtime Semantics](fix-g7-runtime-semantics.md) — assert-vs-
+  status behavior parity and error-contract alignment.

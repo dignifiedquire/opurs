@@ -4,9 +4,9 @@
 Rust sources compared against upstream C in `libopus-sys/opus`.
 
 ## Remaining Items (Grouped)
-Snapshot from the current findings list (excluding resolved item `238`):
-- Remaining findings: `238`
-- Severity split: `44 HIGH`, `63 MEDIUM`, `131 LOW`
+Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
+
+Resolved/removed in this refresh (now implemented in Rust): `10,11,18,64,65,91,105,112,214,224,236`.
 
 Priority groups for execution:
 
@@ -17,13 +17,13 @@ IDs: `3,4,5,15,16,17,21,22,23,24,25,26,28,29,30,31,32,34,42,52,88,111,150,166,17
 IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
-IDs: `10,11,12,43,45,98,104,105,110,116,119,120,122,163,173,177,178,186,199`
+IDs: `12,43,45,98,104,110,116,119,120,122,163,173,177,178,186,199`
 
 4. DNN/DRED/OSCE model loading and constant parity
 IDs: `12,45,76,94,135,136,137,175,176,177,178,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
 
 5. SIMD/arch-dispatch/build-flag parity
-IDs: `64,91,107,194,202,203,204,205,212,213,214,224,230,231,232,233,234,235,236,237`
+IDs: `107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
 
 6. Documentation/version/metadata drift
 IDs: `95,96,108,131,133,134,217,223,228`
@@ -83,16 +83,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
   - `OPUS_GET_OSCE_BWE_REQUEST`
 - Detail: API surface parity for CTL constants is incomplete.
 
-10. [MEDIUM] Missing `opus_encode24` API parity.
-- Rust: `src/opus/opus_encoder.rs` (has `opus_encode`, `opus_encode_float` only)
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:2697`, `libopus-sys/opus/src/opus_encoder.c:2706`
-- Detail: Upstream exports 24-bit integer encode API (`opus_encode24`); Rust API surface currently does not provide a matching entry point.
-
-11. [MEDIUM] Missing `opus_decode24` API parity.
-- Rust: `src/opus/opus_decoder.rs` (has `opus_decode`, `opus_decode_float` only)
-- Upstream: `libopus-sys/opus/src/opus_decoder.c:937`, `libopus-sys/opus/src/opus_decoder.c:946`
-- Detail: Upstream exports 24-bit integer decode API (`opus_decode24`); Rust API surface currently does not provide a matching entry point.
-
 12. [MEDIUM][DRED] Missing decoder DRED API entry points.
 - Rust: `src/opus/opus_decoder.rs`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:1609`, `libopus-sys/opus/src/opus_decoder.c:1643`, `libopus-sys/opus/src/opus_decoder.c:1677`
@@ -122,11 +112,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/celt/celt_decoder.rs:575-588`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:567-571`
 - Detail: Upstream uses QEXT-aware sizing/stride in `pitch_downsample(..., QEXT_SCALE(2), ...)`; Rust currently drives downsampling with fixed `DECODE_BUFFER_SIZE`-based lengths.
-
-18. [MEDIUM] Decoder `ignore_extensions` behavior/CTL parity missing.
-- Rust: `src/opus/opus_decoder.rs` (no `ignore_extensions` field/ctl path found)
-- Upstream: `libopus-sys/opus/src/opus_decoder.c` (uses `st->ignore_extensions` in parse path and exposes ignore-extensions CTLs)
-- Detail: Upstream can ignore packet extensions at decode time via CTL/state; matching Rust control surface/behavior was not found.
 
 19. [MEDIUM] Multistream/projection API surface parity missing.
 - Rust: `src/` (no `opus_multistream_*` / `opus_projection_*` implementation files found)
@@ -359,16 +344,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2662`, `libopus-sys/opus/src/opus_encoder.c:2735`
 - Detail: Upstream exports direct C API functions `opus_encode` and `opus_encode_float`. Rust keeps same-named functions private and exposes method-based encoding on `OpusEncoder`, so symbol-level/public function parity differs.
 
-64. [LOW][CPU Dispatch] Runtime architecture selection is stubbed to scalar-only in Rust.
-- Rust: `src/opus/opus_encoder.rs:16-21` (`opus_select_arch()` returns `0`), plus decoder/CELT states that keep `arch=0`
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:248`, `libopus-sys/opus/src/opus_decoder.c:177`, `libopus-sys/opus/celt/celt_decoder.c:264` (runtime `opus_select_arch()` usage)
-- Detail: Upstream initializes encoder/decoder/CELT state with runtime architecture dispatch. Rust hardcodes architecture selection to `0`, so optimized arch-specific paths are never selected, diverging from upstream runtime-path selection behavior.
-
-65. [LOW][Decoder Integration] `silk_Decode` is called with fixed `arch=0` instead of decoder runtime arch.
-- Rust: `src/opus/opus_decoder.rs:578`
-- Upstream: `libopus-sys/opus/src/opus_decoder.c:478-480`
-- Detail: Upstream passes `st->arch` through to `silk_Decode(...)`. Rust passes literal `0`, so SILK decode path ignores runtime arch selection even when upstream would route arch-specific kernels.
-
 66. [MEDIUM][Runtime Semantics] Decoder validation asserts run unconditionally in Rust hot paths.
 - Rust: `src/opus/opus_decoder.rs:919`, `src/celt/celt_decoder.rs:1028`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:92-117`, `libopus-sys/opus/src/opus_decoder.c:119-123`; `libopus-sys/opus/celt/celt_decoder.c:136-151`, `libopus-sys/opus/celt/celt_decoder.c:153-155`
@@ -494,11 +469,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/analysis.c:561-567`
 - Detail: Rust `DownmixInput::Float::downmix` clamps to `[-65536, 65536]` and converts NaN to `0` before analysis FFT. Upstream does not clamp there; it checks for NaN after FFT output and bails from analysis if detected. This alters analysis feature generation under extreme/NaN inputs.
 
-91. [LOW][CPU Dispatch] Analysis path uses stubbed architecture selection (`arch=0`) in Rust.
-- Rust: `src/opus/analysis.rs:194-200`, `src/opus/analysis.rs:677`
-- Upstream: `libopus-sys/opus/src/analysis.c:220`, `libopus-sys/opus/src/analysis.c:558`
-- Detail: Upstream analysis state stores selected runtime architecture and passes it into FFT calls. Rust analysis also stores `arch` but `opus_select_arch()` is stubbed to `0`, so arch-dispatched analysis kernels are never selected.
-
 92. [LOW][Packet API] Additional packet helper signatures are slice-based rather than upstream pointer+length forms.
 - Rust: `src/opus/packet.rs:388-405` (`opus_packet_parse(data: &[u8], ...)`), `src/opus/opus_decoder.rs:1178` (`opus_packet_get_nb_frames(packet: &[u8])`)
 - Upstream: `libopus-sys/opus/src/opus.c:392-398` (`opus_packet_parse(const unsigned char *data, opus_int32 len, ...)`), `libopus-sys/opus/src/opus.c:216` (`opus_packet_get_nb_frames(const unsigned char packet[], opus_int32 len)`)
@@ -564,11 +534,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_multistream.c`, `libopus-sys/opus/src/opus_multistream_encoder.c`, `libopus-sys/opus/src/opus_multistream_decoder.c`, `libopus-sys/opus/src/opus_projection_encoder.c`, `libopus-sys/opus/src/opus_projection_decoder.c`
 - Detail: Beyond missing `mapping_matrix`, Rust currently lacks the core multistream/projection encoder/decoder implementations and public API surface present in upstream.
 
-105. [MEDIUM][API Coverage][24-bit Paths] 24-bit PCM encode/decode APIs are missing.
-- Rust: `src/opus/opus_encoder.rs` (no `opus_encode24`), `src/opus/opus_decoder.rs` (no `opus_decode24`), `src/lib.rs` exports
-- Upstream: `libopus-sys/opus/include/opus.h` (`opus_encode24`, `opus_decode24` declarations)
-- Detail: Upstream exposes dedicated 24-bit integer entry points; Rust currently exposes 16-bit and float paths only.
-
 106. [LOW][Runtime Semantics][QEXT] `compute_qext_mode` uses unconditional `panic!` on unsupported mode relation.
 - Rust: `src/celt/modes.rs:113`
 - Upstream: `libopus-sys/opus/celt/modes.c:511`
@@ -598,11 +563,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/opus/opus_encoder.rs:2810-2820`, `src/celt/celt_encoder.rs:3283-3287`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2491-2495` (enables QEXT via ctl before CELT encode)
 - Detail: Rust sets `enable_qext` on CELT state but always calls `celt_encode_with_ec(..., qext_payload=None, qext_bytes=0)`. Rust CELT QEXT path is gated on `qext_bytes > 0`, so no QEXT payload is produced through this path despite QEXT enable state.
-
-112. [MEDIUM][Decoder Controls] Ignore-extensions control path from upstream decoder is missing.
-- Rust: `src/opus/opus_decoder.rs` (no `ignore_extensions` control field/request API)
-- Upstream: `libopus-sys/opus/src/opus_decoder.c:1197-1207` (`OPUS_SET/GET_IGNORE_EXTENSIONS_REQUEST`)
-- Detail: Upstream decoder exposes controls to ignore packet extensions during decode. Rust decoder does not mirror this control plane, so extension parsing behavior cannot be toggled equivalently.
 
 113. [LOW][MLP Runtime Semantics] GRU layer neuron bound check is stricter than upstream (`< 32` vs allowing `== 32`).
 - Rust: `src/opus/mlp/layers.rs:95-103`
@@ -1116,11 +1076,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:46-48`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:59-61`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:75-77`
 - Detail: Upstream RTCD supports SSE2 and SSE4.1 dispatch levels for linear/activation/conv2d before AVX2. Rust x86 DNN dispatch checks only `avx2+fma` and otherwise falls back to scalar, so non-AVX2 x86 behavior/perf tiering is not source-equivalent.
 
-214. [LOW][Arch Dispatch Coverage][DNN ARM] ARM DOTPROD dispatch tier is not mirrored.
-- Rust: `src/dnn/simd/aarch64.rs:1-6`, `src/dnn/simd/mod.rs:36-42`, `src/dnn/simd/mod.rs:63-69`, `src/dnn/simd/mod.rs:90-96`
-- Upstream: `libopus-sys/opus/dnn/arm/arm_dnn_map.c:47-49`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:64-66`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:80-82`
-- Detail: Upstream ARM RTCD can dispatch DNN kernels at NEON and DOTPROD tiers. Rust aarch64 path currently assumes NEON-only implementations and has no DOTPROD-specific dispatch tier, so ARM dispatch coverage is incomplete relative to upstream.
-
 215. [LOW][Algorithmic Path][DNN Conv2D] Rust `compute_conv2d` lacks upstream 3x3 specialized convolution branch.
 - Rust: `src/dnn/nnet.rs:351-381`, `src/dnn/nnet.rs:406-416`
 - Upstream: `libopus-sys/opus/dnn/nnet_arch.h:230-233`
@@ -1167,12 +1122,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/lib.rs:1`, `libopus-sys/README.md:1`
 - Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
 - Detail: User-facing docs advertise 1.5.2 while the vendored/build baseline declares 1.6.1. This is documentation/versioning drift that can mislead reviewers and downstream users about compatibility targets.
-
-224. [MEDIUM][Build Parity][libopus-sys ARM SIMD/RTCD] `libopus-sys/build.rs` does not mirror upstream ARM RTCD + DOTPROD source/define enablement.
-- Rust build setup: `libopus-sys/build.rs:180-195`, `libopus-sys/build.rs:310-319`
-- Upstream RTCD/ARM source selection: `libopus-sys/opus/dnn/meson.build:17-30`, `libopus-sys/opus/meson.build:345-351`
-- Upstream ARM RTCD source lists: `libopus-sys/opus/lpcnet_sources.mk:43-45`, `libopus-sys/opus/celt_sources.mk:27-28`, `libopus-sys/opus/silk_sources.mk:34-35`
-- Detail: Upstream can enable ARM runtime dispatch (`OPUS_HAVE_RTCD`) and DOTPROD tier (`OPUS_ARM_MAY_HAVE_DOTPROD`) with `DNN_SOURCES_ARM_RTCD`/`DNN_SOURCES_DOTPROD` (plus CELT/SILK ARM RTCD maps). `build.rs` currently hard-presumes NEON on aarch64 and leaves RTCD/DOTPROD sources/defines behind TODO gates, so build-time SIMD dispatch coverage differs from upstream.
 
 225. [LOW][Build Config Defaults][libopus-sys DNN] `DISABLE_DEBUG_FLOAT` default from upstream build systems is not mirrored in generated config.
 - Rust build config: `libopus-sys/build.rs:45-84`, `libopus-sys/build.rs:277-322`
@@ -1234,11 +1183,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust call path: `src/dnn/nnet.rs:108-112`, `src/dnn/nnet.rs:137-160`, `src/dnn/simd/mod.rs:26-147`
 - Upstream arch-indexed dispatch: `libopus-sys/opus/dnn/x86/dnn_x86.h:89`, `libopus-sys/opus/dnn/x86/dnn_x86.h:100`, `libopus-sys/opus/dnn/x86/dnn_x86.h:114`, `libopus-sys/opus/dnn/arm/dnn_arm.h:62`, `libopus-sys/opus/dnn/arm/dnn_arm.h:84`, `libopus-sys/opus/dnn/arm/dnn_arm.h:98`
 - Detail: Upstream DNN compute entry points select implementations by `(arch & OPUS_ARCHMASK)` through RTCD tables/macros. Rust DNN wrappers select by host target/cpufeatures directly and expose no arch-tier control, so forced-tier testing/reproducibility semantics differ from upstream.
-
-236. [LOW][SIMD Tier Parity][DNN aarch64] Rust aarch64 DNN int8 GEMV uses only NEON dot-product emulation and does not expose upstream DOTPROD tier selection.
-- Rust aarch64 implementation: `src/dnn/simd/aarch64.rs:364-377`, `src/dnn/simd/aarch64.rs:387-462`, `src/dnn/simd/aarch64.rs:474-530`
-- Upstream DOTPROD tier and maps: `libopus-sys/opus/dnn/arm/arm_dnn_map.c:39-49`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:55-82`, `libopus-sys/opus/dnn/arm/dnn_arm.h:34-41`, `libopus-sys/opus/dnn/arm/nnet_dotprod.c:33-36`
-- Detail: Upstream ARM RTCD has a separate DOTPROD tier (`OPUS_ARCH_ARM_DOTPROD`) for DNN compute functions. Rust keeps a NEON emulated dot-product path and does not expose DOTPROD-specific runtime tiering, so ARM SIMD tier parity is incomplete.
 
 237. [LOW][Build SIMD Flags][libopus-sys x86 AVX2] `libopus-sys/build.rs` omits upstream `-mavx` companion flag for CELT/DNN AVX2 groups.
 - Rust AVX2 group flags: `libopus-sys/build.rs:165-168`, `libopus-sys/build.rs:178`
