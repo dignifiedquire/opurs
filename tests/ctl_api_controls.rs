@@ -1,14 +1,16 @@
 #[cfg(feature = "qext")]
 use opurs::internals::{opus_packet_extensions_parse, opus_packet_parse_impl};
-#[cfg(feature = "osce")]
-use opurs::OPUS_APPLICATION_RESTRICTED_LOWDELAY;
 #[cfg(feature = "qext")]
-use opurs::{
-    opus_multistream_packet_unpad, opus_packet_unpad, Bitrate, OpusEncoder, OpusMSEncoder,
-};
+use opurs::{opus_multistream_packet_unpad, opus_packet_unpad};
+#[cfg(any(feature = "qext", feature = "osce"))]
+use opurs::{Bitrate, OpusEncoder, OpusMSEncoder};
 use opurs::{
     OpusDecoder, OpusMSDecoder, OpusProjectionDecoder, OpusProjectionEncoder,
     OPUS_APPLICATION_AUDIO,
+};
+#[cfg(feature = "osce")]
+use opurs::{
+    OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
 };
 
 #[cfg(feature = "qext")]
@@ -71,14 +73,20 @@ fn parse_padding_extensions(packet: &[u8]) -> Vec<i32> {
 }
 
 #[cfg(feature = "qext")]
-fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
+fn decode_single_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
     let mut dec = OpusDecoder::new(SAMPLE_RATE_96K, 2).expect("decoder create");
     dec.set_ignore_extensions(ignore_extensions);
 
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
+    (ret, pcm, dec.final_range())
+}
+
+#[cfg(feature = "qext")]
+fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
+    let (ret, pcm, final_range) = decode_single_raw(packet, ignore_extensions);
     assert_eq!(ret, FRAME_SIZE_20MS_96K, "single decode failed");
-    (pcm, dec.final_range())
+    (pcm, final_range)
 }
 
 #[cfg(feature = "qext")]
@@ -149,6 +157,56 @@ fn decode_projection(
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
     assert_eq!(ret, FRAME_SIZE_20MS_96K, "projection decode failed");
     (pcm, dec.final_range())
+}
+
+#[cfg(feature = "qext")]
+fn packet_padding_bounds(packet: &[u8]) -> Option<(usize, usize, i32)> {
+    let mut toc = 0u8;
+    let mut sizes = [0i16; 48];
+    let mut packet_offset = 0i32;
+    let mut padding_len = 0i32;
+    let nb_frames = opus_packet_parse_impl(
+        packet,
+        false,
+        Some(&mut toc),
+        None,
+        &mut sizes,
+        None,
+        Some(&mut packet_offset),
+        Some(&mut padding_len),
+    );
+    if nb_frames <= 0 || padding_len <= 0 {
+        return None;
+    }
+
+    let start = (packet_offset - padding_len) as usize;
+    let end = packet_offset as usize;
+    if end <= start || end > packet.len() {
+        return None;
+    }
+    Some((start, end, nb_frames))
+}
+
+#[cfg(feature = "qext")]
+fn find_malformed_extension_packet(packet: &[u8]) -> Option<Vec<u8>> {
+    let (padding_start, padding_end, nb_frames) = packet_padding_bounds(packet)?;
+    let masks = [0x01u8, 0x20, 0x40, 0x80, 0xFF];
+
+    for idx in padding_start..padding_end {
+        for mask in masks {
+            let mut mutated = packet.to_vec();
+            mutated[idx] ^= mask;
+            if mutated[idx] == packet[idx] {
+                continue;
+            }
+            if opus_packet_extensions_parse(&mutated[padding_start..padding_end], 64, nb_frames)
+                .is_err()
+            {
+                return Some(mutated);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(feature = "qext")]
@@ -293,6 +351,108 @@ fn projection_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_pa
     panic!("failed to find a projection packet where extension-aware decode differs from unpadded");
 }
 
+#[cfg(feature = "qext")]
+#[test]
+fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
+    for seed in 1..=80u32 {
+        let mut enc =
+            OpusEncoder::new(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO).expect("encoder create");
+        enc.set_bitrate(Bitrate::Bits(128_000));
+        enc.set_complexity(10).expect("set complexity");
+        enc.set_qext(true);
+
+        let pcm = stereo_pcm(seed.wrapping_add(5000));
+        let mut packet = vec![0u8; 4000];
+        let len = enc.encode(&pcm, &mut packet);
+        assert!(len > 0, "encode failed");
+        packet.truncate(len as usize);
+
+        let ext_ids = parse_padding_extensions(&packet);
+        if !ext_ids.contains(&QEXT_EXTENSION_ID) {
+            continue;
+        }
+
+        let malformed = match find_malformed_extension_packet(&packet) {
+            Some(m) => m,
+            None => continue,
+        };
+
+        let (ret_ignore, pcm_ignore, rng_ignore) = decode_single_raw(&malformed, true);
+        assert_eq!(
+            ret_ignore, FRAME_SIZE_20MS_96K,
+            "ignore_extensions decode failed on malformed extension packet"
+        );
+        let (ret_with_ext_a, pcm_with_ext_a, rng_with_ext_a) = decode_single_raw(&malformed, false);
+        let (ret_with_ext_b, pcm_with_ext_b, rng_with_ext_b) = decode_single_raw(&malformed, false);
+        assert_eq!(
+            ret_with_ext_a, ret_with_ext_b,
+            "extension-aware decode return code should be deterministic on malformed extensions"
+        );
+        assert!(
+            ret_with_ext_a == FRAME_SIZE_20MS_96K || ret_with_ext_a == opurs::OPUS_INVALID_PACKET,
+            "unexpected extension-aware decode return code on malformed extension packet: {ret_with_ext_a}"
+        );
+        if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+            assert_eq!(
+                pcm_with_ext_a, pcm_with_ext_b,
+                "extension-aware decode output should be deterministic on malformed extensions"
+            );
+            assert_eq!(
+                rng_with_ext_a, rng_with_ext_b,
+                "extension-aware decode final range should be deterministic on malformed extensions"
+            );
+        }
+        assert_eq!(
+            ret_ignore, FRAME_SIZE_20MS_96K,
+            "ignore_extensions decode return code should stay valid for malformed extension packets"
+        );
+        let (_ret_ignore_b, pcm_ignore_b, rng_ignore_b) = decode_single_raw(&malformed, true);
+        assert_eq!(
+            pcm_ignore, pcm_ignore_b,
+            "ignore_extensions decode output should be deterministic on malformed extensions"
+        );
+        assert_eq!(
+            rng_ignore, rng_ignore_b,
+            "ignore_extensions decode final range should be deterministic on malformed extensions"
+        );
+        return;
+    }
+
+    panic!("failed to synthesize a malformed QEXT extension packet");
+}
+
+#[cfg(feature = "osce")]
+fn mono_pcm_20ms_48k(seed: u32) -> Vec<i16> {
+    (0..960usize)
+        .map(|i| {
+            let x = seed
+                .wrapping_mul(747796405)
+                .wrapping_add(i as u32 * 2891336453);
+            ((x >> 11) as i16).wrapping_sub(12288)
+        })
+        .collect()
+}
+
+#[cfg(feature = "osce")]
+fn decode_single_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u32) {
+    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    dec.set_complexity(10).expect("set complexity");
+    dec.set_osce_bwe(enable_osce_bwe);
+    let mut pcm = vec![0i16; 960];
+    let ret = dec.decode(packet, &mut pcm, 960, false);
+    (ret, pcm, dec.final_range())
+}
+
+#[cfg(feature = "osce")]
+fn decode_ms_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u32) {
+    let mut dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    dec.set_complexity(10).expect("set complexity");
+    dec.set_osce_bwe(enable_osce_bwe);
+    let mut pcm = vec![0i16; 960];
+    let ret = dec.decode(packet, &mut pcm, 960, false);
+    (ret, pcm, dec.final_range())
+}
+
 #[cfg(feature = "osce")]
 #[test]
 fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
@@ -331,6 +491,75 @@ fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
     assert!(proj_dec.osce_bwe());
     proj_dec.set_osce_bwe(false);
     assert!(!proj_dec.osce_bwe());
+}
+
+#[cfg(feature = "osce")]
+#[test]
+fn osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets() {
+    for seed in 1..=80u32 {
+        let pcm = mono_pcm_20ms_48k(seed);
+
+        let mut enc =
+            OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_SILK).expect("encoder create");
+        enc.set_bitrate(Bitrate::Bits(20_000));
+        enc.set_complexity(10).expect("set complexity");
+        let mut packet = vec![0u8; 2000];
+        let len = enc.encode(&pcm, &mut packet);
+        assert!(len > 0, "single-stream encode failed");
+        packet.truncate(len as usize);
+
+        let (ret_off_a, pcm_off_a, rng_off_a) = decode_single_osce(&packet, false);
+        let (ret_off_b, pcm_off_b, rng_off_b) = decode_single_osce(&packet, false);
+        let (ret_on_a, pcm_on_a, rng_on_a) = decode_single_osce(&packet, true);
+        let (ret_on_b, pcm_on_b, rng_on_b) = decode_single_osce(&packet, true);
+
+        assert_eq!(ret_off_a, 960);
+        assert_eq!(ret_off_b, 960);
+        assert_eq!(ret_on_a, 960);
+        assert_eq!(ret_on_b, 960);
+
+        assert_eq!(
+            pcm_off_a, pcm_off_b,
+            "osce off decode should be deterministic"
+        );
+        assert_eq!(
+            rng_off_a, rng_off_b,
+            "osce off final range should be deterministic"
+        );
+        assert_eq!(pcm_on_a, pcm_on_b, "osce on decode should be deterministic");
+        assert_eq!(
+            rng_on_a, rng_on_b,
+            "osce on final range should be deterministic"
+        );
+        assert_eq!(
+            rng_off_a, rng_on_a,
+            "osce toggle should not affect entropy final range"
+        );
+
+        let mut ms_enc = OpusMSEncoder::new(48_000, 1, 1, 0, &[0], OPUS_APPLICATION_VOIP)
+            .expect("ms encoder create");
+        ms_enc.set_bitrate(Bitrate::Bits(8_000));
+        ms_enc.set_complexity(10).expect("set complexity");
+        let mut ms_packet = vec![0u8; 2000];
+        let ms_len = ms_enc.encode(&pcm, &mut ms_packet);
+        assert!(ms_len > 0, "multistream encode failed");
+        ms_packet.truncate(ms_len as usize);
+
+        let (ms_ret_off, _ms_pcm_off, ms_rng_off) = decode_ms_osce(&ms_packet, false);
+        let (ms_ret_on, _ms_pcm_on, ms_rng_on) = decode_ms_osce(&ms_packet, true);
+        assert_eq!(ms_ret_off, 960);
+        assert_eq!(ms_ret_on, 960);
+        assert_eq!(
+            ms_rng_off, ms_rng_on,
+            "multistream osce toggle should not affect entropy final range"
+        );
+
+        if pcm_off_a != pcm_on_a {
+            return;
+        }
+    }
+
+    panic!("failed to observe OSCE BWE decode-path effect on single-stream SILK-only packets");
 }
 
 #[test]
