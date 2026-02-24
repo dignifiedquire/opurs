@@ -300,7 +300,7 @@ fn deemphasis(
         );
         return;
     }
-    let mut scratch = [0.0f32; 960];
+    let mut scratch = vec![0.0f32; N as usize];
     let coef0: opus_val16 = coef[0];
     let Nd: i32 = N / downsample;
     let mut c = 0;
@@ -388,7 +388,7 @@ fn celt_synthesis(
     // Allocate N + M - 1 elements so that strided mdct_backward calls
     // can form slices freq[b..b + n2*B] for b in 0..B without going
     // out of bounds. The extra elements are never read (stride skips them).
-    let mut freq = [0.0f32; 960 + 8 - 1];
+    let mut freq = vec![0.0f32; n + M as usize - 1];
     if isTransient != 0 {
         B = M;
         NB = mode.shortMdctSize;
@@ -413,7 +413,7 @@ fn celt_synthesis(
             silence,
         );
         // Use a temporary array for freq2 instead of borrowing out_syn_ch1
-        let mut freq2 = [0.0f32; 960 + 8 - 1];
+        let mut freq2 = vec![0.0f32; n + M as usize - 1];
         freq2[..n].copy_from_slice(&freq[..n]);
         b = 0;
         while b < B {
@@ -456,7 +456,7 @@ fn celt_synthesis(
             silence,
         );
         // freq2 for the second channel
-        let mut freq2 = [0.0f32; 960];
+        let mut freq2 = vec![0.0f32; n];
         denormalise_bands(
             mode,
             &X[n..2 * n],
@@ -629,7 +629,7 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
     let mut c = 0;
     loop {
         let ch_off = c as usize * chan_stride;
-        let mut etmp = [0.0f32; 120];
+        let mut etmp = vec![0.0f32; overlap_u];
 
         // Apply the pre-filter to the MDCT overlap for the next frame because
         // the post-filter will be re-applied in the decoder after the MDCT overlap.

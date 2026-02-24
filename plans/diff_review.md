@@ -6,12 +6,12 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `10,11,18,26,27,28,29,64,65,91,105,112,214,224,236`.
+Resolved/removed in this refresh (now implemented in Rust): `10,11,18,26,27,28,29,30,33,64,65,91,105,112,214,224,236`.
 
 Priority groups for execution:
 
 1. QEXT correctness blockers (bitstream/PLC/sizing)
-IDs: `3,4,5,15,16,17,21,22,23,24,25,30,31,32,34,42,52,88,111,150,166,175,229`
+IDs: `3,4,5,15,16,17,21,22,23,24,25,31,32,34,42,52,88,111,150,166,175,229`
 
 2. Extensions and repacketizer semantic parity
 IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
@@ -148,11 +148,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/celt/pitch.c:140-142` (takes `C`, `factor`, `arch`), call-site uses `QEXT_SCALE(2)` in QEXT decode path (`libopus-sys/opus/celt/celt_decoder.c:567-571`)
 - Detail: Rust downsampler infers channels from slice count and hardcodes stride/filtering for factor 2 (`2*i±1` indexing). Upstream uses a parameterized factor and explicitly passes scaled factor under QEXT. This creates a structural mismatch in PLC pitch preprocessing at 96 kHz.
 
-30. [HIGH][QEXT] CELT decoder uses fixed-size synthesis/prefilter scratch buffers where upstream is runtime-sized.
-- Rust: `src/celt/celt_decoder.rs:369`, `src/celt/celt_decoder.rs:394`, `src/celt/celt_decoder.rs:437`, `src/celt/celt_decoder.rs:604`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:432`, `libopus-sys/opus/celt/celt_decoder.c:597`
-- Detail: Rust hardcodes `freq`/`freq2` to `960(+7)` and `etmp` to `120`. Upstream allocates `freq` with size `N` and `etmp` with size `overlap`. For 96 kHz/QEXT operation (`N=1920`, `overlap=240`) this diverges from upstream buffer model and risks truncation/index errors.
-
 31. [HIGH][QEXT] Decoder synthesis path does not pass/apply QEXT denormalisation inputs.
 - Rust: `src/celt/celt_decoder.rs:341`, `src/celt/celt_decoder.rs:1787`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:416`, `libopus-sys/opus/celt/celt_decoder.c:456-458`, `libopus-sys/opus/celt/celt_decoder.c:480-483`, `libopus-sys/opus/celt/celt_decoder.c:496-498`, `libopus-sys/opus/celt/celt_decoder.c:1534-1535`
@@ -162,11 +157,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/celt/celt_decoder.rs:259-337`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:345-359`
 - Detail: Upstream has an alternate deemphasis branch (compiled for custom/QEXT builds) that uses `coef[1]` and `coef[3]` and saturating arithmetic before downsampling. Rust only implements the simpler single-coefficient path, so output filtering diverges when non-default deemphasis coefficients are used.
-
-33. [MEDIUM][QEXT] `deemphasis` scratch allocation is fixed to 960 instead of `N`.
-- Rust: `src/celt/celt_decoder.rs:281`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:335`
-- Detail: Upstream allocates `scratch` with runtime length `N`; Rust hardcodes `[f32; 960]`. This mismatches larger-frame/QEXT decode configurations where `N > 960`.
 
 34. [HIGH][QEXT] Decoder energy finalisation updates `oldEBands` even when QEXT payload is present.
 - Rust: `src/celt/celt_decoder.rs:1744-1754`

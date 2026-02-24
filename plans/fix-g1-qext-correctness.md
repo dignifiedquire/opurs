@@ -27,10 +27,11 @@ Close all QEXT bitstream/PLC/sizing correctness gaps from `diff_review.md`.
 - QEXT parity tests pass consistently in CI and local matrix runs.
 
 ## Progress
-- 2026-02-24: Resolved IDs `26,27,28,29`.
+- 2026-02-24: Resolved IDs `26,27,28,29,30,33`.
 - Implemented:
   - Mode-derived `qext_scale` initialization in CELT encoder/decoder.
   - QEXT old-band history clearing in encoder/decoder reset paths.
   - Decoder validation updates for 96 kHz QEXT modes and scaled max-period checks.
   - Encoder overlap history buffer sizing raised for 96 kHz overlap (`2*240`).
+  - Decoder synthesis/prefilter/deemphasis scratch allocations switched to runtime `N`/`overlap` sizes.
 - Added unit coverage for the above in `src/celt/celt_encoder.rs` and `src/celt/celt_decoder.rs`.
