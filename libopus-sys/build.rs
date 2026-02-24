@@ -178,20 +178,19 @@ fn build_opus() {
                 simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"), "-mavx2 -mfma"));
             }
         } else if target_arch == "aarch64" {
-            // NEON intrinsics (always available on aarch64, no extra flags needed).
-            // With PRESUME_NEON_INTR, no RTCD sources needed — NEON is used directly.
+            // aarch64: keep NEON intrinsics plus RTCD mapping/detection so C and Rust
+            // select the same runtime arch level (NEON vs DOTPROD).
+            sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_RTCD"));
+            sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_RTCD"));
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_NEON_INTR"));
             sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_NEON_INTR"));
             if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
+                sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_ARM_RTCD"));
                 sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_NEON"));
-                // TODO: add DOTPROD support to Rust SIMD, then enable:
-                //   sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_RTCD"));
-                //   sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_RTCD"));
-                //   sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_ARM_RTCD"));
-                //   simd_groups.push((
-                //       get_sources(lpcnet_mk, "DNN_SOURCES_DOTPROD"),
-                //       "-march=armv8.2-a+dotprod",
-                //   ));
+                simd_groups.push((
+                    get_sources(lpcnet_mk, "DNN_SOURCES_DOTPROD"),
+                    "-march=armv8.2-a+dotprod",
+                ));
             }
         }
     }
@@ -308,14 +307,13 @@ fn build_opus() {
                 config.push_str("#define CPU_INFO_BY_C 1\n");
             }
         } else if target_arch == "aarch64" {
-            // NEON intrinsics are always available on aarch64 — presume them.
-            // Matches upstream configure.ac behavior for aarch64.
+            // aarch64 RTCD setup (upstream-style):
+            // - NEON is always available.
+            // - DOTPROD is runtime-detected and mapped through arch level 4.
             config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
-            config.push_str("#define OPUS_ARM_PRESUME_NEON_INTR 1\n");
             config.push_str("#define OPUS_ARM_PRESUME_AARCH64_NEON_INTR 1\n");
-            // TODO: add DOTPROD support to Rust SIMD, then enable:
-            //   config.push_str("#define OPUS_ARM_MAY_HAVE_DOTPROD 1\n");
-            //   config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            config.push_str("#define OPUS_ARM_MAY_HAVE_DOTPROD 1\n");
+            config.push_str("#define OPUS_HAVE_RTCD 1\n");
         }
     }
 

@@ -149,3 +149,17 @@ pub fn opus_select_arch() -> Arch {
 pub fn opus_select_arch() -> Arch {
     Arch::Scalar
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Arch;
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn dotprod_implies_neon() {
+        assert!(Arch::DotProd.has_dotprod());
+        assert!(Arch::DotProd.has_neon());
+        assert!(Arch::Neon.has_neon());
+        assert!(!Arch::Neon.has_dotprod());
+    }
+}

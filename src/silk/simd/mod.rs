@@ -476,3 +476,20 @@ pub unsafe fn silk_NSQ_del_dec_neon(
         LTP_scale_Q14,
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn neon_nsq_del_dec_gate_accepts_dotprod_for_3_and_4_states() {
+        for arch in [Arch::Neon, Arch::DotProd] {
+            assert!(!use_neon_nsq_del_dec(arch, 1));
+            assert!(!use_neon_nsq_del_dec(arch, 2));
+            assert!(use_neon_nsq_del_dec(arch, 3));
+            assert!(use_neon_nsq_del_dec(arch, 4));
+            assert!(!use_neon_nsq_del_dec(arch, 5));
+        }
+    }
+}
