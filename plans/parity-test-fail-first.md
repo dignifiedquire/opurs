@@ -58,6 +58,22 @@ Make every known upstream parity gap produce a deterministic failing test before
   - dnn-only vectors: `264/264` passing
 - Use this as the regression baseline for upcoming API expansion and multistream/projection work.
 
+## Completed Summary: SIMD/Dispatch Alignment
+- Full divergence tracker moved to `plans/simd_diff.md`.
+- Upstream parity divergences `D1` through `D9` are fixed and committed.
+- Implemented alignment includes:
+  - DNN arch threading for dispatch on x86/ARM paths.
+  - x86 CPUID/RTCD parity (`SSE2`, `SSE4.1`, `AVX2`, `FMA`) and mask handling.
+  - ARM dotprod detection and native dotprod dispatch path.
+  - Build-time `MAY_HAVE_*` probing parity on x86 and AArch64.
+  - FUZZING arch downgrade semantics and fuzz feature plumbing.
+  - ARMv7 RTCD priority-ladder parity.
+  - Decode fuzz target behavior aligned with upstream C harness semantics.
+- Validation status after fixes:
+  - full classic parity matrix: `1416/1416` passing
+  - classic suite: `228/228` passing
+  - dnn-only suite: `264/264` passing
+
 ## Workstreams
 
 ### 1) QEXT Fail-First Coverage (Highest Risk)
@@ -131,6 +147,9 @@ Add tests first:
 
 Acceptance:
 - SIMD and scalar outputs remain parity-equivalent (or within upstream-defined tolerance where not bit-exact).
+- Current status:
+  - Primary dispatch/build/detection divergences resolved (see `plans/simd_diff.md`).
+  - Remaining work in this stream is regression hardening and additional targeted SIMD/scalar parity coverage.
 
 ### 6) Runtime Semantics / Error Contract Parity
 Target findings: representative IDs `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`.

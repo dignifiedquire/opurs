@@ -163,5 +163,8 @@ transitions between Not started / In progress / Complete.
 
 - [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — maps
   `diff_review.md` findings to targeted red→green parity tests and CI gates.
+- [SIMD Dispatch Alignment Diff](simd_diff.md) — detailed upstream-vs-Rust
+  SIMD/RTCD/build-detection diff log with completed D1–D9 fixes and commit
+  trace.
 - [API Expansion: Upstream Parity](api-expansion-upstream-parity.md) — milestone
   plan for multistream/projection API coverage plus tooling/examples parity.
