@@ -1,5 +1,7 @@
 target
-corpus
+corpus/*
+!corpus/extensions_fuzzer/
+!corpus/extensions_fuzzer/*
 artifacts
 coverage
 Cargo.lock
