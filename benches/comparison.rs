@@ -81,9 +81,10 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
             BenchmarkId::new("rust_dispatch", &label),
             &(len, max_pitch),
             |b, &(len, max_pitch)| {
+                let arch = opurs::internals::opus_select_arch();
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
-                    opurs::internals::celt_pitch_xcorr(&x[..len], &y, &mut xcorr, len);
+                    opurs::internals::celt_pitch_xcorr(&x[..len], &y, &mut xcorr, len, arch);
                     black_box(&xcorr);
                 })
             },
@@ -171,7 +172,8 @@ fn bench_silk_inner_product_flp_comparison(c: &mut Criterion) {
         });
 
         group.bench_with_input(BenchmarkId::new("rust_dispatch", n), &n, |b, &_n| {
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2)))
+            let arch = opurs::internals::opus_select_arch();
+            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2, arch)))
         });
 
         group.bench_with_input(BenchmarkId::new("c_scalar", n), &n, |b, &n| {

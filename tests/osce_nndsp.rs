@@ -160,6 +160,7 @@ fn rust_adaconv(
         _ => panic!("invalid use_nolace"),
     };
 
+    let arch = opurs::arch::opus_select_arch();
     let mut state = AdaConvState::default();
     let mut prng = Prng::new(seed);
     let mut all_out = Vec::with_capacity(num_frames * frame_size * out_channels);
@@ -189,6 +190,7 @@ fn rust_adaconv(
             filter_gain_b,
             shape_gain,
             window,
+            arch,
         );
         all_out.extend_from_slice(&x_out);
     }
@@ -197,6 +199,7 @@ fn rust_adaconv(
 
 /// Run Rust adacomb with same PRNG inputs as C harness.
 fn rust_adacomb(lace: &LACE, num_frames: usize, seed: u32) -> Vec<f32> {
+    let arch = opurs::arch::opus_select_arch();
     let mut state = AdaCombState::default();
     let mut prng = Prng::new(seed);
     let frame_size = LACE_FRAME_SIZE;
@@ -230,6 +233,7 @@ fn rust_adacomb(lace: &LACE, num_frames: usize, seed: u32) -> Vec<f32> {
             LACE_CF1_FILTER_GAIN_B,
             LACE_CF1_LOG_GAIN_LIMIT,
             &lace.window,
+            arch,
         );
         all_out.extend_from_slice(&x_out);
     }
@@ -440,8 +444,9 @@ fn test_celt_pitch_xcorr_neon() {
         .map(|_| prng.next_float() * 0.5)
         .collect();
 
+    let arch = opurs::arch::opus_select_arch();
     let mut rust_out = vec![0.0f32; max_pitch];
-    celt_pitch_xcorr(&kernel, &signal, &mut rust_out, len);
+    celt_pitch_xcorr(&kernel, &signal, &mut rust_out, len, arch);
 
     compare_outputs("celt_pitch_xcorr_neon", &rust_out, &c_out);
 }
@@ -793,12 +798,14 @@ fn test_adacomb_intermediates() {
     kernel_padded[..kernel_size].copy_from_slice(&scaled[..kernel_size]);
 
     let xcorr_start = p_offset - left_padding - pitch_lag as usize;
+    let arch = opurs::arch::opus_select_arch();
     let mut rust_xcorr = vec![0.0f32; frame_size];
     celt_pitch_xcorr(
         &kernel_padded,
         &input_buffer[xcorr_start..],
         &mut rust_xcorr,
         ADACOMB_MAX_KERNEL_SIZE,
+        arch,
     );
 
     let c_xcorr = &c_buf[36..36 + frame_size];

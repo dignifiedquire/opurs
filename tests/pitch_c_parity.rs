@@ -105,11 +105,12 @@ fn pitch_primitives_match_c_scalar() {
             ch1[i] = rng.next_f32();
         }
 
+        let arch = opurs::arch::opus_select_arch();
         let mut x_lp_r = vec![0.0f32; half];
         if c == 2 {
-            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, len);
+            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, len, arch);
         } else {
-            rust_pitch_downsample(&[&ch0], &mut x_lp_r, len);
+            rust_pitch_downsample(&[&ch0], &mut x_lp_r, len, arch);
         }
 
         let mut x_lp_c = vec![0.0f32; half];
@@ -144,6 +145,7 @@ fn pitch_primitives_match_c_scalar() {
             &y_r[..lag],
             n,
             max_pitch,
+            arch,
         );
         unsafe {
             pitch_search(
@@ -173,6 +175,7 @@ fn pitch_primitives_match_c_scalar() {
             &mut t0_r,
             prev_period,
             prev_gain,
+            arch,
         );
         let g_c = unsafe {
             remove_doubling(
@@ -205,6 +208,7 @@ fn pitch_primitives_match_c_scalar() {
 
 #[test]
 fn comb_filter_matches_c_scalar() {
+    use opurs::arch::Arch;
     use opurs::celt::common::comb_filter as rust_comb_filter;
 
     let mut rng = Rng::new(0x1234_5678_9abc_def0);
@@ -237,8 +241,20 @@ fn comb_filter_matches_c_scalar() {
         }
 
         rust_comb_filter(
-            &mut y_r, y_start, &x, x_start, t0, t1, n, g0, g1, tapset0, tapset1, &window, overlap,
-            0,
+            &mut y_r,
+            y_start,
+            &x,
+            x_start,
+            t0,
+            t1,
+            n,
+            g0,
+            g1,
+            tapset0,
+            tapset1,
+            &window,
+            overlap,
+            Arch::Scalar,
         );
 
         unsafe {

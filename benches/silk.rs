@@ -47,12 +47,14 @@ fn bench_short_prediction(c: &mut Criterion) {
             })
         });
         group.bench_with_input(BenchmarkId::new("dispatch", order), &order, |b, &order| {
+            let arch = opurs::internals::opus_select_arch();
             b.iter(|| {
                 black_box(
                     opurs::internals::silk_noise_shape_quantizer_short_prediction(
                         &buf32,
                         &coef16,
                         order as i32,
+                        arch,
                     ),
                 )
             })
@@ -86,7 +88,8 @@ fn bench_inner_product_flp(c: &mut Criterion) {
             b.iter(|| black_box(opurs::internals::silk_inner_product_FLP_scalar(&d1, &d2)))
         });
         group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &_n| {
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2)))
+            let arch = opurs::internals::opus_select_arch();
+            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2, arch)))
         });
     }
     group.finish();

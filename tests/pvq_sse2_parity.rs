@@ -1,6 +1,6 @@
 #![cfg(all(
-    feature = "simd",
     feature = "tools",
+    feature = "simd",
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 
