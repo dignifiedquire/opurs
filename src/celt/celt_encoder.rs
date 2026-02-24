@@ -110,8 +110,8 @@ pub struct OpusCustomEncoder {
     pub spec_avg: opus_val16,
     /// Overlap memory, size = channels * overlap (max 2*240 = 480)
     pub in_mem: [celt_sig; 2 * 240],
-    /// Prefilter memory, size = channels * COMBFILTER_MAXPERIOD (max 2*1024 = 2048)
-    pub prefilter_mem: [celt_sig; 2 * COMBFILTER_MAXPERIOD as usize],
+    /// Prefilter memory, size = channels * QEXT_SCALE(COMBFILTER_MAXPERIOD) (max 2*2048 = 4096)
+    pub prefilter_mem: [celt_sig; 2 * PREFILTER_MEM_CHAN_CAP],
     /// Old band energies, size = channels * nbEBands (max 2*21 = 42)
     pub oldBandE: [opus_val16; 2 * 21],
     /// Old log energies, size = channels * nbEBands (max 2*21 = 42)
@@ -140,6 +140,12 @@ fn qext_scale_for_mode(mode: &OpusCustomMode) -> i32 {
         1
     }
 }
+
+#[cfg(feature = "qext")]
+const PREFILTER_MAX_SCALE: usize = 2;
+#[cfg(not(feature = "qext"))]
+const PREFILTER_MAX_SCALE: usize = 1;
+const PREFILTER_MEM_CHAN_CAP: usize = COMBFILTER_MAXPERIOD as usize * PREFILTER_MAX_SCALE;
 
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
@@ -223,7 +229,7 @@ impl OpusCustomEncoder {
             energy_mask_len: 0,
             spec_avg: 0.0,
             in_mem: [0.0; 2 * 240],
-            prefilter_mem: [0.0; 2 * COMBFILTER_MAXPERIOD as usize],
+            prefilter_mem: [0.0; 2 * PREFILTER_MEM_CHAN_CAP],
             oldBandE: [0.0; 2 * 21],
             oldLogE: [0.0; 2 * 21],
             oldLogE2: [0.0; 2 * 21],
@@ -288,7 +294,11 @@ impl OpusCustomEncoder {
         self.intensity = 0;
         self.spec_avg = 0.0;
         (&mut self.in_mem)[..cc * overlap].fill(0.0);
-        (&mut self.prefilter_mem)[..cc * COMBFILTER_MAXPERIOD as usize].fill(0.0);
+        #[cfg(feature = "qext")]
+        let max_period = (COMBFILTER_MAXPERIOD * self.qext_scale) as usize;
+        #[cfg(not(feature = "qext"))]
+        let max_period = COMBFILTER_MAXPERIOD as usize;
+        (&mut self.prefilter_mem)[..cc * max_period].fill(0.0);
         (&mut self.oldBandE)[..cc * nbEBands].fill(0.0);
         (&mut self.oldLogE)[..cc * nbEBands].fill(-28.0);
         (&mut self.oldLogE2)[..cc * nbEBands].fill(-28.0);
@@ -318,6 +328,19 @@ mod tests {
         enc.qext_oldBandE.fill(1.0);
         enc.reset();
         assert!(enc.qext_oldBandE.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn encoder_prefilter_mem_capacity_scales_for_qext() {
+        let enc_96k = OpusCustomEncoder::new(96000, 2, Arch::Scalar).unwrap();
+        let needed_96k =
+            (COMBFILTER_MAXPERIOD * enc_96k.qext_scale) as usize * enc_96k.channels as usize;
+        assert!(enc_96k.prefilter_mem.len() >= needed_96k);
+
+        let enc_48k = OpusCustomEncoder::new(48000, 2, Arch::Scalar).unwrap();
+        let needed_48k =
+            (COMBFILTER_MAXPERIOD * enc_48k.qext_scale) as usize * enc_48k.channels as usize;
+        assert!(enc_48k.prefilter_mem.len() >= needed_48k);
     }
 }
 
@@ -1729,6 +1752,10 @@ fn run_prefilter(
     tone_freq: opus_val16,
     toneishness: opus_val32,
 ) -> i32 {
+    #[cfg(feature = "qext")]
+    let qext_scale = st.qext_scale;
+    #[cfg(not(feature = "qext"))]
+    let qext_scale = 1;
     let mut pitch_index: i32 = 0;
     let mut gain1: opus_val16 = 0.;
     let mut pf_threshold: opus_val16;
@@ -1736,28 +1763,26 @@ fn run_prefilter(
     let mut qg: i32 = 0;
     let mode = st.mode;
     let overlap = mode.overlap as i32;
-    let pre_chan_len = (N + COMBFILTER_MAXPERIOD) as usize;
+    let max_period = COMBFILTER_MAXPERIOD * qext_scale;
+    let min_period = COMBFILTER_MINPERIOD * qext_scale;
+    let pre_chan_len = (N + max_period) as usize;
     let vla = (CC as usize) * pre_chan_len;
     let mut _pre: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
     // pre[c] starts at c * pre_chan_len in _pre
     for c in 0..CC as usize {
         let pre_base = c * pre_chan_len;
-        // Copy prefilter_mem[c*1024 .. c*1024 + 1024] into pre[c][0..1024]
-        _pre[pre_base..pre_base + COMBFILTER_MAXPERIOD as usize].copy_from_slice(
-            &st.prefilter_mem
-                [c * COMBFILTER_MAXPERIOD as usize..(c + 1) * COMBFILTER_MAXPERIOD as usize],
-        );
-        // Copy in_0[c*(N+overlap)+overlap .. +N] into pre[c][1024..1024+N]
+        let max_period_u = max_period as usize;
+        _pre[pre_base..pre_base + max_period_u]
+            .copy_from_slice(&st.prefilter_mem[c * max_period_u..(c + 1) * max_period_u]);
         let in_src = c * (N + overlap) as usize + overlap as usize;
-        _pre[pre_base + COMBFILTER_MAXPERIOD as usize
-            ..pre_base + COMBFILTER_MAXPERIOD as usize + N as usize]
+        _pre[pre_base + max_period_u..pre_base + max_period_u + N as usize]
             .copy_from_slice(&in_0[in_src..in_src + N as usize]);
     }
     if enabled != 0 && toneishness > 0.99 {
         // If we detect that the signal is dominated by a single tone, don't rely
         // on the standard pitch estimator, as it can become unreliable.
         let mut multiple = 1i32;
-        let mut tf = tone_freq;
+        let mut tf = tone_freq * qext_scale as f32;
         // Using aliased version of the postfilter above 24 kHz.
         // Threshold is purposely slightly above pi to avoid triggering for Fs=48kHz.
         if tf >= 3.1416f32 {
@@ -1778,39 +1803,40 @@ fn run_prefilter(
         }
         gain1 = 0.75;
     } else if enabled != 0 && st.complexity >= 5 {
-        let vla_0 = ((COMBFILTER_MAXPERIOD + N) >> 1) as usize;
+        let vla_0 = ((max_period + N) >> 1) as usize;
         let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
         {
-            let ds_len = (COMBFILTER_MAXPERIOD + N) as usize;
+            let ds_len = (max_period + N) as usize;
             let ch0 = &_pre[..ds_len];
             if CC == 2 {
                 let ch1 = &_pre[pre_chan_len..pre_chan_len + ds_len];
-                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), ds_len, st.arch);
+                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), vla_0, 2, st.arch);
             } else {
-                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), ds_len, st.arch);
+                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), vla_0, 2, st.arch);
             }
         }
         pitch_index = pitch_search(
-            &pitch_buf[(COMBFILTER_MAXPERIOD >> 1) as usize..],
+            &pitch_buf[(max_period >> 1) as usize..],
             pitch_buf.as_slice(),
             N,
-            COMBFILTER_MAXPERIOD - 3 * COMBFILTER_MINPERIOD,
+            max_period - 3 * min_period,
             st.arch,
         );
-        pitch_index = COMBFILTER_MAXPERIOD - pitch_index;
+        pitch_index = max_period - pitch_index;
         gain1 = remove_doubling(
             pitch_buf.as_slice(),
-            COMBFILTER_MAXPERIOD,
-            COMBFILTER_MINPERIOD,
+            max_period,
+            min_period,
             N,
             &mut pitch_index,
             st.prefilter_period,
             st.prefilter_gain,
             st.arch,
         );
-        if pitch_index > COMBFILTER_MAXPERIOD - 2 {
-            pitch_index = COMBFILTER_MAXPERIOD - 2;
+        if pitch_index > max_period - 2 * qext_scale {
+            pitch_index = max_period - 2 * qext_scale;
         }
+        pitch_index /= qext_scale;
         gain1 *= 0.7f32;
         if st.loss_rate > 2 {
             gain1 *= 0.5f32;
@@ -1897,7 +1923,7 @@ fn run_prefilter(
                     in_slice,
                     0,
                     pre_slice,
-                    COMBFILTER_MAXPERIOD as usize,
+                    max_period as usize,
                     st.prefilter_period,
                     st.prefilter_period,
                     offset,
@@ -1914,7 +1940,7 @@ fn run_prefilter(
                 in_slice,
                 offset as usize,
                 pre_slice,
-                (COMBFILTER_MAXPERIOD + offset) as usize,
+                (max_period + offset) as usize,
                 st.prefilter_period,
                 pitch_index,
                 N - offset,
@@ -1960,17 +1986,15 @@ fn run_prefilter(
             let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
             let in_base = c * (N + overlap) as usize + overlap as usize;
             // Revert: copy original pre data back
-            in_0[in_base..in_base + N as usize].copy_from_slice(
-                &pre_slice
-                    [COMBFILTER_MAXPERIOD as usize..COMBFILTER_MAXPERIOD as usize + N as usize],
-            );
+            in_0[in_base..in_base + N as usize]
+                .copy_from_slice(&pre_slice[max_period as usize..max_period as usize + N as usize]);
             // Re-apply transition with gain=0
             let in_slice = &mut in_0[in_base..in_base + N as usize];
             comb_filter(
                 in_slice,
                 offset as usize,
                 pre_slice,
-                (COMBFILTER_MAXPERIOD + offset) as usize,
+                (max_period + offset) as usize,
                 st.prefilter_period,
                 pitch_index,
                 overlap,
@@ -1995,23 +2019,20 @@ fn run_prefilter(
             .copy_from_slice(&in_0[in_src..in_src + overlap as usize]);
         // Update prefilter_mem from _pre
         let pre_base = c * pre_chan_len;
-        let pfm_base = c * COMBFILTER_MAXPERIOD as usize;
-        if N > COMBFILTER_MAXPERIOD {
-            st.prefilter_mem[pfm_base..pfm_base + COMBFILTER_MAXPERIOD as usize].copy_from_slice(
-                &_pre[pre_base + N as usize..pre_base + N as usize + COMBFILTER_MAXPERIOD as usize],
+        let max_period_u = max_period as usize;
+        let pfm_base = c * max_period_u;
+        if N > max_period {
+            st.prefilter_mem[pfm_base..pfm_base + max_period_u].copy_from_slice(
+                &_pre[pre_base + N as usize..pre_base + N as usize + max_period_u],
             );
         } else {
             // Shift prefilter_mem left by N
-            st.prefilter_mem.copy_within(
-                pfm_base + N as usize..pfm_base + COMBFILTER_MAXPERIOD as usize,
-                pfm_base,
-            );
+            st.prefilter_mem
+                .copy_within(pfm_base + N as usize..pfm_base + max_period_u, pfm_base);
             // Copy last N samples from _pre
-            st.prefilter_mem[pfm_base + COMBFILTER_MAXPERIOD as usize - N as usize
-                ..pfm_base + COMBFILTER_MAXPERIOD as usize]
+            st.prefilter_mem[pfm_base + max_period_u - N as usize..pfm_base + max_period_u]
                 .copy_from_slice(
-                    &_pre[pre_base + COMBFILTER_MAXPERIOD as usize
-                        ..pre_base + COMBFILTER_MAXPERIOD as usize + N as usize],
+                    &_pre[pre_base + max_period_u..pre_base + max_period_u + N as usize],
                 );
         }
     }
@@ -2242,6 +2263,11 @@ pub fn celt_encode_with_ec<'b>(
     let mut hybrid: i32 = 0;
     let mut weak_transient: i32 = 0;
     let mut enable_tf_analysis: i32 = 0;
+    #[cfg(feature = "qext")]
+    let qext_scale = st.qext_scale;
+    #[cfg(not(feature = "qext"))]
+    let qext_scale = 1;
+    let max_period = COMBFILTER_MAXPERIOD * qext_scale;
     // QEXT: Initialize extension entropy encoder from payload buffer
     #[cfg(feature = "qext")]
     let mut _qext_empty_buf = [0u8; 0];
@@ -2445,7 +2471,7 @@ pub fn celt_encode_with_ec<'b>(
         );
         // Copy overlap from prefilter_mem into in_0 (must be before tone_detect/transient_analysis)
         let in_dst = (c * (N + overlap)) as usize;
-        let pfm_src = ((c + 1) * COMBFILTER_MAXPERIOD - overlap) as usize;
+        let pfm_src = ((c + 1) * max_period - overlap) as usize;
         in_0[in_dst..in_dst + overlap as usize]
             .copy_from_slice(&st.prefilter_mem[pfm_src..pfm_src + overlap as usize]);
         c += 1;
@@ -3317,8 +3343,6 @@ pub fn celt_encode_with_ec<'b>(
         C,
     );
     // QEXT: Compute QEXT mode and band energies after first-pass fine energy
-    #[cfg(feature = "qext")]
-    let qext_scale = st.qext_scale;
     #[cfg(feature = "qext")]
     {
         use crate::celt::modes::data_96000::NB_QEXT_BANDS;

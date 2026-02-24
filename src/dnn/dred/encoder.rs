@@ -18,6 +18,9 @@ use super::rdovae_enc::{dred_rdovae_encode_dframe, init_rdovaeenc, RDOVAEEnc, RD
 use super::stats::*;
 
 const RESAMPLING_ORDER: usize = 8;
+#[cfg(feature = "qext")]
+const MAX_DOWNMIX_BUFFER: usize = 1920 * 2;
+#[cfg(not(feature = "qext"))]
 const MAX_DOWNMIX_BUFFER: usize = 960 * 2;
 
 /// Full DRED encoder state.
@@ -158,6 +161,8 @@ fn dred_convert_to_16k(
         16000 => 1,
         24000 => 2,
         48000 => 1,
+        #[cfg(feature = "qext")]
+        96000 => 1,
         _ => panic!("Unsupported sample rate"),
     };
 
@@ -281,6 +286,41 @@ fn dred_convert_to_16k(
             RESAMPLING_ORDER,
             resample_mem,
         );
+    } else if fs == 96000 {
+        static FILTER_B: [f32; 8] = [
+            -0.002160290245,
+            0.002887088080,
+            -0.001214921271,
+            -0.001214921271,
+            0.002887088080,
+            -0.002160290245,
+            0.000880286074,
+            0.0,
+        ];
+        static FILTER_A: [f32; 8] = [
+            -5.813483928050,
+            14.932091805554,
+            -21.900933283269,
+            19.774128964756,
+            -10.978028462771,
+            3.467650469467,
+            -0.480641240411,
+            0.0,
+        ];
+        let b0 = 0.000880286074f32;
+        filter_df2t(
+            &downmix.clone(),
+            &mut downmix,
+            up * in_len,
+            b0,
+            &FILTER_B,
+            &FILTER_A,
+            RESAMPLING_ORDER,
+            resample_mem,
+        );
+        for i in 0..out_len {
+            output[i] = downmix[6 * i];
+        }
     }
 }
 

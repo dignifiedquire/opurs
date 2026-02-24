@@ -6,12 +6,12 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `10,11,18,26,27,28,29,30,33,64,65,91,105,112,214,224,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,3,4,5,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,52,64,65,88,91,105,112,150,214,224,236`.
 
 Priority groups for execution:
 
 1. QEXT correctness blockers (bitstream/PLC/sizing)
-IDs: `3,4,5,15,16,17,21,22,23,24,25,31,32,34,42,52,88,111,150,166,175,229`
+IDs: `6,111,166,175,229`
 
 2. Extensions and repacketizer semantic parity
 IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
@@ -33,30 +33,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 
 ## Findings
 
-1. [HIGH] CELT PLC attenuation ratio mismatch.
-- Rust: `src/celt/celt_decoder.rs:983`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:1002`
-- Detail: Rust uses `celt_sqrt((S1 + 1.0) / (S2 + 1.0))`; upstream uses halved S1 before ratio (`SHR32(S1,1)+1`), equivalent to `celt_sqrt((0.5*S1 + 1)/(S2 + 1))`.
-
 2. [HIGH] Missing restricted application mode parity in encoder.
 - Rust: `src/opus/opus_encoder.rs:162`, `src/opus/opus_encoder.rs:1878`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:219`, `libopus-sys/opus/src/opus_encoder.c:1467`, `libopus-sys/opus/src/opus_encoder.c:1470`
 - Detail: Rust path does not mirror `OPUS_APPLICATION_RESTRICTED_SILK` and `OPUS_APPLICATION_RESTRICTED_CELT` control-flow branches present upstream.
-
-3. [HIGH][QEXT] `run_prefilter` does not use qext-scaled periods/memory layout.
-- Rust: `src/celt/celt_encoder.rs:1697`, `src/celt/celt_encoder.rs:1704`, `src/celt/celt_encoder.rs:1754`, `src/celt/celt_encoder.rs:1953`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:1418`, `libopus-sys/opus/celt/celt_encoder.c:1423`, `libopus-sys/opus/celt/celt_encoder.c:1469`, `libopus-sys/opus/celt/celt_encoder.c:1590`
-- Detail: Rust uses fixed `COMBFILTER_MAXPERIOD/MINPERIOD`; upstream uses `QEXT_SCALE(...)` in this path.
-
-4. [HIGH][QEXT] Overlap copy into encoder input uses unscaled combfilter period.
-- Rust: `src/celt/celt_encoder.rs:2403`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:2017`
-- Detail: Rust indexes via `COMBFILTER_MAXPERIOD`; upstream indexes via `QEXT_SCALE(COMBFILTER_MAXPERIOD)`.
-
-5. [HIGH][QEXT] Decoder PLC/buffer path appears unscaled vs upstream.
-- Rust: `src/celt/celt_decoder.rs:577`, `src/celt/celt_decoder.rs:598`, `src/celt/celt_decoder.rs:653`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:704`, `libopus-sys/opus/celt/celt_decoder.c:705`, `libopus-sys/opus/celt/celt_decoder.c:573`
-- Detail: Rust uses fixed `DECODE_BUFFER_SIZE` assumptions in PLC path where upstream uses `QEXT_SCALE(DECODE_BUFFER_SIZE)` and `QEXT_SCALE(MAX_PERIOD)`.
 
 6. [MEDIUM][QEXT] QEXT payload not wired in main encoder CELT call path.
 - Rust: `src/opus/opus_encoder.rs:2818`
@@ -93,26 +73,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_encoder.c` (`opus_encoder_ctl`), `libopus-sys/opus/src/opus_decoder.c:1031` (`opus_decoder_ctl`)
 - Detail: Rust provides typed setters/getters on structs, but direct C-style variadic CTL function parity is not present.
 
-14. [HIGH][Deep PLC/QEXT] Missing 96 kHz guard for neural PLC selection in CELT decoder loss path.
-- Rust: `src/celt/celt_decoder.rs:663-667`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c` (condition around `curr_frame_type = FRAME_PLC_NEURAL` includes `st->mode->Fs != 96000`)
-- Detail: Upstream explicitly avoids Deep PLC path at 96 kHz; Rust selection condition currently omits this guard.
-
-15. [HIGH][QEXT] `run_prefilter` tone/pitch scaling logic diverges from upstream.
-- Rust: `src/celt/celt_encoder.rs:1720-1731`, `src/celt/celt_encoder.rs:1756-1767`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:1440-1453`, `libopus-sys/opus/celt/celt_encoder.c:1475-1479`
-- Detail: Upstream applies `QEXT_SCALE(tone_freq)` in tone-threshold logic and divides `pitch_index` by `qext_scale`; Rust currently uses unscaled tone-frequency comparisons and does not apply `pitch_index /= qext_scale`.
-
-16. [HIGH][QEXT] `celt_plc_pitch_search` return value is not QEXT-scaled.
-- Rust: `src/celt/celt_decoder.rs:574-590`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:556-573`
-- Detail: Upstream returns `QEXT_SCALE(pitch_index)`; Rust currently returns unscaled `pitch_index`.
-
-17. [HIGH][QEXT] PLC pitch-search downsampling inputs are not QEXT-aware.
-- Rust: `src/celt/celt_decoder.rs:575-588`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:567-571`
-- Detail: Upstream uses QEXT-aware sizing/stride in `pitch_downsample(..., QEXT_SCALE(2), ...)`; Rust currently drives downsampling with fixed `DECODE_BUFFER_SIZE`-based lengths.
-
 19. [MEDIUM] Multistream/projection API surface parity missing.
 - Rust: `src/` (no `opus_multistream_*` / `opus_projection_*` implementation files found)
 - Upstream: `libopus-sys/opus/src/opus_multistream_encoder.c`, `libopus-sys/opus/src/opus_multistream_decoder.c`, `libopus-sys/opus/src/opus_projection_encoder.c`, `libopus-sys/opus/src/opus_projection_decoder.c`
@@ -122,46 +82,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/opus/repacketizer.rs` (single-stream repacketizer only; notes no multistream manipulation)
 - Upstream: `libopus-sys/opus/src/repacketizer.c` (`opus_multistream_packet_pad`, `opus_multistream_packet_unpad`)
 - Detail: Upstream multistream packet pad/unpad helpers are not mirrored as Rust public functions.
-
-21. [HIGH][QEXT] CELT encoder prefilter memory/state sizing is not qext-scaled.
-- Rust: `src/celt/celt_encoder.rs:113`, `src/celt/celt_encoder.rs:212`, `src/celt/celt_encoder.rs:277`
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:167` (+ related QEXT-scale use sites)
-- Detail: Rust prefilter memory/state handling is dimensioned and reset with fixed `COMBFILTER_MAXPERIOD`; upstream scales combfilter-period-dependent state by `QEXT_SCALE(COMBFILTER_MAXPERIOD)` for 96 kHz QEXT operation.
-
-22. [HIGH][QEXT] CELT decoder loss-concealment core still uses hardcoded 2048/1024 instead of scaled buffer/period.
-- Rust: `src/celt/celt_decoder.rs:853-857`, `src/celt/celt_decoder.rs:869-871`, `src/celt/celt_decoder.rs:894`, `src/celt/celt_decoder.rs:926-927`, `src/celt/celt_decoder.rs:941`, `src/celt/celt_decoder.rs:950`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:835`, `libopus-sys/opus/celt/celt_decoder.c:851-853`, `libopus-sys/opus/celt/celt_decoder.c:913-916`, `libopus-sys/opus/celt/celt_decoder.c:934`, `libopus-sys/opus/celt/celt_decoder.c:939`, `libopus-sys/opus/celt/celt_decoder.c:958`
-- Detail: Upstream computes and uses `decode_buffer_size = QEXT_SCALE(DECODE_BUFFER_SIZE)` and `max_period = QEXT_SCALE(MAX_PERIOD)` throughout PLC extrapolation/energy logic. Rust still hardcodes `2048`/`1024` in multiple indexing and shift/copy sites, diverging for QEXT scale 2.
-
-23. [HIGH][QEXT] Stereo split in `quant_band` uses wrong `qext_extra` basis in one branch.
-- Rust: `src/celt/bands.rs:1707-1712`, `src/celt/bands.rs:1763-1789`
-- Upstream: `libopus-sys/opus/celt/bands.c:1517-1519`, `libopus-sys/opus/celt/bands.c:1537-1539`
-- Detail: Rust computes `qext_extra` once from `mbits` and reuses it in both branch paths. Upstream computes `qext_extra` from `mbits` in the `mbits >= sbits` branch and from `sbits` in the opposite branch. This changes QEXT side/mid bit reallocation and entropy path.
-
-24. [HIGH][QEXT] Decoder state buffer sizing is fixed to 48 kHz assumptions.
-- Rust: `src/celt/celt_decoder.rs:75`, `src/celt/celt_decoder.rs:183`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:201` (size formula includes `QEXT_SCALE(DECODE_BUFFER_SIZE)` and runtime overlap)
-- Detail: Rust allocates `decode_mem` as `2 * (DECODE_BUFFER_SIZE + 120)`. Upstream sizing scales decode buffer for QEXT and uses mode overlap; 96 kHz path needs larger state footprint. This can alter history indexing and PLC behavior under QEXT.
-
-25. [HIGH][QEXT] `pitch_downsample` API/behavior is fixed to factor-2 and cannot represent upstream QEXT factor-4 path.
-- Rust: `src/celt/pitch.rs:271-314`
-- Upstream: `libopus-sys/opus/celt/pitch.c:140-142` (takes `C`, `factor`, `arch`), call-site uses `QEXT_SCALE(2)` in QEXT decode path (`libopus-sys/opus/celt/celt_decoder.c:567-571`)
-- Detail: Rust downsampler infers channels from slice count and hardcodes stride/filtering for factor 2 (`2*i±1` indexing). Upstream uses a parameterized factor and explicitly passes scaled factor under QEXT. This creates a structural mismatch in PLC pitch preprocessing at 96 kHz.
-
-31. [HIGH][QEXT] Decoder synthesis path does not pass/apply QEXT denormalisation inputs.
-- Rust: `src/celt/celt_decoder.rs:341`, `src/celt/celt_decoder.rs:1787`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:416`, `libopus-sys/opus/celt/celt_decoder.c:456-458`, `libopus-sys/opus/celt/celt_decoder.c:480-483`, `libopus-sys/opus/celt/celt_decoder.c:496-498`, `libopus-sys/opus/celt/celt_decoder.c:1534-1535`
-- Detail: Upstream `celt_synthesis()` takes `qext_mode`, `qext_bandLogE`, `qext_end` and applies extra `denormalise_bands()` contributions when QEXT is active. Rust `celt_synthesis()` has no QEXT parameters and call-sites never feed QEXT band energies into synthesis, changing decoded HF reconstruction.
-
-32. [HIGH][QEXT] `deemphasis` misses upstream custom/QEXT IIR branch (`coef[1]`/`coef[3]` path).
-- Rust: `src/celt/celt_decoder.rs:259-337`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:345-359`
-- Detail: Upstream has an alternate deemphasis branch (compiled for custom/QEXT builds) that uses `coef[1]` and `coef[3]` and saturating arithmetic before downsampling. Rust only implements the simpler single-coefficient path, so output filtering diverges when non-default deemphasis coefficients are used.
-
-34. [HIGH][QEXT] Decoder energy finalisation updates `oldEBands` even when QEXT payload is present.
-- Rust: `src/celt/celt_decoder.rs:1744-1754`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:1520`
-- Detail: Upstream calls `unquant_energy_finalise(..., (qext_bytes > 0) ? NULL : oldBandE, ...)`, explicitly skipping base-band history updates when QEXT bits are present. Rust always passes `&mut st.oldEBands`, so history evolution differs in QEXT packets.
 
 35. [HIGH][Extensions] Public extension parse/count path does not implement upstream "repeat these extensions" expansion semantics.
 - Rust: `src/opus/extensions.rs:35-84`, `src/opus/extensions.rs:90-168`
@@ -197,11 +117,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/opus/extensions.rs:176-193`, `src/opus/repacketizer.rs:334-336`, `src/opus/repacketizer.rs:392-396`
 - Upstream: `libopus-sys/opus/src/extensions.c:471-473`, `libopus-sys/opus/src/extensions.c:495`, `libopus-sys/opus/src/repacketizer.c:263-264`, `libopus-sys/opus/src/repacketizer.c:309-310`
 - Detail: Upstream generation takes `nb_frames` and rejects any extension with `frame >= nb_frames`. Rust generator APIs do not take packet frame count and only enforce `frame < 48`, so repacketizer extension emission can accept frame indices that upstream would reject.
-
-42. [HIGH][QEXT] Encoder fade helpers omit `IMAX(1, 48000/Fs)` guard and can compute zero increment at 96 kHz.
-- Rust: `src/opus/opus_encoder.rs:833`, `src/opus/opus_encoder.rs:875`
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:554`, `libopus-sys/opus/src/opus_encoder.c:588`
-- Detail: Upstream clamps `inc` to at least 1. Rust uses raw integer division (`48000/Fs`), which becomes `0` for `Fs=96000` and can break overlap/index math in `stereo_fade`/`gain_fade` on QEXT 96 kHz paths.
 
 43. [MEDIUM] Missing CELT custom 24-bit API parity.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (no `opus_custom_encode24` / `opus_custom_decode24` entry points found)
@@ -253,11 +168,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/opus/opus_encoder.rs:942-974`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:827-851` (notably `:849-850`)
 - Detail: Upstream rejects frame sizes below 10 ms for `OPUS_APPLICATION_RESTRICTED_SILK` (`new_size < Fs/100`). Rust `frame_size_select` has no `application` parameter and therefore cannot enforce this rule, allowing frame-size selections upstream would reject.
-
-52. [HIGH][QEXT] Encoder `delay_buffer` capacity is fixed to non-QEXT size.
-- Rust: `src/opus/opus_encoder.rs:104`, `src/opus/opus_encoder.rs:250`
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:63-66`, `libopus-sys/opus/src/opus_encoder.c:145`
-- Detail: Upstream uses `delay_buffer[MAX_ENCODER_BUFFER*2]` with `MAX_ENCODER_BUFFER=960` under QEXT builds (capacity 1920 samples). Rust hardcodes `delay_buffer: [opus_val16; 960]`, matching only non-QEXT sizing and risking state truncation for 96 kHz/QEXT operation.
 
 53. [MEDIUM] Encoder init sets `encoder_buffer` unconditionally, missing restricted-app zero-buffer behavior.
 - Rust: `src/opus/opus_encoder.rs:222`
@@ -423,11 +333,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/celt/celt_encoder.rs:369`, `src/celt/celt_encoder.rs:370`, `src/celt/celt_encoder.rs:2256`, `src/celt/celt_encoder.rs:2530`, `src/celt/celt_encoder.rs:2604`
 - Upstream: `libopus-sys/opus/celt/celt_encoder.c:423`, `libopus-sys/opus/celt/celt_encoder.c:424`, `libopus-sys/opus/celt/celt_encoder.c:1895`, `libopus-sys/opus/celt/celt_encoder.c:2093`, `libopus-sys/opus/celt/celt_encoder.c:2136`
 - Detail: Upstream marks these checks as `celt_assert(...)` (typically compiled out in non-assert builds). Rust uses unconditional `assert!`, changing runtime failure behavior.
-
-88. [HIGH][QEXT][Validation] CELT decoder validation hardcodes `end <= 21`, missing upstream QEXT allowance up to 25.
-- Rust: `src/celt/celt_decoder.rs:109`
-- Upstream: `libopus-sys/opus/celt/celt_decoder.c:149-155`
-- Detail: Upstream validates `end <= 21` for non-QEXT and `end <= 25` when QEXT is enabled. Rust always asserts `st.end <= 21`, which can incorrectly reject valid QEXT decoder states.
 
 89. [LOW][Projection/Multistream] `mapping_matrix` module/API is missing.
 - Rust: `src/opus/` (no `mapping_matrix.rs` equivalent found)
@@ -718,11 +623,6 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/dnn/burg.rs:29`, `src/dnn/burg.rs:76-77`, `src/dnn/burg.rs:139-140`, `src/dnn/burg.rs:144`
 - Upstream: `libopus-sys/opus/dnn/burg.c:66`, `libopus-sys/opus/dnn/burg.c:115`, `libopus-sys/opus/dnn/burg.c:173-174`, `libopus-sys/opus/dnn/burg.c:178`
 - Detail: Upstream uses C `assert(...)` invariants in this path. Rust uses unconditional `assert!`, so invalid-state handling remains abortive rather than explicit error returns and mirrors assert-enabled behavior only.
-
-150. [HIGH][QEXT][Sampling Rate] `resampling_factor` is missing upstream 96 kHz handling under QEXT.
-- Rust: `src/celt/common.rs:32-40`, call sites `src/celt/celt_encoder.rs:142`, `src/celt/celt_encoder.rs:148`, `src/celt/celt_decoder.rs:130`, `src/celt/celt_decoder.rs:136`
-- Upstream: `libopus-sys/opus/celt/celt.c:67-72` (96 kHz case under `ENABLE_QEXT`), `libopus-sys/opus/celt/celt.c:85-90`
-- Detail: Upstream maps `96000 -> 1` when QEXT is enabled, and falls back to `ret=0` in default branch. Rust has no `96000` arm and panics in default. With Rust `qext` feature enabled, 96 kHz init paths can still trip this panic despite upstream-supported handling.
 
 151. [LOW][Validation Semantics][SILK LP] `silk_LP_variable_cutoff` omits multiple upstream invariant checks.
 - Rust: `src/silk/LP_variable_cutoff.rs:97-104`, `src/silk/LP_variable_cutoff.rs:120`

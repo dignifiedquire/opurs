@@ -32,6 +32,8 @@ const GAINS: [[opus_val16; 3]; 3] = [
 
 pub fn resampling_factor(rate: i32) -> i32 {
     match rate {
+        #[cfg(feature = "qext")]
+        96000 => 1,
         48000 => 1,
         24000 => 2,
         16000 => 3,

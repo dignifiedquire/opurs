@@ -73,12 +73,12 @@ pub struct OpusCustomDecoder {
     pub prefilter_and_fold: i32,
     pub preemph_memD: [celt_sig; 2],
 
-    pub decode_mem: [f32; 2 * (DECODE_BUFFER_SIZE + 120)], /* Size = channels*(DECODE_BUFFER_SIZE+mode->overlap) */
-    pub lpc: [f32; 2 * LPC_ORDER],                         /* Size = channels*LPC_ORDER */
-    pub oldEBands: [f32; 2 * 21],                          /* Size = 2*mode->nbEBands */
-    pub oldLogE: [f32; 2 * 21],                            /* Size = 2*mode->nbEBands */
-    pub oldLogE2: [f32; 2 * 21],                           /* Size = 2*mode->nbEBands */
-    pub backgroundLogE: [f32; 2 * 21],                     /* Size = 2*mode->nbEBands */
+    pub decode_mem: [f32; 2 * (2 * DECODE_BUFFER_SIZE + 240)], /* Size = channels*(QEXT_SCALE(DECODE_BUFFER_SIZE)+mode->overlap), max qext_scale=2, overlap=240 */
+    pub lpc: [f32; 2 * LPC_ORDER],                             /* Size = channels*LPC_ORDER */
+    pub oldEBands: [f32; 2 * 21],                              /* Size = 2*mode->nbEBands */
+    pub oldLogE: [f32; 2 * 21],                                /* Size = 2*mode->nbEBands */
+    pub oldLogE2: [f32; 2 * 21],                               /* Size = 2*mode->nbEBands */
+    pub backgroundLogE: [f32; 2 * 21],                         /* Size = 2*mode->nbEBands */
     /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
     #[cfg(feature = "qext")]
     pub qext_scale: i32,
@@ -101,6 +101,28 @@ pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
 
+#[inline]
+fn decoder_qext_scale(st: &OpusCustomDecoder) -> i32 {
+    #[cfg(feature = "qext")]
+    {
+        st.qext_scale
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        1
+    }
+}
+
+#[inline]
+fn decoder_buffer_size(st: &OpusCustomDecoder) -> usize {
+    DECODE_BUFFER_SIZE * decoder_qext_scale(st) as usize
+}
+
+#[inline]
+fn decoder_max_period(st: &OpusCustomDecoder) -> i32 {
+    MAX_PERIOD * decoder_qext_scale(st)
+}
+
 const FRAME_NONE: i32 = 0;
 const FRAME_NORMAL: i32 = 1;
 const FRAME_PLC_NOISE: i32 = 2;
@@ -122,12 +144,12 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert!(st.start < st.end);
     assert!(st.end <= st.mode.effEBands);
     // arch is now an enum — no range check needed
-    assert!(st.last_pitch_index <= 720);
-    assert!(st.last_pitch_index >= 100 || st.last_pitch_index == 0);
-    #[cfg(feature = "qext")]
-    let max_period = MAX_PERIOD * st.qext_scale;
-    #[cfg(not(feature = "qext"))]
-    let max_period = MAX_PERIOD;
+    assert!(st.last_pitch_index <= PLC_PITCH_LAG_MAX * decoder_qext_scale(st));
+    assert!(
+        st.last_pitch_index >= PLC_PITCH_LAG_MIN * decoder_qext_scale(st)
+            || st.last_pitch_index == 0
+    );
+    let max_period = decoder_max_period(st);
     assert!(st.postfilter_period < max_period);
     assert!(st.postfilter_period >= 15 || st.postfilter_period == 0);
     assert!(st.postfilter_period_old < max_period);
@@ -200,7 +222,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         prefilter_and_fold: 0,
         preemph_memD: [0.0; 2],
 
-        decode_mem: [0.0; 2 * (DECODE_BUFFER_SIZE + 120)],
+        decode_mem: [0.0; 2 * (2 * DECODE_BUFFER_SIZE + 240)],
         lpc: [0.0; 2 * LPC_ORDER],
         oldEBands: [0.0; 2 * 21],
         oldLogE: [0.0; 2 * 21],
@@ -289,7 +311,12 @@ fn deemphasis(
     accum: i32,
 ) {
     let mut apply_downsampling: i32 = 0;
-    if downsample == 1 && C == 2 && accum == 0 {
+    #[cfg(feature = "qext")]
+    let use_custom_iir = coef.len() > 1 && coef[1] != 0.0;
+    #[cfg(not(feature = "qext"))]
+    let use_custom_iir = false;
+
+    if downsample == 1 && C == 2 && accum == 0 && !use_custom_iir {
         deemphasis_stereo_simple(
             in_channels[0],
             in_channels[1],
@@ -308,6 +335,45 @@ fn deemphasis(
         let mut j: i32;
         let mut m: celt_sig = mem[c as usize];
         let x = in_channels[c as usize];
+        #[cfg(feature = "qext")]
+        if use_custom_iir {
+            let coef1: opus_val16 = coef[1];
+            let coef3: opus_val16 = coef.get(3).copied().unwrap_or(0.0);
+            j = 0;
+            while j < N {
+                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                m = coef0 * tmp - coef1 * x[j as usize];
+                scratch[j as usize] = 4.0 * (coef3 * tmp);
+                j += 1;
+            }
+            apply_downsampling = 1;
+        } else if downsample > 1 {
+            j = 0;
+            while j < N {
+                let tmp: celt_sig = x[j as usize] + VERY_SMALL + m;
+                m = coef0 * tmp;
+                scratch[j as usize] = tmp;
+                j += 1;
+            }
+            apply_downsampling = 1;
+        } else if accum != 0 {
+            j = 0;
+            while j < N {
+                let tmp: celt_sig = x[j as usize] + m + VERY_SMALL;
+                m = coef0 * tmp;
+                pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
+                j += 1;
+            }
+        } else {
+            j = 0;
+            while j < N {
+                let tmp_0: celt_sig = x[j as usize] + VERY_SMALL + m;
+                m = coef0 * tmp_0;
+                pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                j += 1;
+            }
+        }
+        #[cfg(not(feature = "qext"))]
         if downsample > 1 {
             j = 0;
             while j < N {
@@ -375,6 +441,9 @@ fn celt_synthesis(
     downsample: i32,
     silence: i32,
     _arch: Arch,
+    #[cfg(feature = "qext")] qext_mode: Option<&OpusCustomMode>,
+    #[cfg(feature = "qext")] qext_bandLogE: &[opus_val16],
+    #[cfg(feature = "qext")] mut qext_end: i32,
 ) {
     let mut b: i32;
     let B: i32;
@@ -385,6 +454,12 @@ fn celt_synthesis(
     let N = mode.shortMdctSize << LM;
     let n = N as usize;
     let M: i32 = (1) << LM;
+    #[cfg(feature = "qext")]
+    let qext_stride = crate::celt::modes::data_96000::NB_QEXT_BANDS;
+    #[cfg(feature = "qext")]
+    if mode.Fs != 96000 {
+        qext_end = 2;
+    }
     // Allocate N + M - 1 elements so that strided mdct_backward calls
     // can form slices freq[b..b + n2*B] for b in 0..B without going
     // out of bounds. The extra elements are never read (stride skips them).
@@ -412,6 +487,20 @@ fn celt_synthesis(
             downsample,
             silence,
         );
+        #[cfg(feature = "qext")]
+        if let Some(qm) = qext_mode {
+            denormalise_bands(
+                qm,
+                &X[..n],
+                &mut freq,
+                &qext_bandLogE[..qext_stride],
+                0,
+                qext_end,
+                M,
+                downsample,
+                silence,
+            );
+        }
         // Use a temporary array for freq2 instead of borrowing out_syn_ch1
         let mut freq2 = vec![0.0f32; n + M as usize - 1];
         freq2[..n].copy_from_slice(&freq[..n]);
@@ -468,6 +557,31 @@ fn celt_synthesis(
             downsample,
             silence,
         );
+        #[cfg(feature = "qext")]
+        if let Some(qm) = qext_mode {
+            denormalise_bands(
+                qm,
+                &X[..n],
+                &mut freq,
+                &qext_bandLogE[..qext_stride],
+                0,
+                qext_end,
+                M,
+                downsample,
+                silence,
+            );
+            denormalise_bands(
+                qm,
+                &X[n..2 * n],
+                &mut freq2,
+                &qext_bandLogE[qext_stride..2 * qext_stride],
+                0,
+                qext_end,
+                M,
+                downsample,
+                silence,
+            );
+        }
         let mut i = 0;
         while i < n {
             freq[i] = 0.5f32 * freq[i] + 0.5f32 * freq2[i];
@@ -501,6 +615,20 @@ fn celt_synthesis(
             downsample,
             silence,
         );
+        #[cfg(feature = "qext")]
+        if let Some(qm) = qext_mode {
+            denormalise_bands(
+                qm,
+                &X[..n],
+                &mut freq,
+                &qext_bandLogE[..qext_stride],
+                0,
+                qext_end,
+                M,
+                downsample,
+                silence,
+            );
+        }
         b = 0;
         while b < B {
             let bu = b as usize;
@@ -528,6 +656,20 @@ fn celt_synthesis(
                 downsample,
                 silence,
             );
+            #[cfg(feature = "qext")]
+            if let Some(qm) = qext_mode {
+                denormalise_bands(
+                    qm,
+                    &X[n..2 * n],
+                    &mut freq,
+                    &qext_bandLogE[qext_stride..2 * qext_stride],
+                    0,
+                    qext_end,
+                    M,
+                    downsample,
+                    silence,
+                );
+            }
             b = 0;
             while b < B {
                 let bu = b as usize;
@@ -594,18 +736,31 @@ fn tf_decode(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_plc_pitch_search
-fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: Arch) -> i32 {
-    let mut lp_pitch_buf: [opus_val16; 1024] = [0.; 1024];
-    let ds_len = DECODE_BUFFER_SIZE;
+fn celt_plc_pitch_search(
+    ch0: &[celt_sig],
+    ch1: Option<&[celt_sig]>,
+    qext_scale: i32,
+    _arch: Arch,
+) -> i32 {
+    let mut lp_pitch_buf: [opus_val16; DECODE_BUFFER_SIZE >> 1] = [0.; DECODE_BUFFER_SIZE >> 1];
+    let ds_len = DECODE_BUFFER_SIZE >> 1;
+    let factor = (2 * qext_scale) as usize;
     if let Some(ch1) = ch1 {
         pitch::pitch_downsample(
-            &[&ch0[..ds_len], &ch1[..ds_len]],
+            &[&ch0[..ds_len * factor], &ch1[..ds_len * factor]],
             &mut lp_pitch_buf,
             ds_len,
+            factor,
             _arch,
         );
     } else {
-        pitch::pitch_downsample(&[&ch0[..ds_len]], &mut lp_pitch_buf, ds_len, _arch);
+        pitch::pitch_downsample(
+            &[&ch0[..ds_len * factor]],
+            &mut lp_pitch_buf,
+            ds_len,
+            factor,
+            _arch,
+        );
     }
     let mut pitch_index = pitch::pitch_search(
         &lp_pitch_buf[(PLC_PITCH_LAG_MAX >> 1) as usize..],
@@ -615,7 +770,7 @@ fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: Arch
         _arch,
     );
     pitch_index = PLC_PITCH_LAG_MAX - pitch_index;
-    pitch_index
+    qext_scale * pitch_index
 }
 /// Upstream C: celt/celt_decoder.c:prefilter_and_fold
 fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
@@ -623,7 +778,8 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
     let mode = st.mode;
     let overlap = mode.overlap as i32;
     let overlap_u = overlap as usize;
-    let chan_stride = DECODE_BUFFER_SIZE + overlap_u;
+    let decode_buffer_size = decoder_buffer_size(st);
+    let chan_stride = decode_buffer_size + overlap_u;
     let n = N as usize;
 
     let mut c = 0;
@@ -637,7 +793,7 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
             &mut etmp,
             0,
             &st.decode_mem[ch_off..ch_off + chan_stride],
-            DECODE_BUFFER_SIZE - n,
+            decode_buffer_size - n,
             st.postfilter_period_old,
             st.postfilter_period,
             overlap,
@@ -653,7 +809,7 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
         // Simulate TDAC on the concealed audio so that it blends with the
         // MDCT of the next frame.
         for i in 0..overlap_u / 2 {
-            st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i] =
+            st.decode_mem[ch_off + decode_buffer_size - n + i] =
                 mode.window[i] * etmp[overlap_u - 1 - i] + mode.window[overlap_u - i - 1] * etmp[i];
         }
 
@@ -678,7 +834,10 @@ fn celt_decode_lost(
     let overlap = mode.overlap as i32;
     let overlap_u = overlap as usize;
     let eBands = &mode.eBands;
-    let chan_stride = DECODE_BUFFER_SIZE + overlap_u;
+    let decode_buffer_size = decoder_buffer_size(st);
+    let max_period = decoder_max_period(st);
+    let qext_scale = decoder_qext_scale(st);
+    let chan_stride = decode_buffer_size + overlap_u;
     let n = N as usize;
 
     let loss_duration = st.loss_duration;
@@ -690,7 +849,12 @@ fn celt_decode_lost(
     #[cfg(feature = "deep-plc")]
     if start == 0 {
         if let Some(ref lpcnet) = lpcnet {
-            if lpcnet.loaded && st.complexity >= 5 && st.plc_duration < 80 && st.skip_plc == 0 {
+            if lpcnet.loaded
+                && mode.Fs != 96000
+                && st.complexity >= 5
+                && st.plc_duration < 80
+                && st.skip_plc == 0
+            {
                 curr_frame_type = FRAME_PLC_NEURAL;
             }
             #[cfg(feature = "dred")]
@@ -718,7 +882,7 @@ fn celt_decode_lost(
         let mut c = 0;
         loop {
             let ch_off = c as usize * chan_stride;
-            let shift_len = 2048 - n + overlap_u;
+            let shift_len = decode_buffer_size - n + overlap_u;
             st.decode_mem
                 .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
             c += 1;
@@ -770,7 +934,7 @@ fn celt_decode_lost(
         }
         st.rng = seed;
         {
-            let out_syn_off = DECODE_BUFFER_SIZE - n;
+            let out_syn_off = decode_buffer_size - n;
             let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
             celt_synthesis(
                 mode,
@@ -791,6 +955,12 @@ fn celt_decode_lost(
                 st.downsample,
                 0,
                 st.arch,
+                #[cfg(feature = "qext")]
+                None,
+                #[cfg(feature = "qext")]
+                &[],
+                #[cfg(feature = "qext")]
+                0,
             );
         }
         // Run the postfilter with the last parameters
@@ -800,7 +970,7 @@ fn celt_decode_lost(
                 st.postfilter_period = st.postfilter_period.max(COMBFILTER_MINPERIOD);
                 st.postfilter_period_old = st.postfilter_period_old.max(COMBFILTER_MINPERIOD);
                 let ch_off = c as usize * chan_stride;
-                let out_syn_off = DECODE_BUFFER_SIZE - n;
+                let out_syn_off = decode_buffer_size - n;
                 let dm_slice = &mut st.decode_mem[ch_off..ch_off + chan_stride];
                 comb_filter_inplace(
                     dm_slice,
@@ -865,12 +1035,13 @@ fn celt_decode_lost(
         if need_pitch_search {
             let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
             pitch_index = celt_plc_pitch_search(
-                &ch0[..DECODE_BUFFER_SIZE],
+                &ch0[..decode_buffer_size],
                 if C == 2 {
-                    Some(&ch1_region[..DECODE_BUFFER_SIZE])
+                    Some(&ch1_region[..decode_buffer_size])
                 } else {
                     None
                 },
+                qext_scale,
                 st.arch,
             );
             st.last_pitch_index = pitch_index;
@@ -878,12 +1049,12 @@ fn celt_decode_lost(
             pitch_index = st.last_pitch_index;
             fade = 0.8f32;
         }
-        let exc_length: i32 = if 2 * pitch_index < 1024 {
+        let exc_length: i32 = if 2 * pitch_index < max_period {
             2 * pitch_index
         } else {
-            1024
+            max_period
         };
-        let mut _exc: [opus_val16; 1048] = [0.; 1048];
+        let mut _exc: Vec<opus_val16> = vec![0.0; (max_period as usize) + LPC_ORDER];
         let mut fir_tmp: Vec<opus_val16> = ::std::vec::from_elem(0., exc_length as usize);
         // exc = _exc[LPC_ORDER..], so exc[i] = _exc[LPC_ORDER + i]
         let exc_off = LPC_ORDER;
@@ -894,15 +1065,16 @@ fn celt_decode_lost(
             // Copy exc data from decode_mem channel
             {
                 let mut i = 0;
-                while i < MAX_PERIOD as usize + LPC_ORDER {
-                    _exc[i] = st.decode_mem[ch_off + 2048 - 1024 - LPC_ORDER + i];
+                while i < max_period as usize + LPC_ORDER {
+                    _exc[i] = st.decode_mem
+                        [ch_off + decode_buffer_size - max_period as usize - LPC_ORDER + i];
                     i += 1;
                 }
             }
             if need_pitch_search {
                 let mut ac: [opus_val32; 25] = [0.; 25];
                 _celt_autocorr(
-                    &_exc[exc_off..exc_off + MAX_PERIOD as usize],
+                    &_exc[exc_off..exc_off + max_period as usize],
                     &mut ac,
                     Some(&window[..overlap_u]),
                     overlap_u,
@@ -920,7 +1092,7 @@ fn celt_decode_lost(
             }
             {
                 let fir_n = exc_length as usize;
-                let fir_start = 1024 - fir_n; // index into _exc
+                let fir_start = max_period as usize - fir_n;
                 let fir_x = &_exc[fir_start..fir_start + LPC_ORDER + fir_n];
                 let lpc_start = c as usize * LPC_ORDER;
                 celt_fir_c(
@@ -933,7 +1105,7 @@ fn celt_decode_lost(
             }
             // Copy filtered result back to exc buffer
             {
-                let dst_start = exc_off + 1024 - exc_length as usize;
+                let dst_start = exc_off + max_period as usize - exc_length as usize;
                 _exc[dst_start..dst_start + exc_length as usize]
                     .copy_from_slice(&fir_tmp[..exc_length as usize]);
             }
@@ -943,18 +1115,18 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < decay_length {
-                    let e = _exc[exc_off + (MAX_PERIOD - decay_length + i) as usize];
+                    let e = _exc[exc_off + (max_period - decay_length + i) as usize];
                     E1 += e * e;
-                    let e = _exc[exc_off + (MAX_PERIOD - 2 * decay_length + i) as usize];
+                    let e = _exc[exc_off + (max_period - 2 * decay_length + i) as usize];
                     E2 += e * e;
                     i += 1;
                 }
             }
             E1 = if E1 < E2 { E1 } else { E2 };
             let decay_0: opus_val16 = celt_sqrt(E1 / E2);
-            // Shift decode_mem: memmove(buf, buf+N, (2048-N)*sizeof)
-            st.decode_mem.copy_within(ch_off + n..ch_off + 2048, ch_off);
-            let extrapolation_offset = MAX_PERIOD - pitch_index;
+            st.decode_mem
+                .copy_within(ch_off + n..ch_off + decode_buffer_size, ch_off);
+            let extrapolation_offset = max_period - pitch_index;
             let extrapolation_len = N + overlap;
             let mut attenuation: opus_val16 = fade * decay_0;
             let mut j_0 = 0i32;
@@ -965,10 +1137,10 @@ fn celt_decode_lost(
                     j_0 -= pitch_index;
                     attenuation *= decay_0;
                 }
-                st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i as usize] =
+                st.decode_mem[ch_off + decode_buffer_size - n + i as usize] =
                     attenuation * _exc[exc_off + (extrapolation_offset + j_0) as usize];
-                let tmp =
-                    st.decode_mem[ch_off + 2048 - 1024 - n + (extrapolation_offset + j_0) as usize];
+                let tmp = st.decode_mem[ch_off + decode_buffer_size - max_period as usize - n
+                    + (extrapolation_offset + j_0) as usize];
                 S1 += tmp * tmp;
                 i += 1;
                 j_0 += 1;
@@ -977,13 +1149,13 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < LPC_ORDER {
-                    lpc_mem[i] = st.decode_mem[ch_off + 2048 - n - 1 - i];
+                    lpc_mem[i] = st.decode_mem[ch_off + decode_buffer_size - n - 1 - i];
                     i += 1;
                 }
             }
             {
                 let lpc_start = c as usize * LPC_ORDER;
-                let iir_start = ch_off + DECODE_BUFFER_SIZE - n;
+                let iir_start = ch_off + decode_buffer_size - n;
                 let iir_buf = &mut st.decode_mem[iir_start..iir_start + extrapolation_len as usize];
                 celt_iir(
                     iir_buf,
@@ -998,7 +1170,8 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    let tmp_0: opus_val16 = st.decode_mem[ch_off + 2048 - n + i as usize];
+                    let tmp_0: opus_val16 =
+                        st.decode_mem[ch_off + decode_buffer_size - n + i as usize];
                     S2 += tmp_0 * tmp_0;
                     i += 1;
                 }
@@ -1007,7 +1180,7 @@ fn celt_decode_lost(
             if !(S1 > 0.2f32 * S2) {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i as usize] = 0.0;
+                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] = 0.0;
                     i += 1;
                 }
             } else if S1 < S2 {
@@ -1015,14 +1188,12 @@ fn celt_decode_lost(
                 let mut i = 0;
                 while i < overlap {
                     let tmp_g: opus_val16 = Q15ONE - window[i as usize] * (1.0f32 - ratio);
-                    st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i as usize] =
-                        tmp_g * st.decode_mem[ch_off + 2048 - n + i as usize];
+                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] *= tmp_g;
                     i += 1;
                 }
                 i = overlap;
                 while i < extrapolation_len {
-                    st.decode_mem[ch_off + DECODE_BUFFER_SIZE - n + i as usize] =
-                        ratio * st.decode_mem[ch_off + 2048 - n + i as usize];
+                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] *= ratio;
                     i += 1;
                 }
             }
@@ -1063,8 +1234,9 @@ pub fn celt_decode_with_ec(
     let eBands = &mode.eBands;
     let start = st.start;
     let end = st.end;
+    let decode_buffer_size = decoder_buffer_size(st);
     frame_size *= st.downsample;
-    let chan_stride = DECODE_BUFFER_SIZE + overlap as usize;
+    let chan_stride = decode_buffer_size + overlap as usize;
 
     let mut LM: i32 = 0;
     while LM <= mode.maxLM {
@@ -1082,7 +1254,7 @@ pub fn celt_decode_with_ec(
     }
     let N: i32 = M * mode.shortMdctSize;
     let n = N as usize;
-    let out_syn_off = DECODE_BUFFER_SIZE - n;
+    let out_syn_off = decode_buffer_size - n;
     let mut effEnd: i32 = end;
     if effEnd > mode.effEBands {
         effEnd = mode.effEBands;
@@ -1148,6 +1320,7 @@ pub fn celt_decode_with_ec(
             mode,
             eBands,
             out_syn_off,
+            decode_buffer_size,
             chan_stride,
             #[cfg(feature = "qext")]
             qext_payload,
@@ -1175,6 +1348,7 @@ pub fn celt_decode_with_ec(
         mode,
         eBands,
         out_syn_off,
+        decode_buffer_size,
         chan_stride,
         #[cfg(feature = "qext")]
         qext_payload,
@@ -1204,6 +1378,7 @@ fn celt_decode_body(
     mode: &'static OpusCustomMode,
     eBands: &[i16],
     out_syn_off: usize,
+    decode_buffer_size: usize,
     chan_stride: usize,
     #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
 ) -> i32 {
@@ -1575,7 +1750,7 @@ fn celt_decode_body(
     c = 0;
     loop {
         let ch_off = c as usize * chan_stride;
-        let shift_len = (2048 - N + overlap) as usize;
+        let shift_len = decode_buffer_size - n + overlap as usize;
         st.decode_mem
             .copy_within(ch_off + n..ch_off + n + shift_len, ch_off);
         c += 1;
@@ -1772,6 +1947,38 @@ fn celt_decode_body(
     if anti_collapse_rsv > 0 {
         anti_collapse_on = ec_dec_bits(dec, 1) as i32;
     }
+    #[cfg(feature = "qext")]
+    {
+        if qext_bytes > 0 {
+            // Upstream passes NULL oldBandE when QEXT payload is present:
+            // keep base-band history unchanged during finalise.
+            let mut dummy_old = vec![0.0f32; (C * nbEBands) as usize];
+            unquant_energy_finalise(
+                mode,
+                start,
+                end,
+                &mut dummy_old,
+                &fine_quant,
+                &fine_priority,
+                len * 8 - ec_tell(dec),
+                dec,
+                C,
+            );
+        } else {
+            unquant_energy_finalise(
+                mode,
+                start,
+                end,
+                &mut st.oldEBands[..(C * nbEBands) as usize],
+                &fine_quant,
+                &fine_priority,
+                len * 8 - ec_tell(dec),
+                dec,
+                C,
+            );
+        }
+    }
+    #[cfg(not(feature = "qext"))]
     unquant_energy_finalise(
         mode,
         start,
@@ -1834,6 +2041,12 @@ fn celt_decode_body(
             st.downsample,
             silence,
             st.arch,
+            #[cfg(feature = "qext")]
+            qext_mode.as_ref(),
+            #[cfg(feature = "qext")]
+            &st.qext_oldBandE,
+            #[cfg(feature = "qext")]
+            qext_end,
         );
     }
     c = 0;
@@ -2014,5 +2227,64 @@ mod tests {
     fn validate_accepts_96k_qext_decoder_state() {
         let dec = celt_decoder_init(96000, 2);
         validate_celt_decoder(&dec);
+    }
+
+    #[test]
+    fn decoder_qext_scales_buffer_size_and_period() {
+        let dec_96k = celt_decoder_init(96000, 2);
+        assert_eq!(decoder_qext_scale(&dec_96k), 2);
+        assert_eq!(decoder_buffer_size(&dec_96k), 2 * DECODE_BUFFER_SIZE);
+        assert_eq!(decoder_max_period(&dec_96k), 2 * MAX_PERIOD);
+
+        let dec_48k = celt_decoder_init(48000, 2);
+        assert_eq!(decoder_qext_scale(&dec_48k), 1);
+        assert_eq!(decoder_buffer_size(&dec_48k), DECODE_BUFFER_SIZE);
+        assert_eq!(decoder_max_period(&dec_48k), MAX_PERIOD);
+    }
+
+    #[test]
+    fn deemphasis_uses_qext_custom_iir_branch() {
+        let x = [1000.0f32, -500.0, 250.0, -125.0];
+        let in_channels: [&[f32]; 1] = [&x];
+        let mut pcm = [0.0f32; 4];
+        let mut mem = [0.0f32; 1];
+        let coef = [0.85f32, 0.1f32, 0.0f32, 0.5f32];
+
+        deemphasis(
+            &in_channels,
+            &mut pcm,
+            x.len() as i32,
+            1,
+            1,
+            &coef,
+            &mut mem,
+            0,
+        );
+
+        let mut m = 0.0f32;
+        let mut expected = [0.0f32; 4];
+        for (i, &xi) in x.iter().enumerate() {
+            let tmp = xi + m + VERY_SMALL;
+            m = coef[0] * tmp - coef[1] * xi;
+            let scratch = 4.0 * (coef[3] * tmp);
+            expected[i] = scratch * (1.0 / CELT_SIG_SCALE);
+        }
+
+        for i in 0..x.len() {
+            let d = (pcm[i] - expected[i]).abs();
+            assert!(
+                d <= 1e-6,
+                "sample {} mismatch: got {}, want {}",
+                i,
+                pcm[i],
+                expected[i]
+            );
+        }
+        assert!(
+            (mem[0] - m).abs() <= 1e-6,
+            "mem mismatch: got {}, want {}",
+            mem[0],
+            m
+        );
     }
 }

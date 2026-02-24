@@ -94,7 +94,7 @@ pub struct OpusEncoder {
     pub(crate) energy_masking: [opus_val16; 2 * 21],
     pub(crate) energy_masking_len: usize,
     pub(crate) width_mem: StereoWidthState,
-    pub(crate) delay_buffer: [opus_val16; 960],
+    pub(crate) delay_buffer: [opus_val16; 1920],
     pub(crate) detected_bandwidth: i32,
     pub(crate) nb_no_activity_ms_Q1: i32,
     pub(crate) peak_signal_energy: opus_val32,
@@ -252,7 +252,7 @@ impl OpusEncoder {
                 smoothed_width: 0.0,
                 max_follower: 0.0,
             },
-            delay_buffer: [0.0; 960],
+            delay_buffer: [0.0; 1920],
             detected_bandwidth: 0,
             nb_no_activity_ms_Q1: 0,
             peak_signal_energy: 0.0,
@@ -669,7 +669,7 @@ impl OpusEncoder {
             smoothed_width: 0.0,
             max_follower: 0.0,
         };
-        self.delay_buffer = [0.0; 960];
+        self.delay_buffer = [0.0; 1920];
         self.detected_bandwidth = 0;
         self.nb_no_activity_ms_Q1 = 0;
         self.peak_signal_energy = 0.0;
@@ -862,7 +862,7 @@ fn stereo_fade(
     let mut i: i32 = 0;
     let mut overlap: i32 = 0;
     let mut inc: i32 = 0;
-    inc = 48000 / Fs;
+    inc = (48000 / Fs).max(1);
     overlap = overlap48 / inc;
     g1 = Q15ONE - g1;
     g2 = Q15ONE - g2;
@@ -904,7 +904,7 @@ fn gain_fade(
     let mut inc: i32 = 0;
     let mut overlap: i32 = 0;
     let mut c: i32 = 0;
-    inc = 48000 / Fs;
+    inc = (48000 / Fs).max(1);
     overlap = overlap48 / inc;
     if channels == 1 {
         i = 0;

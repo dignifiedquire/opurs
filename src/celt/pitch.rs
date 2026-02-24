@@ -277,14 +277,15 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
 /// Upstream C: celt/pitch.c:pitch_downsample
 ///
 /// Downsamples and LPC-filters audio for pitch analysis.
-/// `x` contains 1 or 2 channel slices of length `len`.
-/// `x_lp` receives the downsampled output of length `len/2`.
-pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, arch: Arch) {
+/// `x` contains 1 or 2 channel slices of length at least `len*factor`.
+/// `x_lp` receives the downsampled output of length `len`.
+pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usize, arch: Arch) {
     let C = x.len();
     assert!(C == 1 || C == 2);
-    assert!(x[0].len() >= len);
-    let half = len >> 1;
-    assert!(x_lp.len() >= half);
+    assert!(factor >= 2 && factor.is_multiple_of(2));
+    assert!(x[0].len() >= len * factor);
+    assert!(x_lp.len() >= len);
+    let offset = factor >> 1;
 
     let mut ac: [f32; 5] = [0.0; 5];
     let mut tmp: f32 = 1.0;
@@ -292,19 +293,23 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, arch: Arch) 
     let mut lpc2: [f32; 5] = [0.0; 5];
     let c1: f32 = 0.8f32;
 
-    for i in 1..half {
-        x_lp[i] = 0.25f32 * x[0][2 * i - 1] + 0.25f32 * x[0][2 * i + 1] + 0.5f32 * x[0][2 * i];
+    for i in 1..len {
+        x_lp[i] = 0.25f32 * x[0][factor * i - offset]
+            + 0.25f32 * x[0][factor * i + offset]
+            + 0.5f32 * x[0][factor * i];
     }
-    x_lp[0] = 0.25f32 * x[0][1] + 0.5f32 * x[0][0];
+    x_lp[0] = 0.25f32 * x[0][offset] + 0.5f32 * x[0][0];
 
     if C == 2 {
-        for i in 1..half {
-            x_lp[i] += 0.25f32 * x[1][2 * i - 1] + 0.25f32 * x[1][2 * i + 1] + 0.5f32 * x[1][2 * i];
+        for i in 1..len {
+            x_lp[i] += 0.25f32 * x[1][factor * i - offset]
+                + 0.25f32 * x[1][factor * i + offset]
+                + 0.5f32 * x[1][factor * i];
         }
-        x_lp[0] += 0.25f32 * x[1][1] + 0.5f32 * x[1][0];
+        x_lp[0] += 0.25f32 * x[1][offset] + 0.5f32 * x[1][0];
     }
 
-    _celt_autocorr(&x_lp[..half], &mut ac, None, 0, 4, arch);
+    _celt_autocorr(&x_lp[..len], &mut ac, None, 0, 4, arch);
 
     ac[0] *= 1.0001f32;
     #[allow(clippy::needless_range_loop)]
@@ -321,7 +326,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, arch: Arch) 
     lpc2[2] = lpc[2] + c1 * lpc[1];
     lpc2[3] = lpc[3] + c1 * lpc[2];
     lpc2[4] = c1 * lpc[3];
-    celt_fir5(&mut x_lp[..half], &lpc2);
+    celt_fir5(&mut x_lp[..len], &lpc2);
 }
 
 /// Upstream C: celt/pitch.c:celt_pitch_xcorr_c
@@ -673,5 +678,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_pitch_downsample_supports_factor4() {
+        let arch = crate::arch::opus_select_arch();
+        let len = 128usize;
+        let factor = 4usize;
+        let x0 = gen_f32(len * factor, 7);
+        let x1 = gen_f32(len * factor, 11);
+        let mut out = vec![0.0f32; len];
+        pitch_downsample(&[&x0, &x1], &mut out, len, factor, arch);
+        assert!(out.iter().all(|v| v.is_finite()));
     }
 }
