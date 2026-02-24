@@ -354,6 +354,7 @@ pub fn opus_select_arch() -> Arch {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_arch = "aarch64")]
     use super::Arch;
 
     #[cfg(target_arch = "aarch64")]

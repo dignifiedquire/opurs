@@ -3019,7 +3019,10 @@ pub fn opus_encode_native(
                 }
                 st.celt_enc.bitrate = celt_bitrate;
             }
+            #[cfg(feature = "qext")]
             let mut celt_compr_bytes = nb_compr_bytes;
+            #[cfg(not(feature = "qext"))]
+            let celt_compr_bytes = nb_compr_bytes;
             #[cfg(feature = "qext")]
             if st.mode == MODE_CELT_ONLY {
                 st.celt_enc.enable_qext = st.enable_qext;

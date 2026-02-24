@@ -109,6 +109,7 @@ fn decoder_qext_scale(st: &OpusCustomDecoder) -> i32 {
     }
     #[cfg(not(feature = "qext"))]
     {
+        let _ = st;
         1
     }
 }

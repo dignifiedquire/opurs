@@ -479,6 +479,7 @@ pub unsafe fn silk_NSQ_del_dec_neon(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_arch = "aarch64")]
     use super::*;
 
     #[cfg(target_arch = "aarch64")]
