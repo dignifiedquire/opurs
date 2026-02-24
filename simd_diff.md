@@ -56,10 +56,10 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D6 - Build-time SIMD define/probe policy differs from upstream configure/meson
 
 - Severity: Medium
-- Status: OPEN
+- Status: FIXED
 - Upstream: probes intrinsics then sets `MAY_HAVE`/`PRESUME` conditionally (`libopus-sys/opus/configure.ac:530`, `libopus-sys/opus/configure.ac:592`, `libopus-sys/opus/configure.ac:644`)
-- Rust: `libopus-sys/build.rs` sets target-arch define sets directly under `feature=simd` (`libopus-sys/build.rs:295`, `libopus-sys/build.rs:313`)
-- Impact: possible macro-state mismatch on unusual compilers/flags
+- Rust: `libopus-sys/build.rs` now probes compiler SIMD flag support and conditionally enables SIMD source groups and corresponding `OPUS_*_MAY_HAVE_*` defines (including aarch64 DOTPROD)
+- Impact: aligns macro enablement with actual compiler capability and avoids over-advertising unsupported SIMD levels
 
 ### D7 - x86 AVX2 detection criteria implementation differs
 
@@ -93,5 +93,6 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Fixed D3 by threading `Arch` through DNN nnet compute entrypoints and call graph (`src/dnn/nnet.rs` plus DNN callers).
 - 2026-02-24: Fixed D4 by implementing true aarch64 DOTPROD kernels (`sdot` inline asm) for dense/sparse DNN int8 GEMV and wiring them to DOTPROD dispatch entries (`src/dnn/simd/aarch64.rs`, `src/dnn/simd/mod.rs`).
 - 2026-02-24: Fixed D7 by replacing x86 SIMD level detection with upstream-equivalent CPUID bit checks in `opus_select_arch()` (`src/arch.rs`).
-- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples; no additional confirmed divergences beyond open D6/D8/D9.
+- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples; no additional confirmed divergences beyond open D8/D9.
 - 2026-02-24: Added aarch64 unit parity tests to assert DOTPROD dense/sparse DNN int8 GEMV matches scalar reference (`src/dnn/simd/aarch64.rs`).
+- 2026-02-24: Fixed D6 by making `libopus-sys/build.rs` conditionally enable SIMD `MAY_HAVE` defines and SIMD source groups based on compiler flag probes (not blanket target-arch enables).

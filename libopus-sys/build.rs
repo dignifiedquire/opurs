@@ -122,6 +122,29 @@ fn build_opus() {
     let silk_headers_mk = parse_mk_file(&opus_source_path.join("silk_headers.mk"));
 
     let simd = cfg!(feature = "simd");
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+    // Probe compiler flag support to better match upstream MAY_HAVE/PRESUME policy.
+    let probe_build = cc::Build::new();
+    let probe_compiler = probe_build.get_compiler();
+    let probe_is_gnu_like = probe_compiler.is_like_clang() || probe_compiler.is_like_gnu();
+    let probe_is_msvc = probe_compiler.is_like_msvc();
+    let supports_flags = |flags: &str| -> bool {
+        if !probe_is_gnu_like {
+            return true;
+        }
+        flags
+            .split_whitespace()
+            .all(|flag| probe_build.is_flag_supported(flag).unwrap_or(false))
+    };
+
+    let mut x86_may_have_sse = false;
+    let mut x86_may_have_sse2 = false;
+    let mut x86_may_have_sse4_1 = false;
+    let mut x86_may_have_avx2 = false;
+    let mut arm_may_have_neon_intr = false;
+    let mut arm_presume_aarch64_neon_intr = false;
+    let mut arm_may_have_dotprod = false;
 
     // Collect source files to compile (float mode)
     let mut sources: Vec<String> = Vec::new();
@@ -144,42 +167,66 @@ fn build_opus() {
     let mut simd_groups: Vec<(Vec<String>, &str)> = Vec::new(); // (sources, arch_flag)
 
     if simd {
-        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-
         if target_arch == "x86_64" || target_arch == "x86" {
             // RTCD (runtime CPU detection) sources — no special flags
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_X86_RTCD"));
             sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_X86_RTCD"));
 
+            x86_may_have_sse = true;
+            x86_may_have_sse2 = true;
+            x86_may_have_sse4_1 = if probe_is_msvc {
+                true
+            } else {
+                supports_flags("-msse4.1")
+            };
+            x86_may_have_avx2 = if probe_is_msvc {
+                true
+            } else {
+                supports_flags("-mavx2 -mfma")
+            };
+
             // SIMD sources with per-group compiler flags
             simd_groups.push((get_sources(&celt_sources_mk, "CELT_SOURCES_SSE"), "-msse"));
             simd_groups.push((get_sources(&celt_sources_mk, "CELT_SOURCES_SSE2"), "-msse2"));
-            simd_groups.push((
-                get_sources(&celt_sources_mk, "CELT_SOURCES_SSE4_1"),
-                "-msse4.1",
-            ));
-            simd_groups.push((
-                get_sources(&silk_sources_mk, "SILK_SOURCES_SSE4_1"),
-                "-msse4.1",
-            ));
-            simd_groups.push((
-                get_sources(&celt_sources_mk, "CELT_SOURCES_AVX2"),
-                "-mavx2 -mfma",
-            ));
-            simd_groups.push((get_sources(&silk_sources_mk, "SILK_SOURCES_AVX2"), "-mavx2"));
-            simd_groups.push((
-                get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT_AVX2"),
-                "-mavx2 -mfma",
-            ));
+            if x86_may_have_sse4_1 {
+                simd_groups.push((
+                    get_sources(&celt_sources_mk, "CELT_SOURCES_SSE4_1"),
+                    "-msse4.1",
+                ));
+                simd_groups.push((
+                    get_sources(&silk_sources_mk, "SILK_SOURCES_SSE4_1"),
+                    "-msse4.1",
+                ));
+            }
+            if x86_may_have_avx2 {
+                simd_groups.push((
+                    get_sources(&celt_sources_mk, "CELT_SOURCES_AVX2"),
+                    "-mavx2 -mfma",
+                ));
+                simd_groups.push((get_sources(&silk_sources_mk, "SILK_SOURCES_AVX2"), "-mavx2"));
+                simd_groups.push((
+                    get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT_AVX2"),
+                    "-mavx2 -mfma",
+                ));
+            } else {
+                println!("cargo:warning=AVX2/FMA compile flags not supported; disabling x86 AVX2 MAY_HAVE paths");
+            }
             if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
                 sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_X86_RTCD"));
                 simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE2"), "-msse2"));
-                simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE4_1"), "-msse4.1"));
-                simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"), "-mavx2 -mfma"));
+                if x86_may_have_sse4_1 {
+                    simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE4_1"), "-msse4.1"));
+                }
+                if x86_may_have_avx2 {
+                    simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"), "-mavx2 -mfma"));
+                }
             }
         } else if target_arch == "aarch64" {
             // aarch64: keep NEON intrinsics plus RTCD mapping/detection so C and Rust
             // select the same runtime arch level (NEON vs DOTPROD).
+            arm_may_have_neon_intr = true;
+            arm_presume_aarch64_neon_intr = true;
+            arm_may_have_dotprod = supports_flags("-march=armv8.2-a+dotprod");
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_RTCD"));
             sources.extend(get_sources(&silk_sources_mk, "SILK_SOURCES_ARM_RTCD"));
             sources.extend(get_sources(&celt_sources_mk, "CELT_SOURCES_ARM_NEON_INTR"));
@@ -187,10 +234,16 @@ fn build_opus() {
             if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
                 sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_ARM_RTCD"));
                 sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_NEON"));
-                simd_groups.push((
-                    get_sources(lpcnet_mk, "DNN_SOURCES_DOTPROD"),
-                    "-march=armv8.2-a+dotprod",
-                ));
+                if arm_may_have_dotprod {
+                    simd_groups.push((
+                        get_sources(lpcnet_mk, "DNN_SOURCES_DOTPROD"),
+                        "-march=armv8.2-a+dotprod",
+                    ));
+                } else {
+                    println!(
+                        "cargo:warning=DOTPROD compile flags not supported; disabling ARM DOTPROD MAY_HAVE paths"
+                    );
+                }
             }
         }
     }
@@ -290,14 +343,22 @@ fn build_opus() {
     }
 
     if simd {
-        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-
         if target_arch == "x86_64" || target_arch == "x86" {
-            config.push_str("#define OPUS_X86_MAY_HAVE_SSE 1\n");
-            config.push_str("#define OPUS_X86_MAY_HAVE_SSE2 1\n");
-            config.push_str("#define OPUS_X86_MAY_HAVE_SSE4_1 1\n");
-            config.push_str("#define OPUS_X86_MAY_HAVE_AVX2 1\n");
-            config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            if x86_may_have_sse {
+                config.push_str("#define OPUS_X86_MAY_HAVE_SSE 1\n");
+            }
+            if x86_may_have_sse2 {
+                config.push_str("#define OPUS_X86_MAY_HAVE_SSE2 1\n");
+            }
+            if x86_may_have_sse4_1 {
+                config.push_str("#define OPUS_X86_MAY_HAVE_SSE4_1 1\n");
+            }
+            if x86_may_have_avx2 {
+                config.push_str("#define OPUS_X86_MAY_HAVE_AVX2 1\n");
+            }
+            if x86_may_have_sse || x86_may_have_sse2 || x86_may_have_sse4_1 || x86_may_have_avx2 {
+                config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            }
             // CPUID detection method for runtime CPU feature detection
             let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
             if target_os == "windows" {
@@ -310,10 +371,18 @@ fn build_opus() {
             // aarch64 RTCD setup (upstream-style):
             // - NEON is always available.
             // - DOTPROD is runtime-detected and mapped through arch level 4.
-            config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
-            config.push_str("#define OPUS_ARM_PRESUME_AARCH64_NEON_INTR 1\n");
-            config.push_str("#define OPUS_ARM_MAY_HAVE_DOTPROD 1\n");
-            config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            if arm_may_have_neon_intr {
+                config.push_str("#define OPUS_ARM_MAY_HAVE_NEON_INTR 1\n");
+            }
+            if arm_presume_aarch64_neon_intr {
+                config.push_str("#define OPUS_ARM_PRESUME_AARCH64_NEON_INTR 1\n");
+            }
+            if arm_may_have_dotprod {
+                config.push_str("#define OPUS_ARM_MAY_HAVE_DOTPROD 1\n");
+            }
+            if arm_may_have_neon_intr || arm_may_have_dotprod {
+                config.push_str("#define OPUS_HAVE_RTCD 1\n");
+            }
         }
     }
 
