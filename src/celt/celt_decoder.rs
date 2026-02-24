@@ -1550,21 +1550,8 @@ fn celt_decode_body(
             ext_dec = ec_dec_init(&mut ext_dec_buf);
             qext_bytes = payload.len() as i32;
         } else {
-            ext_dec_buf = vec![0u8; 4];
-            ext_dec = crate::celt::entcode::ec_ctx {
-                buf: &mut ext_dec_buf,
-                storage: 0,
-                end_offs: 0,
-                end_window: 0,
-                nend_bits: 0,
-                nbits_total: 32,
-                offs: 0,
-                rng: 0x80000000,
-                val: 0,
-                ext: 0,
-                rem: 0,
-                error: 0,
-            };
+            ext_dec_buf = Vec::new();
+            ext_dec = ec_dec_init(&mut ext_dec_buf);
             qext_bytes = 0;
         }
 
@@ -1838,21 +1825,8 @@ fn celt_decode_body(
 
         if let Some(ref qm) = qext_mode {
             let mut qext_collapse_masks = [0u8; 2 * NB_QEXT_BANDS];
-            let mut dummy_buf = [0u8; 4];
-            let mut dummy_dec = crate::celt::entcode::ec_ctx {
-                buf: &mut dummy_buf,
-                storage: 0,
-                end_offs: 0,
-                end_window: 0,
-                nend_bits: 0,
-                nbits_total: 32,
-                offs: 0,
-                rng: 0x80000000,
-                val: 0,
-                ext: 0,
-                rem: 0,
-                error: 0,
-            };
+            let mut dummy_buf = [0u8; 0];
+            let mut dummy_dec = ec_dec_init(&mut dummy_buf);
             let zeros = vec![0i32; nbEBands as usize];
             let ext_balance = {
                 let mut bal = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_dec) as i32;

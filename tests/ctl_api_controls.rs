@@ -534,11 +534,38 @@ fn decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
         {
             let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) = decode_single_c(&packet, false);
             assert_eq!(c_ret_with_ext, FRAME_SIZE_20MS_96K);
-            assert_eq!(pcm_with_ext, c_pcm_with_ext);
-            assert_eq!(rng_with_ext, c_rng_with_ext);
-
             let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) = decode_single_c(&packet, true);
             assert_eq!(c_ret_ignore, FRAME_SIZE_20MS_96K);
+            if pcm_with_ext != c_pcm_with_ext {
+                let first_diff = pcm_with_ext
+                    .iter()
+                    .zip(c_pcm_with_ext.iter())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or(usize::MAX);
+                let mut diff_count = 0usize;
+                let mut max_abs_diff = 0i32;
+                for (a, b) in pcm_with_ext.iter().zip(c_pcm_with_ext.iter()) {
+                    let d = (*a as i32 - *b as i32).abs();
+                    if d != 0 {
+                        diff_count += 1;
+                        max_abs_diff = max_abs_diff.max(d);
+                    }
+                }
+                panic!(
+                    "single-stream with-ext PCM mismatch (rust vs c): \
+first_diff={first_diff}, rust_sample={}, c_sample={}, \
+diff_count={diff_count}, max_abs_diff={max_abs_diff}, \
+rust_with_ext_eq_ignore={}, rust_with_ext_eq_unpadded={}, \
+c_with_ext_eq_ignore={}, rust_rng_with_ext={rng_with_ext}, c_rng_with_ext={c_rng_with_ext}, \
+rust_rng_ignore={rng_ignored}, c_rng_ignore={c_rng_ignore}",
+                    pcm_with_ext.get(first_diff).copied().unwrap_or(0),
+                    c_pcm_with_ext.get(first_diff).copied().unwrap_or(0),
+                    pcm_with_ext == pcm_ignored,
+                    pcm_with_ext == pcm_unpadded,
+                    c_pcm_with_ext == c_pcm_ignore,
+                );
+            }
+            assert_eq!(rng_with_ext, c_rng_with_ext);
             assert_eq!(pcm_ignored, c_pcm_ignore);
             assert_eq!(rng_ignored, c_rng_ignore);
 

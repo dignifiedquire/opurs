@@ -1651,10 +1651,6 @@ fn quant_band_stereo(
         }
         sign = 1 - 2 * sign;
         // quant_band on x2 (the "primary" channel for this theta)
-        #[cfg(feature = "qext")]
-        {
-            ctx.ext_b /= 2;
-        }
         if c != 0 {
             cm = quant_band(
                 ctx,
