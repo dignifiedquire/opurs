@@ -110,7 +110,10 @@ pub fn compute_qext_mode(m: &OpusCustomMode) -> OpusCustomMode {
         qext.eBands = &QEXT_EBANDS_180;
         qext.logN = &QEXT_LOGN_180;
     } else {
-        panic!("compute_qext_mode: unsupported shortMdctSize/Fs combination");
+        debug_assert!(
+            false,
+            "compute_qext_mode: unsupported shortMdctSize/Fs combination"
+        );
     }
     qext.nbEBands = NB_QEXT_BANDS;
     qext.effEBands = NB_QEXT_BANDS as i32;

@@ -160,7 +160,7 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert!(st.postfilter_tapset_old <= 2);
     assert!(st.postfilter_tapset_old >= 0);
 }
-pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> OpusCustomDecoder {
+pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCustomDecoder, i32> {
     #[cfg(feature = "qext")]
     let (mode, downsample) = if sampling_rate == 96000 {
         (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
@@ -175,21 +175,21 @@ pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> OpusCustomDecod
         opus_custom_mode_create(48000, 960, None).unwrap(),
         resampling_factor(sampling_rate),
     );
-    let mut st = opus_custom_decoder_init(mode, channels);
+    let mut st = opus_custom_decoder_init(mode, channels)?;
     st.downsample = downsample;
     if st.downsample == 0 {
-        panic!("Unsupported sampling rate: {}", sampling_rate);
+        return Err(OPUS_BAD_ARG);
     }
 
-    st
+    Ok(st)
 }
 #[inline]
-fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> OpusCustomDecoder {
+fn opus_custom_decoder_init(
+    mode: &'static OpusCustomMode,
+    channels: usize,
+) -> Result<OpusCustomDecoder, i32> {
     if channels > 2 {
-        panic!(
-            "Invalid channel count: {}, want either 0 (??), 1 or 2",
-            channels
-        );
+        return Err(OPUS_BAD_ARG);
     }
     #[cfg(feature = "qext")]
     let qext_scale = qext_scale_for_mode(mode);
@@ -237,7 +237,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
 
     st.reset();
 
-    st
+    Ok(st)
 }
 
 impl OpusCustomDecoder {
@@ -2207,18 +2207,18 @@ mod tests {
     #[test]
     fn decoder_sets_qext_scale_from_mode() {
         let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
-        let dec_96k = opus_custom_decoder_init(mode_96k, 2);
+        let dec_96k = opus_custom_decoder_init(mode_96k, 2).unwrap();
         assert_eq!(dec_96k.qext_scale, 2);
 
         let mode_48k = opus_custom_mode_create(48000, 960, None).unwrap();
-        let dec_48k = opus_custom_decoder_init(mode_48k, 2);
+        let dec_48k = opus_custom_decoder_init(mode_48k, 2).unwrap();
         assert_eq!(dec_48k.qext_scale, 1);
     }
 
     #[test]
     fn decoder_reset_clears_qext_history() {
         let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
-        let mut dec = opus_custom_decoder_init(mode_96k, 2);
+        let mut dec = opus_custom_decoder_init(mode_96k, 2).unwrap();
         dec.qext_oldBandE.fill(1.0);
         dec.reset();
         assert!(dec.qext_oldBandE.iter().all(|&v| v == 0.0));
@@ -2226,21 +2226,31 @@ mod tests {
 
     #[test]
     fn validate_accepts_96k_qext_decoder_state() {
-        let dec = celt_decoder_init(96000, 2);
+        let dec = celt_decoder_init(96000, 2).unwrap();
         validate_celt_decoder(&dec);
     }
 
     #[test]
     fn decoder_qext_scales_buffer_size_and_period() {
-        let dec_96k = celt_decoder_init(96000, 2);
+        let dec_96k = celt_decoder_init(96000, 2).unwrap();
         assert_eq!(decoder_qext_scale(&dec_96k), 2);
         assert_eq!(decoder_buffer_size(&dec_96k), 2 * DECODE_BUFFER_SIZE);
         assert_eq!(decoder_max_period(&dec_96k), 2 * MAX_PERIOD);
 
-        let dec_48k = celt_decoder_init(48000, 2);
+        let dec_48k = celt_decoder_init(48000, 2).unwrap();
         assert_eq!(decoder_qext_scale(&dec_48k), 1);
         assert_eq!(decoder_buffer_size(&dec_48k), DECODE_BUFFER_SIZE);
         assert_eq!(decoder_max_period(&dec_48k), MAX_PERIOD);
+    }
+
+    #[test]
+    fn decoder_init_invalid_sampling_rate_returns_bad_arg() {
+        assert!(matches!(celt_decoder_init(12345, 2), Err(OPUS_BAD_ARG)));
+    }
+
+    #[test]
+    fn decoder_init_invalid_channel_count_returns_bad_arg() {
+        assert!(matches!(celt_decoder_init(48000, 3), Err(OPUS_BAD_ARG)));
     }
 
     #[test]

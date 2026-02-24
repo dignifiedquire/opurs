@@ -163,7 +163,10 @@ fn dred_convert_to_16k(
         48000 => 1,
         #[cfg(feature = "qext")]
         96000 => 1,
-        _ => panic!("Unsupported sample rate"),
+        _ => {
+            debug_assert!(false, "Unsupported sample rate");
+            1
+        }
     };
 
     let mut downmix = vec![0.0f32; MAX_DOWNMIX_BUFFER];

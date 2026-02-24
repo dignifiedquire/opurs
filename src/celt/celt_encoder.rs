@@ -150,6 +150,9 @@ const PREFILTER_MEM_CHAN_CAP: usize = COMBFILTER_MAXPERIOD as usize * PREFILTER_
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
     pub fn new(sampling_rate: i32, channels: i32, arch: Arch) -> Result<Self, i32> {
+        if !(0..=2).contains(&channels) {
+            return Err(OPUS_BAD_ARG);
+        }
         #[cfg(feature = "qext")]
         let (mode, upsample) = if sampling_rate == 96000 {
             (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
@@ -166,6 +169,9 @@ impl OpusCustomEncoder {
         );
         #[cfg(feature = "qext")]
         let qext_scale = qext_scale_for_mode(mode);
+        if upsample == 0 {
+            return Err(OPUS_BAD_ARG);
+        }
 
         let mut st = OpusCustomEncoder {
             mode,
@@ -341,6 +347,22 @@ mod tests {
         let needed_48k =
             (COMBFILTER_MAXPERIOD * enc_48k.qext_scale) as usize * enc_48k.channels as usize;
         assert!(enc_48k.prefilter_mem.len() >= needed_48k);
+    }
+
+    #[test]
+    fn encoder_new_invalid_sampling_rate_returns_bad_arg() {
+        assert!(matches!(
+            OpusCustomEncoder::new(12345, 2, Arch::Scalar),
+            Err(OPUS_BAD_ARG)
+        ));
+    }
+
+    #[test]
+    fn encoder_new_invalid_channels_returns_bad_arg() {
+        assert!(matches!(
+            OpusCustomEncoder::new(48000, 3, Arch::Scalar),
+            Err(OPUS_BAD_ARG)
+        ));
     }
 }
 

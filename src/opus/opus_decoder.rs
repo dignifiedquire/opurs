@@ -74,7 +74,7 @@ impl OpusDecoder {
         }
 
         let mut st = OpusDecoder {
-            celt_dec: celt_decoder_init(Fs, channels),
+            celt_dec: celt_decoder_init(Fs, channels)?,
             silk_dec: silk_InitDecoder(),
             channels: channels as i32,
             Fs,
@@ -556,7 +556,7 @@ fn opus_decode_frame(
                     st.DecControl.internalSampleRate = 16000;
                 } else {
                     st.DecControl.internalSampleRate = 16000;
-                    panic!("libopus: assert(0) called");
+                    debug_assert!(false, "libopus: assert(0) called");
                 }
             } else {
                 st.DecControl.internalSampleRate = 16000;
@@ -715,7 +715,7 @@ fn opus_decode_frame(
                 endband = 21;
             }
             _ => {
-                panic!("libopus: assert(0) called");
+                debug_assert!(false, "libopus: assert(0) called");
             }
         }
         celt_dec.end = endband;

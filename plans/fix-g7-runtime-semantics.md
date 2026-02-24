@@ -26,3 +26,9 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 
 ## Progress
 - 2026-02-24: Aligned `opus_strerror()` output strings in `src/celt/common.rs` to upstream canonical text (removed numeric suffix decorations).
+- 2026-02-24: Replaced `resampling_factor()` panic path with upstream-style `0` return on unsupported rates (`src/celt/common.rs`), and propagated this to non-panicking `OPUS_BAD_ARG` returns in CELT init paths.
+- 2026-02-24: Converted `celt_decoder_init()` and internal custom-decoder init to return `Result<_, i32>` instead of panicking on invalid sampling rates/channels (`src/celt/celt_decoder.rs`), and propagated through `OpusDecoder::new`.
+- 2026-02-24: Updated `compute_qext_mode()` unsupported tuple handling from unconditional panic to assertion-style behavior (`src/celt/modes.rs`) to match upstream `celt_assert(0)` semantics.
+- 2026-02-24: Added CELT init negative tests for invalid sampling rate/channel behavior and validated with release+qext unit runs.
+- 2026-02-24: Replaced two `opus_decode_frame` default-switch panics with assert-style fallback behavior (`src/opus/opus_decoder.rs`) to mirror upstream `celt_assert` branches.
+- 2026-02-24: Replaced DRED 16 kHz conversion unsupported-rate panic with assert-style fallback initialization (`src/dnn/dred/encoder.rs`).

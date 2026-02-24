@@ -39,7 +39,10 @@ pub fn resampling_factor(rate: i32) -> i32 {
         16000 => 3,
         12000 => 4,
         8000 => 6,
-        _ => panic!("Unsupported sampling rate: {}", rate),
+        _ => {
+            debug_assert!(false, "Unsupported sampling rate: {}", rate);
+            0
+        }
     }
 }
 
