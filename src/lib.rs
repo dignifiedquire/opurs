@@ -2,6 +2,8 @@
 
 extern crate core;
 
+pub mod arch;
+
 mod enums;
 mod error;
 pub mod util;
