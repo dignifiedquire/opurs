@@ -23,6 +23,18 @@ use crate::silk::macros::EC_CLZ0;
 const EPSILON: f32 = 1e-15f32;
 const Q15ONE: f32 = 1.0f32;
 const NORM_SCALING: f32 = 1.0f32;
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_hash_band(x: &[f32]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &v in x {
+        for b in v.to_ne_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    }
+    h
+}
 
 pub const SPREAD_NONE: i32 = 0;
 pub const SPREAD_LIGHT: i32 = 1;
@@ -904,6 +916,25 @@ fn compute_theta(
     sctx.qalloc = qalloc;
     #[cfg(feature = "qext")]
     {
+        if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && i == 0 {
+            eprintln!(
+                "[rust theta] i={} N={} stereo={} qn={} b={} qalloc={} itheta={} itheta_q30={} delta={} imid={} iside={} ext_b={} tell={} ext_tell={}",
+                i,
+                N,
+                stereo,
+                qn,
+                *b,
+                qalloc,
+                itheta,
+                itheta_q30,
+                sctx.delta,
+                imid,
+                iside,
+                ctx.ext_b,
+                ec_tell_frac(ec),
+                ec_tell_frac(unsafe { &*ctx.ext_ec }),
+            );
+        }
         sctx.itheta_q30 = itheta_q30;
     }
 }
@@ -982,6 +1013,20 @@ fn quant_partition(
     mut fill: i32,
     ec: &mut ec_ctx,
 ) -> u32 {
+    #[cfg(feature = "qext")]
+    let qp_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some() && ctx.encode == 0 && ctx.i == 20;
+    #[cfg(feature = "qext")]
+    if qp_trace {
+        eprintln!(
+            "[rust qp] enter N={} b={} B={} LM={} ext_b={} xh={:016x}",
+            N,
+            b,
+            B,
+            LM,
+            ctx.ext_b,
+            qext_hash_band(&X[..N as usize]),
+        );
+    }
     let B0 = B;
     let mut cm: u32;
     let encode = ctx.encode;
@@ -1293,6 +1338,19 @@ fn quant_partition(
             }
         }
     }
+    #[cfg(feature = "qext")]
+    if qp_trace {
+        eprintln!(
+            "[rust qp] exit  N={} b={} B={} LM={} ext_b={} cm={} xh={:016x}",
+            N,
+            b,
+            B,
+            LM,
+            ctx.ext_b,
+            cm,
+            qext_hash_band(&X[..N as usize]),
+        );
+    }
     cm
 }
 
@@ -1317,17 +1375,19 @@ fn cubic_quant_partition(
     ctx.remaining_bits = ec.storage as i32 * 8 * 8 - ec_tell_frac(ec) as i32;
     b = b.min(ctx.remaining_bits);
     if LM == 0 || b <= (2 * N) << BITRES {
-        b = b.min((b + ((N - 1) << BITRES) / 2).min(ctx.remaining_bits));
+        b = (b + ((N - 1) << BITRES) / 2).min(ctx.remaining_bits);
         // Resolution left after coding the cube face
         let res = ((b - (1 << BITRES) - ctx.m.logN[ctx.i as usize] as i32 - (LM << BITRES) - 1)
             / (N - 1))
             >> BITRES;
         let res = 14.min(0.max(res));
-        if encode != 0 {
+        let ret = if encode != 0 {
             cubic_quant(X, N, res, B, ec, gain, resynth)
         } else {
             cubic_unquant(X, N, res, B, ec, gain)
-        }
+        };
+        ctx.remaining_bits = ec.storage as i32 * 8 * 8 - ec_tell_frac(ec) as i32;
+        ret
     } else {
         let N0 = N;
         N >>= 1;
@@ -1732,6 +1792,18 @@ fn quant_band_stereo(
             {
                 ctx.ext_b = saved_ext_b / 2 + qext_extra;
             }
+            #[cfg(feature = "qext")]
+            if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && ctx.i == 20 {
+                eprintln!(
+                    "[rust stereo] mid call i={} N={} mbits={} sbits={} ext_b={} xh_pre={:016x}",
+                    ctx.i,
+                    N,
+                    mbits,
+                    sbits,
+                    ctx.ext_b,
+                    qext_hash_band(&X[..N as usize]),
+                );
+            }
             cm = quant_band(
                 ctx,
                 X,
@@ -1746,6 +1818,15 @@ fn quant_band_stereo(
                 fill,
                 ec,
             );
+            #[cfg(feature = "qext")]
+            if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && ctx.i == 20 {
+                eprintln!(
+                    "[rust stereo] mid done i={} N={} xh_post={:016x}",
+                    ctx.i,
+                    N,
+                    qext_hash_band(&X[..N as usize]),
+                );
+            }
             rebalance = mbits - (rebalance - ctx.remaining_bits);
             if rebalance > (3) << BITRES && itheta != 0 {
                 sbits += rebalance - ((3) << BITRES);
@@ -1772,6 +1853,15 @@ fn quant_band_stereo(
                 fill >> B,
                 ec,
             );
+            #[cfg(feature = "qext")]
+            if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && ctx.i == 20 {
+                eprintln!(
+                    "[rust stereo] side done i={} N={} yh_post={:016x}",
+                    ctx.i,
+                    N,
+                    qext_hash_band(&Y[..N as usize]),
+                );
+            }
         } else {
             #[cfg(feature = "qext")]
             let qext_extra = {
@@ -1828,6 +1918,19 @@ fn quant_band_stereo(
         }
     }
     if ctx.resynth != 0 {
+        #[cfg(feature = "qext")]
+        if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && ctx.i == 20 {
+            eprintln!(
+                "[rust stereo] pre i={} N={} itheta={} mid={:.9} inv={} xh={:016x} yh={:016x}",
+                ctx.i,
+                N,
+                itheta,
+                mid,
+                inv,
+                qext_hash_band(&X[..N as usize]),
+                qext_hash_band(&Y[..N as usize])
+            );
+        }
         if N != 2 {
             stereo_merge(&mut X[..N as usize], &mut Y[..N as usize], mid, N, ctx.arch);
         }
@@ -1835,6 +1938,19 @@ fn quant_band_stereo(
             for y in Y[..N as usize].iter_mut() {
                 *y = -*y;
             }
+        }
+        #[cfg(feature = "qext")]
+        if std::env::var_os("OPURS_QEXT_TRACE").is_some() && encode == 0 && ctx.i == 20 {
+            eprintln!(
+                "[rust stereo] post i={} N={} itheta={} mid={:.9} inv={} xh={:016x} yh={:016x}",
+                ctx.i,
+                N,
+                itheta,
+                mid,
+                inv,
+                qext_hash_band(&X[..N as usize]),
+                qext_hash_band(&Y[..N as usize])
+            );
         }
     }
     cm
@@ -1979,9 +2095,7 @@ pub fn quant_all_bands<'a>(
         cap_len: cap.len() as i32,
     };
     #[cfg(feature = "qext")]
-    let qext_band_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some()
-        && m.nbEBands == crate::celt::modes::data_96000::NB_QEXT_BANDS
-        && ext_total_bits > 0;
+    let qext_band_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some();
 
     let mut i = start;
     while i < end {
@@ -2503,14 +2617,30 @@ pub fn quant_all_bands<'a>(
         collapse_masks[(i * C + C - 1) as usize] = y_cm as u8;
         #[cfg(feature = "qext")]
         if qext_band_trace {
+            let xh = if use_norm_xy {
+                qext_hash_band(&_norm[..n])
+            } else {
+                qext_hash_band(&x_band_src[band_start..band_start + n])
+            };
+            let yh = if has_y {
+                if use_norm_xy {
+                    qext_hash_band(&_norm[n..2 * n])
+                } else {
+                    qext_hash_band(&y_mut.as_deref().unwrap()[band_start..band_start + n])
+                }
+            } else {
+                0
+            };
             eprintln!(
-                "[rust qext bands] post i={} ec_tell={} ext_tell={} x_cm={} y_cm={} seed={}",
+                "[rust qext bands] post i={} ec_tell={} ext_tell={} x_cm={} y_cm={} seed={} xh={:016x} yh={:016x}",
                 i,
                 ec_tell_frac(ec),
                 ec_tell_frac(ext_ec),
                 x_cm,
                 y_cm,
-                ctx.seed
+                ctx.seed,
+                xh,
+                yh
             );
         }
         balance += pulses[i as usize] + tell;

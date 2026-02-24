@@ -103,6 +103,19 @@ fn qext_trace_enabled() -> bool {
     std::env::var_os("OPURS_QEXT_TRACE").is_some()
 }
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_hash_slice(x: &[f32]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &v in x {
+        for b in v.to_ne_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    }
+    h
+}
+
 pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
@@ -1863,10 +1876,11 @@ fn celt_decode_body(
     #[cfg(feature = "qext")]
     if qext_trace && qext_bytes > 0 {
         eprintln!(
-            "[rust qext] after base bands tell_frac={} rng={} st_rng={}",
+            "[rust qext] after base bands tell_frac={} rng={} st_rng={} x_hash={:016x}",
             ec_tell_frac(&ext_dec),
             ext_dec.rng,
-            st.rng
+            st.rng,
+            qext_hash_slice(&X[..(C * N) as usize]),
         );
     }
     // QEXT: Decode high-frequency band residuals
@@ -1976,10 +1990,11 @@ fn celt_decode_body(
             }
             if qext_trace {
                 eprintln!(
-                    "[rust qext] after qext bands tell_frac={} rng={} st_rng={}",
+                    "[rust qext] after qext bands tell_frac={} rng={} st_rng={} x_hash={:016x}",
                     ec_tell_frac(&ext_dec),
                     ext_dec.rng,
-                    st.rng
+                    st.rng,
+                    qext_hash_slice(&X[..(C * N) as usize]),
                 );
             }
         }
@@ -2062,6 +2077,13 @@ fn celt_decode_body(
     }
     {
         let out_syn_len = n + overlap as usize;
+        #[cfg(feature = "qext")]
+        if qext_trace && qext_bytes > 0 {
+            eprintln!(
+                "[rust qext] pre synth x_hash={:016x}",
+                qext_hash_slice(&X[..(C * N) as usize])
+            );
+        }
         let (ch0, ch1_region) = st.decode_mem.split_at_mut(chan_stride);
         celt_synthesis(
             mode,
@@ -2089,6 +2111,19 @@ fn celt_decode_body(
             #[cfg(feature = "qext")]
             qext_end,
         );
+        #[cfg(feature = "qext")]
+        if qext_trace && qext_bytes > 0 {
+            let h0 = qext_hash_slice(&ch0[out_syn_off..out_syn_off + n]);
+            if CC >= 2 {
+                let h1 = qext_hash_slice(&ch1_region[out_syn_off..out_syn_off + n]);
+                eprintln!(
+                    "[rust qext] post synth ch0_hash={:016x} ch1_hash={:016x}",
+                    h0, h1
+                );
+            } else {
+                eprintln!("[rust qext] post synth ch0_hash={:016x}", h0);
+            }
+        }
     }
     c = 0;
     loop {
@@ -2220,6 +2255,19 @@ fn celt_decode_body(
                 &st.decode_mem[c * chan_stride + out_syn_off..c * chan_stride + out_syn_off + n]
             })
             .collect();
+        #[cfg(feature = "qext")]
+        if qext_trace && qext_bytes > 0 {
+            let h0 = qext_hash_slice(in_ch[0]);
+            if CC >= 2 {
+                let h1 = qext_hash_slice(in_ch[1]);
+                eprintln!(
+                    "[rust qext] pre deemph ch0_hash={:016x} ch1_hash={:016x}",
+                    h0, h1
+                );
+            } else {
+                eprintln!("[rust qext] pre deemph ch0_hash={:016x}", h0);
+            }
+        }
         let pcm_len = (frame_size / st.downsample * CC) as usize;
         deemphasis(
             &in_ch,

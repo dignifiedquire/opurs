@@ -50,6 +50,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "celt_lpc.h"
 #include "vq.h"
 
@@ -92,6 +93,19 @@ static void qext_tracef(const char *fmt, ...) {
    vfprintf(stderr, fmt, ap);
    fprintf(stderr, "\n");
    va_end(ap);
+}
+
+static unsigned long long qext_hash_sig(const celt_sig *x, int n) {
+   int i, j;
+   unsigned long long h = 0xcbf29ce484222325ULL;
+   for (i = 0; i < n; i++) {
+      const unsigned char *p = (const unsigned char *)&x[i];
+      for (j = 0; j < (int)sizeof(celt_sig); j++) {
+         h ^= (unsigned long long)p[j];
+         h *= 0x100000001b3ULL;
+      }
+   }
+   return h;
 }
 #endif
 
@@ -1529,8 +1543,8 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
          ARG_QEXT(&ext_dec) ARG_QEXT(extra_pulses)
          ARG_QEXT(qext_bytes*(8<<BITRES)) ARG_QEXT(cap));
    if (qext_bytes > 0) {
-      qext_tracef("after base bands tell_frac=%d rng=%u st_rng=%u",
-            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng);
+      qext_tracef("after base bands tell_frac=%d rng=%u st_rng=%u x_hash=%016llx",
+            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng, qext_hash_sig(X, C*N));
    }
 
 #ifdef ENABLE_QEXT
@@ -1552,8 +1566,8 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
             NULL, &extra_pulses[nbEBands], shortBlocks, spread_decision, qext_dual_stereo, qext_intensity, zeros,
             qext_bytes*(8<<BITRES), ext_balance, &ext_dec, LM, qext_end, &st->rng, 0,
             st->arch, st->disable_inv, &dummy_dec, zeros, 0, NULL);
-      qext_tracef("after qext bands tell_frac=%d rng=%u st_rng=%u",
-            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng);
+      qext_tracef("after qext bands tell_frac=%d rng=%u st_rng=%u x_hash=%016llx",
+            ec_tell_frac(&ext_dec), ext_dec.rng, st->rng, qext_hash_sig(X, C*N));
    }
 #endif
 
@@ -1575,8 +1589,19 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    if (st->prefilter_and_fold) {
       prefilter_and_fold(st, N);
    }
+   if (qext_bytes > 0) {
+      qext_tracef("pre synth x_hash=%016llx", qext_hash_sig(X, C*N));
+   }
    celt_synthesis(mode, X, out_syn, oldBandE, start, effEnd,
                   C, CC, isTransient, LM, st->downsample, silence, st->arch ARG_QEXT(qext_mode) ARG_QEXT(st->qext_oldBandE) ARG_QEXT(qext_end));
+   if (qext_bytes > 0) {
+      if (CC >= 2) {
+         qext_tracef("post synth ch0_hash=%016llx ch1_hash=%016llx",
+               qext_hash_sig(out_syn[0], N), qext_hash_sig(out_syn[1], N));
+      } else {
+         qext_tracef("post synth ch0_hash=%016llx", qext_hash_sig(out_syn[0], N));
+      }
+   }
 
    c=0; do {
       st->postfilter_period=IMAX(st->postfilter_period, COMBFILTER_MINPERIOD);
@@ -1640,6 +1665,14 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
       qext_tracef("final prexor dec_rng=%u ext_rng=%u st_rng_before=%u",
             dec->rng, ext_dec.rng, st->rng);
       st->rng = st->rng ^ ext_dec.rng;
+   }
+   if (qext_bytes) {
+      if (CC >= 2) {
+         qext_tracef("pre deemph ch0_hash=%016llx ch1_hash=%016llx",
+               qext_hash_sig(out_syn[0], N), qext_hash_sig(out_syn[1], N));
+      } else {
+         qext_tracef("pre deemph ch0_hash=%016llx", qext_hash_sig(out_syn[0], N));
+      }
    }
 #endif
 

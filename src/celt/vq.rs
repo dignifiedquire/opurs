@@ -20,6 +20,36 @@ use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint};
 
 const EPSILON: f32 = 1e-15f32;
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_trace_enabled_vq() -> bool {
+    std::env::var_os("OPURS_QEXT_TRACE").is_some()
+}
+
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_hash_i32(x: &[i32]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &v in x {
+        h ^= v as u32 as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_hash_f32(x: &[f32]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &v in x {
+        for b in v.to_ne_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    }
+    h
+}
+
 /// Dispatch wrapper for `op_pvq_search`.
 #[cfg(feature = "simd")]
 #[inline]
@@ -620,7 +650,7 @@ pub fn alg_unquant(
                 iy[0] -= refine;
                 iy[1] -= refine * if iy[0] > 0 { 1 } else { -1 };
             }
-            Ryy = (iy[0] as f64 * iy[0] as f64 + iy[1] as f64 * iy[1] as f64) as f32;
+            Ryy = iy[0] as f32 * iy[0] as f32 + iy[1] as f32 * iy[1] as f32;
         } else if extra_bits >= 2 {
             let n = N as usize;
             yy_shift = 0.max(extra_bits - 7);
@@ -646,18 +676,71 @@ pub fn alg_unquant(
             if sign {
                 iy[(N - 1) as usize] = -iy[(N - 1) as usize];
             }
-            let mut yy64: f64 = 0.0;
+            let mut yy64: f32 = 0.0;
             for i in 0..n {
-                yy64 += iy[i] as f64 * iy[i] as f64;
+                yy64 += iy[i] as f32 * iy[i] as f32;
             }
-            Ryy = yy64 as f32;
+            Ryy = yy64;
         }
+    }
+
+    #[cfg(feature = "qext")]
+    let vq_trace = qext_trace_enabled_vq();
+    #[cfg(feature = "qext")]
+    if vq_trace {
+        eprintln!(
+            "[rust vq] pre N={} K={} B={} extra={} tell={} iyh={:016x} ryy={:.8} gain={:.9} iy0={} iy1={} iy2={} iy3={}",
+            N,
+            K,
+            B,
+            extra_bits,
+            ec_tell(dec),
+            qext_hash_i32(&iy[..N as usize]),
+            Ryy,
+            gain,
+            iy[0],
+            if N > 1 { iy[1] } else { 0 },
+            if N > 2 { iy[2] } else { 0 },
+            if N > 3 { iy[3] } else { 0 }
+        );
     }
 
     let _ = yy_shift; // used by fixed-point only
     normalise_residual(&iy, X, N, Ryy, gain);
+    #[cfg(feature = "qext")]
+    if vq_trace {
+        eprintln!(
+            "[rust vq] norm N={} K={} B={} extra={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9} b0={:08x} b1={:08x} b2={:08x} b3={:08x}",
+            N,
+            K,
+            B,
+            extra_bits,
+            qext_hash_f32(&X[..N as usize]),
+            X[0],
+            if N > 1 { X[1] } else { 0.0 },
+            if N > 2 { X[2] } else { 0.0 },
+            if N > 3 { X[3] } else { 0.0 },
+            X[0].to_bits(),
+            if N > 1 { X[1].to_bits() } else { 0 },
+            if N > 2 { X[2].to_bits() } else { 0 },
+            if N > 3 { X[3].to_bits() } else { 0 }
+        );
+    }
     exp_rotation(X, N, -1, B, K, spread);
-    extract_collapse_mask(&iy, N, B)
+    let cm = extract_collapse_mask(&iy, N, B);
+    #[cfg(feature = "qext")]
+    if vq_trace {
+        eprintln!(
+            "[rust vq] post N={} K={} B={} extra={} xh={:016x} cm={}",
+            N,
+            K,
+            B,
+            extra_bits,
+            qext_hash_f32(&X[..N as usize]),
+            cm
+        );
+    }
+    cm
 }
 
 /// Upstream C: celt/vq.c:renormalise_vector

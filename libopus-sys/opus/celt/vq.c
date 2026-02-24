@@ -39,6 +39,70 @@
 #include "rate.h"
 #include "pitch.h"
 #include "SigProc_FIX.h"
+#ifdef ENABLE_QEXT
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#endif
+
+#ifdef ENABLE_QEXT
+static int qext_vq_trace_enabled(void)
+{
+   static int init = 0;
+   static int enabled = 0;
+   if (!init) {
+      enabled = getenv("OPURS_QEXT_TRACE") != NULL;
+      init = 1;
+   }
+   return enabled;
+}
+
+static void qext_vq_tracef(const char *fmt, ...)
+{
+   va_list ap;
+   if (!qext_vq_trace_enabled()) return;
+   va_start(ap, fmt);
+   fprintf(stderr, "[c vq] ");
+   vfprintf(stderr, fmt, ap);
+   fprintf(stderr, "\n");
+   va_end(ap);
+}
+
+static unsigned long long qext_vq_hash_i32(const int *x, int n)
+{
+   int i;
+   unsigned long long h = 0xcbf29ce484222325ULL;
+   for (i=0;i<n;i++) {
+      h ^= (unsigned int)x[i];
+      h *= 0x100000001b3ULL;
+   }
+   return h;
+}
+
+static unsigned long long qext_vq_hash_norm(const celt_norm *x, int n)
+{
+   int i, j;
+   unsigned long long h = 0xcbf29ce484222325ULL;
+   for (i=0;i<n;i++) {
+      const unsigned char *p = (const unsigned char *)&x[i];
+      for (j=0;j<(int)sizeof(celt_norm);j++) {
+         h ^= (unsigned long long)p[j];
+         h *= 0x100000001b3ULL;
+      }
+   }
+   return h;
+}
+
+static unsigned qext_vq_bits_f32(celt_norm x)
+{
+   union {
+      celt_norm f;
+      unsigned u;
+   } v;
+   v.f = x;
+   return v.u;
+}
+#endif
 
 #if defined(FIXED_POINT)
 void norm_scaleup(celt_norm *X, int N, int shift) {
@@ -682,9 +746,24 @@ unsigned alg_unquant(celt_norm *X, int N, int K, int spread, int B,
 #endif
    }
 #endif
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("pre N=%d K=%d B=%d extra=%d tell=%d iyh=%016llx ryy=%f gain=%.9f iy0=%d iy1=%d iy2=%d iy3=%d",
+            N, K, B, extra_bits, ec_tell(dec), qext_vq_hash_i32(iy, N), (double)Ryy, (double)gain,
+            iy[0], N>1?iy[1]:0, N>2?iy[2]:0, N>3?iy[3]:0);
+   }
    normalise_residual(iy, X, N, Ryy, gain, yy_shift);
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("norm N=%d K=%d B=%d extra=%d xh=%016llx x0=%.9f x1=%.9f x2=%.9f x3=%.9f b0=%08x b1=%08x b2=%08x b3=%08x",
+            N, K, B, extra_bits, qext_vq_hash_norm(X, N),
+            (double)X[0], N>1?(double)X[1]:0.0, N>2?(double)X[2]:0.0, N>3?(double)X[3]:0.0,
+            qext_vq_bits_f32(X[0]), N>1?qext_vq_bits_f32(X[1]):0, N>2?qext_vq_bits_f32(X[2]):0, N>3?qext_vq_bits_f32(X[3]):0);
+   }
    exp_rotation(X, N, -1, B, K, spread);
    collapse_mask = extract_collapse_mask(iy, N, B);
+   if (qext_vq_trace_enabled()) {
+      qext_vq_tracef("post N=%d K=%d B=%d extra=%d xh=%016llx cm=%u",
+            N, K, B, extra_bits, qext_vq_hash_norm(X, N), collapse_mask);
+   }
    RESTORE_STACK;
    return collapse_mask;
 }

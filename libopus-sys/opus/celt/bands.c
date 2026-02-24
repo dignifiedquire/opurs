@@ -32,6 +32,11 @@
 #endif
 
 #include <math.h>
+#ifdef ENABLE_QEXT
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#endif
 #include "bands.h"
 #include "modes.h"
 #include "vq.h"
@@ -42,6 +47,44 @@
 #include "rate.h"
 #include "quant_bands.h"
 #include "pitch.h"
+
+#ifdef ENABLE_QEXT
+static int qext_trace_enabled(void)
+{
+   static int init = 0;
+   static int enabled = 0;
+   if (!init) {
+      enabled = getenv("OPURS_QEXT_TRACE") != NULL;
+      init = 1;
+   }
+   return enabled;
+}
+
+static void qext_bands_tracef(const char *fmt, ...)
+{
+   va_list ap;
+   if (!qext_trace_enabled()) return;
+   va_start(ap, fmt);
+   fprintf(stderr, "[c qext bands] ");
+   vfprintf(stderr, fmt, ap);
+   fprintf(stderr, "\n");
+   va_end(ap);
+}
+
+static unsigned long long qext_bands_hash(const celt_norm *x, int n)
+{
+   int i, j;
+   unsigned long long h = 0xcbf29ce484222325ULL;
+   for (i=0;i<n;i++) {
+      const unsigned char *p = (const unsigned char *)&x[i];
+      for (j=0;j<(int)sizeof(celt_norm);j++) {
+         h ^= (unsigned long long)p[j];
+         h *= 0x100000001b3ULL;
+      }
+   }
+   return h;
+}
+#endif
 
 int hysteresis_decision(opus_val16 val, const opus_val16 *thresholds, const opus_val16 *hysteresis, int N, int prev)
 {
@@ -927,6 +970,11 @@ static void compute_theta(struct band_ctx *ctx, struct split_ctx *sctx,
    sctx->delta = delta;
    sctx->itheta = itheta;
 #ifdef ENABLE_QEXT
+   if (qext_trace_enabled() && !encode && i==0) {
+      qext_bands_tracef("theta i=%d N=%d stereo=%d qn=%d b=%d qalloc=%d itheta=%d itheta_q30=%d delta=%d imid=%d iside=%d ext_b=%d tell=%d ext_tell=%d",
+            i, N, stereo, qn, *b, qalloc, itheta, itheta_q30, delta, imid, iside, *ext_b,
+            ec_tell_frac(ec), ec_tell_frac(ctx->ext_ec));
+   }
    sctx->itheta_q30 = itheta_q30;
 #endif
    sctx->qalloc = qalloc;
@@ -995,6 +1043,13 @@ static unsigned quant_partition(struct band_ctx *ctx, celt_norm *X,
    i = ctx->i;
    spread = ctx->spread;
    ec = ctx->ec;
+
+#ifdef ENABLE_QEXT
+   if (qext_trace_enabled() && !encode && ctx->i == 20) {
+      qext_bands_tracef("qp enter N=%d b=%d B=%d LM=%d ext_b=%d xh=%016llx",
+            N, b, B, LM, ext_b, qext_bands_hash(X, N));
+   }
+#endif
 
    /* If we need 1.5 more bit than we can produce, split the band in two. */
    cache = m->cache.bits + m->cache.index[(LM+1)*m->nbEBands+i];
@@ -1173,6 +1228,12 @@ static unsigned quant_partition(struct band_ctx *ctx, celt_norm *X,
       }
    }
 
+#ifdef ENABLE_QEXT
+   if (qext_trace_enabled() && !encode && ctx->i == 20) {
+      qext_bands_tracef("qp exit  N=%d b=%d B=%d LM=%d ext_b=%d cm=%u xh=%016llx",
+            N, b, B, LM, ext_b, cm, qext_bands_hash(X, N));
+   }
+#endif
    return cm;
 }
 
@@ -1520,8 +1581,16 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
 #endif
          /* In stereo mode, we do not apply a scaling to the mid because we need the normalized
             mid for folding later. */
+         if (qext_trace_enabled() && !encode && ctx->i == 20) {
+            qext_bands_tracef("mid call i=%d N=%d mbits=%d sbits=%d ext_b=%d xh_pre=%016llx",
+                  ctx->i, N, mbits, sbits, ext_b/2+qext_extra, qext_bands_hash(X, N));
+         }
          cm = quant_band(ctx, X, N, mbits, B, lowband, LM, lowband_out, Q31ONE,
                lowband_scratch, fill ARG_QEXT(ext_b/2+qext_extra));
+         if (qext_trace_enabled() && !encode && ctx->i == 20) {
+            qext_bands_tracef("mid done i=%d N=%d xh_post=%016llx",
+                  ctx->i, N, qext_bands_hash(X, N));
+         }
          rebalance = mbits - (rebalance-ctx->remaining_bits);
          if (rebalance > 3<<BITRES && itheta!=0)
             sbits += rebalance - (3<<BITRES);
@@ -1532,6 +1601,10 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
          /* For a stereo split, the high bits of fill are always zero, so no
             folding will be done to the side. */
          cm |= quant_band(ctx, Y, N, sbits, B, NULL, LM, NULL, side, NULL, fill>>B ARG_QEXT(ext_b/2-qext_extra));
+         if (qext_trace_enabled() && !encode && ctx->i == 20) {
+            qext_bands_tracef("side done i=%d N=%d yh_post=%016llx",
+                  ctx->i, N, qext_bands_hash(Y, N));
+         }
       } else {
 #ifdef ENABLE_QEXT
          int qext_extra = 0;
@@ -1559,6 +1632,10 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
    /* This code is used by the decoder and by the resynthesis-enabled encoder */
    if (ctx->resynth)
    {
+      if (qext_trace_enabled() && !encode && ctx->i == 20) {
+         qext_bands_tracef("stereo pre i=%d N=%d itheta=%d mid=%f inv=%d xh=%016llx yh=%016llx",
+               ctx->i, N, itheta, (double)mid, inv, qext_bands_hash(X, N), qext_bands_hash(Y, N));
+      }
       if (N!=2)
          stereo_merge(X, Y, mid, N, ctx->arch);
       if (inv)
@@ -1566,6 +1643,10 @@ static unsigned quant_band_stereo(struct band_ctx *ctx, celt_norm *X, celt_norm 
          int j;
          for (j=0;j<N;j++)
             Y[j] = -Y[j];
+      }
+      if (qext_trace_enabled() && !encode && ctx->i == 20) {
+         qext_bands_tracef("stereo post i=%d N=%d itheta=%d mid=%f inv=%d xh=%016llx yh=%016llx",
+               ctx->i, N, itheta, (double)mid, inv, qext_bands_hash(X, N), qext_bands_hash(Y, N));
       }
    }
    return cm;
@@ -1627,6 +1708,7 @@ void quant_all_bands(int encode, const CELTMode *m, int start, int end,
    opus_int32 ext_balance=0;
    opus_int32 ext_tell=0;
    VARDECL(unsigned char, ext_bytes_save);
+   int qext_band_trace;
 #endif
    SAVE_STACK;
 
@@ -1673,6 +1755,7 @@ void quant_all_bands(int encode, const CELTMode *m, int start, int end,
    ctx.ext_ec = ext_ec;
    ctx.ext_total_bits = ext_total_bits;
    ctx.extra_bands = end == NB_QEXT_BANDS || end == 2;
+   qext_band_trace = qext_trace_enabled();
    if (ctx.extra_bands) theta_rdo = 0;
    ALLOC(ext_bytes_save, theta_rdo ? QEXT_PACKET_SIZE_CAP : ALLOC_NONE, unsigned char);
 #endif
@@ -1733,6 +1816,12 @@ void quant_all_bands(int encode, const CELTMode *m, int start, int end,
       } else {
          b = 0;
       }
+#ifdef ENABLE_QEXT
+      if (qext_band_trace) {
+         qext_bands_tracef("pre i=%d b=%d ext_b=%d ec_tell=%d ext_tell=%d rem=%d tf=%d",
+               i, b, ext_b, ec_tell_frac(ec), ec_tell_frac(ext_ec), remaining_bits, tf_res[i]);
+      }
+#endif
 
 #ifndef DISABLE_UPDATE_DRAFT
       if (resynth && (M*eBands[i]-N >= M*eBands[start] || i==start+1) && (update_lowband || lowband_offset==0))
@@ -1908,6 +1997,14 @@ void quant_all_bands(int encode, const CELTMode *m, int start, int end,
       }
       collapse_masks[i*C+0] = (unsigned char)x_cm;
       collapse_masks[i*C+C-1] = (unsigned char)y_cm;
+#ifdef ENABLE_QEXT
+      if (qext_band_trace) {
+         unsigned long long xh = qext_bands_hash(X, N);
+         unsigned long long yh = Y != NULL ? qext_bands_hash(Y, N) : 0;
+         qext_bands_tracef("post i=%d ec_tell=%d ext_tell=%d x_cm=%u y_cm=%u seed=%u xh=%016llx yh=%016llx",
+               i, ec_tell_frac(ec), ec_tell_frac(ext_ec), x_cm, y_cm, ctx.seed, xh, yh);
+      }
+#endif
       balance += pulses[i] + tell;
 
       /* Update the folding position only as long as we have 1 bit/sample depth. */
