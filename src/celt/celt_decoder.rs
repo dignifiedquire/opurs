@@ -1715,7 +1715,7 @@ fn celt_decode_body(
         vec![0i32; nbEBands as usize + crate::celt::modes::data_96000::NB_QEXT_BANDS];
     #[cfg(feature = "qext")]
     {
-        let qext_bits = ((qext_bytes * 8) << BITRES) - ec_tell_frac(&ext_dec) as i32 - 1;
+        let qext_bits = ((qext_bytes * 8) << BITRES) - ec_tell_frac(dec) as i32 - 1;
         crate::celt::rate::clt_compute_extra_allocation(
             mode,
             qext_mode.as_ref(),

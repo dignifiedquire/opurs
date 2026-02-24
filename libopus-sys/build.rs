@@ -112,6 +112,7 @@ fn build_opus() {
     let deep_plc = env::var("CARGO_FEATURE_DEEP_PLC").is_ok();
     let dred = env::var("CARGO_FEATURE_DRED").is_ok();
     let osce = env::var("CARGO_FEATURE_OSCE").is_ok();
+    let qext = env::var("CARGO_FEATURE_QEXT").is_ok();
     let fuzzing = env::var("CARGO_FEATURE_FUZZING").is_ok();
 
     // Parse upstream .mk files for source and header lists
@@ -338,6 +339,9 @@ fn build_opus() {
     if osce {
         config.push_str("#define ENABLE_OSCE 1\n");
         config.push_str("#define ENABLE_OSCE_BWE 1\n");
+    }
+    if qext {
+        config.push_str("#define ENABLE_QEXT 1\n");
     }
     if env::var("OSCE_DUMP_DEBUG").is_ok() {
         config.push_str("#define OSCE_DUMP_DEBUG 1\n");

@@ -16,6 +16,8 @@ default = []
 generate_binding = ["bindgen"]
 # SIMD intrinsics (SSE/SSE2/SSE4.1/AVX2 on x86, NEON on aarch64)
 simd = []
+# QEXT support (96 kHz Opus HD path)
+qext = []
 # DNN features — require weight data: `cargo make download-dnn-data`
 deep-plc = []
 dred = ["deep-plc"]

@@ -125,7 +125,7 @@ builtin-weights = ["deep-plc"]  # Compile ~4.7MB of weight data into the binary
 osce-dump-debug = ["osce"]  # Dump OSCE intermediates for debugging
 
 # Quality Extension (Opus HD): 96 kHz support, extended bandwidth, 32-bit samples
-qext = []
+qext = ["libopus-sys?/qext"]
 
 # Pass DNN features through to libopus-sys (for tools that need C weight data)
 tools-dnn = ["tools", "dnn", "builtin-weights", "libopus-sys/dnn"]

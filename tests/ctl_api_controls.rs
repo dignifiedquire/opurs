@@ -15,6 +15,43 @@ use opurs::{
 use opurs::{
     OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
 };
+#[cfg(all(feature = "tools", feature = "qext"))]
+use opurs::{OPUS_GET_FINAL_RANGE_REQUEST, OPUS_SET_IGNORE_EXTENSIONS_REQUEST};
+#[cfg(all(feature = "tools", feature = "qext"))]
+use std::ffi::c_void;
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+use libopus_sys::{
+    opus_decode as c_opus_decode, opus_decoder_create as c_opus_decoder_create,
+    opus_decoder_ctl as c_opus_decoder_ctl, opus_decoder_destroy as c_opus_decoder_destroy,
+    opus_multistream_decode as c_opus_multistream_decode,
+    opus_multistream_decoder_create as c_opus_multistream_decoder_create,
+    opus_multistream_decoder_ctl as c_opus_multistream_decoder_ctl,
+    opus_multistream_decoder_destroy as c_opus_multistream_decoder_destroy,
+};
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+unsafe extern "C" {
+    fn opus_projection_decoder_create(
+        Fs: i32,
+        channels: i32,
+        streams: i32,
+        coupled_streams: i32,
+        demixing_matrix: *const u8,
+        demixing_matrix_size: i32,
+        error: *mut i32,
+    ) -> *mut c_void;
+    fn opus_projection_decoder_ctl(st: *mut c_void, request: i32, ...) -> i32;
+    fn opus_projection_decode(
+        st: *mut c_void,
+        data: *const u8,
+        len: i32,
+        pcm: *mut i16,
+        frame_size: i32,
+        decode_fec: i32,
+    ) -> i32;
+    fn opus_projection_decoder_destroy(st: *mut c_void);
+}
 
 #[cfg(feature = "qext")]
 const SAMPLE_RATE_96K: i32 = 96_000;
@@ -85,6 +122,34 @@ fn decode_single_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, 
     (ret, pcm, dec.final_range())
 }
 
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn decode_single_c(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
+    let mut err = 0i32;
+    let dec = unsafe { c_opus_decoder_create(SAMPLE_RATE_96K, 2, &mut err as *mut _) };
+    assert!(!dec.is_null(), "c decoder create failed: {err}");
+    if ignore_extensions {
+        let set_ret = unsafe { c_opus_decoder_ctl(dec, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, 1i32) };
+        assert_eq!(set_ret, 0, "c set ignore_extensions failed: {set_ret}");
+    }
+    let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
+    let ret = unsafe {
+        c_opus_decode(
+            dec,
+            packet.as_ptr(),
+            packet.len() as i32,
+            pcm.as_mut_ptr(),
+            FRAME_SIZE_20MS_96K,
+            0,
+        )
+    };
+    let mut rng = 0u32;
+    let rng_ret =
+        unsafe { c_opus_decoder_ctl(dec, OPUS_GET_FINAL_RANGE_REQUEST, &mut rng as *mut _) };
+    assert_eq!(rng_ret, 0, "c get final range failed: {rng_ret}");
+    unsafe { c_opus_decoder_destroy(dec) };
+    (ret, pcm, rng)
+}
+
 #[cfg(feature = "qext")]
 fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
     let (ret, pcm, final_range) = decode_single_raw(packet, ignore_extensions);
@@ -100,6 +165,40 @@ fn decode_ms_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32)
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
     (ret, pcm, dec.final_range())
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn decode_ms_c(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
+    let mut err = 0i32;
+    let mapping = [0u8, 1u8];
+    let dec = unsafe {
+        c_opus_multistream_decoder_create(SAMPLE_RATE_96K, 2, 1, 1, mapping.as_ptr(), &mut err)
+    };
+    assert!(!dec.is_null(), "c ms decoder create failed: {err}");
+    if ignore_extensions {
+        let set_ret = unsafe {
+            c_opus_multistream_decoder_ctl(dec, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, 1i32)
+        };
+        assert_eq!(set_ret, 0, "c ms set ignore_extensions failed: {set_ret}");
+    }
+    let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
+    let ret = unsafe {
+        c_opus_multistream_decode(
+            dec,
+            packet.as_ptr(),
+            packet.len() as i32,
+            pcm.as_mut_ptr(),
+            FRAME_SIZE_20MS_96K,
+            0,
+        )
+    };
+    let mut rng = 0u32;
+    let rng_ret = unsafe {
+        c_opus_multistream_decoder_ctl(dec, OPUS_GET_FINAL_RANGE_REQUEST, &mut rng as *mut _)
+    };
+    assert_eq!(rng_ret, 0, "c ms get final range failed: {rng_ret}");
+    unsafe { c_opus_multistream_decoder_destroy(dec) };
+    (ret, pcm, rng)
 }
 
 #[cfg(feature = "qext")]
@@ -184,6 +283,55 @@ fn decode_projection_raw(
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 4];
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
     (ret, pcm, dec.final_range())
+}
+
+#[cfg(all(feature = "tools", feature = "qext"))]
+fn decode_projection_c(
+    packet: &[u8],
+    streams: i32,
+    coupled_streams: i32,
+    demixing: &[u8],
+    ignore_extensions: bool,
+) -> (i32, Vec<i16>, u32) {
+    let mut err = 0i32;
+    let dec = unsafe {
+        opus_projection_decoder_create(
+            SAMPLE_RATE_96K,
+            4,
+            streams,
+            coupled_streams,
+            demixing.as_ptr(),
+            demixing.len() as i32,
+            &mut err as *mut _,
+        )
+    };
+    assert!(!dec.is_null(), "c projection decoder create failed: {err}");
+    if ignore_extensions {
+        let set_ret =
+            unsafe { opus_projection_decoder_ctl(dec, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, 1i32) };
+        assert_eq!(
+            set_ret, 0,
+            "c projection set ignore_extensions failed: {set_ret}"
+        );
+    }
+    let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 4];
+    let ret = unsafe {
+        opus_projection_decode(
+            dec,
+            packet.as_ptr(),
+            packet.len() as i32,
+            pcm.as_mut_ptr(),
+            FRAME_SIZE_20MS_96K,
+            0,
+        )
+    };
+    let mut rng = 0u32;
+    let rng_ret = unsafe {
+        opus_projection_decoder_ctl(dec, OPUS_GET_FINAL_RANGE_REQUEST, &mut rng as *mut _)
+    };
+    assert_eq!(rng_ret, 0, "c projection get final range failed: {rng_ret}");
+    unsafe { opus_projection_decoder_destroy(dec) };
+    (ret, pcm, rng)
 }
 
 #[cfg(feature = "qext")]
@@ -382,6 +530,24 @@ fn decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
         let (pcm_with_ext, rng_with_ext) = decode_single(&packet, false);
         let (pcm_ignored, rng_ignored) = decode_single(&packet, true);
         let (pcm_unpadded, rng_unpadded) = decode_single(&unpadded, false);
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) = decode_single_c(&packet, false);
+            assert_eq!(c_ret_with_ext, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_with_ext, c_pcm_with_ext);
+            assert_eq!(rng_with_ext, c_rng_with_ext);
+
+            let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) = decode_single_c(&packet, true);
+            assert_eq!(c_ret_ignore, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_ignored, c_pcm_ignore);
+            assert_eq!(rng_ignored, c_rng_ignore);
+
+            let (c_ret_unpadded, c_pcm_unpadded, c_rng_unpadded) =
+                decode_single_c(&unpadded, false);
+            assert_eq!(c_ret_unpadded, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_unpadded, c_pcm_unpadded);
+            assert_eq!(rng_unpadded, c_rng_unpadded);
+        }
 
         assert_eq!(
             pcm_ignored, pcm_unpadded,
@@ -430,6 +596,20 @@ fn ms_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() 
         let (pcm_with_ext, rng_with_ext) = decode_ms(&packet, false);
         let (pcm_ignored, rng_ignored) = decode_ms(&packet, true);
         let (pcm_unpadded, rng_unpadded) = decode_ms(&unpadded, false);
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) = decode_ms_c(&packet, false);
+            assert_eq!(c_ret_with_ext, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_with_ext, c_pcm_with_ext);
+            assert_eq!(rng_with_ext, c_rng_with_ext);
+
+            let (c_ret_unpadded, c_pcm_unpadded, c_rng_unpadded) = decode_ms_c(&unpadded, false);
+            assert_eq!(c_ret_unpadded, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_unpadded, c_pcm_unpadded);
+            assert_eq!(rng_unpadded, c_rng_unpadded);
+            assert_eq!(pcm_ignored, c_pcm_unpadded);
+            assert_eq!(rng_ignored, c_rng_unpadded);
+        }
 
         assert_eq!(
             pcm_ignored, pcm_unpadded,
@@ -477,6 +657,22 @@ fn projection_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_pa
             decode_projection(&packet, streams, coupled_streams, &demixing, true);
         let (pcm_unpadded, rng_unpadded) =
             decode_projection(&unpadded, streams, coupled_streams, &demixing, false);
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) =
+                decode_projection_c(&packet, streams, coupled_streams, &demixing, false);
+            assert_eq!(c_ret_with_ext, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_with_ext, c_pcm_with_ext);
+            assert_eq!(rng_with_ext, c_rng_with_ext);
+
+            let (c_ret_unpadded, c_pcm_unpadded, c_rng_unpadded) =
+                decode_projection_c(&unpadded, streams, coupled_streams, &demixing, false);
+            assert_eq!(c_ret_unpadded, FRAME_SIZE_20MS_96K);
+            assert_eq!(pcm_unpadded, c_pcm_unpadded);
+            assert_eq!(rng_unpadded, c_rng_unpadded);
+            assert_eq!(pcm_ignored, c_pcm_unpadded);
+            assert_eq!(rng_ignored, c_rng_unpadded);
+        }
 
         assert_eq!(
             pcm_ignored, pcm_unpadded,
@@ -561,6 +757,62 @@ fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
             rng_ignore, rng_ignore_b,
             "ignore_extensions decode final range should be deterministic on malformed extensions"
         );
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) =
+                decode_single_c(&malformed, false);
+            let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) = decode_single_c(&malformed, true);
+            assert_eq!(
+                ret_with_ext_a, c_ret_with_ext,
+                "single-stream malformed extension-aware return code mismatch (rust vs c)"
+            );
+            if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+                if pcm_with_ext_a != c_pcm_with_ext {
+                    let first_diff = pcm_with_ext_a
+                        .iter()
+                        .zip(c_pcm_with_ext.iter())
+                        .position(|(a, b)| a != b)
+                        .unwrap_or(usize::MAX);
+                    let mut diff_count = 0usize;
+                    let mut max_abs_diff = 0i32;
+                    for (a, b) in pcm_with_ext_a.iter().zip(c_pcm_with_ext.iter()) {
+                        let d = (*a as i32 - *b as i32).abs();
+                        if d != 0 {
+                            diff_count += 1;
+                            max_abs_diff = max_abs_diff.max(d);
+                        }
+                    }
+                    panic!(
+                        "single-stream malformed extension-aware PCM mismatch (rust vs c): \
+first_diff={first_diff}, rust_sample={}, c_sample={}, \
+diff_count={diff_count}, max_abs_diff={max_abs_diff}, \
+rust_with_ext_eq_ignore={}, c_with_ext_eq_ignore={}, \
+rust_rng_with_ext={rng_with_ext_a}, c_rng_with_ext={c_rng_with_ext}, \
+rust_rng_ignore={rng_ignore}, c_rng_ignore={c_rng_ignore}",
+                        pcm_with_ext_a.get(first_diff).copied().unwrap_or(0),
+                        c_pcm_with_ext.get(first_diff).copied().unwrap_or(0),
+                        pcm_with_ext_a == pcm_ignore,
+                        c_pcm_with_ext == c_pcm_ignore,
+                    );
+                }
+                assert_eq!(
+                    rng_with_ext_a, c_rng_with_ext,
+                    "single-stream malformed extension-aware final range mismatch (rust vs c)"
+                );
+            }
+            assert_eq!(
+                ret_ignore, c_ret_ignore,
+                "single-stream malformed ignore_extensions return code mismatch (rust vs c)"
+            );
+            assert_eq!(
+                pcm_ignore, c_pcm_ignore,
+                "single-stream malformed ignore_extensions PCM mismatch (rust vs c)"
+            );
+            assert_eq!(
+                rng_ignore, c_rng_ignore,
+                "single-stream malformed ignore_extensions final range mismatch (rust vs c)"
+            );
+        }
         return;
     }
 
@@ -623,6 +875,48 @@ fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
             assert_eq!(
                 rng_with_ext_a, rng_with_ext_b,
                 "multistream extension-aware decode final range should be deterministic"
+            );
+        }
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) = decode_ms_c(&malformed, false);
+            assert_eq!(
+                ret_with_ext_a, c_ret_with_ext,
+                "multistream malformed extension-aware return code mismatch (rust vs c)"
+            );
+            if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+                assert_eq!(
+                    pcm_with_ext_a, c_pcm_with_ext,
+                    "multistream malformed extension-aware PCM mismatch (rust vs c)"
+                );
+                assert_eq!(
+                    rng_with_ext_a, c_rng_with_ext,
+                    "multistream malformed extension-aware final range mismatch (rust vs c)"
+                );
+            }
+            let mut malformed_unpadded = malformed.clone();
+            let malformed_unpadded_cap = malformed_unpadded.len() as i32;
+            let malformed_unpadded_len =
+                opus_multistream_packet_unpad(&mut malformed_unpadded, malformed_unpadded_cap, 1);
+            assert!(
+                malformed_unpadded_len > 0,
+                "multistream malformed packet unpad failed"
+            );
+            malformed_unpadded.truncate(malformed_unpadded_len as usize);
+
+            let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) =
+                decode_ms_c(&malformed_unpadded, false);
+            assert_eq!(
+                ret_ignore, c_ret_ignore,
+                "multistream malformed ignore_extensions return code mismatch (rust vs c unpadded)"
+            );
+            assert_eq!(
+                pcm_ignore_a, c_pcm_ignore,
+                "multistream malformed ignore_extensions PCM mismatch (rust vs c unpadded)"
+            );
+            assert_eq!(
+                rng_ignore_a, c_rng_ignore,
+                "multistream malformed ignore_extensions final range mismatch (rust vs c unpadded)"
             );
         }
         return;
@@ -692,6 +986,57 @@ fn malformed_qext_extensions_projection_decode_path_is_deterministic() {
             assert_eq!(
                 rng_with_ext_a, rng_with_ext_b,
                 "projection extension-aware decode final range should be deterministic"
+            );
+        }
+        #[cfg(feature = "tools")]
+        {
+            let (c_ret_with_ext, c_pcm_with_ext, c_rng_with_ext) =
+                decode_projection_c(&malformed, streams, coupled_streams, &demixing, false);
+            assert_eq!(
+                ret_with_ext_a, c_ret_with_ext,
+                "projection malformed extension-aware return code mismatch (rust vs c)"
+            );
+            if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+                assert_eq!(
+                    pcm_with_ext_a, c_pcm_with_ext,
+                    "projection malformed extension-aware PCM mismatch (rust vs c)"
+                );
+                assert_eq!(
+                    rng_with_ext_a, c_rng_with_ext,
+                    "projection malformed extension-aware final range mismatch (rust vs c)"
+                );
+            }
+            let mut malformed_unpadded = malformed.clone();
+            let malformed_unpadded_cap = malformed_unpadded.len() as i32;
+            let malformed_unpadded_len = opus_multistream_packet_unpad(
+                &mut malformed_unpadded,
+                malformed_unpadded_cap,
+                streams,
+            );
+            assert!(
+                malformed_unpadded_len > 0,
+                "projection malformed packet unpad failed"
+            );
+            malformed_unpadded.truncate(malformed_unpadded_len as usize);
+
+            let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) = decode_projection_c(
+                &malformed_unpadded,
+                streams,
+                coupled_streams,
+                &demixing,
+                false,
+            );
+            assert_eq!(
+                ret_ignore, c_ret_ignore,
+                "projection malformed ignore_extensions return code mismatch (rust vs c unpadded)"
+            );
+            assert_eq!(
+                pcm_ignore_a, c_pcm_ignore,
+                "projection malformed ignore_extensions PCM mismatch (rust vs c unpadded)"
+            );
+            assert_eq!(
+                rng_ignore_a, c_rng_ignore,
+                "projection malformed ignore_extensions final range mismatch (rust vs c unpadded)"
             );
         }
         return;
