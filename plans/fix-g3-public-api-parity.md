@@ -25,3 +25,14 @@ Close remaining public API coverage gaps versus upstream core/custom/multistream
 ## Definition Of Done
 - All required public symbols/constants exist and match upstream values.
 - API behavior parity tests pass for supported features.
+
+## Progress
+- 2026-02-24: Added missing upstream application constants `OPUS_APPLICATION_RESTRICTED_SILK` (2052) and `OPUS_APPLICATION_RESTRICTED_CELT` (2053) in `src/opus/opus_defines.rs` and re-exported via `src/lib.rs`.
+- 2026-02-24: Extended typed `Application` enum conversions for restricted SILK/CELT values in `src/enums.rs`.
+- 2026-02-24: Aligned core encoder restricted-application behavior with upstream in `src/opus/opus_encoder.rs`:
+  - constructor accepts restricted SILK/CELT values and applies `encoder_buffer=0` for both restricted modes
+  - `frame_size_select()` now takes `application` and enforces restricted-SILK minimum 10 ms frame rule
+  - analysis gating now skips `run_analysis()` in restricted SILK mode
+  - mode selection now forces SILK-only for restricted SILK and CELT-only for restricted CELT
+  - delay compensation, lookahead, and bandwidth/LSB-depth branches updated for restricted mode semantics
+- 2026-02-24: Updated multistream encoder call-sites to pass application into `frame_size_select()` (`src/opus/opus_multistream_encoder.rs`).

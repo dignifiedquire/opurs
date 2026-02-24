@@ -27,6 +27,10 @@ pub enum Application {
     /// Only use when lowest-achievable latency is what matters most.
     /// Voice-optimized modes will not be used.
     LowDelay,
+    /// Restricted SILK mode.
+    RestrictedSilk,
+    /// Restricted CELT mode.
+    RestrictedCelt,
 }
 
 impl TryFrom<i32> for Application {
@@ -37,6 +41,8 @@ impl TryFrom<i32> for Application {
             OPUS_APPLICATION_VOIP => Ok(Application::Voip),
             OPUS_APPLICATION_AUDIO => Ok(Application::Audio),
             OPUS_APPLICATION_RESTRICTED_LOWDELAY => Ok(Application::LowDelay),
+            OPUS_APPLICATION_RESTRICTED_SILK => Ok(Application::RestrictedSilk),
+            OPUS_APPLICATION_RESTRICTED_CELT => Ok(Application::RestrictedCelt),
             _ => Err(ErrorCode::BadArg),
         }
     }
@@ -48,6 +54,8 @@ impl From<Application> for i32 {
             Application::Voip => OPUS_APPLICATION_VOIP,
             Application::Audio => OPUS_APPLICATION_AUDIO,
             Application::LowDelay => OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+            Application::RestrictedSilk => OPUS_APPLICATION_RESTRICTED_SILK,
+            Application::RestrictedCelt => OPUS_APPLICATION_RESTRICTED_CELT,
         }
     }
 }
@@ -281,6 +289,14 @@ mod tests {
         assert_eq!(Application::try_from(2048).unwrap(), Application::Voip);
         assert_eq!(Application::try_from(2049).unwrap(), Application::Audio);
         assert_eq!(Application::try_from(2051).unwrap(), Application::LowDelay);
+        assert_eq!(
+            Application::try_from(2052).unwrap(),
+            Application::RestrictedSilk
+        );
+        assert_eq!(
+            Application::try_from(2053).unwrap(),
+            Application::RestrictedCelt
+        );
     }
 
     #[test]
@@ -294,6 +310,8 @@ mod tests {
         assert_eq!(i32::from(Application::Voip), 2048);
         assert_eq!(i32::from(Application::Audio), 2049);
         assert_eq!(i32::from(Application::LowDelay), 2051);
+        assert_eq!(i32::from(Application::RestrictedSilk), 2052);
+        assert_eq!(i32::from(Application::RestrictedCelt), 2053);
     }
 
     #[test]

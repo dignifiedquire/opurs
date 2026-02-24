@@ -29,8 +29,9 @@ use crate::opus::analysis::{
     DownmixInput, TonalityAnalysisState,
 };
 use crate::opus::opus_defines::{
-    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP, OPUS_AUTO,
-    OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_CELT, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+    OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
+    OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
     OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_2_5_MS, OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_ARG,
     OPUS_INTERNAL_ERROR, OPUS_OK, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE,
@@ -167,6 +168,8 @@ impl OpusEncoder {
             || application != OPUS_APPLICATION_VOIP
                 && application != OPUS_APPLICATION_AUDIO
                 && application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
+                && application != OPUS_APPLICATION_RESTRICTED_SILK
+                && application != OPUS_APPLICATION_RESTRICTED_CELT
         {
             return Err(OPUS_BAD_ARG);
         }
@@ -224,7 +227,13 @@ impl OpusEncoder {
             bitrate_bps: 3000 + Fs * channels,
             user_bitrate_bps: OPUS_AUTO,
             lsb_depth: 24,
-            encoder_buffer: Fs / 100,
+            encoder_buffer: if application != OPUS_APPLICATION_RESTRICTED_CELT
+                && application != OPUS_APPLICATION_RESTRICTED_SILK
+            {
+                Fs / 100
+            } else {
+                0
+            },
             lfe: 0,
             arch,
             use_dtx: 0,
@@ -327,11 +336,21 @@ impl OpusEncoder {
     // -- Type-safe CTL getters and setters --
 
     pub fn set_application(&mut self, app: Application) -> Result<(), i32> {
-        if self.first == 0 && self.application != i32::from(app) {
+        let value = i32::from(app);
+        if self.application == OPUS_APPLICATION_RESTRICTED_SILK
+            || self.application == OPUS_APPLICATION_RESTRICTED_CELT
+        {
             return Err(OPUS_BAD_ARG);
         }
-        self.application = app.into();
-        self.analysis.application = app.into();
+        if (value != OPUS_APPLICATION_VOIP
+            && value != OPUS_APPLICATION_AUDIO
+            && value != OPUS_APPLICATION_RESTRICTED_LOWDELAY)
+            || (self.first == 0 && self.application != value)
+        {
+            return Err(OPUS_BAD_ARG);
+        }
+        self.application = value;
+        self.analysis.application = value;
         Ok(())
     }
 
@@ -562,7 +581,9 @@ impl OpusEncoder {
 
     pub fn lookahead(&self) -> i32 {
         let mut la = self.Fs / 400;
-        if self.application != OPUS_APPLICATION_RESTRICTED_LOWDELAY {
+        if self.application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
+            && self.application != OPUS_APPLICATION_RESTRICTED_CELT
+        {
             la += self.delay_compensation;
         }
         la
@@ -1019,7 +1040,12 @@ fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes
 }
 
 /// Upstream C: src/opus_encoder.c:frame_size_select
-pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i32 {
+pub fn frame_size_select(
+    application: i32,
+    frame_size: i32,
+    variable_duration: i32,
+    Fs: i32,
+) -> i32 {
     let mut new_size: i32 = 0;
     if frame_size < Fs / 400 {
         return -1;
@@ -1050,8 +1076,12 @@ pub fn frame_size_select(frame_size: i32, variable_duration: i32, Fs: i32) -> i3
     {
         return -1;
     }
+    if application == OPUS_APPLICATION_RESTRICTED_SILK && new_size < Fs / 100 {
+        return -1;
+    }
     new_size
 }
+
 /// Upstream C: src/opus_encoder.c:compute_stereo_width
 pub fn compute_stereo_width(
     pcm: &[opus_val16],
@@ -1799,7 +1829,10 @@ pub fn opus_encode_native(
     if max_data_bytes == 1 && st.Fs == frame_size * 10 {
         return OPUS_BUFFER_TOO_SMALL;
     }
-    if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
+    if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY
+        || st.application == OPUS_APPLICATION_RESTRICTED_CELT
+        || st.application == OPUS_APPLICATION_RESTRICTED_SILK
+    {
         delay_compensation = 0;
     } else {
         delay_compensation = st.delay_compensation;
@@ -1819,7 +1852,11 @@ pub fn opus_encode_native(
     analysis_info.valid = 0;
     if let Some(info) = precomputed_analysis_info {
         analysis_info = *info;
-    } else if !multiframe_fixed && st.silk_mode.complexity >= 7 && st.Fs >= 16000 && st.Fs <= 48000
+    } else if !multiframe_fixed
+        && st.silk_mode.complexity >= 7
+        && st.Fs >= 16000
+        && st.Fs <= 48000
+        && st.application != OPUS_APPLICATION_RESTRICTED_SILK
     {
         analysis_read_pos_bak = st.analysis.read_pos;
         analysis_read_subframe_bak = st.analysis.read_subframe;
@@ -2031,7 +2068,11 @@ pub fn opus_encode_native(
         );
         st.silk_mode.useDTX =
             (st.use_dtx != 0 && !(analysis_info.valid != 0 || is_silence != 0)) as i32;
-        if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY {
+        if st.application == OPUS_APPLICATION_RESTRICTED_SILK {
+            st.mode = MODE_SILK_ONLY;
+        } else if st.application == OPUS_APPLICATION_RESTRICTED_LOWDELAY
+            || st.application == OPUS_APPLICATION_RESTRICTED_CELT
+        {
             st.mode = MODE_CELT_ONLY;
         } else if st.user_forced_mode == OPUS_AUTO {
             let mut mode_voice: i32 = 0;
@@ -2278,7 +2319,9 @@ pub fn opus_encode_native(
             equiv_rate,
         );
     }
-    st.celt_enc.lsb_depth = lsb_depth;
+    if st.application != OPUS_APPLICATION_RESTRICTED_SILK {
+        st.celt_enc.lsb_depth = lsb_depth;
+    }
     if st.mode == MODE_CELT_ONLY && st.bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
         st.bandwidth = OPUS_BANDWIDTH_WIDEBAND;
     }
@@ -2286,6 +2329,12 @@ pub fn opus_encode_native(
         st.bandwidth = OPUS_BANDWIDTH_NARROWBAND;
     }
     curr_bandwidth = st.bandwidth;
+    if st.application == OPUS_APPLICATION_RESTRICTED_SILK
+        && curr_bandwidth > OPUS_BANDWIDTH_WIDEBAND
+    {
+        st.bandwidth = OPUS_BANDWIDTH_WIDEBAND;
+        curr_bandwidth = OPUS_BANDWIDTH_WIDEBAND;
+    }
     if st.mode == MODE_SILK_ONLY && curr_bandwidth > OPUS_BANDWIDTH_WIDEBAND {
         st.mode = MODE_HYBRID;
     }
@@ -3270,7 +3319,12 @@ fn opus_encode(
     analysis_frame_size: i32,
     data: &mut [u8],
 ) -> i32 {
-    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
+    let frame_size = frame_size_select(
+        st.application,
+        analysis_frame_size,
+        st.variable_duration,
+        st.Fs,
+    );
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
@@ -3302,7 +3356,12 @@ fn opus_encode_float(
     analysis_frame_size: i32,
     data: &mut [u8],
 ) -> i32 {
-    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
+    let frame_size = frame_size_select(
+        st.application,
+        analysis_frame_size,
+        st.variable_duration,
+        st.Fs,
+    );
     opus_encode_native(
         st,
         pcm,
@@ -3327,7 +3386,12 @@ fn opus_encode24(
     analysis_frame_size: i32,
     data: &mut [u8],
 ) -> i32 {
-    let frame_size = frame_size_select(analysis_frame_size, st.variable_duration, st.Fs);
+    let frame_size = frame_size_select(
+        st.application,
+        analysis_frame_size,
+        st.variable_duration,
+        st.Fs,
+    );
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
@@ -3351,4 +3415,71 @@ fn opus_encode24(
         None,
         1,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::opus::opus_defines::{OPUS_FRAMESIZE_10_MS, OPUS_FRAMESIZE_5_MS};
+
+    #[test]
+    fn frame_size_select_restricted_silk_rejects_sub_10ms() {
+        assert_eq!(
+            frame_size_select(
+                OPUS_APPLICATION_RESTRICTED_SILK,
+                960,
+                OPUS_FRAMESIZE_5_MS,
+                48000,
+            ),
+            -1
+        );
+        assert_eq!(
+            frame_size_select(OPUS_APPLICATION_VOIP, 960, OPUS_FRAMESIZE_5_MS, 48000),
+            240
+        );
+        assert_eq!(
+            frame_size_select(
+                OPUS_APPLICATION_RESTRICTED_SILK,
+                960,
+                OPUS_FRAMESIZE_10_MS,
+                48000,
+            ),
+            480
+        );
+    }
+
+    #[test]
+    fn restricted_applications_set_expected_buffer_and_lookahead() {
+        let enc_silk = OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_SILK).unwrap();
+        assert_eq!(enc_silk.encoder_buffer, 0);
+        assert_eq!(enc_silk.lookahead(), 48000 / 400 + 48000 / 250);
+
+        let enc_celt = OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_CELT).unwrap();
+        assert_eq!(enc_celt.encoder_buffer, 0);
+        assert_eq!(enc_celt.lookahead(), 48000 / 400);
+
+        let enc_audio = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        assert_eq!(enc_audio.encoder_buffer, 48000 / 100);
+        assert_eq!(enc_audio.lookahead(), 48000 / 400 + 48000 / 250);
+    }
+
+    #[test]
+    fn set_application_rejects_restricted_modes_and_restricted_instances() {
+        let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        assert_eq!(
+            enc.set_application(Application::RestrictedSilk),
+            Err(OPUS_BAD_ARG)
+        );
+        assert_eq!(
+            enc.set_application(Application::RestrictedCelt),
+            Err(OPUS_BAD_ARG)
+        );
+
+        let mut enc_restricted =
+            OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_SILK).unwrap();
+        assert_eq!(
+            enc_restricted.set_application(Application::Audio),
+            Err(OPUS_BAD_ARG)
+        );
+    }
 }

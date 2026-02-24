@@ -524,6 +524,7 @@ impl OpusMSEncoder {
             return OPUS_BAD_ARG;
         };
         let frame_size_i32 = frame_size_select(
+            first_encoder.application,
             analysis_frame_size,
             first_encoder.variable_duration,
             self.sample_rate(),
@@ -657,6 +658,7 @@ impl OpusMSEncoder {
             return OPUS_BAD_ARG;
         };
         let frame_size_i32 = frame_size_select(
+            first_encoder.application,
             analysis_frame_size,
             first_encoder.variable_duration,
             self.sample_rate(),
@@ -756,6 +758,7 @@ impl OpusMSEncoder {
             return OPUS_BAD_ARG;
         };
         let frame_size_i32 = frame_size_select(
+            first_encoder.application,
             analysis_frame_size,
             first_encoder.variable_duration,
             self.sample_rate(),
