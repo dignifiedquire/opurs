@@ -17,6 +17,7 @@ const MAX_FRAME_SAMP: i32 = 5760;
 const MAX_PACKET: usize = 1500;
 /// 4 bytes packet length + 4 bytes encoder final range
 const SETUP_BYTE_COUNT: usize = 8;
+const MAX_DECODES: i32 = 12;
 
 const SAMP_FREQS: [i32; 5] = [8000, 12000, 16000, 24000, 48000];
 
@@ -30,9 +31,6 @@ fuzz_target!(|data: &[u8]| {
     let toc = data[SETUP_BYTE_COUNT];
     let bandwidth = opus_packet_get_bandwidth(toc);
     let bw_idx = bandwidth - OPUS_BANDWIDTH_NARROWBAND;
-    if !(0..5).contains(&bw_idx) {
-        return;
-    }
     let fs = SAMP_FREQS[bw_idx as usize];
     let channels = opus_packet_get_nb_channels(toc);
 
@@ -44,17 +42,17 @@ fuzz_target!(|data: &[u8]| {
     let mut pcm = vec![0i16; MAX_FRAME_SAMP as usize * channels as usize];
 
     let mut i = 0usize;
-    loop {
-        if i + SETUP_BYTE_COUNT > data.len() {
-            break;
-        }
-
+    let mut num_decodes = 0;
+    while i + SETUP_BYTE_COUNT < data.len() && {
+        num_decodes += 1;
+        num_decodes <= MAX_DECODES
+    } {
         let len = (data[i] as u32) << 24
             | (data[i + 1] as u32) << 16
             | (data[i + 2] as u32) << 8
             | (data[i + 3] as u32);
         let len = len as i32;
-        if len > MAX_PACKET as i32 || len < 0 {
+        if len > MAX_PACKET as i32 || len < 0 || i + SETUP_BYTE_COUNT + len as usize > data.len() {
             break;
         }
         let len = len as usize;
@@ -65,18 +63,13 @@ fuzz_target!(|data: &[u8]| {
         if len == 0 {
             // Lost packet — use PLC
             let frame_size = dec.last_packet_duration();
-            if frame_size > 0 {
-                let _ = dec.decode(
-                    &[],
-                    &mut pcm[..frame_size as usize * channels as usize],
-                    frame_size,
-                    fec,
-                );
-            }
+            let _ = dec.decode(
+                &[],
+                &mut pcm[..frame_size as usize * channels as usize],
+                frame_size,
+                fec,
+            );
         } else {
-            if i + SETUP_BYTE_COUNT + len > data.len() {
-                break;
-            }
             let packet = &data[i + SETUP_BYTE_COUNT..i + SETUP_BYTE_COUNT + len];
             let _ = dec.decode(packet, &mut pcm, MAX_FRAME_SAMP, fec);
         }
