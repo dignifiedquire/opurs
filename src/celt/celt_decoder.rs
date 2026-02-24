@@ -24,6 +24,7 @@ use crate::celt::quant_bands::{
 use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
+use crate::arch::Arch;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
 
 pub use self::arch_h::{
@@ -55,7 +56,7 @@ pub struct OpusCustomDecoder {
     pub signalling: i32,
     pub disable_inv: i32,
     pub complexity: i32,
-    pub arch: i32,
+    pub arch: Arch,
     pub rng: u32,
     pub error: i32,
     pub last_pitch_index: i32,
@@ -107,8 +108,7 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     assert!(st.start == 0 || st.start == 17);
     assert!(st.start < st.end);
     assert!(st.end <= 21);
-    assert!(st.arch >= 0);
-    assert!(st.arch <= 4);
+    // arch is now an enum — no range check needed
     assert!(st.last_pitch_index <= 720);
     assert!(st.last_pitch_index >= 100 || st.last_pitch_index == 0);
     assert!(st.postfilter_period < 1024);
@@ -162,7 +162,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         signalling: 1,
         disable_inv: (channels == 1) as i32,
         complexity: 0,
-        arch: 0,
+        arch: Arch::Scalar,
 
         rng: 0,
         error: 0,
@@ -352,7 +352,7 @@ fn celt_synthesis(
     LM: i32,
     downsample: i32,
     silence: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut b: i32;
     let B: i32;
@@ -572,19 +572,25 @@ fn tf_decode(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_plc_pitch_search
-fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: i32) -> i32 {
+fn celt_plc_pitch_search(ch0: &[celt_sig], ch1: Option<&[celt_sig]>, _arch: Arch) -> i32 {
     let mut lp_pitch_buf: [opus_val16; 1024] = [0.; 1024];
     let ds_len = DECODE_BUFFER_SIZE;
     if let Some(ch1) = ch1 {
-        pitch::pitch_downsample(&[&ch0[..ds_len], &ch1[..ds_len]], &mut lp_pitch_buf, ds_len);
+        pitch::pitch_downsample(
+            &[&ch0[..ds_len], &ch1[..ds_len]],
+            &mut lp_pitch_buf,
+            ds_len,
+            _arch,
+        );
     } else {
-        pitch::pitch_downsample(&[&ch0[..ds_len]], &mut lp_pitch_buf, ds_len);
+        pitch::pitch_downsample(&[&ch0[..ds_len]], &mut lp_pitch_buf, ds_len, _arch);
     }
     let mut pitch_index = pitch::pitch_search(
         &lp_pitch_buf[(PLC_PITCH_LAG_MAX >> 1) as usize..],
         &lp_pitch_buf,
         DECODE_BUFFER_SIZE as i32 - PLC_PITCH_LAG_MAX,
         PLC_PITCH_LAG_MAX - PLC_PITCH_LAG_MIN,
+        _arch,
     );
     pitch_index = PLC_PITCH_LAG_MAX - pitch_index;
     pitch_index
@@ -879,6 +885,7 @@ fn celt_decode_lost(
                     Some(&window[..overlap_u]),
                     overlap_u,
                     LPC_ORDER,
+                    st.arch,
                 );
                 ac[0] *= 1.0001f32;
                 let mut i = 1i32;
@@ -899,6 +906,7 @@ fn celt_decode_lost(
                     &st.lpc[lpc_start..lpc_start + LPC_ORDER],
                     &mut fir_tmp,
                     LPC_ORDER,
+                    st.arch,
                 );
             }
             // Copy filtered result back to exc buffer
@@ -961,6 +969,7 @@ fn celt_decode_lost(
                     &st.lpc[lpc_start..lpc_start + LPC_ORDER],
                     LPC_ORDER,
                     &mut lpc_mem,
+                    st.arch,
                 );
             }
             let mut S2: opus_val32 = 0.0;

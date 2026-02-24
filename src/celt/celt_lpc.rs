@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/celt_lpc.c`
 
+use crate::arch::Arch;
 use crate::celt::pitch::{celt_pitch_xcorr, xcorr_kernel};
 
 pub const LPC_ORDER: usize = 24;
@@ -50,7 +51,7 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
 ///
 /// Upstream C: celt/celt_lpc.c:celt_fir_c
 #[inline]
-pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
+pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize, arch: Arch) {
     let n = y.len();
     assert!(x.len() >= n + ord);
     assert!(num.len() >= ord);
@@ -70,7 +71,7 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
         sum[1] = x[ord + ix + 1];
         sum[2] = x[ord + ix + 2];
         sum[3] = x[ord + ix + 3];
-        xcorr_kernel(&rnum, &x[ix..], &mut sum, ord);
+        xcorr_kernel(&rnum, &x[ix..], &mut sum, ord, arch);
         y[ix] = sum[0];
         y[ix + 1] = sum[1];
         y[ix + 2] = sum[2];
@@ -96,7 +97,7 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize) {
 ///
 /// Upstream C: celt/celt_lpc.c:celt_iir
 #[inline]
-pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f32]) {
+pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f32], arch: Arch) {
     assert!(buf.len() >= n);
     assert!(den.len() >= ord);
     assert!(mem.len() >= ord);
@@ -123,7 +124,7 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
         sum[1] = buf[ix + 1];
         sum[2] = buf[ix + 2];
         sum[3] = buf[ix + 3];
-        xcorr_kernel(&rden, &yy[ix..], &mut sum, ord);
+        xcorr_kernel(&rden, &yy[ix..], &mut sum, ord, arch);
         yy[ix + ord] = -sum[0];
         buf[ix] = sum[0];
         sum[1] += yy[ix + ord] * den[0];
@@ -169,6 +170,7 @@ pub fn _celt_autocorr(
     window: Option<&[f32]>,
     overlap: usize,
     lag: usize,
+    arch: Arch,
 ) -> i32 {
     let n = x.len();
     let fast_n = n - lag;
@@ -193,7 +195,7 @@ pub fn _celt_autocorr(
         xptr = x;
     }
 
-    celt_pitch_xcorr(xptr, xptr, &mut ac[..lag + 1], fast_n);
+    celt_pitch_xcorr(xptr, xptr, &mut ac[..lag + 1], fast_n, arch);
 
     for k in 0..=lag {
         let mut d = 0.0f32;

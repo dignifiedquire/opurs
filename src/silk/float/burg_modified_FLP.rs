@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/float/burg_modified_FLP.c`
 
+use crate::arch::Arch;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 use crate::silk::tuning_parameters::FIND_LPC_COND_FAC;
@@ -14,6 +15,7 @@ pub fn silk_burg_modified_FLP(
     subfr_length: i32,
     nb_subfr: i32,
     D: i32,
+    arch: Arch,
 ) -> f32 {
     let mut k: i32 = 0;
     let mut n: i32 = 0;
@@ -45,6 +47,7 @@ pub fn silk_burg_modified_FLP(
             C_first_row[(n - 1) as usize] += silk_inner_product_FLP(
                 &x[x_off..x_off + size],
                 &x[x_off + n as usize..x_off + n as usize + size],
+                arch,
             );
             n += 1;
         }

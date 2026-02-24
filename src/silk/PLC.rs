@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `silk/PLC.c`
 
+use crate::arch::Arch;
+
 // const BWE_COEF: f64 = 0.99;
 
 /// 0.7 in Q14
@@ -55,7 +57,7 @@ pub fn silk_PLC(
     frame: &mut [i16],
     lost: i32,
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
-    arch: i32,
+    arch: Arch,
 ) {
     if psDec.fs_kHz != psDec.sPLC.fs_kHz {
         silk_PLC_Reset(psDec);
@@ -195,7 +197,7 @@ fn silk_PLC_conceal(
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
-    _arch: i32,
+    _arch: Arch,
 ) {
     // Max: ltp_mem_length(320) + frame_length(320) = 640
     let mut sLTP_Q14 = [0i32; 2 * MAX_FRAME_LENGTH];
@@ -274,7 +276,7 @@ fn silk_PLC_conceal(
             let invGain_Q30 = {
                 #[cfg(feature = "simd")]
                 {
-                    silk_LPC_inverse_pred_gain(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order])
+                    silk_LPC_inverse_pred_gain(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order], _arch)
                 }
                 #[cfg(not(feature = "simd"))]
                 {
@@ -403,6 +405,7 @@ fn silk_PLC_conceal(
                         crate::dnn::lpcnet::lpcnet_plc_conceal(
                             lpcnet,
                             &mut frame[k * subfr_length..(k + 2) * subfr_length],
+                            _arch,
                         );
                     }
                     // Reconstruct LPC state from neural PLC output so that

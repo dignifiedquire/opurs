@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `dnn/nndsp.c`, `dnn/nndsp.h`
 
+use crate::arch::Arch;
 use crate::celt::mathops::celt_log;
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::dnn::nnet::*;
@@ -167,6 +168,7 @@ pub fn adaconv_process_frame(
     filter_gain_b: f32,
     _shape_gain: f32,
     window: &[f32],
+    arch: Arch,
 ) {
     assert_eq!(left_padding, kernel_size - 1); // only causal version supported
     assert!(kernel_size < frame_size);
@@ -231,12 +233,14 @@ pub fn adaconv_process_frame(
                 &input_buffer[p_start..],
                 &mut channel_buffer0[..overlap_size],
                 ADACONV_MAX_KERNEL_SIZE,
+                arch,
             );
             celt_pitch_xcorr(
                 &kernel1[..ADACONV_MAX_KERNEL_SIZE],
                 &input_buffer[p_start..],
                 &mut channel_buffer1[..frame_size],
                 ADACONV_MAX_KERNEL_SIZE,
+                arch,
             );
 
             for i in 0..overlap_size {
@@ -286,6 +290,7 @@ pub fn adacomb_process_frame(
     filter_gain_b: f32,
     log_gain_limit: f32,
     window: &[f32],
+    arch: Arch,
 ) {
     let mut output_buffer = vec![0.0f32; ADACOMB_MAX_FRAME_SIZE];
     let mut output_buffer_last = vec![0.0f32; ADACOMB_MAX_FRAME_SIZE];
@@ -339,6 +344,7 @@ pub fn adacomb_process_frame(
         &input_buffer[xcorr_start_last..],
         &mut output_buffer_last[..overlap_size],
         ADACOMB_MAX_KERNEL_SIZE,
+        arch,
     );
 
     // Xcorr with new kernel (full frame)
@@ -348,6 +354,7 @@ pub fn adacomb_process_frame(
         &input_buffer[xcorr_start..],
         &mut output_buffer[..frame_size],
         ADACOMB_MAX_KERNEL_SIZE,
+        arch,
     );
 
     // Overlap-add crossfade

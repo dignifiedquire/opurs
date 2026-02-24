@@ -8,17 +8,17 @@ use nalgebra::{Dim, Matrix, RawStorage, U1};
 /// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 ///
 /// Inner product of two silk_float arrays, with result as double.
-/// When the `simd` feature is enabled, dispatches to SSE2 on x86 or scalar fallback.
+/// When the `simd` feature is enabled, dispatches to AVX2/NEON on supported platforms.
 #[cfg(feature = "simd")]
-pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32]) -> f64 {
-    crate::silk::simd::silk_inner_product_flp(data1, data2)
+pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32], arch: crate::arch::Arch) -> f64 {
+    crate::silk::simd::silk_inner_product_flp(data1, data2, arch)
 }
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 ///
 /// Inner product of two silk_float arrays, with result as double (scalar-only build).
 #[cfg(not(feature = "simd"))]
-pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32]) -> f64 {
+pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32], _arch: crate::arch::Arch) -> f64 {
     silk_inner_product_FLP_scalar(data1, data2)
 }
 

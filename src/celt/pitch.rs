@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/pitch.c`
 
+use crate::arch::Arch;
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::mathops::celt_sqrt;
@@ -22,56 +23,56 @@ fn celt_max32(a: f32, b: f32) -> f32 {
 /// Dispatch wrapper for `dual_inner_prod`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
-    super::simd::dual_inner_prod(x, y01, y02, n)
+pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, arch: Arch) -> (f32, f32) {
+    super::simd::dual_inner_prod(x, y01, y02, n, arch)
 }
 
 /// Dispatch wrapper for `dual_inner_prod` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, _arch: Arch) -> (f32, f32) {
     dual_inner_prod_scalar(x, y01, y02, n)
 }
 
 /// Dispatch wrapper for `xcorr_kernel`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
-    super::simd::xcorr_kernel(x, y, sum, len)
+pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, arch: Arch) {
+    super::simd::xcorr_kernel(x, y, sum, len, arch)
 }
 
 /// Dispatch wrapper for `xcorr_kernel` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, _arch: Arch) {
     xcorr_kernel_scalar(x, y, sum, len)
 }
 
 /// Dispatch wrapper for `celt_inner_prod`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
-    super::simd::celt_inner_prod(x, y, n)
+pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, arch: Arch) -> f32 {
+    super::simd::celt_inner_prod(x, y, n, arch)
 }
 
 /// Dispatch wrapper for `celt_inner_prod` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize) -> f32 {
+pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, _arch: Arch) -> f32 {
     celt_inner_prod_scalar(x, y, n)
 }
 
 /// Dispatch wrapper for `celt_pitch_xcorr`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
-    super::simd::celt_pitch_xcorr(x, y, xcorr, len)
+pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, arch: Arch) {
+    super::simd::celt_pitch_xcorr(x, y, xcorr, len, arch)
 }
 
 /// Dispatch wrapper for `celt_pitch_xcorr` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, _arch: Arch) {
     celt_pitch_xcorr_scalar(x, y, xcorr, len)
 }
 
@@ -279,7 +280,7 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
 /// Downsamples and LPC-filters audio for pitch analysis.
 /// `x` contains 1 or 2 channel slices of length `len`.
 /// `x_lp` receives the downsampled output of length `len/2`.
-pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize) {
+pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, arch: Arch) {
     let C = x.len();
     assert!(C == 1 || C == 2);
     assert!(x[0].len() >= len);
@@ -304,7 +305,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize) {
         x_lp[0] += 0.25f32 * x[1][1] + 0.5f32 * x[1][0];
     }
 
-    _celt_autocorr(&x_lp[..half], &mut ac, None, 0, 4);
+    _celt_autocorr(&x_lp[..half], &mut ac, None, 0, 4, arch);
 
     ac[0] *= 1.0001f32;
     #[allow(clippy::needless_range_loop)]
@@ -356,7 +357,7 @@ pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usi
 ///
 /// Pitch search: finds the best pitch period.
 /// Returns the pitch index.
-pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32) -> i32 {
+pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arch) -> i32 {
     assert!(len > 0);
     assert!(max_pitch > 0);
     let lag: i32 = len + max_pitch;
@@ -377,6 +378,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32) -> i32 {
         &y_lp4,
         &mut xcorr[..(max_pitch >> 2) as usize],
         (len >> 2) as usize,
+        arch,
     );
 
     let best_pitch = find_best_pitch(
@@ -389,7 +391,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32) -> i32 {
     for i in 0..(max_pitch >> 1) as usize {
         xcorr[i] = 0.0;
         if !((i as i32 - 2 * best_pitch[0]).abs() > 2 && (i as i32 - 2 * best_pitch[1]).abs() > 2) {
-            let sum = celt_inner_prod(x_lp, &y[i..], (len >> 1) as usize);
+            let sum = celt_inner_prod(x_lp, &y[i..], (len >> 1) as usize, arch);
             xcorr[i] = celt_max32(-1.0f32, sum);
         }
     }
@@ -441,6 +443,7 @@ pub fn remove_doubling(
     T0_: &mut i32,
     mut prev_period: i32,
     prev_gain: f32,
+    arch: Arch,
 ) -> f32 {
     let mut T: i32;
 
@@ -473,6 +476,7 @@ pub fn remove_doubling(
         &x[x_off..],
         &x[x_off - T0 as usize..],
         N as usize,
+        arch,
     );
     let xx: f32 = xx_val;
     xy = xy_val;
@@ -512,6 +516,7 @@ pub fn remove_doubling(
             &x[x_off - T1 as usize..],
             &x[x_off - T1b as usize..],
             N as usize,
+            arch,
         );
         xy = 0.5f32 * (xy_new + xy2_new);
         yy = 0.5f32 * (yy_lookup[T1 as usize] + yy_lookup[T1b as usize]);
@@ -542,8 +547,12 @@ pub fn remove_doubling(
         pg = best_xy / (best_yy + 1.0);
     }
     for k in 0..3i32 {
-        xcorr[k as usize] =
-            celt_inner_prod(&x[x_off..], &x[x_off - (T + k - 1) as usize..], N as usize);
+        xcorr[k as usize] = celt_inner_prod(
+            &x[x_off..],
+            &x[x_off - (T + k - 1) as usize..],
+            N as usize,
+            arch,
+        );
     }
     if xcorr[2] - xcorr[0] > 0.7f32 * (xcorr[1] - xcorr[0]) {
         offset = 1;
@@ -597,23 +606,25 @@ mod tests {
 
     #[test]
     fn test_celt_inner_prod_close_to_scalar() {
+        let arch = crate::arch::opus_select_arch();
         for &n in &[0, 1, 3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
             let x = gen_f32(n, 42);
             let y = gen_f32(n, 123);
             let scalar = celt_inner_prod_scalar(&x, &y, n);
-            let dispatch = celt_inner_prod(&x, &y, n);
+            let dispatch = celt_inner_prod(&x, &y, n, arch);
             approx_eq(scalar, dispatch, &format!("inner_prod n={n}"));
         }
     }
 
     #[test]
     fn test_dual_inner_prod_close_to_scalar() {
+        let arch = crate::arch::opus_select_arch();
         for &n in &[0, 1, 3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
             let x = gen_f32(n, 42);
             let y01 = gen_f32(n, 123);
             let y02 = gen_f32(n, 456);
             let (s1, s2) = dual_inner_prod_scalar(&x, &y01, &y02, n);
-            let (d1, d2) = dual_inner_prod(&x, &y01, &y02, n);
+            let (d1, d2) = dual_inner_prod(&x, &y01, &y02, n, arch);
             approx_eq(s1, d1, &format!("dual_inner_prod xy01 n={n}"));
             approx_eq(s2, d2, &format!("dual_inner_prod xy02 n={n}"));
         }
@@ -621,6 +632,7 @@ mod tests {
 
     #[test]
     fn test_xcorr_kernel_close_to_scalar() {
+        let arch = crate::arch::opus_select_arch();
         for &n in &[3, 4, 7, 8, 15, 16, 63, 64, 100, 240, 480, 960] {
             let x = gen_f32(n, 42);
             let y = gen_f32(n + 3, 123);
@@ -629,7 +641,7 @@ mod tests {
             let mut sum_dispatch = [0.0f32; 4];
 
             xcorr_kernel_scalar(&x, &y, &mut sum_scalar, n);
-            xcorr_kernel(&x, &y, &mut sum_dispatch, n);
+            xcorr_kernel(&x, &y, &mut sum_dispatch, n, arch);
 
             for i in 0..4 {
                 approx_eq(
@@ -643,6 +655,7 @@ mod tests {
 
     #[test]
     fn test_celt_pitch_xcorr_close_to_scalar() {
+        let arch = crate::arch::opus_select_arch();
         for &(len, max_pitch) in &[(64, 16), (240, 60), (480, 120), (960, 240)] {
             let x = gen_f32(len, 42);
             let y = gen_f32(len + max_pitch, 123);
@@ -651,7 +664,7 @@ mod tests {
             let mut xcorr_d = vec![0.0f32; max_pitch];
 
             celt_pitch_xcorr_scalar(&x, &y, &mut xcorr_s, len);
-            celt_pitch_xcorr(&x, &y, &mut xcorr_d, len);
+            celt_pitch_xcorr(&x, &y, &mut xcorr_d, len, arch);
 
             for i in 0..max_pitch {
                 approx_eq(

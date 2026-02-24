@@ -47,6 +47,7 @@ pub fn silk_find_LPC_FLP(
         subfr_length,
         psEncC.nb_subfr as i32,
         psEncC.predictLPCOrder,
+        psEncC.arch,
     );
     if psEncC.useInterpolatedNLSFs != 0
         && psEncC.first_frame_after_reset == 0
@@ -60,6 +61,7 @@ pub fn silk_find_LPC_FLP(
             subfr_length,
             MAX_NB_SUBFR as i32 / 2,
             psEncC.predictLPCOrder,
+            psEncC.arch,
         );
         silk_A2NLSF_FLP(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
         res_nrg_2nd = silk_float_MAX;
@@ -71,7 +73,7 @@ pub fn silk_find_LPC_FLP(
                 &NLSF_Q15[..psEncC.predictLPCOrder as usize],
                 k,
             );
-            silk_NLSF2A_FLP(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder);
+            silk_NLSF2A_FLP(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder, psEncC.arch);
             silk_LPC_analysis_filter_FLP(
                 &mut LPC_res,
                 &a_tmp,

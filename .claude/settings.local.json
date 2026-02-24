@@ -7,7 +7,10 @@
       "WebFetch(domain:docs.rs)",
       "WebFetch(domain:opus-codec.org)",
       "WebFetch(domain:media.xiph.org)",
-      "WebFetch(domain:www.ietf.org)"
+      "WebFetch(domain:www.ietf.org)",
+      "Bash(git add:*)",
+      "Bash(git rebase:*)",
+      "Bash(GIT_EDITOR=true git rebase:*)"
     ]
   }
 }

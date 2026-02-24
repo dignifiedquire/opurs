@@ -193,6 +193,9 @@ pub mod internals {
         xcorr_kernel_scalar,
     };
 
+    // -- Arch (for benchmarks) --
+    pub use crate::arch::{opus_select_arch, Arch};
+
     // -- SILK functions (for benchmarks) --
     // Dispatch wrappers:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;

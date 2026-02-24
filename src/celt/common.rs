@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/celt.c`, `celt/celt.h`
 
+use crate::arch::Arch;
 use crate::celt::modes::OpusCustomMode;
 
 pub mod arch_h {
@@ -92,7 +93,7 @@ pub fn comb_filter(
     tapset1: i32,
     window: &[f32],
     mut overlap: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     #[cfg(feature = "qext")]
     if overlap == 240 {
@@ -160,6 +161,7 @@ pub fn comb_filter(
             g10,
             g11,
             g12,
+            _arch,
         );
     }
     #[cfg(not(feature = "simd"))]
@@ -196,7 +198,7 @@ pub fn comb_filter_inplace(
     tapset1: i32,
     window: &[f32],
     mut overlap: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     if g0 == 0.0f32 && g1 == 0.0f32 {
         // In-place with no filtering: nothing to do
@@ -268,6 +270,7 @@ pub fn comb_filter_inplace(
             g10,
             g11,
             g12,
+            _arch,
         );
     }
     #[cfg(not(feature = "simd"))]
@@ -312,7 +315,7 @@ pub fn comb_filter_qext(
     tapset1: i32,
     window: &[f32],
     overlap: i32,
-    arch: i32,
+    arch: Arch,
 ) {
     let N2 = (N / 2) as usize;
     let overlap2 = (overlap / 2) as usize;

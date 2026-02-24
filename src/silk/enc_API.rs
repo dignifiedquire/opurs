@@ -38,6 +38,7 @@ pub mod errors_h {
     pub const SILK_NO_ERROR: i32 = 0;
 }
 use self::errors_h::SILK_NO_ERROR;
+use crate::arch::Arch;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
 use crate::celt::float_cast::FLOAT2INT16;
@@ -68,7 +69,7 @@ use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
 pub fn silk_InitEncoder(
     psEnc: &mut silk_encoder,
-    arch: i32,
+    arch: Arch,
     encStatus: &mut silk_EncControlStruct,
 ) -> i32 {
     // Zero-init the encoder state

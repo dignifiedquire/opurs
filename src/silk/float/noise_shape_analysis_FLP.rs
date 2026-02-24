@@ -248,6 +248,7 @@ pub fn silk_noise_shape_analysis_FLP(
             silk_autocorrelation_FLP(
                 &mut auto_corr[..(psEnc.sCmn.shapingLPCOrder + 1) as usize],
                 &x_windowed[..psEnc.sCmn.shapeWinLength as usize],
+                psEnc.sCmn.arch,
             );
         }
         auto_corr[0_usize] += auto_corr[0_usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;

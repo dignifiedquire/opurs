@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/structs.h`
 
+use crate::arch::Arch;
 use crate::silk::define::{LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR};
 use crate::silk::resampler::ResamplerState;
 use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;
@@ -121,7 +122,7 @@ pub struct silk_decoder_state {
     pub sCNG: silk_CNG_struct,
     pub lossCnt: i32,
     pub prevSignalType: i32,
-    pub arch: i32,
+    pub arch: Arch,
     pub sPLC: silk_PLC_struct,
     #[cfg(feature = "osce")]
     pub osce: crate::dnn::osce::OSCEState,
@@ -153,7 +154,7 @@ pub struct NsqConfig {
     pub shapingLPCOrder: i32,
     pub nStatesDelayedDecision: i32,
     pub warping_Q16: i32,
-    pub arch: i32,
+    pub arch: Arch,
 }
 
 #[derive(Copy, Clone)]
@@ -273,7 +274,7 @@ pub struct silk_encoder_state {
     pub LBRR_flags: [i32; 3],
     pub indices: SideInfoIndices,
     pub pulses: [i8; 320],
-    pub arch: i32,
+    pub arch: Arch,
     pub inputBuf: [i16; 322],
     pub inputBufIx: i32,
     pub nFramesPerPacket: i32,
@@ -372,7 +373,7 @@ impl Default for silk_encoder_state {
             LBRR_flags: [0; 3],
             indices: Default::default(),
             pulses: [0; 320],
-            arch: 0,
+            arch: Arch::default(),
             inputBuf: [0; 322],
             inputBufIx: 0,
             nFramesPerPacket: 0,

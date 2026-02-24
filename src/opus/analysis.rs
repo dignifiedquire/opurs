@@ -140,7 +140,7 @@ impl<'a> DownmixInput<'a> {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct TonalityAnalysisState {
-    pub arch: i32,
+    pub arch: Arch,
     pub application: i32,
     pub Fs: i32,
     pub angle: [f32; 240],
@@ -176,7 +176,7 @@ pub struct TonalityAnalysisState {
 impl Default for TonalityAnalysisState {
     fn default() -> Self {
         Self {
-            arch: 0,
+            arch: Arch::default(),
             application: 0,
             Fs: 0,
             angle: [0.0; 240],
@@ -218,15 +218,9 @@ pub const NB_TBANDS: i32 = 18;
 pub mod math_h {
     pub const M_PI: f64 = std::f64::consts::PI;
 }
-pub mod cpu_support_h {
-    #[inline]
-    pub fn opus_select_arch() -> i32 {
-        0
-    }
-}
 pub use self::arch_h::{opus_val32, opus_val64};
-pub use self::cpu_support_h::opus_select_arch;
 pub use self::math_h::M_PI;
+use crate::arch::{opus_select_arch, Arch};
 use crate::celt::float_cast::{float2int, CELT_SIG_SCALE};
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
 use crate::celt::mathops::{celt_log10, celt_sqrt, fast_atan2f};

@@ -8,6 +8,7 @@ pub mod typedef_h {
     pub const silk_int16_MAX: i32 = i16::MAX as i32;
 }
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX};
+use crate::arch::Arch;
 use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
     NSQ_LPC_BUF_LENGTH, TYPE_VOICED,
@@ -130,7 +131,7 @@ pub fn silk_NSQ_del_dec_c(
     // AVX2 fast path: replaces entire function when nStatesDelayedDecision is 3 or 4
     #[cfg(feature = "simd")]
     {
-        if super::simd::use_nsq_del_dec_avx2(psEncC.nStatesDelayedDecision) {
+        if super::simd::use_nsq_del_dec_avx2(psEncC.arch, psEncC.nStatesDelayedDecision) {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             unsafe {
                 super::simd::silk_NSQ_del_dec_avx2(
@@ -159,7 +160,7 @@ pub fn silk_NSQ_del_dec_c(
     // NEON fast path: replaces entire function when nStatesDelayedDecision is 3 or 4 on aarch64
     #[cfg(feature = "simd")]
     {
-        if super::simd::use_neon_nsq_del_dec(psEncC.nStatesDelayedDecision) {
+        if super::simd::use_neon_nsq_del_dec(psEncC.arch, psEncC.nStatesDelayedDecision) {
             #[cfg(target_arch = "aarch64")]
             unsafe {
                 super::simd::silk_NSQ_del_dec_neon(
@@ -320,7 +321,7 @@ pub fn silk_NSQ_del_dec_c(
             }
         }
         #[cfg(feature = "simd")]
-        let use_simd = super::simd::use_nsq_sse4_1();
+        let use_simd = super::simd::use_nsq_sse4_1(psEncC.arch);
         #[cfg(not(feature = "simd"))]
         let use_simd = false;
 
@@ -510,7 +511,7 @@ fn silk_noise_shape_quantizer_del_dec(
     nStatesDelayedDecision: i32,
     smpl_buf_idx: &mut i32,
     decisionDelay: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut Winner_ind: i32;
     let mut RDmin_ind: i32;
@@ -601,6 +602,7 @@ fn silk_noise_shape_quantizer_del_dec(
                 &psDD.sLPC_Q14[..lpc_idx + 1],
                 a_Q12,
                 predictLPCOrder,
+                _arch,
             );
             LPC_pred_Q14 = ((LPC_pred_Q14 as u32) << 4) as i32;
 

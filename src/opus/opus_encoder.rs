@@ -13,14 +13,8 @@ pub mod arch_h {
     pub const VERY_SMALL: f32 = 1e-30f32;
 }
 pub mod stddef_h {}
-pub mod cpu_support_h {
-    #[inline]
-    pub fn opus_select_arch() -> i32 {
-        0
-    }
-}
 use self::arch_h::{opus_val16, opus_val32, EPSILON, Q15ONE, VERY_SMALL};
-pub use self::cpu_support_h::opus_select_arch;
+use crate::arch::{opus_select_arch, Arch};
 use crate::celt::celt_encoder::{celt_encode_with_ec, OpusCustomEncoder, SILKInfo};
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::ec_enc;
@@ -78,7 +72,7 @@ pub struct OpusEncoder {
     pub(crate) lsb_depth: i32,
     pub(crate) encoder_buffer: i32,
     pub(crate) lfe: i32,
-    pub(crate) arch: i32,
+    pub(crate) arch: Arch,
     pub(crate) use_dtx: i32,
     pub(crate) fec_config: i32,
     pub(crate) analysis: TonalityAnalysisState,
@@ -762,7 +756,7 @@ fn hp_cutoff(
     len: i32,
     channels: i32,
     Fs: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut B_Q28: [i32; 3] = [0; 3];
     let mut A_Q28: [i32; 2] = [0; 2];
@@ -1263,11 +1257,11 @@ fn compute_frame_energy(
     pcm: &[opus_val16],
     frame_size: i32,
     channels: i32,
-    _arch: i32,
+    _arch: Arch,
 ) -> opus_val32 {
     let len = (frame_size * channels) as usize;
     let s = &pcm[..len];
-    celt_inner_prod(s, s, len) / len as f32
+    celt_inner_prod(s, s, len, _arch) / len as f32
 }
 /// Upstream C: src/opus_encoder.c:decide_dtx_mode
 fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_Q1: i32) -> i32 {
@@ -2416,7 +2410,7 @@ pub fn opus_encode_native(
         {
             let off = (total_buffer * st.channels) as usize;
             let n = (frame_size * st.channels) as usize;
-            sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n);
+            sum = celt_inner_prod(&pcm_buf[off..], &pcm_buf[off..], n, st.arch);
         }
         #[allow(clippy::neg_cmp_op_on_partial_ord)]
         if !(sum < 1e9f32) || sum.is_nan() {
@@ -2441,6 +2435,7 @@ pub fn opus_encode_native(
                 &pcm_buf,
                 frame_size as usize,
                 total_buffer as usize,
+                st.arch,
             );
             // Shift activity memory and fill with current activity
             st.activity_mem

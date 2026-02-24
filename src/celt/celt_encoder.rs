@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/celt_encoder.c`
 
+use crate::arch::Arch;
 use crate::celt::bands::{
     compute_band_energies, haar1, hysteresis_decision, normalise_bands, quant_all_bands,
     spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
@@ -79,7 +80,7 @@ pub struct OpusCustomEncoder {
     pub lsb_depth: i32,
     pub lfe: i32,
     pub disable_inv: i32,
-    pub arch: i32,
+    pub arch: Arch,
     pub rng: u32,
     pub spread_decision: i32,
     pub delayedIntra: opus_val32,
@@ -132,7 +133,7 @@ pub struct OpusCustomEncoder {
 
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
-    pub fn new(sampling_rate: i32, channels: i32, arch: i32) -> Result<Self, i32> {
+    pub fn new(sampling_rate: i32, channels: i32, arch: Arch) -> Result<Self, i32> {
         #[cfg(feature = "qext")]
         let (mode, upsample) = if sampling_rate == 96000 {
             (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
@@ -930,7 +931,7 @@ fn alloc_trim_analysis(
     intensity: i32,
     surround_trim: opus_val16,
     equiv_rate: i32,
-    _arch: i32,
+    _arch: Arch,
 ) -> i32 {
     let mut i: i32 = 0;
     let mut diff: opus_val32 = 0 as opus_val32;
@@ -959,6 +960,7 @@ fn alloc_trim_analysis(
                 &X[band_off..band_off + band_len],
                 &X[band_off2..band_off2 + band_len],
                 band_len,
+                _arch,
             );
             sum += partial;
             i += 1;
@@ -981,6 +983,7 @@ fn alloc_trim_analysis(
                 &X[band_off..band_off + band_len],
                 &X[band_off2..band_off2 + band_len],
                 band_len,
+                _arch,
             );
             minXC = if minXC < (partial_0).abs() {
                 minXC
@@ -1744,9 +1747,9 @@ fn run_prefilter(
             let ch0 = &_pre[..ds_len];
             if CC == 2 {
                 let ch1 = &_pre[pre_chan_len..pre_chan_len + ds_len];
-                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), ds_len);
+                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), ds_len, st.arch);
             } else {
-                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), ds_len);
+                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), ds_len, st.arch);
             }
         }
         pitch_index = pitch_search(
@@ -1754,6 +1757,7 @@ fn run_prefilter(
             pitch_buf.as_slice(),
             N,
             COMBFILTER_MAXPERIOD - 3 * COMBFILTER_MINPERIOD,
+            st.arch,
         );
         pitch_index = COMBFILTER_MAXPERIOD - pitch_index;
         gain1 = remove_doubling(
@@ -1764,6 +1768,7 @@ fn run_prefilter(
             &mut pitch_index,
             st.prefilter_period,
             st.prefilter_gain,
+            st.arch,
         );
         if pitch_index > COMBFILTER_MAXPERIOD - 2 {
             pitch_index = COMBFILTER_MAXPERIOD - 2;

@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `silk/dec_API.c`
 
+use crate::arch::Arch;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_DecControlStruct {
@@ -97,7 +99,7 @@ pub fn silk_Decode(
     samplesOut: &mut [f32],
     nSamplesOut: &mut i32,
     #[cfg(feature = "deep-plc")] mut lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
-    arch: i32,
+    arch: Arch,
 ) -> i32 {
     let mut i: i32;
     let mut n: i32;
@@ -430,6 +432,7 @@ pub fn silk_Decode(
                     resample_out,
                     resample_input,
                     nSamplesOutDec as usize,
+                    arch,
                 );
 
                 if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_ONLY
@@ -460,6 +463,7 @@ pub fn silk_Decode(
                         &mut resamp_buffer,
                         resample_input,
                         nSamplesOutDec as usize,
+                        arch,
                     );
                     osce_bwe_cross_fade_10ms(resample_out, &resamp_buffer, 480);
                 }

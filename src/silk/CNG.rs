@@ -147,6 +147,7 @@ pub fn silk_CNG(
         silk_NLSF2A(
             &mut A_Q12[..psDec.LPC_order],
             &psCNG.CNG_smth_NLSF_Q15[..psDec.LPC_order],
+            psDec.arch,
         );
 
         /* Generate CNG signal, by synthesis filtering */

@@ -3,6 +3,7 @@
 //!
 //! Upstream C: `dnn/dred_encoder.c`, `dnn/dred_encoder.h`
 
+use crate::arch::Arch;
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::{
     ec_enc, ec_enc_done, ec_enc_init, ec_enc_shrink, ec_enc_uint, ec_encode,
@@ -286,7 +287,7 @@ fn dred_convert_to_16k(
 /// Process one double frame through RDOVAE.
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_process_frame
-fn dred_process_frame(enc: &mut DREDEnc) {
+fn dred_process_frame(enc: &mut DREDEnc, arch: Arch) {
     assert!(enc.loaded);
     let mut feature_buffer = vec![0.0f32; 2 * 36];
     let mut input_buffer = vec![0.0f32; 2 * DRED_NUM_FEATURES];
@@ -303,12 +304,14 @@ fn dred_process_frame(enc: &mut DREDEnc) {
         &mut enc.lpcnet_enc_state,
         &buf0,
         &mut feature_buffer,
+        arch,
     );
     let buf1 = enc.input_buffer[DRED_FRAME_SIZE..2 * DRED_FRAME_SIZE].to_vec();
     lpcnet_compute_single_frame_features_float(
         &mut enc.lpcnet_enc_state,
         &buf1,
         &mut feature_buffer[36..],
+        arch,
     );
 
     // Prepare input (discard LPC coefficients, keep first 20 features)
@@ -330,7 +333,13 @@ fn dred_process_frame(enc: &mut DREDEnc) {
 /// Compute latents from PCM audio.
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_compute_latents
-pub fn dred_compute_latents(enc: &mut DREDEnc, pcm: &[f32], frame_size: usize, extra_delay: usize) {
+pub fn dred_compute_latents(
+    enc: &mut DREDEnc,
+    pcm: &[f32],
+    frame_size: usize,
+    extra_delay: usize,
+    arch: Arch,
+) {
     assert!(enc.loaded);
     let frame_size16k = frame_size * 16000 / enc.fs as usize;
     let curr_offset16k = 40 + extra_delay * 16000 / enc.fs as usize - enc.input_buffer_fill;
@@ -354,7 +363,7 @@ pub fn dred_compute_latents(enc: &mut DREDEnc, pcm: &[f32], frame_size: usize, e
         );
         enc.input_buffer_fill += process_size16k;
         if enc.input_buffer_fill >= 2 * DRED_FRAME_SIZE {
-            dred_process_frame(enc);
+            dred_process_frame(enc, arch);
             enc.input_buffer_fill -= 2 * DRED_FRAME_SIZE;
             let fill = enc.input_buffer_fill;
             enc.input_buffer

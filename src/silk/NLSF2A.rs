@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/NLSF2A.c`
 
+use crate::arch::Arch;
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
 #[cfg(feature = "simd")]
@@ -55,7 +56,7 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
 /// arch    I   Run-time architecture
 /// ```
 #[inline]
-pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
+pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     let d = a_Q12.len();
 
     /* This ordering was found to maximize quality. It improves the numerical accuracy of
@@ -120,9 +121,12 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16]) {
 
     let mut i = 0;
     #[cfg(feature = "simd")]
-    let pred_gain_fn = silk_LPC_inverse_pred_gain;
+    let pred_gain_fn = |a: &[i16]| silk_LPC_inverse_pred_gain(a, arch);
     #[cfg(not(feature = "simd"))]
-    let pred_gain_fn = silk_LPC_inverse_pred_gain_c;
+    let pred_gain_fn = {
+        let _ = arch;
+        silk_LPC_inverse_pred_gain_c
+    };
     while pred_gain_fn(a_Q12) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS {
         /* Prediction coefficients are (too close to) unstable; apply bandwidth expansion   */
         /* on the unscaled coefficients, convert to Q12 and measure again                   */

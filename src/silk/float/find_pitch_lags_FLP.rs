@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/float/find_pitch_lags_FLP.c`
 
+use crate::arch::Arch;
 use crate::silk::define::{TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, TYPE_VOICED};
 use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
 use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;
@@ -21,7 +22,7 @@ pub fn silk_find_pitch_lags_FLP(
     psEncCtrl: &mut silk_encoder_control_FLP,
     res: &mut [f32],
     x: &[f32],
-    arch: i32,
+    arch: Arch,
 ) {
     let mut thrhld: f32;
 
@@ -58,6 +59,7 @@ pub fn silk_find_pitch_lags_FLP(
     silk_autocorrelation_FLP(
         &mut auto_corr[..(psEnc.sCmn.pitchEstimationLPCOrder + 1) as usize],
         &Wsig[..psEnc.sCmn.pitch_LPC_win_length as usize],
+        arch,
     );
     auto_corr[0_usize] += auto_corr[0_usize] * FIND_PITCH_WHITE_NOISE_FRACTION + 1_f32;
     let res_nrg: f32 = silk_schur_FLP(

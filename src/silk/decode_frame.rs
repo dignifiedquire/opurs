@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/decode_frame.c`
 
+use crate::arch::Arch;
 use crate::celt::entdec::ec_dec;
 
 #[cfg(feature = "osce")]
@@ -35,7 +36,7 @@ pub fn silk_decode_frame(
     condCoding: i32,
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut LPCNetPLCState>,
     #[cfg(feature = "osce")] osce_model: &OSCEModel,
-    arch: i32,
+    arch: Arch,
 ) -> (i32, i32) {
     let L = psDec.frame_length as i32;
     let ret: i32 = 0;
@@ -93,7 +94,7 @@ pub fn silk_decode_frame(
         #[cfg(feature = "osce")]
         {
             let num_bits = ec_tell(psRangeDec) - ec_start;
-            osce_enhance_frame(osce_model, psDec, &psDecCtrl, pOut_slice, num_bits);
+            osce_enhance_frame(osce_model, psDec, &psDecCtrl, pOut_slice, num_bits, arch);
         }
 
         silk_PLC(

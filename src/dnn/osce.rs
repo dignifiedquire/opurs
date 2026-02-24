@@ -5,6 +5,7 @@
 //! Upstream C: `dnn/osce.c`, `dnn/osce.h`, `dnn/osce_features.c`,
 //! `dnn/osce_config.h`, `dnn/osce_structs.h`
 
+use crate::arch::Arch;
 use crate::dnn::freq::{forward_transform, NB_BANDS};
 use crate::dnn::nndsp::*;
 use crate::dnn::nnet::*;
@@ -2011,6 +2012,7 @@ pub fn lace_process_20ms_frame(
     features: &[f32],
     numbits: &[f32],
     periods: &[i32],
+    arch: Arch,
 ) {
     let mut feature_buffer = vec![0.0f32; 4 * LACE_COND_DIM];
     let mut output_buffer = vec![0.0f32; 4 * LACE_FRAME_SIZE];
@@ -2046,6 +2048,7 @@ pub fn lace_process_20ms_frame(
             LACE_CF1_FILTER_GAIN_B,
             LACE_CF1_LOG_GAIN_LIMIT,
             &lace.window,
+            arch,
         );
     }
 
@@ -2071,6 +2074,7 @@ pub fn lace_process_20ms_frame(
             LACE_CF2_FILTER_GAIN_B,
             LACE_CF2_LOG_GAIN_LIMIT,
             &lace.window,
+            arch,
         );
     }
 
@@ -2096,6 +2100,7 @@ pub fn lace_process_20ms_frame(
             LACE_AF1_FILTER_GAIN_B,
             LACE_AF1_SHAPE_GAIN,
             &lace.window,
+            arch,
         );
     }
 
@@ -2216,6 +2221,7 @@ pub fn nolace_process_20ms_frame(
     features: &[f32],
     numbits: &[f32],
     periods: &[i32],
+    arch: Arch,
 ) {
     let mut feature_buffer = vec![0.0f32; 4 * NOLACE_COND_DIM];
     let mut feature_transform_buffer = vec![0.0f32; 4 * NOLACE_COND_DIM];
@@ -2260,6 +2266,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_CF1_FILTER_GAIN_B,
             NOLACE_CF1_LOG_GAIN_LIMIT,
             &nolace.window,
+            arch,
         );
         compute_generic_conv1d(
             &nolace.layers.post_cf1,
@@ -2295,6 +2302,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_CF2_FILTER_GAIN_B,
             NOLACE_CF2_LOG_GAIN_LIMIT,
             &nolace.window,
+            arch,
         );
         compute_generic_conv1d(
             &nolace.layers.post_cf2,
@@ -2331,6 +2339,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_AF1_FILTER_GAIN_B,
             NOLACE_AF1_SHAPE_GAIN,
             &nolace.window,
+            arch,
         );
         compute_generic_conv1d(
             &nolace.layers.post_af1,
@@ -2384,6 +2393,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_AF2_FILTER_GAIN_B,
             NOLACE_AF2_SHAPE_GAIN,
             &nolace.window,
+            arch,
         );
         compute_generic_conv1d(
             &nolace.layers.post_af2,
@@ -2437,6 +2447,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_AF3_FILTER_GAIN_B,
             NOLACE_AF3_SHAPE_GAIN,
             &nolace.window,
+            arch,
         );
         compute_generic_conv1d(
             &nolace.layers.post_af3,
@@ -2490,6 +2501,7 @@ pub fn nolace_process_20ms_frame(
             NOLACE_AF4_FILTER_GAIN_B,
             NOLACE_AF4_SHAPE_GAIN,
             &nolace.window,
+            arch,
         );
     }
 
@@ -2530,6 +2542,7 @@ pub fn osce_enhance_frame(
     psDecCtrl: &silk_decoder_control,
     xq: &mut [i16],
     num_bits: i32,
+    arch: Arch,
 ) {
     // Enhancement only implemented for 20 ms frame at 16kHz
     if psDec.fs_kHz != 16 || psDec.nb_subfr != 4 {
@@ -2626,6 +2639,7 @@ pub fn osce_enhance_frame(
                     &features,
                     &numbits,
                     &periods,
+                    arch,
                 );
             } else {
                 out_buffer.copy_from_slice(&in_buffer);
@@ -2641,6 +2655,7 @@ pub fn osce_enhance_frame(
                     &features,
                     &numbits,
                     &periods,
+                    arch,
                 );
             } else {
                 out_buffer.copy_from_slice(&in_buffer);
@@ -3000,6 +3015,7 @@ fn bbwenet_process_frames(
     x_in: &[f32],
     features: &[f32],
     num_frames: usize,
+    arch: Arch,
 ) {
     let num_subframes = 2 * num_frames;
     let mut latent_features = vec![0.0f32; 4 * BBWENET_COND_DIM];
@@ -3035,6 +3051,7 @@ fn bbwenet_process_frames(
             BBWENET_AF1_FILTER_GAIN_B,
             BBWENET_AF1_SHAPE_GAIN,
             &model.window16,
+            arch,
         );
     }
 
@@ -3111,6 +3128,7 @@ fn bbwenet_process_frames(
             BBWENET_AF2_FILTER_GAIN_B,
             BBWENET_AF2_SHAPE_GAIN,
             &model.window32,
+            arch,
         );
     }
 
@@ -3187,6 +3205,7 @@ fn bbwenet_process_frames(
             BBWENET_AF3_FILTER_GAIN_B,
             BBWENET_AF3_SHAPE_GAIN,
             &model.window48,
+            arch,
         );
     }
 }
@@ -3343,6 +3362,7 @@ pub fn osce_bwe(
     xq48: &mut [i16],
     xq16: &[i16],
     xq16_len: usize,
+    arch: Arch,
 ) {
     debug_assert!(xq16_len == 160 || xq16_len == 320);
 
@@ -3373,6 +3393,7 @@ pub fn osce_bwe(
         &in_buffer,
         &features,
         num_frames,
+        arch,
     );
 
     // Scale and delay output

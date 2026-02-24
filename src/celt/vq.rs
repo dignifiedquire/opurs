@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/vq.c`
 
+use crate::arch::Arch;
 use crate::celt::bands::SPREAD_NONE;
 use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;
@@ -22,14 +23,14 @@ const EPSILON: f32 = 1e-15f32;
 /// Dispatch wrapper for `op_pvq_search`.
 #[cfg(feature = "simd")]
 #[inline]
-fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: i32) -> f32 {
+fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
     super::simd::op_pvq_search(X, iy, K, N, arch)
 }
 
 /// Dispatch wrapper for `op_pvq_search` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: i32) -> f32 {
+fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
     op_pvq_search_c(X, iy, K, N, arch)
 }
 
@@ -123,7 +124,7 @@ fn extract_collapse_mask(iy: &[i32], N: i32, B: i32) -> u32 {
 }
 
 /// Upstream C: celt/vq.c:op_pvq_search_c
-pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: i32) -> f32 {
+pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arch) -> f32 {
     let mut sum: f32 = 0.0;
     let mut xy: f32;
     let mut yy: f32;
@@ -502,7 +503,7 @@ pub fn alg_quant(
     enc: &mut ec_enc,
     gain: f32,
     resynth: i32,
-    arch: i32,
+    arch: Arch,
     #[cfg(feature = "qext")] ext_enc: &mut ec_enc,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
@@ -661,8 +662,8 @@ pub fn alg_unquant(
 
 /// Upstream C: celt/vq.c:renormalise_vector
 #[inline]
-pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
-    let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize);
+pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
+    let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
     let g = celt_rsqrt_norm(E) * gain;
     for xi in X[..N as usize].iter_mut() {
         *xi *= g;
@@ -674,7 +675,7 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: i32) {
 /// Returns Q30 value in range [0, 1073741824] (= 2^30).
 /// Callers that need Q14 should right-shift by 16.
 #[inline]
-pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i32 {
+pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
     if stereo != 0 {
@@ -685,8 +686,8 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: i32) -> i
             Eside += s * s;
         }
     } else {
-        Emid += celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize);
-        Eside += celt_inner_prod(&Y[..N as usize], &Y[..N as usize], N as usize);
+        Emid += celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
+        Eside += celt_inner_prod(&Y[..N as usize], &Y[..N as usize], N as usize, _arch);
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);

@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `celt/bands.c`
 
+use crate::arch::Arch;
 use crate::celt::entcode::{celt_sudiv, celt_udiv, ec_ctx, ec_tell_frac, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_uint, ec_dec_update, ec_decode};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint, ec_encode};
@@ -46,7 +47,7 @@ struct band_ctx<'a> {
     remaining_bits: i32,
     bandE: &'a [f32],
     seed: u32,
-    arch: i32,
+    arch: Arch,
     theta_round: i32,
     disable_inv: i32,
     avoid_split_noise: i32,
@@ -153,7 +154,7 @@ pub fn compute_band_energies(
     end: i32,
     C: i32,
     LM: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let eBands = &m.eBands;
     let N = m.shortMdctSize << LM;
@@ -169,6 +170,7 @@ pub fn compute_band_energies(
                     &X[band_off..band_off + band_len],
                     &X[band_off..band_off + band_len],
                     band_len,
+                    _arch,
                 );
             bandE[(i + c * m.nbEBands as i32) as usize] = celt_sqrt(sum);
             i += 1;
@@ -283,7 +285,7 @@ pub fn anti_collapse(
     pulses: &[i32],
     mut seed: u32,
     encode: i32,
-    arch: i32,
+    arch: Arch,
 ) {
     let mut i = start;
     while i < end {
@@ -397,9 +399,9 @@ fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
 
 /// Upstream C: celt/bands.c:stereo_merge
 #[inline]
-fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: i32) {
+fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: Arch) {
     let n = N as usize;
-    let (xp, side) = dual_inner_prod(&Y[..n], &X[..n], &Y[..n], n);
+    let (xp, side) = dual_inner_prod(&Y[..n], &X[..n], &Y[..n], n, _arch);
     let xp = mid * xp;
     let mid2 = mid;
     let El = mid2 * mid2 + side - 2.0f32 * xp;
@@ -1874,7 +1876,7 @@ pub fn quant_all_bands<'a>(
     codedBands: i32,
     seed: &mut u32,
     complexity: i32,
-    arch: i32,
+    arch: Arch,
     disable_inv: i32,
     #[cfg(feature = "qext")] ext_ec: &mut ec_ctx<'a>,
     #[cfg(feature = "qext")] extra_pulses: &[i32],
@@ -2325,8 +2327,8 @@ pub fn quant_all_bands<'a>(
                         cm as i32,
                         ec,
                     );
-                    let dist0: f32 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n)
-                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n);
+                    let dist0: f32 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n, arch)
+                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n, arch);
                     let cm2: u32 = x_cm;
                     let ec_save2 = ec.save();
                     let ctx_save2: band_ctx = ctx;
@@ -2403,8 +2405,8 @@ pub fn quant_all_bands<'a>(
                         cm as i32,
                         ec,
                     );
-                    let dist1: f32 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n)
-                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n);
+                    let dist1: f32 = w[0] * celt_inner_prod(&_X_save[..n], &x_band[..n], n, arch)
+                        + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n, arch);
                     if dist0 >= dist1 {
                         x_cm = cm2;
                         ec.restore(ec_save2);

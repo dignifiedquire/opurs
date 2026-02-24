@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `silk/quant_LTP_gains.c`
 
+use crate::arch::Arch;
+
 pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }
@@ -29,7 +31,7 @@ pub fn silk_quant_LTP_gains(
     xX_Q17: &[i32],
     subfr_len: i32,
     nb_subfr: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut j: i32 = 0;
     let mut k: i32 = 0;
@@ -79,6 +81,7 @@ pub fn silk_quant_LTP_gains(
                 subfr_len,
                 max_gain_Q7,
                 cbk_size,
+                _arch,
             );
             #[cfg(not(feature = "simd"))]
             silk_VQ_WMat_EC_c(

@@ -89,8 +89,9 @@ pub fn silk_noise_shape_quantizer_short_prediction(
     buf32: &[i32],
     coef16: &[i16],
     order: i32,
+    arch: Arch,
 ) -> i32 {
-    super::simd::silk_noise_shape_quantizer_short_prediction(buf32, coef16, order)
+    super::simd::silk_noise_shape_quantizer_short_prediction(buf32, coef16, order, arch)
 }
 
 /// Dispatch wrapper for short prediction (scalar-only build).
@@ -100,6 +101,7 @@ pub fn silk_noise_shape_quantizer_short_prediction(
     buf32: &[i32],
     coef16: &[i16],
     order: i32,
+    _arch: Arch,
 ) -> i32 {
     silk_noise_shape_quantizer_short_prediction_c(buf32, coef16, order)
 }
@@ -112,8 +114,9 @@ pub fn silk_NSQ_noise_shape_feedback_loop(
     data1: &mut [i32],
     coef: &[i16],
     order: i32,
+    arch: Arch,
 ) -> i32 {
-    super::simd::silk_NSQ_noise_shape_feedback_loop(data0, data1, coef, order)
+    super::simd::silk_NSQ_noise_shape_feedback_loop(data0, data1, coef, order, arch)
 }
 
 /// Dispatch wrapper for noise shape feedback loop (scalar-only build).
@@ -124,10 +127,12 @@ pub fn silk_NSQ_noise_shape_feedback_loop(
     data1: &mut [i32],
     coef: &[i16],
     order: i32,
+    _arch: Arch,
 ) -> i32 {
     silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
+use crate::arch::Arch;
 #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
 use crate::silk::define::QUANT_LEVEL_ADJUST_Q10;
 use crate::silk::define::{
@@ -170,7 +175,7 @@ pub fn silk_NSQ_c(
     // Precompute quantization lookup table for SSE4.1 path (x86 only)
     #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
     let (use_simd_quantizer, table) = {
-        let use_it = super::simd::use_nsq_sse4_1()
+        let use_it = super::simd::use_nsq_sse4_1(psEncC.arch)
             && psEncC.shapingLPCOrder == 10
             && psEncC.predictLPCOrder == 16;
         let table = if use_it {
@@ -349,7 +354,7 @@ fn silk_noise_shape_quantizer(
     length: i32,
     shapingLPCOrder: i32,
     predictLPCOrder: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut LTP_pred_Q13: i32;
     let mut LPC_pred_Q10: i32;
@@ -394,6 +399,7 @@ fn silk_noise_shape_quantizer(
             &NSQ.sLPC_Q14[..lpc_idx + 1],
             a_Q12,
             predictLPCOrder,
+            _arch,
         );
 
         // LTP prediction
@@ -426,6 +432,7 @@ fn silk_noise_shape_quantizer(
             &mut NSQ.sAR2_Q14,
             AR_shp_Q13,
             shapingLPCOrder,
+            _arch,
         );
 
         n_AR_Q12 =

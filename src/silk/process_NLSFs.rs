@@ -73,6 +73,7 @@ pub fn silk_process_NLSFs(
     silk_NLSF2A(
         &mut PredCoef_Q12[1][..psEncC.predictLPCOrder as usize],
         &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
+        psEncC.arch,
     );
     if doInterpolate != 0 {
         silk_interpolate(
@@ -84,6 +85,7 @@ pub fn silk_process_NLSFs(
         silk_NLSF2A(
             &mut PredCoef_Q12[0][..psEncC.predictLPCOrder as usize],
             &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
+            psEncC.arch,
         );
     } else {
         assert!(psEncC.predictLPCOrder <= 16);

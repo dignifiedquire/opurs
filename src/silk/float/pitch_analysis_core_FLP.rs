@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `silk/float/pitch_analysis_core_FLP.c`
 
+use crate::arch::Arch;
+
 pub mod arch_h {
     pub type opus_val32 = f32;
 }
@@ -42,7 +44,7 @@ pub fn silk_pitch_analysis_core_FLP(
     Fs_kHz: i32,
     complexity: i32,
     nb_subfr: i32,
-    arch: i32,
+    arch: Arch,
 ) -> i32 {
     let mut i: i32;
     let mut k: i32;
@@ -187,6 +189,7 @@ pub fn silk_pitch_analysis_core_FLP(
                     ..target_off - max_lag_4kHz as usize + sf_length_8kHz as usize + xcorr_len],
                 &mut xcorr[..xcorr_len],
                 sf_length_8kHz as usize,
+                arch,
             );
         }
         cross_corr = xcorr[(max_lag_4kHz - min_lag_4kHz) as usize] as f64;
@@ -300,6 +303,7 @@ pub fn silk_pitch_analysis_core_FLP(
             cross_corr = silk_inner_product_FLP(
                 &frame_8[basis_off..basis_off + sf_length_8kHz as usize],
                 &frame_8[target_off..target_off + sf_length_8kHz as usize],
+                arch,
             );
             if cross_corr > 0.0f32 as f64 {
                 energy = silk_energy_FLP(&frame_8[basis_off..basis_off + sf_length_8kHz as usize]);
@@ -532,7 +536,7 @@ fn silk_P_Ana_calc_corr_st3(
     sf_length: i32,
     nb_subfr: i32,
     complexity: i32,
-    _arch: i32,
+    _arch: Arch,
 ) {
     let mut i: i32;
     let mut j: i32;
@@ -576,6 +580,7 @@ fn silk_P_Ana_calc_corr_st3(
                 &frame[basis_start..basis_start + sf_length as usize + xcorr_len],
                 &mut xcorr[..xcorr_len],
                 sf_length as usize,
+                _arch,
             );
         }
         j = lag_low;

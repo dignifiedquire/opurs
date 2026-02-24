@@ -7,6 +7,8 @@ pub mod typedef_h {
     pub const silk_int32_MAX: i32 = i32::MAX;
 }
 pub use self::typedef_h::{silk_int32_MAX, silk_uint8_MAX};
+#[cfg(not(feature = "simd"))]
+use crate::arch::Arch;
 use crate::silk::ana_filt_bank_1::silk_ana_filt_bank_1;
 use crate::silk::define::{
     VAD_INTERNAL_SUBFRAMES, VAD_NEGATIVE_OFFSET_Q5, VAD_NOISE_LEVEL_SMOOTH_COEF_Q16, VAD_N_BANDS,
@@ -22,7 +24,7 @@ use crate::silk::simd::silk_vad_energy;
 
 /// Scalar VAD energy: sum of (X[i] >> 3)^2.
 #[cfg(not(feature = "simd"))]
-fn silk_vad_energy(x: &[i16]) -> i32 {
+fn silk_vad_energy(x: &[i16], _arch: Arch) -> i32 {
     let mut sum: i32 = 0;
     for &sample in x {
         let x_tmp = (sample as i32) >> 3;
@@ -151,7 +153,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
             {
                 let start = (X_offset[b as usize] + dec_subframe_offset) as usize;
                 let end = start + dec_subframe_length as usize;
-                sumSquared = silk_vad_energy(&X[start..end]);
+                sumSquared = silk_vad_energy(&X[start..end], psEncC.arch);
             }
             if s < VAD_INTERNAL_SUBFRAMES - 1 {
                 Xnrg[b as usize] = if (Xnrg[b as usize] as u32).wrapping_add(sumSquared as u32)

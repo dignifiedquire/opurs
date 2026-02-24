@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `silk/float/wrappers_FLP.c`
 
+use crate::arch::Arch;
 use crate::silk::A2NLSF::silk_A2NLSF;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
@@ -31,12 +32,13 @@ pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
     );
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_NLSF2A_FLP
-pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32) {
+pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: Arch) {
     let mut i: i32 = 0;
     let mut a_fix_Q12: [i16; 16] = [0; 16];
     silk_NLSF2A(
         &mut a_fix_Q12[..LPC_order as usize],
         &NLSF_Q15[..LPC_order as usize],
+        arch,
     );
     i = 0;
     while i < LPC_order {
@@ -188,7 +190,7 @@ pub fn silk_quant_LTP_gains_FLP(
     xX: &[f32],
     subfr_len: i32,
     nb_subfr: i32,
-    arch: i32,
+    arch: Arch,
 ) {
     let mut i: i32 = 0;
     let mut pred_gain_dB_Q7: i32 = 0;

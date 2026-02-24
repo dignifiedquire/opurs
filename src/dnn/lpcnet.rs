@@ -9,6 +9,7 @@ use super::fargan::*;
 use super::freq::*;
 use super::nnet::*;
 use super::pitchdnn::*;
+use crate::arch::Arch;
 use crate::celt::celt_lpc::celt_fir_c;
 use crate::celt::kiss_fft::kiss_fft_cpx;
 use crate::celt::mathops::celt_log2;
@@ -274,7 +275,7 @@ fn frame_analysis(
 /// Compute full frame features from input PCM.
 ///
 /// Upstream C: dnn/lpcnet_enc.c:compute_frame_features
-pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
+pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch) {
     let mut aligned_in = vec![0.0f32; FRAME_SIZE];
     aligned_in[..TRAINING_OFFSET]
         .copy_from_slice(&st.analysis_mem[OVERLAP_SIZE - TRAINING_OFFSET..OVERLAP_SIZE]);
@@ -343,6 +344,7 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
         &st.lpc,
         &mut st.lp_buf[PITCH_MAX_PERIOD..PITCH_MAX_PERIOD + FRAME_SIZE],
         LPC_ORDER,
+        arch,
     );
 
     for i in 0..FRAME_SIZE {
@@ -373,14 +375,16 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
         buf,
         &mut xcorr,
         FRAME_SIZE,
+        arch,
     );
 
     let ener0 = celt_inner_prod(
         &buf[PITCH_MAX_PERIOD..],
         &buf[PITCH_MAX_PERIOD..],
         FRAME_SIZE,
+        arch,
     );
-    let mut ener1: f64 = celt_inner_prod(buf, buf, FRAME_SIZE) as f64;
+    let mut ener1: f64 = celt_inner_prod(buf, buf, FRAME_SIZE, arch) as f64;
     let mut ener_norm = vec![0.0f32; PITCH_MAX_PERIOD - PITCH_MIN_PERIOD];
 
     for i in 0..PITCH_MAX_PERIOD - PITCH_MIN_PERIOD {
@@ -405,17 +409,20 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32]) {
         &st.lp_buf[PITCH_MAX_PERIOD..],
         &st.lp_buf[PITCH_MAX_PERIOD..],
         FRAME_SIZE,
+        arch,
     );
     let pitch_u = pitch as usize;
     let yy = celt_inner_prod(
         &st.lp_buf[PITCH_MAX_PERIOD - pitch_u..],
         &st.lp_buf[PITCH_MAX_PERIOD - pitch_u..],
         FRAME_SIZE,
+        arch,
     );
     let xy = celt_inner_prod(
         &st.lp_buf[PITCH_MAX_PERIOD..],
         &st.lp_buf[PITCH_MAX_PERIOD - pitch_u..],
         FRAME_SIZE,
+        arch,
     );
     // C: xy/sqrt(1+xx*yy) — sqrt(float) promotes to double, result is double,
     // xy (float) / double → double, truncated to float on assignment.
@@ -436,6 +443,7 @@ pub fn lpcnet_compute_single_frame_features(
     st: &mut LPCNetEncState,
     pcm: &[i16],
     features: &mut [f32],
+    arch: Arch,
 ) {
     let mut x = vec![0.0f32; FRAME_SIZE];
     for i in 0..FRAME_SIZE {
@@ -444,7 +452,7 @@ pub fn lpcnet_compute_single_frame_features(
     // In-place preemphasis: C does preemphasis(x, mem, x, coef, N)
     let tmp = x.clone();
     preemphasis(&mut x, &mut st.mem_preemph, &tmp, PREEMPHASIS, FRAME_SIZE);
-    compute_frame_features(st, &x);
+    compute_frame_features(st, &x, arch);
     features[..NB_TOTAL_FEATURES].copy_from_slice(&st.features[..NB_TOTAL_FEATURES]);
 }
 
@@ -455,12 +463,13 @@ pub fn lpcnet_compute_single_frame_features_float(
     st: &mut LPCNetEncState,
     pcm: &[f32],
     features: &mut [f32],
+    arch: Arch,
 ) {
     let mut x = vec![0.0f32; FRAME_SIZE];
     x[..FRAME_SIZE].copy_from_slice(&pcm[..FRAME_SIZE]);
     let tmp = x.clone();
     preemphasis(&mut x, &mut st.mem_preemph, &tmp, PREEMPHASIS, FRAME_SIZE);
-    compute_frame_features(st, &x);
+    compute_frame_features(st, &x, arch);
     features[..NB_TOTAL_FEATURES].copy_from_slice(&st.features[..NB_TOTAL_FEATURES]);
 }
 
@@ -722,7 +731,7 @@ static ATT_TABLE: [f32; 10] = [0.0, 0.0, -0.2, -0.2, -0.4, -0.4, -0.8, -0.8, -1.
 /// Conceal a lost frame using neural PLC.
 ///
 /// Upstream C: dnn/lpcnet_plc.c:lpcnet_plc_conceal
-pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16]) {
+pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) {
     assert!(st.loaded);
 
     if st.blend == 0 {
@@ -738,7 +747,7 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16]) {
             let mut plc_features = vec![0.0f32; 2 * NB_BANDS + NB_FEATURES + 1];
             burg_cepstral_analysis(&mut plc_features, &x);
 
-            lpcnet_compute_single_frame_features_float(&mut st.enc, &x, &mut st.features);
+            lpcnet_compute_single_frame_features_float(&mut st.enc, &x, &mut st.features, arch);
 
             if (!st.analysis_gap || count > 0) && st.analysis_pos >= st.predict_pos {
                 let features_copy = st.features.clone();
