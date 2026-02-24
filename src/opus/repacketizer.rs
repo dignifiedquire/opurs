@@ -336,7 +336,12 @@ impl OpusRepacketizer {
                     Err(e) => return e,
                 }
                 if !pad {
-                    pad_amount = ext_len + ext_len / 254 + 1;
+                    pad_amount = ext_len
+                        + if ext_len > 0 {
+                            (ext_len + 253) / 254
+                        } else {
+                            1
+                        };
                 }
             }
             if pad_amount != 0 {

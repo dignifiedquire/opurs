@@ -4,7 +4,7 @@
 Close all QEXT bitstream/PLC/sizing correctness gaps from `diff_review.md`.
 
 ## Findings IDs
-`6,111,166,175,229`
+`6,111,166,175,229` (all resolved)
 
 ## Scope
 - CELT encoder QEXT scaling, prefilter memory/layout, overlap history sizing.
@@ -29,7 +29,8 @@ Close all QEXT bitstream/PLC/sizing correctness gaps from `diff_review.md`.
 ## Progress
 - 2026-02-24: Resolved IDs `24,26,27,28,29,30,31,32,33,34,42,52,88,150`.
 - 2026-02-24: Resolved IDs `1,3,4,5,14,15,16,17,21,22,23,25`.
-- Remaining open IDs: `6,111,166,175,229`.
+- 2026-02-24: Resolved IDs `6,111,166,175,229`.
+- Remaining open IDs: `none`.
 - Implemented:
   - Mode-derived `qext_scale` initialization in CELT encoder/decoder.
   - QEXT old-band history clearing in encoder/decoder reset paths.
@@ -47,4 +48,9 @@ Close all QEXT bitstream/PLC/sizing correctness gaps from `diff_review.md`.
   - Deep PLC selection now gates out 96 kHz modes in loss concealment, matching upstream guard.
   - Stereo `quant_band` QEXT bit redistribution now computes `qext_extra` on the correct branch basis (`mbits` vs `sbits`).
   - `pitch_downsample` now supports upstream factorized downsampling (including factor-4 QEXT path).
+  - Opus encoder now provisions QEXT payload bytes for CELT-only mode, passes `qext_payload`/`qext_bytes` to CELT, and emits QEXT extension ID `124` via packet extension padding.
+  - SILK resampler now mirrors upstream QEXT 96 kHz tables/rate mapping/input checks, including encoder/decoder delay matrices and 96-sample delay buffer capacity.
+  - Repacketizer non-pad extension sizing now matches upstream `pad_amount = ext_len + (ext_len ? (ext_len+253)/254 : 1)`.
+  - QEXT encode stability fixes: dynamic `quant_all_bands` norm buffer sizing (`C * norm_size`) and guarded `quant_fine_energy` shift bounds to prevent overflow panics on invalid bit counts.
+  - Tools parity harness build fix: updated `tests/pitch_c_parity.rs` for the `pitch_downsample(..., factor, arch)` signature.
 - Added unit coverage for the above in `src/celt/celt_encoder.rs` and `src/celt/celt_decoder.rs`.

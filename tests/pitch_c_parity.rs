@@ -108,9 +108,9 @@ fn pitch_primitives_match_c_scalar() {
         let arch = opurs::arch::opus_select_arch();
         let mut x_lp_r = vec![0.0f32; half];
         if c == 2 {
-            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, len, arch);
+            rust_pitch_downsample(&[&ch0, &ch1], &mut x_lp_r, len, 2, arch);
         } else {
-            rust_pitch_downsample(&[&ch0], &mut x_lp_r, len, arch);
+            rust_pitch_downsample(&[&ch0], &mut x_lp_r, len, 2, arch);
         }
 
         let mut x_lp_c = vec![0.0f32; half];

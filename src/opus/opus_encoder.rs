@@ -954,6 +954,54 @@ fn bitrate_to_bits(bitrate: i32, fs: i32, frame_size: i32) -> i32 {
     bitrate * 6 / (6 * fs / frame_size)
 }
 
+#[cfg(feature = "qext")]
+#[inline]
+fn qext_padding_len(qext_total_bytes: i32) -> i32 {
+    (qext_total_bytes + 253) / 254
+}
+
+#[cfg(feature = "qext")]
+fn qext_allocation(total_celt_bytes: i32, fs: i32, frame_size: i32, channels: i32) -> (i32, i32) {
+    // Mirror upstream CELT QEXT allocation split from celt_encode_with_ec:
+    // compute total QEXT bytes (including extension ID), then derive
+    // core CELT bytes and extension payload bytes (excluding extension ID).
+    let offset = bitrate_to_bits(channels * 80000, fs, frame_size) / 8;
+    let mut qext_total_bytes =
+        (total_celt_bytes - 1275).max((total_celt_bytes - offset).max(0) * 4 / 5);
+
+    if qext_total_bytes <= 20 {
+        return (total_celt_bytes, 0);
+    }
+
+    let padding_len = qext_padding_len(qext_total_bytes);
+    // Keep at least two bytes for the CELT frame body.
+    let max_qext_total = total_celt_bytes - 2 - padding_len - 1;
+    qext_total_bytes = qext_total_bytes.min(max_qext_total);
+    if qext_total_bytes <= 20 {
+        return (total_celt_bytes, 0);
+    }
+
+    let core_bytes = total_celt_bytes - qext_total_bytes - padding_len - 1;
+    if core_bytes < 2 {
+        return (total_celt_bytes, 0);
+    }
+
+    // CELT receives payload bytes (total minus one-byte extension ID header).
+    (core_bytes, qext_total_bytes - 1)
+}
+
+#[cfg(all(feature = "qext", feature = "dred"))]
+#[inline]
+fn qext_reserved_packet_bytes(qext_payload_bytes: i32) -> i32 {
+    if qext_payload_bytes <= 0 {
+        0
+    } else {
+        // Reserve code-3 conversion overhead (+1), extension header (+1),
+        // payload bytes, and padding length encoding bytes.
+        qext_payload_bytes + ((qext_payload_bytes + 253) / 254) + 2
+    }
+}
+
 /// Upstream C: src/opus_encoder.c:user_bitrate_to_bitrate
 fn user_bitrate_to_bitrate(st: &OpusEncoder, mut frame_size: i32, max_data_bytes: i32) -> i32 {
     if frame_size == 0 {
@@ -2906,6 +2954,10 @@ pub fn opus_encode_native(
     let mut redundancy_tmp = vec![0u8; redundancy_bytes.max(0) as usize];
     // Where to copy redundancy_tmp into data[] (offset from data start). 0 = no copy needed.
     let mut redundancy_copy_off: usize = 0;
+    #[cfg(feature = "qext")]
+    let mut qext_payload: Option<Vec<u8>> = None;
+    #[cfg(feature = "qext")]
+    let mut qext_payload_bytes = 0;
     if redundancy != 0 && celt_to_silk != 0 {
         let mut err: i32 = 0;
         st.celt_enc.start = 0;
@@ -2967,21 +3019,33 @@ pub fn opus_encode_native(
                 }
                 st.celt_enc.bitrate = celt_bitrate;
             }
+            let mut celt_compr_bytes = nb_compr_bytes;
             #[cfg(feature = "qext")]
             if st.mode == MODE_CELT_ONLY {
                 st.celt_enc.enable_qext = st.enable_qext;
+                if st.enable_qext != 0 {
+                    let (core_bytes, payload_bytes) =
+                        qext_allocation(nb_compr_bytes, st.Fs, frame_size, st.stream_channels);
+                    if payload_bytes > 0 {
+                        celt_compr_bytes = core_bytes;
+                        qext_payload_bytes = payload_bytes;
+                        qext_payload = Some(vec![0u8; payload_bytes as usize]);
+                    }
+                }
             }
+            #[cfg(feature = "qext")]
+            let qext_payload_slice = qext_payload.as_deref_mut();
             ret = celt_encode_with_ec(
                 &mut st.celt_enc,
                 &pcm_buf,
                 frame_size,
                 &mut [],
-                nb_compr_bytes,
+                celt_compr_bytes,
                 Some(&mut enc),
                 #[cfg(feature = "qext")]
-                None, // TODO: pass actual QEXT payload buffer once packet framing is complete
+                qext_payload_slice,
                 #[cfg(feature = "qext")]
-                0,
+                qext_payload_bytes,
             );
             #[cfg(feature = "qext")]
             {
@@ -3107,6 +3171,18 @@ pub fn opus_encode_native(
     ret += 1 + redundancy_bytes;
     #[allow(unused_mut)]
     let mut apply_padding = st.use_vbr == 0;
+    #[cfg(any(feature = "dred", feature = "qext"))]
+    let mut extensions: Vec<crate::opus::extensions::OpusExtensionData> = Vec::new();
+    #[cfg(feature = "qext")]
+    if let Some(payload) = qext_payload.take() {
+        if !payload.is_empty() {
+            extensions.push(crate::opus::extensions::OpusExtensionData {
+                id: crate::celt::modes::data_96000::QEXT_EXTENSION_ID,
+                frame: 0,
+                data: payload,
+            });
+        }
+    }
     #[cfg(feature = "dred")]
     {
         use crate::dnn::dred::config::{
@@ -3114,8 +3190,6 @@ pub fn opus_encode_native(
             DRED_MAX_DATA_SIZE, DRED_MIN_BYTES, DRED_NUM_REDUNDANCY_FRAMES,
         };
         use crate::dnn::dred::encoder::dred_encode_silk_frame;
-        use crate::opus::extensions::OpusExtensionData;
-        use crate::opus::repacketizer::opus_packet_pad_impl;
 
         if st.dred_duration > 0 && st.dred_encoder.loaded {
             let mut buf = [0u8; DRED_MAX_DATA_SIZE];
@@ -3128,6 +3202,10 @@ pub fn opus_encode_native(
             // padding length, and extension number.
             let mut dred_bytes_left =
                 (DRED_MAX_DATA_SIZE as i32).min(orig_max_data_bytes - ret - 3);
+            #[cfg(feature = "qext")]
+            {
+                dred_bytes_left -= qext_reserved_packet_bytes(qext_payload_bytes);
+            }
             // Account for the extra bytes required to signal large padding length.
             dred_bytes_left -= (dred_bytes_left + 1 + DRED_EXPERIMENTAL_BYTES as i32) / 255;
             // Check whether we actually have something to encode.
@@ -3151,25 +3229,23 @@ pub fn opus_encode_native(
                 if dred_bytes > 0 {
                     let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;
                     assert!(total_dred_bytes <= dred_bytes_left as usize);
-                    let extension = OpusExtensionData {
+                    extensions.push(crate::opus::extensions::OpusExtensionData {
                         id: DRED_EXTENSION_ID,
                         frame: 0,
                         data: buf[..total_dred_bytes].to_vec(),
-                    };
-                    ret = opus_packet_pad_impl(
-                        data,
-                        ret,
-                        orig_max_data_bytes,
-                        st.use_vbr == 0,
-                        &[extension],
-                    );
-                    if ret < 0 {
-                        return OPUS_INTERNAL_ERROR;
-                    }
-                    apply_padding = false;
+                    });
                 }
             }
         }
+    }
+    #[cfg(any(feature = "dred", feature = "qext"))]
+    if !extensions.is_empty() {
+        use crate::opus::repacketizer::opus_packet_pad_impl;
+        ret = opus_packet_pad_impl(data, ret, orig_max_data_bytes, st.use_vbr == 0, &extensions);
+        if ret < 0 {
+            return OPUS_INTERNAL_ERROR;
+        }
+        apply_padding = false;
     }
     if apply_padding {
         if opus_packet_pad(

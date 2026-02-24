@@ -1899,6 +1899,12 @@ pub fn quant_all_bands<'a>(
 ) {
     let mut remaining_bits: i32;
     let eBands = &m.eBands;
+    debug_assert!(
+        end <= m.nbEBands as i32,
+        "quant_all_bands: end {} > nbEBands {}",
+        end,
+        m.nbEBands
+    );
 
     let M: i32 = (1) << LM;
     let mut lowband_offset: i32 = 0;
@@ -1917,7 +1923,7 @@ pub fn quant_all_bands<'a>(
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;
-    let mut _norm = [0.0f32; 1920];
+    let mut _norm = vec![0.0f32; C as usize * norm_size];
 
     let _resynth_alloc: i32 = if encode != 0 && resynth != 0 {
         M * (eBands[m.nbEBands] as i32 - eBands[m.nbEBands - 1] as i32)
