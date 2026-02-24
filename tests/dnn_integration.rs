@@ -105,6 +105,31 @@ mod osce_tests {
         );
         assert!(model.loaded, "OSCEModel.loaded should be true");
     }
+
+    #[test]
+    fn osce_model_load_rejects_partial_weights() {
+        let mut arrays = get_weights();
+        arrays.retain(|w| !w.name.starts_with("bbwenet_"));
+
+        let mut model = opurs::dnn::osce::OSCEModel::default();
+        assert!(
+            !opurs::dnn::osce::osce_load_models(&mut model, &arrays),
+            "OSCEModel load should fail when BBWENet weights are missing"
+        );
+        assert!(!model.loaded, "OSCEModel.loaded should be false");
+        assert!(
+            model.lace.is_some(),
+            "LACE should still parse from provided weights"
+        );
+        assert!(
+            model.nolace.is_some(),
+            "NoLACE should still parse from provided weights"
+        );
+        assert!(
+            model.bbwenet.is_none(),
+            "BBWENet should be absent when its weights are removed"
+        );
+    }
 }
 
 // ---- Encoder/Decoder integration ----

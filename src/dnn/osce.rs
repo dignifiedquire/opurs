@@ -1599,7 +1599,7 @@ pub fn osce_load_models(model: &mut OSCEModel, arrays: &[WeightArray]) -> bool {
     model.lace = init_lace(arrays);
     model.nolace = init_nolace(arrays);
     model.bbwenet = init_bbwenet(arrays);
-    model.loaded = model.lace.is_some() || model.nolace.is_some() || model.bbwenet.is_some();
+    model.loaded = model.lace.is_some() && model.nolace.is_some() && model.bbwenet.is_some();
     model.loaded
 }
 

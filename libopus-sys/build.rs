@@ -184,7 +184,7 @@ fn build_opus() {
             x86_may_have_avx2 = if probe_is_msvc {
                 true
             } else {
-                supports_flags("-mavx2 -mfma")
+                supports_flags("-mavx -mfma -mavx2")
             };
 
             // SIMD sources with per-group compiler flags
@@ -203,15 +203,18 @@ fn build_opus() {
             if x86_may_have_avx2 {
                 simd_groups.push((
                     get_sources(&celt_sources_mk, "CELT_SOURCES_AVX2"),
-                    "-mavx2 -mfma",
+                    "-mavx -mfma -mavx2",
                 ));
-                simd_groups.push((get_sources(&silk_sources_mk, "SILK_SOURCES_AVX2"), "-mavx2"));
+                simd_groups.push((
+                    get_sources(&silk_sources_mk, "SILK_SOURCES_AVX2"),
+                    "-mavx -mfma -mavx2",
+                ));
                 simd_groups.push((
                     get_sources(&silk_sources_mk, "SILK_SOURCES_FLOAT_AVX2"),
-                    "-mavx2 -mfma",
+                    "-mavx -mfma -mavx2",
                 ));
             } else {
-                println!("cargo:warning=AVX2/FMA compile flags not supported; disabling x86 AVX2 MAY_HAVE paths");
+                println!("cargo:warning=AVX/AVX2/FMA compile flags not supported; disabling x86 AVX2 MAY_HAVE paths");
             }
             if let Some(ref lpcnet_mk) = lpcnet_sources_mk {
                 sources.extend(get_sources(lpcnet_mk, "DNN_SOURCES_X86_RTCD"));
@@ -220,7 +223,10 @@ fn build_opus() {
                     simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_SSE4_1"), "-msse4.1"));
                 }
                 if x86_may_have_avx2 {
-                    simd_groups.push((get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"), "-mavx2 -mfma"));
+                    simd_groups.push((
+                        get_sources(lpcnet_mk, "DNN_SOURCES_AVX2"),
+                        "-mavx -mfma -mavx2",
+                    ));
                 }
             }
         } else if target_arch == "aarch64" {
