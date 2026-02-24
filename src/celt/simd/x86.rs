@@ -543,7 +543,7 @@ pub unsafe fn celt_pitch_xcorr_sse(x: &[f32], y: &[f32], xcorr: &mut [f32], len:
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tools"))]
 mod tests {
     use super::{
         celt_inner_prod_sse as rust_celt_inner_prod_sse,
