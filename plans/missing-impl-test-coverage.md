@@ -17,7 +17,7 @@ Track implementation gaps and untested runtime paths, with explicit tests requir
 |---|---|---|---|---|
 | M04 | OSCE controls | `set_osce_bwe`/`osce_bwe` wrappers are covered only as roundtrip toggles; no runtime decode-path assertion. | Covered for single-stream runtime + multistream smoke in `tests/ctl_api_controls.rs` (`osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets`) | Keep decode-path tests where OSCE-enabled packets run with flag on/off and verify deterministic behavior + no panic/regression. |
 | M05 | Reset semantics | Reset behavior for new controls (`ignore_extensions`, `osce_bwe`, `qext`) across base/multistream/projection wrappers. | Covered in `tests/ctl_api_controls.rs` | Keep tests verifying flags are preserved across `reset()` to match upstream state-clear boundaries. |
-| M06 | CTL constant parity in behavior | New request constants (4054..4059) are defined/exported, but not validated through runtime request handling paths. | Partial | Add API tests that exercise typed wrappers + equivalent ctl request path assertions (where exposed) for get/set symmetry. |
+| M06 | CTL constant parity in behavior | New request constants (4054..4059) are defined/exported, but not validated through runtime request handling paths. | Covered in `tests/ctl_api_controls.rs` (`qext_and_ignore_extensions_ctl_get_path_matches_c` under `qext+tools`, `osce_bwe_ctl_get_path_matches_c` under `tools-dnn`) | Keep request-path parity checks that compare typed wrapper get/set state with C `*_ctl` request handlers where upstream exposes those requests. |
 | M07 | Unsupported surround layouts | `surround_layout()` returns `OPUS_UNIMPLEMENTED` on unsupported mappings (`src/opus/opus_multistream_encoder.rs:1142`, `src/opus/opus_multistream_encoder.rs:1179`) with limited explicit test coverage. | Covered in `tests/opus_multistream_api.rs` (`multistream_surround_unimplemented_paths_match_upstream_c`) | Keep targeted error-path tests for unsupported family/channel combinations to lock expected error codes. |
 
 ## P2 (hardening)
@@ -38,6 +38,5 @@ Track implementation gaps and untested runtime paths, with explicit tests requir
 - `cwrs.c` enables extra PVQ U rows when QEXT is enabled (`CWRS_EXTRA_ROWS`). Rust table used compact rows only; lookups could go out-of-bounds in `src/celt/cwrs.rs`. Rust now performs table lookup when present and uses a SMALL_FOOTPRINT-equivalent recurrence fallback when indices exceed compact rows.
 
 ## Immediate execution order
-1. Fill remaining CTL request-path parity checks (M06).
-2. Keep CI feature matrix coverage for `qext`/`osce` paths green (M09).
-3. Add fuzz-corpus/target coverage for malformed extension classes (M08 hardening follow-up).
+1. Keep CI feature matrix coverage for `qext`/`osce` paths green (M09).
+2. Add fuzz-corpus/target coverage for malformed extension classes (M08 hardening follow-up).

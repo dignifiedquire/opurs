@@ -21,18 +21,34 @@ use opurs::{
     OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
 };
 #[cfg(all(feature = "tools", feature = "qext"))]
-use opurs::{OPUS_GET_FINAL_RANGE_REQUEST, OPUS_SET_IGNORE_EXTENSIONS_REQUEST};
+use opurs::{
+    OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_IGNORE_EXTENSIONS_REQUEST, OPUS_GET_QEXT_REQUEST,
+    OPUS_SET_IGNORE_EXTENSIONS_REQUEST, OPUS_SET_QEXT_REQUEST,
+};
+#[cfg(all(feature = "osce", feature = "tools-dnn"))]
+use opurs::{OPUS_GET_OSCE_BWE_REQUEST, OPUS_SET_OSCE_BWE_REQUEST};
 #[cfg(all(feature = "tools", feature = "qext"))]
 use std::ffi::c_void;
 
 #[cfg(all(feature = "tools", feature = "qext"))]
 use libopus_sys::{
-    opus_decode as c_opus_decode, opus_decoder_create as c_opus_decoder_create,
-    opus_decoder_ctl as c_opus_decoder_ctl, opus_decoder_destroy as c_opus_decoder_destroy,
+    opus_decode as c_opus_decode, opus_encoder_create as c_opus_encoder_create,
+    opus_encoder_ctl as c_opus_encoder_ctl, opus_encoder_destroy as c_opus_encoder_destroy,
     opus_multistream_decode as c_opus_multistream_decode,
     opus_multistream_decoder_create as c_opus_multistream_decoder_create,
     opus_multistream_decoder_ctl as c_opus_multistream_decoder_ctl,
     opus_multistream_decoder_destroy as c_opus_multistream_decoder_destroy,
+    opus_multistream_encoder_create as c_opus_multistream_encoder_create,
+    opus_multistream_encoder_ctl as c_opus_multistream_encoder_ctl,
+    opus_multistream_encoder_destroy as c_opus_multistream_encoder_destroy,
+};
+#[cfg(any(
+    all(feature = "tools", feature = "qext"),
+    all(feature = "tools-dnn", feature = "osce")
+))]
+use libopus_sys::{
+    opus_decoder_create as c_opus_decoder_create, opus_decoder_ctl as c_opus_decoder_ctl,
+    opus_decoder_destroy as c_opus_decoder_destroy,
 };
 
 #[cfg(all(feature = "tools", feature = "qext"))]
@@ -695,6 +711,86 @@ fn build_projection_packet_with_forced_qext(
 
 #[cfg(feature = "qext")]
 #[test]
+fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
+    let mut rust_enc =
+        OpusEncoder::new(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let mut c_err = 0i32;
+    let c_enc =
+        unsafe { c_opus_encoder_create(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO, &mut c_err) };
+    assert!(!c_enc.is_null(), "c encoder create failed: {c_err}");
+
+    for enabled in [false, true, false] {
+        rust_enc.set_qext(enabled);
+        let set_ret = unsafe { c_opus_encoder_ctl(c_enc, OPUS_SET_QEXT_REQUEST, enabled as i32) };
+        assert_eq!(set_ret, 0, "c encoder set qext failed: {set_ret}");
+
+        let mut c_qext = 0i32;
+        let get_ret = unsafe { c_opus_encoder_ctl(c_enc, OPUS_GET_QEXT_REQUEST, &mut c_qext) };
+        assert_eq!(get_ret, 0, "c encoder get qext failed: {get_ret}");
+        assert_eq!(rust_enc.qext() as i32, c_qext);
+    }
+    unsafe { c_opus_encoder_destroy(c_enc) };
+
+    let mut rust_dec = OpusDecoder::new(SAMPLE_RATE_96K, 2).expect("decoder create");
+    let c_dec = unsafe { c_opus_decoder_create(SAMPLE_RATE_96K, 2, &mut c_err) };
+    assert!(!c_dec.is_null(), "c decoder create failed: {c_err}");
+
+    for enabled in [false, true, false] {
+        rust_dec.set_ignore_extensions(enabled);
+        let set_ret = unsafe {
+            c_opus_decoder_ctl(c_dec, OPUS_SET_IGNORE_EXTENSIONS_REQUEST, enabled as i32)
+        };
+        assert_eq!(
+            set_ret, 0,
+            "c decoder set ignore_extensions failed: {set_ret}"
+        );
+
+        let mut c_ignore = 0i32;
+        let get_ret =
+            unsafe { c_opus_decoder_ctl(c_dec, OPUS_GET_IGNORE_EXTENSIONS_REQUEST, &mut c_ignore) };
+        assert_eq!(
+            get_ret, 0,
+            "c decoder get ignore_extensions failed: {get_ret}"
+        );
+        assert_eq!(rust_dec.ignore_extensions() as i32, c_ignore);
+    }
+    unsafe { c_opus_decoder_destroy(c_dec) };
+
+    let mapping = [0u8, 1u8];
+    let mut rust_ms_enc =
+        OpusMSEncoder::new(SAMPLE_RATE_96K, 2, 1, 1, &mapping, OPUS_APPLICATION_AUDIO)
+            .expect("ms encoder create");
+    let c_ms_enc = unsafe {
+        c_opus_multistream_encoder_create(
+            SAMPLE_RATE_96K,
+            2,
+            1,
+            1,
+            mapping.as_ptr(),
+            OPUS_APPLICATION_AUDIO,
+            &mut c_err,
+        )
+    };
+    assert!(!c_ms_enc.is_null(), "c ms encoder create failed: {c_err}");
+
+    for enabled in [false, true, false] {
+        rust_ms_enc.set_qext(enabled);
+        let set_ret = unsafe {
+            c_opus_multistream_encoder_ctl(c_ms_enc, OPUS_SET_QEXT_REQUEST, enabled as i32)
+        };
+        assert_eq!(set_ret, 0, "c ms encoder set qext failed: {set_ret}");
+
+        let mut c_qext = 0i32;
+        let get_ret =
+            unsafe { c_opus_multistream_encoder_ctl(c_ms_enc, OPUS_GET_QEXT_REQUEST, &mut c_qext) };
+        assert_eq!(get_ret, 0, "c ms encoder get qext failed: {get_ret}");
+        assert_eq!(rust_ms_enc.qext() as i32, c_qext);
+    }
+    unsafe { c_opus_multistream_encoder_destroy(c_ms_enc) };
+}
+
+#[cfg(feature = "qext")]
+#[test]
 fn decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
     for seed in 1..=40u32 {
         let mut enc =
@@ -1288,7 +1384,7 @@ fn mono_pcm_20ms_48k(seed: u32) -> Vec<i16> {
         .map(|i| {
             let x = seed
                 .wrapping_mul(747796405)
-                .wrapping_add(i as u32 * 2891336453);
+                .wrapping_add((i as u32).wrapping_mul(2891336453));
             ((x >> 11) as i16).wrapping_sub(12288)
         })
         .collect()
@@ -1352,6 +1448,29 @@ fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
     assert!(proj_dec.osce_bwe());
     proj_dec.set_osce_bwe(false);
     assert!(!proj_dec.osce_bwe());
+}
+
+#[cfg(all(feature = "osce", feature = "tools-dnn"))]
+#[test]
+fn osce_bwe_ctl_get_path_matches_c() {
+    let mut rust_dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut c_err = 0i32;
+    let c_dec = unsafe { c_opus_decoder_create(48_000, 1, &mut c_err) };
+    assert!(!c_dec.is_null(), "c decoder create failed: {c_err}");
+
+    for enabled in [false, true, false] {
+        rust_dec.set_osce_bwe(enabled);
+        let set_ret =
+            unsafe { c_opus_decoder_ctl(c_dec, OPUS_SET_OSCE_BWE_REQUEST, enabled as i32) };
+        assert_eq!(set_ret, 0, "c decoder set osce_bwe failed: {set_ret}");
+
+        let mut c_osce_bwe = 0i32;
+        let get_ret =
+            unsafe { c_opus_decoder_ctl(c_dec, OPUS_GET_OSCE_BWE_REQUEST, &mut c_osce_bwe) };
+        assert_eq!(get_ret, 0, "c decoder get osce_bwe failed: {get_ret}");
+        assert_eq!(rust_dec.osce_bwe() as i32, c_osce_bwe);
+    }
+    unsafe { c_opus_decoder_destroy(c_dec) };
 }
 
 #[cfg(feature = "osce")]
