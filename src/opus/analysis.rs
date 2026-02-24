@@ -1370,10 +1370,10 @@ fn tonality_analysis(
                 band_log2[b as usize] - (leakage_from[b as usize] + 2.5f32)
             });
         tonal.info[info_idx].leak_boost[b as usize] =
-            (if (255) < (0.5 + (64.0 * boost)).floor() as i32 {
+            (if (255) < (0.5f64 + (64.0f32 * boost) as f64).floor() as i32 {
                 255
             } else {
-                (0.5 + (64.0 * boost)).floor() as i32
+                (0.5f64 + (64.0f32 * boost) as f64).floor() as i32
             }) as u8;
         b += 1;
     }

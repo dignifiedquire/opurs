@@ -6,19 +6,20 @@ use crate::opus::mlp::tansig::{sigmoid_approx, tansig_approx};
 
 pub const WEIGHTS_SCALE: f32 = 1.0f32 / 128f32;
 
-/// Matrix-vector multiply-accumulate: out[i] += sum_j(weights[i * col_stride + j] * x[j])
+/// Matrix-vector multiply-accumulate: out[i] += sum_j(weights[i + j * col_stride] * x[j])
 ///
 /// The weight matrix is stored in interleaved layout with `col_stride` between columns,
 /// where rows are contiguous starting at offset `row` (stride 1 between rows).
+///
+/// Note: accumulates directly into `out[i]` (not via a temporary), matching the upstream C
+/// accumulation order for bit-exact results.
 fn gemm_accum(out: &mut [f32], weights: &[i8], n: usize, m: usize, col_stride: usize, x: &[f32]) {
     debug_assert_eq!(out.len(), n);
     debug_assert_eq!(x.len(), m);
     for i in 0..n {
-        let mut acc = 0.0f32;
         for j in 0..m {
-            acc += weights[i + j * col_stride] as f32 * x[j];
+            out[i] += weights[i + j * col_stride] as f32 * x[j];
         }
-        out[i] += acc;
     }
 }
 

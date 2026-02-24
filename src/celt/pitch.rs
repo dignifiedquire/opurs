@@ -237,9 +237,8 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
                 }
             }
         }
-        // Match C left-associative evaluation: (Syy + add) - sub.
-        Syy += y[i + len] * y[i + len];
-        Syy -= y[i] * y[i];
+        // C: Syy += A - B, i.e. Syy + (A - B), not (Syy + A) - B.
+        Syy += y[i + len] * y[i + len] - y[i] * y[i];
         Syy = celt_max32(1.0f32, Syy);
     }
     best_pitch
