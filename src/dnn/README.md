@@ -1,6 +1,6 @@
 # DNN Subsystem
 
-Neural network inference engine for Opus 1.5.2, ported from the upstream C
+Neural network inference engine for Opus 1.6.1, ported from the upstream C
 implementation in `dnn/`. Provides three codec enhancements:
 
 - **Deep PLC** — Neural packet loss concealment using LPCNet/FARGAN vocoder

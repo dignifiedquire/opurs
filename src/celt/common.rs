@@ -429,5 +429,15 @@ pub fn opus_strerror(error: i32) -> &'static str {
 }
 
 pub fn opus_get_version_string() -> &'static str {
-    "opurs (rust port) 1.5.2"
+    use std::sync::OnceLock;
+
+    static VERSION: OnceLock<String> = OnceLock::new();
+    VERSION
+        .get_or_init(|| {
+            format!(
+                "opurs {}",
+                option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
+            )
+        })
+        .as_str()
 }

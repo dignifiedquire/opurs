@@ -3,7 +3,7 @@
 //! All functions require `#[target_feature(enable = "avx2", enable = "fma")]`
 //! and are called only after cpufeatures detection confirms AVX2+FMA support.
 //!
-//! Port of `dnn/vec_avx.h` from libopus 1.5.2.
+//! Port of `dnn/vec_avx.h` from libopus 1.6.1.
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;

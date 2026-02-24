@@ -1,15 +1,15 @@
 # opurs
 
 [![CI](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml/badge.svg)](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml)
-[![Rust 1.65+](https://img.shields.io/badge/rust-1.65+-blue.svg)](https://www.rust-lang.org)
+[![Rust 1.70+](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.5.2.
+A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.6.1.
 
 ## Features
 
 - **Pure Rust** -- no C compiler required, no FFI
-- **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.5.2, verified across 228 IETF test vectors
+- **Bit-exact** -- encoder output is byte-identical and decoder output is sample-identical to libopus 1.6.1, verified across 228 IETF test vectors
 - **Nearly unsafe-free** -- only 2 documented `unsafe` blocks remain (ndarray interleaved view splitting in the MDCT)
 - **SIMD accelerated** -- optional (enabled by default), with runtime CPU detection on x86/x86_64 and compile-time NEON on aarch64. Disable with `default-features = false` for scalar-only builds.
 - **Cross-platform** -- tested on Linux, macOS, and Windows (x86, x86_64, ARM64)
@@ -134,7 +134,7 @@ The vector test suite runs the encoder at 9 bitrates and the decoder at 10 confi
 
 ### DNN-based audio enhancement (optional)
 
-The crate includes optional deep neural network features ported from libopus 1.5.2. These are disabled by default and have no effect on the core codec when not enabled.
+The crate includes optional deep neural network features ported from libopus 1.6.1. These are disabled by default and have no effect on the core codec when not enabled.
 
 | Feature | Description |
 |---------|-------------|

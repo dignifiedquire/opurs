@@ -3,7 +3,7 @@
 //! NEON is always available on aarch64, so these are selected at compile time
 //! (no runtime detection needed).
 //!
-//! Port of `dnn/vec_neon.h` from libopus 1.5.2.
+//! Port of `dnn/vec_neon.h` from libopus 1.6.1.
 
 use core::arch::aarch64::*;
 use core::arch::asm;

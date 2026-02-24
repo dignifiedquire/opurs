@@ -798,7 +798,7 @@ fn opus_decode_frame(
         }
         st.rangeFinal = dec.rng;
     }
-    // In C 1.5.2: SILK decoded to int16 buffer, then mixed here.
+    // In older C code: SILK decoded to int16 buffer, then mixed here.
     // In C 1.6.1: SILK decodes to float directly into pcm, CELT accumulates on top.
     // The mixing loop is no longer needed.
     let celt_mode = celt_dec.mode;

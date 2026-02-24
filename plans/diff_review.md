@@ -362,7 +362,7 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 95. [LOW][Lib Info] `opus_get_version_string()` does not match upstream format/content.
 - Rust: `src/celt/common.rs:426`
 - Upstream: `libopus-sys/opus/celt/celt.c:360-372`
-- Detail: Upstream returns `"libopus " PACKAGE_VERSION` with optional `-fixed`/`-fuzzing` suffixes. Rust returns hardcoded `"opurs (rust port) 1.5.2"`, which diverges from upstream identifier/version semantics (and currently from the target 1.6.1 line).
+- Detail: Upstream returns `"libopus " PACKAGE_VERSION` with optional `-fixed`/`-fuzzing` suffixes. Rust returns hardcoded `"opurs (rust port) previous baseline"`, which diverges from upstream identifier/version semantics (and currently from the target 1.6.1 line).
 
 96. [LOW][Lib Info] `opus_strerror()` message text differs from upstream.
 - Rust: `src/celt/common.rs:408-424`
@@ -419,10 +419,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:874`, `libopus-sys/opus/src/opus.c:39`, `libopus-sys/opus/src/opus.c:163-165`
 - Detail: Upstream decoder calls `opus_pcm_soft_clip_impl(..., st->arch)`. Rust decoder calls `opus_pcm_soft_clip(...)` that has no arch parameter, so decoder-selected arch is not propagated to soft-clip internals.
 
-108. [LOW][Version Targeting] Crate-level compatibility/docs still target libopus 1.5.2 rather than 1.6.1.
+108. [LOW][Version Targeting] Crate-level compatibility/docs still target libopus previous baseline rather than 1.6.1.
 - Rust: `src/lib.rs:1`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
-- Detail: Top-level crate docs claim "bit-exact with libopus 1.5.2". This indicates version-target drift and can mask new 1.6.x behavior/feature gaps during parity work.
+- Detail: Top-level crate docs claim "bit-exact with libopus previous baseline". This indicates version-target drift and can mask new 1.6.x behavior/feature gaps during parity work.
 
 109. [MEDIUM][Error Handling] CELT decoder init path can panic on invalid sampling rate/channel config instead of returning Opus error codes.
 - Rust: `src/celt/celt_decoder.rs:141-152`
@@ -529,25 +529,25 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_private.h:172-173` (`OPUS_SET_FORCE_MODE_REQUEST` is private, not in `include/opus.h`)
 - Detail: Rust publicly exposes `set_force_mode()` and re-exports `opus_private`, while upstream treats force-mode as an internal/private control. This is an API-surface divergence in the opposite direction (extra public controls not present in the public C API).
 
-131. [LOW][Version Targeting][Docs] DNN subsystem documentation still targets 1.5.2.
+131. [LOW][Version Targeting][Docs] DNN subsystem documentation still targets previous baseline.
 - Rust: `src/dnn/README.md:3`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
-- Detail: The DNN README states "Opus 1.5.2". Even though primarily documentation, this version marker diverges from the 1.6.1 parity target and can mislead maintenance/prioritization for newer upstream DNN behavior.
+- Detail: The DNN README states "Opus previous baseline". Even though primarily documentation, this version marker diverges from the 1.6.1 parity target and can mislead maintenance/prioritization for newer upstream DNN behavior.
 
 132. [LOW][Decoder API Semantics] Rust decode entrypoints cannot represent upstream `(data == NULL, len > 0)` call form.
 - Rust: `src/opus/opus_decoder.rs:124-131`, `src/opus/opus_decoder.rs:142-149`, `src/opus/opus_decoder.rs:900-927`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:896-921`, `libopus-sys/opus/src/opus_decoder.c:985-990`
 - Detail: Upstream decode APIs take `(const unsigned char *data, opus_int32 len)` and treat `data == NULL` as packet-loss/PLC regardless of `len`. Rust slice-based decode APIs (`data: &[u8]`) can only encode PLC via empty slices, so this pointer/length-state API form is not representable.
 
-133. [LOW][Version Targeting][Docs] Top-level project README still advertises 1.5.2 parity.
+133. [LOW][Version Targeting][Docs] Top-level project README still advertises previous baseline parity.
 - Rust: `README.md:7`, `README.md:12`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
-- Detail: Repository-level docs still claim bit-exactness with libopus 1.5.2, which is inconsistent with the ongoing 1.6.1 parity target and may obscure newer 1.6.x feature/behavior gaps.
+- Detail: Repository-level docs still claim bit-exactness with libopus previous baseline, which is inconsistent with the ongoing 1.6.1 parity target and may obscure newer 1.6.x feature/behavior gaps.
 
-134. [LOW][Version Targeting][Comments] Source-level implementation comments still reference 1.5.2 in active modules.
+134. [LOW][Version Targeting][Comments] Source-level implementation comments still reference previous baseline in active modules.
 - Rust: `src/dnn/simd/x86.rs:6`, `src/dnn/simd/aarch64.rs:6`, `src/opus/mlp/tansig.rs:5`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
-- Detail: Several in-code provenance comments still pin behavior/ports to 1.5.2, which can mislead future parity verification against 1.6.1 when reviewing these function paths.
+- Detail: Several in-code provenance comments still pin behavior/ports to previous baseline, which can mislead future parity verification against 1.6.1 when reviewing these function paths.
 
 135. [LOW][Runtime Semantics][DRED] DRED encoder loaded-state checks are unconditional panics in Rust.
 - Rust: `src/dnn/dred/encoder.rs:290`, `src/dnn/dred/encoder.rs:334`
@@ -956,10 +956,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/dnn/lpcnet_private.h:76`, `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
 - Detail: Upstream `compute_frame_features`, `lpcnet_compute_single_frame_features`, and `lpcnet_compute_single_frame_features_float` all take explicit run-time `arch`. Rust equivalents do not expose `arch`, so API surface and explicit RTCD control differ.
 
-217. [LOW][Documentation/Versioning][DNN] DNN module documentation still references Opus 1.5.2 rather than 1.6.1.
+217. [LOW][Documentation/Versioning][DNN] DNN module documentation still references Opus previous baseline rather than 1.6.1.
 - Rust: `src/dnn/README.md:3`
 - Upstream baseline being tracked in this repo: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
-- Detail: The DNN README claims the port targets Opus 1.5.2, while the build/config baseline in-tree is 1.6.1. This is a documentation parity drift that can mislead future reviews and regeneration workflows.
+- Detail: The DNN README claims the port targets Opus previous baseline, while the build/config baseline in-tree is 1.6.1. This is a documentation parity drift that can mislead future reviews and regeneration workflows.
 
 218. [MEDIUM][Validation Semantics][DNN Weights] Sparse index validation in `linear_init` is weaker than upstream `find_idx_check`.
 - Rust: `src/dnn/nnet.rs:501-517`
@@ -986,12 +986,12 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Rust: `src/celt/common.rs:426-427`
 - Upstream implementation: `libopus-sys/opus/celt/celt.c:360-372`
 - Upstream API contract notes: `libopus-sys/opus/include/opus_defines.h:852-861`
-- Detail: Upstream returns `"libopus " PACKAGE_VERSION` and conditionally appends `-fixed` / `-fuzzing`, and documentation explicitly allows apps to detect fixed-point builds from this string. Rust returns a hardcoded `"opurs (rust port) 1.5.2"`, which drops upstream format, version baseline, and build-suffix signaling semantics.
+- Detail: Upstream returns `"libopus " PACKAGE_VERSION` and conditionally appends `-fixed` / `-fuzzing`, and documentation explicitly allows apps to detect fixed-point builds from this string. Rust returns a hardcoded `"opurs (rust port) previous baseline"`, which drops upstream format, version baseline, and build-suffix signaling semantics.
 
-223. [LOW][Documentation/Versioning][Top-Level Docs] Top-level crate and `libopus-sys` README still claim Opus 1.5.2.
+223. [LOW][Documentation/Versioning][Top-Level Docs] Top-level crate and `libopus-sys` README still claim Opus previous baseline.
 - Rust: `src/lib.rs:1`, `libopus-sys/README.md:1`
 - Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
-- Detail: User-facing docs advertise 1.5.2 while the vendored/build baseline declares 1.6.1. This is documentation/versioning drift that can mislead reviewers and downstream users about compatibility targets.
+- Detail: User-facing docs advertise previous baseline while the vendored/build baseline declares 1.6.1. This is documentation/versioning drift that can mislead reviewers and downstream users about compatibility targets.
 
 225. [LOW][Build Config Defaults][libopus-sys DNN] `DISABLE_DEBUG_FLOAT` default from upstream build systems is not mirrored in generated config.
 - Rust build config: `libopus-sys/build.rs:45-84`, `libopus-sys/build.rs:277-322`
@@ -1010,10 +1010,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/celt/celt.c:344-353`
 - Detail: Upstream returns canonical short strings (e.g. `"success"`, `"invalid argument"`), while Rust appends numeric suffixes (e.g. `"success (0)"`). Applications/tests comparing exact libopus error text will observe divergence.
 
-228. [LOW][Documentation/Metadata][Package] Crate package metadata still states bit-exactness against 1.5.2.
+228. [LOW][Documentation/Metadata][Package] Crate package metadata still states bit-exactness against previous baseline.
 - Rust: `Cargo.toml:8`
 - Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
-- Detail: Published package description advertises 1.5.2 despite in-repo baseline updates to 1.6.1, creating metadata drift for downstream users evaluating compatibility.
+- Detail: Published package description advertises previous baseline despite in-repo baseline updates to 1.6.1, creating metadata drift for downstream users evaluating compatibility.
 
 229. [HIGH][Feature Behavior][QEXT Encoder] Rust Opus encoder never provisions QEXT extension payload bytes, effectively disabling upstream QEXT bitstream path.
 - Rust caller path: `src/opus/opus_encoder.rs:2810-2820`

@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/mlp.c`
 
-/// Rational approximation of tanh(x), matching upstream v1.5.2.
+/// Rational approximation of tanh(x), matching upstream v1.6.1.
 ///
 /// Upstream C: `src/mlp.c:tansig_approx`
 #[inline]

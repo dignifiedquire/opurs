@@ -1,8 +1,8 @@
-# Plan: Upgrade opurs from libopus 1.5.2 to 1.6.1
+# Plan: Upgrade opurs from libopus previous baseline to 1.6.1
 
 ## Context
 
-Upstream xiph/opus has released v1.6 and v1.6.1 since our current baseline (v1.5.2). The diff is **222 commits, ~19,500 insertions / ~4,700 deletions across 196 C/H files**. The dominant new feature is **QEXT (Quality Extension / Opus HD)** — a CELT extension layer adding 96 kHz support, higher-precision audio (32-bit samples), and bandwidth extension via a neural network (BBWENet). There are also significant standalone bug fixes, encoder quality improvements, DNN fixes, and the extensions API rework.
+Upstream xiph/opus has released v1.6 and v1.6.1 since our previous baseline. The diff is **222 commits, ~19,500 insertions / ~4,700 deletions across 196 C/H files**. The dominant new feature is **QEXT (Quality Extension / Opus HD)** — a CELT extension layer adding 96 kHz support, higher-precision audio (32-bit samples), and bandwidth extension via a neural network (BBWENet). There are also significant standalone bug fixes, encoder quality improvements, DNN fixes, and the extensions API rework.
 
 The upgrade should be done **incrementally in phases** to maintain bit-exactness at each step and avoid a massive single PR that's impossible to review.
 
@@ -70,7 +70,7 @@ These can be verified against the existing IETF test vectors (228/228 must still
 
 **Goal**: Port encoder behavior changes that improve quality but change output.
 
-These WILL change encoded bitstreams, breaking bit-exactness with 1.5.2 C reference. After porting, the reference becomes the 1.6.1 C encoder. New test vectors will be needed.
+These WILL change encoded bitstreams, breaking bit-exactness with previous baseline C reference. After porting, the reference becomes the 1.6.1 C encoder. New test vectors will be needed.
 
 1. **Fix reversed math in `compute_stereo_width`** (`src/opus_encoder.c` → `src/src/opus_encoder.rs`)
    - `c13d23f3` — `short_alpha` formula was inverted. opurs currently has the **old buggy formula**. HIGH priority.
@@ -195,7 +195,7 @@ qext = []  # Quality Extension (Opus HD: 96kHz, 32-bit samples)
 - Phase 5 is the bulk of the work, can be broken into sub-PRs (5a-5f)
 - Phase 6 runs throughout
 
-## What We Skip (Same as 1.5.2)
+## What We Skip (Same as previous baseline)
 
 - Multistream/projection APIs (still deferred)
 - MIPS/Xtensa optimizations (not relevant for our targets)

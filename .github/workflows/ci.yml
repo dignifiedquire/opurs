@@ -20,6 +20,19 @@ env:
   OPUS_PROJECTION_VECTORS_DIR: opus_projection_vectors
 
 jobs:
+  msrv:
+    name: MSRV (1.70.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.70.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-1-70
+      - run: cargo check -p opurs --lib
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

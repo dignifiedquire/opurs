@@ -21,5 +21,5 @@ Remove user-facing and metadata drift for versioning, docs, and release semantic
 - Manual verification of `src/lib.rs`, `Cargo.toml`, `libopus-sys/README.md`.
 
 ## Definition Of Done
-- No stale 1.5.2 references remain where 1.6.1 parity is intended.
+- No stale previous baseline references remain where 1.6.1 parity is intended.
 - Docs/metadata accurately describe current compatibility scope.
