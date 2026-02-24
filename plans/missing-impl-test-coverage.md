@@ -24,7 +24,7 @@ Track implementation gaps and untested runtime paths, with explicit tests requir
 
 | ID | Area | Missing impl detail / missing path | Current status | Required test coverage |
 |---|---|---|---|---|
-| M08 | Extension robustness | Decoder behavior on malformed/edge extension payloads is not explicitly fuzz/regression covered at API level. | Partial: covered for malformed QEXT extension payloads in `tests/ctl_api_controls.rs` (`malformed_qext_extensions_fallback_matches_ignore_extensions_decode`) | Expand malformed extension packet tests (and/or fuzz corpus seeds) for broader mutation classes and multistream/projection decode paths. |
+| M08 | Extension robustness | Decoder behavior on malformed/edge extension payloads is not explicitly fuzz/regression covered at API level. | Covered for deterministic malformed/mutated QEXT extension payloads across base/multistream/projection decode paths in `tests/ctl_api_controls.rs` (`malformed_qext_extensions_fallback_matches_ignore_extensions_decode`, `malformed_qext_extensions_multistream_decode_path_is_deterministic`, `malformed_qext_extensions_projection_decode_path_is_deterministic`) | Add fuzz corpus seeds/targets so these malformed extension classes are exercised in fuzzing, not only integration tests. |
 | M09 | Feature-gated API parity | Feature matrix coverage for `qext`/`osce` combinations is incomplete for new public wrappers. | Covered via CI matrices in `.github/workflows/ci.yml` (`clippy-features`, `test-features`) plus existing `test-dnn` (`osce`) | Keep matrix CI checks for `qext`, `qext+osce`, and `osce` ctl/behavior paths. |
 
 ## Existing tests touching this area
@@ -39,5 +39,5 @@ Track implementation gaps and untested runtime paths, with explicit tests requir
 
 ## Immediate execution order
 1. Fill remaining CTL request-path parity checks (M06).
-2. Expand malformed-extension hardening breadth (M08) across more mutation classes and decoder wrappers.
-3. Keep CI feature matrix coverage for `qext`/`osce` paths green (M09).
+2. Keep CI feature matrix coverage for `qext`/`osce` paths green (M09).
+3. Add fuzz-corpus/target coverage for malformed extension classes (M08 hardening follow-up).
