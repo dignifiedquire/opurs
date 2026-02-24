@@ -299,7 +299,6 @@ impl OpusDecoder {
         self.last_packet_duration = 0;
         self.softclip_mem = [0.0; 2];
         self.rangeFinal = 0;
-        self.ignore_extensions = false;
     }
 }
 

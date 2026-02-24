@@ -16,7 +16,7 @@ Track implementation gaps and untested runtime paths, with explicit tests requir
 | ID | Area | Missing impl detail / missing path | Current status | Required test coverage |
 |---|---|---|---|---|
 | M04 | OSCE controls | `set_osce_bwe`/`osce_bwe` wrappers are covered only as roundtrip toggles; no runtime decode-path assertion. | Partial | Add decode-path tests where OSCE-enabled packets run with flag on/off and verify deterministic behavior + no panic/regression. |
-| M05 | Reset semantics | Reset behavior for new controls (`ignore_extensions`, `osce_bwe`, `qext`) across base/multistream/projection wrappers is not fully covered. | Missing | Add tests verifying flags after `reset()` for each wrapper match upstream semantics. |
+| M05 | Reset semantics | Reset behavior for new controls (`ignore_extensions`, `osce_bwe`, `qext`) across base/multistream/projection wrappers. | Covered in `tests/ctl_api_controls.rs` | Keep tests verifying flags are preserved across `reset()` to match upstream state-clear boundaries. |
 | M06 | CTL constant parity in behavior | New request constants (4054..4059) are defined/exported, but not validated through runtime request handling paths. | Partial | Add API tests that exercise typed wrappers + equivalent ctl request path assertions (where exposed) for get/set symmetry. |
 | M07 | Unsupported surround layouts | `surround_layout()` returns `OPUS_UNIMPLEMENTED` on unsupported mappings (`src/opus/opus_multistream_encoder.rs:1142`, `src/opus/opus_multistream_encoder.rs:1179`) with limited explicit test coverage. | Partial | Add targeted error-path tests for unsupported family/channel combinations to lock expected error codes. |
 

@@ -100,6 +100,25 @@ fn make_projection_codec_pair() -> (OpusProjectionEncoder, i32, i32, Vec<u8>) {
     (enc, streams, coupled_streams, demixing)
 }
 
+fn make_projection_decoder_for(sample_rate: i32) -> OpusProjectionDecoder {
+    let mut streams = 0;
+    let mut coupled_streams = 0;
+    let enc = OpusProjectionEncoder::new(
+        sample_rate,
+        4,
+        3,
+        &mut streams,
+        &mut coupled_streams,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("projection encoder create");
+    let mut demixing = vec![0u8; enc.demixing_matrix_size() as usize];
+    enc.copy_demixing_matrix(&mut demixing)
+        .expect("copy demixing matrix");
+    OpusProjectionDecoder::new(sample_rate, 4, streams, coupled_streams, &demixing)
+        .expect("projection decoder create")
+}
+
 fn decode_projection(
     packet: &[u8],
     streams: i32,
@@ -298,4 +317,91 @@ fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
     assert!(proj_dec.osce_bwe());
     proj_dec.set_osce_bwe(false);
     assert!(!proj_dec.osce_bwe());
+}
+
+#[test]
+fn ignore_extensions_is_preserved_across_reset_on_all_decoder_types() {
+    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let before_dec = !dec.ignore_extensions();
+    dec.set_ignore_extensions(before_dec);
+    dec.reset();
+    assert_eq!(dec.ignore_extensions(), before_dec);
+
+    let mut ms_dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let before_ms = !ms_dec.ignore_extensions();
+    ms_dec.set_ignore_extensions(before_ms);
+    ms_dec.reset();
+    assert_eq!(ms_dec.ignore_extensions(), before_ms);
+
+    let mut proj_dec = make_projection_decoder_for(48_000);
+    let before_proj = !proj_dec.ignore_extensions();
+    proj_dec.set_ignore_extensions(before_proj);
+    proj_dec.reset();
+    assert_eq!(proj_dec.ignore_extensions(), before_proj);
+}
+
+#[cfg(feature = "qext")]
+#[test]
+fn qext_is_preserved_across_reset_on_all_encoder_types() {
+    let mut enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let before_enc = !enc.qext();
+    enc.set_qext(before_enc);
+    enc.reset();
+    assert_eq!(enc.qext(), before_enc);
+
+    let mut ms_enc = OpusMSEncoder::new(48_000, 1, 1, 0, &[0], OPUS_APPLICATION_AUDIO)
+        .expect("ms encoder create");
+    let before_ms = !ms_enc.qext();
+    ms_enc.set_qext(before_ms);
+    ms_enc.reset();
+    assert_eq!(ms_enc.qext(), before_ms);
+
+    let mut streams = 0;
+    let mut coupled_streams = 0;
+    let mut proj_enc = OpusProjectionEncoder::new(
+        48_000,
+        4,
+        3,
+        &mut streams,
+        &mut coupled_streams,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("projection encoder create");
+    let mut default_streams = 0;
+    let mut default_coupled_streams = 0;
+    let default_proj_enc = OpusProjectionEncoder::new(
+        48_000,
+        4,
+        3,
+        &mut default_streams,
+        &mut default_coupled_streams,
+        OPUS_APPLICATION_AUDIO,
+    )
+    .expect("projection encoder create");
+    let before_proj = !default_proj_enc.qext();
+    proj_enc.set_qext(before_proj);
+    proj_enc.reset();
+    assert_eq!(proj_enc.qext(), before_proj);
+}
+
+#[cfg(feature = "osce")]
+#[test]
+fn osce_bwe_is_preserved_across_reset_on_all_decoder_types() {
+    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let before_dec = !dec.osce_bwe();
+    dec.set_osce_bwe(before_dec);
+    dec.reset();
+    assert_eq!(dec.osce_bwe(), before_dec);
+
+    let mut ms_dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let before_ms = !ms_dec.osce_bwe();
+    ms_dec.set_osce_bwe(before_ms);
+    ms_dec.reset();
+    assert_eq!(ms_dec.osce_bwe(), before_ms);
+
+    let mut proj_dec = make_projection_decoder_for(48_000);
+    let before_proj = !proj_dec.osce_bwe();
+    proj_dec.set_osce_bwe(before_proj);
+    proj_dec.reset();
+    assert_eq!(proj_dec.osce_bwe(), before_proj);
 }
