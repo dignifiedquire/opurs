@@ -102,26 +102,59 @@ impl Arch {
 pub fn opus_select_arch() -> Arch {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // Mirror upstream x86cpu.c:opus_select_arch_impl():
-        //   check SSE → SSE2 → SSE4.1 → AVX2+FMA, return highest.
-        cpufeatures::new!(detect_avx2_fma, "avx2", "fma");
-        cpufeatures::new!(detect_sse4_1, "sse4.1");
-        cpufeatures::new!(detect_sse2, "sse2");
-        cpufeatures::new!(detect_sse, "sse");
+        // Mirror upstream x86cpu.c:opus_select_arch_impl() bit checks exactly:
+        // - SSE   : CPUID.1:EDX bit 25
+        // - SSE2  : CPUID.1:EDX bit 26
+        // - SSE4.1: CPUID.1:ECX bit 19
+        // - AVX2  : CPUID.1:ECX bits 28 (AVX) + 12 (FMA), then CPUID.7:EBX bit 5
+        #[cfg(target_arch = "x86")]
+        use core::arch::x86::{__cpuid, __cpuid_count};
+        #[cfg(target_arch = "x86_64")]
+        use core::arch::x86_64::{__cpuid, __cpuid_count};
 
-        if detect_avx2_fma::get() {
-            return Arch::Avx2;
+        let leaf0 = unsafe { __cpuid(0) };
+        let max_leaf = leaf0.eax;
+        if max_leaf < 1 {
+            return Arch::Scalar;
         }
-        if detect_sse4_1::get() {
-            return Arch::Sse4_1;
+
+        let leaf1 = unsafe { __cpuid(1) };
+        let hw_sse = (leaf1.edx & (1 << 25)) != 0;
+        let hw_sse2 = (leaf1.edx & (1 << 26)) != 0;
+        let hw_sse4_1 = (leaf1.ecx & (1 << 19)) != 0;
+        let mut hw_avx2 = (leaf1.ecx & (1 << 28)) != 0 && (leaf1.ecx & (1 << 12)) != 0;
+
+        if hw_avx2 && max_leaf >= 7 {
+            let leaf7 = unsafe { __cpuid_count(7, 0) };
+            hw_avx2 &= (leaf7.ebx & (1 << 5)) != 0;
+        } else {
+            hw_avx2 = false;
         }
-        if detect_sse2::get() {
-            return Arch::Sse2;
+
+        let mut arch = Arch::Scalar;
+        if hw_sse {
+            arch = Arch::Sse;
+        } else {
+            return arch;
         }
-        if detect_sse::get() {
-            return Arch::Sse;
+
+        if hw_sse2 {
+            arch = Arch::Sse2;
+        } else {
+            return arch;
         }
-        return Arch::Scalar;
+
+        if hw_sse4_1 {
+            arch = Arch::Sse4_1;
+        } else {
+            return arch;
+        }
+
+        if hw_avx2 {
+            arch = Arch::Avx2;
+        }
+
+        return arch;
     }
 
     #[cfg(target_arch = "aarch64")]

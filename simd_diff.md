@@ -64,9 +64,9 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D7 - x86 AVX2 detection criteria implementation differs
 
 - Severity: Low
-- Status: OPEN
+- Status: FIXED
 - Upstream: CPUID bit checks in C (`libopus-sys/opus/celt/x86/x86cpu.c:124`)
-- Rust: `cpufeatures` runtime checks (`src/arch.rs:107`, `src/arch.rs:112`)
+- Rust: x86 detection now mirrors upstream CPUID bit checks and ordering (`src/arch.rs`)
 - Impact: edge-case platform behavior can differ
 
 ### D8 - Rust arch model omits non-aarch64 ARM levels
@@ -92,3 +92,4 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Fixed D5 by initializing CELT custom decoder arch via `opus_select_arch()` (`src/celt/celt_decoder.rs`).
 - 2026-02-24: Fixed D3 by threading `Arch` through DNN nnet compute entrypoints and call graph (`src/dnn/nnet.rs` plus DNN callers).
 - 2026-02-24: Progressed D4 by adding explicit aarch64 DOTPROD dispatch entries/branching for DNN int8 GEMV (`src/dnn/simd/mod.rs`, `src/dnn/simd/aarch64.rs`).
+- 2026-02-24: Fixed D7 by replacing x86 SIMD level detection with upstream-equivalent CPUID bit checks in `opus_select_arch()` (`src/arch.rs`).
