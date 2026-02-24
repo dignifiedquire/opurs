@@ -2490,7 +2490,7 @@ mod tests {
         for (i, &xi) in x.iter().enumerate() {
             let tmp = xi + m + VERY_SMALL;
             m = coef[0] * tmp - coef[1] * xi;
-            let scratch = 4.0 * (coef[3] * tmp);
+            let scratch = coef[3] * tmp;
             expected[i] = scratch * (1.0 / CELT_SIG_SCALE);
         }
 
