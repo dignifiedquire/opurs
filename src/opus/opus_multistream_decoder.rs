@@ -292,6 +292,13 @@ impl OpusMSDecoder {
         }
     }
 
+    #[cfg(feature = "osce")]
+    pub fn set_osce_bwe(&mut self, enabled: bool) {
+        for decoder in &mut self.decoders {
+            decoder.set_osce_bwe(enabled);
+        }
+    }
+
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
         for decoder in &mut self.decoders {
             decoder.set_phase_inversion_disabled(disabled);
@@ -350,6 +357,14 @@ impl OpusMSDecoder {
         self.decoders
             .first()
             .map(OpusDecoder::ignore_extensions)
+            .unwrap_or(false)
+    }
+
+    #[cfg(feature = "osce")]
+    pub fn osce_bwe(&self) -> bool {
+        self.decoders
+            .first()
+            .map(OpusDecoder::osce_bwe)
             .unwrap_or(false)
     }
 }

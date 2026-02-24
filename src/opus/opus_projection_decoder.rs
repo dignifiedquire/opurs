@@ -267,6 +267,11 @@ impl OpusProjectionDecoder {
         self.decoder.set_ignore_extensions(ignore);
     }
 
+    #[cfg(feature = "osce")]
+    pub fn set_osce_bwe(&mut self, enabled: bool) {
+        self.decoder.set_osce_bwe(enabled);
+    }
+
     pub fn reset(&mut self) {
         self.decoder.reset();
     }
@@ -301,6 +306,11 @@ impl OpusProjectionDecoder {
 
     pub fn ignore_extensions(&self) -> bool {
         self.decoder.ignore_extensions()
+    }
+
+    #[cfg(feature = "osce")]
+    pub fn osce_bwe(&self) -> bool {
+        self.decoder.osce_bwe()
     }
 
     pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, i32> {

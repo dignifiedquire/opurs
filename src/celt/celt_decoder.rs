@@ -1760,7 +1760,7 @@ fn celt_decode_body(
         }
     }
     let mut collapse_masks = [0u8; 42];
-    let mut X = [0.0f32; 1920];
+    let mut X = vec![0.0f32; (C * N) as usize];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(

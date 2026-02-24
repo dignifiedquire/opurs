@@ -356,6 +356,11 @@ impl OpusProjectionEncoder {
         self.encoder.set_phase_inversion_disabled(disabled);
     }
 
+    #[cfg(feature = "qext")]
+    pub fn set_qext(&mut self, enabled: bool) {
+        self.encoder.set_qext(enabled);
+    }
+
     pub fn reset(&mut self) {
         self.encoder.reset();
     }
@@ -430,6 +435,11 @@ impl OpusProjectionEncoder {
 
     pub fn phase_inversion_disabled(&self) -> bool {
         self.encoder.phase_inversion_disabled()
+    }
+
+    #[cfg(feature = "qext")]
+    pub fn qext(&self) -> bool {
+        self.encoder.qext()
     }
 
     pub fn lookahead(&self) -> i32 {

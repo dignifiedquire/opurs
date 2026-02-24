@@ -283,8 +283,58 @@ fn pvq_u(n: u32, k: u32) -> u32 {
     // N = MIN(n, k)
     // K = MAX(n, k)
     let (n, k) = if n < k { (n, k) } else { (k, n) };
-    // NOTE: this will cause panics if values are out of range
-    PVQ_U_DATA2[n as usize][k as usize]
+    if let Some(row) = PVQ_U_DATA2.get(n as usize) {
+        if let Some(value) = row.get(k as usize) {
+            return *value;
+        }
+    }
+    pvq_u_fallback(n, k)
+}
+
+#[inline]
+fn unext(u: &mut [u32], mut ui0: u32) {
+    let mut j = 1usize;
+    while j < u.len() {
+        let ui1 = u[j].wrapping_add(u[j - 1]).wrapping_add(ui0);
+        u[j - 1] = ui0;
+        ui0 = ui1;
+        j += 1;
+    }
+    if let Some(last) = u.last_mut() {
+        *last = ui0;
+    }
+}
+
+/// Upstream C (SMALL_FOOTPRINT): celt/cwrs.c:ncwrs_urow
+#[inline]
+fn pvq_u_fallback(n: u32, k: u32) -> u32 {
+    if n == 0 {
+        return (k == 0) as u32;
+    }
+    if k == 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+
+    let len = k as usize + 1;
+    let mut u = vec![0u32; len.max(2)];
+    u[0] = 0;
+    u[1] = 1;
+
+    let mut idx = 2usize;
+    while idx < u.len() {
+        u[idx] = ((idx as u32) << 1).wrapping_sub(1);
+        idx += 1;
+    }
+
+    let mut row = 2u32;
+    while row < n {
+        unext(&mut u[1..], 1);
+        row += 1;
+    }
+    u[k as usize]
 }
 
 /// Upstream C: celt/cwrs.c:CELT_PVQ_V (macro)
@@ -333,26 +383,25 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
     while n > 2 {
         let q: u32;
         if k >= n as i32 {
-            let row = PVQ_U_DATA2[n];
-            p = row[(k + 1) as usize];
+            p = pvq_u(n as u32, (k + 1) as u32);
             s = -((i >= p) as i32);
             i = i.wrapping_sub(p & s as u32);
             k0 = k;
-            q = row[n];
+            q = pvq_u(n as u32, n as u32);
             if q > i {
                 k = n as i32;
                 loop {
                     k -= 1;
-                    p = PVQ_U_DATA2[k as usize][n];
+                    p = pvq_u(k as u32, n as u32);
                     if p <= i {
                         break;
                     }
                 }
             } else {
-                p = row[k as usize];
+                p = pvq_u(n as u32, k as u32);
                 while p > i {
                     k -= 1;
-                    p = row[k as usize];
+                    p = pvq_u(n as u32, k as u32);
                 }
             }
             i = i.wrapping_sub(p);
@@ -361,8 +410,8 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
             yi += 1;
             yy += val as f32 * val as f32;
         } else {
-            p = PVQ_U_DATA2[k as usize][n];
-            q = PVQ_U_DATA2[k as usize + 1][n];
+            p = pvq_u(k as u32, n as u32);
+            q = pvq_u((k + 1) as u32, n as u32);
             if p <= i && i < q {
                 i = i.wrapping_sub(p);
                 y[yi] = 0;
@@ -373,7 +422,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 k0 = k;
                 loop {
                     k -= 1;
-                    p = PVQ_U_DATA2[k as usize][n];
+                    p = pvq_u(k as u32, n as u32);
                     if p <= i {
                         break;
                     }

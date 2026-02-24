@@ -36,3 +36,12 @@ Close remaining public API coverage gaps versus upstream core/custom/multistream
   - mode selection now forces SILK-only for restricted SILK and CELT-only for restricted CELT
   - delay compensation, lookahead, and bandwidth/LSB-depth branches updated for restricted mode semantics
 - 2026-02-24: Updated multistream encoder call-sites to pass application into `frame_size_select()` (`src/opus/opus_multistream_encoder.rs`).
+- 2026-02-24: Added missing upstream CTL request constants for OSCE/QEXT/ignore-extensions (`4054..4059`) in `src/opus/opus_defines.rs` and re-exported them in `src/lib.rs`.
+- 2026-02-24: Added typed API coverage for the newly represented controls across wrappers:
+  - `set_osce_bwe()` / `osce_bwe()` on multistream and projection decoders
+  - `set_qext()` / `qext()` on projection encoder
+- 2026-02-24: Added integration coverage for these control paths in `tests/ctl_api_controls.rs` (base + `qext` + `osce` feature variants).
+- 2026-02-24: Added a gap matrix in `plans/missing-impl-test-coverage.md` to track unresolved implementation details and required path-level test coverage (prioritized M01..M09).
+- 2026-02-24: Upstream parity review for qext decoder paths fixed two concrete divergences:
+  - `src/celt/celt_decoder.rs`: allocate `X` as `C*N` (matching upstream) instead of fixed 1920.
+  - `src/celt/cwrs.rs`: added safe PVQ-U lookup fallback equivalent to upstream SMALL_FOOTPRINT recurrence when compact table rows are exceeded (qext/cwrs-extra-row cases).
