@@ -1,7 +1,7 @@
 # opurs
 
 [![CI](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml/badge.svg)](https://github.com/dignifiedquire/opurs/actions/workflows/ci.yml)
-[![Rust 1.70+](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
+[![Rust 1.87+](https://img.shields.io/badge/rust-1.87+-blue.svg)](https://www.rust-lang.org)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
 A pure Rust implementation of the [Opus audio codec](https://opus-codec.org/), bit-exact with libopus 1.6.1.

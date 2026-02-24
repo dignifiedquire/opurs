@@ -196,6 +196,15 @@ pub mod internals {
     // -- Arch (for benchmarks) --
     pub use crate::arch::{opus_select_arch, Arch};
 
+    // -- Extensions/Repacketizer internals (for parity tests) --
+    pub use crate::opus::extensions::{
+        opus_packet_extensions_count, opus_packet_extensions_count_ext,
+        opus_packet_extensions_generate, opus_packet_extensions_parse,
+        opus_packet_extensions_parse_ext, OpusExtensionData,
+    };
+    pub use crate::opus::packet::opus_packet_parse_impl;
+    pub use crate::opus::repacketizer::opus_packet_pad_impl;
+
     // -- SILK functions (for benchmarks) --
     // Dispatch wrappers:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;

@@ -24,3 +24,16 @@ Align packet extension parse/generate/repacketizer semantics with upstream behav
 ## Definition Of Done
 - Rust accepts/rejects same packets as upstream for covered fixtures.
 - Repacketized bytes and extension summaries match upstream expectations.
+
+## Progress
+- 2026-02-24: Added `tests/extensions_repacketizer_parity.rs` with:
+  - repeat-extension generate/count/parse roundtrip coverage (`opus_packet_extensions_*`)
+  - repacketizer extension-preservation coverage across concatenated packets
+  - tools-gated differential coverage against upstream C `opus_packet_extensions_{count,count_ext,parse,parse_ext}` entry points
+- 2026-02-24: Added test-only internal re-exports in `src/lib.rs` for extension/repacketizer parity tests.
+- 2026-02-24: Verification run:
+  - `CARGO_TARGET_DIR=target-local cargo test -p opurs --test extensions_repacketizer_parity --release`
+  - `CARGO_TARGET_DIR=target-local cargo test -p opurs --test extensions_repacketizer_parity --features tools --release`
+  - `CARGO_TARGET_DIR=target-local cargo test -p opurs --test opus_multistream_packet --features tools --release`
+  - `CARGO_TARGET_DIR=target-local cargo clippy -p opurs --all-targets -- -D warnings`
+  - `CARGO_TARGET_DIR=target-local cargo clippy -p opurs --all-targets --features tools -- -D warnings`

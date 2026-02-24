@@ -3,7 +3,7 @@ name = "opurs"
 authors = ["DCNick3", "Friedel Ziegelmayer"]
 version = "0.3.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.87"
 
 repository = "https://github.com/dignifiedquire/opurs"
 description = "Pure Rust Opus codec, bit-exact with libopus 1.6.1"
