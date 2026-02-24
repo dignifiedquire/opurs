@@ -4,7 +4,7 @@
 
 use crate::opus::extensions::OpusExtensionData;
 use crate::opus::opus_defines::{
-    OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK,
+    OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
 };
 use crate::opus::packet::{encode_size, opus_packet_parse_impl};
 use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
@@ -41,9 +41,14 @@ pub struct OpusRepacketizer {
     frames: [usize; 48],
     len: [i16; 48],
     framesize: i32,
+    paddings: [Option<Vec<u8>>; 48],
+    padding_nb_frames: [u8; 48],
 }
 
 impl Default for OpusRepacketizer {
+    /// Create a zeroed repacketizer state.
+    ///
+    /// Upstream C: storage initialization done by `src/repacketizer.c:opus_repacketizer_init`.
     fn default() -> Self {
         Self {
             toc: 0,
@@ -51,6 +56,8 @@ impl Default for OpusRepacketizer {
             frames: [0; 48],
             len: [0; 48],
             framesize: 0,
+            paddings: std::array::from_fn(|_| None),
+            padding_nb_frames: [0; 48],
         }
     }
 }
@@ -64,8 +71,12 @@ impl OpusRepacketizer {
     /// configuration (coding mode, audio bandwidth, frame size, or channel count).
     /// Failure to do so will prevent a new packet from being added with
     /// [`OpusRepacketizer::cat`].
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_init
     pub fn init(&mut self) {
         self.nb_frames = 0;
+        self.paddings = std::array::from_fn(|_| None);
+        self.padding_nb_frames = [0; 48];
     }
 
     /// Add a packet to the current repacketizer state.
@@ -99,10 +110,15 @@ impl OpusRepacketizer {
     /// with previously submitted packets (because the coding mode, audio bandwidth, frame size,
     /// or channel count did not match), or adding this packet would increase the total amount of
     /// audio stored in the repacketizer state to more than 120 ms.
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_cat
     pub fn cat(&mut self, data: &[u8]) -> i32 {
         self.cat_impl(data, false)
     }
 
+    /// Internal packet enqueue path with optional self-delimited parsing.
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_cat_impl
     fn cat_impl(&mut self, data: &[u8], self_delimited: bool) -> i32 {
         // Set of check ToC
         if data.is_empty() {
@@ -125,6 +141,8 @@ impl OpusRepacketizer {
         }
 
         let mut tmp_toc: u8 = 0;
+        let mut packet_offset = 0i32;
+        let mut padding_len = 0i32;
         let num_frames = opus_packet_parse_impl(
             data,
             self_delimited,
@@ -132,14 +150,39 @@ impl OpusRepacketizer {
             Some(&mut self.frames[self.nb_frames as usize..]),
             &mut self.len[self.nb_frames as usize..],
             None,
-            None,
-            None,
+            Some(&mut packet_offset),
+            Some(&mut padding_len),
         );
         if num_frames < 1 {
             return num_frames;
         }
 
+        let base = self.nb_frames as usize;
+        if padding_len > 0 {
+            if packet_offset < padding_len
+                || packet_offset < 0
+                || packet_offset as usize > data.len()
+            {
+                return OPUS_INVALID_PACKET;
+            }
+            let end = packet_offset as usize;
+            let start = end - padding_len as usize;
+            self.paddings[base] = Some(data[start..end].to_vec());
+        } else {
+            self.paddings[base] = None;
+        }
+        self.padding_nb_frames[base] = num_frames as u8;
+
         self.nb_frames += curr_nb_frames;
+
+        let mut idx = base + 1;
+        let mut remaining_frames = curr_nb_frames;
+        while remaining_frames > 1 {
+            self.paddings[idx] = None;
+            self.padding_nb_frames[idx] = 0;
+            idx += 1;
+            remaining_frames -= 1;
+        }
 
         OPUS_OK
     }
@@ -152,6 +195,8 @@ impl OpusRepacketizer {
     ///
     /// Returns the total number of frames contained in the packet data submitted
     /// to the repacketizer state.
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_get_nb_frames
     pub fn get_nb_frames(&self) -> i32 {
         self.nb_frames
     }
@@ -171,6 +216,8 @@ impl OpusRepacketizer {
     /// - `OPUS_BAD_ARG`: `[begin,end)` was an invalid range of frames (begin < 0, begin >= end, or end >
     ///   `OpusRepacketizer::get_nb_frames`).
     /// - `OPUS_BUFFER_TOO_SMALL`: `maxlen` was insufficient to contain the complete output packet.
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_out_range
     pub fn out_range(&mut self, begin: i32, end: i32, data: &mut [u8]) -> i32 {
         self.out_range_impl(
             begin,
@@ -197,6 +244,8 @@ impl OpusRepacketizer {
     /// Returns the total size of the output packet on success, or an error code
     ///          on failure.
     /// - `OPUS_BUFFER_TOO_SMALL`: `maxlen` was insufficient to contain the complete output packet.
+    ///
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_out
     pub fn out(&mut self, data: &mut [u8]) -> i32 {
         self.out_range_impl(
             0,
@@ -208,6 +257,9 @@ impl OpusRepacketizer {
         )
     }
 
+    /// Internal wrapper for `out_range_impl_ext` when no extensions are supplied.
+    ///
+    /// Upstream C: wrapper behavior around `src/repacketizer.c:opus_repacketizer_out_range_impl`.
     pub(crate) fn out_range_impl(
         &mut self,
         begin: i32,
@@ -237,8 +289,6 @@ impl OpusRepacketizer {
             opus_packet_extensions_generate, opus_packet_extensions_generate_size,
         };
 
-        let ext_count = extensions.len();
-
         if begin < 0 || begin >= end || end > self.nb_frames {
             return OPUS_BAD_ARG;
         }
@@ -247,6 +297,30 @@ impl OpusRepacketizer {
         let count = end - begin;
         let len = &self.len[begin as usize..];
         let frames = &self.frames[begin as usize..];
+
+        let mut all_extensions: Vec<OpusExtensionData> = extensions.to_vec();
+        for frame_idx in begin..end {
+            let slot = frame_idx as usize;
+            if let Some(ref padding) = self.paddings[slot] {
+                if self.padding_nb_frames[slot] == 0 {
+                    continue;
+                }
+                let mut frame_exts = match crate::opus::extensions::opus_packet_extensions_parse(
+                    padding,
+                    i32::MAX,
+                    self.padding_nb_frames[slot] as i32,
+                ) {
+                    Ok(v) => v,
+                    Err(_) => return OPUS_INTERNAL_ERROR,
+                };
+                for ext in &mut frame_exts {
+                    ext.frame += frame_idx - begin;
+                }
+                all_extensions.extend(frame_exts);
+            }
+        }
+
+        let ext_count = all_extensions.len();
 
         let mut tot_size = 0;
         if self_delimited {
@@ -331,7 +405,7 @@ impl OpusRepacketizer {
             pad_amount = if pad { maxlen - tot_size } else { 0 };
             if ext_count > 0 {
                 // Figure out how much space we need for the extensions
-                match opus_packet_extensions_generate_size(extensions) {
+                match opus_packet_extensions_generate_size(&all_extensions, count) {
                     Ok(size) => ext_len = size as i32,
                     Err(e) => return e,
                 }
@@ -396,7 +470,8 @@ impl OpusRepacketizer {
             if ext_len > 0 {
                 let _ = opus_packet_extensions_generate(
                     &mut data[ext_begin..ext_begin + ext_len as usize],
-                    extensions,
+                    &all_extensions,
+                    count,
                     false,
                 );
             }
@@ -513,6 +588,8 @@ pub fn opus_packet_pad_impl(
 /// - `OPUS_OK`: on success.
 /// - `OPUS_BAD_ARG`:  len was less than 1 or new_len was less than len.
 /// - `OPUS_INVALID_PACKET`:  data did not contain a valid Opus packet.
+///
+/// Upstream C: src/repacketizer.c:opus_packet_pad
 pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> i32 {
     let ret = opus_packet_pad_impl(data, len, new_len, true, &[]);
     if ret > 0 {
@@ -531,6 +608,8 @@ pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> i32 {
 /// Returns the new size of the output packet on success, or an error code on failure.
 /// - `OPUS_BAD_ARG`: len was less than 1.
 /// - `OPUS_INVALID_PACKET`: data did not contain a valid Opus packet.
+///
+/// Upstream C: src/repacketizer.c:opus_packet_unpad
 pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
     if data.is_empty() {
         return OPUS_BAD_ARG;
@@ -539,6 +618,9 @@ pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
     let ret = rp.cat(data);
     if ret < 0 {
         return ret;
+    }
+    for i in 0..rp.nb_frames as usize {
+        rp.paddings[i] = None;
     }
     let ret = rp.out_range_impl(
         0,
@@ -652,6 +734,9 @@ pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32)
         let ret = rp.cat_impl(&packet, self_delimited);
         if ret < 0 {
             return ret;
+        }
+        for i in 0..rp.nb_frames as usize {
+            rp.paddings[i] = None;
         }
 
         let ret = rp.out_range_impl(
