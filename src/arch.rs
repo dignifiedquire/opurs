@@ -91,6 +91,70 @@ impl Arch {
     }
 }
 
+#[cfg(all(feature = "simd", feature = "fuzzing"))]
+fn fuzz_random_u32() -> u32 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static SEED: AtomicU64 = AtomicU64::new(0);
+
+    let mut seed = SEED.load(Ordering::Relaxed);
+    if seed == 0 {
+        let t = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        seed = t ^ ((&SEED as *const AtomicU64 as usize) as u64);
+    }
+
+    loop {
+        let next = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        match SEED.compare_exchange_weak(seed, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return (next >> 32) as u32,
+            Err(cur) => seed = cur,
+        }
+    }
+}
+
+#[cfg(all(
+    feature = "simd",
+    feature = "fuzzing",
+    any(target_arch = "x86", target_arch = "x86_64")
+))]
+fn fuzz_downgrade_arch(arch: Arch) -> Arch {
+    let max = match arch {
+        Arch::Scalar => 0,
+        Arch::Sse => 1,
+        Arch::Sse2 => 2,
+        Arch::Sse4_1 => 3,
+        Arch::Avx2 => 4,
+    };
+    let arch = fuzz_random_u32() % (max + 1);
+    match arch {
+        0 => Arch::Scalar,
+        1 => Arch::Sse,
+        2 => Arch::Sse2,
+        3 => Arch::Sse4_1,
+        4 => Arch::Avx2,
+        _ => Arch::Scalar,
+    }
+}
+
+#[cfg(all(feature = "simd", feature = "fuzzing", target_arch = "aarch64"))]
+fn fuzz_downgrade_arch(arch: Arch) -> Arch {
+    let max = match arch {
+        Arch::Scalar => 0,
+        Arch::Neon => 3,
+        Arch::DotProd => 4,
+    };
+    let arch = fuzz_random_u32() % (max + 1);
+    match arch {
+        4 => Arch::DotProd,
+        3 => Arch::Neon,
+        _ => Arch::Scalar,
+    }
+}
+
 /// Detect the highest supported SIMD architecture at runtime.
 ///
 /// Mirrors upstream C `opus_select_arch()` from `celt/x86/x86cpu.c` and
@@ -154,6 +218,10 @@ pub fn opus_select_arch() -> Arch {
             arch = Arch::Avx2;
         }
 
+        #[cfg(feature = "fuzzing")]
+        {
+            arch = fuzz_downgrade_arch(arch);
+        }
         return arch;
     }
 
@@ -167,10 +235,14 @@ pub fn opus_select_arch() -> Arch {
         //     FreeBSD: elf_aux_info AT_HWCAP / HWCAP_ASIMDDP
         //
         // Rust's std::arch mirrors these platform-specific detection methods.
-        if std::arch::is_aarch64_feature_detected!("dotprod") {
-            return Arch::DotProd;
-        }
-        return Arch::Neon;
+        let arch = if std::arch::is_aarch64_feature_detected!("dotprod") {
+            Arch::DotProd
+        } else {
+            Arch::Neon
+        };
+        #[cfg(feature = "fuzzing")]
+        let arch = fuzz_downgrade_arch(arch);
+        return arch;
     }
 
     #[allow(unreachable_code)]

@@ -80,10 +80,10 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D9 - FUZZING random arch downgrade behavior not mirrored
 
 - Severity: Low
-- Status: OPEN
+- Status: FIXED
 - Upstream: random downgrade under `FUZZING` (`libopus-sys/opus/celt/arm/armcpu.c:318`, `libopus-sys/opus/celt/x86/x86cpu.c:177`)
-- Rust: no equivalent in `src/arch.rs`
-- Impact: fuzzing-specific behavior divergence
+- Rust: `fuzzing` feature now mirrors random arch downgrade in `opus_select_arch()`; `libopus-sys` also receives `FUZZING` define via forwarded feature
+- Impact: fuzzing-mode architecture behavior now aligned
 
 ## Alignment Log
 
@@ -93,6 +93,7 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Fixed D3 by threading `Arch` through DNN nnet compute entrypoints and call graph (`src/dnn/nnet.rs` plus DNN callers).
 - 2026-02-24: Fixed D4 by implementing true aarch64 DOTPROD kernels (`sdot` inline asm) for dense/sparse DNN int8 GEMV and wiring them to DOTPROD dispatch entries (`src/dnn/simd/aarch64.rs`, `src/dnn/simd/mod.rs`).
 - 2026-02-24: Fixed D7 by replacing x86 SIMD level detection with upstream-equivalent CPUID bit checks in `opus_select_arch()` (`src/arch.rs`).
-- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples; no additional confirmed divergences beyond open D8/D9.
+- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples; no additional confirmed divergences beyond open D8.
 - 2026-02-24: Added aarch64 unit parity tests to assert DOTPROD dense/sparse DNN int8 GEMV matches scalar reference (`src/dnn/simd/aarch64.rs`).
 - 2026-02-24: Fixed D6 by making `libopus-sys/build.rs` conditionally enable SIMD `MAY_HAVE` defines and SIMD source groups based on compiler flag probes (not blanket target-arch enables).
+- 2026-02-24: Fixed D9 by adding a `fuzzing` feature that mirrors upstream random arch downgrade in Rust `opus_select_arch()` and forwards `FUZZING` to `libopus-sys`.

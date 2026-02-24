@@ -112,6 +112,7 @@ fn build_opus() {
     let deep_plc = env::var("CARGO_FEATURE_DEEP_PLC").is_ok();
     let dred = env::var("CARGO_FEATURE_DRED").is_ok();
     let osce = env::var("CARGO_FEATURE_OSCE").is_ok();
+    let fuzzing = env::var("CARGO_FEATURE_FUZZING").is_ok();
 
     // Parse upstream .mk files for source and header lists
     let opus_sources_mk = parse_mk_file(&opus_source_path.join("opus_sources.mk"));
@@ -340,6 +341,9 @@ fn build_opus() {
     }
     if env::var("OSCE_DUMP_DEBUG").is_ok() {
         config.push_str("#define OSCE_DUMP_DEBUG 1\n");
+    }
+    if fuzzing {
+        config.push_str("#define FUZZING 1\n");
     }
 
     if simd {

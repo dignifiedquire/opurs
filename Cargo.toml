@@ -128,6 +128,8 @@ qext = []
 
 # Pass DNN features through to libopus-sys (for tools that need C weight data)
 tools-dnn = ["tools", "dnn", "builtin-weights", "libopus-sys/dnn"]
+# Match upstream FUZZING behavior (random arch downgrade and codec randomization).
+fuzzing = ["libopus-sys?/fuzzing"]
 
 [[example]]
 name = "run_vectors2"
