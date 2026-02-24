@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/init_decoder.c`
 
-use crate::arch::Arch;
+use crate::arch::{opus_select_arch, Arch};
 use crate::silk::resampler::ResamplerState;
 use crate::silk::structs::{silk_CNG_struct, silk_PLC_struct, silk_decoder_state, SideInfoIndices};
 use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
@@ -44,7 +44,7 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
     dec.sCNG = silk_CNG_struct::default();
     dec.lossCnt = 0;
     dec.prevSignalType = 0;
-    dec.arch = Arch::Scalar;
+    dec.arch = opus_select_arch();
     dec.sPLC = silk_PLC_struct::default();
     #[cfg(feature = "osce")]
     {

@@ -24,7 +24,7 @@ use crate::celt::quant_bands::{
 use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
-use crate::arch::Arch;
+use crate::arch::{opus_select_arch, Arch};
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
 
 pub use self::arch_h::{
@@ -162,7 +162,7 @@ fn opus_custom_decoder_init(mode: &'static OpusCustomMode, channels: usize) -> O
         signalling: 1,
         disable_inv: (channels == 1) as i32,
         complexity: 0,
-        arch: Arch::Scalar,
+        arch: opus_select_arch(),
 
         rng: 0,
         error: 0,

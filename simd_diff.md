@@ -16,7 +16,7 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D1 - SILK decoder arch initialization is scalar-only in Rust
 
 - Severity: High
-- Status: OPEN
+- Status: FIXED
 - Upstream: `libopus-sys/opus/silk/init_decoder.c:53` sets `psDec->arch = opus_select_arch();`
 - Rust: `src/silk/init_decoder.rs:47` and `src/silk/init_decoder.rs:91` set `Arch::Scalar`
 - Impact: decoder-side SILK dispatch paths can miss SIMD selection
@@ -24,7 +24,7 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D2 - SILK mono->stereo transition reinit inherits scalar arch in Rust
 
 - Severity: High
-- Status: OPEN
+- Status: FIXED
 - Upstream: channel reinit uses upstream `silk_init_decoder()` with detected arch semantics
 - Rust: `src/silk/dec_API.rs:123` calls `silk_init_decoder()` which currently initializes scalar arch
 - Impact: channel 1 can remain scalar after transition
@@ -48,7 +48,7 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D5 - Standalone CELT custom decoder initializes scalar arch in Rust
 
 - Severity: Medium
-- Status: OPEN
+- Status: FIXED
 - Upstream: CELT custom decoder init sets `st->arch = opus_select_arch();` (`libopus-sys/opus/celt/celt_decoder.c:265`)
 - Rust: `src/celt/celt_decoder.rs:165` initializes `arch: Arch::Scalar`
 - Impact: standalone CELT decoder paths diverge from upstream init behavior
@@ -88,3 +88,5 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ## Alignment Log
 
 - 2026-02-24: Created baseline divergence inventory (D1-D9).
+- 2026-02-24: Fixed D1/D2 by setting SILK decoder arch via `opus_select_arch()` in `silk_reset_decoder` (`src/silk/init_decoder.rs`).
+- 2026-02-24: Fixed D5 by initializing CELT custom decoder arch via `opus_select_arch()` (`src/celt/celt_decoder.rs`).
