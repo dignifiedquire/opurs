@@ -1,7 +1,10 @@
 #[cfg(feature = "qext")]
-use opurs::internals::{opus_packet_extensions_parse, opus_packet_parse_impl};
+use opurs::internals::{
+    opus_packet_extensions_generate, opus_packet_extensions_parse, opus_packet_parse_impl,
+    OpusExtensionData,
+};
 #[cfg(feature = "qext")]
-use opurs::{opus_multistream_packet_unpad, opus_packet_unpad};
+use opurs::{opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad};
 #[cfg(any(feature = "qext", feature = "osce"))]
 use opurs::{Bitrate, OpusEncoder, OpusMSEncoder};
 use opurs::{
@@ -90,14 +93,20 @@ fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
 }
 
 #[cfg(feature = "qext")]
-fn decode_ms(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
+fn decode_ms_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
     let mut dec = OpusMSDecoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1]).expect("ms decoder create");
     dec.set_ignore_extensions(ignore_extensions);
 
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
+    (ret, pcm, dec.final_range())
+}
+
+#[cfg(feature = "qext")]
+fn decode_ms(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
+    let (ret, pcm, final_range) = decode_ms_raw(packet, ignore_extensions);
     assert_eq!(ret, FRAME_SIZE_20MS_96K, "multistream decode failed");
-    (pcm, dec.final_range())
+    (pcm, final_range)
 }
 
 #[cfg(feature = "qext")]
@@ -148,6 +157,25 @@ fn decode_projection(
     demixing: &[u8],
     ignore_extensions: bool,
 ) -> (Vec<i16>, u32) {
+    let (ret, pcm, final_range) = decode_projection_raw(
+        packet,
+        streams,
+        coupled_streams,
+        demixing,
+        ignore_extensions,
+    );
+    assert_eq!(ret, FRAME_SIZE_20MS_96K, "projection decode failed");
+    (pcm, final_range)
+}
+
+#[cfg(feature = "qext")]
+fn decode_projection_raw(
+    packet: &[u8],
+    streams: i32,
+    coupled_streams: i32,
+    demixing: &[u8],
+    ignore_extensions: bool,
+) -> (i32, Vec<i16>, u32) {
     let mut dec =
         OpusProjectionDecoder::new(SAMPLE_RATE_96K, 4, streams, coupled_streams, demixing)
             .expect("projection decoder create");
@@ -155,8 +183,7 @@ fn decode_projection(
 
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 4];
     let ret = dec.decode(packet, &mut pcm, FRAME_SIZE_20MS_96K, false);
-    assert_eq!(ret, FRAME_SIZE_20MS_96K, "projection decode failed");
-    (pcm, dec.final_range())
+    (ret, pcm, dec.final_range())
 }
 
 #[cfg(feature = "qext")]
@@ -190,10 +217,12 @@ fn packet_padding_bounds(packet: &[u8]) -> Option<(usize, usize, i32)> {
 #[cfg(feature = "qext")]
 fn find_malformed_extension_packet(packet: &[u8]) -> Option<Vec<u8>> {
     let (padding_start, padding_end, nb_frames) = packet_padding_bounds(packet)?;
-    let masks = [0x01u8, 0x20, 0x40, 0x80, 0xFF];
+    let xor_masks = [0x01u8, 0x20, 0x40, 0x80, 0xFF];
+    let set_values = [0x00u8, 0x01, 0x20, 0x40, 0x7F, 0x80, 0xFF];
+    let pair_values = [(0x00u8, 0xFFu8), (0xFF, 0x00), (0xFF, 0xFF), (0x7F, 0x80)];
 
     for idx in padding_start..padding_end {
-        for mask in masks {
+        for mask in xor_masks {
             let mut mutated = packet.to_vec();
             mutated[idx] ^= mask;
             if mutated[idx] == packet[idx] {
@@ -205,8 +234,123 @@ fn find_malformed_extension_packet(packet: &[u8]) -> Option<Vec<u8>> {
                 return Some(mutated);
             }
         }
+        for value in set_values {
+            if value == packet[idx] {
+                continue;
+            }
+            let mut mutated = packet.to_vec();
+            mutated[idx] = value;
+            if opus_packet_extensions_parse(&mutated[padding_start..padding_end], 64, nb_frames)
+                .is_err()
+            {
+                return Some(mutated);
+            }
+        }
+        if idx + 1 < padding_end {
+            for (a, b) in pair_values {
+                let mut mutated = packet.to_vec();
+                mutated[idx] = a;
+                mutated[idx + 1] = b;
+                if opus_packet_extensions_parse(&mutated[padding_start..padding_end], 64, nb_frames)
+                    .is_err()
+                {
+                    return Some(mutated);
+                }
+            }
+        }
     }
     None
+}
+
+#[cfg(feature = "qext")]
+fn mutate_extension_packet(packet: &[u8]) -> Option<Vec<u8>> {
+    let (padding_start, _padding_end, _nb_frames) = packet_padding_bounds(packet)?;
+    let mut mutated = packet.to_vec();
+    mutated[padding_start] ^= 0x80;
+    if mutated[padding_start] == packet[padding_start] {
+        mutated[padding_start] = packet[padding_start].wrapping_add(1);
+    }
+    Some(mutated)
+}
+
+#[cfg(feature = "qext")]
+fn locate_last_stream(packet: &[u8], nb_streams: i32) -> Option<(usize, usize)> {
+    let mut offset = 0usize;
+    let mut remaining = packet.len() as i32;
+    for _ in 0..nb_streams - 1 {
+        if remaining <= 0 {
+            return None;
+        }
+        let mut toc = 0u8;
+        let mut sizes = [0i16; 48];
+        let mut packet_offset = 0i32;
+        let ret = opus_packet_parse_impl(
+            &packet[offset..offset + remaining as usize],
+            true,
+            Some(&mut toc),
+            None,
+            &mut sizes,
+            None,
+            Some(&mut packet_offset),
+            None,
+        );
+        if ret < 0 || packet_offset <= 0 || packet_offset > remaining {
+            return None;
+        }
+        offset += packet_offset as usize;
+        remaining -= packet_offset;
+    }
+    Some((offset, packet.len()))
+}
+
+#[cfg(feature = "qext")]
+fn build_projection_packet_with_forced_qext(
+    enc: &mut OpusProjectionEncoder,
+    streams: i32,
+    seed: u32,
+) -> Option<Vec<u8>> {
+    let pcm = quad_pcm(seed);
+    let mut packet = vec![0u8; 6000];
+    let len = enc.encode(&pcm, FRAME_SIZE_20MS_96K, &mut packet);
+    if len <= 0 {
+        return None;
+    }
+    packet.truncate(len as usize);
+
+    let (last_off, last_end) = locate_last_stream(&packet, streams)?;
+    let old_last_len = last_end - last_off;
+    let new_last_len = old_last_len + 64;
+    let mut padded = vec![0u8; packet.len() + 64];
+    padded[..packet.len()].copy_from_slice(&packet);
+    let pad_ret = opus_packet_pad(
+        &mut padded[last_off..last_off + new_last_len],
+        old_last_len as i32,
+        new_last_len as i32,
+    );
+    if pad_ret < 0 {
+        return None;
+    }
+    padded.truncate(last_off + new_last_len);
+
+    let (padding_start, padding_end, nb_frames) = packet_padding_bounds(&padded[last_off..])?;
+    let padding = &mut padded[last_off + padding_start..last_off + padding_end];
+    let exts = [OpusExtensionData {
+        id: QEXT_EXTENSION_ID,
+        frame: 0,
+        data: vec![0x11, 0x22, 0x33, 0x44],
+    }];
+    if opus_packet_extensions_generate(padding, &exts, nb_frames, true).is_err() {
+        return None;
+    }
+    let ids = opus_packet_extensions_parse(padding, 64, nb_frames)
+        .ok()?
+        .into_iter()
+        .map(|e| e.id)
+        .collect::<Vec<_>>();
+    if !ids.contains(&QEXT_EXTENSION_ID) {
+        return None;
+    }
+    Some(padded)
 }
 
 #[cfg(feature = "qext")]
@@ -372,7 +516,9 @@ fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
             continue;
         }
 
-        let malformed = match find_malformed_extension_packet(&packet) {
+        let malformed = match find_malformed_extension_packet(&packet)
+            .or_else(|| mutate_extension_packet(&packet))
+        {
             Some(m) => m,
             None => continue,
         };
@@ -419,6 +565,139 @@ fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
     }
 
     panic!("failed to synthesize a malformed QEXT extension packet");
+}
+
+#[cfg(feature = "qext")]
+#[test]
+fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
+    for seed in 1..=80u32 {
+        let mut enc = OpusMSEncoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO)
+            .expect("ms encoder create");
+        enc.set_bitrate(Bitrate::Bits(128_000));
+        enc.set_complexity(10).expect("set complexity");
+        enc.set_qext(true);
+
+        let pcm = stereo_pcm(seed.wrapping_add(6000));
+        let mut packet = vec![0u8; 4000];
+        let len = enc.encode(&pcm, &mut packet);
+        assert!(len > 0, "multistream encode failed");
+        packet.truncate(len as usize);
+
+        let malformed = match find_malformed_extension_packet(&packet)
+            .or_else(|| mutate_extension_packet(&packet))
+        {
+            Some(m) => m,
+            None => continue,
+        };
+
+        let (ret_ignore, pcm_ignore_a, rng_ignore_a) = decode_ms_raw(&malformed, true);
+        assert_eq!(
+            ret_ignore, FRAME_SIZE_20MS_96K,
+            "multistream ignore_extensions decode failed on malformed extension packet"
+        );
+        let (_ret_ignore_b, pcm_ignore_b, rng_ignore_b) = decode_ms_raw(&malformed, true);
+        assert_eq!(
+            pcm_ignore_a, pcm_ignore_b,
+            "multistream ignore_extensions decode output should be deterministic"
+        );
+        assert_eq!(
+            rng_ignore_a, rng_ignore_b,
+            "multistream ignore_extensions decode final range should be deterministic"
+        );
+
+        let (ret_with_ext_a, pcm_with_ext_a, rng_with_ext_a) = decode_ms_raw(&malformed, false);
+        let (ret_with_ext_b, pcm_with_ext_b, rng_with_ext_b) = decode_ms_raw(&malformed, false);
+        assert_eq!(
+            ret_with_ext_a, ret_with_ext_b,
+            "multistream extension-aware decode return code should be deterministic"
+        );
+        assert!(
+            ret_with_ext_a == FRAME_SIZE_20MS_96K || ret_with_ext_a == opurs::OPUS_INVALID_PACKET,
+            "unexpected multistream extension-aware decode return code: {ret_with_ext_a}"
+        );
+        if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+            assert_eq!(
+                pcm_with_ext_a, pcm_with_ext_b,
+                "multistream extension-aware decode output should be deterministic"
+            );
+            assert_eq!(
+                rng_with_ext_a, rng_with_ext_b,
+                "multistream extension-aware decode final range should be deterministic"
+            );
+        }
+        return;
+    }
+
+    panic!("failed to synthesize malformed QEXT packet for multistream decode path");
+}
+
+#[cfg(feature = "qext")]
+#[test]
+fn malformed_qext_extensions_projection_decode_path_is_deterministic() {
+    let (mut enc, streams, coupled_streams, demixing) = make_projection_codec_pair();
+    enc.set_bitrate(Bitrate::Bits(192_000));
+    enc.set_complexity(10).expect("set complexity");
+    enc.set_qext(true);
+
+    for seed in 1..=100u32 {
+        let packet = match build_projection_packet_with_forced_qext(
+            &mut enc,
+            streams,
+            seed.wrapping_add(7000),
+        ) {
+            Some(p) => p,
+            None => continue,
+        };
+        let malformed = match find_malformed_extension_packet(&packet)
+            .or_else(|| mutate_extension_packet(&packet))
+        {
+            Some(m) => m,
+            None => continue,
+        };
+
+        let (ret_ignore, pcm_ignore_a, rng_ignore_a) =
+            decode_projection_raw(&malformed, streams, coupled_streams, &demixing, true);
+        assert_eq!(
+            ret_ignore, FRAME_SIZE_20MS_96K,
+            "projection ignore_extensions decode failed on mutated extension packet"
+        );
+        let (_ret_ignore_b, pcm_ignore_b, rng_ignore_b) =
+            decode_projection_raw(&malformed, streams, coupled_streams, &demixing, true);
+        assert_eq!(
+            pcm_ignore_a, pcm_ignore_b,
+            "projection ignore_extensions decode output should be deterministic"
+        );
+        assert_eq!(
+            rng_ignore_a, rng_ignore_b,
+            "projection ignore_extensions decode final range should be deterministic"
+        );
+
+        let (ret_with_ext_a, pcm_with_ext_a, rng_with_ext_a) =
+            decode_projection_raw(&malformed, streams, coupled_streams, &demixing, false);
+        let (ret_with_ext_b, pcm_with_ext_b, rng_with_ext_b) =
+            decode_projection_raw(&malformed, streams, coupled_streams, &demixing, false);
+        assert_eq!(
+            ret_with_ext_a, ret_with_ext_b,
+            "projection extension-aware decode return code should be deterministic"
+        );
+        assert!(
+            ret_with_ext_a == FRAME_SIZE_20MS_96K || ret_with_ext_a == opurs::OPUS_INVALID_PACKET,
+            "unexpected projection extension-aware decode return code: {ret_with_ext_a}"
+        );
+        if ret_with_ext_a == FRAME_SIZE_20MS_96K {
+            assert_eq!(
+                pcm_with_ext_a, pcm_with_ext_b,
+                "projection extension-aware decode output should be deterministic"
+            );
+            assert_eq!(
+                rng_with_ext_a, rng_with_ext_b,
+                "projection extension-aware decode final range should be deterministic"
+            );
+        }
+        return;
+    }
+
+    panic!("failed to synthesize mutated QEXT packet for projection decode path");
 }
 
 #[cfg(feature = "osce")]
