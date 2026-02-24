@@ -253,11 +253,11 @@ pub fn denormalise_bands(
         end = 0;
         start = end;
     }
-    let mut f_idx = 0usize;
-    let mut x_idx = (M * eBands[start as usize] as i32) as usize;
-    for _ in 0..M * eBands[start as usize] as i32 {
-        freq[f_idx] = 0.0;
-        f_idx += 1;
+    let start_bin = (M * eBands[start as usize] as i32) as usize;
+    let mut f_idx = start_bin;
+    let mut x_idx = start_bin;
+    if start != 0 {
+        freq[..start_bin].fill(0.0);
     }
     let mut i = start;
     while i < end {

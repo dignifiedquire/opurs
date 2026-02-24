@@ -369,7 +369,7 @@ fn deemphasis(
             while j < N {
                 let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp - coef1 * x[j as usize];
-                scratch[j as usize] = 4.0 * (coef3 * tmp);
+                scratch[j as usize] = coef3 * tmp;
                 j += 1;
             }
             apply_downsampling = 1;
@@ -2200,6 +2200,21 @@ fn celt_decode_body(
         {
             let ch_off = c as usize * chan_stride;
             let dm_slice = &mut st.decode_mem[ch_off..ch_off + chan_stride];
+            #[cfg(feature = "qext")]
+            if qext_trace && qext_bytes > 0 {
+                eprintln!(
+                    "[rust qext] pf pre ch={} h={:016x} p0={} p1={} n0={} g0={:.9} g1={:.9} t0={} t1={}",
+                    c,
+                    qext_hash_slice(&dm_slice[out_syn_off..out_syn_off + n]),
+                    st.postfilter_period_old,
+                    st.postfilter_period,
+                    mode.shortMdctSize,
+                    st.postfilter_gain_old,
+                    st.postfilter_gain,
+                    st.postfilter_tapset_old,
+                    st.postfilter_tapset
+                );
+            }
             comb_filter_inplace(
                 dm_slice,
                 out_syn_off,
@@ -2214,6 +2229,14 @@ fn celt_decode_body(
                 overlap,
                 st.arch,
             );
+            #[cfg(feature = "qext")]
+            if qext_trace && qext_bytes > 0 {
+                eprintln!(
+                    "[rust qext] pf post0 ch={} h={:016x}",
+                    c,
+                    qext_hash_slice(&dm_slice[out_syn_off..out_syn_off + n])
+                );
+            }
             if LM != 0 {
                 comb_filter_inplace(
                     dm_slice,
@@ -2229,6 +2252,21 @@ fn celt_decode_body(
                     overlap,
                     st.arch,
                 );
+                #[cfg(feature = "qext")]
+                if qext_trace && qext_bytes > 0 {
+                    eprintln!(
+                        "[rust qext] pf post1 ch={} h={:016x} p0={} p1={} n1={} g0={:.9} g1={:.9} t0={} t1={}",
+                        c,
+                        qext_hash_slice(&dm_slice[out_syn_off..out_syn_off + n]),
+                        st.postfilter_period,
+                        postfilter_pitch,
+                        N - mode.shortMdctSize,
+                        st.postfilter_gain,
+                        postfilter_gain,
+                        st.postfilter_tapset,
+                        postfilter_tapset
+                    );
+                }
             }
         }
         c += 1;
@@ -2327,6 +2365,17 @@ fn celt_decode_body(
             } else {
                 eprintln!("[rust qext] pre deemph ch0_hash={:016x}", h0);
             }
+            eprintln!(
+                "[rust qext] deemph cfg n={} c={} downsample={} accum={} coef0={:.9} coef1={:.9} coef2={:.9} coef3={:.9}",
+                N,
+                CC,
+                st.downsample,
+                accum,
+                mode.preemph[0],
+                mode.preemph[1],
+                mode.preemph[2],
+                mode.preemph[3]
+            );
         }
         let pcm_len = (frame_size / st.downsample * CC) as usize;
         deemphasis(
@@ -2339,6 +2388,16 @@ fn celt_decode_body(
             &mut st.preemph_memD,
             accum,
         );
+        #[cfg(feature = "qext")]
+        if qext_trace && qext_bytes > 0 {
+            let head = pcm_len.min(12);
+            eprintln!(
+                "[rust qext] post deemph pcm_h={:016x} mem0={:016x}",
+                qext_hash_slice(&pcm[..pcm_len]),
+                qext_hash_slice(&st.preemph_memD[..CC as usize])
+            );
+            eprintln!("[rust qext] post deemph head={:?}", &pcm[..head]);
+        }
     }
     st.loss_duration = 0;
     st.plc_duration = 0;

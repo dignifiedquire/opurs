@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_decoder.c`
 
-use crate::celt::float_cast::{celt_float2int16, float2int};
+use crate::celt::float_cast::{float2int, FLOAT2INT16};
 use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples, OpusDecoder};
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
@@ -125,14 +125,7 @@ impl OpusMSDecoder {
                 Err(err) => return err,
             };
 
-        let mut stream_pcm_i16 = Vec::with_capacity(stream_pcm_f32.len());
-        for stream in stream_pcm_f32 {
-            let mut out = vec![0i16; stream.len()];
-            celt_float2int16(&stream, &mut out, stream.len());
-            stream_pcm_i16.push(out);
-        }
-
-        map_output_i16(&self.layout, &stream_pcm_i16, pcm, decoded_samples);
+        map_output_i16(&self.layout, &stream_pcm_f32, pcm, decoded_samples);
         decoded_samples as i32
     }
 
@@ -501,7 +494,7 @@ fn mapping_to_stream_channel(
 
 fn map_output_i16(
     layout: &OpusMultistreamLayout,
-    stream_pcm: &[Vec<i16>],
+    stream_pcm: &[Vec<f32>],
     output: &mut [i16],
     decoded_samples: usize,
 ) {
@@ -518,7 +511,7 @@ fn map_output_i16(
             let source = &stream_pcm[stream_idx];
             for frame in 0..decoded_samples {
                 output[frame * channels + out_channel] =
-                    source[frame * stream_channels + stream_channel];
+                    FLOAT2INT16(source[frame * stream_channels + stream_channel]);
             }
         }
     }

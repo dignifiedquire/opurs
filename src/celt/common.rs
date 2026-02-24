@@ -23,12 +23,68 @@ pub static tf_select_table: [[i8; 8]; 4] = [
 
 pub const COMBFILTER_MAXPERIOD: i32 = 1024;
 pub const COMBFILTER_MINPERIOD: i32 = 15;
+const SIG_SAT: f32 = 536_870_911.0;
 
 const GAINS: [[opus_val16; 3]; 3] = [
     [0.306_640_63_f32, 0.217_041_02_f32, 0.129_638_67_f32],
     [0.463_867_2_f32, 0.268_066_4_f32, 0.0f32],
     [0.799_804_7_f32, 0.100_097_656_f32, 0.0f32],
 ];
+
+#[inline]
+fn saturate_sig(x: f32) -> f32 {
+    x.clamp(-SIG_SAT, SIG_SAT)
+}
+
+#[cfg(feature = "qext")]
+#[inline]
+fn comb_filter_qext_inplace(
+    buf: &mut [f32],
+    start: usize,
+    T0: i32,
+    T1: i32,
+    N: i32,
+    g0: opus_val16,
+    g1: opus_val16,
+    tapset0: i32,
+    tapset1: i32,
+    window: &[f32],
+    overlap: i32,
+    arch: Arch,
+) {
+    let n2 = (N / 2) as usize;
+    let overlap2 = (overlap / 2) as usize;
+    for s in 0..2usize {
+        let mut new_window = vec![0.0f32; overlap2];
+        for i in 0..overlap2 {
+            new_window[i] = window[2 * i + s];
+        }
+        let mem_len = COMBFILTER_MAXPERIOD as usize + n2;
+        let mut mem_buf = vec![0.0f32; mem_len];
+        for (i, mem) in mem_buf.iter_mut().enumerate() {
+            let src_idx = start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
+            *mem = buf[src_idx as usize];
+        }
+        let cf_start = COMBFILTER_MAXPERIOD as usize;
+        comb_filter_inplace(
+            &mut mem_buf,
+            cf_start,
+            T0,
+            T1,
+            n2 as i32,
+            g0,
+            g1,
+            tapset0,
+            tapset1,
+            &new_window,
+            overlap2 as i32,
+            arch,
+        );
+        for i in 0..n2 {
+            buf[start + 2 * i + s] = mem_buf[cf_start + i];
+        }
+    }
+}
 
 pub fn resampling_factor(rate: i32) -> i32 {
     match rate {
@@ -69,7 +125,8 @@ pub(crate) fn comb_filter_const_c(
     let mut x1 = x[x_start - t + 1];
     for i in 0..N as usize {
         let x0 = x[x_start + i - t + 2];
-        y[y_start + i] = x[x_start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4);
+        y[y_start + i] =
+            saturate_sig(x[x_start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4));
         x4 = x3;
         x3 = x2;
         x2 = x1;
@@ -131,17 +188,19 @@ pub fn comb_filter(
         let iu = i as usize;
         let x0 = x[x_start + iu - T1 as usize + 2];
         let f = window[iu] * window[iu];
-        y[y_start + iu] = x[x_start + iu]
-            + (1.0f32 - f) * g00 * x[x_start + iu - T0 as usize]
-            + (1.0f32 - f)
-                * g01
-                * (x[x_start + iu - T0 as usize + 1] + x[x_start + iu - T0 as usize - 1])
-            + (1.0f32 - f)
-                * g02
-                * (x[x_start + iu - T0 as usize + 2] + x[x_start + iu - T0 as usize - 2])
-            + f * g10 * x2
-            + f * g11 * (x1 + x3)
-            + f * g12 * (x0 + x4);
+        y[y_start + iu] = saturate_sig(
+            x[x_start + iu]
+                + (1.0f32 - f) * g00 * x[x_start + iu - T0 as usize]
+                + (1.0f32 - f)
+                    * g01
+                    * (x[x_start + iu - T0 as usize + 1] + x[x_start + iu - T0 as usize - 1])
+                + (1.0f32 - f)
+                    * g02
+                    * (x[x_start + iu - T0 as usize + 2] + x[x_start + iu - T0 as usize - 2])
+                + f * g10 * x2
+                + f * g11 * (x1 + x3)
+                + f * g12 * (x0 + x4),
+        );
         x4 = x3;
         x3 = x2;
         x2 = x1;
@@ -183,6 +242,10 @@ pub fn comb_filter(
             g12,
         );
     }
+    let tail_start = y_start + i as usize;
+    y[tail_start..y_start + N as usize]
+        .iter_mut()
+        .for_each(|v| *v = saturate_sig(*v));
 }
 
 /// Upstream C: celt/celt.c:comb_filter (in-place variant)
@@ -205,6 +268,13 @@ pub fn comb_filter_inplace(
     mut overlap: i32,
     _arch: Arch,
 ) {
+    #[cfg(feature = "qext")]
+    if overlap == 240 {
+        comb_filter_qext_inplace(
+            buf, start, T0, T1, N, g0, g1, tapset0, tapset1, window, overlap, _arch,
+        );
+        return;
+    }
     if g0 == 0.0f32 && g1 == 0.0f32 {
         // In-place with no filtering: nothing to do
         return;
@@ -229,17 +299,19 @@ pub fn comb_filter_inplace(
         let x0 = buf[start + i - T1 as usize + 2];
         let f = window[i] * window[i];
         // Since T >= 15, reads at [start + i - T] are always before writes at [start + i]
-        buf[start + i] = buf[start + i]
-            + (1.0f32 - f) * g00 * buf[start + i - T0 as usize]
-            + (1.0f32 - f)
-                * g01
-                * (buf[start + i - T0 as usize + 1] + buf[start + i - T0 as usize - 1])
-            + (1.0f32 - f)
-                * g02
-                * (buf[start + i - T0 as usize + 2] + buf[start + i - T0 as usize - 2])
-            + f * g10 * x2
-            + f * g11 * (x1 + x3)
-            + f * g12 * (x0 + x4);
+        buf[start + i] = saturate_sig(
+            buf[start + i]
+                + (1.0f32 - f) * g00 * buf[start + i - T0 as usize]
+                + (1.0f32 - f)
+                    * g01
+                    * (buf[start + i - T0 as usize + 1] + buf[start + i - T0 as usize - 1])
+                + (1.0f32 - f)
+                    * g02
+                    * (buf[start + i - T0 as usize + 2] + buf[start + i - T0 as usize - 2])
+                + f * g10 * x2
+                + f * g11 * (x1 + x3)
+                + f * g12 * (x0 + x4),
+        );
         x4 = x3;
         x3 = x2;
         x2 = x1;
@@ -296,6 +368,10 @@ pub fn comb_filter_inplace(
             xv1 = xv0;
         }
     }
+    let tail_start = start + i;
+    buf[tail_start..start + N as usize]
+        .iter_mut()
+        .for_each(|v| *v = saturate_sig(*v));
 }
 
 /// Comb filter for 96 kHz QEXT operation.
@@ -348,13 +424,10 @@ pub fn comb_filter_qext(
         );
 
         if in_place {
-            // In-place: work in mem_buf directly
+            // In-place: work in mem_buf directly, matching x==y C behavior.
             let cf_start = COMBFILTER_MAXPERIOD as usize;
-            let mem_buf_copy = mem_buf.clone();
-            comb_filter(
+            comb_filter_inplace(
                 &mut mem_buf,
-                cf_start,
-                &mem_buf_copy,
                 cf_start,
                 T0,
                 T1,

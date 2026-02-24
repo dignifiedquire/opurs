@@ -1622,13 +1622,32 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
    c=0; do {
       st->postfilter_period=IMAX(st->postfilter_period, COMBFILTER_MINPERIOD);
       st->postfilter_period_old=IMAX(st->postfilter_period_old, COMBFILTER_MINPERIOD);
+      if (qext_bytes > 0) {
+         qext_tracef("pf pre ch=%d h=%016llx p0=%d p1=%d n0=%d g0=%.9f g1=%.9f t0=%d t1=%d",
+               c, qext_hash_sig(out_syn[c], N),
+               st->postfilter_period_old, st->postfilter_period, mode->shortMdctSize,
+               (double)st->postfilter_gain_old, (double)st->postfilter_gain,
+               st->postfilter_tapset_old, st->postfilter_tapset);
+      }
       comb_filter(out_syn[c], out_syn[c], st->postfilter_period_old, st->postfilter_period, mode->shortMdctSize,
             st->postfilter_gain_old, st->postfilter_gain, st->postfilter_tapset_old, st->postfilter_tapset,
             mode->window, overlap, st->arch);
+      if (qext_bytes > 0) {
+         qext_tracef("pf post0 ch=%d h=%016llx", c, qext_hash_sig(out_syn[c], N));
+      }
       if (LM!=0)
+      {
          comb_filter(out_syn[c]+mode->shortMdctSize, out_syn[c]+mode->shortMdctSize, st->postfilter_period, postfilter_pitch, N-mode->shortMdctSize,
                st->postfilter_gain, postfilter_gain, st->postfilter_tapset, postfilter_tapset,
                mode->window, overlap, st->arch);
+         if (qext_bytes > 0) {
+            qext_tracef("pf post1 ch=%d h=%016llx p0=%d p1=%d n1=%d g0=%.9f g1=%.9f t0=%d t1=%d",
+                  c, qext_hash_sig(out_syn[c], N),
+                  st->postfilter_period, postfilter_pitch, N-mode->shortMdctSize,
+                  (double)st->postfilter_gain, (double)postfilter_gain,
+                  st->postfilter_tapset, postfilter_tapset);
+         }
+      }
 
    } while (++c<CC);
    st->postfilter_period_old = st->postfilter_period;
@@ -1689,10 +1708,27 @@ int celt_decode_with_ec_dred(CELTDecoder * OPUS_RESTRICT st, const unsigned char
       } else {
          qext_tracef("pre deemph ch0_hash=%016llx", qext_hash_sig(out_syn[0], N));
       }
+      qext_tracef("deemph cfg n=%d c=%d downsample=%d accum=%d coef0=%.9f coef1=%.9f coef2=%.9f coef3=%.9f",
+            N, CC, st->downsample, accum,
+            (double)mode->preemph[0], (double)mode->preemph[1],
+            (double)mode->preemph[2], (double)mode->preemph[3]);
    }
 #endif
 
    deemphasis(out_syn, pcm, N, CC, st->downsample, mode->preemph, st->preemph_memD, accum);
+#ifdef ENABLE_QEXT
+   if (qext_bytes) {
+      int h;
+      qext_tracef("post deemph pcm_h=%016llx mem0=%016llx",
+            qext_hash_sig((const celt_sig *)pcm, (frame_size/st->downsample)*CC),
+            qext_hash_sig(st->preemph_memD, CC));
+      h = IMIN(12, (frame_size/st->downsample)*CC);
+      qext_tracef("post deemph head %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f",
+            h > 0 ? pcm[0] : 0, h > 1 ? pcm[1] : 0, h > 2 ? pcm[2] : 0, h > 3 ? pcm[3] : 0,
+            h > 4 ? pcm[4] : 0, h > 5 ? pcm[5] : 0, h > 6 ? pcm[6] : 0, h > 7 ? pcm[7] : 0,
+            h > 8 ? pcm[8] : 0, h > 9 ? pcm[9] : 0, h > 10 ? pcm[10] : 0, h > 11 ? pcm[11] : 0);
+   }
+#endif
    st->loss_duration = 0;
    st->plc_duration = 0;
    st->last_frame_type = FRAME_NORMAL;
