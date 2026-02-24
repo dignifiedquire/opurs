@@ -72,10 +72,10 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 ### D8 - Rust arch model omits non-aarch64 ARM levels
 
 - Severity: Low
-- Status: OPEN
+- Status: FIXED
 - Upstream ARM arch ladder: V4/EDSP/MEDIA/NEON/DOTPROD (`libopus-sys/opus/celt/arm/armcpu.h:82`)
-- Rust arch enum only models x86 levels and aarch64 Neon/DotProd (`src/arch.rs:18`)
-- Impact: no full ARMv7 RTCD parity model
+- Rust arch enum now models non-aarch64 ARM EDSP/MEDIA/NEON levels and `opus_select_arch()` adds ARM `/proc/cpuinfo`-based ladder detection to mirror upstream Linux behavior (`src/arch.rs`)
+- Impact: ARMv7-style RTCD arch model parity restored
 
 ### D9 - FUZZING random arch downgrade behavior not mirrored
 
@@ -93,7 +93,8 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Fixed D3 by threading `Arch` through DNN nnet compute entrypoints and call graph (`src/dnn/nnet.rs` plus DNN callers).
 - 2026-02-24: Fixed D4 by implementing true aarch64 DOTPROD kernels (`sdot` inline asm) for dense/sparse DNN int8 GEMV and wiring them to DOTPROD dispatch entries (`src/dnn/simd/aarch64.rs`, `src/dnn/simd/mod.rs`).
 - 2026-02-24: Fixed D7 by replacing x86 SIMD level detection with upstream-equivalent CPUID bit checks in `opus_select_arch()` (`src/arch.rs`).
-- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples; no additional confirmed divergences beyond open D8.
+- 2026-02-24: Deep dispatch/cfg audit completed across upstream build+RTCD maps and Rust usage in runtime/tests/examples.
 - 2026-02-24: Added aarch64 unit parity tests to assert DOTPROD dense/sparse DNN int8 GEMV matches scalar reference (`src/dnn/simd/aarch64.rs`).
 - 2026-02-24: Fixed D6 by making `libopus-sys/build.rs` conditionally enable SIMD `MAY_HAVE` defines and SIMD source groups based on compiler flag probes (not blanket target-arch enables).
 - 2026-02-24: Fixed D9 by adding a `fuzzing` feature that mirrors upstream random arch downgrade in Rust `opus_select_arch()` and forwards `FUZZING` to `libopus-sys`.
+- 2026-02-24: Fixed D8 by extending Rust `Arch` with non-aarch64 ARM EDSP/MEDIA/NEON levels and adding ARM ladder detection in `opus_select_arch()`.

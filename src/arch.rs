@@ -41,6 +41,17 @@ pub enum Arch {
     /// ARM NEON + DOTPROD (dot product instructions). C arch level 4.
     #[cfg(target_arch = "aarch64")]
     DotProd,
+
+    // -- arm (32-bit) --
+    /// ARM EDSP. C arch level 1.
+    #[cfg(target_arch = "arm")]
+    Edsp,
+    /// ARM MEDIA. C arch level 2.
+    #[cfg(target_arch = "arm")]
+    Media,
+    /// ARM NEON. C arch level 3.
+    #[cfg(target_arch = "arm")]
+    Neon,
 }
 
 impl Arch {
@@ -76,11 +87,18 @@ impl Arch {
 
     // -- aarch64 helpers --
 
-    /// True for NEON or higher (aarch64).
-    #[cfg(target_arch = "aarch64")]
+    /// True for NEON or higher (ARM/aarch64).
+    #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
     #[inline]
     pub fn has_neon(self) -> bool {
-        matches!(self, Self::Neon | Self::DotProd)
+        #[cfg(target_arch = "aarch64")]
+        {
+            matches!(self, Self::Neon | Self::DotProd)
+        }
+        #[cfg(target_arch = "arm")]
+        {
+            matches!(self, Self::Neon)
+        }
     }
 
     /// True for DOTPROD (aarch64).
@@ -150,6 +168,24 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     let arch = fuzz_random_u32() % (max + 1);
     match arch {
         4 => Arch::DotProd,
+        3 => Arch::Neon,
+        _ => Arch::Scalar,
+    }
+}
+
+#[cfg(all(feature = "simd", feature = "fuzzing", target_arch = "arm"))]
+fn fuzz_downgrade_arch(arch: Arch) -> Arch {
+    let max = match arch {
+        Arch::Scalar => 0,
+        Arch::Edsp => 1,
+        Arch::Media => 2,
+        Arch::Neon => 3,
+    };
+    let arch = fuzz_random_u32() % (max + 1);
+    match arch {
+        0 => Arch::Scalar,
+        1 => Arch::Edsp,
+        2 => Arch::Media,
         3 => Arch::Neon,
         _ => Arch::Scalar,
     }
@@ -242,6 +278,67 @@ pub fn opus_select_arch() -> Arch {
         };
         #[cfg(feature = "fuzzing")]
         let arch = fuzz_downgrade_arch(arch);
+        return arch;
+    }
+
+    #[cfg(target_arch = "arm")]
+    {
+        // Mirror upstream armcpu.c Linux logic for non-aarch64 ARM:
+        // - Parse /proc/cpuinfo "Features" line for edsp/neon/asimd.
+        // - Parse "CPU architecture:" and set MEDIA for version >= 6.
+        let mut has_edsp = false;
+        let mut has_media = false;
+        let mut has_neon = false;
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+                for line in cpuinfo.lines() {
+                    if let Some(features) = line.strip_prefix("Features") {
+                        let f = features;
+                        if f.contains(" edsp") {
+                            has_edsp = true;
+                        }
+                        if f.contains(" neon") {
+                            has_neon = true;
+                        }
+                        // Keep parity with upstream's aarch64 token handling.
+                        if f.contains(" asimd") {
+                            has_edsp = true;
+                            has_media = true;
+                            has_neon = true;
+                        }
+                    } else if let Some(v) = line.strip_prefix("CPU architecture:") {
+                        if v.trim().parse::<i32>().map(|x| x >= 6).unwrap_or(false) {
+                            has_media = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut arch = Arch::Scalar;
+        if has_edsp {
+            arch = Arch::Edsp;
+        } else {
+            return arch;
+        }
+
+        if has_media {
+            arch = Arch::Media;
+        } else {
+            return arch;
+        }
+
+        if has_neon {
+            arch = Arch::Neon;
+        } else {
+            return arch;
+        }
+
+        #[cfg(feature = "fuzzing")]
+        let arch = fuzz_downgrade_arch(arch);
+
         return arch;
     }
 
