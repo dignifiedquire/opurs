@@ -1,16 +1,24 @@
+#[cfg(feature = "qext")]
 use opurs::internals::{opus_packet_extensions_parse, opus_packet_parse_impl};
 #[cfg(feature = "osce")]
 use opurs::OPUS_APPLICATION_RESTRICTED_LOWDELAY;
+#[cfg(feature = "qext")]
 use opurs::{
-    opus_multistream_packet_unpad, opus_packet_unpad, Bitrate, OpusDecoder, OpusEncoder,
-    OpusMSDecoder, OpusMSEncoder, OpusProjectionDecoder, OpusProjectionEncoder,
+    opus_multistream_packet_unpad, opus_packet_unpad, Bitrate, OpusEncoder, OpusMSEncoder,
+};
+use opurs::{
+    OpusDecoder, OpusMSDecoder, OpusProjectionDecoder, OpusProjectionEncoder,
     OPUS_APPLICATION_AUDIO,
 };
 
+#[cfg(feature = "qext")]
 const SAMPLE_RATE_96K: i32 = 96_000;
+#[cfg(feature = "qext")]
 const FRAME_SIZE_20MS_96K: i32 = 1920;
+#[cfg(feature = "qext")]
 const QEXT_EXTENSION_ID: i32 = 124;
 
+#[cfg(feature = "qext")]
 fn stereo_pcm(seed: u32) -> Vec<i16> {
     let samples = FRAME_SIZE_20MS_96K as usize * 2;
     (0..samples)
@@ -21,6 +29,7 @@ fn stereo_pcm(seed: u32) -> Vec<i16> {
         .collect()
 }
 
+#[cfg(feature = "qext")]
 fn quad_pcm(seed: u32) -> Vec<i16> {
     let samples = FRAME_SIZE_20MS_96K as usize * 4;
     (0..samples)
@@ -33,6 +42,7 @@ fn quad_pcm(seed: u32) -> Vec<i16> {
         .collect()
 }
 
+#[cfg(feature = "qext")]
 fn parse_padding_extensions(packet: &[u8]) -> Vec<i32> {
     let mut toc = 0u8;
     let mut sizes = [0i16; 48];
@@ -60,6 +70,7 @@ fn parse_padding_extensions(packet: &[u8]) -> Vec<i32> {
     exts.into_iter().map(|e| e.id).collect()
 }
 
+#[cfg(feature = "qext")]
 fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
     let mut dec = OpusDecoder::new(SAMPLE_RATE_96K, 2).expect("decoder create");
     dec.set_ignore_extensions(ignore_extensions);
@@ -70,6 +81,7 @@ fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
     (pcm, dec.final_range())
 }
 
+#[cfg(feature = "qext")]
 fn decode_ms(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
     let mut dec = OpusMSDecoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1]).expect("ms decoder create");
     dec.set_ignore_extensions(ignore_extensions);
@@ -80,6 +92,7 @@ fn decode_ms(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
     (pcm, dec.final_range())
 }
 
+#[cfg(feature = "qext")]
 fn make_projection_codec_pair() -> (OpusProjectionEncoder, i32, i32, Vec<u8>) {
     let mut streams = 0;
     let mut coupled_streams = 0;
@@ -119,6 +132,7 @@ fn make_projection_decoder_for(sample_rate: i32) -> OpusProjectionDecoder {
         .expect("projection decoder create")
 }
 
+#[cfg(feature = "qext")]
 fn decode_projection(
     packet: &[u8],
     streams: i32,

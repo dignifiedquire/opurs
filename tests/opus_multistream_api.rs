@@ -41,7 +41,7 @@ use opurs::{
     OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST,
     OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
     OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
-    OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_VOICE,
+    OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
 };
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -492,6 +492,101 @@ fn multistream_surround_init_parity_with_c() {
                 &c_mapping[..channels as usize]
             );
         }
+    }
+}
+
+#[test]
+fn multistream_surround_unimplemented_paths_match_upstream_c() {
+    let _guard = test_guard();
+    let cases = [(3, 0), (9, 1), (2, 42)];
+
+    let c_max_size = unsafe { opus_multistream_surround_encoder_get_size(255, 255) };
+    assert!(c_max_size > 0, "unexpected zero max surround encoder size");
+    let c_layout = Layout::from_size_align(c_max_size as usize, 64).expect("valid C layout");
+
+    for (channels, mapping_family) in cases {
+        let mut rust_streams = -1i32;
+        let mut rust_coupled = -1i32;
+        let mut rust_mapping = vec![0u8; channels as usize];
+        let rust_create = rust_opus_multistream_surround_encoder_create(
+            48_000,
+            channels,
+            mapping_family,
+            &mut rust_streams,
+            &mut rust_coupled,
+            &mut rust_mapping,
+            OPUS_APPLICATION_AUDIO,
+        );
+        let rust_create_err = match rust_create {
+            Ok(_) => panic!(
+                "unexpected rust create success (channels={channels}, family={mapping_family})"
+            ),
+            Err(err) => err,
+        };
+        assert_eq!(
+            rust_create_err, OPUS_UNIMPLEMENTED,
+            "unexpected rust create error (channels={channels}, family={mapping_family})"
+        );
+
+        let mut c_streams = -1i32;
+        let mut c_coupled = -1i32;
+        let mut c_mapping = vec![0u8; channels as usize];
+        let mut c_error = 0i32;
+        let c_ptr = unsafe {
+            opus_multistream_surround_encoder_create(
+                48_000,
+                channels,
+                mapping_family,
+                &mut c_streams as *mut _,
+                &mut c_coupled as *mut _,
+                c_mapping.as_mut_ptr(),
+                OPUS_APPLICATION_AUDIO,
+                &mut c_error as *mut _,
+            )
+        };
+        assert!(c_ptr.is_null(), "unexpected C create success");
+        assert_eq!(
+            c_error, OPUS_UNIMPLEMENTED,
+            "unexpected C create error (channels={channels}, family={mapping_family})"
+        );
+
+        let mut rust_enc =
+            OpusMSEncoder::new(48_000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
+        let rust_init = rust_opus_multistream_surround_encoder_init(
+            &mut rust_enc,
+            48_000,
+            channels,
+            mapping_family,
+            &mut rust_streams,
+            &mut rust_coupled,
+            &mut rust_mapping,
+            OPUS_APPLICATION_AUDIO,
+        );
+        assert_eq!(
+            rust_init, OPUS_UNIMPLEMENTED,
+            "unexpected rust init error (channels={channels}, family={mapping_family})"
+        );
+
+        let c_storage = unsafe { alloc_zeroed(c_layout) };
+        assert!(!c_storage.is_null(), "c allocation failed");
+        let c_enc_ptr = c_storage.cast();
+        let c_init = unsafe {
+            opus_multistream_surround_encoder_init(
+                c_enc_ptr,
+                48_000,
+                channels,
+                mapping_family,
+                &mut c_streams as *mut _,
+                &mut c_coupled as *mut _,
+                c_mapping.as_mut_ptr(),
+                OPUS_APPLICATION_AUDIO,
+            )
+        };
+        unsafe { dealloc(c_storage, c_layout) };
+        assert_eq!(
+            c_init, OPUS_UNIMPLEMENTED,
+            "unexpected C init error (channels={channels}, family={mapping_family})"
+        );
     }
 }
 
