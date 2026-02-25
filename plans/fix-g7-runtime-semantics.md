@@ -33,3 +33,4 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 - 2026-02-24: Replaced two `opus_decode_frame` default-switch panics with assert-style fallback behavior (`src/opus/opus_decoder.rs`) to mirror upstream `celt_assert` branches.
 - 2026-02-24: Replaced DRED 16 kHz conversion unsupported-rate panic with assert-style fallback initialization (`src/dnn/dred/encoder.rs`).
 - 2026-02-24: Aligned `opus_packet_parse_impl` padding-output error semantics with upstream by zeroing `padding_out` on entry (`src/opus/packet.rs`), and added a C-vs-Rust parity test (`tests/packet_parse_impl_parity.rs`) covering error paths.
+- 2026-02-24: Added C-vs-Rust runtime parity coverage for encoder bitrate CTL semantics in `tests/restricted_application_parity.rs` (`bitrate_ctl_semantics_match_c`), validating non-positive explicit bitrate rejection and high-bitrate clamping behavior against upstream requests `OPUS_SET/GET_BITRATE_REQUEST`.

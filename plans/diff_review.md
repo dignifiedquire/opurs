@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,56,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
 
 Priority groups for execution:
 
@@ -184,10 +184,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus.c:392-398`
 - Detail: Upstream returns direct frame pointers (`const unsigned char *frames[48]`) into the packet buffer. Rust returns frame byte offsets (`[usize; 48]`). This is an API-surface mismatch for callers expecting C-equivalent pointer outputs.
 
-56. [MEDIUM][Encoder CTL] Bitrate validation/clamping diverges from upstream (`300000*channels` vs `750000*channels`, and non-positive handling).
-- Rust: `src/opus/opus_encoder.rs:321`
+56. [RESOLVED][Encoder CTL] Bitrate validation/clamping now matches upstream semantics.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2826-2827`
-- Detail: Upstream `OPUS_SET_BITRATE_REQUEST` rejects non-positive explicit values (`goto bad_arg`) and clamps high values to `750000*channels`. Rust `set_bitrate()` clamps arbitrary explicit values into `[500, 300000*channels]`, changing control semantics and resulting encode configuration at both low and high out-of-range inputs.
+- Detail: Rust now mirrors upstream non-positive explicit bitrate rejection and `750000*channels` clamp behavior; parity test `bitrate_ctl_semantics_match_c` validates request-path behavior against C `OPUS_SET/GET_BITRATE_REQUEST`.
 
 57. [LOW][Packet API] `opus_packet_has_lbrr` entry point is missing.
 - Rust: `src/opus/packet.rs` (no `opus_packet_has_lbrr` symbol found)
