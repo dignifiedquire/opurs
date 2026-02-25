@@ -8,6 +8,8 @@ Snapshot from the current findings list (open items only; stale/resolved entries
 
 Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,49,52,56,64,65,88,91,97,98,99,100,105,111,112,115,138,139,150,156,163,165,166,173,174,175,199,214,224,229,236`.
 
+Excluded from functional-equivalence tracking (C API-surface only): `177,178,186`.
+
 Priority groups for execution:
 
 1. QEXT correctness blockers (bitstream/PLC/sizing)
@@ -17,10 +19,10 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
-IDs: `12,43,45,104,110,116,119,120,122,177,178,186`
+IDs: `12,43,45,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,94,135,136,137,175,176,177,178,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
+IDs: `12,45,76,94,135,136,137,175,176,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
 
 5. SIMD/arch-dispatch/build-flag parity
 IDs: `107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
@@ -754,15 +756,15 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.c:79-87`
 - Detail: Upstream `dred_encoder_init` sets `loaded=1` when built-in RDOVAE weights are compiled (`!USE_WEIGHTS_FILE`) before reset. Rust `DREDEnc::init` unconditionally sets `loaded=false` and resets without an equivalent built-in auto-load path at this API boundary.
 
-177. [LOW][API Coverage][DRED] Upstream encoder deinitialization helper is not mirrored as a dedicated Rust API.
-- Rust: `src/dnn/dred/encoder.rs` (no `dred_deinit_encoder` equivalent found)
+177. [EXCLUDED][API Coverage][DRED] Encoder deinitialization helper is excluded from functional-equivalence scope.
+- Rust: `src/dnn/dred/encoder.rs`
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.h:65`
-- Detail: Upstream declares `dred_deinit_encoder(DREDEnc*)` as part of the DRED encoder lifecycle surface. Rust relies on ownership/drop and does not expose a direct deinit helper, so lifecycle API parity is incomplete.
+- Detail: This is a lifecycle API-surface item (no runtime algorithmic divergence). We track functional behavior parity and do not require adding C-specific lifecycle wrappers.
 
-178. [LOW][API Coverage][MLP] Upstream analysis-layer helper entry points are not mirrored as direct Rust APIs.
-- Rust: `src/opus/mlp/mod.rs:13-15`, `src/opus/mlp/analysis_mlp.rs:267-276` (only high-level `run_analysis_mlp` exposed)
+178. [EXCLUDED][API Coverage][MLP] Analysis helper entry points are excluded from functional-equivalence scope.
+- Rust: `src/opus/mlp/analysis_mlp.rs`
 - Upstream: `libopus-sys/opus/src/mlp.h:56-58`, `libopus-sys/opus/src/mlp.c:70-131`
-- Detail: Upstream provides callable helper functions `analysis_compute_dense(...)` and `analysis_compute_gru(...)`. Rust implements equivalent logic inside layer methods (`src/opus/mlp/layers.rs`) but does not expose matching standalone entry points, so API-level parity for these MLP helpers is incomplete.
+- Detail: Rust already implements equivalent layer behavior in the active analysis path; this item is direct API-shape parity only and is excluded from functional-equivalence comparisons.
 
 179. [MEDIUM][DNN API Coverage][LPCNet] Standalone LPCNet decoder/synthesis API surface from upstream headers is not mirrored.
 - Rust: `src/dnn/lpcnet.rs` (provides `LPCNetEncState`, `LPCNetPLCState`, feature/PLC helpers; no `LPCNetDecState`/`LPCNetState` create/decode/synthesize API)
@@ -799,10 +801,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/nnet.h:89-93`, `libopus-sys/opus/dnn/nnet.c:60`, `libopus-sys/opus/dnn/nnet.c:76`, `libopus-sys/opus/dnn/nnet.c:107`, `libopus-sys/opus/dnn/nnet.c:124`, `libopus-sys/opus/dnn/nnet.c:136`
 - Detail: Upstream signatures carry an explicit `arch` parameter through generic dense/GRU/GLU/conv helpers (matching runtime dispatch conventions). Rust equivalents expose no `arch` parameter, so function-level API surface and call-shape are not source-equivalent.
 
-186. [LOW][API Coverage][DNN NNDSP] Explicit adaptive-filter state init helpers from upstream headers are not mirrored as direct functions.
-- Rust: `src/dnn/nndsp.rs:30`, `src/dnn/nndsp.rs:54`, `src/dnn/nndsp.rs:74` (`Default` impls for `AdaConvState`/`AdaCombState`/`AdaShapeState`)
-- Upstream: `libopus-sys/opus/dnn/nndsp.h:80-84`
-- Detail: Upstream exports `init_adaconv_state`, `init_adacomb_state`, and `init_adashape_state`. Rust initializes these states via struct defaults but does not expose matching named init helpers, leaving API-level parity incomplete.
+186. [EXCLUDED][API Coverage][DNN NNDSP] Explicit adaptive-filter init helpers are excluded from functional-equivalence scope.
+- Rust: `src/dnn/nndsp.rs`
+- Upstream: `libopus-sys/opus/dnn/nndsp.h:80-84`, `libopus-sys/opus/dnn/nndsp.c:48-60`
+- Detail: Rust state reset behavior is functionally equivalent via defaults/resets in active runtime paths; standalone init-function API parity is excluded.
 
 187. [LOW][API Signature][LPCNet] Single-frame feature extraction helpers omit upstream `arch` argument.
 - Rust: `src/dnn/lpcnet.rs:435`, `src/dnn/lpcnet.rs:454`
