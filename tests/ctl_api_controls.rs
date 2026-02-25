@@ -177,7 +177,7 @@ fn parse_padding_extensions(packet: &[u8]) -> Vec<i32> {
     exts.into_iter().map(|e| e.id).collect()
 }
 
-#[cfg(feature = "qext")]
+#[cfg(all(feature = "tools", feature = "qext"))]
 fn first_qext_payload(packet: &[u8]) -> Option<Vec<u8>> {
     let mut toc = 0u8;
     let mut sizes = [0i16; 48];
@@ -709,7 +709,7 @@ fn build_projection_packet_with_forced_qext(
     Some(padded)
 }
 
-#[cfg(feature = "qext")]
+#[cfg(all(feature = "tools", feature = "qext"))]
 #[test]
 fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
     let mut rust_enc =
