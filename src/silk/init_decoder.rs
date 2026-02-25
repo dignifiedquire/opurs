@@ -12,7 +12,7 @@ use crate::silk::PLC::silk_PLC_Reset;
 /// Reset decoder state, preserving model data (OSCE, etc.).
 ///
 /// Upstream C: silk/init_decoder.c:silk_reset_decoder
-pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
+pub fn silk_reset_decoder(dec: &mut silk_decoder_state) -> i32 {
     // Clear everything from prev_gain_Q16 onward (SILK_DECODER_STATE_RESET_START)
     dec.prev_gain_Q16 = 65536;
     dec.exc_Q14 = [0; 320];
@@ -53,11 +53,12 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
 
     silk_CNG_Reset(dec);
     silk_PLC_Reset(dec);
+
+    0
 }
 
-/// Upstream C: silk/init_decoder.c:silk_init_decoder
-pub fn silk_init_decoder() -> silk_decoder_state {
-    let mut dec = silk_decoder_state {
+fn zeroed_decoder_state() -> silk_decoder_state {
+    silk_decoder_state {
         prev_gain_Q16: 0,
         exc_Q14: [0; 320],
         sLPC_Q14_buf: [0; 16],
@@ -96,10 +97,49 @@ pub fn silk_init_decoder() -> silk_decoder_state {
         osce_bwe: crate::dnn::osce::OSCEBWEState::default(),
         #[cfg(feature = "osce")]
         osce_bwe_features: crate::dnn::osce::OSCEBWEFeatureState::default(),
-    };
+    }
+}
 
-    // Full init zeroes everything, then reset sets the proper initial values
-    silk_reset_decoder(&mut dec);
+/// Initialize a decoder state in place.
+///
+/// Upstream C: silk/init_decoder.c:silk_init_decoder
+pub fn silk_init_decoder(dec: &mut silk_decoder_state) -> i32 {
+    *dec = zeroed_decoder_state();
+    silk_reset_decoder(dec)
+}
 
+/// Rust convenience constructor mirroring upstream init sequence.
+pub fn silk_decoder_state_new() -> silk_decoder_state {
+    let mut dec = zeroed_decoder_state();
+    let _ = silk_init_decoder(&mut dec);
     dec
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn silk_reset_decoder_returns_success_and_sets_defaults() {
+        let mut dec = zeroed_decoder_state();
+        dec.prev_gain_Q16 = 123;
+        dec.first_frame_after_reset = 0;
+        let ret = silk_reset_decoder(&mut dec);
+        assert_eq!(ret, 0);
+        assert_eq!(dec.prev_gain_Q16, 65536);
+        assert_eq!(dec.first_frame_after_reset, 1);
+    }
+
+    #[test]
+    fn silk_init_decoder_in_place_returns_success() {
+        let mut dec = zeroed_decoder_state();
+        dec.nFramesDecoded = 7;
+        dec.prevSignalType = 2;
+        let ret = silk_init_decoder(&mut dec);
+        assert_eq!(ret, 0);
+        assert_eq!(dec.nFramesDecoded, 0);
+        assert_eq!(dec.prevSignalType, 0);
+        assert_eq!(dec.prev_gain_Q16, 65536);
+        assert_eq!(dec.first_frame_after_reset, 1);
+    }
 }

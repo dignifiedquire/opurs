@@ -4,7 +4,7 @@
 
 #![cfg(all(feature = "dnn", feature = "builtin-weights"))]
 
-use opurs::dnn::nnet::WeightArray;
+use opurs::dnn::nnet::{write_weights, WeightArray};
 use opurs::dnn::weights::compiled_weights;
 
 fn get_weights() -> Vec<WeightArray> {
@@ -18,6 +18,40 @@ fn pitchdnn_model_loads() {
     let arrays = get_weights();
     let model = opurs::dnn::pitchdnn::init_pitchdnn(&arrays);
     assert!(model.is_some(), "PitchDNN model failed to load");
+}
+
+#[test]
+fn pitchdnn_blob_loader_matches_array_init() {
+    let arrays = get_weights();
+    let blob = write_weights(&arrays);
+
+    let mut from_arrays = opurs::dnn::pitchdnn::PitchDNNState::new();
+    assert!(from_arrays.init(&arrays));
+
+    let mut from_blob = opurs::dnn::pitchdnn::PitchDNNState::new();
+    assert!(from_blob.load_model(&blob));
+
+    let if_features = vec![0.01f32; 88];
+    let xcorr_features = vec![0.02f32; opurs::dnn::pitchdnn::NB_XCORR_FEATURES];
+    let out_arrays = opurs::dnn::pitchdnn::compute_pitchdnn(
+        &mut from_arrays,
+        &if_features,
+        &xcorr_features,
+        opurs::arch::Arch::default(),
+    );
+    let out_blob = opurs::dnn::pitchdnn::compute_pitchdnn(
+        &mut from_blob,
+        &if_features,
+        &xcorr_features,
+        opurs::arch::Arch::default(),
+    );
+    assert!((out_arrays - out_blob).abs() < 1e-6);
+}
+
+#[test]
+fn pitchdnn_blob_loader_rejects_invalid_blob() {
+    let mut st = opurs::dnn::pitchdnn::PitchDNNState::new();
+    assert!(!st.load_model(&[0x00, 0x01, 0x02, 0x03]));
 }
 
 #[test]

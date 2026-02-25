@@ -165,6 +165,23 @@ impl PitchDNNState {
             None => false,
         }
     }
+
+    /// Initialize from a serialized DNN weight blob in one call.
+    ///
+    /// Upstream C: dnn/pitchdnn.c:pitchdnn_load_model
+    pub fn load_model(&mut self, data: &[u8]) -> bool {
+        pitchdnn_load_model(self, data)
+    }
+}
+
+/// One-shot PitchDNN model loading from a serialized weight blob.
+///
+/// Upstream C: dnn/pitchdnn.c:pitchdnn_load_model
+pub fn pitchdnn_load_model(st: &mut PitchDNNState, data: &[u8]) -> bool {
+    let Some(arrays) = parse_weights(data) else {
+        return false;
+    };
+    st.init(&arrays)
 }
 
 /// Compute neural pitch estimate from IF and cross-correlation features.

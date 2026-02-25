@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,56,64,65,88,91,105,111,112,138,139,150,156,165,166,174,175,214,224,229,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,49,52,56,64,65,88,91,97,98,99,100,105,111,112,115,138,139,150,156,163,165,166,173,174,175,199,214,224,229,236`.
 
 Priority groups for execution:
 
@@ -14,10 +14,10 @@ Priority groups for execution:
 IDs: `none (resolved)`
 
 2. Extensions and repacketizer semantic parity
-IDs: `35,36,37,38,39,40,41,97,98,99,100,115`
+IDs: `none (resolved)`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
-IDs: `12,43,45,98,104,110,116,119,120,122,163,173,177,178,186,199`
+IDs: `12,43,45,104,110,116,119,120,122,177,178,186`
 
 4. DNN/DRED/OSCE model loading and constant parity
 IDs: `12,45,76,94,135,136,137,175,176,177,178,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
@@ -83,40 +83,40 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/src/repacketizer.c` (`opus_multistream_packet_pad`, `opus_multistream_packet_unpad`)
 - Detail: Upstream multistream packet pad/unpad helpers are not mirrored as Rust public functions.
 
-35. [HIGH][Extensions] Public extension parse/count path does not implement upstream "repeat these extensions" expansion semantics.
-- Rust: `src/opus/extensions.rs:35-84`, `src/opus/extensions.rs:90-168`
-- Upstream: `libopus-sys/opus/src/extensions.c:154-220`, `libopus-sys/opus/src/extensions.c:226-379`
-- Detail: Upstream `opus_packet_extensions_count/parse` iterate through `OpusExtensionIterator` and include repeated extensions (ID=2 mechanism). Rust public `opus_packet_extensions_count()` / `opus_packet_extensions_parse()` use a simplified scanner based on `skip_extension()` and do not perform iterator-driven repetition, so extension lists/counts can differ on packets using repeat markers.
+35. [RESOLVED][Extensions] Public extension parse/count path now uses iterator semantics including repeat-extension expansion.
+- Rust: `src/opus/extensions.rs`, `tests/extensions_repacketizer_parity.rs`
+- Upstream: `libopus-sys/opus/src/extensions.c:154-220`, `libopus-sys/opus/src/extensions.c:226-383`
+- Detail: `opus_packet_extensions_count()` and `opus_packet_extensions_parse()` are iterator-based and cover ID=2 repeat semantics and frame-limit handling; tests validate repeat roundtrip behavior.
 
-36. [MEDIUM][Extensions] Extension generation path omits upstream repeat-compaction logic.
-- Rust: `src/opus/extensions.rs:176-273`, `src/opus/extensions.rs:667-713`
+36. [RESOLVED][Extensions] Extension generation now includes upstream repeat-compaction logic.
+- Rust: `src/opus/extensions.rs`, `tests/extensions_repacketizer_parity.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:471-624`
-- Detail: Upstream `opus_packet_extensions_generate()` performs cross-frame repeat analysis and may emit ID=2 repeat indicators to compact payloads. Rust generator writes extensions frame-by-frame without repeat-compaction analysis, producing different padding bitstreams and sizes for repeatable extension sets.
+- Detail: Generator performs cross-frame repeat analysis and emits repeat indicators; parity tests assert repeat markers and consistent parse/count behavior.
 
-37. [LOW][Extensions] `_ext` extension helper APIs are missing.
-- Rust: `src/opus/extensions.rs` (no `opus_packet_extensions_count_ext` / `opus_packet_extensions_parse_ext`)
+37. [RESOLVED][Extensions] `_ext` helper APIs are implemented.
+- Rust: `src/opus/extensions.rs`, `src/lib.rs`, `tests/extensions_repacketizer_parity.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:341-421`
-- Detail: Upstream exposes frame-counted parse helpers (`*_count_ext`, `*_parse_ext`) used for frame-order extraction workflows; matching Rust public functions are not present.
+- Detail: Rust provides `opus_packet_extensions_count_ext` and `opus_packet_extensions_parse_ext`; tools-gated parity tests compare outputs against upstream C.
 
-38. [HIGH][Repacketizer+Extensions] Repacketizer state does not retain parsed padding/extension metadata from input packets.
-- Rust: `src/opus/repacketizer.rs:38-44`, `src/opus/repacketizer.rs:128-137`
-- Upstream: `libopus-sys/opus/src/repacketizer.c:147-148` and struct usage in `libopus-sys/opus/src/repacketizer.c:143-177`
-- Detail: Upstream `OpusRepacketizer` stores per-input padding pointer/length/frame-count and parses those extensions during output packing. Rust state only keeps frame offsets/lengths and drops padding metadata during `cat`, so extension-preserving behavior diverges.
+38. [RESOLVED][Repacketizer+Extensions] Repacketizer state retains padding/extension metadata from input packets.
+- Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
+- Upstream: `libopus-sys/opus/src/repacketizer.c:86-99`, `libopus-sys/opus/src/repacketizer.c:143-177`
+- Detail: Rust stores per-packet padding bytes and frame counts from parse, enabling extension-preserving repacketization.
 
-39. [HIGH][Repacketizer+Extensions] `out_range_impl_ext` does not merge extensions embedded in source packet paddings.
-- Rust: `src/opus/repacketizer.rs:240`, `src/opus/repacketizer.rs:332-340`, `src/opus/repacketizer.rs:390-397`
+39. [RESOLVED][Repacketizer+Extensions] `out_range_impl_ext` merges caller and source-packet extensions.
+- Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:143-177`, `libopus-sys/opus/src/repacketizer.c:260-265`, `libopus-sys/opus/src/repacketizer.c:308-311`
-- Detail: Upstream computes `total_ext_count = passed_in + parsed_from_rp_paddings`, renumbers frame indices, and generates combined extension payload. Rust only serializes caller-provided `extensions` and never incorporates extensions already present in repacketized input packets.
+- Detail: Rust parses stored per-input padding extensions, renumbers frame indices relative to output range, and emits combined extension payload.
 
-40. [MEDIUM][Repacketizer+Extensions] Non-pad extension overhead formula is off by one for `ext_len` multiples of 254.
-- Rust: `src/opus/repacketizer.rs:339`
+40. [RESOLVED][Repacketizer+Extensions] Non-pad extension overhead formula now matches upstream.
+- Rust: `src/opus/repacketizer.rs`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:267`
-- Detail: Upstream uses `pad_amount = ext_len + (ext_len ? (ext_len+253)/254 : 1)`. Rust uses `ext_len + ext_len/254 + 1`, which is larger by 1 when `ext_len % 254 == 0` and `ext_len > 0`, changing packing decisions and output layout.
+- Detail: Rust uses `ext_len + (ext_len ? (ext_len+253)/254 : 1)` semantics, matching upstream behavior at `ext_len % 254 == 0`.
 
-41. [MEDIUM][Repacketizer+Extensions] Extension frame-index validation is not constrained to output packet frame count.
-- Rust: `src/opus/extensions.rs:176-193`, `src/opus/repacketizer.rs:334-336`, `src/opus/repacketizer.rs:392-396`
+41. [RESOLVED][Repacketizer+Extensions] Extension frame-index validation is constrained by output packet frame count.
+- Rust: `src/opus/extensions.rs`, `src/opus/repacketizer.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:471-473`, `libopus-sys/opus/src/extensions.c:495`, `libopus-sys/opus/src/repacketizer.c:263-264`, `libopus-sys/opus/src/repacketizer.c:309-310`
-- Detail: Upstream generation takes `nb_frames` and rejects any extension with `frame >= nb_frames`. Rust generator APIs do not take packet frame count and only enforce `frame < 48`, so repacketizer extension emission can accept frame indices that upstream would reject.
+- Detail: Generator takes `nb_frames` and rejects out-of-range frame indices (`frame >= nb_frames`) as upstream does.
 
 43. [MEDIUM] Missing CELT custom 24-bit API parity.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (no `opus_custom_encode24` / `opus_custom_decode24` entry points found)
@@ -369,25 +369,25 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/celt/celt.c:342-358`
 - Detail: Rust returns strings including numeric suffixes (e.g., `"success (0)"`), while upstream returns plain canonical messages (e.g., `"success"`). API behavior is functionally similar but string outputs are not byte-identical.
 
-97. [HIGH][Extensions][RTE Semantics] Public extension count/parse/find helpers ignore `nb_frames` and do not apply full repeat-extension (ID=2) iterator semantics.
-- Rust: `src/opus/extensions.rs:90-121`, `src/opus/extensions.rs:279-285`
-- Upstream: `libopus-sys/opus/src/extensions.c:329-383` (count/parse via `opus_extension_iterator_next`)
-- Detail: Rust helpers explicitly discard `nb_frames` (`let _ = nb_frames`) and use a simplified parser path. Upstream routes these APIs through `OpusExtensionIterator`, including repeated-extension expansion and frame-limit validation, so outputs differ for packets using RTE (ID=2).
+97. [RESOLVED][Extensions][RTE Semantics] Public extension count/parse/find helpers now apply full iterator semantics.
+- Rust: `src/opus/extensions.rs`
+- Upstream: `libopus-sys/opus/src/extensions.c:329-383`
+- Detail: Helpers are `nb_frames`-aware and route through `OpusExtensionIterator`, including repeat-extension expansion and frame-limit semantics.
 
-98. [MEDIUM][Extensions][API Coverage] Frame-ordered extension helpers are missing (`opus_packet_extensions_count_ext`, `opus_packet_extensions_parse_ext`).
-- Rust: `src/opus/extensions.rs` (no equivalents found)
+98. [RESOLVED][Extensions][API Coverage] Frame-ordered extension helpers are implemented.
+- Rust: `src/opus/extensions.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:341-420`
-- Detail: Upstream exposes per-frame extension counting and frame-ordered parse APIs required by the full extension workflow. Rust only exposes count/parse/find/generate variants and omits `_ext` forms.
+- Detail: Rust implements `opus_packet_extensions_count_ext` and `opus_packet_extensions_parse_ext` and re-exports them for parity tests.
 
-99. [MEDIUM][Extensions][Generator Semantics] Extension generator signature/logic diverges from upstream (`nb_frames` omitted and repeat optimization not implemented).
-- Rust: `src/opus/extensions.rs:176-180`, `src/opus/extensions.rs:667-669`
+99. [RESOLVED][Extensions][Generator Semantics] Generator signature and repeat optimization match upstream shape.
+- Rust: `src/opus/extensions.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:471-635`
-- Detail: Upstream `opus_packet_extensions_generate(..., nb_frames, pad)` validates against frame count and can emit repeat indicators to compact repeated extensions. Rust generator infers `max_frame` from extension list and does not run upstream repeat-pointer/indicator logic, producing different packet layouts.
+- Detail: Rust generator takes `nb_frames`, validates frame indices against it, and executes repeat-indicator compaction logic.
 
-100. [LOW][Extensions][Iterator API] Iterator control helpers are missing (`reset`, `set_frame_max`).
-- Rust: `src/opus/extensions.rs:456-660` (`OpusExtensionIterator` has `new/next/find` only)
+100. [RESOLVED][Extensions][Iterator API] Iterator control helpers are implemented.
+- Rust: `src/opus/extensions.rs`
 - Upstream: `libopus-sys/opus/src/extensions.c:134-153`
-- Detail: Upstream iterator API supports in-place reset and dynamic `frame_max` truncation. Rust struct stores `frame_max` but exposes no equivalent public control methods.
+- Detail: `OpusExtensionIterator` exposes `reset()` and `set_frame_max()` alongside `new()/next()/find()`.
 
 101. [MEDIUM][Platform/State Layout] `align()` helper is hardcoded to 8-byte alignment instead of upstream computed union alignment.
 - Rust: `src/opus/opus_private.rs:11-16`
@@ -449,10 +449,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:827-851`
 - Detail: Upstream signature includes `application` and rejects sub-10 ms frames for `OPUS_APPLICATION_RESTRICTED_SILK` (`new_size < Fs/100`). Rust function omits `application` entirely and therefore cannot enforce this branch.
 
-115. [HIGH][Repacketizer][Extensions Preservation] Repacketizer `cat` path does not capture packet padding/extension metadata, so repacketized output cannot preserve incoming extensions.
-- Rust: `src/opus/repacketizer.rs:38-44` (state lacks padding fields), `src/opus/repacketizer.rs:128-137` (`opus_packet_parse_impl(..., None, None)`)
-- Upstream: `libopus-sys/opus/src/repacketizer.c:86-99` (stores `paddings/padding_len/padding_nb_frames`), `libopus-sys/opus/src/repacketizer.c:143-177` (parses and reindexes existing extensions during output)
-- Detail: Upstream repacketizer tracks per-frame padding extension regions and merges them into output packets. Rust `OpusRepacketizer` drops this metadata at ingest, so extension payloads from source packets are not propagated through repacketization.
+115. [RESOLVED][Repacketizer][Extensions Preservation] Repacketizer ingest captures padding metadata and preserves extensions through output.
+- Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
+- Upstream: `libopus-sys/opus/src/repacketizer.c:86-99`, `libopus-sys/opus/src/repacketizer.c:143-177`
+- Detail: Rust stores parse-time padding metadata in repacketizer state and merges source-packet extensions into repacketized output.
 
 116. [HIGH][Opus Custom API Coverage] `opus_custom.h` API surface is largely missing (create/destroy/get_size/init/encode/decode/ctl entrypoints).
 - Rust: `src/lib.rs:83-88` (exports only `OpusCustomEncoder`, `OpusCustomDecoder`, `opus_custom_mode_create`, with note about no mode destroy)
@@ -684,10 +684,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/src/opus_demo.c:742-744`, `libopus-sys/opus/src/opus_demo.c:857`
 - Detail: Upstream `opus_demo` supports `-ignore_extensions` and forwards it to decoder CTL (`OPUS_SET_IGNORE_EXTENSIONS`). Rust demo argument surface has no corresponding decode option, so this behavior cannot be exercised through the Rust tool wrapper.
 
-163. [LOW][API Surface][DNN PitchDNN] Upstream one-shot model-loading helper is not mirrored as a direct Rust API.
-- Rust: `src/dnn/pitchdnn.rs:154-166` (`PitchDNNState::init(&[WeightArray])`), `src/dnn/weights.rs:37-38` (`load_weights` parser helper)
+163. [RESOLVED][API Surface][DNN PitchDNN] One-shot blob model-loading helper is now mirrored.
+- Rust: `src/dnn/pitchdnn.rs`, `tests/dnn_integration.rs`
 - Upstream: `libopus-sys/opus/dnn/pitchdnn.c:71-79` (`pitchdnn_load_model(PitchDNNState*, const void*, int)`)
-- Detail: Upstream exposes a direct blob-based `pitchdnn_load_model` convenience entry point that parses and installs weights in one call. Rust currently provides the same flow as two separate steps (parse blob, then `init` with arrays), but no direct PitchDNN blob-loading method.
+- Detail: Added direct blob-loading API (`pitchdnn_load_model` plus `PitchDNNState::load_model`) that parses and initializes in one call, with integration coverage for valid and invalid blobs.
 
 164. [LOW][Tooling Semantics][Demo Backend] Rust demo backend uses `panic!` for some feature-gated DNN/DRED operations instead of recoverable status flow.
 - Rust: `src/tools/demo/backend.rs:120`, `src/tools/demo/backend.rs:131`, `src/tools/demo/backend.rs:175`
@@ -734,10 +734,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/celt/mathops.h:170-173`
 - Detail: Upstream guards non-negative-domain inputs with `celt_sig_assert(x>=0 && y>=0)`. Rust uses `debug_assert!`, so release builds drop this invariant check and no longer mirror upstream assert-gated behavior at that call boundary.
 
-173. [LOW][API Surface][SILK Decoder Init] `silk_init_decoder`/`silk_reset_decoder` do not mirror upstream in-place status-return API.
-- Rust: `src/silk/init_decoder.rs:14`, `src/silk/init_decoder.rs:58` (reset is `fn(...){...}`; init constructs/returns `silk_decoder_state`)
-- Upstream: `libopus-sys/opus/silk/init_decoder.c:43-45`, `libopus-sys/opus/silk/init_decoder.c:73-75`, `libopus-sys/opus/silk/init_decoder.c:66-67`, `libopus-sys/opus/silk/init_decoder.c:82`
-- Detail: Upstream initializes/reset an existing decoder struct and returns `opus_int` status (`0` on success). Rust exposes a constructor-style init returning the state directly and a void reset path, so the initialization API contract differs from upstream C.
+173. [RESOLVED][API Surface][SILK Decoder Init] Decoder init/reset now mirror upstream in-place status-return API.
+- Rust: `src/silk/init_decoder.rs`, `src/silk/dec_API.rs`
+- Upstream: `libopus-sys/opus/silk/init_decoder.c:43-45`, `libopus-sys/opus/silk/init_decoder.c:73-75`, `libopus-sys/opus/silk/dec_API.c:98-101`, `libopus-sys/opus/silk/dec_API.c:176-179`
+- Detail: `silk_reset_decoder` and `silk_init_decoder` now operate in-place and return status (`0`), with decode-path call sites updated to use the in-place return-flow semantics.
 
 174. [RESOLVED][Runtime Semantics][SILK+OSCE] Decoder reset now uses upstream default OSCE method.
 - Rust: `src/dnn/osce.rs`, `src/silk/init_decoder.rs`
@@ -865,10 +865,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:43`
 - Detail: Upstream requires `h->name[43] == 0` (fixed-field null termination) and rejects records otherwise. Rust scans for the first NUL and allows fully non-terminated 44-byte names (`unwrap_or(44)`), so some headers rejected upstream are accepted in Rust.
 
-199. [LOW][API Coverage][DNN NNet] `compute_gated_activation` helper from upstream header is not mirrored.
-- Rust: `src/dnn/nnet.rs` (no `compute_gated_activation` function)
+199. [RESOLVED][API Coverage][DNN NNet] `compute_gated_activation` helper is now mirrored.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/nnet.h:94`
-- Detail: Upstream exposes `compute_gated_activation(const LinearLayer*, float*, const float*, int activation, int arch)` as part of the generic NNet API surface. Rust currently exposes `compute_glu` and other helpers but no equivalent gated-activation entry point.
+- Detail: Added `compute_gated_activation` with upstream-equivalent signature and behavior (`output = input * activation(W*input)`), plus unit tests covering linear activation and GLU-equivalent sigmoid behavior.
 
 200. [LOW][API Signature][DNN Weights] `parse_weights` return contract differs from upstream C API.
 - Rust: `src/dnn/nnet.rs:591`

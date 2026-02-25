@@ -48,7 +48,7 @@ use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, CODE_INDEPENDENTLY_NO_LTP_SCALING, MAX_API_FS_KHZ,
     MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED,
 };
-use crate::silk::init_decoder::{silk_init_decoder, silk_reset_decoder};
+use crate::silk::init_decoder::{silk_decoder_state_new, silk_init_decoder, silk_reset_decoder};
 use crate::silk::resampler::silk_resampler;
 use crate::silk::stereo_MS_to_LR::silk_stereo_MS_to_LR;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
@@ -68,7 +68,7 @@ pub struct silk_decoder {
 }
 pub fn silk_InitDecoder() -> silk_decoder {
     silk_decoder {
-        channel_state: [silk_init_decoder(), silk_init_decoder()],
+        channel_state: [silk_decoder_state_new(), silk_decoder_state_new()],
         sStereo: stereo_dec_state::default(),
         nChannelsAPI: 0,
         nChannelsInternal: 0,
@@ -83,7 +83,7 @@ pub fn silk_InitDecoder() -> silk_decoder {
 /// Upstream C: silk/dec_API.c:silk_ResetDecoder
 pub fn silk_ResetDecoder(dec: &mut silk_decoder) {
     for ch in dec.channel_state.iter_mut() {
-        silk_reset_decoder(ch);
+        let _ = silk_reset_decoder(ch);
     }
     dec.sStereo = stereo_dec_state::default();
     dec.prev_decode_only_middle = false;
@@ -121,7 +121,7 @@ pub fn silk_Decode(
         }
     }
     if decControl.nChannelsInternal > psDec.nChannelsInternal {
-        channel_state[1] = silk_init_decoder();
+        ret += silk_init_decoder(&mut channel_state[1]);
     }
     let stereo_to_mono: i32 = (decControl.nChannelsInternal == 1
         && psDec.nChannelsInternal == 2

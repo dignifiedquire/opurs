@@ -4,7 +4,7 @@
 Close remaining public API coverage gaps versus upstream core/custom/multistream/projection and related controls.
 
 ## Findings IDs
-`12,43,45,98,104,110,116,119,120,122,163,173,177,178,186,199`
+`12,43,45,104,110,116,119,120,122,177,178,186`
 
 ## Scope
 - DRED public decoder/aux APIs and state lifecycle entry points.
@@ -48,3 +48,7 @@ Close remaining public API coverage gaps versus upstream core/custom/multistream
 - 2026-02-24: Added C-vs-Rust parity coverage for restricted-application encoder control flow in `tests/restricted_application_parity.rs` (`--features tools`):
   - restricted-SILK 5 ms encode rejection parity (`OPUS_BAD_ARG`)
   - `OPUS_SET_APPLICATION_REQUEST` parity for restricted application values and restricted-instance application-change rejection
+- 2026-02-25: Resolved three open Group 3 API-shape gaps:
+  - `src/dnn/pitchdnn.rs`: added one-shot blob API (`pitchdnn_load_model`, `PitchDNNState::load_model`) and coverage in `tests/dnn_integration.rs`.
+  - `src/silk/init_decoder.rs` + `src/silk/dec_API.rs`: switched low-level decoder init/reset to in-place status-return flow and updated decode-path call sites.
+  - `src/dnn/nnet.rs`: added `compute_gated_activation` and unit tests, and aligned `compute_glu` in-place behavior with upstream pointer-alias semantics.

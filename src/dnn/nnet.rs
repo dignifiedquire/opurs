@@ -277,8 +277,41 @@ pub fn compute_glu(layer: &LinearLayer, output: &mut [f32], input: &[f32], arch:
     compute_linear(layer, &mut act, input, arch);
     let tmp = act.clone();
     compute_activation(&mut act, &tmp, n, ACTIVATION_SIGMOID, arch);
-    for i in 0..n {
-        output[i] = input[i] * act[i];
+    if std::ptr::eq(output.as_ptr(), input.as_ptr()) {
+        for i in 0..n {
+            output[i] *= act[i];
+        }
+    } else {
+        for i in 0..n {
+            output[i] = input[i] * act[i];
+        }
+    }
+}
+
+/// Gated activation: out = input * activation(W*input).
+///
+/// Upstream C: dnn/nnet.h:compute_gated_activation
+pub fn compute_gated_activation(
+    layer: &LinearLayer,
+    output: &mut [f32],
+    input: &[f32],
+    activation: i32,
+    arch: Arch,
+) {
+    assert!(layer.nb_inputs == layer.nb_outputs);
+    let n = layer.nb_outputs;
+    let mut act = vec![0.0f32; n];
+    compute_linear(layer, &mut act, input, arch);
+    let tmp = act.clone();
+    compute_activation(&mut act, &tmp, n, activation, arch);
+    if std::ptr::eq(output.as_ptr(), input.as_ptr()) {
+        for i in 0..n {
+            output[i] *= act[i];
+        }
+    } else {
+        for i in 0..n {
+            output[i] = input[i] * act[i];
+        }
     }
 }
 
@@ -700,6 +733,48 @@ pub fn write_weights(arrays: &[WeightArray]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_identity_linear_layer(size: usize) -> LinearLayer {
+        let mut weights = vec![0.0f32; size * size];
+        for i in 0..size {
+            weights[i * size + i] = 1.0;
+        }
+        LinearLayer {
+            nb_inputs: size,
+            nb_outputs: size,
+            float_weights: weights,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compute_gated_activation_matches_glu_for_sigmoid() {
+        let layer = test_identity_linear_layer(3);
+        let input = [1.5f32, -0.5, 0.25];
+        let mut glu_out = [0.0f32; 3];
+        let mut gate_out = [0.0f32; 3];
+        compute_glu(&layer, &mut glu_out, &input, Arch::default());
+        compute_gated_activation(
+            &layer,
+            &mut gate_out,
+            &input,
+            ACTIVATION_SIGMOID,
+            Arch::default(),
+        );
+        for i in 0..glu_out.len() {
+            assert!((glu_out[i] - gate_out[i]).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_compute_gated_activation_linear() {
+        let layer = test_identity_linear_layer(2);
+        let input = [1.5f32, -0.5];
+        let mut out = [0.0f32; 2];
+        compute_gated_activation(&layer, &mut out, &input, ACTIVATION_LINEAR, Arch::default());
+        assert!((out[0] - 2.25).abs() < 1e-6);
+        assert!((out[1] - 0.25).abs() < 1e-6);
+    }
 
     #[test]
     fn test_write_weights_roundtrip() {
