@@ -4,7 +4,7 @@
 Align packet extension parse/generate/repacketizer semantics with upstream behavior.
 
 ## Findings IDs
-`35,36,37,38,39,40,41,97,98,99,100,115,139`
+`none (resolved)`
 
 ## Scope
 - Repeat-extension iterator semantics and count/parse parity.
@@ -26,6 +26,10 @@ Align packet extension parse/generate/repacketizer semantics with upstream behav
 - Repacketized bytes and extension summaries match upstream expectations.
 
 ## Progress
+- 2026-02-25: Audited and confirmed upstream parity for all originally listed G2 findings:
+  - `src/opus/extensions.rs` now provides iterator-driven count/parse/find semantics with repeat-extension handling, frame-bounded generation, repeat-compaction emission, `_ext` helpers, and iterator control helpers (`reset`, `set_frame_max`).
+  - `src/opus/repacketizer.rs` preserves per-input padding metadata and merges source-packet extensions into repacketized output.
+  - `tests/extensions_repacketizer_parity.rs` covers repeat roundtrip semantics, repacketizer extension preservation, and tools-gated C-vs-Rust extension API parity.
 - 2026-02-24: Added `tests/extensions_repacketizer_parity.rs` with:
   - repeat-extension generate/count/parse roundtrip coverage (`opus_packet_extensions_*`)
   - repacketizer extension-preservation coverage across concatenated packets
