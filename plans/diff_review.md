@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,52,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
 
 Priority groups for execution:
 
@@ -148,10 +148,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:194`, `libopus-sys/opus/src/opus_encoder.c:622`, `libopus-sys/opus/src/opus_encoder.c:3362`, `libopus-sys/opus/src/opus_decoder.c:121`, `libopus-sys/opus/src/opus_decoder.c:186`, `libopus-sys/opus/src/opus_decoder.c:1244`
 - Detail: Upstream exports C-style `opus_encoder_get_size/init/create/destroy` and `opus_decoder_get_size/init/create/destroy` entry points. Rust uses struct constructors/methods and does not mirror these direct symbols.
 
-49. [LOW][Packet Parser] `opus_packet_parse_impl` does not clear padding output on entry like upstream.
-- Rust: `src/opus/packet.rs:172-195`
+49. [RESOLVED][Packet Parser] `opus_packet_parse_impl` now clears padding output on entry like upstream.
+- Rust: `src/opus/packet.rs`, `tests/packet_parse_impl_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus.c:239-244`
-- Detail: Upstream sets padding outputs to null/zero before validation so callers get deterministic output on error paths. Rust only writes `padding_out` at successful end of parse, so caller-provided storage may retain stale values after early parse errors.
+- Detail: Rust now zeroes `padding_out` before validation, matching upstream deterministic error-path behavior; parity test compares Rust vs C `opus_packet_parse_impl` outputs for invalid packets.
 
 50. [MEDIUM] Encoder analysis gating misses upstream restricted-SILK application guard.
 - Rust: `src/opus/opus_encoder.rs:1677-1681`

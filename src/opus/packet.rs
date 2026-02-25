@@ -177,7 +177,7 @@ pub fn opus_packet_parse_impl(
     size: &mut [i16],
     payload_offset: Option<&mut i32>,
     packet_offset: Option<&mut i32>,
-    padding_out: Option<&mut i32>,
+    mut padding_out: Option<&mut i32>,
 ) -> i32 {
     let len = data.len() as i32;
     if len < 0 {
@@ -189,6 +189,9 @@ pub fn opus_packet_parse_impl(
         len,
         data.len()
     );
+    if let Some(padding_out) = padding_out.as_mut() {
+        **padding_out = 0;
+    }
 
     if data.is_empty() || len == 0 {
         return OPUS_INVALID_PACKET;
@@ -365,8 +368,8 @@ pub fn opus_packet_parse_impl(
     if let Some(out_toc) = out_toc {
         *out_toc = toc;
     }
-    if let Some(padding_out) = padding_out {
-        *padding_out = pad;
+    if let Some(padding_out) = padding_out.as_mut() {
+        **padding_out = pad;
     }
 
     count
