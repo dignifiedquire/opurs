@@ -19,7 +19,7 @@ use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_short2float_a
 use crate::silk::pitch_est_tables::{
     SILK_PE_MAX_COMPLEX, SILK_PE_MID_COMPLEX, SILK_PE_MIN_COMPLEX,
 };
-use crate::silk::resampler::{silk_resampler, silk_resampler_init};
+use crate::silk::resampler::{silk_resampler, silk_resampler_init, ResamplerState};
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;
 use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
@@ -75,8 +75,12 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
     let mut ret: i32 = SILK_NO_ERROR;
     if psEnc.sCmn.fs_kHz != fs_kHz || psEnc.sCmn.prev_API_fs_Hz != psEnc.sCmn.API_fs_Hz {
         if psEnc.sCmn.fs_kHz == 0 {
-            psEnc.sCmn.resampler_state =
-                silk_resampler_init(psEnc.sCmn.API_fs_Hz, fs_kHz * 1000, 1);
+            ret += silk_resampler_init(
+                &mut psEnc.sCmn.resampler_state,
+                psEnc.sCmn.API_fs_Hz,
+                fs_kHz * 1000,
+                1,
+            );
         } else {
             let mut new_buf_samples: i32 = 0;
             let mut api_buf_samples: i32 = 0;
@@ -97,7 +101,9 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
             );
 
             /* Initialize resampler for temporary resampling of x_buf data to API_fs_Hz */
-            let mut temp_resampler_state = silk_resampler_init(
+            let mut temp_resampler_state = ResamplerState::default();
+            ret += silk_resampler_init(
+                &mut temp_resampler_state,
                 psEnc.sCmn.fs_kHz as i16 as i32 * 1000,
                 psEnc.sCmn.API_fs_Hz,
                 0,
@@ -114,8 +120,12 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
                 &mut x_buf_API_fs_Hz,
                 &x_bufFIX[..old_buf_samples as usize],
             );
-            psEnc.sCmn.resampler_state =
-                silk_resampler_init(psEnc.sCmn.API_fs_Hz, fs_kHz as i16 as i32 * 1000, 1);
+            ret += silk_resampler_init(
+                &mut psEnc.sCmn.resampler_state,
+                psEnc.sCmn.API_fs_Hz,
+                fs_kHz as i16 as i32 * 1000,
+                1,
+            );
             ret += silk_resampler(
                 &mut psEnc.sCmn.resampler_state,
                 &mut x_bufFIX,

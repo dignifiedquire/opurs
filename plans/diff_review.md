@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current findings list (open items only; stale/resolved entries removed in this refresh).
 
-Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,56,64,65,88,91,105,111,112,150,166,175,214,224,229,236`.
+Resolved/removed in this refresh (now implemented in Rust): `1,2,3,4,5,6,10,11,14,15,16,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,42,49,52,56,64,65,88,91,105,111,112,138,139,150,156,165,166,174,175,214,224,229,236`.
 
 Priority groups for execution:
 
@@ -14,7 +14,7 @@ Priority groups for execution:
 IDs: `none (resolved)`
 
 2. Extensions and repacketizer semantic parity
-IDs: `35,36,37,38,39,40,41,97,98,99,100,115,139`
+IDs: `35,36,37,38,39,40,41,97,98,99,100,115`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
 IDs: `12,43,45,98,104,110,116,119,120,122,163,173,177,178,186,199`
@@ -29,7 +29,7 @@ IDs: `107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
 IDs: `95,96,108,131,133,134,217,223,228`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`
+IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
 
 ## Findings
 
@@ -349,15 +349,15 @@ IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,1
 - Upstream: `libopus-sys/opus/src/opus.c:392-398` (`opus_packet_parse(const unsigned char *data, opus_int32 len, ...)`), `libopus-sys/opus/src/opus.c:216` (`opus_packet_get_nb_frames(const unsigned char packet[], opus_int32 len)`)
 - Detail: Rust APIs infer length from slice and do not expose explicit `len` parameters, which diverges from upstream C signatures and affects FFI-level compatibility semantics.
 
-93. [MEDIUM][Runtime Semantics][SILK] Remaining unconditional panic paths are now limited to SILK resampler init validation.
-- Rust: `src/silk/resampler/mod.rs:155`, `src/silk/resampler/mod.rs:168`
-- Upstream: `libopus-sys/opus/silk/resampler.c` (`silk_resampler_init` returns error status on invalid Fs combinations; assert-gated diagnostics)
-- Detail: `check_control_input`, `enc_API`, `dec_API`, and `decoder_set_fs` panic sites were converted to status returns or debug-only assertions. Remaining divergence is that Rust `silk_resampler_init` still panics on invalid rate tuples instead of exposing an error-return path.
+93. [RESOLVED][Runtime Semantics][SILK] Resampler init now returns status codes instead of panicking.
+- Rust: `src/silk/resampler/mod.rs`, `src/silk/control_codec.rs`, `src/silk/decoder_set_fs.rs`
+- Upstream: `libopus-sys/opus/silk/resampler.c:silk_resampler_init`
+- Detail: Rust now mirrors upstream by returning `-1` on invalid rate tuples/unsupported ratios and threading status through encoder/decoder setup call paths.
 
-94. [LOW][Runtime Semantics][DRED] DRED 16 kHz conversion helper panics on unsupported sample rates.
-- Rust: `src/dnn/dred/encoder.rs:160`
+94. [RESOLVED][Runtime Semantics][DRED] Unsupported sample-rate branch now uses assertion-style fallback.
+- Rust: `src/dnn/dred/encoder.rs`
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.c:165`, `libopus-sys/opus/dnn/dred_encoder.c:207`
-- Detail: Upstream uses assertion-style checks in unreachable/default sample-rate branches; Rust uses unconditional `panic!(\"Unsupported sample rate\")`, changing failure mode from assert-gated to hard abort.
+- Detail: Rust no longer panics in the default sample-rate branch and now mirrors upstream assert-style behavior.
 
 95. [LOW][Lib Info] `opus_get_version_string()` does not match upstream format/content.
 - Rust: `src/celt/common.rs:426`
@@ -564,15 +564,15 @@ IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,1
 - Upstream: `libopus-sys/opus/dnn/nnet.c:85-86`, `libopus-sys/opus/dnn/nnet.c:111`, `libopus-sys/opus/dnn/nnet.c:128`, `libopus-sys/opus/dnn/nnet.c:142`, `libopus-sys/opus/dnn/nndsp.c:169`, `libopus-sys/opus/dnn/nndsp.c:364-366`
 - Detail: Upstream encodes these as `celt_assert(...)` internal invariants. Rust promotes them to unconditional `assert!`, so malformed/inconsistent dimensions can panic in production builds where upstream often compiles these checks out.
 
-138. [MEDIUM][Packet API][Error Handling] `opus_packet_pad_impl` can panic on slice bounds instead of returning Opus error codes.
-- Rust: `src/opus/repacketizer.rs:480`, `src/opus/repacketizer.rs:491`
+138. [RESOLVED][Packet API][Error Handling] `opus_packet_pad_impl` now returns `OPUS_BAD_ARG` for out-of-bounds `len/new_len`.
+- Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:341-347`, `libopus-sys/opus/src/repacketizer.c:354`
-- Detail: Rust indexes `data[..len as usize]` and `data[..new_len as usize]` without checking against `data.len()`. If caller passes inconsistent `len/new_len` relative to slice size, Rust panics. Upstream follows pointer+length conventions and returns Opus status codes for its explicit argument checks rather than triggering a safe-slice panic mode.
+- Detail: Added explicit `len/new_len <= data.len()` guards before slice indexing, removing panic-only behavior and aligning with status-return argument handling. Added tests for both oversize `len` and `new_len`.
 
-139. [LOW][Runtime Semantics][Repacketizer] `opus_packet_unpad` uses unconditional `assert!` for postcondition check.
-- Rust: `src/opus/repacketizer.rs:546`
+139. [RESOLVED][Runtime Semantics][Repacketizer] `opus_packet_unpad` postcondition check now matches upstream assert gating.
+- Rust: `src/opus/repacketizer.rs`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:388`
-- Detail: Upstream uses `celt_assert(ret > 0 && ret <= len)` for an internal invariant. Rust uses unconditional `assert!`, which can hard-abort at runtime where upstream non-assert builds would typically not.
+- Detail: Converted unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
 140. [LOW][Runtime Semantics][CELT Entropy/Rate/VQ] Internal invariant checks are unconditional in Rust.
 - Rust: `src/celt/entenc.rs:215`, `src/celt/entenc.rs:238`, `src/celt/entenc.rs:262`, `src/celt/entenc.rs:280`, `src/celt/entdec.rs:204`, `src/celt/laplace.rs:67-68`, `src/celt/laplace.rs:106-109`, `src/celt/cwrs.rs:298`, `src/celt/cwrs.rs:319`, `src/celt/cwrs.rs:331-332`, `src/celt/rate.rs:229`, `src/celt/rate.rs:286`, `src/celt/rate.rs:333-334`, `src/celt/rate.rs:340`, `src/celt/rate.rs:660`, `src/celt/vq.rs:509-510`, `src/celt/vq.rs:592-593`
@@ -649,10 +649,10 @@ IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,1
 - Upstream: `libopus-sys/opus/silk/NLSF_del_dec_quant.c:82`, `libopus-sys/opus/silk/NLSF_del_dec_quant.c:208-213`, `libopus-sys/opus/silk/stereo_find_predictor.c:64`, `libopus-sys/opus/silk/stereo_LR_to_MS.c:113`, `libopus-sys/opus/silk/float/process_gains_FLP.c:101-102`, `libopus-sys/opus/silk/float/wrappers_FLP.c:148`, `libopus-sys/opus/silk/float/energy_FLP.c:57`, `libopus-sys/opus/silk/float/noise_shape_analysis_FLP.c:113`, `libopus-sys/opus/silk/float/noise_shape_analysis_FLP.c:143`
 - Detail: Upstream includes assert-gated invariants in these paths (quantizer-state shape, output-index bounds, smooth/rate constraints, lambda/gain/energy bounds, and convergence asserts in noise-shape helpers). Rust implementations currently omit these checks, so invalid/internal-corrupt states are no longer guarded the same way.
 
-156. [LOW][Runtime Semantics][SILK Pitch Decode] Invalid `(Fs_kHz, nb_subfr)` combinations panic in Rust where upstream keeps assert-gated fallback table selection.
-- Rust: `src/silk/decode_pitch.rs:26-34`
+156. [RESOLVED][Runtime Semantics][SILK Pitch Decode] `silk_decode_pitch` now matches upstream fallback table selection.
+- Rust: `src/silk/decode_pitch.rs`
 - Upstream: `libopus-sys/opus/silk/decode_pitch.c:49-66`
-- Detail: Upstream uses `celt_assert(nb_subfr == PE_MAX_NB_SUBFR >> 1)` in fallback branches but still assigns stage2/stage3 10 ms codebooks. Rust uses a strict `(Fs_kHz, nb_subfr)` match and calls `unreachable!` otherwise, producing hard panic instead of upstream assert-gated fallback behavior.
+- Detail: Replaced strict tuple match + `unreachable!` with upstream-style branching: `Fs_kHz==8` uses stage2 tables, otherwise stage3 tables, with debug-assert-gated `nb_subfr` checks on 10 ms fallback branches.
 
 157. [MEDIUM][Module Coverage][SILK FLP] `silk_residual_energy_covar_FLP` is not implemented in Rust.
 - Rust: `src/silk/float/residual_energy_FLP.rs` (contains `silk_residual_energy_FLP` only)
@@ -694,10 +694,10 @@ IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,1
 - Upstream: `libopus-sys/opus/src/opus_demo.c:830-833`, `libopus-sys/opus/src/opus_demo.c:923-927` (feature-gated paths are compile-time conditioned and wired through ctl calls)
 - Detail: Rust demo backend aborts with `panic!` when required features (`dred`, `builtin-weights`, `deep-plc`) are unavailable for requested operations. Upstream demo behavior is controlled via compile-time feature paths and ctl calls rather than Rust-style hard panics in wrapper methods.
 
-165. [LOW][Runtime Semantics][SILK Resampler] Down-FIR interpolation default branch is an unconditional panic in Rust.
-- Rust: `src/silk/resampler/down_fir.rs:214`
+165. [RESOLVED][Runtime Semantics][SILK Resampler] Down-FIR interpolation default branch now uses assert-gated fallback behavior.
+- Rust: `src/silk/resampler/down_fir.rs`
 - Upstream: `libopus-sys/opus/silk/resampler_private_down_FIR.c:138-141`
-- Detail: Upstream uses `celt_assert(0)` in the `FIR_Order` switch default and then returns (assert-gated behavior). Rust uses `unreachable!()` for the same branch, producing an unconditional hard panic if reached.
+- Detail: Replaced `unreachable!()` with `debug_assert!(false, ...)` and return of the remaining output slice, matching upstream `celt_assert(0)` + return semantics.
 
 166. [HIGH][QEXT][SILK Resampler] `silk_resampler_init` lacks upstream 96 kHz delay-table/rate-index coverage.
 - Rust: `src/silk/resampler/mod.rs:53-67`, `src/silk/resampler/mod.rs:70-78`, `src/silk/resampler/mod.rs:121-143`
@@ -739,10 +739,10 @@ IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,1
 - Upstream: `libopus-sys/opus/silk/init_decoder.c:43-45`, `libopus-sys/opus/silk/init_decoder.c:73-75`, `libopus-sys/opus/silk/init_decoder.c:66-67`, `libopus-sys/opus/silk/init_decoder.c:82`
 - Detail: Upstream initializes/reset an existing decoder struct and returns `opus_int` status (`0` on success). Rust exposes a constructor-style init returning the state directly and a void reset path, so the initialization API contract differs from upstream C.
 
-174. [LOW][Runtime Semantics][SILK+OSCE] Decoder reset initializes OSCE method to `NONE` rather than upstream `OSCE_DEFAULT_METHOD`.
-- Rust: `src/silk/init_decoder.rs:50`
+174. [RESOLVED][Runtime Semantics][SILK+OSCE] Decoder reset now uses upstream default OSCE method.
+- Rust: `src/dnn/osce.rs`, `src/silk/init_decoder.rs`
 - Upstream: `libopus-sys/opus/silk/init_decoder.c:61-64`, `libopus-sys/opus/dnn/osce.h:59-67`
-- Detail: With OSCE enabled, upstream `silk_reset_decoder` calls `osce_reset(..., OSCE_DEFAULT_METHOD)` (typically NOLACE/LACE when compiled). Rust reset uses `OSCE_METHOD_NONE`, changing default post-reset OSCE state semantics.
+- Detail: Added `OSCE_DEFAULT_METHOD` constant and switched `silk_reset_decoder` to call `osce_reset(..., OSCE_DEFAULT_METHOD)` instead of `OSCE_METHOD_NONE`.
 
 175. [HIGH][QEXT][DRED] DRED 16 kHz conversion helper omits upstream 96 kHz handling.
 - Rust: `src/dnn/dred/encoder.rs:154-161`

@@ -211,7 +211,10 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                 index_Q16 += index_increment_Q16;
             }
         }
-        _ => unreachable!(),
+        _ => {
+            debug_assert!(false, "libopus: assert(0) called");
+            return out;
+        }
     }
 
     out

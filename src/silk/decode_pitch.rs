@@ -23,14 +23,18 @@ use crate::silk::SigProc_FIX::silk_LIMIT;
 pub fn silk_decode_pitch(lagIndex: i16, contourIndex: i8, pitch_lags: &mut [i32], Fs_kHz: i32) {
     let nb_subfr = pitch_lags.len();
 
-    let (lag_cb_flat, ncols): (&[i8], usize) = match (Fs_kHz, nb_subfr) {
-        (8, PE_MAX_NB_SUBFR) => (&silk_CB_lags_stage2, PE_NB_CBKS_STAGE2_EXT),
-        (8, PE_MAX_NB_SUBFR_OVER_2) => (&silk_CB_lags_stage2_10_ms, PE_NB_CBKS_STAGE2_10MS),
-        (12 | 16, PE_MAX_NB_SUBFR) => (&silk_CB_lags_stage3, PE_NB_CBKS_STAGE3_MAX),
-        (12 | 16, PE_MAX_NB_SUBFR_OVER_2) => (&silk_CB_lags_stage3_10_ms, PE_NB_CBKS_STAGE3_10MS),
-        (Fs_kHz, nb_subfr) => {
-            unreachable!("Fs_kHz: {}, nb_subfr: {}", Fs_kHz, nb_subfr)
+    let (lag_cb_flat, ncols): (&[i8], usize) = if Fs_kHz == 8 {
+        if nb_subfr == PE_MAX_NB_SUBFR {
+            (&silk_CB_lags_stage2, PE_NB_CBKS_STAGE2_EXT)
+        } else {
+            debug_assert_eq!(nb_subfr, PE_MAX_NB_SUBFR_OVER_2);
+            (&silk_CB_lags_stage2_10_ms, PE_NB_CBKS_STAGE2_10MS)
         }
+    } else if nb_subfr == PE_MAX_NB_SUBFR {
+        (&silk_CB_lags_stage3, PE_NB_CBKS_STAGE3_MAX)
+    } else {
+        debug_assert_eq!(nb_subfr, PE_MAX_NB_SUBFR_OVER_2);
+        (&silk_CB_lags_stage3_10_ms, PE_NB_CBKS_STAGE3_10MS)
     };
 
     let min_lag = PE_MIN_LAG_MS * Fs_kHz as i16 as i32;

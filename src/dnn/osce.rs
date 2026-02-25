@@ -40,6 +40,7 @@ pub const OSCE_LOG_GAIN_LENGTH: usize = 1;
 pub const OSCE_METHOD_NONE: i32 = 0;
 pub const OSCE_METHOD_LACE: i32 = 1;
 pub const OSCE_METHOD_NOLACE: i32 = 2;
+pub const OSCE_DEFAULT_METHOD: i32 = OSCE_METHOD_NOLACE;
 
 // ========== OSCE Extended Modes (osce.h) ==========
 

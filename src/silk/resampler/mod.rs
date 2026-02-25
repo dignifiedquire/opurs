@@ -105,6 +105,7 @@ fn rate_id(r: i32) -> usize {
 }
 
 pub(crate) const SILK_RESAMPLER_MAX_FIR_ORDER: usize = 36;
+const SILK_RESAMPLER_INVALID: i32 = -1;
 
 #[derive(Copy, Clone)]
 pub struct ResamplerState {
@@ -143,17 +144,22 @@ enum ResamplerMode {
 }
 
 /// Upstream C: silk/resampler.c:silk_resampler_init
-pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> ResamplerState {
+pub fn silk_resampler_init(
+    s: &mut ResamplerState,
+    Fs_Hz_in: i32,
+    Fs_Hz_out: i32,
+    forEnc: i32,
+) -> i32 {
+    *s = ResamplerState::default();
+
     let inputDelay = if forEnc != 0 {
         #[cfg(feature = "qext")]
         let input_valid = matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
         #[cfg(not(feature = "qext"))]
         let input_valid = matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000);
         if !input_valid || !matches!(Fs_Hz_out, 8000 | 12000 | 16000) {
-            // see comments in `[opurs::silk::check_control_input]`
-            // TODO: we should probably make this function return a Result..
-            panic!("libopus: assert(0) called");
-            // return -1;
+            debug_assert!(false, "libopus: assert(0) called");
+            return SILK_RESAMPLER_INVALID;
         }
 
         delay_matrix_enc[rate_id(Fs_Hz_in)][rate_id(Fs_Hz_out)] as i32
@@ -163,10 +169,8 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
         #[cfg(not(feature = "qext"))]
         let output_valid = matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000);
         if !matches!(Fs_Hz_in, 8000 | 12000 | 16000) || !output_valid {
-            // see comments in `[opurs::silk::check_control_input]`
-            // TODO: we should probably make this function return a Result..
-            panic!("libopus: assert(0) called");
-            // return -1;
+            debug_assert!(false, "libopus: assert(0) called");
+            return SILK_RESAMPLER_INVALID;
         }
 
         delay_matrix_dec[rate_id(Fs_Hz_in)][rate_id(Fs_Hz_out)] as i32
@@ -235,7 +239,8 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
                     coefs: &silk_Resampler_1_6_COEFS,
                 }
             } else {
-                unreachable!("Unsupported resampling ratio: {} : {}", Fs_Hz_out, Fs_Hz_in);
+                debug_assert!(false, "libopus: assert(0) called");
+                return SILK_RESAMPLER_INVALID;
             };
 
             ResamplerMode::DownFir(params, ResamplerDownFirState::default())
@@ -261,11 +266,12 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
         input_delay: inputDelay as usize,
     };
 
-    ResamplerState {
+    *s = ResamplerState {
         params,
         mode,
         delay_buf: [0; RESAMPLER_MAX_FS_KHZ],
-    }
+    };
+    0
 }
 
 /* Resampler: convert from one sampling rate to another */
@@ -274,9 +280,9 @@ pub fn silk_resampler_init(Fs_Hz_in: i32, Fs_Hz_out: i32, forEnc: i32) -> Resamp
 #[inline]
 pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> i32 {
     /* Need at least 1 ms of input data */
-    assert!(in_0.len() >= S.params.fs_in_khz);
+    debug_assert!(in_0.len() >= S.params.fs_in_khz);
     /* Delay can't exceed the 1 ms of buffering */
-    assert!(S.params.input_delay <= S.params.fs_in_khz);
+    debug_assert!(S.params.input_delay <= S.params.fs_in_khz);
 
     let nSamples = S.params.fs_in_khz - S.params.input_delay;
 
@@ -321,14 +327,16 @@ mod tests {
 
     #[test]
     fn encoder_delay_table_matches_upstream_for_48k_to_16k() {
-        let state = silk_resampler_init(48000, 16000, 1);
+        let mut state = ResamplerState::default();
+        assert_eq!(silk_resampler_init(&mut state, 48000, 16000, 1), 0);
         assert_eq!(state.params.input_delay, 12);
     }
 
     #[cfg(feature = "qext")]
     #[test]
     fn qext_encoder_supports_96k_input() {
-        let state = silk_resampler_init(96000, 16000, 1);
+        let mut state = ResamplerState::default();
+        assert_eq!(silk_resampler_init(&mut state, 96000, 16000, 1), 0);
         assert_eq!(state.params.fs_in_khz, 96);
         assert_eq!(state.params.input_delay, 44);
         assert_eq!(state.delay_buf.len(), RESAMPLER_MAX_FS_KHZ);
@@ -337,7 +345,8 @@ mod tests {
     #[cfg(feature = "qext")]
     #[test]
     fn qext_decoder_supports_96k_output() {
-        let state = silk_resampler_init(16000, 96000, 0);
+        let mut state = ResamplerState::default();
+        assert_eq!(silk_resampler_init(&mut state, 16000, 96000, 0), 0);
         assert_eq!(state.params.fs_out_khz, 96);
         assert_eq!(state.params.input_delay, 7);
     }

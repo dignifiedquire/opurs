@@ -48,7 +48,7 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) {
     dec.sPLC = silk_PLC_struct::default();
     #[cfg(feature = "osce")]
     {
-        crate::dnn::osce::osce_reset(&mut dec.osce, crate::dnn::osce::OSCE_METHOD_NONE);
+        crate::dnn::osce::osce_reset(&mut dec.osce, crate::dnn::osce::OSCE_DEFAULT_METHOD);
     }
 
     silk_CNG_Reset(dec);

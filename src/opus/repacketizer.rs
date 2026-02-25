@@ -555,6 +555,9 @@ pub fn opus_packet_pad_impl(
     } else if len > new_len {
         return OPUS_BAD_ARG;
     }
+    if len as usize > data.len() || new_len as usize > data.len() {
+        return OPUS_BAD_ARG;
+    }
 
     // Copy the original packet data so we can rewrite in place
     let copy = data[..len as usize].to_vec();
@@ -630,7 +633,7 @@ pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
         false,
         FrameSource::Data { offset: 0 },
     );
-    assert!(ret > 0 && ret <= data.len() as _);
+    debug_assert!(ret > 0 && ret <= data.len() as _);
     ret
 }
 

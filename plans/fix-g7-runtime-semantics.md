@@ -4,7 +4,7 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-`61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`
+`61,62,66,67,68,72,79,82,87,106,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -25,6 +25,13 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-25: Closed additional repacketizer/SILK runtime parity gaps:
+  - `src/opus/repacketizer.rs`: added explicit `len/new_len <= data.len()` checks in `opus_packet_pad_impl` to return `OPUS_BAD_ARG` instead of panicking on slice bounds.
+  - `tests/extensions_repacketizer_parity.rs`: added negative tests for oversize `len` and `new_len` in `opus_packet_pad_impl`.
+  - `src/opus/repacketizer.rs`: converted `opus_packet_unpad` postcondition check from `assert!` to `debug_assert!` to match upstream `celt_assert` gating.
+  - `src/silk/resampler/down_fir.rs`: replaced down-FIR default-branch `unreachable!()` with debug-assert + return fallback matching upstream assert-gated behavior.
+  - `src/dnn/osce.rs` and `src/silk/init_decoder.rs`: introduced and used `OSCE_DEFAULT_METHOD` during decoder reset to match upstream `silk_reset_decoder`.
+  - `src/silk/decode_pitch.rs`: replaced strict tuple match + `unreachable!` with upstream-style fallback table selection and debug-assert-gated `nb_subfr` checks.
 - 2026-02-25: Continued assert-gate parity cleanup in encoder/decoder hot paths:
   - `src/opus/opus_decoder.rs`: switched decoder invariant validation and decode-loop internal consistency checks from unconditional `assert!` to `debug_assert!`/`debug_assert_eq!`, matching upstream `VALIDATE_*`/`celt_assert` production behavior.
   - `src/celt/celt_decoder.rs`: switched `validate_celt_decoder()` invariant checks to debug-only assertions.
@@ -34,6 +41,10 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
   - `src/silk/dec_API.rs`: converted invalid payload-size and invalid internal-sample-rate branches from panic behavior to upstream-style `SILK_DEC_INVALID_FRAME_SIZE` / `SILK_DEC_INVALID_SAMPLING_FREQUENCY` status returns.
   - `src/silk/dec_API.rs`: added unit tests that exercise those two status-return paths directly.
   - `src/silk/decoder_set_fs.rs` and `src/silk/float/LPC_analysis_filter_FLP.rs`: converted remaining unconditional internal asserts/panic branches to debug-only assertion behavior matching upstream `celt_assert` semantics.
+- 2026-02-25: Aligned SILK resampler init semantics with upstream status-return behavior:
+  - `src/silk/resampler/mod.rs`: changed `silk_resampler_init` to C-style `state + return-code` contract and removed panic paths in invalid input/rate-ratio branches; now returns `-1` on invalid combinations like upstream.
+  - `src/silk/control_codec.rs` and `src/silk/decoder_set_fs.rs`: updated call sites to propagate resampler-init status codes instead of relying on implicit panic behavior.
+  - Converted remaining resampler internal invariant checks from `assert!` to `debug_assert!` to match upstream assertion gating.
 - 2026-02-25: Aligned SILK encoder control validation/runtime semantics with upstream status-code behavior:
   - `src/silk/check_control_input.rs` now returns `SILK_ENC_*` error codes instead of panicking.
   - Added unit coverage for valid controls plus invalid payload/loss/complexity/channel paths and qext-gated 96 kHz API-rate acceptance.

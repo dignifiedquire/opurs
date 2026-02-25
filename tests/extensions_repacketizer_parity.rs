@@ -4,7 +4,7 @@ use opurs::internals::{
     opus_packet_extensions_parse_ext, opus_packet_pad_impl, opus_packet_parse_impl,
     OpusExtensionData,
 };
-use opurs::{OpusEncoder, OpusRepacketizer, OPUS_APPLICATION_AUDIO, OPUS_OK};
+use opurs::{OpusEncoder, OpusRepacketizer, OPUS_APPLICATION_AUDIO, OPUS_BAD_ARG, OPUS_OK};
 
 #[cfg(feature = "tools")]
 #[repr(C)]
@@ -200,6 +200,21 @@ fn repacketizer_preserves_extensions_across_concatenation() {
             .any(|e| e.frame == 1 && e.id == 4 && e.data == vec![0xB2]),
         "missing extension from second source packet"
     );
+}
+
+#[test]
+fn packet_pad_impl_rejects_len_beyond_buffer() {
+    let mut packet = vec![0u8; 4];
+    let ret = opus_packet_pad_impl(&mut packet, 5, 6, true, &[]);
+    assert_eq!(ret, OPUS_BAD_ARG);
+}
+
+#[test]
+fn packet_pad_impl_rejects_new_len_beyond_buffer() {
+    let mut packet = vec![0u8; 4];
+    packet[0] = 0xF8;
+    let ret = opus_packet_pad_impl(&mut packet, 1, 5, true, &[]);
+    assert_eq!(ret, OPUS_BAD_ARG);
 }
 
 #[cfg(feature = "tools")]
