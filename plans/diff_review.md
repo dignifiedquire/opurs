@@ -29,7 +29,7 @@ IDs: `107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
 IDs: `95,96,108,131,133,134,217,223,228`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`
+IDs (representative): `61,62,72,79,82,87,93,94,106,135,136,137,139,140,141,142,143,144,145,146,148,149,153,156,165,168,170,171,172,174`
 
 ## Findings
 
@@ -224,20 +224,20 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2662`, `libopus-sys/opus/src/opus_encoder.c:2735`
 - Detail: Upstream exports direct C API functions `opus_encode` and `opus_encode_float`. Rust keeps same-named functions private and exposes method-based encoding on `OpusEncoder`, so symbol-level/public function parity differs.
 
-66. [MEDIUM][Runtime Semantics] Decoder validation asserts run unconditionally in Rust hot paths.
-- Rust: `src/opus/opus_decoder.rs:919`, `src/celt/celt_decoder.rs:1028`
-- Upstream: `libopus-sys/opus/src/opus_decoder.c:92-117`, `libopus-sys/opus/src/opus_decoder.c:119-123`; `libopus-sys/opus/celt/celt_decoder.c:136-151`, `libopus-sys/opus/celt/celt_decoder.c:153-155`
-- Detail: Upstream wraps `VALIDATE_OPUS_DECODER`/`VALIDATE_CELT_DECODER` behind `ENABLE_HARDENING || ENABLE_ASSERTIONS` and no-ops otherwise. Rust calls validation functions unconditionally, so release/runtime behavior can panic on invariant violations that upstream production builds would not check.
+66. [RESOLVED][Runtime Semantics] Decoder validation checks now use debug-only assertion gates.
+- Rust: `src/opus/opus_decoder.rs`, `src/celt/celt_decoder.rs`
+- Upstream: `libopus-sys/opus/src/opus_decoder.c:92-123`; `libopus-sys/opus/celt/celt_decoder.c:136-155`
+- Detail: Rust now uses `debug_assert!` in validation helpers, aligning production behavior with upstream `VALIDATE_*` checks that are compiled out unless assertion/hardening gates are enabled.
 
-67. [MEDIUM][Runtime Semantics] Decode-loop invariants use unconditional `assert!` in Rust where upstream uses `celt_assert`.
-- Rust: `src/opus/opus_decoder.rs:946`, `src/opus/opus_decoder.rs:1004`, `src/opus/opus_decoder.rs:1095`
+67. [RESOLVED][Runtime Semantics] Decode-loop invariants now match upstream `celt_assert` gating.
+- Rust: `src/opus/opus_decoder.rs`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:777`, `libopus-sys/opus/src/opus_decoder.c:813`, `libopus-sys/opus/src/opus_decoder.c:864`
-- Detail: Upstream uses `celt_assert(...)` for internal invariants (often compiled out in non-assert builds). Rust uses unconditional `assert!`, which can abort decoding at runtime on mismatch conditions where upstream typically continues/returns errors depending on build flags.
+- Detail: Rust decode-loop consistency checks were converted from unconditional `assert!` to `debug_assert_eq!`, preventing release aborts while retaining debug diagnostics.
 
-68. [LOW][Runtime Semantics] Encoder internal invariants use unconditional `assert!` in Rust where upstream uses `celt_assert`.
-- Rust: `src/opus/opus_encoder.rs:2372`, `src/opus/opus_encoder.rs:2508`, `src/opus/opus_encoder.rs:2988`
+68. [RESOLVED][Runtime Semantics] Encoder internal invariants now match upstream `celt_assert` behavior.
+- Rust: `src/opus/opus_encoder.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2118`, `libopus-sys/opus/src/opus_encoder.c:2230`, `libopus-sys/opus/src/opus_encoder.c:2628`
-- Detail: Upstream marks these as `celt_assert(...)` internal checks. Rust promotes them to unconditional `assert!`, which can terminate runtime encode paths in situations where upstream non-assert builds would not abort.
+- Detail: Rust now uses debug-only assertions for these internal invariants, eliminating unconditional runtime abort risk in release builds.
 
 69. [LOW][Encoder CTL] LFE control request parity is missing.
 - Rust: `src/opus/opus_encoder.rs` (no `set_lfe`/`OPUS_SET_LFE`-equivalent public control path found)
@@ -349,10 +349,10 @@ IDs (representative): `61,62,66,67,68,72,79,82,87,93,94,106,135,136,137,139,140,
 - Upstream: `libopus-sys/opus/src/opus.c:392-398` (`opus_packet_parse(const unsigned char *data, opus_int32 len, ...)`), `libopus-sys/opus/src/opus.c:216` (`opus_packet_get_nb_frames(const unsigned char packet[], opus_int32 len)`)
 - Detail: Rust APIs infer length from slice and do not expose explicit `len` parameters, which diverges from upstream C signatures and affects FFI-level compatibility semantics.
 
-93. [MEDIUM][Runtime Semantics][SILK] Multiple SILK control/validation paths use unconditional `panic!(\"libopus: assert(0) called\")`.
-- Rust: `src/silk/check_control_input.rs:56-96`, `src/silk/decoder_set_fs.rs:55`, `src/silk/enc_API.rs:79`, `src/silk/enc_API.rs:86`, `src/silk/enc_API.rs:148`, `src/silk/enc_API.rs:186`, `src/silk/enc_API.rs:216-219`, `src/silk/dec_API.rs:144-148`, `src/silk/resampler/mod.rs:127-138`
-- Upstream: representative assert sites such as `libopus-sys/opus/silk/enc_API.c:264`, `libopus-sys/opus/silk/enc_API.c:526`, `libopus-sys/opus/silk/decoder_set_fs.c:89`
-- Detail: Upstream uses `silk_assert`/`celt_assert` in these invariant paths (typically compile-time no-op in non-assert builds). Rust panics unconditionally, changing runtime failure semantics.
+93. [MEDIUM][Runtime Semantics][SILK] Remaining unconditional panic paths are now limited to SILK resampler init validation.
+- Rust: `src/silk/resampler/mod.rs:155`, `src/silk/resampler/mod.rs:168`
+- Upstream: `libopus-sys/opus/silk/resampler.c` (`silk_resampler_init` returns error status on invalid Fs combinations; assert-gated diagnostics)
+- Detail: `check_control_input`, `enc_API`, `dec_API`, and `decoder_set_fs` panic sites were converted to status returns or debug-only assertions. Remaining divergence is that Rust `silk_resampler_init` still panics on invalid rate tuples instead of exposing an error-return path.
 
 94. [LOW][Runtime Semantics][DRED] DRED 16 kHz conversion helper panics on unsupported sample rates.
 - Rust: `src/dnn/dred/encoder.rs:160`

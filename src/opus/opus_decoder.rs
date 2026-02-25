@@ -303,8 +303,8 @@ impl OpusDecoder {
 }
 
 fn validate_opus_decoder(st: &OpusDecoder) {
-    assert!(st.channels == 1 || st.channels == 2);
-    assert!(
+    debug_assert!(st.channels == 1 || st.channels == 2);
+    debug_assert!(
         st.Fs == 48000
             || st.Fs == 24000
             || st.Fs == 16000
@@ -312,27 +312,27 @@ fn validate_opus_decoder(st: &OpusDecoder) {
             || st.Fs == 8000
             || cfg!(feature = "qext") && st.Fs == 96000
     );
-    assert!(st.DecControl.API_sampleRate == st.Fs);
-    assert!(
+    debug_assert!(st.DecControl.API_sampleRate == st.Fs);
+    debug_assert!(
         st.DecControl.internalSampleRate == 0
             || st.DecControl.internalSampleRate == 16000
             || st.DecControl.internalSampleRate == 12000
             || st.DecControl.internalSampleRate == 8000
     );
-    assert!(st.DecControl.nChannelsAPI == st.channels as usize);
-    assert!(
+    debug_assert!(st.DecControl.nChannelsAPI == st.channels as usize);
+    debug_assert!(
         st.DecControl.nChannelsInternal == 0
             || st.DecControl.nChannelsInternal == 1
             || st.DecControl.nChannelsInternal == 2
     );
-    assert!(
+    debug_assert!(
         st.DecControl.payloadSize_ms == 0
             || st.DecControl.payloadSize_ms == 10
             || st.DecControl.payloadSize_ms == 20
             || st.DecControl.payloadSize_ms == 40
             || st.DecControl.payloadSize_ms == 60
     );
-    assert!(st.stream_channels == 1 || st.stream_channels == 2);
+    debug_assert!(st.stream_channels == 1 || st.stream_channels == 2);
 }
 
 fn smooth_fade(
@@ -966,7 +966,7 @@ pub fn opus_decode_native(
                 break;
             }
         }
-        assert!(pcm_count == frame_size);
+        debug_assert_eq!(pcm_count, frame_size);
         let _ = _opus_false() != 0;
         st.last_packet_duration = pcm_count;
         return pcm_count;
@@ -1037,7 +1037,7 @@ pub fn opus_decode_native(
                 st.last_packet_duration = duration_copy;
                 return ret_0;
             }
-            assert!(ret_0 == frame_size - packet_frame_size);
+            debug_assert_eq!(ret_0, frame_size - packet_frame_size);
         }
         st.mode = packet_mode;
         st.bandwidth = packet_bandwidth;
@@ -1128,7 +1128,7 @@ pub fn opus_decode_native(
         if ret_1 < 0 {
             return ret_1;
         }
-        assert!(ret_1 == packet_frame_size);
+        debug_assert_eq!(ret_1, packet_frame_size);
         data = &data[size[i as usize] as usize..];
         nb_samples += ret_1 as usize;
         i += 1;
@@ -1167,7 +1167,7 @@ pub fn opus_decode(
             return OPUS_INVALID_PACKET;
         }
     }
-    assert!(st.channels == 1 || st.channels == 2);
+    debug_assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
     let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
@@ -1209,7 +1209,7 @@ pub fn opus_decode24(
             return OPUS_INVALID_PACKET;
         }
     }
-    assert!(st.channels == 1 || st.channels == 2);
+    debug_assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
     let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 0);

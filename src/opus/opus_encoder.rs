@@ -2630,7 +2630,7 @@ pub fn opus_encode_native(
         } else if curr_bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
             st.silk_mode.desiredInternalSampleRate = 12000;
         } else {
-            assert!(st.mode == 1001 || curr_bandwidth == 1103);
+            debug_assert!(st.mode == 1001 || curr_bandwidth == 1103);
             st.silk_mode.desiredInternalSampleRate = 16000;
         }
         if st.mode == MODE_HYBRID {
@@ -2766,7 +2766,7 @@ pub fn opus_encode_native(
                 curr_bandwidth = OPUS_BANDWIDTH_WIDEBAND;
             }
         } else {
-            assert!(st.silk_mode.internalSampleRate == 16000)
+            debug_assert!(st.silk_mode.internalSampleRate == 16000)
         };
         st.silk_mode.opusCanSwitch =
             (st.silk_mode.switchReady != 0 && st.nonfinal_frame == 0) as i32;
@@ -3280,7 +3280,7 @@ pub fn opus_encode_native(
                 );
                 if dred_bytes > 0 {
                     let total_dred_bytes = dred_bytes + DRED_EXPERIMENTAL_BYTES;
-                    assert!(total_dred_bytes <= dred_bytes_left as usize);
+                    debug_assert!(total_dred_bytes <= dred_bytes_left as usize);
                     extensions.push(crate::opus::extensions::OpusExtensionData {
                         id: DRED_EXTENSION_ID,
                         frame: 0,

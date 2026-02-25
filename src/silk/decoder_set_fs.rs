@@ -16,8 +16,8 @@ use crate::silk::tables_pitch_lag::{
 /// Upstream C: silk/decoder_set_fs.c:silk_decoder_set_fs
 pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_Hz: i32) -> i32 {
     let mut frame_length: i32 = 0;
-    assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
-    assert!(psDec.nb_subfr == 4 || psDec.nb_subfr == 4 / 2);
+    debug_assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
+    debug_assert!(psDec.nb_subfr == 4 || psDec.nb_subfr == 4 / 2);
     psDec.subfr_length = 5 * fs_kHz as usize;
     frame_length = psDec.nb_subfr as i16 as i32 * psDec.subfr_length as i16 as i32;
     if psDec.fs_kHz != fs_kHz || psDec.fs_API_hz != fs_API_Hz {
@@ -52,7 +52,7 @@ pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_H
             } else if fs_kHz == 8 {
                 psDec.pitch_lag_low_bits_iCDF = &silk_uniform4_iCDF;
             } else {
-                panic!("libopus: assert(0) called");
+                debug_assert!(false, "libopus: assert(0) called");
             }
             psDec.first_frame_after_reset = 1;
             psDec.lagPrev = 100;
@@ -64,7 +64,7 @@ pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_H
         psDec.fs_kHz = fs_kHz;
         psDec.frame_length = frame_length as usize;
     }
-    assert!(psDec.frame_length > 0 && psDec.frame_length <= 5 * 4 * 16);
+    debug_assert!(psDec.frame_length > 0 && psDec.frame_length <= 5 * 4 * 16);
 
     0
 }

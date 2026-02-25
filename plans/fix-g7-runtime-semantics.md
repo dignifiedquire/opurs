@@ -25,6 +25,19 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-25: Continued assert-gate parity cleanup in encoder/decoder hot paths:
+  - `src/opus/opus_decoder.rs`: switched decoder invariant validation and decode-loop internal consistency checks from unconditional `assert!` to `debug_assert!`/`debug_assert_eq!`, matching upstream `VALIDATE_*`/`celt_assert` production behavior.
+  - `src/celt/celt_decoder.rs`: switched `validate_celt_decoder()` invariant checks to debug-only assertions.
+  - `src/opus/opus_encoder.rs`: switched three remaining runtime `assert!` sites (bandwidth/internal-rate/DRED-size invariants) to debug-only assertions, matching upstream `celt_assert` behavior.
+  - `src/silk/enc_API.rs`: aligned channel-setup loops with upstream (`nChannelsAPI` bounded), added missing entry `celt_assert` equivalent as debug-only, and converted remaining internal invariant asserts to debug-only checks.
+- 2026-02-25: Aligned additional SILK decode-path error semantics and coverage:
+  - `src/silk/dec_API.rs`: converted invalid payload-size and invalid internal-sample-rate branches from panic behavior to upstream-style `SILK_DEC_INVALID_FRAME_SIZE` / `SILK_DEC_INVALID_SAMPLING_FREQUENCY` status returns.
+  - `src/silk/dec_API.rs`: added unit tests that exercise those two status-return paths directly.
+  - `src/silk/decoder_set_fs.rs` and `src/silk/float/LPC_analysis_filter_FLP.rs`: converted remaining unconditional internal asserts/panic branches to debug-only assertion behavior matching upstream `celt_assert` semantics.
+- 2026-02-25: Aligned SILK encoder control validation/runtime semantics with upstream status-code behavior:
+  - `src/silk/check_control_input.rs` now returns `SILK_ENC_*` error codes instead of panicking.
+  - Added unit coverage for valid controls plus invalid payload/loss/complexity/channel paths and qext-gated 96 kHz API-rate acceptance.
+  - `src/silk/enc_API.rs` now propagates control/input validation failures as return codes (`SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES` / check-control return) instead of panicking in `silk_InitEncoder` and early `silk_Encode` validation gates.
 - 2026-02-24: Aligned `opus_strerror()` output strings in `src/celt/common.rs` to upstream canonical text (removed numeric suffix decorations).
 - 2026-02-24: Replaced `resampling_factor()` panic path with upstream-style `0` return on unsupported rates (`src/celt/common.rs`), and propagated this to non-panicking `OPUS_BAD_ARG` returns in CELT init paths.
 - 2026-02-24: Converted `celt_decoder_init()` and internal custom-decoder init to return `Result<_, i32>` instead of panicking on invalid sampling rates/channels (`src/celt/celt_decoder.rs`), and propagated through `OpusDecoder::new`.

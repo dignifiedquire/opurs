@@ -37,7 +37,7 @@ pub mod errors_h {
     pub const SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES: i32 = -(101);
     pub const SILK_NO_ERROR: i32 = 0;
 }
-use self::errors_h::SILK_NO_ERROR;
+use self::errors_h::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 use crate::arch::Arch;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
@@ -78,14 +78,14 @@ pub fn silk_InitEncoder(
     for n in 0..ENCODER_NUM_CHANNELS as usize {
         ret += silk_init_encoder(&mut psEnc.state_Fxx[n], arch);
         if ret != 0 {
-            panic!("libopus: assert(0) called");
+            return ret;
         }
     }
     psEnc.nChannelsAPI = 1;
     psEnc.nChannelsInternal = 1;
     ret += silk_QueryEncoder(psEnc, encStatus);
     if ret != 0 {
-        panic!("libopus: assert(0) called");
+        return ret;
     }
     ret
 }
@@ -139,15 +139,25 @@ pub fn silk_Encode(
     let mut samplesIn_off: usize = 0;
     let mut nSamplesIn = nSamplesIn;
 
+    debug_assert!(
+        encControl.nChannelsAPI >= encControl.nChannelsInternal
+            && encControl.nChannelsAPI >= psEnc.nChannelsInternal
+    );
     if encControl.reducedDependency != 0 {
-        psEnc.state_Fxx[0].sCmn.first_frame_after_reset = 1;
-        psEnc.state_Fxx[1].sCmn.first_frame_after_reset = 1;
+        n = 0;
+        while n < encControl.nChannelsAPI {
+            psEnc.state_Fxx[n as usize].sCmn.first_frame_after_reset = 1;
+            n += 1;
+        }
     }
-    psEnc.state_Fxx[0].sCmn.nFramesEncoded = 0;
-    psEnc.state_Fxx[1].sCmn.nFramesEncoded = 0;
+    n = 0;
+    while n < encControl.nChannelsAPI {
+        psEnc.state_Fxx[n as usize].sCmn.nFramesEncoded = 0;
+        n += 1;
+    }
     ret = check_control_input(encControl);
     if ret != 0 {
-        panic!("libopus: assert(0) called");
+        return ret;
     }
     encControl.switchReady = 0;
     if encControl.nChannelsInternal > psEnc.nChannelsInternal {
@@ -185,7 +195,7 @@ pub fn silk_Encode(
             saved_fs_kHz: 0,
         };
         if nBlocksOf10ms != 1 {
-            panic!("libopus: assert(0) called");
+            return SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES;
         }
         if prefillFlag == 2 {
             save_LP = psEnc.state_Fxx[0].sCmn.sLP;
@@ -198,7 +208,7 @@ pub fn silk_Encode(
             if prefillFlag == 2 {
                 psEnc.state_Fxx[n as usize].sCmn.sLP = save_LP;
             }
-            assert!(ret == 0);
+            debug_assert_eq!(ret, 0);
             n += 1;
         }
         tmp_payloadSize_ms = encControl.payloadSize_ms;
@@ -215,10 +225,10 @@ pub fn silk_Encode(
         }
     } else {
         if nBlocksOf10ms * encControl.API_sampleRate != 100 * nSamplesIn || nSamplesIn < 0 {
-            panic!("libopus: assert(0) called");
+            return SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES;
         }
         if 1000 * nSamplesIn > encControl.payloadSize_ms * encControl.API_sampleRate {
-            panic!("libopus: assert(0) called");
+            return SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES;
         }
     }
     n = 0;
@@ -248,7 +258,7 @@ pub fn silk_Encode(
         psEnc.state_Fxx[n as usize].sCmn.inDTX = psEnc.state_Fxx[n as usize].sCmn.useDTX;
         n += 1;
     }
-    assert!(
+    debug_assert!(
         encControl.nChannelsInternal == 1
             || psEnc.state_Fxx[0].sCmn.fs_kHz == psEnc.state_Fxx[1].sCmn.fs_kHz
     );
@@ -343,7 +353,7 @@ pub fn silk_Encode(
             }
             psEnc.state_Fxx[0].sCmn.inputBufIx += nSamplesToBuffer;
         } else {
-            assert!(encControl.nChannelsAPI == 1 && encControl.nChannelsInternal == 1);
+            debug_assert!(encControl.nChannelsAPI == 1 && encControl.nChannelsInternal == 1);
             for k in 0..nSamplesFromInput as usize {
                 buf[k] = FLOAT2INT16(samplesIn[samplesIn_off + k]);
             }
@@ -364,8 +374,11 @@ pub fn silk_Encode(
         if psEnc.state_Fxx[0].sCmn.inputBufIx < psEnc.state_Fxx[0].sCmn.frame_length as i32 {
             break;
         }
-        assert!(psEnc.state_Fxx[0].sCmn.inputBufIx == psEnc.state_Fxx[0].sCmn.frame_length as i32);
-        assert!(
+        debug_assert_eq!(
+            psEnc.state_Fxx[0].sCmn.inputBufIx,
+            psEnc.state_Fxx[0].sCmn.frame_length as i32
+        );
+        debug_assert!(
             encControl.nChannelsInternal == 1
                 || psEnc.state_Fxx[1].sCmn.inputBufIx
                     == psEnc.state_Fxx[1].sCmn.frame_length as i32
@@ -589,7 +602,7 @@ pub fn silk_Encode(
                     maxBits,
                     useCBR,
                 );
-                let _ = ret != 0;
+                debug_assert_eq!(ret, 0);
             }
             psEnc.state_Fxx[n as usize]
                 .sCmn

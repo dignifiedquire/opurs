@@ -159,31 +159,31 @@ const FRAME_PLC_NEURAL: i32 = 4;
 const FRAME_DRED: i32 = 5;
 pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     #[cfg(feature = "qext")]
-    assert!(st.mode.Fs == 48000 || st.mode.Fs == 96000);
+    debug_assert!(st.mode.Fs == 48000 || st.mode.Fs == 96000);
     #[cfg(not(feature = "qext"))]
-    assert_eq!(st.mode.Fs, 48000);
-    assert_eq!(st.overlap, st.mode.overlap);
-    assert!(st.channels == 1 || st.channels == 2);
-    assert!(st.stream_channels == 1 || st.stream_channels == 2);
-    assert!(st.downsample > 0);
-    assert!(st.start == 0 || st.start == 17);
-    assert!(st.start < st.end);
-    assert!(st.end <= st.mode.effEBands);
+    debug_assert_eq!(st.mode.Fs, 48000);
+    debug_assert_eq!(st.overlap, st.mode.overlap);
+    debug_assert!(st.channels == 1 || st.channels == 2);
+    debug_assert!(st.stream_channels == 1 || st.stream_channels == 2);
+    debug_assert!(st.downsample > 0);
+    debug_assert!(st.start == 0 || st.start == 17);
+    debug_assert!(st.start < st.end);
+    debug_assert!(st.end <= st.mode.effEBands);
     // arch is now an enum — no range check needed
-    assert!(st.last_pitch_index <= PLC_PITCH_LAG_MAX * decoder_qext_scale(st));
-    assert!(
+    debug_assert!(st.last_pitch_index <= PLC_PITCH_LAG_MAX * decoder_qext_scale(st));
+    debug_assert!(
         st.last_pitch_index >= PLC_PITCH_LAG_MIN * decoder_qext_scale(st)
             || st.last_pitch_index == 0
     );
     let max_period = decoder_max_period(st);
-    assert!(st.postfilter_period < max_period);
-    assert!(st.postfilter_period >= 15 || st.postfilter_period == 0);
-    assert!(st.postfilter_period_old < max_period);
-    assert!(st.postfilter_period_old >= 15 || st.postfilter_period_old == 0);
-    assert!(st.postfilter_tapset <= 2);
-    assert!(st.postfilter_tapset >= 0);
-    assert!(st.postfilter_tapset_old <= 2);
-    assert!(st.postfilter_tapset_old >= 0);
+    debug_assert!(st.postfilter_period < max_period);
+    debug_assert!(st.postfilter_period >= 15 || st.postfilter_period == 0);
+    debug_assert!(st.postfilter_period_old < max_period);
+    debug_assert!(st.postfilter_period_old >= 15 || st.postfilter_period_old == 0);
+    debug_assert!(st.postfilter_tapset <= 2);
+    debug_assert!(st.postfilter_tapset >= 0);
+    debug_assert!(st.postfilter_tapset_old <= 2);
+    debug_assert!(st.postfilter_tapset_old >= 0);
 }
 pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCustomDecoder, i32> {
     #[cfg(feature = "qext")]

@@ -107,7 +107,7 @@ pub fn silk_LPC_analysis_filter_FLP(
     length: i32,
     Order: i32,
 ) {
-    assert!(Order <= length);
+    debug_assert!(Order <= length);
     match Order {
         6 => {
             silk_LPC_analysis_filter6_FLP(r_LPC, PredCoef, s, length);
@@ -125,7 +125,7 @@ pub fn silk_LPC_analysis_filter_FLP(
             silk_LPC_analysis_filter16_FLP(r_LPC, PredCoef, s, length);
         }
         _ => {
-            panic!("libopus: assert(0) called");
+            debug_assert!(false, "libopus: assert(0) called");
         }
     }
     r_LPC[..Order as usize].fill(0.0);

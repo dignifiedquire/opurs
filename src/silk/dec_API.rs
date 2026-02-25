@@ -34,10 +34,11 @@ pub const FLAG_PACKET_LOST: i32 = 1;
 pub mod errors_h {
     pub const SILK_DEC_INVALID_SAMPLING_FREQUENCY: i32 = -(200);
     pub const SILK_NO_ERROR: i32 = 0;
-    #[allow(unused)]
     pub const SILK_DEC_INVALID_FRAME_SIZE: i32 = -(203);
 }
-use self::errors_h::{SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR};
+use self::errors_h::{
+    SILK_DEC_INVALID_FRAME_SIZE, SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR,
+};
 use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_icdf};
 use crate::silk::decode_frame::silk_decode_frame;
 use crate::silk::decode_indices::silk_decode_indices;
@@ -111,7 +112,7 @@ pub fn silk_Decode(
     let psDec = decState;
     let channel_state = &mut psDec.channel_state;
 
-    assert!(decControl.nChannelsInternal == 1 || decControl.nChannelsInternal == 2);
+    debug_assert!(decControl.nChannelsInternal == 1 || decControl.nChannelsInternal == 2);
     if newPacketFlag != 0 {
         n = 0;
         while n < decControl.nChannelsInternal {
@@ -142,12 +143,11 @@ pub fn silk_Decode(
                 channel_state[n as usize].nFramesPerPacket = 3;
                 channel_state[n as usize].nb_subfr = 4;
             } else {
-                // see comments in `[opurs::silk::check_control_input]`
-                panic!("libopus: assert(0) called");
+                return SILK_DEC_INVALID_FRAME_SIZE;
             }
             let fs_kHz_dec: i32 = (decControl.internalSampleRate >> 10) + 1;
             if fs_kHz_dec != 8 && fs_kHz_dec != 12 && fs_kHz_dec != 16 {
-                panic!("libopus: assert(0) called");
+                return SILK_DEC_INVALID_SAMPLING_FREQUENCY;
             }
             ret += silk_decoder_set_fs(
                 &mut channel_state[n as usize],
@@ -235,7 +235,7 @@ pub fn silk_Decode(
                         let frame_length = channel_state[n as usize].frame_length;
                         let mut shell_frames = frame_length / SHELL_CODEC_FRAME_LENGTH;
                         if shell_frames * SHELL_CODEC_FRAME_LENGTH < frame_length {
-                            assert_eq!(frame_length, 12 * 10);
+                            debug_assert_eq!(frame_length, 12 * 10);
                             shell_frames += 1;
                         }
                         let frame_buffer_length = shell_frames * SHELL_CODEC_FRAME_LENGTH;
@@ -545,4 +545,88 @@ pub fn silk_Decode(
         psDec.prev_decode_only_middle = decode_only_middle;
     }
     ret
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arch::Arch;
+    use crate::celt::entdec::ec_dec_init;
+
+    fn baseline_control() -> silk_DecControlStruct {
+        silk_DecControlStruct {
+            nChannelsAPI: 1,
+            nChannelsInternal: 1,
+            API_sampleRate: 16_000,
+            internalSampleRate: 16_000,
+            payloadSize_ms: 20,
+            prevPitchLag: 0,
+            enable_deep_plc: false,
+            #[cfg(feature = "osce")]
+            osce_method: 0,
+            #[cfg(feature = "osce")]
+            enable_osce_bwe: false,
+            #[cfg(feature = "osce")]
+            osce_extended_mode: 0,
+            #[cfg(feature = "osce")]
+            prev_osce_extended_mode: 0,
+        }
+    }
+
+    fn decode_once(
+        dec: &mut silk_decoder,
+        ctrl: &mut silk_DecControlStruct,
+        out: &mut [f32],
+    ) -> i32 {
+        let mut bytes = [0u8; 1];
+        let mut range_dec = ec_dec_init(&mut bytes);
+        let mut n_samples_out = 0;
+        #[cfg(feature = "deep-plc")]
+        {
+            silk_Decode(
+                dec,
+                ctrl,
+                FLAG_PACKET_LOST,
+                1,
+                &mut range_dec,
+                out,
+                &mut n_samples_out,
+                None,
+                Arch::default(),
+            )
+        }
+        #[cfg(not(feature = "deep-plc"))]
+        {
+            silk_Decode(
+                dec,
+                ctrl,
+                FLAG_PACKET_LOST,
+                1,
+                &mut range_dec,
+                out,
+                &mut n_samples_out,
+                Arch::default(),
+            )
+        }
+    }
+
+    #[test]
+    fn decode_rejects_invalid_payload_size() {
+        let mut dec = silk_InitDecoder();
+        let mut ctrl = baseline_control();
+        let mut out = [0.0f32; 960];
+        ctrl.payloadSize_ms = 15;
+        let ret = decode_once(&mut dec, &mut ctrl, &mut out);
+        assert_eq!(ret, SILK_DEC_INVALID_FRAME_SIZE);
+    }
+
+    #[test]
+    fn decode_rejects_invalid_internal_sampling_frequency() {
+        let mut dec = silk_InitDecoder();
+        let mut ctrl = baseline_control();
+        let mut out = [0.0f32; 960];
+        ctrl.internalSampleRate = 44_100;
+        let ret = decode_once(&mut dec, &mut ctrl, &mut out);
+        assert_eq!(ret, SILK_DEC_INVALID_SAMPLING_FREQUENCY);
+    }
 }
