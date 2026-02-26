@@ -4,9 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-Open: `12,45,76,179,180,191,192,193,194,235`
+Open: `12,45,76,179,180,191,192,193,194`
 Excluded (intentional API-shape): `177,178`
-Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,216,217,219,220,221`
+Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,215,216,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
@@ -43,3 +43,4 @@ Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,216,21
   - `210`: `compute_pitchdnn` includes `arch`.
   - `211`: `PitchDNNState` now includes `xcorr_mem3` (state-layout parity).
   - `216`: LPCNet feature extraction entry points thread `arch`.
+- 2026-02-26: Aligned DNN conv2d algorithmic path with upstream by adding the `ktime==3 && kheight==3` fast-path branch (`conv2d_3x3_float`) in `compute_conv2d`, and added `tests/osce_nndsp.rs:test_compute_conv2d_3x3` for bit-exact C-vs-Rust coverage.

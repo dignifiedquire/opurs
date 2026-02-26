@@ -39,8 +39,10 @@ int osce_test_compute_linear_nolace_tdshape(float *out, unsigned int seed);
 int osce_test_compute_linear_nolace_af2(float *out, unsigned int seed);
 int osce_test_celt_pitch_xcorr(float *out, int max_pitch, unsigned int seed);
 int osce_test_compute_linear_int8(float *out, unsigned int seed);
+int osce_test_compute_linear_int8_arch(float *out, unsigned int seed, int arch);
 int osce_test_gru_lace_fnet(float *out, unsigned int seed);
 int osce_test_dense_tanh_lace_tconv(float *out, unsigned int seed);
+int osce_test_compute_conv2d_3x3(float *out, unsigned int seed);
 int osce_test_adacomb_intermediates(float *out, unsigned int seed);
 #endif
 

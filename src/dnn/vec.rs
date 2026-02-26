@@ -421,9 +421,7 @@ pub fn cgemv8x4_scalar_su(
     for i in 0..cols {
         x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    let mut acc = vec![0i32; rows];
     let mut w_pos = 0;
     for i in (0..rows).step_by(8) {
         for j in (0..cols).step_by(4) {
@@ -432,16 +430,16 @@ pub fn cgemv8x4_scalar_su(
             let xj2 = x[j + 2] as i32;
             let xj3 = x[j + 3] as i32;
             for k in 0..8 {
-                out[i + k] += (w[w_pos + k * 4] as i32 * xj0
+                acc[i + k] += w[w_pos + k * 4] as i32 * xj0
                     + w[w_pos + k * 4 + 1] as i32 * xj1
                     + w[w_pos + k * 4 + 2] as i32 * xj2
-                    + w[w_pos + k * 4 + 3] as i32 * xj3) as f32;
+                    + w[w_pos + k * 4 + 3] as i32 * xj3;
             }
             w_pos += 32;
         }
     }
     for i in 0..rows {
-        out[i] *= scale[i];
+        out[i] = acc[i] as f32 * scale[i];
     }
 }
 
@@ -469,9 +467,7 @@ pub fn cgemv8x4_scalar_su_ssse3(
     for i in 0..cols {
         x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    let mut acc = vec![0i32; rows];
     let mut w_pos = 0;
     for i in (0..rows).step_by(8) {
         for j in (0..cols).step_by(4) {
@@ -486,13 +482,13 @@ pub fn cgemv8x4_scalar_su_ssse3(
                 let w3 = w[w_pos + k * 4 + 3] as i32;
                 let p01 = sat_i16(w0 * xj0 + w1 * xj1);
                 let p23 = sat_i16(w2 * xj2 + w3 * xj3);
-                out[i + k] += (p01 + p23) as f32;
+                acc[i + k] += p01 + p23;
             }
             w_pos += 32;
         }
     }
     for i in 0..rows {
-        out[i] *= scale[i];
+        out[i] = acc[i] as f32 * scale[i];
     }
 }
 
@@ -563,9 +559,7 @@ pub fn sparse_cgemv8x4_scalar_su(
     for i in 0..cols {
         x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    let mut acc = vec![0i32; rows];
     let mut w_pos = 0;
     let mut idx_pos = 0;
     for i in (0..rows).step_by(8) {
@@ -579,16 +573,16 @@ pub fn sparse_cgemv8x4_scalar_su(
             let xj2 = x[pos + 2] as i32;
             let xj3 = x[pos + 3] as i32;
             for k in 0..8 {
-                out[i + k] += (w[w_pos + k * 4] as i32 * xj0
+                acc[i + k] += w[w_pos + k * 4] as i32 * xj0
                     + w[w_pos + k * 4 + 1] as i32 * xj1
                     + w[w_pos + k * 4 + 2] as i32 * xj2
-                    + w[w_pos + k * 4 + 3] as i32 * xj3) as f32;
+                    + w[w_pos + k * 4 + 3] as i32 * xj3;
             }
             w_pos += 32;
         }
     }
     for i in 0..rows {
-        out[i] *= scale[i];
+        out[i] = acc[i] as f32 * scale[i];
     }
 }
 
@@ -609,9 +603,7 @@ pub fn sparse_cgemv8x4_scalar_su_ssse3(
     for i in 0..cols {
         x[i] = (127.0f64 + (0.5f64 + 127.0f64 * _x[i] as f64).floor()) as u8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    let mut acc = vec![0i32; rows];
     let mut w_pos = 0;
     let mut idx_pos = 0;
     for i in (0..rows).step_by(8) {
@@ -631,13 +623,13 @@ pub fn sparse_cgemv8x4_scalar_su_ssse3(
                 let w3 = w[w_pos + k * 4 + 3] as i32;
                 let p01 = sat_i16(w0 * xj0 + w1 * xj1);
                 let p23 = sat_i16(w2 * xj2 + w3 * xj3);
-                out[i + k] += (p01 + p23) as f32;
+                acc[i + k] += p01 + p23;
             }
             w_pos += 32;
         }
     }
     for i in 0..rows {
-        out[i] *= scale[i];
+        out[i] = acc[i] as f32 * scale[i];
     }
 }
 

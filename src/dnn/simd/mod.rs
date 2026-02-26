@@ -29,19 +29,18 @@ pub fn sgemv(
     cols: usize,
     col_stride: usize,
     x: &[f32],
-    arch: Arch,
+    _arch: Arch,
 ) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
             aarch64::sgemv_neon(out, weights, rows, cols, col_stride, x);
         }
         return;
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::sgemv_avx2(out, weights, rows, cols, col_stride, x);
             }
@@ -63,19 +62,18 @@ pub fn sparse_sgemv8x4(
     idx: &[i32],
     rows: usize,
     x: &[f32],
-    arch: Arch,
+    _arch: Arch,
 ) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
             aarch64::sparse_sgemv8x4_neon(out, w, idx, rows, x);
         }
         return;
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::sparse_sgemv8x4_avx2(out, w, idx, rows, x);
             }
@@ -98,12 +96,12 @@ pub fn cgemv8x4(
     rows: usize,
     cols: usize,
     x: &[f32],
-    arch: Arch,
+    _arch: Arch,
 ) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
-            if arch.has_dotprod() {
+            if _arch.has_dotprod() {
                 aarch64::cgemv8x4_dotprod(out, w, scale, rows, cols, x);
             } else {
                 aarch64::cgemv8x4_neon(out, w, scale, rows, cols, x);
@@ -114,23 +112,26 @@ pub fn cgemv8x4(
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::cgemv8x4_avx2(out, w, scale, rows, cols, x);
             }
             return;
         }
         // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
-        if arch.has_sse4_1() {
+        if _arch.has_sse4_1() {
             super::vec::cgemv8x4_scalar_su_ssse3(out, w, scale, rows, cols, x);
             return;
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
             super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
             return;
         }
-        super::vec::cgemv8x4_scalar(out, w, scale, rows, cols, x);
+        // Upstream x86 compiles vec_avx.h for all runtime arch tiers, including
+        // arch=0/1 entries that still dispatch to compute_linear_c.
+        // Keep USE_SU_BIAS quantization in this fallback too.
+        super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
         return;
     }
 
@@ -150,12 +151,12 @@ pub fn sparse_cgemv8x4(
     rows: usize,
     cols: usize,
     x: &[f32],
-    arch: Arch,
+    _arch: Arch,
 ) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
-            if arch.has_dotprod() {
+            if _arch.has_dotprod() {
                 aarch64::sparse_cgemv8x4_dotprod(out, w, idx, scale, rows, cols, x);
             } else {
                 aarch64::sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
@@ -166,23 +167,24 @@ pub fn sparse_cgemv8x4(
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::sparse_cgemv8x4_avx2(out, w, idx, scale, rows, cols, x);
             }
             return;
         }
         // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
-        if arch.has_sse4_1() {
+        if _arch.has_sse4_1() {
             super::vec::sparse_cgemv8x4_scalar_su_ssse3(out, w, idx, scale, rows, cols, x);
             return;
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
             super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
             return;
         }
-        super::vec::sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x);
+        // Upstream x86 compute_linear_c also uses USE_SU_BIAS at low arch tiers.
+        super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
         return;
     }
 
@@ -206,18 +208,17 @@ pub fn sparse_cgemv8x4(
 /// This matches C's `vec_avx.h:tanh_approx` which uses `_mm256_rcp_ps` (approximate
 /// reciprocal) rather than true division, producing slightly different results.
 #[inline]
-pub fn tanh_approx(x: f32, arch: Arch) -> f32 {
+pub fn tanh_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         return unsafe { aarch64::tanh_approx_neon(x) };
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             return unsafe { x86::tanh_approx_avx2(x) };
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             return unsafe { x86::tanh_approx_sse2(x) };
         }
     }
@@ -233,18 +234,17 @@ pub fn tanh_approx(x: f32, arch: Arch) -> f32 {
 /// On aarch64: broadcasts into NEON, calls sigmoid4_approx, extracts lane 0.
 /// On x86 with AVX2: broadcasts into __m256, calls sigmoid8_approx, extracts lane 0.
 #[inline]
-pub fn sigmoid_approx(x: f32, arch: Arch) -> f32 {
+pub fn sigmoid_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         return unsafe { aarch64::sigmoid_approx_neon(x) };
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             return unsafe { x86::sigmoid_approx_avx2(x) };
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             return unsafe { x86::sigmoid_approx_sse2(x) };
         }
     }
@@ -260,15 +260,14 @@ pub fn sigmoid_approx(x: f32, arch: Arch) -> f32 {
 /// On aarch64: broadcasts into NEON, calls exp4_approx, extracts lane 0.
 /// On x86 with AVX2: broadcasts into __m256, calls exp8_approx, extracts lane 0.
 #[inline]
-pub fn lpcnet_exp(x: f32, arch: Arch) -> f32 {
+pub fn lpcnet_exp(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         return unsafe { aarch64::lpcnet_exp_neon(x) };
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             return unsafe { x86::lpcnet_exp_avx2(x) };
         }
     }
@@ -281,24 +280,23 @@ pub fn lpcnet_exp(x: f32, arch: Arch) -> f32 {
 
 /// SIMD-accelerated batch tanh approximation.
 #[inline]
-pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
+pub fn vec_tanh(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
             aarch64::vec_tanh_neon(y, x);
         }
         return;
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::vec_tanh_avx2(y, x);
             }
             return;
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             unsafe {
                 x86::vec_tanh_sse2(y, x);
             }
@@ -314,24 +312,23 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
 
 /// SIMD-accelerated batch sigmoid approximation.
 #[inline]
-pub fn vec_sigmoid(y: &mut [f32], x: &[f32], arch: Arch) {
+pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
             aarch64::vec_sigmoid_neon(y, x);
         }
         return;
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::vec_sigmoid_avx2(y, x);
             }
             return;
         }
-        if arch.has_sse2() {
+        if _arch.has_sse2() {
             unsafe {
                 x86::vec_sigmoid_sse2(y, x);
             }
@@ -366,7 +363,8 @@ pub fn use_su_bias(arch: Arch) -> bool {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        return arch.has_sse2(); // x86 vec_avx.h paths use USE_SU_BIAS for SSE2+
+        let _ = arch;
+        return true; // x86 build uses vec_avx.h (USE_SU_BIAS) for all arch tiers
     }
 
     #[allow(unreachable_code)]
@@ -377,18 +375,17 @@ pub fn use_su_bias(arch: Arch) -> bool {
 
 /// SIMD-accelerated batch softmax (unnormalized exp).
 #[inline]
-pub fn softmax(y: &mut [f32], x: &[f32], arch: Arch) {
+pub fn softmax(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
+    {
         unsafe {
             aarch64::softmax_neon(y, x);
         }
         return;
     }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if arch.has_avx2() {
+        if _arch.has_avx2() {
             unsafe {
                 x86::softmax_avx2(y, x);
             }

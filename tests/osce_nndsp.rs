@@ -10,6 +10,11 @@ use opurs::dnn::nndsp::*;
 use opurs::dnn::osce::*;
 use opurs::dnn::weights::compiled_weights;
 
+unsafe extern "C" {
+    fn osce_test_compute_conv2d_3x3(out: *mut f32, seed: u32) -> i32;
+    fn osce_test_compute_linear_int8_arch(out: *mut f32, seed: u32, arch: i32) -> i32;
+}
+
 /// Same xorshift32 PRNG as the C test harness.
 struct Prng(u32);
 
@@ -575,6 +580,61 @@ fn test_compute_linear_int8_lace_fnet_conv2() {
     compare_outputs("compute_linear_int8_lace_fnet_conv2", &rust_out, &c_out);
 }
 
+/// Verify compute_linear int8 path respects forced arch tiers like upstream RTCD.
+#[test]
+fn test_compute_linear_int8_arch_tiers_match_c() {
+    use opurs::arch::Arch;
+    use opurs::dnn::nnet::compute_linear;
+
+    let arrays = compiled_weights();
+    let lace = init_lace(&arrays).expect("LACE init failed");
+    let layer = &lace.layers.fnet_conv2;
+    let nb_inputs = layer.nb_inputs;
+    let nb_outputs = layer.nb_outputs;
+
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..nb_inputs).map(|_| prng.next_float() * 0.1).collect();
+
+    let tiers: Vec<(Arch, i32, &'static str)> = {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            vec![
+                (Arch::Scalar, 0, "scalar"),
+                (Arch::Sse, 1, "sse"),
+                (Arch::Sse2, 2, "sse2"),
+                (Arch::Sse4_1, 3, "sse4_1"),
+                (Arch::Avx2, 4, "avx2"),
+            ]
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            vec![
+                (Arch::Scalar, 0, "scalar"),
+                (Arch::Neon, 3, "neon"),
+                (Arch::DotProd, 4, "dotprod"),
+            ]
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            vec![(Arch::Scalar, 0, "scalar")]
+        }
+    };
+
+    for (arch, c_arch, name) in tiers {
+        let mut c_out = vec![0.0f32; nb_outputs];
+        let c_nb_inputs =
+            unsafe { osce_test_compute_linear_int8_arch(c_out.as_mut_ptr(), SEED, c_arch) }
+                as usize;
+        assert_eq!(c_nb_inputs, nb_inputs);
+
+        let mut rust_out = vec![0.0f32; nb_outputs];
+        compute_linear(layer, &mut rust_out, &input, arch);
+
+        let label = format!("compute_linear_int8_arch_tier_{name}");
+        compare_outputs(&label, &rust_out, &c_out);
+    }
+}
+
 /// Test compute_generic_gru on LACE fnet GRU (int8 weights, 2 steps).
 #[test]
 fn test_gru_lace_fnet() {
@@ -646,6 +706,58 @@ fn test_dense_tanh_lace_tconv() {
     );
 
     compare_outputs("dense_tanh_lace_tconv", &rust_out, &c_out);
+}
+
+/// Test compute_conv2d on a deterministic 3x3 setup against upstream C.
+#[test]
+fn test_compute_conv2d_3x3() {
+    use opurs::dnn::nnet::{compute_conv2d, Conv2dLayer, ACTIVATION_TANH};
+
+    const IN_CHANNELS: usize = 3;
+    const OUT_CHANNELS: usize = 2;
+    const KTIME: usize = 3;
+    const KHEIGHT: usize = 3;
+    const HEIGHT: usize = 17;
+    const HSTRIDE: usize = 17;
+
+    let arch = opurs::arch::opus_select_arch();
+    let time_stride = IN_CHANNELS * (HEIGHT + KHEIGHT - 1);
+    let hist_size = (KTIME - 1) * time_stride;
+    let w_size = OUT_CHANNELS * IN_CHANNELS * KTIME * KHEIGHT;
+
+    let mut prng = Prng::new(SEED);
+    let weights: Vec<f32> = (0..w_size).map(|_| prng.next_float() * 0.25).collect();
+    let bias: Vec<f32> = (0..OUT_CHANNELS).map(|_| prng.next_float() * 0.1).collect();
+    let mem_init: Vec<f32> = (0..hist_size).map(|_| prng.next_float() * 0.05).collect();
+    let input: Vec<f32> = (0..time_stride).map(|_| prng.next_float() * 0.5).collect();
+
+    let conv = Conv2dLayer {
+        bias,
+        float_weights: weights,
+        in_channels: IN_CHANNELS,
+        out_channels: OUT_CHANNELS,
+        ktime: KTIME,
+        kheight: KHEIGHT,
+    };
+
+    let mut rust_mem = mem_init;
+    let mut rust_out = vec![0.0f32; OUT_CHANNELS * HSTRIDE];
+    compute_conv2d(
+        &conv,
+        &mut rust_out,
+        &mut rust_mem,
+        &input,
+        HEIGHT,
+        HSTRIDE,
+        ACTIVATION_TANH,
+        arch,
+    );
+
+    let mut c_out = vec![0.0f32; OUT_CHANNELS * HSTRIDE];
+    let c_len = unsafe { osce_test_compute_conv2d_3x3(c_out.as_mut_ptr(), SEED) } as usize;
+    c_out.truncate(c_len);
+
+    compare_outputs("compute_conv2d_3x3", &rust_out, &c_out);
 }
 
 /// Step-by-step bit-exact comparison of adacomb intermediates between Rust and C.

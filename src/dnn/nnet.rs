@@ -436,6 +436,46 @@ fn conv2d_float(
     }
 }
 
+/// 3x3 specialized convolution used by upstream for common PitchDNN kernels.
+///
+/// Upstream C: dnn/nnet_arch.h:conv2d_3x3_float
+fn conv2d_3x3_float(
+    out: &mut [f32],
+    weights: &[f32],
+    in_channels: usize,
+    out_channels: usize,
+    input: &[f32],
+    height: usize,
+    hstride: usize,
+) {
+    let in_stride = height + 2;
+    for i in 0..out_channels {
+        for j in 0..height {
+            out[i * hstride + j] = 0.0;
+        }
+        for m in 0..in_channels {
+            for j in 0..height {
+                out[i * hstride + j] += weights[i * in_channels * 9 + m * 9]
+                    * input[m * in_stride + j]
+                    + weights[i * in_channels * 9 + m * 9 + 1] * input[m * in_stride + j + 1]
+                    + weights[i * in_channels * 9 + m * 9 + 2] * input[m * in_stride + j + 2]
+                    + weights[i * in_channels * 9 + m * 9 + 3]
+                        * input[in_channels * in_stride + m * in_stride + j]
+                    + weights[i * in_channels * 9 + m * 9 + 4]
+                        * input[in_channels * in_stride + m * in_stride + j + 1]
+                    + weights[i * in_channels * 9 + m * 9 + 5]
+                        * input[in_channels * in_stride + m * in_stride + j + 2]
+                    + weights[i * in_channels * 9 + m * 9 + 6]
+                        * input[2 * in_channels * in_stride + m * in_stride + j]
+                    + weights[i * in_channels * 9 + m * 9 + 7]
+                        * input[2 * in_channels * in_stride + m * in_stride + j + 1]
+                    + weights[i * in_channels * 9 + m * 9 + 8]
+                        * input[2 * in_channels * in_stride + m * in_stride + j + 2];
+            }
+        }
+    }
+}
+
 /// Compute Conv2D layer with temporal memory.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_conv2d_c
@@ -460,17 +500,29 @@ pub fn compute_conv2d(
     // Shift memory
     mem[..hist_size].copy_from_slice(&in_buf[time_stride..time_stride + hist_size]);
 
-    conv2d_float(
-        out,
-        &conv.float_weights,
-        conv.in_channels,
-        conv.out_channels,
-        conv.ktime,
-        conv.kheight,
-        &in_buf,
-        height,
-        hstride,
-    );
+    if conv.kheight == 3 && conv.ktime == 3 {
+        conv2d_3x3_float(
+            out,
+            &conv.float_weights,
+            conv.in_channels,
+            conv.out_channels,
+            &in_buf,
+            height,
+            hstride,
+        );
+    } else {
+        conv2d_float(
+            out,
+            &conv.float_weights,
+            conv.in_channels,
+            conv.out_channels,
+            conv.ktime,
+            conv.kheight,
+            &in_buf,
+            height,
+            hstride,
+        );
+    }
 
     if !conv.bias.is_empty() {
         for i in 0..conv.out_channels {

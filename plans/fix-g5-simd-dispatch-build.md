@@ -4,8 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-Open: `194,202,203,204,205,212,213,230,233,234,235`
-Closed in this group: `107,231,232,237`
+Open: `194,202,203,213,233,234`
+Closed in this group: `107,204,205,212,230,231,232,235,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.
@@ -33,3 +33,7 @@ Closed in this group: `107,231,232,237`
 - 2026-02-26: Closed additional dispatch-semantic gaps:
   - `107`: decoder now threads runtime arch into internal soft-clip implementation (`opus_pcm_soft_clip_impl(..., arch)`).
   - `231`: removed aarch64 NEON override for `silk_inner_product_FLP`; SIMD override now matches upstream x86-AVX2-only behavior.
+- 2026-02-26: Closed additional arch-tier dispatch parity items with deterministic C-vs-Rust coverage:
+  - `204`: `celt_pitch_xcorr` now keeps scalar for non-AVX2 x86 tiers (AVX2-only override parity).
+  - `205`: `op_pvq_search` uses threaded `arch` tier for SSE2/scalar selection.
+  - `212`, `230`, `235`: DNN/CELT/SILK dispatch now honors threaded `arch` control semantics, including upstream aarch64 low-tier NEON behavior for DNN; added forced-tier regression coverage in `tests/osce_nndsp.rs:test_compute_linear_int8_arch_tiers_match_c`.

@@ -892,17 +892,15 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:72-92`
 - Detail: Upstream x86 RTCD can dispatch the entire `silk_NSQ` function to SSE4.1. Rust uses scalar `silk_NSQ_c` as the top-level flow and conditionally swaps only the inner `silk_noise_shape_quantizer_10_16` kernel, so function-level RTCD parity is partial.
 
-204. [MEDIUM][Arch Dispatch Semantics][CELT x86] `celt_pitch_xcorr` uses SSE fallback in Rust where upstream keeps scalar for non-AVX2.
-- Rust: `src/celt/simd/mod.rs:113-126`
-- Rust SSE implementation exists: `src/celt/simd/x86.rs:538`
+204. [RESOLVED][Arch Dispatch Semantics][CELT x86] `celt_pitch_xcorr` non-AVX2 dispatch now matches upstream scalar fallback.
+- Rust: `src/celt/simd/mod.rs`
 - Upstream: `libopus-sys/opus/celt/x86/x86_celt_map.c:95-108`
-- Detail: Upstream x86 RTCD table dispatches `celt_pitch_xcorr` to AVX2 only; non-AVX2 arch levels stay on `celt_pitch_xcorr_c`. Rust dispatch adds an SSE path before scalar fallback, changing architecture-dependent execution path (and potentially floating-point accumulation behavior) relative to upstream.
+- Detail: Rust now dispatches `celt_pitch_xcorr` to AVX2-only on x86 and uses scalar for lower tiers, matching upstream RTCD table behavior.
 
-205. [MEDIUM][Arch Dispatch Semantics][CELT VQ] `op_pvq_search` ignores caller-provided `arch` level in Rust SIMD path.
-- Rust: `src/celt/simd/mod.rs:170-175`, `src/celt/simd/mod.rs:180`
-- Rust call path still passes `arch`: `src/celt/vq.rs:25-26`, `src/celt/vq.rs:554`
+205. [RESOLVED][Arch Dispatch Semantics][CELT VQ] `op_pvq_search` now honors caller-provided arch tier.
+- Rust: `src/celt/simd/mod.rs`, `src/celt/vq.rs`
 - Upstream: `libopus-sys/opus/celt/vq.h:60-64`, `libopus-sys/opus/celt/x86/x86_celt_map.c:175-182`
-- Detail: Upstream dispatch can be controlled via the `arch` argument (through `OP_PVQ_SEARCH_IMPL[(arch)&mask]`). Rust SIMD dispatch chooses SSE2 solely from host CPUID and ignores `_arch`, so callers cannot force scalar/lower-arch behavior in the same way.
+- Detail: Rust dispatch now uses the passed `arch` tier for SSE2/scalar selection, matching upstream arch-masked RTCD control semantics.
 
 206. [RESOLVED][Initialization Semantics][OSCE] Rust OSCE model loader now requires full model-set initialization for success.
 - Rust: `src/dnn/osce.rs`
@@ -934,22 +932,20 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/pitchdnn.h:18-20`
 - Detail: Added `xcorr_mem3` storage and initialization/reset behavior to mirror upstream state layout.
 
-212. [MEDIUM][Arch Dispatch/API Surface][DNN Core] Core DNN compute APIs omit upstream `arch` parameter and lose explicit RTCD control surface.
-- Rust: `src/dnn/nnet.rs:108`, `src/dnn/nnet.rs:137`, `src/dnn/nnet.rs:197-202`, `src/dnn/nnet.rs:214-219`, `src/dnn/nnet.rs:253`, `src/dnn/nnet.rs:272-279`, `src/dnn/nnet.rs:299-307`, `src/dnn/nnet.rs:386-394`
-- Upstream API signatures: `libopus-sys/opus/dnn/nnet.h:89-94`
-- Upstream arch-dispatch macros: `libopus-sys/opus/dnn/nnet.h:145-154`
-- Upstream RTCD tables: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:39-78`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c:39-82`
-- Detail: Upstream threads an explicit `arch` argument through DNN compute entry points and can route through `DNN_COMPUTE_*_IMPL[(arch)&OPUS_ARCHMASK]`. Rust DNN compute functions select SIMD path from host capabilities internally and expose no `arch` parameter, so callers cannot force/mirror upstream arch-tier execution semantics.
+212. [RESOLVED][Arch Dispatch/API Surface][DNN Core] Core DNN compute APIs thread upstream-style arch control.
+- Rust: `src/dnn/nnet.rs`, `src/dnn/simd/mod.rs`, `tests/osce_nndsp.rs`
+- Upstream: `libopus-sys/opus/dnn/nnet.h:89-94`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c`
+- Detail: Rust DNN compute entry points carry `arch`, dispatch uses this parameter, and tiered C-vs-Rust regression coverage is present (`test_compute_linear_int8_arch_tiers_match_c`).
 
 213. [MEDIUM][Arch Dispatch Coverage][DNN x86] Rust DNN SIMD dispatch has AVX2-only acceleration on x86, missing upstream SSE2/SSE4.1 tiers.
 - Rust: `src/dnn/simd/mod.rs:19-20`, `src/dnn/simd/mod.rs:44-57`, `src/dnn/simd/mod.rs:71-84`, `src/dnn/simd/mod.rs:98-110`
 - Upstream: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:46-48`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:59-61`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:75-77`
 - Detail: Upstream RTCD supports SSE2 and SSE4.1 dispatch levels for linear/activation/conv2d before AVX2. Rust x86 DNN dispatch checks only `avx2+fma` and otherwise falls back to scalar, so non-AVX2 x86 behavior/perf tiering is not source-equivalent.
 
-215. [LOW][Algorithmic Path][DNN Conv2D] Rust `compute_conv2d` lacks upstream 3x3 specialized convolution branch.
-- Rust: `src/dnn/nnet.rs:351-381`, `src/dnn/nnet.rs:406-416`
+215. [RESOLVED][Algorithmic Path][DNN Conv2D] `compute_conv2d` now mirrors upstream 3x3 specialized convolution branch.
+- Rust: `src/dnn/nnet.rs`, `tests/osce_nndsp.rs`
 - Upstream: `libopus-sys/opus/dnn/nnet_arch.h:230-233`
-- Detail: Upstream selects `conv2d_3x3_float` when `ktime == 3 && kheight == 3`; otherwise it uses generic `conv2d_float`. Rust always executes the generic loop nest, so operation ordering/optimization path differs for the common 3x3 case.
+- Detail: Rust now selects `conv2d_3x3_float` when `ktime == 3 && kheight == 3`, matching upstream `compute_conv2d_c` branch selection. Added deterministic C-vs-Rust regression `test_compute_conv2d_3x3` (via `osce_test_compute_conv2d_3x3`) to lock bit-exact behavior.
 
 216. [RESOLVED][API Signature][LPCNet] LPCNet feature extraction entry points include upstream `arch` parameter.
 - Rust: `src/dnn/lpcnet.rs`
@@ -1021,11 +1017,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream behavior: `libopus-sys/opus/celt/celt_encoder.c:2535-2590`, `libopus-sys/opus/celt/celt_encoder.c:2816-2818`
 - Detail: Upstream `celt_encode_with_ec` computes `qext_bytes`, carves extension payload space from the packet, and entropy-codes QEXT data when `st->enable_qext` is set. Rust currently calls `celt_encode_with_ec` with `qext_payload=None` and `qext_bytes=0` (TODO noted), so QEXT coding branches guarded by `qext_bytes > 0` never activate, diverging from upstream QEXT-enabled encoding behavior.
 
-230. [MEDIUM][Arch Dispatch Semantics][CELT/SILK SIMD] Rust SIMD dispatch ignores upstream `arch`-masked control path and always uses host CPUID result.
-- Rust dispatch: `src/celt/simd/mod.rs:40-55`, `src/celt/simd/mod.rs:60-76`, `src/celt/simd/mod.rs:104-133`, `src/celt/simd/mod.rs:170-181`, `src/silk/simd/mod.rs:37-62`, `src/silk/simd/mod.rs:78-97`, `src/silk/simd/mod.rs:152-206`
-- Rust evidence of dropped `arch` parameter: `src/celt/simd/mod.rs:170` (`_arch` unused)
-- Upstream arch-masked dispatch macros/tables: `libopus-sys/opus/celt/x86/pitch_sse.h:74-77`, `libopus-sys/opus/celt/x86/pitch_sse.h:126-129`, `libopus-sys/opus/celt/x86/vq_sse.h:43-47`, `libopus-sys/opus/silk/x86/main_sse.h:266-269`, `libopus-sys/opus/silk/x86/main_sse.h:293`
-- Detail: Upstream SIMD selection is keyed by `(arch & OPUS_ARCHMASK)` (allowing explicit arch-tier control by caller/state). Rust dispatches directly off runtime CPUID checks inside wrappers and does not honor an `arch`-tier input for SIMD selection, so execution-tier semantics differ from upstream RTCD behavior.
+230. [RESOLVED][Arch Dispatch Semantics][CELT/SILK SIMD] Runtime SIMD dispatch honors upstream arch-tier control path.
+- Rust: `src/celt/simd/mod.rs`, `src/silk/simd/mod.rs`
+- Upstream: `libopus-sys/opus/celt/x86/pitch_sse.h`, `libopus-sys/opus/celt/x86/vq_sse.h`, `libopus-sys/opus/silk/x86/main_sse.h`
+- Detail: Rust CELT/SILK SIMD wrappers now use the threaded `arch` tier for dispatch decisions instead of host-only CPUID checks, matching upstream arch-masked control semantics.
 
 231. [RESOLVED][SIMD Coverage/Semantics][SILK FLP] `silk_inner_product_FLP` override now matches upstream x86-only AVX2 behavior.
 - Rust: `src/silk/simd/mod.rs`, `src/silk/float/inner_product_FLP.rs`
@@ -1049,10 +1044,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream x86 dispatch macros: `libopus-sys/opus/dnn/x86/dnn_x86.h:82-114`
 - Detail: On x86 CPUs without AVX2+FMA but with SSE2/SSE4.1, upstream still uses SIMD DNN implementations via RTCD tables. Rust falls back to scalar for those CPUs, reducing SIMD coverage/perf relative to upstream architecture tiers.
 
-235. [MEDIUM][Arch Dispatch Semantics][DNN] Rust DNN path does not preserve upstream arch-indexed RTCD selection semantics.
-- Rust call path: `src/dnn/nnet.rs:108-112`, `src/dnn/nnet.rs:137-160`, `src/dnn/simd/mod.rs:26-147`
-- Upstream arch-indexed dispatch: `libopus-sys/opus/dnn/x86/dnn_x86.h:89`, `libopus-sys/opus/dnn/x86/dnn_x86.h:100`, `libopus-sys/opus/dnn/x86/dnn_x86.h:114`, `libopus-sys/opus/dnn/arm/dnn_arm.h:62`, `libopus-sys/opus/dnn/arm/dnn_arm.h:84`, `libopus-sys/opus/dnn/arm/dnn_arm.h:98`
-- Detail: Upstream DNN compute entry points select implementations by `(arch & OPUS_ARCHMASK)` through RTCD tables/macros. Rust DNN wrappers select by host target/cpufeatures directly and expose no arch-tier control, so forced-tier testing/reproducibility semantics differ from upstream.
+235. [RESOLVED][Arch Dispatch Semantics][DNN] DNN RTCD selection semantics now mirror upstream arch-tier behavior.
+- Rust: `src/dnn/simd/mod.rs`, `src/dnn/vec.rs`, `tests/osce_nndsp.rs`, `libopus-sys/src/osce_test_harness.c`
+- Upstream: `libopus-sys/opus/dnn/x86/dnn_x86.h`, `libopus-sys/opus/dnn/arm/dnn_arm.h`, `libopus-sys/opus/dnn/vec_neon.h`, `libopus-sys/opus/dnn/vec_avx.h`
+- Detail: Rust DNN dispatch uses threaded `arch` tier, matches upstream aarch64 compile-time-NEON low-tier semantics, and has explicit forced-tier C-vs-Rust regression coverage (`osce_test_compute_linear_int8_arch` / `test_compute_linear_int8_arch_tiers_match_c`).
 
 237. [LOW][Build SIMD Flags][libopus-sys x86 AVX2] `libopus-sys/build.rs` omits upstream `-mavx` companion flag for CELT/DNN AVX2 groups.
 - Rust AVX2 group flags: `libopus-sys/build.rs:165-168`, `libopus-sys/build.rs:178`

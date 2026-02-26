@@ -12,6 +12,7 @@
 #ifdef ENABLE_OSCE
 #include "osce.h"
 #include "nndsp.h"
+#include "nnet.h"
 #include "vec.h"
 #include "pitch.h"
 #include "cpu_support.h"
@@ -553,6 +554,28 @@ int osce_test_compute_linear_int8(
     return hLACE.lace_fnet_conv2.nb_inputs;
 }
 
+/* Test compute_linear on the LACE fnet_conv2 layer with explicit arch tier. */
+int osce_test_compute_linear_int8_arch(
+    float *out,
+    unsigned int seed,
+    int arch
+)
+{
+    LACELayers hLACE;
+    float input[1024];
+    int i;
+
+    init_lacelayers(&hLACE, lacelayers_arrays);
+
+    prng_reset(seed);
+    for (i = 0; i < hLACE.lace_fnet_conv2.nb_inputs; i++) {
+        input[i] = prng_float() * 0.1f;
+    }
+
+    compute_linear(&hLACE.lace_fnet_conv2, out, input, arch);
+    return hLACE.lace_fnet_conv2.nb_inputs;
+}
+
 /* Test compute_generic_gru on LACE fnet GRU layers (int8 weights).
  * Runs 2 GRU steps. out gets 2*LACE_COND_DIM floats (state after each step). */
 int osce_test_gru_lace_fnet(
@@ -615,6 +638,55 @@ int osce_test_dense_tanh_lace_tconv(
 
     compute_generic_dense(&hLACE.lace_fnet_tconv, out, input, ACTIVATION_TANH, opus_select_arch());
     return hLACE.lace_fnet_tconv.nb_inputs;
+}
+
+/* Test compute_conv2d on a deterministic 3x3 kernel setup.
+ * Exercises upstream conv2d_3x3_float specialization path. */
+int osce_test_compute_conv2d_3x3(
+    float *out,
+    unsigned int seed
+)
+{
+    const int in_channels = 3;
+    const int out_channels = 2;
+    const int ktime = 3;
+    const int kheight = 3;
+    const int height = 17;
+    const int hstride = 17;
+    const int time_stride = in_channels * (height + kheight - 1);
+    const int hist_size = (ktime - 1) * time_stride;
+    const int w_size = out_channels * in_channels * ktime * kheight;
+    int i;
+
+    float bias[2];
+    float weights[2 * 3 * 3 * 3];
+    float mem[(3 - 1) * 3 * (17 + 3 - 1)];
+    float in[3 * (17 + 3 - 1)];
+
+    Conv2dLayer conv;
+    conv.bias = bias;
+    conv.float_weights = weights;
+    conv.in_channels = in_channels;
+    conv.out_channels = out_channels;
+    conv.ktime = ktime;
+    conv.kheight = kheight;
+
+    prng_reset(seed);
+    for (i = 0; i < w_size; i++) {
+        weights[i] = prng_float() * 0.25f;
+    }
+    for (i = 0; i < out_channels; i++) {
+        bias[i] = prng_float() * 0.1f;
+    }
+    for (i = 0; i < hist_size; i++) {
+        mem[i] = prng_float() * 0.05f;
+    }
+    for (i = 0; i < time_stride; i++) {
+        in[i] = prng_float() * 0.5f;
+    }
+
+    compute_conv2d(&conv, out, mem, in, height, hstride, ACTIVATION_TANH, opus_select_arch());
+    return out_channels * hstride;
 }
 
 /* Dump adacomb intermediates for one frame, including xcorr output.
