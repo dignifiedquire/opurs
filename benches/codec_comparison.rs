@@ -7,38 +7,16 @@
 //! Run with: `cargo bench --features tools --bench codec_comparison`
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use libopus_sys::{
+    opus_decode as c_opus_decode, opus_decoder_create as c_opus_decoder_create,
+    opus_decoder_destroy as c_opus_decoder_destroy, opus_encode as c_opus_encode,
+    opus_encoder_create as c_opus_encoder_create, opus_encoder_ctl as c_opus_encoder_ctl,
+    opus_encoder_destroy as c_opus_encoder_destroy, OpusDecoder as COpusDecoder,
+    OpusEncoder as COpusEncoder,
+};
 
 const SAMPLE_RATE: i32 = 48000;
 const FRAME_SIZE_20MS: usize = 960; // 48000 * 20 / 1000
-
-extern "C" {
-    fn opus_encoder_create(
-        fs: i32,
-        channels: i32,
-        application: i32,
-        error: *mut i32,
-    ) -> *mut std::ffi::c_void;
-    fn opus_encode(
-        st: *mut std::ffi::c_void,
-        pcm: *const i16,
-        frame_size: i32,
-        data: *mut u8,
-        max_data_bytes: i32,
-    ) -> i32;
-    fn opus_encoder_ctl(st: *mut std::ffi::c_void, request: i32, ...) -> i32;
-    fn opus_encoder_destroy(st: *mut std::ffi::c_void);
-
-    fn opus_decoder_create(fs: i32, channels: i32, error: *mut i32) -> *mut std::ffi::c_void;
-    fn opus_decode(
-        st: *mut std::ffi::c_void,
-        data: *const u8,
-        len: i32,
-        pcm: *mut i16,
-        frame_size: i32,
-        decode_fec: i32,
-    ) -> i32;
-    fn opus_decoder_destroy(st: *mut std::ffi::c_void);
-}
 
 const OPUS_APPLICATION_AUDIO: i32 = 2049;
 const OPUS_APPLICATION_VOIP: i32 = 2048;
@@ -120,13 +98,13 @@ fn bench_encode_comparison(c: &mut Criterion) {
         // C encoder (with SIMD via RTCD when compiled with simd feature)
         group.bench_with_input(BenchmarkId::new("c", &label), &bitrate, |b, &bitrate| {
             let mut error = 0i32;
-            let enc = unsafe {
-                opus_encoder_create(SAMPLE_RATE, channels, OPUS_APPLICATION_AUDIO, &mut error)
+            let enc: *mut COpusEncoder = unsafe {
+                c_opus_encoder_create(SAMPLE_RATE, channels, OPUS_APPLICATION_AUDIO, &mut error)
             };
             assert!(!enc.is_null(), "C encoder_create failed: {error}");
             unsafe {
-                opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate);
-                opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
+                c_opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate);
+                c_opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
             }
             let mut output = vec![0u8; 1500];
 
@@ -134,7 +112,7 @@ fn bench_encode_comparison(c: &mut Criterion) {
                 let mut total_bytes = 0i32;
                 for frame in pcm.chunks_exact(frame_samples) {
                     let len = unsafe {
-                        opus_encode(
+                        c_opus_encode(
                             enc,
                             frame.as_ptr(),
                             FRAME_SIZE_20MS as i32,
@@ -147,7 +125,7 @@ fn bench_encode_comparison(c: &mut Criterion) {
                 black_box(total_bytes)
             });
 
-            unsafe { opus_encoder_destroy(enc) };
+            unsafe { c_opus_encoder_destroy(enc) };
         });
     }
     group.finish();
@@ -183,7 +161,8 @@ fn bench_decode_comparison(c: &mut Criterion) {
         // C decoder
         group.bench_with_input(BenchmarkId::new("c", &label), &packets, |b, packets| {
             let mut error = 0i32;
-            let dec = unsafe { opus_decoder_create(SAMPLE_RATE, channels, &mut error) };
+            let dec: *mut COpusDecoder =
+                unsafe { c_opus_decoder_create(SAMPLE_RATE, channels, &mut error) };
             assert!(!dec.is_null(), "C decoder_create failed: {error}");
             let mut out_pcm = vec![0i16; FRAME_SIZE_20MS * channels as usize];
 
@@ -191,7 +170,7 @@ fn bench_decode_comparison(c: &mut Criterion) {
                 let mut total_samples = 0i32;
                 for packet in packets {
                     let len = unsafe {
-                        opus_decode(
+                        c_opus_decode(
                             dec,
                             packet.as_ptr(),
                             packet.len() as i32,
@@ -205,7 +184,7 @@ fn bench_decode_comparison(c: &mut Criterion) {
                 black_box(total_samples)
             });
 
-            unsafe { opus_decoder_destroy(dec) };
+            unsafe { c_opus_decoder_destroy(dec) };
         });
     }
     group.finish();
@@ -244,13 +223,13 @@ fn bench_encode_mono_comparison(c: &mut Criterion) {
         // C encoder
         group.bench_with_input(BenchmarkId::new("c", &label), &bitrate, |b, &bitrate| {
             let mut error = 0i32;
-            let enc = unsafe {
-                opus_encoder_create(SAMPLE_RATE, channels, OPUS_APPLICATION_VOIP, &mut error)
+            let enc: *mut COpusEncoder = unsafe {
+                c_opus_encoder_create(SAMPLE_RATE, channels, OPUS_APPLICATION_VOIP, &mut error)
             };
             assert!(!enc.is_null(), "C encoder_create failed: {error}");
             unsafe {
-                opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate);
-                opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
+                c_opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate);
+                c_opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
             }
             let mut output = vec![0u8; 1500];
 
@@ -258,7 +237,7 @@ fn bench_encode_mono_comparison(c: &mut Criterion) {
                 let mut total_bytes = 0i32;
                 for frame in pcm.chunks_exact(frame_samples) {
                     let len = unsafe {
-                        opus_encode(
+                        c_opus_encode(
                             enc,
                             frame.as_ptr(),
                             FRAME_SIZE_20MS as i32,
@@ -271,7 +250,7 @@ fn bench_encode_mono_comparison(c: &mut Criterion) {
                 black_box(total_bytes)
             });
 
-            unsafe { opus_encoder_destroy(enc) };
+            unsafe { c_opus_encoder_destroy(enc) };
         });
     }
     group.finish();

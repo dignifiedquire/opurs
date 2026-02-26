@@ -3,6 +3,15 @@
 //! Run with: `cargo bench --features tools --bench projection`
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use libopus_sys::{
+    opus_projection_ambisonics_encoder_create as c_opus_projection_ambisonics_encoder_create,
+    opus_projection_decode as c_opus_projection_decode,
+    opus_projection_decoder_create as c_opus_projection_decoder_create,
+    opus_projection_decoder_destroy as c_opus_projection_decoder_destroy,
+    opus_projection_encode as c_opus_projection_encode,
+    opus_projection_encoder_ctl as c_opus_projection_encoder_ctl,
+    opus_projection_encoder_destroy as c_opus_projection_encoder_destroy,
+};
 use opurs::{
     opus_projection_ambisonics_encoder_create as rust_projection_encoder_create,
     opus_projection_decode as rust_projection_decode,
@@ -22,46 +31,6 @@ const FRAMES_PER_ITER: usize = 50;
 const CHANNELS: [i32; 2] = [4, 9];
 const FRAME_SIZES: [(usize, &str); 2] = [(480, "10ms"), (960, "20ms")];
 const BITRATES: [i32; 2] = [96_000, 192_000];
-
-unsafe extern "C" {
-    fn opus_projection_ambisonics_encoder_create(
-        Fs: i32,
-        channels: i32,
-        mapping_family: i32,
-        streams: *mut i32,
-        coupled_streams: *mut i32,
-        application: i32,
-        error: *mut i32,
-    ) -> *mut c_void;
-    fn opus_projection_encoder_destroy(st: *mut c_void);
-    fn opus_projection_encoder_ctl(st: *mut c_void, request: i32, ...) -> i32;
-    fn opus_projection_encode(
-        st: *mut c_void,
-        pcm: *const i16,
-        frame_size: i32,
-        data: *mut u8,
-        max_data_bytes: i32,
-    ) -> i32;
-
-    fn opus_projection_decoder_create(
-        Fs: i32,
-        channels: i32,
-        streams: i32,
-        coupled_streams: i32,
-        demixing_matrix: *mut u8,
-        demixing_matrix_size: i32,
-        error: *mut i32,
-    ) -> *mut c_void;
-    fn opus_projection_decoder_destroy(st: *mut c_void);
-    fn opus_projection_decode(
-        st: *mut c_void,
-        data: *const u8,
-        len: i32,
-        pcm: *mut i16,
-        frame_size: i32,
-        decode_fec: i32,
-    ) -> i32;
-}
 
 #[derive(Clone)]
 struct PreparedProjection {
@@ -110,7 +79,7 @@ fn create_c_encoder(channels: i32, bitrate: i32) -> (*mut c_void, i32, i32) {
     let mut coupled_streams = -1i32;
     let mut err = 0i32;
     let enc = unsafe {
-        opus_projection_ambisonics_encoder_create(
+        c_opus_projection_ambisonics_encoder_create(
             SAMPLE_RATE,
             channels,
             MAPPING_FAMILY_AMBISONICS,
@@ -122,10 +91,10 @@ fn create_c_encoder(channels: i32, bitrate: i32) -> (*mut c_void, i32, i32) {
     };
     assert!(!enc.is_null(), "c projection encoder create failed: {err}");
     let set_bitrate =
-        unsafe { opus_projection_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate) };
+        unsafe { c_opus_projection_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate) };
     assert_eq!(set_bitrate, OPUS_OK, "c projection set bitrate failed");
     let set_complexity =
-        unsafe { opus_projection_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32) };
+        unsafe { c_opus_projection_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32) };
     assert_eq!(
         set_complexity, OPUS_OK,
         "c projection set complexity failed"
@@ -136,7 +105,7 @@ fn create_c_encoder(channels: i32, bitrate: i32) -> (*mut c_void, i32, i32) {
 fn fetch_c_demixing_matrix(enc: *mut c_void) -> Vec<u8> {
     let mut matrix_size = 0i32;
     let ret = unsafe {
-        opus_projection_encoder_ctl(
+        c_opus_projection_encoder_ctl(
             enc,
             OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
             &mut matrix_size as *mut _,
@@ -147,7 +116,7 @@ fn fetch_c_demixing_matrix(enc: *mut c_void) -> Vec<u8> {
 
     let mut matrix = vec![0u8; matrix_size as usize];
     let ret = unsafe {
-        opus_projection_encoder_ctl(
+        c_opus_projection_encoder_ctl(
             enc,
             OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
             matrix.as_mut_ptr(),
@@ -172,7 +141,7 @@ fn create_rust_decoder(prepared: &PreparedProjection) -> opurs::OpusProjectionDe
 fn create_c_decoder(prepared: &PreparedProjection) -> *mut c_void {
     let mut err = 0i32;
     let dec = unsafe {
-        opus_projection_decoder_create(
+        c_opus_projection_decoder_create(
             SAMPLE_RATE,
             prepared.channels,
             prepared.streams,
@@ -223,7 +192,7 @@ fn pre_encode_c(channels: i32, frame_size: usize, bitrate: i32, pcm: &[i16]) -> 
     for frame in pcm.chunks_exact(frame_size * channels as usize) {
         let mut packet = vec![0u8; MAX_PACKET];
         let len = unsafe {
-            opus_projection_encode(
+            c_opus_projection_encode(
                 enc,
                 frame.as_ptr(),
                 frame_size as i32,
@@ -235,7 +204,7 @@ fn pre_encode_c(channels: i32, frame_size: usize, bitrate: i32, pcm: &[i16]) -> 
         packet.truncate(len as usize);
         packets.push(packet);
     }
-    unsafe { opus_projection_encoder_destroy(enc) };
+    unsafe { c_opus_projection_encoder_destroy(enc) };
 
     PreparedProjection {
         channels,
@@ -281,7 +250,7 @@ fn bench_projection_encode_cmp(c: &mut Criterion) {
                         let mut total = 0i32;
                         for frame in pcm.chunks_exact(frame_size * channels as usize) {
                             total += unsafe {
-                                opus_projection_encode(
+                                c_opus_projection_encode(
                                     enc,
                                     frame.as_ptr(),
                                     frame_size as i32,
@@ -290,7 +259,7 @@ fn bench_projection_encode_cmp(c: &mut Criterion) {
                                 )
                             };
                         }
-                        unsafe { opus_projection_encoder_destroy(enc) };
+                        unsafe { c_opus_projection_encoder_destroy(enc) };
                         black_box(total);
                     });
                 });
@@ -338,7 +307,7 @@ fn bench_projection_decode_cmp(c: &mut Criterion) {
                         let mut total = 0i32;
                         for packet in &prepared_c.packets {
                             total += unsafe {
-                                opus_projection_decode(
+                                c_opus_projection_decode(
                                     dec,
                                     packet.as_ptr(),
                                     packet.len() as i32,
@@ -348,7 +317,7 @@ fn bench_projection_decode_cmp(c: &mut Criterion) {
                                 )
                             };
                         }
-                        unsafe { opus_projection_decoder_destroy(dec) };
+                        unsafe { c_opus_projection_decoder_destroy(dec) };
                         black_box(total);
                     });
                 });

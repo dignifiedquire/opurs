@@ -7,46 +7,11 @@
 //! Run with: `cargo bench --features tools --bench comparison`
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-
-// C reference functions from libopus-sys
-extern "C" {
-    // Always-available scalar implementation
-    fn celt_pitch_xcorr_c(
-        x: *const f32,
-        y: *const f32,
-        xcorr: *mut f32,
-        len: i32,
-        max_pitch: i32,
-        arch: i32,
-    );
-    fn silk_inner_product_FLP_c(data1: *const f32, data2: *const f32, data_size: i32) -> f64;
-}
-
-// x86 SIMD: dispatch tables and arch detection (RTCD)
-#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-extern "C" {
-    fn opus_select_arch() -> i32;
-
-    static PITCH_XCORR_IMPL:
-        [unsafe extern "C" fn(*const f32, *const f32, *mut f32, i32, i32, i32); 8];
-
-    static SILK_INNER_PRODUCT_FLP_IMPL:
-        [unsafe extern "C" fn(*const f32, *const f32, i32) -> f64; 8];
-}
-
-// aarch64 SIMD: NEON is presumed, no dispatch tables — call NEON functions directly.
-// silk_inner_product_FLP has no NEON variant in upstream C (only x86 AVX2).
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-extern "C" {
-    fn celt_pitch_xcorr_float_neon(
-        x: *const f32,
-        y: *const f32,
-        xcorr: *mut f32,
-        len: i32,
-        max_pitch: i32,
-        arch: i32,
-    );
-}
+use libopus_sys::CELT_PITCH_XCORR_IMPL;
+use libopus_sys::{celt_pitch_xcorr_c, silk_inner_product_FLP_c};
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+use libopus_sys::{PITCH_XCORR_IMPL, SILK_INNER_PRODUCT_FLP_IMPL};
 
 fn generate_signal(len: usize, seed: u32) -> Vec<f32> {
     let mut v = Vec::with_capacity(len);
@@ -117,7 +82,7 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
             BenchmarkId::new("c_simd", &label),
             &(len, max_pitch),
             |b, &(len, max_pitch)| {
-                let arch = unsafe { opus_select_arch() };
+                let arch = unsafe { libopus_sys::opus_select_arch() };
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
                     unsafe {
@@ -135,22 +100,23 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
             },
         );
 
-        // aarch64: NEON is presumed, call directly (no dispatch table)
+        // aarch64: C RTCD dispatch table (NEON/DOTPROD arch levels map here).
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         group.bench_with_input(
-            BenchmarkId::new("c_neon", &label),
+            BenchmarkId::new("c_simd", &label),
             &(len, max_pitch),
             |b, &(len, max_pitch)| {
+                let arch = unsafe { libopus_sys::opus_select_arch() };
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
                     unsafe {
-                        celt_pitch_xcorr_float_neon(
+                        CELT_PITCH_XCORR_IMPL[(arch as usize) & 7](
                             x.as_ptr(),
                             y.as_ptr(),
                             xcorr.as_mut_ptr(),
                             len as i32,
                             max_pitch as i32,
-                            0,
+                            arch,
                         );
                     }
                     black_box(&xcorr);
@@ -185,7 +151,7 @@ fn bench_silk_inner_product_flp_comparison(c: &mut Criterion) {
         // C SIMD dispatch (AVX2 on x86 when available)
         #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
         group.bench_with_input(BenchmarkId::new("c_simd", n), &n, |b, &n| {
-            let arch = unsafe { opus_select_arch() };
+            let arch = unsafe { libopus_sys::opus_select_arch() };
             b.iter(|| unsafe {
                 black_box(SILK_INNER_PRODUCT_FLP_IMPL[(arch as usize) & 7](
                     d1.as_ptr(),

@@ -1157,4 +1157,101 @@ unsafe extern "C" {
     );
 }
 
+unsafe extern "C" {
+    pub fn celt_pitch_xcorr_c(
+        x: *const f32,
+        y: *const f32,
+        xcorr: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+    pub fn silk_inner_product_FLP_c(
+        data1: *const f32,
+        data2: *const f32,
+        data_size: ::std::os::raw::c_int,
+    ) -> f64;
+}
+
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+pub type pitch_xcorr_impl_fn = unsafe extern "C" fn(
+    x: *const f32,
+    y: *const f32,
+    xcorr: *mut f32,
+    len: ::std::os::raw::c_int,
+    max_pitch: ::std::os::raw::c_int,
+    arch: ::std::os::raw::c_int,
+);
+
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+pub type silk_inner_product_flp_impl_fn = unsafe extern "C" fn(
+    data1: *const f32,
+    data2: *const f32,
+    data_size: ::std::os::raw::c_int,
+) -> f64;
+
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+unsafe extern "C" {
+    pub static PITCH_XCORR_IMPL: [pitch_xcorr_impl_fn; 8usize];
+    pub static SILK_INNER_PRODUCT_FLP_IMPL: [silk_inner_product_flp_impl_fn; 8usize];
+}
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+pub type celt_pitch_xcorr_impl_fn = unsafe extern "C" fn(
+    x: *const f32,
+    y: *const f32,
+    xcorr: *mut f32,
+    len: ::std::os::raw::c_int,
+    max_pitch: ::std::os::raw::c_int,
+    arch: ::std::os::raw::c_int,
+);
+
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+unsafe extern "C" {
+    pub static CELT_PITCH_XCORR_IMPL: [celt_pitch_xcorr_impl_fn; 8usize];
+}
+
+unsafe extern "C" {
+    pub fn opus_projection_ambisonics_encoder_create(
+        Fs: ::std::os::raw::c_int,
+        channels: ::std::os::raw::c_int,
+        mapping_family: ::std::os::raw::c_int,
+        streams: *mut ::std::os::raw::c_int,
+        coupled_streams: *mut ::std::os::raw::c_int,
+        application: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut ::std::os::raw::c_void;
+    pub fn opus_projection_encoder_destroy(st: *mut ::std::os::raw::c_void);
+    pub fn opus_projection_encoder_ctl(
+        st: *mut ::std::os::raw::c_void,
+        request: ::std::os::raw::c_int,
+        ...
+    ) -> ::std::os::raw::c_int;
+    pub fn opus_projection_encode(
+        st: *mut ::std::os::raw::c_void,
+        pcm: *const i16,
+        frame_size: ::std::os::raw::c_int,
+        data: *mut u8,
+        max_data_bytes: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+    pub fn opus_projection_decoder_create(
+        Fs: ::std::os::raw::c_int,
+        channels: ::std::os::raw::c_int,
+        streams: ::std::os::raw::c_int,
+        coupled_streams: ::std::os::raw::c_int,
+        demixing_matrix: *mut u8,
+        demixing_matrix_size: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut ::std::os::raw::c_void;
+    pub fn opus_projection_decoder_destroy(st: *mut ::std::os::raw::c_void);
+    pub fn opus_projection_decode(
+        st: *mut ::std::os::raw::c_void,
+        data: *const u8,
+        len: ::std::os::raw::c_int,
+        pcm: *mut i16,
+        frame_size: ::std::os::raw::c_int,
+        decode_fec: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
