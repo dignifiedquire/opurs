@@ -525,6 +525,48 @@ fn bytes_as_i32(data: &[u8]) -> Vec<i32> {
         .collect()
 }
 
+/// Validate sparse index stream shape and bounds.
+///
+/// Upstream C: dnn/parse_lpcnet_weights.c:find_idx_check
+fn find_idx_check(
+    arrays: &[WeightArray],
+    name: &str,
+    nb_inputs: usize,
+    nb_outputs: usize,
+) -> Option<(Vec<i32>, usize)> {
+    let idx_array = find_array(arrays, name)?;
+    let idx_data = bytes_as_i32(&idx_array.data);
+
+    let mut remain = idx_data.len() as i32;
+    let mut out_remain = nb_outputs as i32;
+    let mut idx_pos = 0usize;
+    let mut total_blocks = 0usize;
+
+    while remain > 0 {
+        let nb_blocks = *idx_data.get(idx_pos)?;
+        if nb_blocks < 0 || remain < nb_blocks + 1 {
+            return None;
+        }
+        idx_pos += 1;
+        for _ in 0..nb_blocks as usize {
+            let pos = *idx_data.get(idx_pos)?;
+            idx_pos += 1;
+            if pos + 3 >= nb_inputs as i32 || (pos & 0x3) != 0 {
+                return None;
+            }
+        }
+        out_remain -= 8;
+        remain -= nb_blocks + 1;
+        total_blocks += nb_blocks as usize;
+    }
+
+    if out_remain != 0 {
+        return None;
+    }
+
+    Some((idx_data, total_blocks))
+}
+
 /// Helper to interpret raw bytes as a slice of i8.
 fn bytes_as_i8(data: &[u8]) -> Vec<i8> {
     data.iter().map(|&b| b as i8).collect()
@@ -562,21 +604,8 @@ pub fn linear_init(
         layer.subias = bytes_as_f32(data);
     }
     if !weights_idx_name.is_empty() {
-        let idx_array = find_array(arrays, weights_idx_name)?;
-        let idx_data = bytes_as_i32(&idx_array.data);
-        // Count total sparse blocks for weight size validation
-        let mut total_blocks = 0;
-        let mut pos = 0;
-        let mut remaining_outputs = nb_outputs as i32;
-        while pos < idx_data.len() {
-            let nb_blocks = idx_data[pos] as usize;
-            pos += 1 + nb_blocks;
-            total_blocks += nb_blocks;
-            remaining_outputs -= 8;
-        }
-        if remaining_outputs != 0 {
-            return None;
-        }
+        let (idx_data, total_blocks) =
+            find_idx_check(arrays, weights_idx_name, nb_inputs, nb_outputs)?;
         layer.weights_idx = idx_data;
 
         if !weights_name.is_empty() {
@@ -734,6 +763,14 @@ pub fn write_weights(arrays: &[WeightArray]) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    fn i32_bytes(values: &[i32]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(values.len() * 4);
+        for &v in values {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        out
+    }
+
     fn test_identity_linear_layer(size: usize) -> LinearLayer {
         let mut weights = vec![0.0f32; size * size];
         for i in 0..size {
@@ -825,5 +862,58 @@ mod tests {
         assert_eq!(blob.len(), 128);
         let parsed = parse_weights(&blob).unwrap();
         assert_eq!(parsed[0].data, vec![1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn linear_init_rejects_sparse_idx_with_short_block_stream() {
+        // nb_blocks=2 but only one block index present.
+        let arrays = vec![WeightArray {
+            name: "idx".into(),
+            type_id: WEIGHT_TYPE_INT,
+            size: 2 * 4,
+            data: i32_bytes(&[2, 0]),
+        }];
+        let layer = linear_init(&arrays, "", "", "", "", "idx", "", "", 16, 8);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn linear_init_rejects_sparse_idx_with_unaligned_pos() {
+        let arrays = vec![WeightArray {
+            name: "idx".into(),
+            type_id: WEIGHT_TYPE_INT,
+            size: 2 * 4,
+            data: i32_bytes(&[1, 2]),
+        }];
+        let layer = linear_init(&arrays, "", "", "", "", "idx", "", "", 16, 8);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn linear_init_rejects_sparse_idx_with_oob_pos() {
+        // pos+3 >= nb_inputs should fail.
+        let arrays = vec![WeightArray {
+            name: "idx".into(),
+            type_id: WEIGHT_TYPE_INT,
+            size: 2 * 4,
+            data: i32_bytes(&[1, 13]),
+        }];
+        let layer = linear_init(&arrays, "", "", "", "", "idx", "", "", 16, 8);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn linear_init_accepts_valid_sparse_idx_shape() {
+        let arrays = vec![WeightArray {
+            name: "idx".into(),
+            type_id: WEIGHT_TYPE_INT,
+            size: 3 * 4,
+            data: i32_bytes(&[2, 0, 4]),
+        }];
+        let layer = linear_init(&arrays, "", "", "", "", "idx", "", "", 16, 8)
+            .expect("valid sparse index stream should be accepted");
+        assert_eq!(layer.weights_idx, vec![2, 0, 4]);
+        assert_eq!(layer.nb_inputs, 16);
+        assert_eq!(layer.nb_outputs, 8);
     }
 }

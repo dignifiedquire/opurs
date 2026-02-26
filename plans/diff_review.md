@@ -847,10 +847,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/x86/dnn_x86.h`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c`, `libopus-sys/opus/dnn/x86/nnet_sse2.c`, `libopus-sys/opus/dnn/x86/nnet_sse4_1.c`, `libopus-sys/opus/dnn/x86/nnet_avx2.c`, `libopus-sys/opus/dnn/arm/nnet_dotprod.c`, `libopus-sys/opus/dnn/arm/nnet_neon.c`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c`
 - Detail: Upstream provides RTCD-selected architecture-specific implementations for core NNet ops beyond generic C. Rust currently provides generic kernels plus a vec-level SIMD layer, but no equivalent x86/ARM NNet backend surface.
 
-195. [MEDIUM][Validation Semantics][DNN Weights] `linear_init` omits upstream sparse-index structural validation.
-- Rust: `src/dnn/nnet.rs:501-517`
+195. [RESOLVED][Validation Semantics][DNN Weights] `linear_init` now mirrors upstream sparse-index structural validation.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-120`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:151`
-- Detail: Upstream `find_idx_check` validates sparse index stream shape (`remain < nb_blocks+1`), 4-column alignment (`pos&0x3`), and bounds (`pos+3 < nb_in`) before accepting `weights_idx`. Rust only counts blocks and output groups, then accepts the index array without these checks, so malformed sparse index blobs that upstream rejects can be accepted.
+- Detail: Rust now uses `find_idx_check`-equivalent validation before accepting sparse indices, including stream-shape (`remain < nb_blocks+1`), 4-column alignment (`pos&0x3`), per-index bounds (`pos+3 < nb_in`), and output-group accounting. Added unit tests for short streams, unaligned indices, out-of-bounds indices, and a valid sparse layout.
 
 196. [LOW][Initialization Semantics][DNN Weights] Optional float-weight size mismatches are silently ignored instead of treated as init errors.
 - Rust: `src/dnn/nnet.rs:523-526`, `src/dnn/nnet.rs:534-538`, `src/dnn/nnet.rs:578-582`
@@ -963,10 +963,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream baseline being tracked in this repo: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
 - Detail: The DNN README claims the port targets Opus previous baseline, while the build/config baseline in-tree is 1.6.1. This is a documentation parity drift that can mislead future reviews and regeneration workflows.
 
-218. [MEDIUM][Validation Semantics][DNN Weights] Sparse index validation in `linear_init` is weaker than upstream `find_idx_check`.
-- Rust: `src/dnn/nnet.rs:501-517`
+218. [RESOLVED][Validation Semantics][DNN Weights] Sparse index validation in `linear_init` now matches upstream `find_idx_check`.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-121`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:149-152`
-- Detail: Upstream validates each sparse block index (`remain < nb_blocks+1`, `pos+3 < nb_in`, and `pos` 4-aligned) before accepting `weights_idx`. Rust only counts blocks and output groups, without per-index bounds/alignment checks, so malformed sparse index blobs that upstream rejects may be accepted.
+- Detail: Rust now performs the same sparse-index validity checks as upstream before accepting `weights_idx`, closing acceptance of malformed sparse index blobs that upstream rejects.
 
 219. [LOW][Boundary Condition][MLP] GRU neuron-capacity assertion is off-by-one versus upstream fixed-size buffers.
 - Rust: `src/opus/mlp/layers.rs:95`, `src/opus/mlp/layers.rs:102`, `src/opus/mlp/layers.rs:119-124`

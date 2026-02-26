@@ -28,3 +28,4 @@ Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior 
 ## Progress
 - 2026-02-24: Aligned OSCE model-loading contract with upstream `osce_load_models` semantics: Rust now marks model load success only when all enabled OSCE components (`lace`, `nolace`, `bbwenet`) initialize successfully.
 - 2026-02-24: Added regression coverage in `tests/dnn_integration.rs` (`osce_model_load_rejects_partial_weights`) to ensure partial weight bundles fail load and do not mark the OSCE model as loaded.
+- 2026-02-26: Aligned DNN sparse-index parsing with upstream `find_idx_check` semantics in `linear_init`, adding structural, alignment, and bounds checks plus dedicated unit tests for malformed and valid sparse streams.
