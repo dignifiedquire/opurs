@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,170,171,172`
 
 ## Findings
 
@@ -634,10 +634,10 @@ IDs: `61,62,72,79,82,87,106,153,170,171,172`
 - Upstream: `libopus-sys/opus/silk/LPC_fit.c:36`, `libopus-sys/opus/silk/NLSF_VQ.c:35`, `libopus-sys/opus/silk/NLSF_decode.c:63`, `libopus-sys/opus/silk/biquad_alt.c:42`, `libopus-sys/opus/silk/code_signs.c:41`, `libopus-sys/opus/silk/code_signs.c:75`, `libopus-sys/opus/silk/resampler_private_AR2.c:36`, `libopus-sys/opus/silk/stereo_MS_to_LR.c:35`, `libopus-sys/opus/silk/float/find_LTP_FLP.c:35`, `libopus-sys/opus/silk/float/corrMatrix_FLP.c:60`, `libopus-sys/opus/silk/float/inner_product_FLP.c:35`
 - Detail: These C entry points are pointer-based and do not expose equivalent runtime shape checks. Rust adds unconditional `assert!`/`assert_eq!` preconditions, which can panic on mismatched buffer geometry where upstream behavior is unchecked/assert-gated.
 
-153. [LOW][Runtime Semantics][SILK] Additional upstream assert-gated invariants are unconditional `assert!` in Rust.
+153. [RESOLVED][Runtime Semantics][SILK] Additional upstream assert-gated invariants now follow assert-gated semantics.
 - Rust: `src/silk/NLSF2A.rs:66`, `src/silk/NLSF_stabilize.rs:39`, `src/silk/PLC.rs:298`, `src/silk/PLC.rs:364`, `src/silk/decode_indices.rs:90`, `src/silk/float/encode_frame_FLP.rs:322`, `src/silk/float/encode_frame_FLP.rs:356`, `src/silk/float/find_LPC_FLP.rs:102`
 - Upstream: `libopus-sys/opus/silk/NLSF2A.c:89`, `libopus-sys/opus/silk/NLSF_stabilize.c:58`, `libopus-sys/opus/silk/PLC.c:319`, `libopus-sys/opus/silk/PLC.c:373`, `libopus-sys/opus/silk/decode_indices.c:82`, `libopus-sys/opus/silk/float/encode_frame_FLP.c:261`, `libopus-sys/opus/silk/float/encode_frame_FLP.c:291`, `libopus-sys/opus/silk/float/find_LPC_FLP.c:103`
-- Detail: Upstream keeps these as `celt_assert`/`silk_assert` checks. Rust enforces corresponding conditions with unconditional `assert!`, so invariant violations hard-abort at runtime in builds where upstream would typically compile such checks out.
+- Detail: Converted the tracked invariant checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!` so release behavior matches upstream `celt_assert`/`silk_assert` gating while preserving debug-time invariant checks.
 
 154. [LOW][Runtime Semantics][SILK Wrapper Preconditions] Additional Rust-only shape/size assertions have no upstream equivalent checks.
 - Rust: `src/silk/NLSF2A.rs:30`, `src/silk/gain_quant.rs:129`, `src/silk/float/SigProc_FLP.rs:18`, `src/silk/float/SigProc_FLP.rs:29`

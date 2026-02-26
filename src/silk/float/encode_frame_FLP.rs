@@ -319,7 +319,7 @@ pub fn silk_encode_frame_FLP(
             if iter == maxIter {
                 if found_lower != 0 && (gainsID == gainsID_lower || nBits > maxBits) {
                     psRangeEnc.restore(sRangeEnc_copy2);
-                    assert!(sRangeEnc_copy2.offs <= 1275);
+                    debug_assert!(sRangeEnc_copy2.offs <= 1275);
                     let offs = sRangeEnc_copy2.offs as usize;
                     psRangeEnc.buf[..offs].copy_from_slice(&ec_buf_copy[..offs]);
                     psEnc.sCmn.sNSQ = sNSQ_copy2;
@@ -353,7 +353,7 @@ pub fn silk_encode_frame_FLP(
                     if gainsID != gainsID_lower {
                         gainsID_lower = gainsID;
                         sRangeEnc_copy2 = psRangeEnc.save();
-                        assert!(psRangeEnc.offs <= 1275);
+                        debug_assert!(psRangeEnc.offs <= 1275);
                         let offs = psRangeEnc.offs as usize;
                         ec_buf_copy[..offs].copy_from_slice(&psRangeEnc.buf[..offs]);
                         sNSQ_copy2 = psEnc.sCmn.sNSQ;

@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,168`
+Open: `61,62,72,79,82,87,106,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,153,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,9 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed additional SILK assert-gating parity item:
+  - `src/silk/NLSF2A.rs`, `src/silk/NLSF_stabilize.rs`, `src/silk/PLC.rs`, `src/silk/decode_indices.rs`, `src/silk/float/encode_frame_FLP.rs`, `src/silk/float/find_LPC_FLP.rs`: converted tracked upstream assert-equivalent checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.
+  - closes `153`.
 - 2026-02-26: Closed SILK helper assert-gating parity item:
   - `src/silk/CNG.rs`, `src/silk/VAD.rs`, `src/silk/interpolate.rs`, `src/silk/NLSF_VQ_weights_laroia.rs`, `src/silk/encode_indices.rs`, `src/silk/stereo_encode_pred.rs`, `src/silk/sort.rs`, `src/silk/resampler/down2.rs`, `src/silk/shell_coder.rs`: converted tracked helper invariants from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.
   - `src/silk/resampler/up2_hq.rs`: added upstream-equivalent coefficient-sign debug assertions and converted length precondition check to debug-gated semantics.

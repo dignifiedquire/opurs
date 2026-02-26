@@ -36,7 +36,7 @@ pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
     let L = NLSF_Q15.len();
 
     /* This is necessary to ensure an output within range of a opus_int16 */
-    assert!(NDeltaMin_Q15[L] >= 1);
+    debug_assert!(NDeltaMin_Q15[L] >= 1);
 
     loops = 0;
     while loops < MAX_LOOPS {

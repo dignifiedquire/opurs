@@ -297,7 +297,7 @@ fn silk_PLC_conceal(
 
     /* Rewhiten LTP state */
     let idx = psDec.ltp_mem_length as i32 - lag - psDec.LPC_order as i32 - LTP_ORDER as i32 / 2;
-    assert!(idx > 0);
+    debug_assert!(idx > 0);
     let idx = idx as usize;
     silk_LPC_analysis_filter(
         &mut sLTP[idx..psDec.ltp_mem_length],
@@ -363,7 +363,7 @@ fn silk_PLC_conceal(
     sLTP_Q14[sLPC_off..sLPC_off + MAX_LPC_ORDER]
         .copy_from_slice(&psDec.sLPC_Q14_buf[..MAX_LPC_ORDER]);
 
-    assert!(psDec.LPC_order >= 10); /* check that unrolling works */
+    debug_assert!(psDec.LPC_order >= 10); /* check that unrolling works */
     #[allow(clippy::needless_range_loop)]
     for i in 0..psDec.frame_length {
         /* Partly unrolled LPC prediction */

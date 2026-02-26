@@ -101,7 +101,7 @@ pub fn silk_find_LPC_FLP(
     if psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4 {
         silk_A2NLSF_FLP(NLSF_Q15, &a, psEncC.predictLPCOrder);
     }
-    assert!(
+    debug_assert!(
         psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4
             || psEncC.useInterpolatedNLSFs != 0
                 && psEncC.first_frame_after_reset == 0
