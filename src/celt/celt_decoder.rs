@@ -468,16 +468,18 @@ fn deemphasis_stereo_simple(
 ) {
     let mut m0: celt_sig = mem[0];
     let mut m1: celt_sig = mem[1];
-    let mut j = 0;
-    while j < N {
-        let ju = j as usize;
-        let tmp0: celt_sig = saturate_sig(ch0[ju] + VERY_SMALL + m0);
-        let tmp1: celt_sig = saturate_sig(ch1[ju] + VERY_SMALL + m1);
+    let n = N as usize;
+    for ((&c0, &c1), out) in ch0[..n]
+        .iter()
+        .zip(&ch1[..n])
+        .zip(pcm[..2 * n].chunks_exact_mut(2))
+    {
+        let tmp0: celt_sig = saturate_sig(c0 + VERY_SMALL + m0);
+        let tmp1: celt_sig = saturate_sig(c1 + VERY_SMALL + m1);
         m0 = coef0 * tmp0;
         m1 = coef0 * tmp1;
-        pcm[2 * ju] = tmp0 * (1_f32 / CELT_SIG_SCALE);
-        pcm[2 * ju + 1] = tmp1 * (1_f32 / CELT_SIG_SCALE);
-        j += 1;
+        out[0] = tmp0 * (1_f32 / CELT_SIG_SCALE);
+        out[1] = tmp1 * (1_f32 / CELT_SIG_SCALE);
     }
     mem[0] = m0;
     mem[1] = m1;
@@ -511,7 +513,10 @@ fn deemphasis(
         );
         return;
     }
-    let mut scratch = vec![0.0f32; N as usize];
+    // N max is 1920 (QEXT 96kHz).
+    const MAX_SCRATCH: usize = 1920;
+    debug_assert!((N as usize) <= MAX_SCRATCH);
+    let mut scratch = [0.0f32; MAX_SCRATCH];
     let coef0: opus_val16 = coef[0];
     let Nd: i32 = N / downsample;
     let mut c = 0;
@@ -609,7 +614,6 @@ fn deemphasis(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_synthesis
-#[inline]
 fn celt_synthesis(
     mode: &OpusCustomMode,
     X: &[celt_norm],
@@ -649,7 +653,10 @@ fn celt_synthesis(
     // Allocate N + M - 1 elements so that strided mdct_backward calls
     // can form slices freq[b..b + n2*B] for b in 0..B without going
     // out of bounds. The extra elements are never read (stride skips them).
-    let mut freq = vec![0.0f32; n + M as usize - 1];
+    // Max: N=1920 (QEXT 96kHz) + M-1=7 = 1927.
+    const MAX_FREQ: usize = 1928;
+    debug_assert!(n + M as usize - 1 <= MAX_FREQ);
+    let mut freq = [0.0f32; MAX_FREQ];
     if isTransient != 0 {
         B = M;
         NB = mode.shortMdctSize;
@@ -688,7 +695,7 @@ fn celt_synthesis(
             );
         }
         // Use a temporary array for freq2 instead of borrowing out_syn_ch1
-        let mut freq2 = vec![0.0f32; n + M as usize - 1];
+        let mut freq2 = [0.0f32; MAX_FREQ];
         freq2[..n].copy_from_slice(&freq[..n]);
         b = 0;
         while b < B {
@@ -731,7 +738,7 @@ fn celt_synthesis(
             silence,
         );
         // freq2 for the second channel
-        let mut freq2 = vec![0.0f32; n];
+        let mut freq2 = [0.0f32; MAX_FREQ];
         denormalise_bands(
             mode,
             &X[n..2 * n],
@@ -1056,7 +1063,8 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
 }
 
 /// Upstream C: celt/celt_decoder.c:celt_decode_lost
-#[inline]
+#[cold]
+#[inline(never)]
 fn celt_decode_lost(
     st: &mut OpusCustomDecoder,
     N: i32,
@@ -1112,7 +1120,10 @@ fn celt_decode_lost(
         } else {
             mode.effEBands
         };
-        let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., (C * N) as usize);
+        // C*N max: 2*1920 = 3840 (QEXT 96kHz stereo).
+        const MAX_X_PLC: usize = 3840;
+        debug_assert!(((C * N) as usize) <= MAX_X_PLC);
+        let mut X = [0.0f32; MAX_X_PLC];
         // Shift decode_mem for each channel (before energy decay)
         let mut c = 0;
         loop {
@@ -1289,8 +1300,12 @@ fn celt_decode_lost(
         } else {
             max_period
         };
-        let mut _exc: Vec<opus_val16> = vec![0.0; (max_period as usize) + LPC_ORDER];
-        let mut fir_tmp: Vec<opus_val16> = ::std::vec::from_elem(0., exc_length as usize);
+        // max_period: 1024 (std) or 2048 (QEXT). LPC_ORDER=24. Max: 2048+24=2072.
+        const MAX_EXC: usize = 2072;
+        debug_assert!((max_period as usize) + LPC_ORDER <= MAX_EXC);
+        let mut _exc = [0.0f32; MAX_EXC];
+        debug_assert!((exc_length as usize) <= MAX_EXC);
+        let mut fir_tmp = [0.0f32; MAX_EXC];
         // exc = _exc[LPC_ORDER..], so exc[i] = _exc[LPC_ORDER + i]
         let exc_off = LPC_ORDER;
         let window = mode.window;
@@ -1333,7 +1348,7 @@ fn celt_decode_lost(
                 celt_fir_c(
                     fir_x,
                     &st.lpc[lpc_start..lpc_start + LPC_ORDER],
-                    &mut fir_tmp,
+                    &mut fir_tmp[..fir_n],
                     LPC_ORDER,
                     st.arch,
                 );
@@ -1664,7 +1679,6 @@ pub fn celt_decode_with_ec(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[inline]
 /// Core entropy decode path shared by packet and external-decoder entry points.
 ///
 /// Upstream C: celt/celt_decoder.c:celt_decode_with_ec_dred
@@ -2096,7 +2110,10 @@ fn celt_decode_body(
         }
     }
     let mut collapse_masks = [0u8; 42];
-    let mut X = vec![0.0f32; (C * N) as usize];
+    // C*N max: 2*1920 = 3840 (QEXT 96kHz stereo).
+    const MAX_X: usize = 3840;
+    debug_assert!(((C * N) as usize) <= MAX_X);
+    let mut X = [0.0f32; MAX_X];
     if C == 2 {
         let (x_part, y_part) = X.split_at_mut(N as usize);
         quant_all_bands(

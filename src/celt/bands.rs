@@ -2004,7 +2004,10 @@ pub fn quant_all_bands<'a>(
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;
-    let mut _norm = vec![0.0f32; C as usize * norm_size];
+    // C * norm_size max: 2 * M * eBands[last]. Stereo QEXT 96kHz ≈ 5632.
+    const MAX_NORM: usize = 6000;
+    debug_assert!(C as usize * norm_size <= MAX_NORM);
+    let mut _norm = [0.0f32; MAX_NORM];
 
     let _resynth_alloc: i32 = if encode != 0 && resynth != 0 {
         M * (eBands[m.nbEBands] as i32 - eBands[m.nbEBands - 1] as i32)
