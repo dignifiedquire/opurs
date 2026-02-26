@@ -37,3 +37,6 @@ Closed in this group: `107,204,205,212,230,231,232,235,237`
   - `204`: `celt_pitch_xcorr` now keeps scalar for non-AVX2 x86 tiers (AVX2-only override parity).
   - `205`: `op_pvq_search` uses threaded `arch` tier for SSE2/scalar selection.
   - `212`, `230`, `235`: DNN/CELT/SILK dispatch now honors threaded `arch` control semantics, including upstream aarch64 low-tier NEON behavior for DNN; added forced-tier regression coverage in `tests/osce_nndsp.rs:test_compute_linear_int8_arch_tiers_match_c`.
+- 2026-02-26: Re-verified forced arch-tier DNN parity under `nextest` on current head:
+  - Command: `CARGO_TARGET_DIR=target-local cargo nextest run --release --features tools-dnn -E 'binary(osce_nndsp) and test(/test_compute_linear_int8_arch_tiers_match_c|test_compute_conv2d_3x3/)'`
+  - Result: both tests passed (`2 passed, 17 skipped`) including aarch64 `dotprod` tier comparison vs C harness.
