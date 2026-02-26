@@ -76,6 +76,22 @@ fn lpcnet_plc_full_load() {
     assert!(plc.loaded, "LPCNetPLCState.loaded should be true");
 }
 
+#[test]
+fn lpcnet_plc_init_rejects_partial_weights() {
+    let mut arrays = get_weights();
+    arrays.retain(|w| !w.name.starts_with("dense_if_upsampler_1_"));
+
+    let mut plc = opurs::dnn::lpcnet::LPCNetPLCState::new();
+    assert!(
+        !plc.init(&arrays),
+        "LPCNetPLCState init should fail when encoder weights are missing"
+    );
+    assert!(
+        !plc.loaded,
+        "LPCNetPLCState.loaded should remain false on partial init"
+    );
+}
+
 #[cfg(feature = "dred")]
 mod dred_tests {
     use super::*;

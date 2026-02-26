@@ -560,18 +560,25 @@ impl LPCNetPLCState {
     /// Upstream C: dnn/lpcnet_plc.c:lpcnet_plc_init
     pub fn init(&mut self, arrays: &[WeightArray]) -> bool {
         self.fargan = FARGANState::new();
-        self.fargan.init(arrays);
         self.enc.init();
-        self.enc.load_model(arrays);
-        match init_plcmodel(arrays) {
-            Some(model) => {
-                self.model = model;
-                self.loaded = true;
-                self.reset();
-                true
-            }
-            None => false,
+        self.loaded = false;
+
+        let model = match init_plcmodel(arrays) {
+            Some(model) => model,
+            None => return false,
+        };
+        self.model = model;
+
+        if !self.enc.load_model(arrays) {
+            return false;
         }
+        if !self.fargan.init(arrays) {
+            return false;
+        }
+
+        self.loaded = true;
+        self.reset();
+        true
     }
 
     /// Load model from binary weight blob.

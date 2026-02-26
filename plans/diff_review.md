@@ -978,11 +978,11 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/src/mlp.c:41-46`
 - Detail: Replaced shortened coefficient literals with upstream-precision constants in `tansig_approx` and kept them exact with a targeted `clippy::excessive_precision` allow on the function.
 
-221. [MEDIUM][Initialization Semantics][LPCNet PLC] Rust `init()` ignores encoder/FARGAN init outcomes when determining loaded state.
-- Rust: `src/dnn/lpcnet.rs:552-560` (calls `self.fargan.init(arrays)` and `self.enc.load_model(arrays)` without checking return values; sets `loaded=true` if `init_plcmodel` succeeds)
-- Rust checked path for comparison: `src/dnn/lpcnet.rs:571-583` (`load_model()` requires PLC model, encoder model, and FARGAN init to all succeed)
+221. [RESOLVED][Initialization Semantics][LPCNet PLC] Rust `init()` now requires encoder/FARGAN init success before setting loaded state.
+- Rust: `src/dnn/lpcnet.rs`
+- Rust checked path for comparison: `src/dnn/lpcnet.rs` (`load_model()` requires PLC model, encoder model, and FARGAN init to all succeed)
 - Upstream init flow: `libopus-sys/opus/dnn/lpcnet_plc.c:58-67`, `libopus-sys/opus/dnn/lpcnet_plc.c:70`
-- Detail: Upstream init path relies on builtin-model initialization assertions and marks loaded only on successful model init. Rust `init()` can mark `loaded=true` even if encoder/FARGAN model init fails, which diverges from the stricter all-components-ready contract already enforced in Rust `load_model()`.
+- Detail: `init()` now leaves `loaded=false` unless PLC model init, encoder model load, and FARGAN init all succeed. Added integration regression coverage (`lpcnet_plc_init_rejects_partial_weights`) to ensure partial model bundles are rejected.
 
 222. [MEDIUM][API Behavior/Version Reporting][Public API] `opus_get_version_string()` does not mirror upstream version-format and build-suffix semantics.
 - Rust: `src/celt/common.rs:426-427`
