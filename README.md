@@ -54,7 +54,7 @@ println!("Decoded {} samples per channel", samples);
 ```rust
 use opurs::{Bitrate, Signal};
 
-encoder.set_bitrate(Bitrate::Bits(128000)).unwrap();
+encoder.set_bitrate(Bitrate::Bits(128000));
 encoder.set_complexity(10).unwrap();
 encoder.set_signal(Signal::Music).unwrap();
 ```

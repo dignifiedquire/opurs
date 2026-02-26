@@ -394,7 +394,7 @@ fn bench_qext_decode_cmp(c: &mut Criterion) {
 
     // Pre-encode with Rust
     let mut enc = opurs::OpusEncoder::new(96000, 2, opurs::OPUS_APPLICATION_AUDIO).unwrap();
-    enc.set_bitrate(opurs::Bitrate::Bits(320000)).unwrap();
+    enc.set_bitrate(opurs::Bitrate::Bits(320000));
     enc.set_complexity(10).unwrap();
     enc.set_qext(true);
 
