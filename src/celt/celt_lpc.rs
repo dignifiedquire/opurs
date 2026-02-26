@@ -109,9 +109,9 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
         rden[i] = den[ord - i - 1];
     }
 
-    // Internal y buffer with ord prefix for history
-    // Max: n=1080 (960+120 for extrapolation) + ord=24 = 1104
-    let mut yy = [0.0f32; 1080 + LPC_ORDER];
+    // Upstream C allocates `N + ord` here (`celt/celt_lpc.c:celt_iir`).
+    // Use the same sizing to avoid fixed-size truncation on malformed inputs.
+    let mut yy = vec![0.0f32; n + ord];
     for i in 0..ord {
         yy[i] = -mem[ord - i - 1];
     }
