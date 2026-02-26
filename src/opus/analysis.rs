@@ -1712,6 +1712,21 @@ pub fn run_analysis(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "tools")]
+    use core::ffi::c_void;
+
+    #[cfg(feature = "tools")]
+    unsafe extern "C" {
+        fn downmix_float(
+            x: *const c_void,
+            y: *mut opus_val32,
+            subframe: i32,
+            offset: i32,
+            c1: i32,
+            c2: i32,
+            C: i32,
+        );
+    }
 
     #[test]
     fn downmix_and_resample_24k_passthrough_matches_downmix_scale() {
@@ -1736,5 +1751,52 @@ mod tests {
         let mut y = vec![0.0f32; 4];
         let mut s = [0.0f32; 3];
         let _ = downmix_and_resample(&input, &mut y, &mut s, 4, 0, 0, -1, 1, 44100);
+    }
+
+    #[cfg(feature = "tools")]
+    #[test]
+    fn downmix_float_matches_upstream_c_nan_and_clamp_behavior() {
+        let c = 3i32;
+        let subframe = 8i32;
+        let offset = 2i32;
+        let mut pcm = vec![0.0f32; ((offset + subframe) * c) as usize];
+        for (i, sample) in pcm.iter_mut().enumerate() {
+            *sample = match i % 7 {
+                0 => 0.25,
+                1 => 3.0,
+                2 => -3.5,
+                3 => f32::INFINITY,
+                4 => f32::NEG_INFINITY,
+                5 => f32::NAN,
+                _ => 1e20,
+            };
+        }
+
+        for &(c1, c2) in &[(0, -1), (0, 1), (0, -2)] {
+            let input = DownmixInput::Float(&pcm);
+            let mut rust_out = vec![0.0f32; subframe as usize];
+            input.downmix(&mut rust_out, subframe, offset, c1, c2, c);
+
+            let mut c_out = vec![0.0f32; subframe as usize];
+            unsafe {
+                downmix_float(
+                    pcm.as_ptr().cast::<c_void>(),
+                    c_out.as_mut_ptr(),
+                    subframe,
+                    offset,
+                    c1,
+                    c2,
+                    c,
+                );
+            }
+
+            for i in 0..subframe as usize {
+                assert_eq!(
+                    rust_out[i].to_bits(),
+                    c_out[i].to_bits(),
+                    "sample mismatch c1={c1} c2={c2} i={i}"
+                );
+            }
+        }
     }
 }

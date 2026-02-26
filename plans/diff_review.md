@@ -334,10 +334,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/mapping_matrix.c`
 - Detail: Upstream includes mapping-matrix utilities and static FOA/SOA/TOA HOA matrices used by projection/multistream components. Rust codebase does not mirror this module, consistent with missing projection/multistream API coverage.
 
-90. [MEDIUM][Analysis] Float downmix path clamps samples and replaces NaNs earlier than upstream.
-- Rust: `src/opus/analysis.rs:78-83`
-- Upstream: `libopus-sys/opus/src/analysis.c:561-567`
-- Detail: Rust `DownmixInput::Float::downmix` clamps to `[-65536, 65536]` and converts NaN to `0` before analysis FFT. Upstream does not clamp there; it checks for NaN after FFT output and bails from analysis if detected. This alters analysis feature generation under extreme/NaN inputs.
+90. [RESOLVED][Analysis] Float downmix clamp/NaN behavior matches upstream callback semantics.
+- Rust: `src/opus/analysis.rs` (`DownmixInput::Float::downmix`, tests)
+- Upstream: `libopus-sys/opus/src/opus_encoder.c:748-779` (`downmix_float`), `libopus-sys/opus/src/analysis.c:561-567`
+- Detail: Upstream performs clamp-to-`[-65536, 65536]` and NaN-to-zero in `downmix_float` before FFT, and still retains post-FFT NaN guard in analysis; Rust already mirrors this. Added direct C-vs-Rust parity coverage for float downmix with NaN/Inf/extreme samples.
 
 92. [LOW][Packet API] Additional packet helper signatures are slice-based rather than upstream pointer+length forms.
 - Rust: `src/opus/packet.rs:388-405` (`opus_packet_parse(data: &[u8], ...)`), `src/opus/opus_decoder.rs:1178` (`opus_packet_get_nb_frames(packet: &[u8])`)
