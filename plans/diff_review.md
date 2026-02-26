@@ -494,20 +494,20 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/dnn/fwgan.c`, `libopus-sys/opus/dnn/lossgen.c` (and related headers/data)
 - Detail: Rust DNN coverage includes LPCNet/OSCE/DRED/FARGAN components, but upstream repository contains additional DNN runtime components not mirrored in Rust sources.
 
-124. [MEDIUM][CTL Semantics] `set_bandwidth(None)` does not mirror upstream side-effect on SILK max internal sample rate.
-- Rust: `src/opus/opus_encoder.rs:356-369`
+124. [RESOLVED][CTL Semantics] `set_bandwidth(None)` mirrors upstream SILK max internal-rate side effect.
+- Rust: `src/opus/opus_encoder.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2890-2903`
-- Detail: Upstream `OPUS_SET_BANDWIDTH(OPUS_AUTO)` still sets `silk_mode.maxInternalSampleRate = 16000`. Rust `set_bandwidth(None)` only sets `user_bandwidth = OPUS_AUTO` and leaves prior `maxInternalSampleRate` unchanged.
+- Detail: Rust `set_bandwidth(None)` sets `silk_mode.maxInternalSampleRate = 16000`; unit test `set_bandwidth_auto_resets_silk_internal_rate_to_16k` covers this behavior.
 
-125. [LOW][Lookahead Semantics] `lookahead()` omits upstream restricted-CELT exclusion when adding delay compensation.
-- Rust: `src/opus/opus_encoder.rs:531-535`
+125. [RESOLVED][Lookahead Semantics] `lookahead()` includes upstream restricted-CELT exclusion for delay compensation.
+- Rust: `src/opus/opus_encoder.rs`, `src/opus/opus_encoder.rs` tests
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:3089-3091`
-- Detail: Upstream adds `delay_compensation` only when application is neither `RESTRICTED_LOWDELAY` nor `RESTRICTED_CELT`. Rust checks only `RESTRICTED_LOWDELAY`.
+- Detail: Rust excludes delay compensation for `RESTRICTED_CELT`; unit test `restricted_applications_set_expected_buffer_and_lookahead` covers the branch.
 
-126. [MEDIUM][DRED API Semantics] Rust `opus_dred_process` helper has different signature/return semantics from upstream API.
-- Rust: `src/dnn/dred/decoder.rs:195-208`
+126. [RESOLVED][DRED API Semantics] Public `opus_dred_process` wrapper matches upstream status/copy contract.
+- Rust: `src/opus/opus_decoder.rs`
 - Upstream: `libopus-sys/opus/include/opus.h:661`, `libopus-sys/opus/src/opus_decoder.c:1587-1600`
-- Detail: Upstream API is `int opus_dred_process(OpusDREDDecoder*, const OpusDRED*, OpusDRED*)` returning Opus status codes with argument validation and copy-on-src!=dst behavior. Rust helper is in-place `fn opus_dred_process(&OpusDREDDecoder, &mut OpusDRED)` returning `()`, uses assertion for loaded-state, and omits status/error reporting semantics.
+- Detail: Rust exposes `opus_dred_process(dec, src, dst) -> i32` with argument validation, loaded-state status, and copy-on-src!=dst semantics; tests cover invalid-stage rejection, unloaded-decoder rejection, and distinct-src/dst copy behavior.
 
 127. [LOW][Header/Feature Flags] Upstream projection-feature indicator macro has no Rust equivalent.
 - Rust: no exported equivalent of `OPUS_HAVE_OPUS_PROJECTION_H` in API constants

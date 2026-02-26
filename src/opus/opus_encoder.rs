@@ -3515,6 +3515,16 @@ mod tests {
     }
 
     #[test]
+    fn set_bandwidth_auto_resets_silk_internal_rate_to_16k() {
+        let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        enc.set_max_bandwidth(Bandwidth::Narrowband);
+        assert_eq!(enc.silk_mode.maxInternalSampleRate, 8000);
+
+        enc.set_bandwidth(None);
+        assert_eq!(enc.silk_mode.maxInternalSampleRate, 16000);
+    }
+
+    #[test]
     fn set_application_rejects_restricted_modes_and_restricted_instances() {
         let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
         assert_eq!(

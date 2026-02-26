@@ -1769,6 +1769,26 @@ mod tests {
         assert_eq!(ret, OPUS_UNIMPLEMENTED);
     }
 
+    #[test]
+    fn dred_process_rejects_invalid_stage() {
+        let dred_dec = OpusDREDDecoder::new();
+        let mut src = OpusDRED::new();
+        src.process_stage = 0;
+        let mut dst = OpusDRED::new();
+        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        assert_eq!(ret, OPUS_BAD_ARG);
+    }
+
+    #[test]
+    fn dred_process_requires_loaded_decoder() {
+        let dred_dec = OpusDREDDecoder::new();
+        let mut src = OpusDRED::new();
+        src.process_stage = 2;
+        let mut dst = OpusDRED::new();
+        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        assert_eq!(ret, OPUS_UNIMPLEMENTED);
+    }
+
     #[cfg(feature = "builtin-weights")]
     #[test]
     fn dred_parse_empty_packet_returns_zero() {
@@ -1786,5 +1806,26 @@ mod tests {
         );
         assert_eq!(ret, 0);
         assert_eq!(dred_end, 0);
+    }
+
+    #[cfg(feature = "builtin-weights")]
+    #[test]
+    fn dred_process_copies_src_when_dst_is_distinct() {
+        let dred_dec = opus_dred_decoder_create().expect("dred decoder");
+        let mut src = OpusDRED::new();
+        src.process_stage = 2;
+        src.nb_latents = 3;
+        src.dred_offset = -7;
+        src.fec_features[0] = 1.5;
+        src.state[0] = -2.0;
+
+        let mut dst = OpusDRED::new();
+        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        assert_eq!(ret, OPUS_OK);
+        assert_eq!(dst.process_stage, 2);
+        assert_eq!(dst.nb_latents, 3);
+        assert_eq!(dst.dred_offset, -7);
+        assert_eq!(dst.fec_features[0], 1.5);
+        assert_eq!(dst.state[0], -2.0);
     }
 }

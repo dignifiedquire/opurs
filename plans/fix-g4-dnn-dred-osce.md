@@ -73,3 +73,7 @@ Closed in this group: `12,45,76,94,135,136,137,175,176,180,181,182,187,191,192,1
 - 2026-02-26: Re-scoped standalone LPCNet decoder/synthesis surface (`179`) as API-shape-only and excluded from functional-equivalence execution:
   - current Opus functional parity scope tracks encoder/decoder behavior, DNN model loading, and runtime DSP paths used by Opus encode/decode.
   - standalone LPCNet codec APIs (`lpcnet_decoder_*`, `lpcnet_*`, `lpcnet_synthesize`, `lpcnet_decode`) are not invoked by Opus packet encode/decode flows in this repository.
+- 2026-02-26: Confirmed/locked DRED process API semantics against upstream wrapper contract:
+  - `src/opus/opus_decoder.rs`: `opus_dred_process(dec, src, dst) -> i32` keeps upstream return and copy semantics.
+  - Added tests: invalid-stage rejection, unloaded-decoder rejection, and distinct-src/dst copy behavior.
+  - closes `126`.
