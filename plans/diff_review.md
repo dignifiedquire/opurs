@@ -877,12 +877,12 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/nnet.h:97`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:55-79`
 - Detail: Upstream `parse_weights(WeightArray **list, const void *data, int len)` allocates a null-terminated C array and returns the array count (or `-1`). Rust returns `Option<Vec<WeightArray>>` with copied payloads and no C-style sentinel/list ownership contract, so parser API shape and memory/lifecycle semantics are not source-equivalent.
 
-201. [MEDIUM][Builtin Weights Coverage][OSCE] `compiled_weights()` omits BBWENet arrays needed for OSCE-BWE model loading.
-- Rust: `src/dnn/weights.rs:15-30`
-- Rust BBWE arrays exist but are not included: `src/dnn/bbwenet_data.rs:112975`
-- Rust OSCE loader consumes BBWENet weights if present: `src/dnn/osce.rs:1597-1601`
+201. [RESOLVED][Builtin Weights Coverage][OSCE] `compiled_weights()` now includes BBWENet arrays for OSCE-BWE model loading.
+- Rust: `src/dnn/weights.rs`
+- Rust BBWE arrays included from: `src/dnn/bbwenet_data.rs`
+- Rust OSCE loader consumes BBWENet weights: `src/dnn/osce.rs`
 - Upstream builtin path initializes BBWENet arrays alongside LACE/NoLACE: `libopus-sys/opus/dnn/osce.c:1465-1468`
-- Detail: Upstream built-in OSCE model loading includes `bbwenetlayers_arrays` when OSCE-BWE is enabled. Rust `compiled_weights()` includes `lacelayers` and `nolacelayers` but not `bbwenetlayers`, so one-shot built-in weight aggregation is not upstream-equivalent for OSCE-BWE coverage.
+- Detail: `compiled_weights()` now extends OSCE builtin arrays with `bbwenetlayers_arrays` under the `osce` feature, matching upstream one-shot built-in model aggregation semantics.
 
 202. [LOW][Arch Dispatch Coverage][SILK VAD] Full-function SSE4.1 VAD RTCD path is not mirrored.
 - Rust: `src/silk/VAD.rs:60`, `src/silk/VAD.rs:154`, `src/silk/simd/mod.rs:101-113`
@@ -906,10 +906,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/celt/vq.h:60-64`, `libopus-sys/opus/celt/x86/x86_celt_map.c:175-182`
 - Detail: Upstream dispatch can be controlled via the `arch` argument (through `OP_PVQ_SEARCH_IMPL[(arch)&mask]`). Rust SIMD dispatch chooses SSE2 solely from host CPUID and ignores `_arch`, so callers cannot force scalar/lower-arch behavior in the same way.
 
-206. [MEDIUM][Initialization Semantics][OSCE] Rust OSCE model loader treats partial model initialization as success.
-- Rust: `src/dnn/osce.rs:1597-1602`
+206. [RESOLVED][Initialization Semantics][OSCE] Rust OSCE model loader now requires full model-set initialization for success.
+- Rust: `src/dnn/osce.rs`
 - Upstream: `libopus-sys/opus/dnn/osce.c:1438-1449`, `libopus-sys/opus/dnn/osce.c:1457-1468`, `libopus-sys/opus/dnn/osce.c:1473-1474`
-- Detail: Upstream chains init calls with `if (ret == 0)` and returns failure (`-1`) if any enabled model init fails. Rust sets `loaded=true` when *any* of LACE/NoLACE/BBWENet init succeeds, allowing partial-load success that upstream would report as failure.
+- Detail: `osce_load_models` now sets `loaded=true` only when all enabled OSCE components (`lace`, `nolace`, `bbwenet`) initialize successfully, matching upstream failure-on-partial-init behavior.
 
 207. [LOW][API Signature][DRED RDOVAE] RDOVAE encode/decode entry points omit upstream `arch` parameter.
 - Rust: `src/dnn/dred/rdovae_enc.rs:373`, `src/dnn/dred/rdovae_dec.rs:441`, `src/dnn/dred/rdovae_dec.rs:483`, `src/dnn/dred/rdovae_dec.rs:662`
@@ -958,25 +958,25 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/lpcnet_private.h:76`, `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
 - Detail: Upstream `compute_frame_features`, `lpcnet_compute_single_frame_features`, and `lpcnet_compute_single_frame_features_float` all take explicit run-time `arch`. Rust equivalents do not expose `arch`, so API surface and explicit RTCD control differ.
 
-217. [LOW][Documentation/Versioning][DNN] DNN module documentation still references Opus previous baseline rather than 1.6.1.
-- Rust: `src/dnn/README.md:3`
+217. [RESOLVED][Documentation/Versioning][DNN] DNN module documentation now references Opus 1.6.1 baseline.
+- Rust: `src/dnn/README.md`
 - Upstream baseline being tracked in this repo: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
-- Detail: The DNN README claims the port targets Opus previous baseline, while the build/config baseline in-tree is 1.6.1. This is a documentation parity drift that can mislead future reviews and regeneration workflows.
+- Detail: Updated DNN README baseline text to 1.6.1 to match the in-tree vendored/build baseline metadata.
 
 218. [RESOLVED][Validation Semantics][DNN Weights] Sparse index validation in `linear_init` now matches upstream `find_idx_check`.
 - Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-121`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:149-152`
 - Detail: Rust now performs the same sparse-index validity checks as upstream before accepting `weights_idx`, closing acceptance of malformed sparse index blobs that upstream rejects.
 
-219. [LOW][Boundary Condition][MLP] GRU neuron-capacity assertion is off-by-one versus upstream fixed-size buffers.
-- Rust: `src/opus/mlp/layers.rs:95`, `src/opus/mlp/layers.rs:102`, `src/opus/mlp/layers.rs:119-124`
+219. [RESOLVED][Boundary Condition][MLP] GRU neuron-capacity assertion now matches upstream fixed-size buffer limit.
+- Rust: `src/opus/mlp/layers.rs`
 - Upstream: `libopus-sys/opus/src/mlp.h:35`, `libopus-sys/opus/src/mlp.c:97-100`, `libopus-sys/opus/src/mlp.c:101-103`
-- Detail: Upstream allocates `tmp/z/r/h` with `MAX_NEURONS` (=32) and supports `N == 32`. Rust asserts `n < MAX_NEURONS`, which rejects `n == 32` and can panic on valid upstream-size models.
+- Detail: Rust now allows `N == MAX_NEURONS` (`n <= MAX_NEURONS`), matching upstream buffer sizing semantics. Added a regression test that runs GRU compute with exactly 32 neurons.
 
-220. [LOW][Numeric Fidelity][MLP] `tansig_approx` polynomial coefficients are truncated compared with upstream constants.
-- Rust: `src/opus/mlp/tansig.rs:10-15`
+220. [RESOLVED][Numeric Fidelity][MLP] `tansig_approx` polynomial coefficients now match upstream constants.
+- Rust: `src/opus/mlp/tansig.rs`
 - Upstream: `libopus-sys/opus/src/mlp.c:41-46`
-- Detail: Rust uses shortened constants (e.g. `952.528`, `952.724`, `413.368`) while upstream uses higher-precision literals (`952.52801514f`, `952.72399902f`, `413.36801147f`, etc.). This can introduce small output differences in MLP activations relative to upstream.
+- Detail: Replaced shortened coefficient literals with upstream-precision constants in `tansig_approx` and kept them exact with a targeted `clippy::excessive_precision` allow on the function.
 
 221. [MEDIUM][Initialization Semantics][LPCNet PLC] Rust `init()` ignores encoder/FARGAN init outcomes when determining loaded state.
 - Rust: `src/dnn/lpcnet.rs:552-560` (calls `self.fargan.init(arrays)` and `self.enc.load_model(arrays)` without checking return values; sets `loaded=true` if `init_plcmodel` succeeds)

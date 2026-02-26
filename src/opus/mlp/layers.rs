@@ -100,7 +100,7 @@ impl AnalysisGRULayer {
         assert_eq!(n, state.len());
         assert_eq!(m, input.len());
 
-        assert!(n < MAX_NEURONS);
+        assert!(n <= MAX_NEURONS);
 
         let col_stride = 3 * n;
 
@@ -161,5 +161,31 @@ impl AnalysisGRULayer {
         for (state, &h) in state.iter_mut().zip(h.iter()) {
             *state = h;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analysis_gru_allows_max_neurons() {
+        const N: usize = 32;
+        const M: usize = 1;
+
+        let bias = Box::leak(vec![0i8; 3 * N].into_boxed_slice());
+        let input_weights = Box::leak(vec![0i8; 3 * N * M].into_boxed_slice());
+        let recurrent_weights = Box::leak(vec![0i8; 3 * N * N].into_boxed_slice());
+
+        let layer = AnalysisGRULayer {
+            bias,
+            input_weights,
+            recurrent_weights,
+        };
+        let mut state = vec![0.0f32; N];
+        let input = vec![0.0f32; M];
+
+        layer.compute(&mut state, &input);
+        assert_eq!(state, vec![0.0; N]);
     }
 }
