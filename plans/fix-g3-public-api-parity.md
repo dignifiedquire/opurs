@@ -4,7 +4,7 @@
 Close remaining public API coverage gaps versus upstream core/custom/multistream/projection and related controls.
 
 ## Findings IDs
-Open: `43,104,110,116,119,120,122`
+Open: `none (resolved/excluded)`
 
 ## Scope
 - DRED public decoder/aux APIs and state lifecycle entry points.
@@ -62,3 +62,8 @@ Open: `43,104,110,116,119,120,122`
   - decoder lifecycle/control: `opus_dred_decoder_get_size`, `opus_dred_decoder_create`, `opus_dred_decoder_init`, `opus_dred_decoder_destroy`, `opus_dred_decoder_ctl`
   - DRED object lifecycle/parse/process: `opus_dred_get_size`, `opus_dred_alloc`, `opus_dred_free`, `opus_dred_parse`, `opus_dred_process`
   - Added unit coverage for parse/control paths in `src/opus/opus_decoder.rs` tests.
+- 2026-02-26: Closed remaining Group 3 items:
+  - Added custom CELT 24-bit API coverage in Rust (`OpusCustomEncoder::encode24`, `OpusCustomDecoder::decode24`) plus parity tests against upstream C in `tests/opus_custom_api.rs`.
+  - Enabled and exposed upstream C custom symbols in `libopus-sys` needed for parity tests (`opus_custom_*` + custom ctl).
+  - Marked C-ABI-only findings (`110,116,122`) as excluded from functional-equivalence tracking per project policy.
+  - Marked stale/resolved API findings (`104,119,120`) as resolved in `plans/diff_review.md`.

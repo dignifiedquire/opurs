@@ -186,7 +186,7 @@ impl OpusCustomEncoder {
             end: mode.effEBands,
             bitrate: OPUS_BITRATE_MAX,
             vbr: 0,
-            signalling: 1,
+            signalling: 0,
             constrained_vbr: 1,
             loss_rate: 0,
             lsb_depth: 24,
@@ -312,6 +312,137 @@ impl OpusCustomEncoder {
         #[cfg(feature = "qext")]
         self.qext_oldBandE.fill(0.0);
     }
+
+    /// Upstream C: celt/celt_encoder.c:opus_custom_encode
+    pub fn encode(&mut self, pcm: &[i16], compressed: &mut [u8]) -> i32 {
+        let channels = self.channels as usize;
+        if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = (pcm.len() / channels) as i32;
+        opus_custom_encode(self, pcm, frame_size, compressed)
+    }
+
+    /// Upstream C: celt/celt_encoder.c:opus_custom_encode_float
+    pub fn encode_float(&mut self, pcm: &[f32], compressed: &mut [u8]) -> i32 {
+        let channels = self.channels as usize;
+        if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = (pcm.len() / channels) as i32;
+        opus_custom_encode_float(self, pcm, frame_size, compressed)
+    }
+
+    /// Upstream C: celt/celt_encoder.c:opus_custom_encode24
+    pub fn encode24(&mut self, pcm: &[i32], compressed: &mut [u8]) -> i32 {
+        let channels = self.channels as usize;
+        if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
+            return OPUS_BAD_ARG;
+        }
+        let frame_size = (pcm.len() / channels) as i32;
+        opus_custom_encode24(self, pcm, frame_size, compressed)
+    }
+}
+
+/// Upstream C: celt/celt_encoder.c:opus_custom_encode
+pub fn opus_custom_encode(
+    st: &mut OpusCustomEncoder,
+    pcm: &[i16],
+    frame_size: i32,
+    compressed: &mut [u8],
+) -> i32 {
+    if frame_size <= 0 || st.channels <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
+        Some(v) => v,
+        None => return OPUS_BAD_ARG,
+    };
+    if pcm.len() < required {
+        return OPUS_BAD_ARG;
+    }
+    let mut input = vec![0.0f32; required];
+    for i in 0..required {
+        input[i] = (1.0f32 / 32768.0f32) * pcm[i] as f32;
+    }
+    celt_encode_with_ec(
+        st,
+        &input,
+        frame_size,
+        compressed,
+        compressed.len() as i32,
+        None,
+        #[cfg(feature = "qext")]
+        None,
+        #[cfg(feature = "qext")]
+        0,
+    )
+}
+
+/// Upstream C: celt/celt_encoder.c:opus_custom_encode_float
+pub fn opus_custom_encode_float(
+    st: &mut OpusCustomEncoder,
+    pcm: &[f32],
+    frame_size: i32,
+    compressed: &mut [u8],
+) -> i32 {
+    if frame_size <= 0 || st.channels <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
+        Some(v) => v,
+        None => return OPUS_BAD_ARG,
+    };
+    if pcm.len() < required {
+        return OPUS_BAD_ARG;
+    }
+    celt_encode_with_ec(
+        st,
+        &pcm[..required],
+        frame_size,
+        compressed,
+        compressed.len() as i32,
+        None,
+        #[cfg(feature = "qext")]
+        None,
+        #[cfg(feature = "qext")]
+        0,
+    )
+}
+
+/// Upstream C: celt/celt_encoder.c:opus_custom_encode24
+pub fn opus_custom_encode24(
+    st: &mut OpusCustomEncoder,
+    pcm: &[i32],
+    frame_size: i32,
+    compressed: &mut [u8],
+) -> i32 {
+    if frame_size <= 0 || st.channels <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
+        Some(v) => v,
+        None => return OPUS_BAD_ARG,
+    };
+    if pcm.len() < required {
+        return OPUS_BAD_ARG;
+    }
+    let mut input = vec![0.0f32; required];
+    for i in 0..required {
+        input[i] = (1.0f32 / 32768.0f32 / 256.0f32) * pcm[i] as f32;
+    }
+    celt_encode_with_ec(
+        st,
+        &input,
+        frame_size,
+        compressed,
+        compressed.len() as i32,
+        None,
+        #[cfg(feature = "qext")]
+        None,
+        #[cfg(feature = "qext")]
+        0,
+    )
 }
 
 #[cfg(all(test, feature = "qext"))]

@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current alignment plans (`fix-g1` ... `fix-g7`) as of 2026-02-26.
 
-Excluded from functional-equivalence tracking (C API-surface only): `177,178,179,186`.
+Excluded from functional-equivalence tracking (C API-surface only): `110,116,122,177,178,179,186`.
 
 Priority groups for execution:
 
@@ -17,7 +17,7 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
-IDs: `43,104,110,116,119,120,122`
+IDs: `none (resolved/excluded)`
 
 4. DNN/DRED/OSCE model loading and constant parity
 IDs: `none (resolved)`
@@ -118,10 +118,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/extensions.c:471-473`, `libopus-sys/opus/src/extensions.c:495`, `libopus-sys/opus/src/repacketizer.c:263-264`, `libopus-sys/opus/src/repacketizer.c:309-310`
 - Detail: Generator takes `nb_frames` and rejects out-of-range frame indices (`frame >= nb_frames`) as upstream does.
 
-43. [MEDIUM] Missing CELT custom 24-bit API parity.
-- Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (no `opus_custom_encode24` / `opus_custom_decode24` entry points found)
-- Upstream: `libopus-sys/opus/celt/celt_encoder.c:2871`, `libopus-sys/opus/celt/celt_decoder.c:1658`
-- Detail: Upstream custom CELT API exports 24-bit integer encode/decode functions; matching Rust entry points are not present.
+43. [RESOLVED][Custom 24-bit] CELT custom 24-bit encode/decode paths are now exposed and parity-tested.
+- Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs`, `tests/opus_custom_api.rs`
+- Upstream: `libopus-sys/opus/celt/celt_encoder.c:2871`, `libopus-sys/opus/celt/celt_decoder.c:1803`
+- Detail: Rust now provides `OpusCustomEncoder::encode24` and `OpusCustomDecoder::decode24` (plus `opus_custom_encode24` / `opus_custom_decode24` helpers), with C-vs-Rust parity tests validating packet and PCM equality.
 
 44. [LOW] Missing direct CELT custom C-style CTL/destroy entry points.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs`
@@ -404,10 +404,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/include/opus_defines.h:223-226`
 - Detail: Upstream defines application IDs 2052 and 2053. Rust constants and typed `Application` enum only include VoIP/Audio/Restricted-LowDelay.
 
-104. [HIGH][API Coverage][Multistream/Projection] Upstream multistream/projection API modules are missing.
-- Rust: `src/lib.rs`, `src/opus/mod.rs` (no `opus_multistream*`/`opus_projection*` modules exported)
+104. [RESOLVED][API Coverage][Multistream/Projection] Multistream/projection modules are implemented and exported.
+- Rust: `src/lib.rs`, `src/opus/opus_multistream*.rs`, `src/opus/opus_projection*.rs`
 - Upstream: `libopus-sys/opus/src/opus_multistream.c`, `libopus-sys/opus/src/opus_multistream_encoder.c`, `libopus-sys/opus/src/opus_multistream_decoder.c`, `libopus-sys/opus/src/opus_projection_encoder.c`, `libopus-sys/opus/src/opus_projection_decoder.c`
-- Detail: Beyond missing `mapping_matrix`, Rust currently lacks the core multistream/projection encoder/decoder implementations and public API surface present in upstream.
+- Detail: Rust now exposes the multistream/projection encoder/decoder surfaces, including 24-bit variants and packet helpers.
 
 106. [RESOLVED][Runtime Semantics][QEXT] `compute_qext_mode` unsupported relation now uses hardening-aligned assertion behavior.
 - Rust: `src/celt/modes.rs:113`
@@ -429,10 +429,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:224-245`
 - Detail: Upstream `celt_decoder_init`/`opus_custom_decoder_init` return `OPUS_BAD_ARG` (or other status) for invalid sampling rate/channel inputs. Rust uses `panic!` branches for unsupported sample rates and channel validation, changing error semantics from return-code to abort.
 
-110. [HIGH][C API Surface] C-style create/destroy/ctl entrypoints are not exposed in the Rust API layer.
+110. [EXCLUDED][C API Surface] C-style create/destroy/ctl entrypoints are not exposed in the Rust API layer.
 - Rust: `src/lib.rs` exports typed structs/methods, but no `opus_encoder_create/destroy/ctl` or `opus_decoder_create/destroy/ctl` symbols
 - Upstream: `libopus-sys/opus/include/opus.h:211`, `libopus-sys/opus/include/opus.h:351`, `libopus-sys/opus/include/opus.h:367`, `libopus-sys/opus/include/opus.h:477`, `libopus-sys/opus/include/opus.h:586`, `libopus-sys/opus/include/opus.h:591`
-- Detail: Upstream public API is centered around C entrypoints with vararg CTL control plane. Rust exposes idiomatic methods/fields instead, so behavior/coverage parity for request dispatch and ABI-level compatibility is incomplete.
+- Detail: Excluded from functional-equivalence tracking by project policy (`no C-ABI-only parity requirements`).
 
 111. [HIGH][QEXT][Encoder Path] QEXT payload path is not wired in main Opus encoder call-site.
 - Rust: `src/opus/opus_encoder.rs:2810-2820`, `src/celt/celt_encoder.rs:3283-3287`
@@ -454,10 +454,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:86-99`, `libopus-sys/opus/src/repacketizer.c:143-177`
 - Detail: Rust stores parse-time padding metadata in repacketizer state and merges source-packet extensions into repacketized output.
 
-116. [HIGH][Opus Custom API Coverage] `opus_custom.h` API surface is largely missing (create/destroy/get_size/init/encode/decode/ctl entrypoints).
+116. [EXCLUDED][Opus Custom C API Coverage] `opus_custom.h` C-ABI surface is not mirrored 1:1.
 - Rust: `src/lib.rs:83-88` (exports only `OpusCustomEncoder`, `OpusCustomDecoder`, `opus_custom_mode_create`, with note about no mode destroy)
 - Upstream: `libopus-sys/opus/include/opus_custom.h:122-373`
-- Detail: Upstream exposes full Opus Custom C API (mode create/destroy, encoder/decoder lifecycle, float/int/int24 encode/decode, ctl). Rust only provides partial typed internals and omits the majority of `opus_custom_*` entrypoints and explicit mode destroy semantics.
+- Detail: Excluded from functional-equivalence tracking by project policy; Rust tracks functional behavior via typed APIs and parity tests.
 
 117. [HIGH][Application Modes] Encoder initialization rejects upstream restricted application modes.
 - Rust: `src/opus/opus_encoder.rs:162-165`
@@ -469,25 +469,25 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2826-2827`
 - Detail: Upstream clamps explicit bitrate to `750000 * channels`. Rust clamps to `300000 * channels`, reducing accepted bitrate range and changing CTL behavior for high-bitrate configurations.
 
-119. [HIGH][DRED API Coverage] Public DRED API from `opus.h` is not exposed in the Rust surface.
-- Rust: no exported `opus_dred_*` / `opus_decoder_dred_decode*` API in `src/lib.rs`
+119. [RESOLVED][DRED API Coverage] Public DRED API from `opus.h` is exposed in Rust wrappers.
+- Rust: `src/opus/opus_decoder.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus.h:596-697`
-- Detail: Upstream 1.6.1 exposes DRED decoder/state lifecycle (`opus_dred_decoder_*`, `opus_dred_*`) plus decode entrypoints (`opus_decoder_dred_decode`, `...decode24`, `...decode_float`). Rust contains internal DRED modules but does not provide the corresponding public API set.
+- Detail: Rust exports `opus_dred_*` lifecycle/parse/process APIs and `opus_decoder_dred_decode*` entry points with parity coverage.
 
-120. [MEDIUM][Packet API Coverage] Multistream packet pad/unpad helpers are missing.
-- Rust: no `opus_multistream_packet_pad` / `opus_multistream_packet_unpad` exports in `src/lib.rs`
+120. [RESOLVED][Packet API Coverage] Multistream packet pad/unpad helpers are implemented and tested.
+- Rust: `src/opus/repacketizer.rs`, `src/lib.rs`, `tests/opus_multistream_packet.rs`
 - Upstream: `libopus-sys/opus/include/opus.h:1152`, `libopus-sys/opus/include/opus.h:1167`
-- Detail: Upstream provides helpers to pad/unpad multi-stream Opus packets. Rust currently exposes only single-stream packet pad/unpad helpers.
+- Detail: Rust exports `opus_multistream_packet_pad` / `opus_multistream_packet_unpad` and has C-vs-Rust parity coverage.
 
 121. [MEDIUM][CTL Semantics] Rust bitrate setter does not preserve upstream `<=0` rejection semantics.
 - Rust: `src/opus/opus_encoder.rs:318-325`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2820-2825`
 - Detail: Upstream returns `OPUS_BAD_ARG` for explicit bitrate values `<= 0` (except sentinels `OPUS_AUTO`/`OPUS_BITRATE_MAX`). Rust `set_bitrate()` accepts any `Bitrate::Bits(v)` and clamps values below 500 up to 500, including non-positive values.
 
-122. [MEDIUM][API Coverage][Sizing/Lifecycle] `*_get_size`/C-style lifecycle functions are broadly missing for core and repacketizer APIs.
+122. [EXCLUDED][API Coverage][Sizing/Lifecycle] `*_get_size`/C-style lifecycle functions are broadly missing for core and repacketizer APIs.
 - Rust: no exported `opus_encoder_get_size`, `opus_decoder_get_size`, `opus_repacketizer_get_size` in `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus.h:174`, `libopus-sys/opus/include/opus.h:460`, `libopus-sys/opus/include/opus.h:953`
-- Detail: Upstream C API exposes size-query and explicit init/create/destroy workflow for externally allocated states. Rust API is object-centric and does not mirror these ABI-level allocation/lifecycle entrypoints.
+- Detail: Excluded from functional-equivalence tracking by project policy; Rust uses object-centric ownership/lifecycle APIs.
 
 123. [LOW][DNN Module Coverage] Several upstream DNN runtime modules are not ported in Rust (e.g., FWGAN/lossgen paths).
 - Rust: `src/dnn/` (no `fwgan.rs`, no `lossgen.rs` module equivalents)

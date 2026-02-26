@@ -451,6 +451,83 @@ unsafe extern "C" {
 pub struct OpusEncoder {
     _unused: [u8; 0],
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomMode {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomEncoder {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomDecoder {
+    _unused: [u8; 0],
+}
+unsafe extern "C" {
+    pub fn opus_custom_mode_create(
+        Fs: opus_int32,
+        frame_size: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut OpusCustomMode;
+}
+unsafe extern "C" {
+    pub fn opus_custom_mode_destroy(mode: *mut OpusCustomMode);
+}
+unsafe extern "C" {
+    pub fn opus_custom_encoder_create(
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut OpusCustomEncoder;
+}
+unsafe extern "C" {
+    pub fn opus_custom_encoder_destroy(st: *mut OpusCustomEncoder);
+}
+unsafe extern "C" {
+    pub fn opus_custom_encoder_ctl(
+        st: *mut OpusCustomEncoder,
+        request: ::std::os::raw::c_int,
+        ...
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn opus_custom_encode24(
+        st: *mut OpusCustomEncoder,
+        pcm: *const opus_int32,
+        frame_size: ::std::os::raw::c_int,
+        compressed: *mut ::std::os::raw::c_uchar,
+        nbCompressedBytes: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn opus_custom_decoder_create(
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut OpusCustomDecoder;
+}
+unsafe extern "C" {
+    pub fn opus_custom_decoder_destroy(st: *mut OpusCustomDecoder);
+}
+unsafe extern "C" {
+    pub fn opus_custom_decoder_ctl(
+        st: *mut OpusCustomDecoder,
+        request: ::std::os::raw::c_int,
+        ...
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn opus_custom_decode24(
+        st: *mut OpusCustomDecoder,
+        data: *const ::std::os::raw::c_uchar,
+        len: ::std::os::raw::c_int,
+        pcm: *mut opus_int32,
+        frame_size: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
 unsafe extern "C" {
     #[doc = " Gets the size of an <code>OpusEncoder</code> structure.\n @param[in] channels <tt>int</tt>: Number of channels.\n                                   This must be 1 or 2.\n @returns The size in bytes.\n @note Since this function does not take the application as input, it will overestimate\n the size required for OPUS_APPLICATION_RESTRICTED_SILK and OPUS_APPLICATION_RESTRICTED_CELT.\n That is generally not a problem, except when trying to know the size to use for a copy."]
     pub fn opus_encoder_get_size(channels: ::std::os::raw::c_int) -> ::std::os::raw::c_int;

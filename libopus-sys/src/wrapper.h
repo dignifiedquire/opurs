@@ -1,4 +1,5 @@
 #include "../opus/include/opus_multistream.h"
+#include "../opus/include/opus_custom.h"
 
 #ifdef ENABLE_DEEP_PLC
 int opus_dnn_weights_blob_size(void);
