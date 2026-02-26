@@ -94,9 +94,7 @@ fn zeroed_decoder_state() -> silk_decoder_state {
         #[cfg(feature = "osce")]
         osce: crate::dnn::osce::OSCEState::default(),
         #[cfg(feature = "osce")]
-        osce_bwe: crate::dnn::osce::OSCEBWEState::default(),
-        #[cfg(feature = "osce")]
-        osce_bwe_features: crate::dnn::osce::OSCEBWEFeatureState::default(),
+        osce_bwe: crate::dnn::osce::OSCEBWE::default(),
     }
 }
 

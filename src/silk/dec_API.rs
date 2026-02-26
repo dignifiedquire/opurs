@@ -419,16 +419,12 @@ pub fn silk_Decode(
 
             if decControl.osce_extended_mode == OSCE_MODE_SILK_BBWE {
                 if decControl.prev_osce_extended_mode != OSCE_MODE_SILK_BBWE {
-                    osce_bwe_reset(
-                        &mut channel_state[n as usize].osce_bwe,
-                        &mut channel_state[n as usize].osce_bwe_features,
-                    );
+                    osce_bwe_reset(&mut channel_state[n as usize].osce_bwe);
                 }
 
                 osce_bwe(
                     &psDec.osce_model,
                     &mut channel_state[n as usize].osce_bwe,
-                    &mut channel_state[n as usize].osce_bwe_features,
                     resample_out,
                     resample_input,
                     nSamplesOutDec as usize,
@@ -459,7 +455,6 @@ pub fn silk_Decode(
                     osce_bwe(
                         &psDec.osce_model,
                         &mut channel_state[n as usize].osce_bwe,
-                        &mut channel_state[n as usize].osce_bwe_features,
                         &mut resamp_buffer,
                         resample_input,
                         nSamplesOutDec as usize,

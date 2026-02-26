@@ -6,7 +6,7 @@ Rust sources compared against upstream C in `libopus-sys/opus`.
 ## Remaining Items (Grouped)
 Snapshot from the current alignment plans (`fix-g1` ... `fix-g7`) as of 2026-02-26.
 
-Excluded from functional-equivalence tracking (C API-surface only): `177,178,186`.
+Excluded from functional-equivalence tracking (C API-surface only): `177,178,179,186`.
 
 Priority groups for execution:
 
@@ -20,7 +20,7 @@ IDs: `none (resolved)`
 IDs: `43,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `179,180,191,192,193`
+IDs: `none (resolved)`
 
 5. SIMD/arch-dispatch/build-flag parity
 IDs: `none (resolved)`
@@ -764,15 +764,15 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/src/mlp.h:56-58`, `libopus-sys/opus/src/mlp.c:70-131`
 - Detail: Rust already implements equivalent layer behavior in the active analysis path; this item is direct API-shape parity only and is excluded from functional-equivalence comparisons.
 
-179. [MEDIUM][DNN API Coverage][LPCNet] Standalone LPCNet decoder/synthesis API surface from upstream headers is not mirrored.
+179. [EXCLUDED][DNN API Coverage][LPCNet] Standalone LPCNet decoder/synthesis API surface is excluded from functional-equivalence scope.
 - Rust: `src/dnn/lpcnet.rs` (provides `LPCNetEncState`, `LPCNetPLCState`, feature/PLC helpers; no `LPCNetDecState`/`LPCNetState` create/decode/synthesize API)
 - Upstream: `libopus-sys/opus/dnn/lpcnet.h:40-79`, `libopus-sys/opus/dnn/lpcnet.h:134-166`
-- Detail: Upstream declares standalone LPCNet decoder/synthesis lifecycle and processing entry points (`lpcnet_decoder_*`, `lpcnet_*`, `lpcnet_synthesize`, `lpcnet_decode`). Rust currently exposes encoder-analysis and PLC components but not the equivalent decoder/synth API set.
+- Detail: This is a standalone API-surface delta outside Opus packet encode/decode functional parity scope in this repo; DNN parity tracking here focuses on model loading and runtime paths that are exercised by Opus encoder/decoder behavior.
 
-180. [LOW][DNN API Surface][LPCNet] Direct blob-based LPCNet load helpers are not mirrored as one-shot APIs.
-- Rust: `src/dnn/lpcnet.rs:215-216`, `src/dnn/lpcnet.rs:571-580`, plus parser helper `src/dnn/weights.rs:37-38`
+180. [RESOLVED][DNN API Surface][LPCNet] Direct blob-based LPCNet load helpers are mirrored as one-shot APIs.
+- Rust: `src/dnn/lpcnet.rs`, `tests/dnn_integration.rs`
 - Upstream: `libopus-sys/opus/dnn/lpcnet.h:97`, `libopus-sys/opus/dnn/lpcnet.h:180-181`
-- Detail: Upstream exposes direct blob loaders (`lpcnet_encoder_load_model`, `lpcnet_load_model`, `lpcnet_plc_load_model`) taking `(const void*, len)`. Rust exposes `load_model(&[WeightArray])` methods and a separate weight parser, but no equivalent one-call LPCNet blob-loading entry points.
+- Detail: Added blob-loading entry points `lpcnet_encoder_load_model` and `lpcnet_plc_load_model` plus corresponding state methods (`load_model_blob`), and coverage that blob and parsed-array model paths produce equivalent loaded states.
 
 181. [RESOLVED][Constants][DRED] Experimental DRED version constant now matches upstream.
 - Rust: `src/dnn/dred/config.rs`
@@ -825,20 +825,20 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/vec.h:38-39`, `libopus-sys/opus/dnn/vec_avx.h:41`, `libopus-sys/opus/dnn/vec.h:187`, `libopus-sys/opus/dnn/vec.h:221`
 - Detail: Upstream x86/SSE2 builds include `vec_avx.h` and use `USE_SU_BIAS` unsigned-input quantization (`127+round(127*x)`) for int8 GEMV paths. Rust only enables SU-bias semantics when AVX2 is detected and otherwise falls back to signed scalar GEMV, so x86 non-AVX2 behavior is not upstream-equivalent.
 
-191. [LOW][API Signature][OSCE] `osce_load_models` does not mirror upstream blob-loading entry point.
-- Rust: `src/dnn/osce.rs:1597`
+191. [RESOLVED][API Signature][OSCE] `osce_load_models` now mirrors upstream blob-loading entry point.
+- Rust: `src/dnn/osce.rs`, `src/opus/opus_decoder.rs`, `tests/dnn_integration.rs`
 - Upstream: `libopus-sys/opus/dnn/osce.h:89`
-- Detail: Upstream signature is `osce_load_models(OSCEModel*, const void *data, int len)`. Rust exposes `osce_load_models(&mut OSCEModel, &[WeightArray]) -> bool`, requiring pre-parsed arrays and omitting the direct `(blob,len)` API shape.
+- Detail: Rust `osce_load_models` now takes binary blob input (with builtin fallback on empty input when enabled), and array-based loading is preserved as explicit helper `osce_load_models_from_arrays` for internal call sites.
 
-192. [LOW][API Signature][OSCE] `osce_enhance_frame`/`osce_bwe` omit upstream `arch` parameter.
-- Rust: `src/dnn/osce.rs:2527`, `src/dnn/osce.rs:3339`
+192. [RESOLVED][API Signature][OSCE] `osce_enhance_frame` and `osce_bwe` already thread upstream `arch` parameter.
+- Rust: `src/dnn/osce.rs:2588`, `src/dnn/osce.rs:3421`
 - Upstream: `libopus-sys/opus/dnn/osce.h:79`, `libopus-sys/opus/dnn/osce.h:93`
-- Detail: Upstream OSCE processing entry points include explicit run-time `arch` dispatch arguments. Rust equivalents do not take `arch`, so function-level call signatures are not source-equivalent.
+- Detail: Re-audit confirmed both Rust entry points already include and pass through `arch`; this finding was stale.
 
-193. [LOW][API Signature][OSCE] `osce_bwe_reset` signature differs by requiring explicit feature-state argument.
-- Rust: `src/dnn/osce.rs:3299`
+193. [RESOLVED][API Signature][OSCE] `osce_bwe_reset` now uses upstream-style single-state argument.
+- Rust: `src/dnn/osce.rs`, `src/silk/structs.rs`, `src/silk/dec_API.rs`
 - Upstream: `libopus-sys/opus/dnn/osce.h:102`, `libopus-sys/opus/dnn/osce.c:1410`
-- Detail: Upstream reset API takes only `silk_OSCE_BWE_struct*`. Rust requires both `OSCEBWEState` and `OSCEBWEFeatureState`, changing reset-call contract and API parity.
+- Detail: Introduced combined `OSCEBWE` (`features + state`) and updated `osce_bwe_reset`/`osce_bwe` plus SILK decoder wiring to pass one OSCE BWE state object, matching upstream `silk_OSCE_BWE_struct*` call-shape.
 
 194. [RESOLVED][Arch Dispatch Coverage][DNN] Upstream RTCD x86/ARM NNet backend surface is now mirrored.
 - Rust: `src/dnn/nnet.rs`

@@ -736,6 +736,15 @@ pub struct OSCEBWEState {
     pub bbwenet: BBWENetState,
 }
 
+/// Combined SILK OSCE-BWE state (features + runtime state).
+///
+/// Upstream C: silk/structs.h:silk_OSCE_BWE_struct
+#[derive(Clone, Default)]
+pub struct OSCEBWE {
+    pub features: OSCEBWEFeatureState,
+    pub state: OSCEBWEState,
+}
+
 /// Top-level OSCE model container.
 ///
 /// Upstream C: dnn/osce_structs.h:OSCEModel
@@ -1593,15 +1602,35 @@ pub fn init_bbwenet(arrays: &[WeightArray]) -> Option<BBWENet> {
     })
 }
 
-/// Load OSCE models from weight data.
-///
-/// Upstream C: dnn/osce.c:osce_load_models
-pub fn osce_load_models(model: &mut OSCEModel, arrays: &[WeightArray]) -> bool {
+/// Load OSCE models from parsed weight arrays.
+pub fn osce_load_models_from_arrays(model: &mut OSCEModel, arrays: &[WeightArray]) -> bool {
     model.lace = init_lace(arrays);
     model.nolace = init_nolace(arrays);
     model.bbwenet = init_bbwenet(arrays);
     model.loaded = model.lace.is_some() && model.nolace.is_some() && model.bbwenet.is_some();
     model.loaded
+}
+
+/// Load OSCE models from binary weight blob.
+///
+/// Upstream C: dnn/osce.c:osce_load_models
+pub fn osce_load_models(model: &mut OSCEModel, data: &[u8]) -> bool {
+    if data.is_empty() {
+        #[cfg(feature = "builtin-weights")]
+        {
+            let arrays = crate::dnn::weights::compiled_weights();
+            return osce_load_models_from_arrays(model, &arrays);
+        }
+        #[cfg(not(feature = "builtin-weights"))]
+        {
+            return false;
+        }
+    }
+
+    match crate::dnn::weights::load_weights(data) {
+        Some(arrays) => osce_load_models_from_arrays(model, &arrays),
+        None => false,
+    }
 }
 
 // ========== Feature Extraction ==========
@@ -3357,13 +3386,13 @@ fn reset_bbwenet_state(state: &mut BBWENetState) {
 /// Reset OSCE BWE state.
 ///
 /// Upstream C: dnn/osce.c:osce_bwe_reset
-pub fn osce_bwe_reset(bwe: &mut OSCEBWEState, bwe_features: &mut OSCEBWEFeatureState) {
-    *bwe_features = OSCEBWEFeatureState::default();
+pub fn osce_bwe_reset(h_osce_bwe: &mut OSCEBWE) {
+    *h_osce_bwe = OSCEBWE::default();
     // "weird python initialization: Fix eventually!" — matches C
     for k in 0..=OSCE_BWE_MAX_INSTAFREQ_BIN {
-        bwe_features.last_spec[2 * k] = 1e-9;
+        h_osce_bwe.features.last_spec[2 * k] = 1e-9;
     }
-    reset_bbwenet_state(&mut bwe.bbwenet);
+    reset_bbwenet_state(&mut h_osce_bwe.state.bbwenet);
 }
 
 /// Cross-fade BWE output with resampled fallback over 10ms.
@@ -3399,8 +3428,7 @@ pub fn osce_bwe_cross_fade_10ms(x_fadein: &mut [i16], x_fadeout: &[i16], length:
 /// Upstream C: dnn/osce.c:osce_bwe
 pub fn osce_bwe(
     model: &OSCEModel,
-    bwe: &mut OSCEBWEState,
-    bwe_features: &mut OSCEBWEFeatureState,
+    h_osce_bwe: &mut OSCEBWE,
     xq48: &mut [i16],
     xq16: &[i16],
     xq16_len: usize,
@@ -3423,14 +3451,14 @@ pub fn osce_bwe(
 
     // Calculate features
     let mut features = vec![0.0f32; 2 * OSCE_BWE_FEATURE_DIM];
-    osce_bwe_calculate_features(bwe_features, &mut features, xq16, xq16_len);
+    osce_bwe_calculate_features(&mut h_osce_bwe.features, &mut features, xq16, xq16_len);
 
     // Process frames through BBWENet
     let out_len = 3 * xq16_len;
     let mut out_buffer = vec![0.0f32; out_len];
     bbwenet_process_frames(
         bbwenet,
-        &mut bwe.bbwenet,
+        &mut h_osce_bwe.state.bbwenet,
         &mut out_buffer,
         &in_buffer,
         &features,
@@ -3440,7 +3468,7 @@ pub fn osce_bwe(
 
     // Scale and delay output
     // Copy delayed samples from previous call
-    xq48[..OSCE_BWE_OUTPUT_DELAY].copy_from_slice(&bwe.bbwenet.output_buffer);
+    xq48[..OSCE_BWE_OUTPUT_DELAY].copy_from_slice(&h_osce_bwe.state.bbwenet.output_buffer);
 
     // Convert float output to i16 with clipping
     for i in 0..out_len - OSCE_BWE_OUTPUT_DELAY {
@@ -3454,6 +3482,6 @@ pub fn osce_bwe(
     for i in 0..OSCE_BWE_OUTPUT_DELAY {
         let tmp = 32768.0f32 * out_buffer[out_len - OSCE_BWE_OUTPUT_DELAY + i];
         let tmp = tmp.clamp(-32767.0, 32767.0);
-        bwe.bbwenet.output_buffer[i] = tmp.round_ties_even() as i16;
+        h_osce_bwe.state.bbwenet.output_buffer[i] = tmp.round_ties_even() as i16;
     }
 }

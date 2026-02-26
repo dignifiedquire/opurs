@@ -329,7 +329,10 @@ impl OpusDecoder {
         }
         #[cfg(feature = "osce")]
         {
-            if !crate::dnn::osce::osce_load_models(&mut self.silk_dec.osce_model, arrays) {
+            if !crate::dnn::osce::osce_load_models_from_arrays(
+                &mut self.silk_dec.osce_model,
+                arrays,
+            ) {
                 return Err(OPUS_INTERNAL_ERROR);
             }
         }

@@ -127,9 +127,7 @@ pub struct silk_decoder_state {
     #[cfg(feature = "osce")]
     pub osce: crate::dnn::osce::OSCEState,
     #[cfg(feature = "osce")]
-    pub osce_bwe: crate::dnn::osce::OSCEBWEState,
-    #[cfg(feature = "osce")]
-    pub osce_bwe_features: crate::dnn::osce::OSCEBWEFeatureState,
+    pub osce_bwe: crate::dnn::osce::OSCEBWE,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]

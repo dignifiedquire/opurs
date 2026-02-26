@@ -216,6 +216,16 @@ impl LPCNetEncState {
     pub fn load_model(&mut self, arrays: &[WeightArray]) -> bool {
         self.pitchdnn.init(arrays)
     }
+
+    /// Load model from binary weight blob.
+    ///
+    /// Upstream C: dnn/lpcnet.h:lpcnet_encoder_load_model
+    pub fn load_model_blob(&mut self, data: &[u8]) -> bool {
+        match crate::dnn::weights::load_weights(data) {
+            Some(arrays) => self.load_model(&arrays),
+            None => false,
+        }
+    }
 }
 
 // --- Frame analysis ---
@@ -581,7 +591,7 @@ impl LPCNetPLCState {
         true
     }
 
-    /// Load model from binary weight blob.
+    /// Load model weights.
     ///
     /// Upstream C: dnn/lpcnet_plc.c:lpcnet_plc_load_model
     pub fn load_model(&mut self, arrays: &[WeightArray]) -> bool {
@@ -599,6 +609,30 @@ impl LPCNetPLCState {
         self.loaded = true;
         true
     }
+
+    /// Load model from binary weight blob.
+    ///
+    /// Upstream C: dnn/lpcnet.h:lpcnet_plc_load_model
+    pub fn load_model_blob(&mut self, data: &[u8]) -> bool {
+        match crate::dnn::weights::load_weights(data) {
+            Some(arrays) => self.load_model(&arrays),
+            None => false,
+        }
+    }
+}
+
+/// Load LPCNet encoder model from binary weight blob.
+///
+/// Upstream C: dnn/lpcnet.h:lpcnet_encoder_load_model
+pub fn lpcnet_encoder_load_model(st: &mut LPCNetEncState, data: &[u8]) -> bool {
+    st.load_model_blob(data)
+}
+
+/// Load LPCNet PLC model from binary weight blob.
+///
+/// Upstream C: dnn/lpcnet.h:lpcnet_plc_load_model
+pub fn lpcnet_plc_load_model(st: &mut LPCNetPLCState, data: &[u8]) -> bool {
+    st.load_model_blob(data)
 }
 
 /// Add FEC features to the PLC state.

@@ -92,6 +92,33 @@ fn lpcnet_plc_init_rejects_partial_weights() {
     );
 }
 
+#[test]
+fn lpcnet_blob_loaders_match_array_init() {
+    let arrays = get_weights();
+    let blob = write_weights(&arrays);
+
+    let mut enc_from_arrays = opurs::dnn::lpcnet::LPCNetEncState::new();
+    assert!(enc_from_arrays.load_model(&arrays));
+
+    let mut enc_from_blob = opurs::dnn::lpcnet::LPCNetEncState::new();
+    assert!(opurs::dnn::lpcnet::lpcnet_encoder_load_model(
+        &mut enc_from_blob,
+        &blob
+    ));
+
+    let mut plc_from_arrays = opurs::dnn::lpcnet::LPCNetPLCState::new();
+    assert!(plc_from_arrays.load_model(&arrays));
+
+    let mut plc_from_blob = opurs::dnn::lpcnet::LPCNetPLCState::new();
+    assert!(opurs::dnn::lpcnet::lpcnet_plc_load_model(
+        &mut plc_from_blob,
+        &blob
+    ));
+
+    assert!(plc_from_arrays.loaded);
+    assert!(plc_from_blob.loaded);
+}
+
 #[cfg(feature = "dred")]
 mod dred_tests {
     use super::*;
@@ -150,7 +177,7 @@ mod osce_tests {
         let arrays = get_weights();
         let mut model = opurs::dnn::osce::OSCEModel::default();
         assert!(
-            opurs::dnn::osce::osce_load_models(&mut model, &arrays),
+            opurs::dnn::osce::osce_load_models_from_arrays(&mut model, &arrays),
             "OSCEModel full load failed"
         );
         assert!(model.loaded, "OSCEModel.loaded should be true");
@@ -163,7 +190,7 @@ mod osce_tests {
 
         let mut model = opurs::dnn::osce::OSCEModel::default();
         assert!(
-            !opurs::dnn::osce::osce_load_models(&mut model, &arrays),
+            !opurs::dnn::osce::osce_load_models_from_arrays(&mut model, &arrays),
             "OSCEModel load should fail when BBWENet weights are missing"
         );
         assert!(!model.loaded, "OSCEModel.loaded should be false");
@@ -179,6 +206,26 @@ mod osce_tests {
             model.bbwenet.is_none(),
             "BBWENet should be absent when its weights are removed"
         );
+    }
+
+    #[test]
+    fn osce_model_blob_loader_matches_array_init() {
+        let arrays = get_weights();
+        let blob = write_weights(&arrays);
+
+        let mut from_arrays = opurs::dnn::osce::OSCEModel::default();
+        assert!(opurs::dnn::osce::osce_load_models_from_arrays(
+            &mut from_arrays,
+            &arrays
+        ));
+
+        let mut from_blob = opurs::dnn::osce::OSCEModel::default();
+        assert!(opurs::dnn::osce::osce_load_models(&mut from_blob, &blob));
+
+        assert_eq!(from_arrays.loaded, from_blob.loaded);
+        assert_eq!(from_arrays.lace.is_some(), from_blob.lace.is_some());
+        assert_eq!(from_arrays.nolace.is_some(), from_blob.nolace.is_some());
+        assert_eq!(from_arrays.bbwenet.is_some(), from_blob.bbwenet.is_some());
     }
 }
 

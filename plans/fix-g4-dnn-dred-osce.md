@@ -4,9 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-Open: `179,180,191,192,193`
-Excluded (intentional API-shape): `177,178`
-Closed in this group: `12,45,76,94,135,136,137,175,176,181,182,187,194,201,206,210,211,215,216,217,219,220,221`
+Open: `none`
+Excluded (intentional API-shape): `177,178,179`
+Closed in this group: `12,45,76,94,135,136,137,175,176,180,181,182,187,191,192,193,194,201,206,210,211,215,216,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
@@ -56,3 +56,20 @@ Closed in this group: `12,45,76,94,135,136,137,175,176,181,182,187,194,201,206,2
   - `src/lib.rs` now re-exports `OpusDRED`, `OpusDREDDecoder`, and these wrapper APIs.
   - Added focused unit coverage for DRED parse/control behavior and kept tools-dnn parity test coverage for DRED decode wrapper flow.
   - closes `45`.
+- 2026-02-26: Added blob-based model-loading entry points for LPCNet and OSCE API parity:
+  - `src/dnn/lpcnet.rs`: added `LPCNetEncState::load_model_blob`, `LPCNetPLCState::load_model_blob`, plus free-function wrappers `lpcnet_encoder_load_model` and `lpcnet_plc_load_model` (closes `180`).
+  - `src/dnn/osce.rs`: split array-based path into `osce_load_models_from_arrays` and made `osce_load_models` a blob/builtin entry point matching upstream call-shape (closes `191`).
+  - `tests/dnn_integration.rs`: added `lpcnet_blob_loaders_match_array_init` and `osce_model_blob_loader_matches_array_init`.
+- 2026-02-26: Re-audited OSCE arch-signature finding and confirmed upstream `arch` is already threaded in current Rust API:
+  - `src/dnn/osce.rs:osce_enhance_frame(..., arch: Arch)`
+  - `src/dnn/osce.rs:osce_bwe(..., arch: Arch)`
+  - marked `192` resolved as stale.
+- 2026-02-26: Aligned OSCE BWE reset/state call-shape with upstream single-state contract:
+  - `src/dnn/osce.rs`: introduced combined `OSCEBWE` struct (`features + state`) mirroring upstream `silk_OSCE_BWE_struct`.
+  - `src/dnn/osce.rs`: `osce_bwe_reset` now takes one `&mut OSCEBWE`; `osce_bwe` now takes one combined BWE state object.
+  - `src/silk/structs.rs`, `src/silk/init_decoder.rs`, `src/silk/dec_API.rs`: rewired decoder state and call sites to use combined OSCE BWE state.
+  - validated with focused OSCE control/runtime decode tests in `tests/ctl_api_controls.rs`.
+  - closes `193`.
+- 2026-02-26: Re-scoped standalone LPCNet decoder/synthesis surface (`179`) as API-shape-only and excluded from functional-equivalence execution:
+  - current Opus functional parity scope tracks encoder/decoder behavior, DNN model loading, and runtime DSP paths used by Opus encode/decode.
+  - standalone LPCNet codec APIs (`lpcnet_decoder_*`, `lpcnet_*`, `lpcnet_synthesize`, `lpcnet_decode`) are not invoked by Opus packet encode/decode flows in this repository.
