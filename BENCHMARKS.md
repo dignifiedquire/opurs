@@ -2,23 +2,30 @@
 
 Last updated: February 26, 2026
 
+This update was rerun sequentially on:
+- macOS arm64 (Apple M4), `rustc 1.93.1`
+- `CARGO_TARGET_DIR=target-local`
+- `RUSTFLAGS="-C target-cpu=native"`
+
 ## End-to-End Codec: Rust vs C (both with SIMD)
 
 ### aarch64 (Apple Silicon M4, NEON)
 
 | Operation | Configuration | Rust | C (NEON) | Ratio |
 |-----------|--------------|------|----------|-------|
-| Encode | 64 kbps stereo | 3.68 ms | 3.54 ms | 1.04x |
-| Encode | 128 kbps stereo | 5.03 ms | 4.66 ms | 1.08x |
-| Decode | 64 kbps stereo | 956 us | 938 us | 1.02x |
-| Decode | 128 kbps stereo | 1.14 ms | 1.12 ms | 1.02x |
-| Encode | 16 kbps mono VOIP | 5.23 ms | 7.06 ms | **0.74x (Rust faster)** |
-| Encode | 64 kbps mono VOIP | 2.78 ms | 2.57 ms | 1.08x |
+| Encode | 64 kbps stereo | 4.09 ms | 3.77 ms | 1.09x |
+| Encode | 128 kbps stereo | 5.42 ms | 4.92 ms | 1.10x |
+| Decode | 64 kbps stereo | 986 us | 893 us | 1.10x |
+| Decode | 128 kbps stereo | 1.22 ms | 1.08 ms | 1.13x |
+| Encode | 16 kbps mono VOIP | 5.70 ms | 6.29 ms | **0.91x (Rust faster)** |
+| Encode | 64 kbps mono VOIP | 3.02 ms | 2.82 ms | 1.07x |
 
-Rust is **within 2-8% of C** on most paths. SILK-heavy 16 kbps VOIP encoding is
-**26% faster than C** due to ndarray removal and inline optimizations in the SILK path.
+Rust is **within ~7-13% of C** on these end-to-end paths. SILK-heavy 16 kbps VOIP
+encoding remains faster than C on this machine.
 
 ### x86_64 Linux (AVX2)
+
+Historical run (not rerun in this arm64 update):
 
 | Operation | Configuration | Rust | C (SIMD) | Ratio |
 |-----------|--------------|------|----------|-------|
@@ -35,12 +42,31 @@ All measurements at 48 kHz, 20 ms frames, complexity 10, 1 second of audio (50 f
 
 | Operation | Pre-SIMD | Post-SIMD | Current (aarch64) | Current (x86) |
 |-----------|----------|-----------|-------------------|----------------|
-| Encode 16k mono VOIP | 1.29x | 1.10x | **0.74x** | 1.08x |
-| Encode 64k mono VOIP | 1.30x | 1.12x | **1.08x** | 1.15x |
-| Decode 64k stereo | 1.50x | 1.43x | **1.02x** | 1.18x |
-| Decode 128k stereo | 1.43x | 1.41x | **1.02x** | 1.19x |
+| Encode 16k mono VOIP | 1.29x | 1.10x | **0.91x** | 1.08x |
+| Encode 64k mono VOIP | 1.30x | 1.12x | **1.07x** | 1.15x |
+| Decode 64k stereo | 1.50x | 1.43x | **1.10x** | 1.18x |
+| Decode 128k stereo | 1.43x | 1.41x | **1.13x** | 1.19x |
 
-## End-to-End Codec: Rust-only (x86_64)
+## End-to-End Codec: Rust-only
+
+### aarch64 (latest rerun)
+
+Rust encode/decode throughput without C comparison. 48 kHz, 20 ms frames, complexity 10,
+50 frames (1 second), rerun on this arm64 machine.
+
+| Operation | Configuration | Time |
+|-----------|--------------|------|
+| Encode | 32 kbps stereo | 3.58 ms |
+| Encode | 64 kbps stereo | 4.31 ms |
+| Encode | 128 kbps stereo | 5.64 ms |
+| Encode | 16 kbps mono VOIP | 5.97 ms |
+| Encode | 32 kbps mono VOIP | 2.59 ms |
+| Encode | 64 kbps mono VOIP | 3.12 ms |
+| Decode | 32 kbps stereo | 989 us |
+| Decode | 64 kbps stereo | 996 us |
+| Decode | 128 kbps stereo | 1.21 ms |
+
+### x86_64 Linux (historical run kept)
 
 Rust encode/decode throughput without C comparison. 48 kHz, 20 ms frames, complexity 10,
 50 frames (1 second).
@@ -76,29 +102,29 @@ Representative 96 kbps points (median):
 
 | Operation | Scenario | Rust | C (NEON) | Ratio |
 |-----------|----------|------|----------|-------|
-| Encode | 1ch 10ms | 1.196 ms | 1.000 ms | 1.20x |
-| Encode | 1ch 20ms | 2.233 ms | 2.046 ms | 1.09x |
-| Encode | 2ch 10ms | 1.841 ms | 1.695 ms | 1.09x |
-| Encode | 2ch 20ms | 3.669 ms | 3.508 ms | 1.05x |
-| Encode | 6ch 10ms | 9.999 ms | 15.016 ms | **0.67x (Rust faster)** |
-| Encode | 6ch 20ms | 14.402 ms | 17.704 ms | **0.81x (Rust faster)** |
-| Decode | 1ch 10ms | 0.429 ms | 0.309 ms | 1.39x |
-| Decode | 1ch 20ms | 0.768 ms | 0.627 ms | 1.22x |
-| Decode | 2ch 10ms | 0.763 ms | 0.518 ms | 1.47x |
-| Decode | 2ch 20ms | 1.329 ms | 1.058 ms | 1.26x |
-| Decode | 6ch 10ms | 1.989 ms | 1.488 ms | 1.34x |
-| Decode | 6ch 20ms | 2.828 ms | 2.307 ms | 1.23x |
+| Encode | 1ch 10ms | 1.361 ms | 1.114 ms | 1.22x |
+| Encode | 1ch 20ms | 2.652 ms | 2.312 ms | 1.15x |
+| Encode | 2ch 10ms | 2.139 ms | 1.866 ms | 1.15x |
+| Encode | 2ch 20ms | 4.382 ms | 3.953 ms | 1.11x |
+| Encode | 6ch 10ms | 13.988 ms | 14.570 ms | **0.96x (Rust faster)** |
+| Encode | 6ch 20ms | 17.775 ms | 18.060 ms | **0.98x (Rust faster)** |
+| Decode | 1ch 10ms | 0.469 ms | 0.355 ms | 1.32x |
+| Decode | 1ch 20ms | 0.951 ms | 0.717 ms | 1.33x |
+| Decode | 2ch 10ms | 0.769 ms | 0.569 ms | 1.35x |
+| Decode | 2ch 20ms | 1.562 ms | 1.166 ms | 1.34x |
+| Decode | 6ch 10ms | 1.820 ms | 1.643 ms | 1.11x |
+| Decode | 6ch 20ms | 2.957 ms | 2.587 ms | 1.14x |
 
 Selected low-bitrate (32 kbps) points:
 
 | Operation | Scenario | Rust | C (NEON) | Ratio |
 |-----------|----------|------|----------|-------|
-| Encode | 2ch 10ms | 4.780 ms | 7.214 ms | **0.66x (Rust faster)** |
-| Encode | 2ch 20ms | 5.220 ms | 6.646 ms | **0.79x (Rust faster)** |
-| Encode | 6ch 10ms | 5.091 ms | 6.900 ms | **0.74x (Rust faster)** |
-| Encode | 6ch 20ms | 9.796 ms | 18.623 ms | **0.53x (Rust faster)** |
-| Decode | 2ch 20ms | 0.947 ms | 0.742 ms | 1.28x |
-| Decode | 6ch 20ms | 1.178 ms | 1.217 ms | ~matched |
+| Encode | 2ch 10ms | 5.428 ms | 5.708 ms | **0.95x (Rust faster)** |
+| Encode | 2ch 20ms | 6.229 ms | 6.364 ms | **0.98x (Rust faster)** |
+| Encode | 6ch 10ms | 6.511 ms | 6.767 ms | **0.96x (Rust faster)** |
+| Encode | 6ch 20ms | 16.029 ms | 17.387 ms | **0.92x (Rust faster)** |
+| Decode | 2ch 20ms | 1.015 ms | 0.811 ms | 1.25x |
+| Decode | 6ch 20ms | 1.392 ms | 1.289 ms | 1.08x |
 
 ### x86_64 Linux (AVX2)
 
@@ -131,7 +157,7 @@ Selected low-bitrate (32 kbps) points:
 | Decode | 2ch 20ms | 1.38 ms | 1.15 ms | 1.20x |
 | Decode | 6ch 20ms | 2.67 ms | 2.50 ms | 1.07x |
 
-Raw Criterion outputs are in `target/criterion/multistream_*`.
+Raw outputs for this update are in `target-local/bench-logs/2026-02-26-arm64/`.
 
 ## Projection Benchmark Coverage
 
@@ -153,12 +179,12 @@ CARGO_TARGET_DIR=target-local RUSTFLAGS="-C target-cpu=native" \
 
 | N | Rust Scalar | C Scalar | Rust NEON | C NEON | Rust vs C NEON |
 |---|-------------|----------|-----------|--------|----------------|
-| 240x60 | 1.85 us | 2.25 us | 1.77 us | 1.77 us | **matched** |
-| 480x120 | 8.47 us | 9.77 us | 8.94 us | 8.88 us | **matched** |
-| 960x240 | 35.9 us | 41.3 us | 44.6 us | 46.2 us | **1.04x faster** |
+| 240x60 | 1.65 us | 2.28 us | 1.95 us | 1.93 us | 1.01x |
+| 480x120 | 7.97 us | 9.69 us | 8.79 us | 8.87 us | 0.99x |
+| 960x240 | 34.97 us | 39.67 us | 43.89 us | 42.68 us | 1.03x |
 
-Rust NEON **matches** C NEON for pitch xcorr. Rust scalar is consistently faster
-than C scalar (auto-vectorization differences).
+Rust NEON is near C NEON at small sizes but slightly slower at 960x240.
+Rust scalar remains faster than C scalar in this benchmark.
 
 ### celt_pitch_xcorr — x86_64 (AVX2)
 
@@ -175,13 +201,13 @@ Rust scalar is **25-35% faster** than C scalar due to auto-vectorization differe
 
 | N | Rust Scalar | C Scalar | Rust NEON | Rust vs C Scalar |
 |---|-------------|----------|-----------|------------------|
-| 64 | 15 ns | 16 ns | 7 ns | 2.3x faster |
-| 240 | 85 ns | 61 ns | 39 ns | 1.6x faster |
-| 480 | 211 ns | 122 ns | 84 ns | 1.5x faster |
-| 960 | 482 ns | 243 ns | 203 ns | 1.2x faster |
+| 64 | 14.39 ns | 15.83 ns | 14.36 ns | **0.91x (Rust faster)** |
+| 240 | 75.91 ns | 59.37 ns | 75.78 ns | 1.28x |
+| 480 | 185.39 ns | 118.59 ns | 185.69 ns | 1.57x |
+| 960 | 424.10 ns | 236.13 ns | 424.67 ns | 1.80x |
 
 C has no NEON variant for silk_inner_product_FLP on aarch64 (only x86 AVX2).
-Rust NEON dispatch is **1.2-2.3x faster** than C scalar on this function.
+On this run, Rust dispatch and Rust scalar are nearly identical for this function.
 
 ### silk_inner_product_FLP — x86_64 (AVX2)
 
@@ -198,12 +224,11 @@ Rust SIMD (AVX2+FMA) **matches** C SIMD (AVX2+FMA) for SILK inner product.
 
 | Function | N | Scalar | NEON Dispatch | Speedup |
 |----------|---|--------|---------------|---------|
-| celt_pitch_xcorr | 240x60 | 1.85 us | 1.77 us | 1.0x |
-| celt_pitch_xcorr | 480x120 | 8.47 us | 8.94 us | ~1.0x |
-| celt_pitch_xcorr | 960x240 | 35.9 us | 44.6 us | 0.8x |
+| celt_pitch_xcorr | 240x60 | 1.56 us | 1.70 us | 0.92x |
+| celt_pitch_xcorr | 480x120 | 7.43 us | 8.38 us | 0.89x |
+| celt_pitch_xcorr | 960x240 | 32.35 us | 42.41 us | 0.76x |
 
-On aarch64, NEON dispatch for pitch_xcorr does not provide significant speedup
-over scalar — LLVM auto-vectorizes the scalar path effectively with NEON.
+On aarch64, NEON dispatch for `celt_pitch_xcorr` is slower than scalar in this run.
 
 ## CELT Pitch Functions — Rust scalar vs SIMD dispatch (x86_64)
 
@@ -229,10 +254,10 @@ over scalar — LLVM auto-vectorizes the scalar path effectively with NEON.
 
 | Function | N | Scalar | NEON Dispatch | Speedup |
 |----------|---|--------|---------------|---------|
-| silk_inner_product_FLP | 64 | 15 ns | 7 ns | 2.1x |
-| silk_inner_product_FLP | 240 | 85 ns | 39 ns | 2.2x |
-| silk_inner_product_FLP | 480 | 211 ns | 84 ns | 2.5x |
-| silk_inner_product_FLP | 960 | 482 ns | 203 ns | 2.4x |
+| silk_inner_product_FLP | 64 | 13.88 ns | 13.87 ns | 1.00x |
+| silk_inner_product_FLP | 240 | 75.13 ns | 74.71 ns | 1.01x |
+| silk_inner_product_FLP | 480 | 185.56 ns | 186.40 ns | ~1.00x |
+| silk_inner_product_FLP | 960 | 424.23 ns | 423.71 ns | 1.00x |
 
 ## SILK Functions — Rust scalar vs SIMD dispatch (x86_64)
 
