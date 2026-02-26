@@ -525,8 +525,10 @@ fn transient_analysis(
         5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
         4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2,
     ];
-    let vla = len as usize;
-    let mut tmp: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
+    // len = N + overlap; max 1920 + 240 = 2160 (QEXT 96kHz).
+    const MAX_TRANSIENT: usize = 2400;
+    debug_assert!((len as usize) <= MAX_TRANSIENT);
+    let mut tmp = [0.0f32; MAX_TRANSIENT];
     *weak_transient = 0;
     if allow_weak_transients != 0 {
         forward_decay = 0.03125f32;
@@ -907,18 +909,19 @@ fn tf_analysis(
         } else {
             0.5f32 - tf_estimate
         });
-    let vla = len as usize;
-    let mut metric: Vec<i32> = ::std::vec::from_elem(0, vla);
-    let vla_0 =
+    // len = nbEBands, max 21 (std) + 14 (QEXT) = 35.
+    const MAX_TF_BANDS: usize = 40;
+    debug_assert!((len as usize) <= MAX_TF_BANDS);
+    let mut metric = [0i32; MAX_TF_BANDS];
+    let band_size =
         ((m.eBands[len as usize] as i32 - m.eBands[(len - 1) as usize] as i32) << LM) as usize;
-    let mut tmp: Vec<celt_norm> = ::std::vec::from_elem(0., vla_0);
-    let vla_1 =
-        ((m.eBands[len as usize] as i32 - m.eBands[(len - 1) as usize] as i32) << LM) as usize;
-    let mut tmp_1: Vec<celt_norm> = ::std::vec::from_elem(0., vla_1);
-    let vla_2 = len as usize;
-    let mut path0: Vec<i32> = ::std::vec::from_elem(0, vla_2);
-    let vla_3 = len as usize;
-    let mut path1: Vec<i32> = ::std::vec::from_elem(0, vla_3);
+    // Last band size * M; max ~128 (48kHz) or ~256 (QEXT).
+    const MAX_BAND_TMP: usize = 256;
+    debug_assert!(band_size <= MAX_BAND_TMP);
+    let mut tmp = [0.0f32; MAX_BAND_TMP];
+    let mut tmp_1 = [0.0f32; MAX_BAND_TMP];
+    let mut path0 = [0i32; MAX_TF_BANDS];
+    let mut path1 = [0i32; MAX_TF_BANDS];
     i = 0;
     while i < len {
         let mut k: i32 = 0;
@@ -1417,10 +1420,11 @@ fn dynalloc_analysis(
     let mut c: i32 = 0;
     let mut tot_boost: i32 = 0;
     let mut maxDepth: opus_val16 = 0.;
-    let vla = (C * nbEBands) as usize;
-    let mut follower: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
-    let vla_0 = (C * nbEBands) as usize;
-    let mut noise_floor: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
+    // C * nbEBands max: 2 * 35 = 70.
+    const MAX_C_BANDS: usize = 80;
+    debug_assert!(((C * nbEBands) as usize) <= MAX_C_BANDS);
+    let mut follower = [0.0f32; MAX_C_BANDS];
+    let mut noise_floor = [0.0f32; MAX_C_BANDS];
     offsets[..nbEBands as usize].fill(0);
     maxDepth = -31.9f32;
     i = 0;
@@ -1448,10 +1452,10 @@ fn dynalloc_analysis(
             break;
         }
     }
-    let vla_1 = nbEBands as usize;
-    let mut mask: Vec<opus_val16> = ::std::vec::from_elem(0., vla_1);
-    let vla_2 = nbEBands as usize;
-    let mut sig: Vec<opus_val16> = ::std::vec::from_elem(0., vla_2);
+    const MAX_BANDS_DA: usize = 40;
+    debug_assert!((nbEBands as usize) <= MAX_BANDS_DA);
+    let mut mask = [0.0f32; MAX_BANDS_DA];
+    let mut sig = [0.0f32; MAX_BANDS_DA];
     i = 0;
     while i < end {
         mask[i as usize] = bandLogE[i as usize] - noise_floor[i as usize];
@@ -1919,8 +1923,10 @@ fn run_prefilter(
     let max_period = COMBFILTER_MAXPERIOD * qext_scale;
     let min_period = COMBFILTER_MINPERIOD * qext_scale;
     let pre_chan_len = (N + max_period) as usize;
-    let vla = (CC as usize) * pre_chan_len;
-    let mut _pre: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
+    // CC * (N + max_period) max: 2 * (1920 + 2048) = 7936.
+    const MAX_PRE: usize = 8000;
+    debug_assert!((CC as usize) * pre_chan_len <= MAX_PRE);
+    let mut _pre = [0.0f32; MAX_PRE];
     // pre[c] starts at c * pre_chan_len in _pre
     for c in 0..CC as usize {
         let pre_base = c * pre_chan_len;
@@ -1956,16 +1962,19 @@ fn run_prefilter(
         }
         gain1 = 0.75;
     } else if enabled != 0 && st.complexity >= 5 {
-        let vla_0 = ((max_period + N) >> 1) as usize;
-        let mut pitch_buf: Vec<opus_val16> = ::std::vec::from_elem(0., vla_0);
+        // (max_period + N) >> 1 max: (2048 + 1920) / 2 = 1984.
+        const MAX_PITCH_BUF: usize = 2000;
+        let pitch_buf_len = ((max_period + N) >> 1) as usize;
+        debug_assert!(pitch_buf_len <= MAX_PITCH_BUF);
+        let mut pitch_buf = [0.0f32; MAX_PITCH_BUF];
         {
             let ds_len = (max_period + N) as usize;
             let ch0 = &_pre[..ds_len];
             if CC == 2 {
                 let ch1 = &_pre[pre_chan_len..pre_chan_len + ds_len];
-                pitch_downsample(&[ch0, ch1], pitch_buf.as_mut_slice(), vla_0, 2, st.arch);
+                pitch_downsample(&[ch0, ch1], &mut pitch_buf[..pitch_buf_len], pitch_buf_len, 2, st.arch);
             } else {
-                pitch_downsample(&[ch0], pitch_buf.as_mut_slice(), vla_0, 2, st.arch);
+                pitch_downsample(&[ch0], &mut pitch_buf[..pitch_buf_len], pitch_buf_len, 2, st.arch);
             }
         }
         pitch_index = pitch_search(
@@ -2421,6 +2430,8 @@ pub fn celt_encode_with_ec<'b>(
     #[cfg(not(feature = "qext"))]
     let qext_scale = 1;
     let max_period = COMBFILTER_MAXPERIOD * qext_scale;
+    // Max C * nbEBands: 2 * (21 + 14) = 70; use 80 for headroom.
+    const MAX_C_BANDS: usize = 80;
     // QEXT: Initialize extension entropy encoder from payload buffer
     #[cfg(feature = "qext")]
     let mut _qext_empty_buf = [0u8; 0];
@@ -2572,8 +2583,10 @@ pub fn celt_encode_with_ec<'b>(
     if effEnd > mode.effEBands {
         effEnd = mode.effEBands;
     }
-    let vla = (CC * (N + overlap)) as usize;
-    let mut in_0: Vec<celt_sig> = ::std::vec::from_elem(0., vla);
+    // CC * (N + overlap) max: 2 * (1920 + 240) = 4320.
+    const MAX_IN: usize = 4320;
+    debug_assert!(((CC * (N + overlap)) as usize) <= MAX_IN);
+    let mut in_0 = [0.0f32; MAX_IN];
     let main_len = (C * (N - overlap) / st.upsample) as usize;
     let overlap_len = (C * overlap / st.upsample) as usize;
     sample_max = if st.overlap_max > celt_maxabs16(&pcm[..main_len]) {
@@ -2716,15 +2729,14 @@ pub fn celt_encode_with_ec<'b>(
     // Allocate N + M - 1 elements so that strided mdct_forward calls
     // can form slices freq[b..b + N*B] for b in 0..B without going
     // out of bounds. The extra elements are never read (stride skips them).
-    let vla_0 = (CC * N + M - 1) as usize;
-    let mut freq: Vec<celt_sig> = ::std::vec::from_elem(0., vla_0);
-    let vla_1 = (nbEBands * CC) as usize;
-    let mut bandE: Vec<celt_ener> = ::std::vec::from_elem(0., vla_1);
-    let vla_2 = (nbEBands * CC) as usize;
-    let mut bandLogE: Vec<opus_val16> = ::std::vec::from_elem(0., vla_2);
+    // CC*N + M - 1 max: 2*1920 + 7 = 3847.
+    const MAX_FREQ: usize = 3848;
+    debug_assert!(((CC * N + M - 1) as usize) <= MAX_FREQ);
+    let mut freq = [0.0f32; MAX_FREQ];
+    let mut bandE = [0.0f32; MAX_C_BANDS];
+    let mut bandLogE = [0.0f32; MAX_C_BANDS];
     secondMdct = (shortBlocks != 0 && st.complexity >= 8) as i32;
-    let vla_3 = (C * nbEBands) as usize;
-    let mut bandLogE2: Vec<opus_val16> = ::std::vec::from_elem(0., vla_3);
+    let mut bandLogE2 = [0.0f32; MAX_C_BANDS];
     if secondMdct != 0 {
         compute_mdcts(mode, 0, &mut in_0, &mut freq, C, CC, LM, st.upsample);
         compute_band_energies(mode, &freq, &mut bandE, effEnd, C, LM, st.arch);
@@ -2771,8 +2783,7 @@ pub fn celt_encode_with_ec<'b>(
         }
     }
     amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
-    let vla_4 = (C * nbEBands) as usize;
-    let mut surround_dynalloc: Vec<opus_val16> = ::std::vec::from_elem(0., vla_4);
+    let mut surround_dynalloc = [0.0f32; MAX_C_BANDS];
     surround_dynalloc[..end as usize].fill(0.0);
     let energy_mask: Option<&[opus_val16]> = if st.energy_mask_len == 0 {
         None
@@ -2976,20 +2987,21 @@ pub fn celt_encode_with_ec<'b>(
     if LM > 0 && ec_tell(enc) + 3 <= total_bits {
         ec_enc_bit_logp(enc, isTransient, 3);
     }
-    let vla_5 = (C * N) as usize;
-    let mut X: Vec<celt_norm> = ::std::vec::from_elem(0., vla_5);
+    // C*N max: 2*1920 = 3840.
+    const MAX_X: usize = 3840;
+    debug_assert!(((C * N) as usize) <= MAX_X);
+    let mut X = [0.0f32; MAX_X];
     normalise_bands(mode, &freq, &mut X, &bandE, effEnd, C, M);
     enable_tf_analysis = (effectiveBytes >= 15 * C
         && hybrid == 0
         && st.complexity >= 2
         && st.lfe == 0
         && toneishness < 0.98) as i32;
-    let vla_6 = nbEBands as usize;
-    let mut offsets: Vec<i32> = ::std::vec::from_elem(0, vla_6);
-    let vla_7 = nbEBands as usize;
-    let mut importance: Vec<i32> = ::std::vec::from_elem(0, vla_7);
-    let vla_8 = nbEBands as usize;
-    let mut spread_weight: Vec<i32> = ::std::vec::from_elem(0, vla_8);
+    const MAX_BANDS_ENC: usize = 40;
+    debug_assert!((nbEBands as usize) <= MAX_BANDS_ENC);
+    let mut offsets = [0i32; MAX_BANDS_ENC];
+    let mut importance = [0i32; MAX_BANDS_ENC];
+    let mut spread_weight = [0i32; MAX_BANDS_ENC];
     maxDepth = dynalloc_analysis(
         &bandLogE,
         &bandLogE2,
@@ -3016,8 +3028,7 @@ pub fn celt_encode_with_ec<'b>(
         tone_freq,
         toneishness,
     );
-    let vla_9 = nbEBands as usize;
-    let mut tf_res: Vec<i32> = ::std::vec::from_elem(0, vla_9);
+    let mut tf_res = [0i32; MAX_BANDS_ENC];
     if enable_tf_analysis != 0 {
         let mut lambda: i32 = 0;
         lambda = if 80 > 20480 / effectiveBytes + 2 {
@@ -3065,8 +3076,7 @@ pub fn celt_encode_with_ec<'b>(
         }
         tf_select = 0;
     }
-    let vla_10 = (C * nbEBands) as usize;
-    let mut error: Vec<opus_val16> = ::std::vec::from_elem(0., vla_10);
+    let mut error = [0.0f32; MAX_C_BANDS];
     c = 0;
     loop {
         i = start;
@@ -3146,8 +3156,7 @@ pub fn celt_encode_with_ec<'b>(
             effectiveBytes / 3
         };
     }
-    let vla_11 = nbEBands as usize;
-    let mut cap: Vec<i32> = ::std::vec::from_elem(0, vla_11);
+    let mut cap = [0i32; MAX_BANDS_ENC];
     init_caps(mode, &mut cap, LM, C);
     dynalloc_logp = 6;
     total_bits <<= BITRES;
@@ -3409,12 +3418,9 @@ pub fn celt_encode_with_ec<'b>(
         };
         ec_enc_shrink(enc, nbCompressedBytes as u32);
     }
-    let vla_12 = nbEBands as usize;
-    let mut fine_quant: Vec<i32> = ::std::vec::from_elem(0, vla_12);
-    let vla_13 = nbEBands as usize;
-    let mut pulses: Vec<i32> = ::std::vec::from_elem(0, vla_13);
-    let vla_14 = nbEBands as usize;
-    let mut fine_priority: Vec<i32> = ::std::vec::from_elem(0, vla_14);
+    let mut fine_quant = [0i32; MAX_BANDS_ENC];
+    let mut pulses = [0i32; MAX_BANDS_ENC];
+    let mut fine_priority = [0i32; MAX_BANDS_ENC];
     bits = (((nbCompressedBytes * 8) << BITRES) as u32)
         .wrapping_sub(ec_tell_frac(enc))
         .wrapping_sub(1) as i32;
@@ -3559,15 +3565,13 @@ pub fn celt_encode_with_ec<'b>(
     #[cfg(feature = "qext")]
     let mut extra_pulses = {
         use crate::celt::modes::data_96000::NB_QEXT_BANDS;
-        vec![0i32; nbEBands as usize + NB_QEXT_BANDS]
+        // nbEBands + NB_QEXT_BANDS max: 21 + 14 = 35.
+        [0i32; 40]
     };
     #[cfg(feature = "qext")]
-    let mut extra_quant = {
-        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
-        vec![0i32; nbEBands as usize + NB_QEXT_BANDS]
-    };
+    let mut extra_quant = [0i32; 40];
     #[cfg(feature = "qext")]
-    let mut error_bak: Vec<opus_val16> = vec![0.0; (C * nbEBands) as usize];
+    let mut error_bak = [0.0f32; MAX_C_BANDS];
     #[cfg(feature = "qext")]
     {
         let qext_bits = ((qext_bytes * 8) << BITRES) - ec_tell_frac(&ext_enc) as i32 - 1;
@@ -3610,8 +3614,7 @@ pub fn celt_encode_with_ec<'b>(
     }
 
     // Residual quantisation
-    let vla_15 = (C * nbEBands) as usize;
-    let mut collapse_masks: Vec<u8> = ::std::vec::from_elem(0, vla_15);
+    let mut collapse_masks = [0u8; MAX_C_BANDS];
 
     #[cfg(feature = "qext")]
     let ext_total_bits = if qext_bytes > 0 {
@@ -3698,7 +3701,7 @@ pub fn celt_encode_with_ec<'b>(
             use crate::celt::modes::data_96000::NB_QEXT_BANDS;
 
             let mut qext_collapse_masks = [0u8; 2 * NB_QEXT_BANDS];
-            let zeros = vec![0i32; nbEBands as usize];
+            let zeros = [0i32; MAX_BANDS_ENC];
 
             // Compute ext_balance
             let mut ext_balance = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_enc) as i32;

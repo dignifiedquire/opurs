@@ -59,8 +59,10 @@ pub fn mdct_forward(
     let trig_real = &trig[..n4];
     let trig_imag = &trig[n4..];
 
-    // TODO: allocate from a custom per-frame allocator?
-    let mut f = std::vec::from_elem(Complex::zero(), n4);
+    // n4 = mdct_size / 4; max 960 (QEXT 96kHz).
+    const MAX_N4: usize = 960;
+    debug_assert!(n4 <= MAX_N4);
+    let mut f = [Complex::zero(); MAX_N4];
 
     /* Consider the input to be composed of four blocks: [a, b, c, d] */
     /* Window, shuffle, fold */
@@ -99,8 +101,7 @@ pub fn mdct_forward(
         }
     }
 
-    // TODO: allocate from a custom per-frame allocator?
-    let mut f2 = std::vec::from_elem(Complex::zero(), n4);
+    let mut f2 = [Complex::zero(); MAX_N4];
 
     /* Pre-rotation */
     {
@@ -112,7 +113,7 @@ pub fn mdct_forward(
     }
 
     /* N/4 complex FFT, does not downscale anymore */
-    opus_fft_impl(st, &mut f2);
+    opus_fft_impl(st, &mut f2[..n4]);
 
     /* Post-rotate */
     {
