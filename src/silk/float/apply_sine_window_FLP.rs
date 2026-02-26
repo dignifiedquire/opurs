@@ -9,8 +9,8 @@ pub fn silk_apply_sine_window_FLP(px_win: &mut [f32], px: &[f32], win_type: i32,
     let mut c: f32 = 0.;
     let mut S0: f32 = 0.;
     let mut S1: f32 = 0.;
-    assert!(win_type == 1 || win_type == 2);
-    assert!(length & 3 == 0);
+    debug_assert!(win_type == 1 || win_type == 2);
+    debug_assert!(length & 3 == 0);
     freq = std::f32::consts::PI / (length + 1) as f32;
     c = 2.0f32 - freq * freq;
     if win_type < 2 {

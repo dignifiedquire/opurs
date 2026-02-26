@@ -22,7 +22,7 @@ pub fn silk_warped_autocorrelation_FLP(
         0 as f64, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0.,
     ];
-    assert!(order & 1 == 0);
+    debug_assert!(order & 1 == 0);
     n = 0;
     while n < length {
         tmp1 = input[n as usize] as f64;

@@ -32,7 +32,7 @@ pub fn silk_find_pitch_lags_FLP(
     let mut Wsig: [f32; 384] = [0.; 384];
     let buf_len: i32 =
         psEnc.sCmn.la_pitch + psEnc.sCmn.frame_length as i32 + psEnc.sCmn.ltp_mem_length as i32;
-    assert!(buf_len >= psEnc.sCmn.pitch_LPC_win_length);
+    debug_assert!(buf_len >= psEnc.sCmn.pitch_LPC_win_length);
     // x starts at offset 0, covers ltp_mem_length + frame_length + la_pitch = buf_len
     let x_buf = x;
     let la = psEnc.sCmn.la_pitch as usize;

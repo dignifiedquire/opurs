@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,142,144,145,146,148,149,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,143,168`
+Open: `61,62,72,79,82,87,106,142,144,146,148,149,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,143,145,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,9 @@ Closed in this group: `66,67,68,135,136,137,140,141,143,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed additional SILK FLP assert-gating parity items:
+  - `src/silk/float/apply_sine_window_FLP.rs`, `src/silk/float/schur_FLP.rs`, `src/silk/float/sort_FLP.rs`, `src/silk/float/burg_modified_FLP.rs`, `src/silk/float/warped_autocorrelation_FLP.rs`, `src/silk/float/find_pitch_lags_FLP.rs`: converted tracked invariant checks from `assert!` to `debug_assert!`.
+  - closes `145`.
 - 2026-02-26: Closed additional CELT LPC/pitch/bands assert-gating parity items:
   - `src/celt/celt_lpc.rs`, `src/celt/pitch.rs`, `src/celt/bands.rs`: converted tracked invariant checks from `assert!` to `debug_assert!` to mirror upstream `celt_assert` release semantics.
   - closes `141`.

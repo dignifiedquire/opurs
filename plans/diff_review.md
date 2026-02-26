@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,142,144,145,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,142,144,146,148,149,153,170,171,172`
 
 ## Findings
 
@@ -599,10 +599,10 @@ IDs: `61,62,72,79,82,87,106,142,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/celt/kiss_fft.c:64`, `libopus-sys/opus/celt/kiss_fft.c:80`
 - Detail: Upstream uses `celt_assert(...)` for internal butterfly preconditions (e.g., radix staging constraints). Rust enforces corresponding shape/length assumptions with unconditional `assert_eq!`, which can abort at runtime instead of remaining assert-gated behavior.
 
-145. [LOW][Runtime Semantics][SILK FLP] Additional float-path invariant checks are unconditional in Rust.
-- Rust: `src/silk/float/apply_sine_window_FLP.rs:12-13`, `src/silk/float/schur_FLP.rs:13`, `src/silk/float/sort_FLP.rs:10-12`, `src/silk/float/burg_modified_FLP.rs:36`, `src/silk/float/warped_autocorrelation_FLP.rs:25`, `src/silk/float/find_pitch_lags_FLP.rs:34`
-- Upstream: `libopus-sys/opus/silk/float/apply_sine_window_FLP.c:48`, `libopus-sys/opus/silk/float/apply_sine_window_FLP.c:51`, `libopus-sys/opus/silk/float/schur_FLP.c:44`, `libopus-sys/opus/silk/float/sort_FLP.c:50-52`, `libopus-sys/opus/silk/float/burg_modified_FLP.c:56`, `libopus-sys/opus/silk/float/warped_autocorrelation_FLP.c:49`, `libopus-sys/opus/silk/float/find_pitch_lags_FLP.c:59`
-- Detail: Upstream marks these as `celt_assert`/`silk_assert` invariants. Rust uses unconditional `assert!`, so invariant violations can hard-abort runtime float encoder paths where upstream non-assert builds typically would not.
+145. [RESOLVED][Runtime Semantics][SILK FLP] Float-path invariant checks now follow assert-gated semantics.
+- Rust: `src/silk/float/apply_sine_window_FLP.rs`, `src/silk/float/schur_FLP.rs`, `src/silk/float/sort_FLP.rs`, `src/silk/float/burg_modified_FLP.rs`, `src/silk/float/warped_autocorrelation_FLP.rs`, `src/silk/float/find_pitch_lags_FLP.rs`
+- Upstream: `libopus-sys/opus/silk/float/apply_sine_window_FLP.c`, `libopus-sys/opus/silk/float/schur_FLP.c`, `libopus-sys/opus/silk/float/sort_FLP.c`, `libopus-sys/opus/silk/float/burg_modified_FLP.c`, `libopus-sys/opus/silk/float/warped_autocorrelation_FLP.c`, `libopus-sys/opus/silk/float/find_pitch_lags_FLP.c`
+- Detail: Converted the tracked SILK FLP invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert`/`silk_assert` release semantics.
 
 146. [LOW][Runtime Semantics][CELT MDCT] MDCT wrappers enforce unconditional slice-length assertions in Rust.
 - Rust: `src/celt/mdct.rs:48-49`, `src/celt/mdct.rs:52`, `src/celt/mdct.rs:55`, `src/celt/mdct.rs:57`

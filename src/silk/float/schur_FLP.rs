@@ -10,7 +10,7 @@ pub fn silk_schur_FLP(refl_coef: &mut [f32], auto_corr: &[f32], order: i32) -> f
     let mut Ctmp1: f64 = 0.;
     let mut Ctmp2: f64 = 0.;
     let mut rc_tmp: f64 = 0.;
-    assert!((0..=24).contains(&order));
+    debug_assert!((0..=24).contains(&order));
     k = 0;
     loop {
         C[k as usize][1_usize] = auto_corr[k as usize] as f64;

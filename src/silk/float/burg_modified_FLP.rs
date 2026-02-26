@@ -35,7 +35,7 @@ pub fn silk_burg_modified_FLP(
     let mut CAf: [f64; 25] = [0.; 25];
     let mut CAb: [f64; 25] = [0.; 25];
     let mut Af: [f64; 24] = [0.; 24];
-    assert!(subfr_length * nb_subfr <= 384);
+    debug_assert!(subfr_length * nb_subfr <= 384);
     C0 = silk_energy_FLP(&x[..(nb_subfr * subfr_length) as usize]);
     C_first_row[..24].fill(0.0);
     s = 0;
