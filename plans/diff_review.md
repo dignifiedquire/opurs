@@ -20,16 +20,16 @@ IDs: `none (resolved)`
 IDs: `12,43,45,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,136,137,179,180,187,191,192,193,194,210,211,216,235`
+IDs: `12,45,76,179,180,187,191,192,193,194,210,211,216,235`
 
 5. SIMD/arch-dispatch/build-flag parity
-IDs: `107,194,202,203,204,205,212,213,230,231,233,234,235`
+IDs: `194,202,203,204,205,212,213,230,233,234,235`
 
 6. Documentation/version/metadata drift
 IDs: `95,134,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 
 ## Findings
 
@@ -414,10 +414,10 @@ IDs: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,
 - Upstream: `libopus-sys/opus/celt/modes.c:511`
 - Detail: Upstream uses `celt_assert(0)` in this unreachable branch. Rust panics unconditionally, changing behavior under non-assert builds.
 
-107. [LOW][CPU Dispatch][Soft Clip] Decoder soft-clip path does not pass runtime arch to implementation.
-- Rust: `src/opus/opus_decoder.rs:1103`, `src/opus/packet.rs:16-21`
+107. [RESOLVED][CPU Dispatch][Soft Clip] Decoder soft-clip path now threads runtime arch to implementation.
+- Rust: `src/opus/opus_decoder.rs`, `src/opus/packet.rs`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:874`, `libopus-sys/opus/src/opus.c:39`, `libopus-sys/opus/src/opus.c:163-165`
-- Detail: Upstream decoder calls `opus_pcm_soft_clip_impl(..., st->arch)`. Rust decoder calls `opus_pcm_soft_clip(...)` that has no arch parameter, so decoder-selected arch is not propagated to soft-clip internals.
+- Detail: Rust now exposes internal `opus_pcm_soft_clip_impl(..., arch)` and decoder calls it with `st.celt_dec.arch`, matching upstream arch-threaded call shape.
 
 108. [RESOLVED][Version Targeting] Crate-level compatibility/docs now target libopus 1.6.1.
 - Rust: `src/lib.rs`
@@ -554,15 +554,15 @@ IDs: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.c:95`, `libopus-sys/opus/dnn/dred_encoder.c:215`, `libopus-sys/opus/src/opus_decoder.c` (`opus_dred_process` assert-gated expectation)
 - Detail: Converted unconditional `assert!` preconditions to `debug_assert!` for DRED encoder/decoder loaded-state checks, matching upstream `celt_assert` gating in non-assert builds.
 
-136. [LOW][Runtime Semantics][DNN] LPCNet/FARGAN state precondition checks are unconditional assertions in Rust.
-- Rust: `src/dnn/lpcnet.rs:623`, `src/dnn/lpcnet.rs:726`, `src/dnn/fargan.rs:441`, `src/dnn/fargan.rs:671`
+136. [RESOLVED][Runtime Semantics][DNN] LPCNet/FARGAN state precondition checks now follow assert-gated behavior.
+- Rust: `src/dnn/lpcnet.rs`, `src/dnn/fargan.rs`
 - Upstream: `libopus-sys/opus/dnn/lpcnet_plc.c:110`, `libopus-sys/opus/dnn/lpcnet_plc.c:159`, `libopus-sys/opus/dnn/fargan.c:85`, `libopus-sys/opus/dnn/fargan.c:202`
-- Detail: Upstream uses `celt_assert(...)` for loaded/continuation-state invariants in these paths. Rust uses unconditional `assert!`, which changes failure mode from assert-gated behavior to hard runtime aborts when state preconditions are violated.
+- Detail: Converted unconditional `assert!` checks to `debug_assert!` in LPCNet/FARGAN precondition sites, matching upstream `celt_assert` gating semantics.
 
-137. [LOW][Runtime Semantics][DNN] Core `nnet`/`nndsp` invariant checks are unconditional assertions in Rust.
-- Rust: `src/dnn/nnet.rs:220-221`, `src/dnn/nnet.rs:254`, `src/dnn/nnet.rs:281`, `src/dnn/nnet.rs:310`, `src/dnn/nndsp.rs:171`, `src/dnn/nndsp.rs:396-400`
+137. [RESOLVED][Runtime Semantics][DNN] Core `nnet`/`nndsp` invariant checks now follow assert-gated behavior.
+- Rust: `src/dnn/nnet.rs`, `src/dnn/nndsp.rs`
 - Upstream: `libopus-sys/opus/dnn/nnet.c:85-86`, `libopus-sys/opus/dnn/nnet.c:111`, `libopus-sys/opus/dnn/nnet.c:128`, `libopus-sys/opus/dnn/nnet.c:142`, `libopus-sys/opus/dnn/nndsp.c:169`, `libopus-sys/opus/dnn/nndsp.c:364-366`
-- Detail: Upstream encodes these as `celt_assert(...)` internal invariants. Rust promotes them to unconditional `assert!`, so malformed/inconsistent dimensions can panic in production builds where upstream often compiles these checks out.
+- Detail: Converted these internal invariant checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`, aligning with upstream `celt_assert`-style gating.
 
 138. [RESOLVED][Packet API][Error Handling] `opus_packet_pad_impl` now returns `OPUS_BAD_ARG` for out-of-bounds `len/new_len`.
 - Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
@@ -1027,11 +1027,11 @@ IDs: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,
 - Upstream arch-masked dispatch macros/tables: `libopus-sys/opus/celt/x86/pitch_sse.h:74-77`, `libopus-sys/opus/celt/x86/pitch_sse.h:126-129`, `libopus-sys/opus/celt/x86/vq_sse.h:43-47`, `libopus-sys/opus/silk/x86/main_sse.h:266-269`, `libopus-sys/opus/silk/x86/main_sse.h:293`
 - Detail: Upstream SIMD selection is keyed by `(arch & OPUS_ARCHMASK)` (allowing explicit arch-tier control by caller/state). Rust dispatches directly off runtime CPUID checks inside wrappers and does not honor an `arch`-tier input for SIMD selection, so execution-tier semantics differ from upstream RTCD behavior.
 
-231. [MEDIUM][SIMD Coverage/Semantics][SILK FLP] Rust enables aarch64 NEON SIMD for `silk_inner_product_FLP`, while upstream only defines SIMD override on x86 AVX2.
-- Rust: `src/silk/simd/mod.rs:78-82`, `src/silk/float/inner_product_FLP.rs:13-15`
+231. [RESOLVED][SIMD Coverage/Semantics][SILK FLP] `silk_inner_product_FLP` override now matches upstream x86-only AVX2 behavior.
+- Rust: `src/silk/simd/mod.rs`, `src/silk/float/inner_product_FLP.rs`
 - Upstream default macro path (scalar): `libopus-sys/opus/silk/float/SigProc_FLP.h:132-133`
 - Upstream SIMD override path (x86 AVX2 only): `libopus-sys/opus/silk/x86/main_sse.h:279-293`, `libopus-sys/opus/silk/x86/x86_silk_map.c:165-175`
-- Detail: Upstream routes `silk_inner_product_FLP` to AVX2 on x86 (or scalar otherwise). Rust adds an aarch64 NEON implementation and dispatches to it unconditionally on aarch64, introducing architecture-dependent numeric/decision-path behavior that upstream does not have.
+- Detail: Removed the aarch64 NEON dispatch override for `silk_inner_product_FLP`; Rust now uses AVX2 override on x86 and scalar fallback elsewhere, matching upstream override coverage.
 
 232. [LOW][Build SIMD Flags][libopus-sys x86 AVX2] `libopus-sys/build.rs` uses weaker AVX2 flags for `SILK_SOURCES_AVX2` than upstream build scripts.
 - Rust build flags: `libopus-sys/build.rs:169-173`

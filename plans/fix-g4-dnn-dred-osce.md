@@ -4,9 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-Open: `12,45,76,136,137,179,180,187,191,192,193,194,210,211,216,235`
+Open: `12,45,76,179,180,187,191,192,193,194,210,211,216,235`
 Excluded (intentional API-shape): `177,178`
-Closed in this group: `94,135,175,176,181,182,201,206,217,219,220,221`
+Closed in this group: `94,135,136,137,175,176,181,182,201,206,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
@@ -34,3 +34,7 @@ Closed in this group: `94,135,175,176,181,182,201,206,217,219,220,221`
 - 2026-02-26: Aligned `opt_array_check` and parser record validation semantics with upstream in `nnet` (`linear_init`/`conv2d_init` optional float size mismatch failures, `parse_weights` zero-size rejection, strict `name[43]==0` check), with focused regression tests.
 - 2026-02-26: Re-audited and closed additional stale parity findings now reflected in code: OSCE builtin aggregation includes BBWENet in `compiled_weights`, OSCE load success requires all model components, DNN README baseline text updated to 1.6.1, and MLP GRU/tansig parity updates (`MAX_NEURONS` bound and upstream-precision coefficients).
 - 2026-02-26: Aligned LPCNet PLC `init()` loaded-state semantics with the stricter all-components-ready contract (`init_plcmodel` + encoder model + FARGAN init), and added `tests/dnn_integration.rs:lpcnet_plc_init_rejects_partial_weights`.
+- 2026-02-26: Aligned DNN runtime invariant gating with upstream assert semantics by converting unconditional DNN asserts to debug-gated checks in:
+  - `src/dnn/lpcnet.rs` / `src/dnn/fargan.rs` (loaded/continuation preconditions)
+  - `src/dnn/nnet.rs` / `src/dnn/nndsp.rs` (internal dimension/invariant checks)
+  - closes `136` and `137`.

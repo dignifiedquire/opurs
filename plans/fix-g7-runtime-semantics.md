@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,171,172`
-Closed in this group: `66,67,68,135,168`
+Open: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,10 @@ Closed in this group: `66,67,68,135,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed DNN runtime assert-gating parity items:
+  - `src/dnn/lpcnet.rs` / `src/dnn/fargan.rs`: converted unconditional loaded/continuation assertions to debug assertions.
+  - `src/dnn/nnet.rs` / `src/dnn/nndsp.rs`: converted internal invariant checks from unconditional assertions to debug-gated assertions.
+  - closes `136` and `137`.
 - 2026-02-26: Closed additional runtime/assert-gate parity gaps across analysis, resampler, and DRED init paths:
   - `src/opus/analysis.rs`: added upstream-equivalent `Fs` assertion gate in `downmix_and_resample()` and unit tests for valid 24 kHz behavior plus unsupported-rate debug assertion.
   - `src/silk/resampler/mod.rs`: removed remaining invalid-rate panic path in `rate_id()` by returning `Option` and mapping unsupported tuples to `SILK_RESAMPLER_INVALID` (`-1`) with debug-assert gating; added debug/release tests for invalid encoder/decoder tuples.

@@ -4,8 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-Open: `107,194,202,203,204,205,212,213,230,231,233,234,235`
-Closed in this group: `232,237`
+Open: `194,202,203,204,205,212,213,230,233,234,235`
+Closed in this group: `107,231,232,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.
@@ -30,3 +30,6 @@ Closed in this group: `232,237`
 - 2026-02-24: Aligned x86 AVX2 compile-flag bundles in `libopus-sys/build.rs` to upstream (`-mavx -mfma -mavx2`) for `CELT_SOURCES_AVX2`, `SILK_SOURCES_AVX2`, `SILK_SOURCES_FLOAT_AVX2`, and `DNN_SOURCES_AVX2`.
 - 2026-02-24: Updated AVX2 capability probe to require the same full flag bundle (`-mavx -mfma -mavx2`) before enabling x86 AVX2 MAY_HAVE paths.
 - 2026-02-24: This closes build-flag parity items `232` and `237`.
+- 2026-02-26: Closed additional dispatch-semantic gaps:
+  - `107`: decoder now threads runtime arch into internal soft-clip implementation (`opus_pcm_soft_clip_impl(..., arch)`).
+  - `231`: removed aarch64 NEON override for `silk_inner_product_FLP`; SIMD override now matches upstream x86-AVX2-only behavior.
