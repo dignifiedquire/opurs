@@ -6,7 +6,7 @@
 //! Run with: `cargo bench --features tools-dnn --bench dnn_comparison`
 //! For QEXT: `cargo bench --features "tools-dnn,qext" --bench dnn_comparison`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 const SAMPLE_RATE: i32 = 48000;
 const FRAME_SIZE: usize = 960; // 20ms at 48kHz
@@ -67,7 +67,24 @@ fn generate_pcm(len: usize, seed: u32) -> Vec<i16> {
     v
 }
 
-// --- DRED encode comparison ---
+fn pre_encode_packets(bitrate: i32) -> Vec<Vec<u8>> {
+    let pcm = generate_pcm(FRAME_SIZE * NUM_FRAMES, 42);
+    let mut enc = opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
+    enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
+    enc.set_complexity(10).unwrap();
+
+    let mut packets = Vec::new();
+    let mut output = vec![0u8; 4000];
+    for frame in 0..NUM_FRAMES {
+        let start = frame * FRAME_SIZE;
+        let end = start + FRAME_SIZE;
+        let len = enc.encode(&pcm[start..end], &mut output);
+        packets.push(output[..len as usize].to_vec());
+    }
+    packets
+}
+
+// --- DRED encode comparison: vary bitrate × DRED duration ---
 
 #[cfg(feature = "dred")]
 fn bench_dred_encode_cmp(c: &mut Criterion) {
@@ -75,216 +92,235 @@ fn bench_dred_encode_cmp(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("dred_encode_cmp");
 
-    // Rust
-    group.bench_function("rust/32kbps_mono", |b| {
-        let mut enc =
-            opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
-        enc.set_bitrate(opurs::Bitrate::Bits(32000));
-        enc.set_complexity(10).unwrap();
-        enc.set_packet_loss_perc(10).unwrap();
-        #[cfg(feature = "builtin-weights")]
-        enc.load_dnn_weights().unwrap();
-        enc.set_dred_duration(24).unwrap();
+    for &bitrate in &[16000, 32000, 64000] {
+        for &dred_dur in &[8, 24, 48] {
+            let config = format!("{}kbps_dred{}", bitrate / 1000, dred_dur);
 
-        let mut output = vec![0u8; 8000];
-        b.iter(|| {
-            for frame in 0..NUM_FRAMES {
-                let start = frame * FRAME_SIZE;
-                let end = start + FRAME_SIZE;
-                let len = enc.encode(&pcm[start..end], &mut output);
-                black_box(len);
+            // Rust
+            {
+                let pcm = pcm.clone();
+                group.bench_function(BenchmarkId::new("rust", &config), |b| {
+                    let mut enc =
+                        opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP)
+                            .unwrap();
+                    enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
+                    enc.set_complexity(10).unwrap();
+                    enc.set_packet_loss_perc(10).unwrap();
+                    #[cfg(feature = "builtin-weights")]
+                    enc.load_dnn_weights().unwrap();
+                    enc.set_dred_duration(dred_dur).unwrap();
+
+                    let mut output = vec![0u8; 8000];
+                    b.iter(|| {
+                        for frame in 0..NUM_FRAMES {
+                            let start = frame * FRAME_SIZE;
+                            let end = start + FRAME_SIZE;
+                            let len = enc.encode(&pcm[start..end], &mut output);
+                            black_box(len);
+                        }
+                    })
+                });
             }
-        })
-    });
 
-    // C
-    group.bench_function("c/32kbps_mono", |b| {
-        let mut err = 0i32;
-        let enc = unsafe { opus_encoder_create(SAMPLE_RATE, 1, OPUS_APPLICATION_VOIP, &mut err) };
-        assert!(!enc.is_null());
-        unsafe {
-            opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, 32000i32);
-            opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
-            opus_encoder_ctl(enc, OPUS_SET_PACKET_LOSS_PERC_REQUEST, 10i32);
-            opus_encoder_ctl(enc, OPUS_SET_DRED_DURATION_REQUEST, 24i32);
+            // C
+            {
+                let pcm = pcm.clone();
+                group.bench_function(BenchmarkId::new("c", &config), |b| {
+                    let mut err = 0i32;
+                    let enc = unsafe {
+                        opus_encoder_create(SAMPLE_RATE, 1, OPUS_APPLICATION_VOIP, &mut err)
+                    };
+                    assert!(!enc.is_null());
+                    unsafe {
+                        opus_encoder_ctl(enc, OPUS_SET_BITRATE_REQUEST, bitrate);
+                        opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY_REQUEST, 10i32);
+                        opus_encoder_ctl(enc, OPUS_SET_PACKET_LOSS_PERC_REQUEST, 10i32);
+                        opus_encoder_ctl(enc, OPUS_SET_DRED_DURATION_REQUEST, dred_dur);
+                    }
+
+                    let mut output = vec![0u8; 8000];
+                    b.iter(|| {
+                        for frame in 0..NUM_FRAMES {
+                            let start = frame * FRAME_SIZE;
+                            let len = unsafe {
+                                opus_encode(
+                                    enc,
+                                    pcm[start..].as_ptr(),
+                                    FRAME_SIZE as i32,
+                                    output.as_mut_ptr(),
+                                    output.len() as i32,
+                                )
+                            };
+                            black_box(len);
+                        }
+                    });
+                    unsafe { opus_encoder_destroy(enc) };
+                });
+            }
         }
-
-        let mut output = vec![0u8; 8000];
-        b.iter(|| {
-            for frame in 0..NUM_FRAMES {
-                let start = frame * FRAME_SIZE;
-                let len = unsafe {
-                    opus_encode(
-                        enc,
-                        pcm[start..].as_ptr(),
-                        FRAME_SIZE as i32,
-                        output.as_mut_ptr(),
-                        output.len() as i32,
-                    )
-                };
-                black_box(len);
-            }
-        });
-        unsafe { opus_encoder_destroy(enc) };
-    });
-
+    }
     group.finish();
 }
 
-// --- OSCE decode comparison ---
+// --- OSCE decode comparison: vary bitrate × complexity ---
 
 #[cfg(feature = "osce")]
 fn bench_osce_decode_cmp(c: &mut Criterion) {
-    let pcm = generate_pcm(FRAME_SIZE * NUM_FRAMES, 42);
+    // Pre-encode at each bitrate (shared between Rust and C decoders)
+    let packets_12k = pre_encode_packets(12000);
+    let packets_16k = pre_encode_packets(16000);
+    let packets_24k = pre_encode_packets(24000);
 
-    // Pre-encode with Rust (SILK-heavy VOIP)
-    let mut enc = opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
-    enc.set_bitrate(opurs::Bitrate::Bits(16000));
-    enc.set_complexity(10).unwrap();
-
-    let mut packets = Vec::new();
-    let mut output = vec![0u8; 4000];
-    for frame in 0..NUM_FRAMES {
-        let start = frame * FRAME_SIZE;
-        let end = start + FRAME_SIZE;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
-    }
+    let packet_sets: &[(&str, &[Vec<u8>])] = &[
+        ("12kbps", &packets_12k),
+        ("16kbps", &packets_16k),
+        ("24kbps", &packets_24k),
+    ];
 
     let mut group = c.benchmark_group("osce_decode_cmp");
 
-    // Rust
-    group.bench_function("rust/16kbps_mono_c7", |b| {
-        let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
-        dec.set_complexity(7).unwrap();
-        #[cfg(feature = "builtin-weights")]
-        dec.load_dnn_weights().unwrap();
-        dec.set_osce_bwe(true);
+    for &(bitrate_label, packets) in packet_sets {
+        for &complexity in &[6, 7, 10] {
+            let config = format!("{}_c{}", bitrate_label, complexity);
 
-        let mut pcm_out = vec![0i16; FRAME_SIZE];
-        b.iter(|| {
-            for pkt in &packets {
-                let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                black_box(n);
+            // Rust
+            {
+                let packets = packets.to_vec();
+                group.bench_function(BenchmarkId::new("rust", &config), |b| {
+                    let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
+                    dec.set_complexity(complexity).unwrap();
+                    #[cfg(feature = "builtin-weights")]
+                    dec.load_dnn_weights().unwrap();
+                    dec.set_osce_bwe(true);
+
+                    let mut pcm_out = vec![0i16; FRAME_SIZE];
+                    b.iter(|| {
+                        for pkt in &packets {
+                            let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
+                            black_box(n);
+                        }
+                    })
+                });
             }
-        })
-    });
 
-    // C
-    group.bench_function("c/16kbps_mono_c7", |b| {
-        let mut err = 0i32;
-        let dec = unsafe { opus_decoder_create(SAMPLE_RATE, 1, &mut err) };
-        assert!(!dec.is_null());
-        unsafe {
-            opus_decoder_ctl(dec, OPUS_SET_COMPLEXITY_REQUEST, 7i32);
-            opus_decoder_ctl(dec, OPUS_SET_OSCE_BWE_REQUEST, 1i32);
+            // C
+            {
+                let packets = packets.to_vec();
+                group.bench_function(BenchmarkId::new("c", &config), |b| {
+                    let mut err = 0i32;
+                    let dec = unsafe { opus_decoder_create(SAMPLE_RATE, 1, &mut err) };
+                    assert!(!dec.is_null());
+                    unsafe {
+                        opus_decoder_ctl(dec, OPUS_SET_COMPLEXITY_REQUEST, complexity);
+                        opus_decoder_ctl(dec, OPUS_SET_OSCE_BWE_REQUEST, 1i32);
+                    }
+
+                    let mut pcm_out = vec![0i16; FRAME_SIZE];
+                    b.iter(|| {
+                        for pkt in &packets {
+                            let n = unsafe {
+                                opus_decode(
+                                    dec,
+                                    pkt.as_ptr(),
+                                    pkt.len() as i32,
+                                    pcm_out.as_mut_ptr(),
+                                    FRAME_SIZE as i32,
+                                    0,
+                                )
+                            };
+                            black_box(n);
+                        }
+                    });
+                    unsafe { opus_decoder_destroy(dec) };
+                });
+            }
         }
-
-        let mut pcm_out = vec![0i16; FRAME_SIZE];
-        b.iter(|| {
-            for pkt in &packets {
-                let n = unsafe {
-                    opus_decode(
-                        dec,
-                        pkt.as_ptr(),
-                        pkt.len() as i32,
-                        pcm_out.as_mut_ptr(),
-                        FRAME_SIZE as i32,
-                        0,
-                    )
-                };
-                black_box(n);
-            }
-        });
-        unsafe { opus_decoder_destroy(dec) };
-    });
-
+    }
     group.finish();
 }
 
-// --- Deep PLC comparison ---
+// --- Deep PLC comparison: vary complexity × loss rate ---
 
 fn bench_deep_plc_cmp(c: &mut Criterion) {
-    let pcm = generate_pcm(FRAME_SIZE * NUM_FRAMES, 42);
-
-    let mut enc = opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
-    enc.set_bitrate(opurs::Bitrate::Bits(16000));
-    enc.set_complexity(10).unwrap();
-
-    let mut packets = Vec::new();
-    let mut output = vec![0u8; 4000];
-    for frame in 0..NUM_FRAMES {
-        let start = frame * FRAME_SIZE;
-        let end = start + FRAME_SIZE;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
-    }
+    let packets = pre_encode_packets(16000);
 
     let mut group = c.benchmark_group("deep_plc_cmp");
 
-    // Rust
-    group.bench_function("rust/20pct_loss", |b| {
-        let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
-        dec.set_complexity(5).unwrap();
-        #[cfg(feature = "builtin-weights")]
-        dec.load_dnn_weights().unwrap();
+    for &complexity in &[5, 7, 10] {
+        for &loss_pct in &[10, 20, 50] {
+            let config = format!("c{}_loss{}pct", complexity, loss_pct);
+            let loss_every = 100 / loss_pct;
 
-        let mut pcm_out = vec![0i16; FRAME_SIZE];
-        b.iter(|| {
-            for (i, pkt) in packets.iter().enumerate() {
-                if i % 5 == 4 {
-                    let n = dec.decode(&[], &mut pcm_out, FRAME_SIZE as i32, false);
-                    black_box(n);
-                } else {
-                    let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                    black_box(n);
-                }
+            // Rust
+            {
+                let packets = packets.clone();
+                group.bench_function(BenchmarkId::new("rust", &config), |b| {
+                    let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
+                    dec.set_complexity(complexity).unwrap();
+                    #[cfg(feature = "builtin-weights")]
+                    dec.load_dnn_weights().unwrap();
+
+                    let mut pcm_out = vec![0i16; FRAME_SIZE];
+                    b.iter(|| {
+                        for (i, pkt) in packets.iter().enumerate() {
+                            if (i + 1) % loss_every == 0 {
+                                let n = dec.decode(&[], &mut pcm_out, FRAME_SIZE as i32, false);
+                                black_box(n);
+                            } else {
+                                let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
+                                black_box(n);
+                            }
+                        }
+                    })
+                });
             }
-        })
-    });
 
-    // C
-    group.bench_function("c/20pct_loss", |b| {
-        let mut err = 0i32;
-        let dec = unsafe { opus_decoder_create(SAMPLE_RATE, 1, &mut err) };
-        assert!(!dec.is_null());
-        unsafe {
-            opus_decoder_ctl(dec, OPUS_SET_COMPLEXITY_REQUEST, 5i32);
+            // C
+            {
+                let packets = packets.clone();
+                group.bench_function(BenchmarkId::new("c", &config), |b| {
+                    let mut err = 0i32;
+                    let dec = unsafe { opus_decoder_create(SAMPLE_RATE, 1, &mut err) };
+                    assert!(!dec.is_null());
+                    unsafe {
+                        opus_decoder_ctl(dec, OPUS_SET_COMPLEXITY_REQUEST, complexity);
+                    }
+
+                    let mut pcm_out = vec![0i16; FRAME_SIZE];
+                    b.iter(|| {
+                        for (i, pkt) in packets.iter().enumerate() {
+                            if (i + 1) % loss_every == 0 {
+                                let n = unsafe {
+                                    opus_decode(
+                                        dec,
+                                        std::ptr::null(),
+                                        0,
+                                        pcm_out.as_mut_ptr(),
+                                        FRAME_SIZE as i32,
+                                        0,
+                                    )
+                                };
+                                black_box(n);
+                            } else {
+                                let n = unsafe {
+                                    opus_decode(
+                                        dec,
+                                        pkt.as_ptr(),
+                                        pkt.len() as i32,
+                                        pcm_out.as_mut_ptr(),
+                                        FRAME_SIZE as i32,
+                                        0,
+                                    )
+                                };
+                                black_box(n);
+                            }
+                        }
+                    });
+                    unsafe { opus_decoder_destroy(dec) };
+                });
+            }
         }
-
-        let mut pcm_out = vec![0i16; FRAME_SIZE];
-        b.iter(|| {
-            for (i, pkt) in packets.iter().enumerate() {
-                if i % 5 == 4 {
-                    let n = unsafe {
-                        opus_decode(
-                            dec,
-                            std::ptr::null(),
-                            0,
-                            pcm_out.as_mut_ptr(),
-                            FRAME_SIZE as i32,
-                            0,
-                        )
-                    };
-                    black_box(n);
-                } else {
-                    let n = unsafe {
-                        opus_decode(
-                            dec,
-                            pkt.as_ptr(),
-                            pkt.len() as i32,
-                            pcm_out.as_mut_ptr(),
-                            FRAME_SIZE as i32,
-                            0,
-                        )
-                    };
-                    black_box(n);
-                }
-            }
-        });
-        unsafe { opus_decoder_destroy(dec) };
-    });
-
+    }
     group.finish();
 }
 
@@ -298,22 +334,25 @@ fn bench_qext_encode_cmp(c: &mut Criterion) {
     let mut group = c.benchmark_group("qext_encode_cmp");
 
     // Rust
-    group.bench_function("rust/320kbps_stereo_96k", |b| {
-        let mut enc = opurs::OpusEncoder::new(96000, 2, opurs::OPUS_APPLICATION_AUDIO).unwrap();
-        enc.set_bitrate(opurs::Bitrate::Bits(320000));
-        enc.set_complexity(10).unwrap();
-        enc.set_qext(true);
+    {
+        let pcm = pcm.clone();
+        group.bench_function("rust/320kbps_stereo_96k", |b| {
+            let mut enc = opurs::OpusEncoder::new(96000, 2, opurs::OPUS_APPLICATION_AUDIO).unwrap();
+            enc.set_bitrate(opurs::Bitrate::Bits(320000));
+            enc.set_complexity(10).unwrap();
+            enc.set_qext(true);
 
-        let mut output = vec![0u8; 8000];
-        b.iter(|| {
-            for frame in 0..NUM_FRAMES {
-                let start = frame * frame_size_96k * 2;
-                let end = start + frame_size_96k * 2;
-                let len = enc.encode(&pcm[start..end], &mut output);
-                black_box(len);
-            }
-        })
-    });
+            let mut output = vec![0u8; 8000];
+            b.iter(|| {
+                for frame in 0..NUM_FRAMES {
+                    let start = frame * frame_size_96k * 2;
+                    let end = start + frame_size_96k * 2;
+                    let len = enc.encode(&pcm[start..end], &mut output);
+                    black_box(len);
+                }
+            })
+        });
+    }
 
     // C
     group.bench_function("c/320kbps_stereo_96k", |b| {
@@ -368,7 +407,7 @@ fn bench_qext_decode_cmp(c: &mut Criterion) {
         packets.push(output[..len as usize].to_vec());
     }
 
-    // Also pre-encode with C for the C decoder
+    // Pre-encode with C
     let mut c_packets = Vec::new();
     {
         let mut err = 0i32;
