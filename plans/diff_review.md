@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,144,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,148,149,153,170,171,172`
 
 ## Findings
 
@@ -594,20 +594,20 @@ IDs: `61,62,72,79,82,87,106,144,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/osce_features.c`, `libopus-sys/opus/dnn/freq.c`
 - Detail: Converted the tracked OSCE/Freq invariant checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`, matching upstream release-mode assertion gating.
 
-144. [LOW][Runtime Semantics][CELT FFT] KISS FFT precondition checks are unconditional in Rust.
-- Rust: `src/celt/kiss_fft.rs:29-30`, `src/celt/kiss_fft.rs:69`, `src/celt/kiss_fft.rs:212`, `src/celt/kiss_fft.rs:247-248`
-- Upstream: `libopus-sys/opus/celt/kiss_fft.c:64`, `libopus-sys/opus/celt/kiss_fft.c:80`
-- Detail: Upstream uses `celt_assert(...)` for internal butterfly preconditions (e.g., radix staging constraints). Rust enforces corresponding shape/length assumptions with unconditional `assert_eq!`, which can abort at runtime instead of remaining assert-gated behavior.
+144. [RESOLVED][Runtime Semantics][CELT FFT] KISS FFT precondition checks now follow assert-gated semantics.
+- Rust: `src/celt/kiss_fft.rs`
+- Upstream: `libopus-sys/opus/celt/kiss_fft.c`
+- Detail: Converted tracked KISS FFT precondition checks from unconditional `assert_eq!` to `debug_assert_eq!`, matching upstream `celt_assert` release behavior.
 
 145. [RESOLVED][Runtime Semantics][SILK FLP] Float-path invariant checks now follow assert-gated semantics.
 - Rust: `src/silk/float/apply_sine_window_FLP.rs`, `src/silk/float/schur_FLP.rs`, `src/silk/float/sort_FLP.rs`, `src/silk/float/burg_modified_FLP.rs`, `src/silk/float/warped_autocorrelation_FLP.rs`, `src/silk/float/find_pitch_lags_FLP.rs`
 - Upstream: `libopus-sys/opus/silk/float/apply_sine_window_FLP.c`, `libopus-sys/opus/silk/float/schur_FLP.c`, `libopus-sys/opus/silk/float/sort_FLP.c`, `libopus-sys/opus/silk/float/burg_modified_FLP.c`, `libopus-sys/opus/silk/float/warped_autocorrelation_FLP.c`, `libopus-sys/opus/silk/float/find_pitch_lags_FLP.c`
 - Detail: Converted the tracked SILK FLP invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert`/`silk_assert` release semantics.
 
-146. [LOW][Runtime Semantics][CELT MDCT] MDCT wrappers enforce unconditional slice-length assertions in Rust.
-- Rust: `src/celt/mdct.rs:48-49`, `src/celt/mdct.rs:52`, `src/celt/mdct.rs:55`, `src/celt/mdct.rs:57`
-- Upstream: `libopus-sys/opus/celt/mdct.c:122`, `libopus-sys/opus/celt/mdct.c:268`
-- Detail: Upstream MDCT APIs operate on raw pointers and internal size assumptions; Rust wrappers add unconditional `assert!`/`assert_eq!` checks for window/trig/input/output sizing. This introduces hard-abort behavior on mismatched buffers instead of upstream-style unchecked pointer semantics.
+146. [RESOLVED][Runtime Semantics][CELT MDCT] MDCT wrapper invariants now follow assert-gated semantics.
+- Rust: `src/celt/mdct.rs`
+- Upstream: `libopus-sys/opus/celt/mdct.c`
+- Detail: Converted tracked MDCT wrapper checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`, matching upstream `celt_assert` release-mode behavior.
 
 147. [LOW][Validation Semantics][SILK] Some upstream assert-gated range checks are missing in Rust counterparts.
 - Rust: `src/silk/process_NLSFs.rs:25-35`, `src/silk/LPC_analysis_filter.rs:27-29`, `src/silk/NLSF_encode.rs:40`

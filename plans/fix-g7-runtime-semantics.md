@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,144,146,148,149,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,145,168`
+Open: `61,62,72,79,82,87,106,148,149,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,10 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,145,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed additional CELT FFT/MDCT assert-gating parity items:
+  - `src/celt/kiss_fft.rs`: converted tracked KISS FFT precondition checks from `assert_eq!` to `debug_assert_eq!`.
+  - `src/celt/mdct.rs`: converted tracked MDCT size/precondition checks from `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.
+  - closes `144` and `146`.
 - 2026-02-26: Closed broad SILK assert-gating parity set:
   - `src/silk/control_codec.rs`, `src/silk/decode_frame.rs`, `src/silk/decode_core.rs`, `src/silk/NSQ.rs`, `src/silk/NSQ_del_dec.rs`, `src/silk/float/pitch_analysis_core_FLP.rs`, `src/silk/float/find_pred_coefs_FLP.rs`: converted tracked invariant checks from `assert!` to `debug_assert!`.
   - closes `142`.

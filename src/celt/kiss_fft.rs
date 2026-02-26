@@ -26,8 +26,8 @@ pub struct kiss_fft_state<'a> {
 fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
     let tw: f32 = std::f32::consts::FRAC_1_SQRT_2;
     /* We know that m==4 here because the radix-2 is just after a radix-4 */
-    assert_eq!(m, 4);
-    assert_eq!(Fout.len(), N as usize * 8);
+    debug_assert_eq!(m, 4);
+    debug_assert_eq!(Fout.len(), N as usize * 8);
     for chunk in Fout.chunks_exact_mut(8) {
         let (Fout, Fout2) = chunk.split_at_mut(4);
 
@@ -66,7 +66,7 @@ fn kf_bfly4(
 ) {
     if m == 1 {
         /* Degenerate case where all the twiddles are 1. */
-        assert_eq!(Fout.len(), N as usize * 4);
+        debug_assert_eq!(Fout.len(), N as usize * 4);
         for chunk in Fout.chunks_exact_mut(4) {
             let scratch0 = chunk[0] - chunk[2];
             chunk[0] += chunk[2];
@@ -209,7 +209,7 @@ fn kf_bfly5(
 /// Upstream C: kiss_fft.c:opus_fft_impl
 #[inline]
 pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
-    assert_eq!(st.nfft, fout.len());
+    debug_assert_eq!(st.nfft, fout.len());
     let shift = st.shift.max(0);
 
     let mut fstride: [i32; 8] = [0; 8];
@@ -244,8 +244,8 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
 pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
     let mut scale: f32 = 0.;
     scale = st.scale;
-    assert_eq!(fin.len(), st.nfft);
-    assert_eq!(fout.len(), st.nfft);
+    debug_assert_eq!(fin.len(), st.nfft);
+    debug_assert_eq!(fout.len(), st.nfft);
     for (&x, &i) in fin.iter().zip(st.bitrev) {
         fout[i as usize] = scale * x;
     }

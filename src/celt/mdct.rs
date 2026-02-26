@@ -45,16 +45,16 @@ pub fn mdct_forward(
     let o2 = overlap / 2;
     let o4 = overlap / 4;
 
-    assert_eq!(window.len(), o);
-    assert_eq!(trig.len(), n2);
+    debug_assert_eq!(window.len(), o);
+    debug_assert_eq!(trig.len(), n2);
 
     // TODO: make sure all callers pass the exactly-sized slice
-    assert!(input.len() >= n2 + o);
+    debug_assert!(input.len() >= n2 + o);
     let input = &input[..n2 + o];
 
-    assert!(out.len() >= n2 * output_stride);
+    debug_assert!(out.len() >= n2 * output_stride);
 
-    assert_eq!(o % 4, 0);
+    debug_assert_eq!(o % 4, 0);
 
     let trig_real = &trig[..n4];
     let trig_imag = &trig[n4..];
@@ -144,14 +144,14 @@ pub fn mdct_backward(
     let o = overlap;
     let o2 = overlap / 2;
 
-    assert_eq!(l.kfft[shift].nfft, n4);
+    debug_assert_eq!(l.kfft[shift].nfft, n4);
 
-    assert_eq!(window.len(), o);
-    assert_eq!(trig.len(), n2);
+    debug_assert_eq!(window.len(), o);
+    debug_assert_eq!(trig.len(), n2);
 
-    assert_eq!(input.len(), n2 * input_stride);
+    debug_assert_eq!(input.len(), n2 * input_stride);
 
-    assert_eq!(out.len(), n2 + o);
+    debug_assert_eq!(out.len(), n2 + o);
     let out = &mut out[..n2 + o];
 
     let trig_real = &trig[..n4];
@@ -180,9 +180,9 @@ pub fn mdct_backward(
     /* Loop to (N4+1)>>1 to handle odd N4. When N4 is odd, the
     middle pair will be computed twice. */
     // additional asserts to maybe help the optimizer remove bounds checks
-    assert_eq!(outmid.len(), n4);
-    assert_eq!(trig_real.len(), n4);
-    assert_eq!(trig_imag.len(), n4);
+    debug_assert_eq!(outmid.len(), n4);
+    debug_assert_eq!(trig_real.len(), n4);
+    debug_assert_eq!(trig_imag.len(), n4);
     for i in 0..n4.div_ceil(2) {
         // NB: unlike the loops in ctl_mdct_forward_c, the yp0 and yp1 "pointers" are NOT disjoint because they are stepped only by 1
         // so yp0 and yp1 can alias, especially when N4 is odd
