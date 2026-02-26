@@ -549,9 +549,6 @@ jobs:
           compiler: llvm
       - name: Build (release)
         run: cargo build --release --features tools --target ${{ matrix.target }}
-      - name: Run focused classic vector regressions (major platforms)
-        if: matrix.major_platform
-        run: cargo test --release --features tools --target ${{ matrix.target }} --test vector_regressions
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
         run: |
@@ -565,6 +562,9 @@ jobs:
           mkdir -p "$OPUS_PROJECTION_VECTORS_DIR"
           curl -L "$OPUS_PROJECTION_VECTORS_URL" -o projection_vectors.tar.gz
           tar -xzf projection_vectors.tar.gz -C "$OPUS_PROJECTION_VECTORS_DIR"
+      - name: Run focused classic vector regressions (major platforms)
+        if: matrix.major_platform
+        run: cargo test --release --features tools --target ${{ matrix.target }} --test vector_regressions
       - name: Run test vectors (full matrix on major platforms)
         if: matrix.major_platform
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- --suite classic --matrix full --jobs 1 opus_newvectors
