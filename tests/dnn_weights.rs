@@ -99,8 +99,14 @@ mod per_model {
         c_write_fn: unsafe extern "C" fn(*mut u8) -> i32,
         model_name: &str,
     ) {
-        let rust_arrays = rust_arrays_fn();
-        let rust_blob = write_weights(&rust_arrays);
+        // Normalize through load_weights() so per-model checks use the same
+        // DISABLE_DEBUG_FLOAT mirror filtering path as compiled_weights().
+        let rust_blob = {
+            let raw_blob = write_weights(&rust_arrays_fn());
+            let normalized = opurs::dnn::weights::load_weights(&raw_blob)
+                .expect("failed to normalize Rust weights");
+            write_weights(&normalized)
+        };
 
         let c_blob = unsafe {
             let size = c_size_fn() as usize;
