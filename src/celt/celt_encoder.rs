@@ -3571,12 +3571,9 @@ pub fn celt_encode_with_ec<'b>(
 
     // QEXT: Compute extra allocation and second-pass fine energy
     st.energyError[..(nbEBands * CC) as usize].fill(0.0);
+    // nbEBands + NB_QEXT_BANDS max: 21 + 14 = 35.
     #[cfg(feature = "qext")]
-    let mut extra_pulses = {
-        use crate::celt::modes::data_96000::NB_QEXT_BANDS;
-        // nbEBands + NB_QEXT_BANDS max: 21 + 14 = 35.
-        [0i32; 40]
-    };
+    let mut extra_pulses = [0i32; 40];
     #[cfg(feature = "qext")]
     let mut extra_quant = [0i32; 40];
     #[cfg(feature = "qext")]
