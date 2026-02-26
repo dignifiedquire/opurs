@@ -99,7 +99,7 @@ pub fn silk_VAD_GetSA_Q8(psEncC: &mut super::structs::silk_encoder_state, pIn: &
 }
 
 /// Scalar implementation of VAD energy accumulation.
-fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
+pub fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
     let mut sum: i32 = 0;
     for &sample in x {
         let x_tmp = (sample as i32) >> 3;

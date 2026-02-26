@@ -149,10 +149,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: bench-smoke
-      - name: Build multistream bench
-        run: cargo bench --features tools --bench multistream --no-run
-      - name: Build projection bench
-        run: cargo bench --features tools --bench projection --no-run
+      - name: Build function-level benches (pitch, silk, vq, codec)
+        run: cargo bench --bench pitch --bench silk --bench vq --bench codec --no-run
+      - name: Build tools-dependent benches (comparison, codec_comparison, multistream, projection)
+        run: cargo bench --features tools --bench comparison --bench codec_comparison --bench multistream --bench projection --no-run
+      - name: Build DNN function-level bench
+        run: cargo bench --features deep-plc --bench dnn --no-run
+      - name: Build DNN codec end-to-end bench
+        run: cargo bench --features "dnn,builtin-weights" --bench dnn_codec --no-run
       - name: Run short multistream encode bench slices
         run: cargo bench --features tools --bench multistream -- multistream_encode_cmp/rust/1ch_10ms_32000
       - name: Run short multistream encode C slice
@@ -473,6 +477,8 @@ jobs:
           popd >/dev/null
       - name: Run weight verification and integration tests
         run: cargo nextest run --features tools-dnn --cargo-profile=release
+      - name: Build DNN comparison bench (Rust vs C)
+        run: cargo bench --features tools-dnn --bench dnn_comparison --no-run
 
   test-vectors:
     name: Vectors (${{ matrix.name }})

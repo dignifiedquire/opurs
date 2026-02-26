@@ -104,7 +104,7 @@ pub fn resampling_factor(rate: i32) -> i32 {
 /// Constant-coefficient comb filter inner loop.
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
 #[inline]
-pub(crate) fn comb_filter_const_c(
+pub fn comb_filter_const_c(
     y: &mut [f32],
     y_start: usize,
     x: &[f32],

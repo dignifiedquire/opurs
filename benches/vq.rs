@@ -24,5 +24,37 @@ fn bench_celt_inner_prod_vq(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_celt_inner_prod_vq);
+fn bench_op_pvq_search(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
+    let mut group = c.benchmark_group("op_pvq_search");
+    for &(n, k) in &[(8, 4), (16, 8), (32, 16), (64, 32)] {
+        let label = format!("N{}_K{}", n, k);
+        group.bench_with_input(BenchmarkId::new("scalar", &label), &(n, k), |b, &(n, k)| {
+            b.iter(|| {
+                let mut x = generate_f32_signal(n, 42);
+                let mut iy = vec![0i32; n];
+                black_box(opurs::internals::op_pvq_search_c(
+                    &mut x, &mut iy, k, n as i32, arch,
+                ))
+            })
+        });
+        #[cfg(feature = "simd")]
+        group.bench_with_input(
+            BenchmarkId::new("dispatch", &label),
+            &(n, k),
+            |b, &(n, k)| {
+                b.iter(|| {
+                    let mut x = generate_f32_signal(n, 42);
+                    let mut iy = vec![0i32; n];
+                    black_box(opurs::internals::op_pvq_search(
+                        &mut x, &mut iy, k, n as i32, arch,
+                    ))
+                })
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_celt_inner_prod_vq, bench_op_pvq_search);
 criterion_main!(benches);
