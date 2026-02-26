@@ -781,15 +781,15 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/dred_config.h:35`
 - Detail: Updated Rust `DRED_EXPERIMENTAL_VERSION` to `12`, matching upstream signaling/version-tag behavior.
 
-182. [HIGH][Model Constants][DRED] RDOVAE dimension/stat-table constants diverge from upstream generated headers.
-- Rust: `src/dnn/dred/config.rs:28-31`, `src/dnn/dred/stats.rs:6`, `src/dnn/dred/stats.rs:84`
+182. [RESOLVED][Model Constants][DRED] RDOVAE stats-table dimensions now match upstream generated data.
+- Rust: `src/dnn/dred/stats.rs`
 - Upstream: `libopus-sys/opus/dnn/dred_rdovae_constants.h:12-19`, `libopus-sys/opus/dnn/dred_rdovae_stats_data.h:15-24`
-- Detail: Upstream defines `DRED_LATENT_DIM=25`, `DRED_STATE_DIM=50`, `DRED_PADDED_LATENT_DIM=32`, `DRED_PADDED_STATE_DIM=56`, with corresponding stats table sizes `400` and `800`. Rust currently uses `21/19/24/24` and stats arrays sized `336/304`, indicating a different model-constant/data layout than upstream 1.6.1.
+- Detail: Regenerated Rust DRED stats tables from upstream data source so latent/state quantization arrays are now `400/800` like upstream.
 
-183. [HIGH][Data Layout][DRED Decoder] `OpusDRED.latents` layout omits upstream per-latent extra slot (`DRED_LATENT_DIM+1`).
-- Rust: `src/dnn/dred/decoder.rs:38`, `src/dnn/dred/decoder.rs:179`, `src/dnn/dred/decoder.rs:200-206`
+183. [RESOLVED][Data Layout][DRED Decoder] `OpusDRED.latents` layout matches upstream `(DRED_LATENT_DIM+1)` storage.
+- Rust: `src/dnn/dred/decoder.rs`
 - Upstream: `libopus-sys/opus/dnn/dred_decoder.h:40`, `libopus-sys/opus/dnn/dred_decoder.c:117`, `libopus-sys/opus/dnn/dred_decoder.c:123`
-- Detail: Upstream stores latents as `(DRED_NUM_REDUNDANCY_FRAMES/2)*(DRED_LATENT_DIM+1)` and writes an extra trailing value per latent (`q_level*.125 - 1`). Rust allocates/stores only `DRED_LATENT_DIM` values per latent frame, so decoded DRED latent layout differs from upstream.
+- Detail: Rust stores latents as `(DRED_NUM_REDUNDANCY_FRAMES/2)*(DRED_LATENT_DIM+1)` and writes the trailing `q_level` slot, matching upstream decoder layout semantics.
 
 184. [LOW][Runtime Semantics][LPCNet PLC] FEC queue-full behavior differs from upstream assert-gated contract.
 - Rust: `src/dnn/lpcnet.rs:597-607`
