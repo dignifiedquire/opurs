@@ -40,3 +40,7 @@ Closed in this group: `107,204,205,212,230,231,232,235,237`
 - 2026-02-26: Re-verified forced arch-tier DNN parity under `nextest` on current head:
   - Command: `CARGO_TARGET_DIR=target-local cargo nextest run --release --features tools-dnn -E 'binary(osce_nndsp) and test(/test_compute_linear_int8_arch_tiers_match_c|test_compute_conv2d_3x3/)'`
   - Result: both tests passed (`2 passed, 17 skipped`) including aarch64 `dotprod` tier comparison vs C harness.
+- 2026-02-26: Added x86 SSE2 dispatch coverage for DNN float kernels:
+  - `src/dnn/simd/x86.rs`: new `sgemv_sse2` and `sparse_sgemv8x4_sse2` implementations.
+  - `src/dnn/simd/mod.rs`: `sgemv` and `sparse_sgemv8x4` now dispatch to SSE2 on non-AVX2 x86 tiers.
+  - Added x86 unit tests in `src/dnn/simd/x86.rs` comparing SSE2 kernels vs scalar references (compiled on all targets; executed on x86 hosts).

@@ -46,6 +46,12 @@ pub fn sgemv(
             }
             return;
         }
+        if _arch.has_sse2() {
+            unsafe {
+                x86::sgemv_sse2(out, weights, rows, cols, col_stride, x);
+            }
+            return;
+        }
     }
 
     #[allow(unreachable_code)]
@@ -76,6 +82,12 @@ pub fn sparse_sgemv8x4(
         if _arch.has_avx2() {
             unsafe {
                 x86::sparse_sgemv8x4_avx2(out, w, idx, rows, x);
+            }
+            return;
+        }
+        if _arch.has_sse2() {
+            unsafe {
+                x86::sparse_sgemv8x4_sse2(out, w, idx, rows, x);
             }
             return;
         }

@@ -377,6 +377,42 @@ pub unsafe fn sgemv_avx2(
     }
 }
 
+/// SSE2 dense float matrix-vector multiply: out = weights^T * x.
+/// Port of non-AVX `vec_avx.h:sgemv`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse2")]
+pub unsafe fn sgemv_sse2(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    let mut i = 0;
+
+    while i + 4 <= rows {
+        let mut vy = _mm_setzero_ps();
+        for j in 0..cols {
+            let vxj = _mm_set1_ps(x[j]);
+            let vw = _mm_loadu_ps(weights.as_ptr().add(j * col_stride + i));
+            vy = _mm_add_ps(vy, _mm_mul_ps(vw, vxj));
+        }
+        _mm_storeu_ps(out.as_mut_ptr().add(i), vy);
+        i += 4;
+    }
+
+    while i < rows {
+        out[i] = 0.0;
+        for j in 0..cols {
+            out[i] += weights[j * col_stride + i] * x[j];
+        }
+        i += 1;
+    }
+}
+
 // =========================================================================
 // Sparse float GEMV
 // =========================================================================
@@ -426,6 +462,66 @@ pub unsafe fn sparse_sgemv8x4_avx2(
         }
 
         _mm256_storeu_ps(out.as_mut_ptr().add(i), vy0);
+    }
+}
+
+/// SSE2 sparse float matrix-vector multiply (8x4 block sparse).
+/// Port of non-AVX `vec_avx.h:sparse_sgemv8x4`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse2")]
+pub unsafe fn sparse_sgemv8x4_sse2(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+) {
+    let mut w_pos = 0usize;
+    let mut idx_pos = 0usize;
+
+    for i in (0..rows).step_by(8) {
+        let cols = idx[idx_pos] as usize;
+        idx_pos += 1;
+        let mut vy0 = _mm_setzero_ps();
+        let mut vy1 = _mm_setzero_ps();
+
+        for _ in 0..cols {
+            let id = idx[idx_pos] as usize;
+            idx_pos += 1;
+
+            let vx0 = _mm_set1_ps(x[id]);
+            let vw0 = _mm_loadu_ps(w.as_ptr().add(w_pos));
+            let vw1 = _mm_loadu_ps(w.as_ptr().add(w_pos + 4));
+            vy0 = _mm_add_ps(vy0, _mm_mul_ps(vw0, vx0));
+            vy1 = _mm_add_ps(vy1, _mm_mul_ps(vw1, vx0));
+            w_pos += 8;
+
+            let vx1 = _mm_set1_ps(x[id + 1]);
+            let vw0 = _mm_loadu_ps(w.as_ptr().add(w_pos));
+            let vw1 = _mm_loadu_ps(w.as_ptr().add(w_pos + 4));
+            vy0 = _mm_add_ps(vy0, _mm_mul_ps(vw0, vx1));
+            vy1 = _mm_add_ps(vy1, _mm_mul_ps(vw1, vx1));
+            w_pos += 8;
+
+            let vx2 = _mm_set1_ps(x[id + 2]);
+            let vw0 = _mm_loadu_ps(w.as_ptr().add(w_pos));
+            let vw1 = _mm_loadu_ps(w.as_ptr().add(w_pos + 4));
+            vy0 = _mm_add_ps(vy0, _mm_mul_ps(vw0, vx2));
+            vy1 = _mm_add_ps(vy1, _mm_mul_ps(vw1, vx2));
+            w_pos += 8;
+
+            let vx3 = _mm_set1_ps(x[id + 3]);
+            let vw0 = _mm_loadu_ps(w.as_ptr().add(w_pos));
+            let vw1 = _mm_loadu_ps(w.as_ptr().add(w_pos + 4));
+            vy0 = _mm_add_ps(vy0, _mm_mul_ps(vw0, vx3));
+            vy1 = _mm_add_ps(vy1, _mm_mul_ps(vw1, vx3));
+            w_pos += 8;
+        }
+
+        _mm_storeu_ps(out.as_mut_ptr().add(i), vy0);
+        _mm_storeu_ps(out.as_mut_ptr().add(i + 4), vy1);
     }
 }
 
@@ -617,5 +713,64 @@ pub unsafe fn sparse_cgemv8x4_avx2(
         let vout = _mm256_cvtepi32_ps(vy0);
         let vscale = _mm256_loadu_ps(scale.as_ptr().add(i));
         _mm256_storeu_ps(out.as_mut_ptr().add(i), _mm256_mul_ps(vout, vscale));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sgemv_sse2_matches_scalar_reference() {
+        if !std::arch::is_x86_feature_detected!("sse2") {
+            return;
+        }
+
+        let rows = 12usize;
+        let cols = 7usize;
+        let col_stride = rows;
+        let weights: Vec<f32> = (0..(cols * col_stride))
+            .map(|i| ((i as i32 % 11) - 5) as f32 * 0.03125)
+            .collect();
+        let x: Vec<f32> = (0..cols)
+            .map(|i| ((i as i32 % 7) - 3) as f32 * 0.0625)
+            .collect();
+
+        let mut out_scalar = vec![0.0f32; rows];
+        crate::dnn::vec::sgemv_scalar(&mut out_scalar, &weights, rows, cols, col_stride, &x);
+
+        let mut out_sse2 = vec![0.0f32; rows];
+        unsafe {
+            sgemv_sse2(&mut out_sse2, &weights, rows, cols, col_stride, &x);
+        }
+
+        assert_eq!(out_sse2, out_scalar);
+    }
+
+    #[test]
+    fn sparse_sgemv8x4_sse2_matches_scalar_reference() {
+        if !std::arch::is_x86_feature_detected!("sse2") {
+            return;
+        }
+
+        let rows = 8usize;
+        let x_len = 12usize;
+        let idx: Vec<i32> = vec![2, 0, 4];
+        let w: Vec<f32> = (0..64)
+            .map(|i| ((i as i32 % 13) - 6) as f32 * 0.015625)
+            .collect();
+        let x: Vec<f32> = (0..x_len)
+            .map(|i| ((i as i32 % 9) - 4) as f32 * 0.09375)
+            .collect();
+
+        let mut out_scalar = vec![0.0f32; rows];
+        crate::dnn::vec::sparse_sgemv8x4_scalar(&mut out_scalar, &w, &idx, rows, &x);
+
+        let mut out_sse2 = vec![0.0f32; rows];
+        unsafe {
+            sparse_sgemv8x4_sse2(&mut out_sse2, &w, &idx, rows, &x);
+        }
+
+        assert_eq!(out_sse2, out_scalar);
     }
 }
