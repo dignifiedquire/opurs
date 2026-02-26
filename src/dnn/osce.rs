@@ -1736,7 +1736,7 @@ fn calculate_cepstrum(cepstrum: &mut [f32], signal: &[f32]) {
     }
 
     // DCT-II (orthonormal) — uses the same dct function from freq.rs
-    assert_eq!(OSCE_NOISY_SPEC_NUM_BANDS, NB_BANDS);
+    debug_assert_eq!(OSCE_NOISY_SPEC_NUM_BANDS, NB_BANDS);
     crate::dnn::freq::dct(cepstrum, &spec);
 }
 
@@ -1781,7 +1781,7 @@ fn pitch_postprocessing(features: &mut OSCEFeatureState, lag: i32, signal_type: 
         features.pitch_hangover_count = 0;
     }
     features.last_type = signal_type;
-    assert!(new_lag != 0);
+    debug_assert!(new_lag != 0);
     new_lag
 }
 
@@ -1888,7 +1888,7 @@ pub fn osce_calculate_features(
 ///
 /// Upstream C: dnn/osce_features.c:osce_cross_fade_10ms
 pub fn osce_cross_fade_10ms(x_enhanced: &mut [f32], x_in: &[f32], length: usize) {
-    assert!(length >= 160);
+    debug_assert!(length >= 160);
     let window = generate_osce_window();
     for i in 0..160 {
         x_enhanced[i] = window[i] * x_enhanced[i] + (1.0 - window[i]) * x_in[i];

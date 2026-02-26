@@ -212,7 +212,7 @@ pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     let mut ft: u32 = 0;
     let mut fl: u32 = 0;
     let mut ftb: i32 = 0;
-    assert!(_ft > 1);
+    debug_assert!(_ft > 1);
     _ft = _ft.wrapping_sub(1);
     ftb = EC_CLZ0 - _ft.leading_zeros() as i32;
     if ftb > EC_UINT_BITS {
@@ -235,7 +235,7 @@ pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
     let mut used: i32 = 0;
     window = this.end_window;
     used = this.nend_bits;
-    assert!(_bits > 0);
+    debug_assert!(_bits > 0);
     if (used as u32).wrapping_add(_bits) > EC_WINDOW_SIZE as u32 {
         loop {
             this.error |= ec_write_byte_at_end(this, window & EC_SYM_MAX);
@@ -259,7 +259,7 @@ pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u
     eprintln!("ec_enc_patch_initial_bits({}, {})", _val, _nbits);
     let mut shift: i32 = 0;
     let mut mask: u32 = 0;
-    assert!(_nbits <= 8);
+    debug_assert!(_nbits <= 8);
     shift = (EC_SYM_BITS as u32).wrapping_sub(_nbits) as i32;
     mask = ((((1) << _nbits) - 1) << shift) as u32;
     if this.offs > 0 {
@@ -277,7 +277,7 @@ pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u
 pub fn ec_enc_shrink(this: &mut ec_enc, new_size: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_shrink({})", new_size);
-    assert!((this.offs).wrapping_add(this.end_offs) <= new_size);
+    debug_assert!((this.offs).wrapping_add(this.end_offs) <= new_size);
 
     this.buf.copy_within(
         (this.storage - this.end_offs) as usize..this.storage as usize,

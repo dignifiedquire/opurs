@@ -345,7 +345,7 @@ pub fn pvq_v(n: u32, k: u32) -> u32 {
 
 /// Upstream C: celt/cwrs.c:icwrs
 pub fn icwrs(n: usize, y: &[i32]) -> u32 {
-    assert!(n >= 2);
+    debug_assert!(n >= 2);
     let mut j = n - 1;
     let mut i = (y[j] < 0) as u32;
     let mut k = y[j].unsigned_abs();
@@ -366,7 +366,7 @@ pub fn icwrs(n: usize, y: &[i32]) -> u32 {
 /// Upstream C: celt/cwrs.c:encode_pulses
 pub fn encode_pulses(y: &[i32], k: i32, enc: &mut ec_enc) {
     let n = y.len();
-    assert!(k > 0);
+    debug_assert!(k > 0);
     ec_enc_uint(enc, icwrs(n, y), pvq_v(n as u32, k as u32));
 }
 
@@ -378,8 +378,8 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
     let mut val: i16;
     let mut yy: f32 = 0.0;
     let mut yi: usize = 0;
-    assert!(k > 0);
-    assert!(n > 1);
+    debug_assert!(k > 0);
+    debug_assert!(n > 1);
     while n > 2 {
         let q: u32;
         if k >= n as i32 {

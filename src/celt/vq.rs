@@ -595,8 +595,8 @@ pub fn alg_quant(
     #[cfg(feature = "qext")] ext_enc: &mut ec_enc,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
-    assert!(K > 0);
-    assert!(N > 1);
+    debug_assert!(K > 0);
+    debug_assert!(N > 1);
     let mut iy: Vec<i32> = vec![0; (N + 3) as usize];
     exp_rotation(X, N, 1, B, K, spread);
 
@@ -678,8 +678,8 @@ pub fn alg_unquant(
     #[cfg(feature = "qext")] ext_dec: &mut ec_dec,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
-    assert!(K > 0);
-    assert!(N > 1);
+    debug_assert!(K > 0);
+    debug_assert!(N > 1);
     let mut iy = [0i32; 176];
     #[allow(unused_mut)]
     let mut Ryy = decode_pulses(&mut iy[..N as usize], K, dec);

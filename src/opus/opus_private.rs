@@ -12,7 +12,14 @@ pub const OPUS_SET_FORCE_MODE_REQUEST: i32 = 11002;
 
 #[inline]
 pub fn align(i: i32) -> i32 {
-    let alignment: u32 = 8_u64 as u32;
+    #[repr(C)]
+    union OpusAlign {
+        i: i32,
+        l: i64,
+        f: f32,
+        p: *mut core::ffi::c_void,
+    }
+    let alignment = core::mem::align_of::<OpusAlign>() as u32;
     (i as u32)
         .wrapping_add(alignment)
         .wrapping_sub(1)

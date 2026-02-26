@@ -304,8 +304,8 @@ pub fn apply_window(x: &mut [f32]) {
 ///
 /// Upstream C: dnn/freq.c:compute_burg_cepstrum
 fn compute_burg_cepstrum(pcm: &[f32], burg_cepstrum: &mut [f32], len: usize, order: usize) {
-    assert!(order <= LPC_ORDER);
-    assert!(len <= FRAME_SIZE);
+    debug_assert!(order <= LPC_ORDER);
+    debug_assert!(len <= FRAME_SIZE);
 
     // Pre-emphasis
     let mut burg_in = [0.0f32; FRAME_SIZE];

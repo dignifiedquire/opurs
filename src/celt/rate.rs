@@ -226,7 +226,7 @@ fn interp_bits2pulses(
             codedBands -= 1;
         }
     }
-    assert!(codedBands > start);
+    debug_assert!(codedBands > start);
     if intensity_rsv > 0 {
         if encode != 0 {
             *intensity = (*intensity).min(codedBands);
@@ -283,7 +283,7 @@ fn interp_bits2pulses(
         let NClogN: i32;
         let mut excess: i32;
 
-        assert!(bits[j as usize] >= 0);
+        debug_assert!(bits[j as usize] >= 0);
         let N0: i32 = m.eBands[(j + 1) as usize] as i32 - m.eBands[j as usize] as i32;
         let N: i32 = N0 << LM;
         let bit: i32 = bits[j as usize] + balance;
@@ -330,14 +330,14 @@ fn interp_bits2pulses(
             excess -= extra_bits;
         }
         balance = excess;
-        assert!(bits[j as usize] >= 0);
-        assert!(ebits[j as usize] >= 0);
+        debug_assert!(bits[j as usize] >= 0);
+        debug_assert!(ebits[j as usize] >= 0);
         j += 1;
     }
     *_balance = balance;
     while j < end {
         ebits[j as usize] = bits[j as usize] >> stereo >> BITRES;
-        assert!((C * ebits[j as usize]) << 3 == bits[j as usize]);
+        debug_assert!((C * ebits[j as usize]) << 3 == bits[j as usize]);
         bits[j as usize] = 0;
         fine_priority[j as usize] = (ebits[j as usize] < 1) as i32;
         j += 1;
@@ -657,7 +657,7 @@ pub fn clt_compute_extra_allocation(
     let tot_samples: i32;
 
     if let Some(qm) = qext_mode {
-        assert!(end == m.nbEBands as i32);
+        debug_assert!(end == m.nbEBands as i32);
         tot_bands = end + qext_end;
         tot_samples = (qm.eBands[qext_end as usize] as i32 * C) << LM;
     } else {

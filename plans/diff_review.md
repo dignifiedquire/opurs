@@ -26,10 +26,10 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 6. Documentation/version/metadata drift
-IDs: `95,134,222,225,226`
+IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,141,142,144,145,146,148,149,153,170,171,172`
 
 ## Findings
 
@@ -389,10 +389,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/src/extensions.c:134-153`
 - Detail: `OpusExtensionIterator` exposes `reset()` and `set_frame_max()` alongside `new()/next()/find()`.
 
-101. [MEDIUM][Platform/State Layout] `align()` helper is hardcoded to 8-byte alignment instead of upstream computed union alignment.
-- Rust: `src/opus/opus_private.rs:11-16`
+101. [RESOLVED][Platform/State Layout] `align()` now uses computed union alignment semantics.
+- Rust: `src/opus/opus_private.rs`
 - Upstream: `libopus-sys/opus/src/opus_private.h:213-223`
-- Detail: Upstream computes alignment from `offsetof(struct foo, u)` (platform-dependent). Rust hardcodes `alignment = 8`, which can diverge on targets where required alignment differs.
+- Detail: Rust now computes alignment from a C-repr union equivalent (`i32/i64/f32/pointer`) via `align_of`, matching upstream platform-dependent alignment intent instead of hardcoding 8.
 
 102. [MEDIUM][Constants/CTL Coverage] New upstream 1.6.1 request IDs are missing from Rust `opus_defines`.
 - Rust: `src/opus/opus_defines.rs:55-57` (stops at `OPUS_SET_DNN_BLOB_REQUEST`)
@@ -544,10 +544,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
 - Detail: Project README now states bit-exactness with libopus 1.6.1.
 
-134. [LOW][Version Targeting][Comments] Source-level implementation comments still reference previous baseline in active modules.
-- Rust: `src/dnn/simd/x86.rs:6`, `src/dnn/simd/aarch64.rs:6`, `src/opus/mlp/tansig.rs:5`
+134. [RESOLVED][Version Targeting][Comments] Source-level implementation comments target 1.6.1 baseline.
+- Rust: `src/dnn/simd/x86.rs`, `src/dnn/simd/aarch64.rs`, `src/opus/mlp/tansig.rs`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
-- Detail: Several in-code provenance comments still pin behavior/ports to previous baseline, which can mislead future parity verification against 1.6.1 when reviewing these function paths.
+- Detail: Updated/re-audited provenance comments to reference the current 1.6.1 baseline in active modules.
 
 135. [RESOLVED][Runtime Semantics][DRED] DRED loaded-state checks now follow upstream assert-gated behavior.
 - Rust: `src/dnn/dred/encoder.rs`, `src/dnn/dred/decoder.rs`
@@ -574,10 +574,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:388`
 - Detail: Converted unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
-140. [LOW][Runtime Semantics][CELT Entropy/Rate/VQ] Internal invariant checks are unconditional in Rust.
-- Rust: `src/celt/entenc.rs:215`, `src/celt/entenc.rs:238`, `src/celt/entenc.rs:262`, `src/celt/entenc.rs:280`, `src/celt/entdec.rs:204`, `src/celt/laplace.rs:67-68`, `src/celt/laplace.rs:106-109`, `src/celt/cwrs.rs:298`, `src/celt/cwrs.rs:319`, `src/celt/cwrs.rs:331-332`, `src/celt/rate.rs:229`, `src/celt/rate.rs:286`, `src/celt/rate.rs:333-334`, `src/celt/rate.rs:340`, `src/celt/rate.rs:660`, `src/celt/vq.rs:509-510`, `src/celt/vq.rs:592-593`
-- Upstream: `libopus-sys/opus/celt/entenc.c:191`, `libopus-sys/opus/celt/entenc.c:209`, `libopus-sys/opus/celt/entenc.c:228`, `libopus-sys/opus/celt/entenc.c:249`, `libopus-sys/opus/celt/entdec.c:224`, `libopus-sys/opus/celt/laplace.c:88-89`, `libopus-sys/opus/celt/laplace.c:128-131`, `libopus-sys/opus/celt/cwrs.c:448`, `libopus-sys/opus/celt/cwrs.c:463`, `libopus-sys/opus/celt/cwrs.c:473-474`, `libopus-sys/opus/celt/rate.c:394`, `libopus-sys/opus/celt/rate.c:445`, `libopus-sys/opus/celt/rate.c:516-517`, `libopus-sys/opus/celt/rate.c:527`, `libopus-sys/opus/celt/rate.c:750`, `libopus-sys/opus/celt/vq.c:46`, `libopus-sys/opus/celt/vq.c:53`
-- Detail: Upstream marks these checks as `celt_assert(...)` internal invariants (typically assertion-gated). Rust uses unconditional `assert!`, changing failure behavior to hard runtime aborts when invariants are violated.
+140. [RESOLVED][Runtime Semantics][CELT Entropy/Rate/VQ] Internal invariant checks now follow assert-gated semantics.
+- Rust: `src/celt/entenc.rs`, `src/celt/entdec.rs`, `src/celt/laplace.rs`, `src/celt/cwrs.rs`, `src/celt/rate.rs`, `src/celt/vq.rs`
+- Upstream: `libopus-sys/opus/celt/entenc.c`, `libopus-sys/opus/celt/entdec.c`, `libopus-sys/opus/celt/laplace.c`, `libopus-sys/opus/celt/cwrs.c`, `libopus-sys/opus/celt/rate.c`, `libopus-sys/opus/celt/vq.c`
+- Detail: Converted these internal invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
 141. [LOW][Runtime Semantics][CELT LPC/Pitch/Bands] Additional internal invariants are unconditional in Rust.
 - Rust: `src/celt/celt_lpc.rs:18`, `src/celt/celt_lpc.rs:103`, `src/celt/celt_lpc.rs:175-176`, `src/celt/pitch.rs:327`, `src/celt/pitch.rs:349-350`, `src/celt/bands.rs:265`, `src/celt/bands.rs:441`, `src/celt/bands.rs:505-506`, `src/celt/bands.rs:531`, `src/celt/bands.rs:626`, `src/celt/bands.rs:803`, `src/celt/bands.rs:1314`, `src/celt/bands.rs:1959`
@@ -589,10 +589,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/silk/control_codec.c:241-242`, `libopus-sys/opus/silk/control_codec.c:302`, `libopus-sys/opus/silk/control_codec.c:315`, `libopus-sys/opus/silk/control_codec.c:393-398`, `libopus-sys/opus/silk/decode_frame.c:68`, `libopus-sys/opus/silk/decode_frame.c:104`, `libopus-sys/opus/silk/decode_frame.c:127`, `libopus-sys/opus/silk/decode_frame.c:145`, `libopus-sys/opus/silk/NSQ.c:402`, `libopus-sys/opus/silk/NSQ_del_dec.c:686`, `libopus-sys/opus/silk/float/pitch_analysis_core_FLP.c:118-119`, `libopus-sys/opus/silk/float/pitch_analysis_core_FLP.c:532`, `libopus-sys/opus/silk/float/find_pred_coefs_FLP.c:55`
 - Detail: Upstream uses `celt_assert`/`silk_assert` for many of these invariants. Rust promotes them to unconditional `assert!`, which can hard-abort runtime encode/decode flows in non-assert configurations where upstream would usually not.
 
-143. [LOW][Runtime Semantics][OSCE/Freq/SILK-FLP] Additional assert-gated upstream checks are unconditional in Rust.
-- Rust: `src/dnn/osce.rs:1753`, `src/dnn/osce.rs:1860`, `src/dnn/freq.rs:307-308`, `src/silk/float/LPC_analysis_filter_FLP.rs:110`, `src/silk/float/LPC_analysis_filter_FLP.rs:128`
-- Upstream: `libopus-sys/opus/dnn/osce_features.c:363`, `libopus-sys/opus/dnn/osce_features.c:548`, `libopus-sys/opus/silk/float/LPC_analysis_filter_FLP.c:218`, `libopus-sys/opus/silk/float/LPC_analysis_filter_FLP.c:242`
-- Detail: Upstream uses `celt_assert(...)` for these invariant/default branches. Rust uses unconditional `assert!` and `panic!(\"libopus: assert(0) called\")`, so invalid/precondition-breaking inputs can hard-abort where upstream non-assert builds would typically not.
+143. [RESOLVED][Runtime Semantics][OSCE/Freq/SILK-FLP] OSCE/Freq invariant checks now follow assert-gated semantics.
+- Rust: `src/dnn/osce.rs`, `src/dnn/freq.rs`
+- Upstream: `libopus-sys/opus/dnn/osce_features.c`, `libopus-sys/opus/dnn/freq.c`
+- Detail: Converted the tracked OSCE/Freq invariant checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`, matching upstream release-mode assertion gating.
 
 144. [LOW][Runtime Semantics][CELT FFT] KISS FFT precondition checks are unconditional in Rust.
 - Rust: `src/celt/kiss_fft.rs:29-30`, `src/celt/kiss_fft.rs:69`, `src/celt/kiss_fft.rs:212`, `src/celt/kiss_fft.rs:247-248`

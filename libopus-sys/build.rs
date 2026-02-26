@@ -522,6 +522,7 @@ fn build_opus() {
             opus_source_path.join(mk_file).display()
         );
     }
+    println!("cargo:rerun-if-env-changed=OSCE_DUMP_DEBUG");
 }
 
 fn main() {

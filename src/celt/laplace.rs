@@ -64,8 +64,8 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
             fs = fs.wrapping_add(LAPLACE_MINP as u32);
             fl = fl.wrapping_add(fs & !s as u32);
         }
-        assert!(fl.wrapping_add(fs) <= 32768);
-        assert!(fs > 0);
+        debug_assert!(fl.wrapping_add(fs) <= 32768);
+        debug_assert!(fs > 0);
     }
     ec_encode_bin(enc, fl, fl.wrapping_add(fs), 15);
 }
@@ -103,10 +103,10 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
             fl = fl.wrapping_add(fs);
         }
     }
-    assert!(fl < 32768);
-    assert!(fs > 0);
-    assert!(fl <= fm);
-    assert!(fm < fl.wrapping_add(fs).min(32768));
+    debug_assert!(fl < 32768);
+    debug_assert!(fs > 0);
+    debug_assert!(fl <= fm);
+    debug_assert!(fm < fl.wrapping_add(fs).min(32768));
     ec_dec_update(
         dec,
         fl,
