@@ -25,6 +25,13 @@ Align runtime error semantics with upstream by replacing panic/assert-only behav
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed additional runtime/assert-gate parity gaps across analysis, resampler, and DRED init paths:
+  - `src/opus/analysis.rs`: added upstream-equivalent `Fs` assertion gate in `downmix_and_resample()` and unit tests for valid 24 kHz behavior plus unsupported-rate debug assertion.
+  - `src/silk/resampler/mod.rs`: removed remaining invalid-rate panic path in `rate_id()` by returning `Option` and mapping unsupported tuples to `SILK_RESAMPLER_INVALID` (`-1`) with debug-assert gating; added debug/release tests for invalid encoder/decoder tuples.
+  - `src/dnn/dred/encoder.rs`: switched loaded-state preconditions in DRED hot paths from unconditional `assert!` to debug assertions to match upstream `celt_assert` gating.
+  - `src/dnn/dred/encoder.rs`: `DREDEnc::init` now mirrors upstream built-in model auto-load behavior when `builtin-weights` is enabled.
+  - `src/opus/opus_encoder.rs`: `OpusEncoder::new` now explicitly invokes `dred_encoder.init(Fs, channels)` (upstream parity with `dred_encoder_init` call in encoder init); added unit tests for Fs/channels propagation and built-in auto-load path.
+  - `src/dnn/dred/encoder.rs`: added qext-gated unit test locking 96 kHz `dred_convert_to_16k` behavior.
 - 2026-02-25: Closed additional repacketizer/SILK runtime parity gaps:
   - `src/opus/repacketizer.rs`: added explicit `len/new_len <= data.len()` checks in `opus_packet_pad_impl` to return `OPUS_BAD_ARG` instead of panicking on slice bounds.
   - `tests/extensions_repacketizer_parity.rs`: added negative tests for oversize `len` and `new_len` in `opus_packet_pad_impl`.

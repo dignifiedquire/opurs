@@ -115,6 +115,14 @@ impl DREDEnc {
         self.fs = fs;
         self.channels = channels;
         self.loaded = false;
+        #[cfg(feature = "builtin-weights")]
+        {
+            let arrays = super::rdovae_enc_data::rdovaeenc_arrays();
+            if let Some(model) = init_rdovaeenc(&arrays) {
+                self.model = model;
+                self.loaded = true;
+            }
+        }
         self.reset();
     }
 }
@@ -331,7 +339,7 @@ fn dred_convert_to_16k(
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_process_frame
 fn dred_process_frame(enc: &mut DREDEnc, arch: Arch) {
-    assert!(enc.loaded);
+    debug_assert!(enc.loaded, "libopus: assert(enc->loaded) called");
     let mut feature_buffer = vec![0.0f32; 2 * 36];
     let mut input_buffer = vec![0.0f32; 2 * DRED_NUM_FEATURES];
 
@@ -384,7 +392,7 @@ pub fn dred_compute_latents(
     extra_delay: usize,
     arch: Arch,
 ) {
-    assert!(enc.loaded);
+    debug_assert!(enc.loaded, "libopus: assert(enc->loaded) called");
     let frame_size16k = frame_size * 16000 / enc.fs as usize;
     let curr_offset16k = 40 + extra_delay * 16000 / enc.fs as usize - enc.input_buffer_fill;
     enc.dred_offset = (curr_offset16k as f32 + 20.0).floor() as i32 / 40;
@@ -596,4 +604,22 @@ pub fn dred_encode_silk_frame(
     ec_enc_shrink(&mut ec_encoder, ec_buffer_fill as u32);
     ec_enc_done(&mut ec_encoder);
     ec_buffer_fill
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "qext")]
+    #[test]
+    fn dred_convert_to_16k_supports_96k_qext() {
+        let in_len = 960usize;
+        let out_len = 160usize;
+        let input = vec![0.125f32; in_len];
+        let mut output = vec![0.0f32; out_len];
+        let mut mem = vec![0.0f32; RESAMPLING_ORDER + 1];
+
+        dred_convert_to_16k(96000, 1, &mut mem, &input, in_len, &mut output, out_len);
+        assert!(output.iter().all(|v| v.is_finite()));
+    }
 }

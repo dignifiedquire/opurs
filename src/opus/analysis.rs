@@ -662,6 +662,10 @@ fn downmix_and_resample(
     if subframe == 0 {
         return 0 as opus_val32;
     }
+    debug_assert!(
+        matches!(Fs, 16000 | 24000 | 48000),
+        "libopus: assert(Fs == 48000 || Fs == 24000 || Fs == 16000) called"
+    );
     if Fs == 48000 {
         subframe *= 2;
         offset *= 2;
@@ -1703,4 +1707,34 @@ pub fn run_analysis(
         analysis.analysis_offset -= frame_size;
     }
     tonality_get_info(analysis, analysis_info, frame_size);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn downmix_and_resample_24k_passthrough_matches_downmix_scale() {
+        let input_pcm = vec![0.25f32; 16];
+        let input = DownmixInput::Float(&input_pcm);
+        let mut y = vec![0.0f32; 8];
+        let mut s = [0.0f32; 3];
+
+        let hp = downmix_and_resample(&input, &mut y, &mut s, 8, 0, 0, -1, 1, 24000);
+        assert_eq!(hp, 0.0);
+        for &v in &y {
+            assert!((v - 8192.0).abs() < 1e-3, "unexpected sample {v}");
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic]
+    fn downmix_and_resample_unsupported_fs_triggers_debug_assert() {
+        let input_pcm = vec![0.25f32; 8];
+        let input = DownmixInput::Float(&input_pcm);
+        let mut y = vec![0.0f32; 4];
+        let mut s = [0.0f32; 3];
+        let _ = downmix_and_resample(&input, &mut y, &mut s, 4, 0, 0, -1, 1, 44100);
+    }
 }

@@ -196,7 +196,7 @@ pub fn dred_ec_decode(
 ///
 /// Upstream C: opus_decoder.c (inline in opus_dred_process)
 pub fn opus_dred_process(dred_dec: &OpusDREDDecoder, dred: &mut OpusDRED) {
-    assert!(dred_dec.loaded);
+    debug_assert!(dred_dec.loaded, "libopus: assert(dec->loaded) called");
     if dred.process_stage != 1 || dred.nb_latents <= 0 {
         return;
     }

@@ -140,10 +140,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/celt/celt_encoder.c:2838`, `libopus-sys/opus/celt/celt_encoder.c:2906`, `libopus-sys/opus/celt/celt_decoder.c:1629`, `libopus-sys/opus/celt/celt_decoder.c:1690`
 - Detail: Upstream provides stable C-style entry points for custom CELT encode/decode variants. Rust currently exposes struct-centric APIs instead of matching these direct function symbols.
 
-47. [LOW][Analysis] `downmix_and_resample` lacks upstream unsupported-Fs assertion path.
-- Rust: `src/opus/analysis.rs:642-672`
+47. [RESOLVED][Runtime Semantics][Analysis] `downmix_and_resample` now mirrors upstream unsupported-Fs assertion behavior.
+- Rust: `src/opus/analysis.rs`, `src/opus/analysis.rs` (unit tests)
 - Upstream: `libopus-sys/opus/src/analysis.c:181`
-- Detail: Upstream asserts `Fs` must be one of `{16000,24000,48000}` in this helper. Rust has no equivalent assertion branch, so unsupported `Fs` values fall through without upstream-equivalent failure behavior.
+- Detail: Added upstream-equivalent debug assertion (`Fs` in `{16000,24000,48000}`) and tests for valid 24 kHz behavior plus debug-assert failure on unsupported `Fs`.
 
 48. [LOW] Missing direct top-level create/get_size/destroy C entry points for encoder/decoder.
 - Rust: `src/opus/opus_encoder.rs` (`OpusEncoder::new`), `src/opus/opus_decoder.rs` (`OpusDecoder::new`)
@@ -551,10 +551,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
 - Detail: Several in-code provenance comments still pin behavior/ports to previous baseline, which can mislead future parity verification against 1.6.1 when reviewing these function paths.
 
-135. [LOW][Runtime Semantics][DRED] DRED encoder loaded-state checks are unconditional panics in Rust.
-- Rust: `src/dnn/dred/encoder.rs:290`, `src/dnn/dred/encoder.rs:334`
-- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:95`, `libopus-sys/opus/dnn/dred_encoder.c:215`
-- Detail: Upstream guards these paths with `celt_assert(enc->loaded)` (assert-gated behavior). Rust uses unconditional `assert!(enc.loaded)`, which can abort at runtime in builds where upstream would typically compile assertions out.
+135. [RESOLVED][Runtime Semantics][DRED] DRED loaded-state checks now follow upstream assert-gated behavior.
+- Rust: `src/dnn/dred/encoder.rs`, `src/dnn/dred/decoder.rs`
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:95`, `libopus-sys/opus/dnn/dred_encoder.c:215`, `libopus-sys/opus/src/opus_decoder.c` (`opus_dred_process` assert-gated expectation)
+- Detail: Converted unconditional `assert!` preconditions to `debug_assert!` for DRED encoder/decoder loaded-state checks, matching upstream `celt_assert` gating in non-assert builds.
 
 136. [LOW][Runtime Semantics][DNN] LPCNet/FARGAN state precondition checks are unconditional assertions in Rust.
 - Rust: `src/dnn/lpcnet.rs:623`, `src/dnn/lpcnet.rs:726`, `src/dnn/fargan.rs:441`, `src/dnn/fargan.rs:671`
@@ -701,20 +701,20 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/silk/resampler_private_down_FIR.c:138-141`
 - Detail: Replaced `unreachable!()` with `debug_assert!(false, ...)` and return of the remaining output slice, matching upstream `celt_assert(0)` + return semantics.
 
-166. [HIGH][QEXT][SILK Resampler] `silk_resampler_init` lacks upstream 96 kHz delay-table/rate-index coverage.
-- Rust: `src/silk/resampler/mod.rs:53-67`, `src/silk/resampler/mod.rs:70-78`, `src/silk/resampler/mod.rs:121-143`
+166. [RESOLVED][QEXT][SILK Resampler] `silk_resampler_init` now includes upstream 96 kHz delay-table/rate-index coverage.
+- Rust: `src/silk/resampler/mod.rs` (+ qext unit coverage)
 - Upstream: `libopus-sys/opus/silk/resampler.c:53-68`, `libopus-sys/opus/silk/resampler.c:70-72`, `libopus-sys/opus/silk/resampler.c:92-114`
-- Detail: Upstream includes QEXT-aware 96 kHz support in `delay_matrix_enc`/`delay_matrix_dec` and `rateID()` mapping (with `ENABLE_QEXT` validation arms). Rust tables/indexing only cover up to 48 kHz, so QEXT 96 kHz init paths cannot be represented and fall into panic paths.
+- Detail: Added 96 kHz QEXT rate-ID/table support and validated with qext-gated resampler init tests.
 
-167. [MEDIUM][API Semantics][SILK Resampler] `silk_resampler_init` return surface is non-equivalent to upstream status-return API.
-- Rust: `src/silk/resampler/mod.rs:120` (returns `ResamplerState` directly)
+167. [RESOLVED][API Semantics][SILK Resampler] `silk_resampler_init` now mirrors upstream status-return semantics.
+- Rust: `src/silk/resampler/mod.rs`, `src/silk/control_codec.rs`, `src/silk/decoder_set_fs.rs`
 - Upstream: `libopus-sys/opus/silk/resampler.c:79-84`, `libopus-sys/opus/silk/resampler.c:99-101`, `libopus-sys/opus/silk/resampler.c:110-112`, `libopus-sys/opus/silk/resampler.c:178`
-- Detail: Upstream `silk_resampler_init(...)` returns `opus_int` and uses `-1` failure status on invalid tuples/ratios. Rust always returns a state object and uses panic paths for invalid inputs, removing upstream error-code semantics from this API boundary.
+- Detail: Rust now uses in-place init + status return (`0`/`-1`) and propagates errors at call-sites instead of panic-based failure flow.
 
-168. [LOW][Runtime Semantics][SILK Resampler] Unsupported downsampling ratio handling is panic-based rather than assert+status.
-- Rust: `src/silk/resampler/mod.rs:207-209`
+168. [RESOLVED][Runtime Semantics][SILK Resampler] Unsupported downsampling ratio handling now matches upstream assert+status flow.
+- Rust: `src/silk/resampler/mod.rs`
 - Upstream: `libopus-sys/opus/silk/resampler.c:161-165`
-- Detail: Upstream handles unreachable ratio combinations with `celt_assert(0)` and `return -1`. Rust uses `unreachable!(...)`, which unconditionally panics instead of preserving upstream status-return flow.
+- Detail: Replaced panic/unreachable paths with debug-assert + `SILK_RESAMPLER_INVALID` status returns, with debug/release unit coverage.
 
 169. [LOW][Validation Semantics][SILK] `silk_A2NLSF` omits upstream non-negative root assertion.
 - Rust: `src/silk/A2NLSF.rs:147-149` (root assignment without explicit non-negative assert)
@@ -746,15 +746,15 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/silk/init_decoder.c:61-64`, `libopus-sys/opus/dnn/osce.h:59-67`
 - Detail: Added `OSCE_DEFAULT_METHOD` constant and switched `silk_reset_decoder` to call `osce_reset(..., OSCE_DEFAULT_METHOD)` instead of `OSCE_METHOD_NONE`.
 
-175. [HIGH][QEXT][DRED] DRED 16 kHz conversion helper omits upstream 96 kHz handling.
-- Rust: `src/dnn/dred/encoder.rs:154-161`
+175. [RESOLVED][QEXT][DRED] DRED 16 kHz conversion now mirrors upstream 96 kHz support.
+- Rust: `src/dnn/dred/encoder.rs` (including `dred_convert_to_16k_supports_96k_qext` unit test)
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.c:143-163`
-- Detail: Upstream includes `case 96000: up = 1` under `ENABLE_QEXT` in `dred_convert_to_16k`. Rust switch has no `96000` arm and falls into panic on that rate, so QEXT-enabled 96 kHz DRED conversion is not mirrored.
+- Detail: 96 kHz QEXT conversion arm is present and now covered by dedicated unit test to lock non-panic behavior.
 
-176. [MEDIUM][Initialization Semantics][DRED] `dred_encoder_init` does not mirror upstream built-in model auto-load behavior.
-- Rust: `src/dnn/dred/encoder.rs:110-115`
-- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:79-87`
-- Detail: Upstream `dred_encoder_init` sets `loaded=1` when built-in RDOVAE weights are compiled (`!USE_WEIGHTS_FILE`) before reset. Rust `DREDEnc::init` unconditionally sets `loaded=false` and resets without an equivalent built-in auto-load path at this API boundary.
+176. [RESOLVED][Initialization Semantics][DRED] `dred_encoder_init` now mirrors upstream built-in model auto-load behavior.
+- Rust: `src/dnn/dred/encoder.rs`, `src/opus/opus_encoder.rs`, `src/opus/opus_encoder.rs` (unit tests)
+- Upstream: `libopus-sys/opus/dnn/dred_encoder.c:79-87`, `libopus-sys/opus/src/opus_encoder.c:288-290`
+- Detail: `DREDEnc::init` now auto-loads built-in RDOVAE weights when available, and `OpusEncoder::new` now invokes DRED init like upstream encoder initialization.
 
 177. [EXCLUDED][API Coverage][DRED] Encoder deinitialization helper is excluded from functional-equivalence scope.
 - Rust: `src/dnn/dred/encoder.rs`

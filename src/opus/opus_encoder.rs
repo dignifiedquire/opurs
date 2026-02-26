@@ -207,7 +207,8 @@ impl OpusEncoder {
         tonality_analysis_init(&mut analysis, Fs);
         analysis.application = application;
 
-        Ok(OpusEncoder {
+        #[allow(unused_mut)]
+        let mut st = OpusEncoder {
             silk_enc,
             celt_enc,
             silk_mode,
@@ -293,7 +294,10 @@ impl OpusEncoder {
             activity_mem: [0u8; DRED_MAX_FRAMES * 4],
             #[cfg(feature = "qext")]
             enable_qext: 0,
-        })
+        };
+        #[cfg(feature = "dred")]
+        st.dred_encoder.init(Fs, channels);
+        Ok(st)
     }
 
     /// Encode an audio frame from interleaved `i16` PCM samples.
@@ -3481,5 +3485,20 @@ mod tests {
             enc_restricted.set_application(Application::Audio),
             Err(OPUS_BAD_ARG)
         );
+    }
+
+    #[cfg(feature = "dred")]
+    #[test]
+    fn dred_encoder_init_tracks_encoder_rate_and_channels() {
+        let enc = OpusEncoder::new(24000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        assert_eq!(enc.dred_encoder.fs, 24000);
+        assert_eq!(enc.dred_encoder.channels, 2);
+    }
+
+    #[cfg(all(feature = "dred", feature = "builtin-weights"))]
+    #[test]
+    fn dred_encoder_init_auto_loads_builtin_model() {
+        let enc = OpusEncoder::new(48000, 1, OPUS_APPLICATION_AUDIO).unwrap();
+        assert!(enc.dred_encoder.loaded);
     }
 }

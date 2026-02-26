@@ -90,9 +90,9 @@ static delay_matrix_dec: [[i8; 5]; 3] = [
     /* 16 */   [  0,  3, 12,  7,  7 ],
 ];
 
-/* Simple way to make [8000, 12000, 16000, 24000, 48000] to [0, 1, 2, 3, 4] */
-fn rate_id(r: i32) -> usize {
-    match r {
+/* Simple way to make [8000, 12000, 16000, 24000, 48000, (96000)] into table IDs. */
+fn rate_id(r: i32) -> Option<usize> {
+    Some(match r {
         8000 => 0,
         12000 => 1,
         16000 => 2,
@@ -100,8 +100,8 @@ fn rate_id(r: i32) -> usize {
         48000 => 4,
         #[cfg(feature = "qext")]
         96000 => 5,
-        _ => unreachable!("unsupported sampling rate"),
-    }
+        _ => return None,
+    })
 }
 
 pub(crate) const SILK_RESAMPLER_MAX_FIR_ORDER: usize = 36;
@@ -161,8 +161,21 @@ pub fn silk_resampler_init(
             debug_assert!(false, "libopus: assert(0) called");
             return SILK_RESAMPLER_INVALID;
         }
-
-        delay_matrix_enc[rate_id(Fs_Hz_in)][rate_id(Fs_Hz_out)] as i32
+        let in_id = match rate_id(Fs_Hz_in) {
+            Some(v) => v,
+            None => {
+                debug_assert!(false, "libopus: assert(0) called");
+                return SILK_RESAMPLER_INVALID;
+            }
+        };
+        let out_id = match rate_id(Fs_Hz_out) {
+            Some(v) => v,
+            None => {
+                debug_assert!(false, "libopus: assert(0) called");
+                return SILK_RESAMPLER_INVALID;
+            }
+        };
+        delay_matrix_enc[in_id][out_id] as i32
     } else {
         #[cfg(feature = "qext")]
         let output_valid = matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
@@ -172,8 +185,21 @@ pub fn silk_resampler_init(
             debug_assert!(false, "libopus: assert(0) called");
             return SILK_RESAMPLER_INVALID;
         }
-
-        delay_matrix_dec[rate_id(Fs_Hz_in)][rate_id(Fs_Hz_out)] as i32
+        let in_id = match rate_id(Fs_Hz_in) {
+            Some(v) => v,
+            None => {
+                debug_assert!(false, "libopus: assert(0) called");
+                return SILK_RESAMPLER_INVALID;
+            }
+        };
+        let out_id = match rate_id(Fs_Hz_out) {
+            Some(v) => v,
+            None => {
+                debug_assert!(false, "libopus: assert(0) called");
+                return SILK_RESAMPLER_INVALID;
+            }
+        };
+        delay_matrix_dec[in_id][out_id] as i32
     };
 
     let Fs_in_kHz = Fs_Hz_in / 1000;
@@ -349,5 +375,37 @@ mod tests {
         assert_eq!(silk_resampler_init(&mut state, 16000, 96000, 0), 0);
         assert_eq!(state.params.fs_out_khz, 96);
         assert_eq!(state.params.input_delay, 7);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "libopus: assert(0) called")]
+    fn invalid_encoder_rates_debug_assert() {
+        let mut state = ResamplerState::default();
+        let _ = silk_resampler_init(&mut state, 11025, 16000, 1);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "libopus: assert(0) called")]
+    fn invalid_decoder_rates_debug_assert() {
+        let mut state = ResamplerState::default();
+        let _ = silk_resampler_init(&mut state, 48000, 16000, 0);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn invalid_encoder_rates_return_error() {
+        let mut state = ResamplerState::default();
+        assert_eq!(silk_resampler_init(&mut state, 11025, 16000, 1), -1);
+        assert_eq!(silk_resampler_init(&mut state, 48000, 24000, 1), -1);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn invalid_decoder_rates_return_error() {
+        let mut state = ResamplerState::default();
+        assert_eq!(silk_resampler_init(&mut state, 48000, 16000, 0), -1);
+        assert_eq!(silk_resampler_init(&mut state, 16000, 44100, 0), -1);
     }
 }
