@@ -24,7 +24,7 @@ pub mod aarch64;
 /// the standalone `xcorr_kernel` (called from celt_lpc). The NEON version does
 /// NOT accumulate into `sum` (starts from zero), while the scalar version does.
 /// To match C behavior, we use scalar on aarch64 for this function.
-#[inline]
+#[inline(always)]
 pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, arch: Arch) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
@@ -37,7 +37,7 @@ pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, arch: 
 
 /// SIMD-accelerated inner product.
 /// Dispatches to SSE on x86 or NEON on aarch64, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
@@ -55,7 +55,7 @@ pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, arch: Arch) -> f32 {
 
 /// SIMD-accelerated dual inner product.
 /// Dispatches to SSE on x86 or NEON on aarch64, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, arch: Arch) -> (f32, f32) {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
@@ -76,7 +76,7 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, arch: Arch
 ///
 /// Upstream x86 RTCD maps `celt_pitch_xcorr` to scalar for non-AVX2 arches,
 /// unlike other pitch helpers that use SSE. Keep this behavior for parity.
-#[inline]
+#[inline(always)]
 pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
@@ -97,7 +97,7 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, arc
 
 /// SIMD-accelerated constant-coefficient comb filter.
 /// Dispatches to SSE on x86, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn comb_filter_const(
     y: &mut [f32],
     y_start: usize,
@@ -123,7 +123,7 @@ pub fn comb_filter_const(
 /// Dispatches to SSE2 on x86, with scalar fallback.
 /// The SSE2 version handles any N by zero-padding arrays to N+3 elements,
 /// matching C which always uses SSE2 at arch >= 2 regardless of alignment.
-#[inline]
+#[inline(always)]
 pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse2() {

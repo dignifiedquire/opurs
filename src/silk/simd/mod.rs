@@ -22,7 +22,7 @@ pub mod aarch64;
 
 /// SIMD-accelerated short-term prediction for noise shaping quantizer.
 /// Dispatches to NEON on aarch64, SSE4.1 on x86, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn silk_noise_shape_quantizer_short_prediction(
     buf32: &[i32],
     coef16: &[i16],
@@ -110,7 +110,7 @@ pub fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
 
 /// SIMD-accelerated noise shape feedback loop.
 /// Dispatches to NEON on aarch64, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn silk_NSQ_noise_shape_feedback_loop(
     data0: i32,
     data1: &mut [i32],

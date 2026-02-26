@@ -106,6 +106,9 @@ pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> 
 #[inline]
 pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     debug_assert!(len >= 3);
+    // Pre-slice to hoist bounds checks out of the hot loop.
+    let x = &x[..len];
+    let y = &y[..len + 3];
     let mut y_0: f32;
     let mut y_1: f32;
     let mut y_2: f32;
@@ -200,6 +203,8 @@ pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize)
 #[inline]
 pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     let mut xy: f32 = 0.0;
+    let x = &x[..N];
+    let y = &y[..N];
     for i in 0..N {
         xy += x[i] * y[i];
     }
