@@ -171,7 +171,9 @@ pub fn compute_activation(
 
 /// Compute affine transform: out = W*in + bias + diag*in
 ///
-/// Dispatches to float sgemv or int8 cgemv depending on which weights are present.
+/// Dispatches to int8 cgemv or float sgemv depending on which weights are present.
+/// Int8 is preferred when available (matching C runtime behavior where float weights
+/// are compile-time excluded via `#ifdef`).
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_linear_c
 fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
@@ -179,20 +181,7 @@ fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: 
     let n = linear.nb_outputs;
     let mut used_int8_path = false;
 
-    if !linear.float_weights.is_empty() {
-        if !linear.weights_idx.is_empty() {
-            sparse_sgemv8x4(
-                out,
-                &linear.float_weights,
-                &linear.weights_idx,
-                n,
-                input,
-                arch,
-            );
-        } else {
-            sgemv(out, &linear.float_weights, n, m, n, input, arch);
-        }
-    } else if !linear.weights.is_empty() {
+    if !linear.weights.is_empty() {
         used_int8_path = true;
         if !linear.weights_idx.is_empty() {
             sparse_cgemv8x4(
@@ -207,6 +196,19 @@ fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: 
             );
         } else {
             cgemv8x4(out, &linear.weights, &linear.scale, n, m, input, arch);
+        }
+    } else if !linear.float_weights.is_empty() {
+        if !linear.weights_idx.is_empty() {
+            sparse_sgemv8x4(
+                out,
+                &linear.float_weights,
+                &linear.weights_idx,
+                n,
+                input,
+                arch,
+            );
+        } else {
+            sgemv(out, &linear.float_weights, n, m, n, input, arch);
         }
     } else {
         for i in 0..n {

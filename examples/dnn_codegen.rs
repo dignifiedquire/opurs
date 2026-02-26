@@ -77,47 +77,8 @@ fn format_byte_array(data: &[u8]) -> String {
     out
 }
 
-/// Filter out float weight arrays that have an int8 sibling.
-///
-/// Upstream C guards float weights with `#ifdef WEIGHTS_<name>_DEFINED` — when a
-/// layer has both `_weights_int8` and `_weights_float`, the C build only exposes
-/// int8. The blob writer (linked from libopus-sys) includes both because all
-/// `#define`s are satisfied at compile time, so we strip the redundant float
-/// arrays here to match C's runtime dispatch behavior: `compute_linear()` prefers
-/// float_weights when present, but C never has them for int8-quantized layers.
-fn filter_redundant_float_weights(arrays: &[WeightArray]) -> Vec<&WeightArray> {
-    use std::collections::HashSet;
-
-    // Collect all layer prefixes that have int8 weights.
-    let int8_prefixes: HashSet<&str> = arrays
-        .iter()
-        .filter_map(|a| a.name.strip_suffix("_weights_int8"))
-        .collect();
-
-    let before = arrays.len();
-    let filtered: Vec<&WeightArray> = arrays
-        .iter()
-        .filter(|a| {
-            // Drop float weights when the same layer has int8 weights.
-            if let Some(prefix) = a.name.strip_suffix("_weights_float") {
-                if int8_prefixes.contains(prefix) {
-                    return false;
-                }
-            }
-            true
-        })
-        .collect();
-
-    let removed = before - filtered.len();
-    if removed > 0 {
-        println!("    stripped {removed} redundant float weight arrays (int8 siblings exist)");
-    }
-    filtered
-}
-
 /// Emit a Rust source file for one model.
 fn emit_rust_file(desc: &ModelDesc, arrays: &[WeightArray], crate_root: &Path) {
-    let arrays = filter_redundant_float_weights(arrays);
     let mut src = String::new();
 
     writeln!(
@@ -135,7 +96,7 @@ fn emit_rust_file(desc: &ModelDesc, arrays: &[WeightArray], crate_root: &Path) {
         "use crate::dnn::nnet::{{WeightArray, {types}}};",
         types = {
             let mut types = Vec::new();
-            for a in &arrays {
+            for a in arrays {
                 let tn = type_name(a.type_id);
                 if !types.contains(&tn) {
                     types.push(tn);
@@ -148,7 +109,7 @@ fn emit_rust_file(desc: &ModelDesc, arrays: &[WeightArray], crate_root: &Path) {
     writeln!(src).unwrap();
 
     // Emit each weight array as a static byte slice.
-    for array in &arrays {
+    for array in arrays {
         let const_name = array.name.to_uppercase();
         writeln!(
             src,
@@ -167,7 +128,7 @@ fn emit_rust_file(desc: &ModelDesc, arrays: &[WeightArray], crate_root: &Path) {
         fn_name = desc.fn_name,
     )
     .unwrap();
-    for array in &arrays {
+    for array in arrays {
         let const_name = array.name.to_uppercase();
         writeln!(
             src,
