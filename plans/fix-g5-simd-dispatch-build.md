@@ -4,8 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-Open: `194,202,203,213,233,234`
-Closed in this group: `107,204,205,212,230,231,232,235,237`
+Open: `194,202,203,233`
+Closed in this group: `107,204,205,212,213,230,231,232,234,235,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.
@@ -44,3 +44,8 @@ Closed in this group: `107,204,205,212,230,231,232,235,237`
   - `src/dnn/simd/x86.rs`: new `sgemv_sse2` and `sparse_sgemv8x4_sse2` implementations.
   - `src/dnn/simd/mod.rs`: `sgemv` and `sparse_sgemv8x4` now dispatch to SSE2 on non-AVX2 x86 tiers.
   - Added x86 unit tests in `src/dnn/simd/x86.rs` comparing SSE2 kernels vs scalar references (compiled on all targets; executed on x86 hosts).
+- 2026-02-26: Closed remaining DNN x86 activation-tier dispatch gaps:
+  - `src/dnn/simd/x86.rs`: added explicit SSE4.1 and SSE2 `lpcnet_exp`/`softmax` paths matching upstream non-AVX `vec_avx.h` behavior (including SSE4.1 floor semantics).
+  - `src/dnn/simd/mod.rs`: `lpcnet_exp` and `softmax` now dispatch AVX2 -> SSE4.1 -> SSE2 -> scalar on x86.
+  - `tests/osce_nndsp.rs` + `libopus-sys/src/osce_test_harness.c`: added forced-tier C-vs-Rust regression `test_compute_activation_exp_arch_tiers_match_c` to lock scalar/SSE/SSE2/SSE4.1/AVX2 arch-table parity.
+  - This closes dispatch findings `213` and `234`.

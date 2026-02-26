@@ -282,6 +282,12 @@ pub fn lpcnet_exp(x: f32, _arch: Arch) -> f32 {
         if _arch.has_avx2() {
             return unsafe { x86::lpcnet_exp_avx2(x) };
         }
+        if _arch.has_sse4_1() {
+            return unsafe { x86::lpcnet_exp_sse4_1(x) };
+        }
+        if _arch.has_sse2() {
+            return unsafe { x86::lpcnet_exp_sse2(x) };
+        }
     }
 
     #[allow(unreachable_code)]
@@ -400,6 +406,18 @@ pub fn softmax(y: &mut [f32], x: &[f32], _arch: Arch) {
         if _arch.has_avx2() {
             unsafe {
                 x86::softmax_avx2(y, x);
+            }
+            return;
+        }
+        if _arch.has_sse4_1() {
+            unsafe {
+                x86::softmax_sse4_1(y, x);
+            }
+            return;
+        }
+        if _arch.has_sse2() {
+            unsafe {
+                x86::softmax_sse2(y, x);
             }
             return;
         }

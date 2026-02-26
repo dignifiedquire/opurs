@@ -13,6 +13,7 @@ use opurs::dnn::weights::compiled_weights;
 unsafe extern "C" {
     fn osce_test_compute_conv2d_3x3(out: *mut f32, seed: u32) -> i32;
     fn osce_test_compute_linear_int8_arch(out: *mut f32, seed: u32, arch: i32) -> i32;
+    fn osce_test_compute_activation_exp_arch(out: *mut f32, seed: u32, arch: i32) -> i32;
 }
 
 /// Same xorshift32 PRNG as the C test harness.
@@ -631,6 +632,55 @@ fn test_compute_linear_int8_arch_tiers_match_c() {
         compute_linear(layer, &mut rust_out, &input, arch);
 
         let label = format!("compute_linear_int8_arch_tier_{name}");
+        compare_outputs(&label, &rust_out, &c_out);
+    }
+}
+
+/// Verify compute_activation EXP path respects forced arch tiers like upstream RTCD.
+#[test]
+fn test_compute_activation_exp_arch_tiers_match_c() {
+    use opurs::arch::Arch;
+    use opurs::dnn::nnet::{compute_activation, ACTIVATION_EXP};
+
+    let n = 23usize;
+    let mut prng = Prng::new(SEED);
+    let input: Vec<f32> = (0..n).map(|_| prng.next_float() * 8.0).collect();
+
+    let tiers: Vec<(Arch, i32, &'static str)> = {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            vec![
+                (Arch::Scalar, 0, "scalar"),
+                (Arch::Sse, 1, "sse"),
+                (Arch::Sse2, 2, "sse2"),
+                (Arch::Sse4_1, 3, "sse4_1"),
+                (Arch::Avx2, 4, "avx2"),
+            ]
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            vec![
+                (Arch::Scalar, 0, "scalar"),
+                (Arch::Neon, 3, "neon"),
+                (Arch::DotProd, 4, "dotprod"),
+            ]
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            vec![(Arch::Scalar, 0, "scalar")]
+        }
+    };
+
+    for (arch, c_arch, name) in tiers {
+        let mut c_out = vec![0.0f32; n];
+        let c_n = unsafe { osce_test_compute_activation_exp_arch(c_out.as_mut_ptr(), SEED, c_arch) }
+            as usize;
+        assert_eq!(c_n, n);
+
+        let mut rust_out = vec![0.0f32; n];
+        compute_activation(&mut rust_out, &input, n, ACTIVATION_EXP, arch);
+
+        let label = format!("compute_activation_exp_arch_tier_{name}");
         compare_outputs(&label, &rust_out, &c_out);
     }
 }

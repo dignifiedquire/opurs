@@ -20,10 +20,10 @@ IDs: `none (resolved)`
 IDs: `12,43,45,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,179,180,191,192,193,194,235`
+IDs: `12,45,76,179,180,191,192,193,194`
 
 5. SIMD/arch-dispatch/build-flag parity
-IDs: `194,202,203,204,205,212,213,230,233,234,235`
+IDs: `194,202,203,233`
 
 6. Documentation/version/metadata drift
 IDs: `95,134,222,225,226`
@@ -937,10 +937,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/nnet.h:89-94`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c`
 - Detail: Rust DNN compute entry points carry `arch`, dispatch uses this parameter, and tiered C-vs-Rust regression coverage is present (`test_compute_linear_int8_arch_tiers_match_c`).
 
-213. [MEDIUM][Arch Dispatch Coverage][DNN x86] Rust DNN SIMD dispatch has AVX2-only acceleration on x86, missing upstream SSE2/SSE4.1 tiers.
-- Rust: `src/dnn/simd/mod.rs:19-20`, `src/dnn/simd/mod.rs:44-57`, `src/dnn/simd/mod.rs:71-84`, `src/dnn/simd/mod.rs:98-110`
+213. [RESOLVED][Arch Dispatch Coverage][DNN x86] Rust DNN SIMD dispatch now mirrors upstream SSE2/SSE4.1/AVX2 tiers.
+- Rust: `src/dnn/simd/mod.rs`, `src/dnn/simd/x86.rs`, `tests/osce_nndsp.rs`, `libopus-sys/src/osce_test_harness.c`
 - Upstream: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:46-48`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:59-61`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:75-77`
-- Detail: Upstream RTCD supports SSE2 and SSE4.1 dispatch levels for linear/activation/conv2d before AVX2. Rust x86 DNN dispatch checks only `avx2+fma` and otherwise falls back to scalar, so non-AVX2 x86 behavior/perf tiering is not source-equivalent.
+- Detail: Rust x86 DNN dispatch now covers non-AVX2 tiers for float/int8 GEMV and activation EXP paths, with explicit SSE4.1 vs SSE2 behavior for `lpcnet_exp/softmax`. Forced-tier C-vs-Rust regression coverage now includes activation EXP (`test_compute_activation_exp_arch_tiers_match_c`), in addition to int8 linear and conv2d parity checks.
 
 215. [RESOLVED][Algorithmic Path][DNN Conv2D] `compute_conv2d` now mirrors upstream 3x3 specialized convolution branch.
 - Rust: `src/dnn/nnet.rs`, `tests/osce_nndsp.rs`
@@ -1038,11 +1038,11 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream SIMD override: `libopus-sys/opus/silk/x86/main_sse.h:250-269`, `libopus-sys/opus/silk/x86/VAD_sse4_1.c:45-260`
 - Detail: Upstream x86 can replace the full `silk_VAD_GetSA_Q8` routine with `silk_VAD_GetSA_Q8_sse4_1` via RTCD/presume macros. Rust keeps the scalar `silk_VAD_GetSA_Q8_c` control flow and only swaps in SIMD for the subframe energy accumulation helper, so SIMD coverage and dispatch granularity differ from upstream.
 
-234. [MEDIUM][SIMD Coverage][DNN x86] Rust DNN SIMD runtime dispatch only uses AVX2+FMA tier, while upstream includes SSE2/SSE4.1 RTCD tiers.
-- Rust dispatch: `src/dnn/simd/mod.rs:44-57`, `src/dnn/simd/mod.rs:71-85`, `src/dnn/simd/mod.rs:98-112`, `src/dnn/simd/mod.rs:133-147`, `src/dnn/simd/mod.rs:268-281`, `src/dnn/simd/mod.rs:322-335`
-- Upstream x86 RTCD tables: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:39-49`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:51-62`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:64-78`
-- Upstream x86 dispatch macros: `libopus-sys/opus/dnn/x86/dnn_x86.h:82-114`
-- Detail: On x86 CPUs without AVX2+FMA but with SSE2/SSE4.1, upstream still uses SIMD DNN implementations via RTCD tables. Rust falls back to scalar for those CPUs, reducing SIMD coverage/perf relative to upstream architecture tiers.
+234. [RESOLVED][SIMD Coverage][DNN x86] Rust DNN runtime dispatch no longer AVX2-only and now matches upstream tiering.
+- Rust dispatch: `src/dnn/simd/mod.rs`
+- Rust x86 kernels: `src/dnn/simd/x86.rs`
+- Upstream x86 RTCD tables/macros: `libopus-sys/opus/dnn/x86/x86_dnn_map.c:39-49`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:51-62`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c:64-78`, `libopus-sys/opus/dnn/x86/dnn_x86.h:82-114`
+- Detail: Rust now dispatches x86 DNN kernels across `AVX2 -> SSE4.1 -> SSE2 -> scalar` for the activation EXP path and uses SSE2/SSE4.1-aware behavior across DNN linear paths, removing the prior non-AVX2 scalar fallback gap.
 
 235. [RESOLVED][Arch Dispatch Semantics][DNN] DNN RTCD selection semantics now mirror upstream arch-tier behavior.
 - Rust: `src/dnn/simd/mod.rs`, `src/dnn/vec.rs`, `tests/osce_nndsp.rs`, `libopus-sys/src/osce_test_harness.c`

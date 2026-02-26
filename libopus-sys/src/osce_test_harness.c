@@ -576,6 +576,27 @@ int osce_test_compute_linear_int8_arch(
     return hLACE.lace_fnet_conv2.nb_inputs;
 }
 
+/* Test compute_activation ACTIVATION_EXP with explicit arch tier.
+ * Uses odd length to exercise SIMD tails. */
+int osce_test_compute_activation_exp_arch(
+    float *out,
+    unsigned int seed,
+    int arch
+)
+{
+    const int n = 23;
+    float input[23];
+    int i;
+
+    prng_reset(seed);
+    for (i = 0; i < n; i++) {
+        input[i] = prng_float() * 8.0f;
+    }
+
+    compute_activation(out, input, n, ACTIVATION_EXP, arch);
+    return n;
+}
+
 /* Test compute_generic_gru on LACE fnet GRU layers (int8 weights).
  * Runs 2 GRU steps. out gets 2*LACE_COND_DIM floats (state after each step). */
 int osce_test_gru_lace_fnet(

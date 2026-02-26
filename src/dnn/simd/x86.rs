@@ -130,6 +130,70 @@ unsafe fn sigmoid4_approx_sse2(x: __m128) -> __m128 {
     _mm_max_ps(min_out, _mm_min_ps(max_out, num))
 }
 
+/// SSE2 fast 2^x approximation via IEEE 754 bit manipulation.
+/// Port of non-AVX `vec_avx.h:exp4_approx`.
+#[target_feature(enable = "sse2")]
+unsafe fn exp4_approx_sse2(x: __m128) -> __m128 {
+    let k0 = _mm_set1_ps(0.99992522);
+    let k1 = _mm_set1_ps(0.69583354);
+    let k2 = _mm_set1_ps(0.22606716);
+    let k3 = _mm_set1_ps(0.078024523);
+    let log2_e = _mm_set1_ps(1.44269504);
+    let max_in = _mm_set1_ps(50.0);
+    let min_in = _mm_set1_ps(-50.0);
+    let mask = _mm_set1_epi32(0x7fff_ffffu32 as i32);
+
+    let x = _mm_mul_ps(x, log2_e);
+    let x = _mm_max_ps(min_in, _mm_min_ps(max_in, x));
+
+    // Match vec_avx.h SSE2 fallback floor emulation when SSE4.1 floor is absent:
+    // floor(x) ~= cvtps_epi32(x - 0.5) converted back to float.
+    let half = _mm_set1_ps(0.5);
+    let xf = _mm_cvtepi32_ps(_mm_cvtps_epi32(_mm_sub_ps(x, half)));
+    let i = _mm_cvtps_epi32(xf);
+    let x = _mm_sub_ps(x, xf);
+
+    let y = _mm_add_ps(
+        _mm_mul_ps(
+            _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(k3, x), k2), x), k1),
+            x,
+        ),
+        k0,
+    );
+    let i = _mm_slli_epi32(i, 23);
+    _mm_castsi128_ps(_mm_and_si128(mask, _mm_add_epi32(i, _mm_castps_si128(y))))
+}
+
+/// SSE4.1 fast 2^x approximation via IEEE 754 bit manipulation.
+/// Port of non-AVX `vec_avx.h:exp4_approx` when `_mm_floor_ps` is available.
+#[target_feature(enable = "sse4.1")]
+unsafe fn exp4_approx_sse4_1(x: __m128) -> __m128 {
+    let k0 = _mm_set1_ps(0.99992522);
+    let k1 = _mm_set1_ps(0.69583354);
+    let k2 = _mm_set1_ps(0.22606716);
+    let k3 = _mm_set1_ps(0.078024523);
+    let log2_e = _mm_set1_ps(1.44269504);
+    let max_in = _mm_set1_ps(50.0);
+    let min_in = _mm_set1_ps(-50.0);
+    let mask = _mm_set1_epi32(0x7fff_ffffu32 as i32);
+
+    let x = _mm_mul_ps(x, log2_e);
+    let x = _mm_max_ps(min_in, _mm_min_ps(max_in, x));
+    let xf = _mm_floor_ps(x);
+    let i = _mm_cvtps_epi32(xf);
+    let x = _mm_sub_ps(x, xf);
+
+    let y = _mm_add_ps(
+        _mm_mul_ps(
+            _mm_add_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(k3, x), k2), x), k1),
+            x,
+        ),
+        k0,
+    );
+    let i = _mm_slli_epi32(i, 23);
+    _mm_castsi128_ps(_mm_and_si128(mask, _mm_add_epi32(i, _mm_castps_si128(y))))
+}
+
 // =========================================================================
 // Scalar activation via broadcast-and-extract (matching C vec_avx.h)
 // =========================================================================
@@ -193,6 +257,28 @@ pub unsafe fn lpcnet_exp_avx2(x: f32) -> f32 {
     let xv = _mm256_set1_ps(x);
     let yv = exp8_approx(xv);
     _mm_cvtss_f32(_mm256_castps256_ps128(yv))
+}
+
+/// Scalar exp via SSE2 broadcast. Port of non-AVX `vec_avx.h:lpcnet_exp`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse2")]
+pub unsafe fn lpcnet_exp_sse2(x: f32) -> f32 {
+    let xv = _mm_set1_ps(x);
+    let yv = exp4_approx_sse2(xv);
+    _mm_cvtss_f32(yv)
+}
+
+/// Scalar exp via SSE4.1 broadcast. Port of non-AVX `vec_avx.h:lpcnet_exp`.
+///
+/// # Safety
+/// Requires SSE4.1 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn lpcnet_exp_sse4_1(x: f32) -> f32 {
+    let xv = _mm_set1_ps(x);
+    let yv = exp4_approx_sse4_1(xv);
+    _mm_cvtss_f32(yv)
 }
 
 // =========================================================================
@@ -302,6 +388,46 @@ pub unsafe fn softmax_avx2(y: &mut [f32], x: &[f32]) {
     // Scalar tail: use broadcast-and-extract to match C's vec_avx.h.
     while i < n {
         y[i] = lpcnet_exp_avx2(x[i]);
+        i += 1;
+    }
+}
+
+/// SSE2 batch softmax (unnormalized exp). Port of non-AVX `vec_avx.h:softmax`.
+///
+/// # Safety
+/// Requires SSE2 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse2")]
+pub unsafe fn softmax_sse2(y: &mut [f32], x: &[f32]) {
+    let n = x.len().min(y.len());
+    let mut i = 0;
+    while i + 4 <= n {
+        let xv = _mm_loadu_ps(x.as_ptr().add(i));
+        let yv = exp4_approx_sse2(xv);
+        _mm_storeu_ps(y.as_mut_ptr().add(i), yv);
+        i += 4;
+    }
+    while i < n {
+        y[i] = lpcnet_exp_sse2(x[i]);
+        i += 1;
+    }
+}
+
+/// SSE4.1 batch softmax (unnormalized exp). Port of non-AVX `vec_avx.h:softmax`.
+///
+/// # Safety
+/// Requires SSE4.1 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn softmax_sse4_1(y: &mut [f32], x: &[f32]) {
+    let n = x.len().min(y.len());
+    let mut i = 0;
+    while i + 4 <= n {
+        let xv = _mm_loadu_ps(x.as_ptr().add(i));
+        let yv = exp4_approx_sse4_1(xv);
+        _mm_storeu_ps(y.as_mut_ptr().add(i), yv);
+        i += 4;
+    }
+    while i < n {
+        y[i] = lpcnet_exp_sse4_1(x[i]);
         i += 1;
     }
 }

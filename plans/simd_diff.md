@@ -1,6 +1,6 @@
 # SIMD Dispatch Divergence Tracker
 
-Last updated: 2026-02-24
+Last updated: 2026-02-26
 
 This file tracks known dispatch/RTCD divergences between upstream Opus C and this Rust port, plus alignment progress.
 
@@ -98,3 +98,5 @@ This file tracks known dispatch/RTCD divergences between upstream Opus C and thi
 - 2026-02-24: Fixed D6 by making `libopus-sys/build.rs` conditionally enable SIMD `MAY_HAVE` defines and SIMD source groups based on compiler flag probes (not blanket target-arch enables).
 - 2026-02-24: Fixed D9 by adding a `fuzzing` feature that mirrors upstream random arch downgrade in Rust `opus_select_arch()` and forwards `FUZZING` to `libopus-sys`.
 - 2026-02-24: Fixed D8 by extending Rust `Arch` with non-aarch64 ARM EDSP/MEDIA/NEON levels and adding ARM ladder detection in `opus_select_arch()`.
+- 2026-02-26: Aligned remaining x86 DNN activation dispatch tiers by adding SSE4.1/SSE2 `lpcnet_exp` and `softmax` kernels and wiring arch-ordered dispatch (`AVX2 -> SSE4.1 -> SSE2 -> scalar`) in `src/dnn/simd/mod.rs`.
+- 2026-02-26: Added deterministic forced-tier C-vs-Rust regression coverage for DNN activation EXP path in `tests/osce_nndsp.rs:test_compute_activation_exp_arch_tiers_match_c` with new harness entry `libopus-sys/src/osce_test_harness.c:osce_test_compute_activation_exp_arch`.
