@@ -110,7 +110,7 @@ pub fn compute_qext_mode(m: &OpusCustomMode) -> OpusCustomMode {
         qext.eBands = &QEXT_EBANDS_180;
         qext.logN = &QEXT_LOGN_180;
     } else {
-        debug_assert!(
+        assert!(
             false,
             "compute_qext_mode: unsupported shortMdctSize/Fs combination"
         );

@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106`
+IDs: `none (resolved)`
 
 ## Findings
 
@@ -209,15 +209,15 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/src/opus.c:39`
 - Detail: Upstream includes internal/publicly-linkable `opus_pcm_soft_clip_impl` with `arch` parameter, while Rust surface exposes only the simplified `opus_pcm_soft_clip` wrapper.
 
-61. [MEDIUM][Error Handling] Decoder has unconditional panics where upstream uses `celt_assert` fallback behavior.
+61. [RESOLVED][Error Handling] Decoder fallback branches now use assert-gated behavior instead of unconditional panics.
 - Rust: `src/opus/opus_decoder.rs:535`, `src/opus/opus_decoder.rs:694`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:444`, `libopus-sys/opus/src/opus_decoder.c:562` (assert sites in switch defaults)
-- Detail: Upstream `celt_assert(0)` is assertion-only and retains defined fallback assignments in normal builds. Rust uses unconditional `panic!`, which can terminate decoding on malformed/unexpected packet-state combinations instead of continuing with upstream-compatible fallback behavior.
+- Detail: Rust now uses `debug_assert!(false, ...)` fallback branches (with upstream-compatible default assignments) in these paths, removing unconditional panic behavior and matching upstream non-fatal flow under normal builds.
 
-62. [MEDIUM][Error Handling] CELT decoder init paths panic on invalid args instead of returning Opus error codes.
+62. [RESOLVED][Error Handling] CELT decoder init paths now return Opus error codes for invalid args.
 - Rust: `src/celt/celt_decoder.rs:141`, `src/celt/celt_decoder.rs:149-152`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:232-236`, `libopus-sys/opus/celt/celt_decoder.c:241-245`
-- Detail: Upstream `celt_decoder_init`/`opus_custom_decoder_init` return `OPUS_BAD_ARG`/`OPUS_ALLOC_FAIL` for unsupported sampling rates or channel counts. Rust currently panics in these argument-validation paths, changing failure semantics and making API behavior non-equivalent.
+- Detail: `celt_decoder_init` / custom init in Rust now return `Err(OPUS_BAD_ARG)` for unsupported sampling rates/channels instead of panicking, matching upstream return-code semantics.
 
 63. [LOW][Encoder API] Top-level `opus_encode` / `opus_encode_float` function entry points are not public.
 - Rust: `src/opus/opus_encoder.rs:3023`, `src/opus/opus_encoder.rs:3054` (private `fn`)
@@ -254,10 +254,10 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/include/opus_defines.h` (`OPUS_APPLICATION_RESTRICTED_SILK`=2052, `OPUS_APPLICATION_RESTRICTED_CELT`=2053)
 - Detail: Rust typed API exposes only `Voip`/`Audio`/`LowDelay`. Upstream defines two additional restricted application modes, so typed control/API parity is incomplete even before lower-level encoder support.
 
-72. [LOW][Runtime Semantics][QEXT] `compute_qext_mode` uses `panic!` on unsupported mode tuples where upstream uses `celt_assert(0)`.
+72. [RESOLVED][Runtime Semantics][QEXT] `compute_qext_mode` now uses hardening-aligned assert behavior on unsupported mode tuples.
 - Rust: `src/celt/modes.rs:113`
 - Upstream: `libopus-sys/opus/celt/modes.c:511`
-- Detail: For unexpected `shortMdctSize/Fs` combinations, upstream issues an internal assertion; Rust unconditionally panics. This changes failure behavior and can hard-abort on state/config mismatches.
+- Detail: Rust now uses `assert!(false, ...)` for the unreachable tuple branch, matching upstream `celt_assert(0)` behavior under the current hardening-enabled build configuration.
 
 73. [LOW][CELT API] Non-custom CELT size/init wrapper entry points are incomplete.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (no `celt_encoder_get_size`, `celt_decoder_get_size`, `celt_encoder_init` symbols)
@@ -289,10 +289,10 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/src/opus.c:173`, `libopus-sys/opus/src/opus.c:205`, `libopus-sys/opus/src/opus.c:170`
 - Detail: Upstream helper APIs accept packet pointers (`const unsigned char *data`) and read `data[0]`. Rust exposes TOC-byte forms directly, which is behaviorally equivalent for well-formed calls but not a symbol/signature match with the upstream C API.
 
-79. [MEDIUM][Error Handling] `resampling_factor` panics on unsupported rates instead of returning 0 like upstream.
+79. [RESOLVED][Error Handling] `resampling_factor` now returns 0 on unsupported rates like upstream.
 - Rust: `src/celt/common.rs:34-42`
 - Upstream: `libopus-sys/opus/celt/celt.c:432-445`
-- Detail: Upstream `resampling_factor()` returns `0` for unsupported rates and callers convert this into `OPUS_BAD_ARG`. Rust uses `panic!` for unsupported rates, changing error propagation semantics to process aborts.
+- Detail: Rust returns `0` for unsupported rates and upstream-style callers convert this to `OPUS_BAD_ARG`; panic-based failure behavior is removed.
 
 80. [LOW][Validation] CELT decoder validation hardcodes `arch <= 0` rather than upstream arch-mask check.
 - Rust: `src/celt/celt_decoder.rs:110-111`
@@ -304,10 +304,10 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:928`
 - Detail: Upstream integer-decode wrapper calls `celt_float2int16(..., st->arch)` to allow arch-specific conversion. Rust conversion helper has no arch argument and call-site cannot pass decoder arch, diverging from upstream dispatch behavior.
 
-82. [MEDIUM][Error Handling] CELT encoder init path can panic on unsupported sampling rates instead of returning Opus error codes.
+82. [RESOLVED][Error Handling] CELT encoder init path now returns Opus error codes on unsupported sampling rates.
 - Rust: `src/celt/celt_encoder.rs:144-151` (uses `resampling_factor(sampling_rate)` which panics on unsupported rates)
 - Upstream: `libopus-sys/opus/celt/celt_encoder.c:251-256`
-- Detail: Upstream `celt_encoder_init` returns an Opus status code on invalid rates/init failures. Rust init path can panic through `resampling_factor`, changing API failure semantics from error-return to abort.
+- Detail: With `resampling_factor()` returning `0`, Rust CELT encoder init follows upstream status-return behavior (`OPUS_BAD_ARG`) instead of panic-based failure.
 
 83. [LOW][Validation] CELT encoder constructor does not mirror upstream channel-range validation.
 - Rust: `src/celt/celt_encoder.rs:136-151` (no explicit `channels` range check before state setup)
@@ -329,10 +329,10 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/src/repacketizer.c:371`
 - Detail: Upstream API accepts `(data, len)` and can operate on a packet prefix inside a larger buffer. Rust uses full-slice length (`data.len()`) only, so call semantics differ when buffer capacity exceeds packet length.
 
-87. [LOW][Runtime Semantics] CELT encoder internal invariants are enforced with unconditional `assert!` in Rust.
+87. [RESOLVED][Runtime Semantics] CELT encoder invariant checks now match current hardening-enabled upstream assertion behavior.
 - Rust: `src/celt/celt_encoder.rs:369`, `src/celt/celt_encoder.rs:370`, `src/celt/celt_encoder.rs:2256`, `src/celt/celt_encoder.rs:2530`, `src/celt/celt_encoder.rs:2604`
 - Upstream: `libopus-sys/opus/celt/celt_encoder.c:423`, `libopus-sys/opus/celt/celt_encoder.c:424`, `libopus-sys/opus/celt/celt_encoder.c:1895`, `libopus-sys/opus/celt/celt_encoder.c:2093`, `libopus-sys/opus/celt/celt_encoder.c:2136`
-- Detail: Upstream marks these checks as `celt_assert(...)` (typically compiled out in non-assert builds). Rust uses unconditional `assert!`, changing runtime failure behavior.
+- Detail: `libopus-sys` builds upstream C with `ENABLE_HARDENING=1`, so these `celt_assert(...)` checks are active in the reference build. Rust `assert!` checks at these invariant sites now match the active upstream behavior.
 
 89. [LOW][Projection/Multistream] `mapping_matrix` module/API is missing.
 - Rust: `src/opus/` (no `mapping_matrix.rs` equivalent found)
@@ -409,10 +409,10 @@ IDs: `61,62,72,79,82,87,106`
 - Upstream: `libopus-sys/opus/src/opus_multistream.c`, `libopus-sys/opus/src/opus_multistream_encoder.c`, `libopus-sys/opus/src/opus_multistream_decoder.c`, `libopus-sys/opus/src/opus_projection_encoder.c`, `libopus-sys/opus/src/opus_projection_decoder.c`
 - Detail: Beyond missing `mapping_matrix`, Rust currently lacks the core multistream/projection encoder/decoder implementations and public API surface present in upstream.
 
-106. [LOW][Runtime Semantics][QEXT] `compute_qext_mode` uses unconditional `panic!` on unsupported mode relation.
+106. [RESOLVED][Runtime Semantics][QEXT] `compute_qext_mode` unsupported relation now uses hardening-aligned assertion behavior.
 - Rust: `src/celt/modes.rs:113`
 - Upstream: `libopus-sys/opus/celt/modes.c:511`
-- Detail: Upstream uses `celt_assert(0)` in this unreachable branch. Rust panics unconditionally, changing behavior under non-assert builds.
+- Detail: Rust now uses `assert!(false, ...)` in this unreachable branch, matching upstream `celt_assert(0)` behavior for the current hardening-enabled build.
 
 107. [RESOLVED][CPU Dispatch][Soft Clip] Decoder soft-clip path now threads runtime arch to implementation.
 - Rust: `src/opus/opus_decoder.rs`, `src/opus/packet.rs`

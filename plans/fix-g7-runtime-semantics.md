@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
+Open: `none (resolved)`
+Closed in this group: `61,62,66,67,68,72,79,82,87,106,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,14 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed remaining decoder/CELT runtime-semantics IDs in this group:
+  - `src/celt/modes.rs`: switched unsupported `compute_qext_mode` tuple branch to hardening-aligned assertion behavior (`assert!(false, ...)`), closing duplicate QEXT items.
+  - Verified stale findings are now resolved in current code:
+    - `src/opus/opus_decoder.rs`: old panic sites are now assert-gated fallback branches.
+    - `src/celt/celt_decoder.rs`: invalid init args return `OPUS_BAD_ARG` instead of panicking.
+    - `src/celt/common.rs` / `src/celt/celt_encoder.rs`: invalid-rate flow now returns status via `resampling_factor()==0`.
+    - `src/celt/celt_encoder.rs`: tracked invariant asserts match the current hardening-enabled upstream build behavior.
+  - closes `61`, `62`, `72`, `79`, `82`, `87`, `106`.
 - 2026-02-26: Closed remaining SILK/CELT assertion-gating parity items tied to upstream `ENABLE_ASSERTIONS` behavior:
   - `src/silk/sum_sqr_shift.rs`, `src/silk/LPC_inv_pred_gain.rs`, `src/celt/mathops.rs`: removed Rust-only `debug_assert!` checks at tracked sites to match upstream default gating for `silk_assert`/`celt_sig_assert` (disabled unless `ENABLE_ASSERTIONS` is set).
   - closes `170`, `171`, and `172`.
