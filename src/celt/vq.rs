@@ -159,8 +159,9 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     let mut xy: f32;
     let mut yy: f32;
     let N = N as usize;
-    let mut y: Vec<f32> = vec![0.0; N];
-    let mut signx: Vec<i32> = vec![0; N];
+    // Max CELT band size is 176; use stack buffers.
+    let mut y = [0.0f32; 176];
+    let mut signx = [0i32; 176];
     // Pre-slice to hoist bounds checks out of the hot loops.
     let X = &mut X[..N];
     let iy = &mut iy[..N];
@@ -601,7 +602,8 @@ pub fn alg_quant(
 ) -> u32 {
     debug_assert!(K > 0);
     debug_assert!(N > 1);
-    let mut iy: Vec<i32> = vec![0; (N + 3) as usize];
+    // Max CELT band size is 176, N+3 <= 179; use stack buffer.
+    let mut iy = [0i32; 180];
     exp_rotation(X, N, 1, B, K, spread);
 
     #[cfg(feature = "qext")]
@@ -819,7 +821,7 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
 ///
 /// Returns Q30 value in range [0, 1073741824] (= 2^30).
 /// Callers that need Q14 should right-shift by 16.
-#[inline]
+#[inline(never)]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
