@@ -5,7 +5,7 @@
 /// Extension ID for DRED data in packet padding.
 pub const DRED_EXTENSION_ID: i32 = 126;
 
-pub const DRED_EXPERIMENTAL_VERSION: i32 = 10;
+pub const DRED_EXPERIMENTAL_VERSION: i32 = 12;
 pub const DRED_EXPERIMENTAL_BYTES: usize = 2;
 
 pub const DRED_MIN_BYTES: usize = 8;

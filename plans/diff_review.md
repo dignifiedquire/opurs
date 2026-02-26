@@ -776,10 +776,10 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/lpcnet.h:97`, `libopus-sys/opus/dnn/lpcnet.h:180-181`
 - Detail: Upstream exposes direct blob loaders (`lpcnet_encoder_load_model`, `lpcnet_load_model`, `lpcnet_plc_load_model`) taking `(const void*, len)`. Rust exposes `load_model(&[WeightArray])` methods and a separate weight parser, but no equivalent one-call LPCNet blob-loading entry points.
 
-181. [MEDIUM][Constants][DRED] Experimental DRED version constant differs from upstream.
-- Rust: `src/dnn/dred/config.rs:8`
+181. [RESOLVED][Constants][DRED] Experimental DRED version constant now matches upstream.
+- Rust: `src/dnn/dred/config.rs`
 - Upstream: `libopus-sys/opus/dnn/dred_config.h:35`
-- Detail: Rust sets `DRED_EXPERIMENTAL_VERSION = 10`, while upstream 1.6.1 defines `DRED_EXPERIMENTAL_VERSION 12`. This can alter extension compatibility/version-tag behavior for experimental DRED packet signaling.
+- Detail: Updated Rust `DRED_EXPERIMENTAL_VERSION` to `12`, matching upstream signaling/version-tag behavior.
 
 182. [HIGH][Model Constants][DRED] RDOVAE dimension/stat-table constants diverge from upstream generated headers.
 - Rust: `src/dnn/dred/config.rs:28-31`, `src/dnn/dred/stats.rs:6`, `src/dnn/dred/stats.rs:84`
