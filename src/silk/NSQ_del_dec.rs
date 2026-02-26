@@ -621,6 +621,7 @@ fn silk_noise_shape_quantizer_del_dec(
 
     debug_assert!(nStatesDelayedDecision > 0);
     let nStates = nStatesDelayedDecision as usize;
+    let length = length as usize;
 
     let mut psSampleState: Vec<NSQ_sample_pair> = vec![[NSQ_sample_struct::default(); 2]; nStates];
 
@@ -628,8 +629,12 @@ fn silk_noise_shape_quantizer_del_dec(
     let mut pred_lag_idx = (NSQ.sLTP_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;
     let Gain_Q10: i32 = Gain_Q16 >> 6;
 
+    // Pre-slice to hoist bounds checks out of the hot loop.
+    let x_Q10 = &x_Q10[..length];
+    let AR_shp_Q13 = &AR_shp_Q13[..shapingLPCOrder as usize];
+
     #[allow(clippy::needless_range_loop)]
-    for i in 0..length as usize {
+    for i in 0..length {
         // LTP prediction (shared across all states)
         if signalType == TYPE_VOICED {
             LTP_pred_Q14 = 2;
@@ -698,28 +703,26 @@ fn silk_noise_shape_quantizer_del_dec(
             n_AR_Q14 = shapingLPCOrder >> 1;
             n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[0] as i64) >> 16)) as i32;
 
-            let mut j = 2;
-            while j < shapingLPCOrder {
-                tmp2 = (psDD.sAR2_Q14[(j - 1) as usize] as i64
-                    + (((psDD.sAR2_Q14[j as usize].wrapping_sub(tmp1)) as i64
+            let shaping_order = shapingLPCOrder as usize;
+            let mut j = 2usize;
+            while j < shaping_order {
+                tmp2 = (psDD.sAR2_Q14[j - 1] as i64
+                    + (((psDD.sAR2_Q14[j].wrapping_sub(tmp1)) as i64 * warping_Q16 as i16 as i64)
+                        >> 16)) as i32;
+                psDD.sAR2_Q14[j - 1] = tmp1;
+                n_AR_Q14 =
+                    (n_AR_Q14 as i64 + ((tmp1 as i64 * AR_shp_Q13[j - 1] as i64) >> 16)) as i32;
+                tmp1 = (psDD.sAR2_Q14[j] as i64
+                    + (((psDD.sAR2_Q14[j + 1].wrapping_sub(tmp2)) as i64
                         * warping_Q16 as i16 as i64)
                         >> 16)) as i32;
-                psDD.sAR2_Q14[(j - 1) as usize] = tmp1;
-                n_AR_Q14 = (n_AR_Q14 as i64
-                    + ((tmp1 as i64 * AR_shp_Q13[(j - 1) as usize] as i64) >> 16))
-                    as i32;
-                tmp1 = (psDD.sAR2_Q14[j as usize] as i64
-                    + (((psDD.sAR2_Q14[(j + 1) as usize].wrapping_sub(tmp2)) as i64
-                        * warping_Q16 as i16 as i64)
-                        >> 16)) as i32;
-                psDD.sAR2_Q14[j as usize] = tmp2;
-                n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[j as usize] as i64) >> 16))
-                    as i32;
+                psDD.sAR2_Q14[j] = tmp2;
+                n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[j] as i64) >> 16)) as i32;
                 j += 2;
             }
-            psDD.sAR2_Q14[(shapingLPCOrder - 1) as usize] = tmp1;
+            psDD.sAR2_Q14[shaping_order - 1] = tmp1;
             n_AR_Q14 = (n_AR_Q14 as i64
-                + ((tmp1 as i64 * AR_shp_Q13[(shapingLPCOrder - 1) as usize] as i64) >> 16))
+                + ((tmp1 as i64 * AR_shp_Q13[shaping_order - 1] as i64) >> 16))
                 as i32;
             n_AR_Q14 = ((n_AR_Q14 as u32) << 1) as i32;
             n_AR_Q14 =
@@ -955,7 +958,7 @@ fn silk_noise_shape_quantizer_del_dec(
     // Copy LPC state for next subframe
     for dd in psDelDec[..nStates].iter_mut() {
         dd.sLPC_Q14
-            .copy_within(length as usize..length as usize + NSQ_LPC_BUF_LENGTH, 0);
+            .copy_within(length..length + NSQ_LPC_BUF_LENGTH, 0);
     }
 }
 

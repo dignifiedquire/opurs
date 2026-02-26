@@ -158,10 +158,14 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     let mut sum: f32 = 0.0;
     let mut xy: f32;
     let mut yy: f32;
-    let mut y: Vec<f32> = vec![0.0; N as usize];
-    let mut signx: Vec<i32> = vec![0; N as usize];
+    let N = N as usize;
+    let mut y: Vec<f32> = vec![0.0; N];
+    let mut signx: Vec<i32> = vec![0; N];
+    // Pre-slice to hoist bounds checks out of the hot loops.
+    let X = &mut X[..N];
+    let iy = &mut iy[..N];
 
-    for j in 0..N as usize {
+    for j in 0..N {
         signx[j] = (X[j] < 0.0) as i32;
         X[j] = X[j].abs();
         iy[j] = 0;
@@ -170,19 +174,19 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     yy = 0.0;
     xy = 0.0;
     let mut pulsesLeft = K;
-    if K > N >> 1 {
-        for xj in X[..N as usize].iter() {
+    if K > (N >> 1) as i32 {
+        for xj in X.iter() {
             sum += xj;
         }
         if !(sum > EPSILON && sum < 64.0) {
             X[0] = 1.0;
-            for xj in X[1..N as usize].iter_mut() {
+            for xj in X[1..].iter_mut() {
                 *xj = 0.0;
             }
             sum = 1.0;
         }
         let rcp: f32 = (K as f32 + 0.8f32) * (1.0f32 / sum);
-        for j in 0..N as usize {
+        for j in 0..N {
             iy[j] = (rcp * X[j]).floor() as i32;
             y[j] = iy[j] as f32;
             yy += y[j] * y[j];
@@ -191,7 +195,7 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
             pulsesLeft -= iy[j];
         }
     }
-    if pulsesLeft > N + 3 {
+    if pulsesLeft > N as i32 + 3 {
         let tmp: f32 = pulsesLeft as f32;
         yy += tmp * tmp;
         yy += tmp * y[0];
@@ -199,7 +203,7 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
         pulsesLeft = 0;
     }
     for _i in 0..pulsesLeft {
-        let mut best_id: i32 = 0;
+        let mut best_id: usize = 0;
         let mut best_num: f32;
         let mut best_den: f32;
         yy += 1.0;
@@ -207,22 +211,22 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
         let Ryy = yy + y[0];
         best_den = Ryy;
         best_num = Rxy * Rxy;
-        for j in 1..N as usize {
+        for j in 1..N {
             let Rxy = xy + X[j];
             let Ryy = yy + y[j];
             let Rxy2 = Rxy * Rxy;
             if best_den * Rxy2 > Ryy * best_num {
                 best_den = Ryy;
                 best_num = Rxy2;
-                best_id = j as i32;
+                best_id = j;
             }
         }
-        xy += X[best_id as usize];
-        yy += y[best_id as usize];
-        y[best_id as usize] += 2.0;
-        iy[best_id as usize] += 1;
+        xy += X[best_id];
+        yy += y[best_id];
+        y[best_id] += 2.0;
+        iy[best_id] += 1;
     }
-    for j in 0..N as usize {
+    for j in 0..N {
         iy[j] = (iy[j] ^ -signx[j]) + signx[j];
     }
     yy

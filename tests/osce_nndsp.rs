@@ -3,6 +3,13 @@
 //! Ports the logic from upstream `dnn/adaconvtest.c` — exercises adaconv, adacomb,
 //! and adashape with compiled-in LACE/NoLACE weights and deterministic PRNG inputs,
 //! then verifies bit-exact match between the Rust and C implementations.
+//!
+//! **Important**: these tests require `--release` (or `--cargo-profile=release`).
+//! In debug mode the `cc` crate compiles libopus-sys with `-O0`, which changes C's
+//! floating-point evaluation order enough to break bit-exact parity with Rust.
+//! CI runs release-mode only; local `cargo test` without `--release` will see
+//! spurious failures in multi-frame tests (adaconv, adacomb, GRU) due to FP
+//! divergence compounding across frames.
 
 #![cfg(feature = "tools-dnn")]
 

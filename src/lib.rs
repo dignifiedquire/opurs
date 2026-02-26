@@ -178,8 +178,11 @@ pub mod internals {
     // -- CELT rate --
     pub use crate::celt::rate::get_pulses;
 
-    // -- CELT VQ (rotation) --
+    // -- CELT VQ (rotation + PVQ search) --
+    #[cfg(feature = "simd")]
+    pub use crate::celt::simd::op_pvq_search;
     pub use crate::celt::vq::exp_rotation;
+    pub use crate::celt::vq::op_pvq_search_c;
 
     // -- CELT FFT --
     pub use crate::celt::kiss_fft::{kiss_fft_state, opus_fft_c, opus_fft_impl};
@@ -193,6 +196,11 @@ pub mod internals {
     // -- SILK LPC --
     pub use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
     pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
+
+    // -- CELT comb filter (for benchmarks) --
+    pub use crate::celt::common::comb_filter_const_c;
+    #[cfg(feature = "simd")]
+    pub use crate::celt::simd::comb_filter_const;
 
     // -- CELT pitch (for benchmarks) --
     // Dispatch wrappers (use SIMD when available):
@@ -227,6 +235,19 @@ pub mod internals {
     pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction;
     // Scalar implementation:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP_scalar;
+    // NSQ noise shape feedback loop:
+    pub use crate::silk::NSQ::silk_NSQ_noise_shape_feedback_loop;
+    pub use crate::silk::NSQ::silk_NSQ_noise_shape_feedback_loop_c;
+    // VQ weighted matrix:
+    #[cfg(feature = "simd")]
+    pub use crate::silk::simd::silk_VQ_WMat_EC;
+    pub use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
+    // VAD energy:
+    #[cfg(feature = "simd")]
+    pub use crate::silk::simd::{silk_vad_energy, silk_vad_energy_scalar};
+    // LPC inverse pred gain dispatch:
+    #[cfg(feature = "simd")]
+    pub use crate::silk::simd::silk_LPC_inverse_pred_gain;
 
     // -- DNN vec functions (for benchmarks) --
     #[cfg(feature = "deep-plc")]

@@ -200,6 +200,114 @@ fn bench_cgemv8x4(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_sparse_sgemv8x4(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
+    let mut group = c.benchmark_group("dnn_sparse_sgemv8x4");
+    // Sparse format: for each 8-row block, idx has [cols_count, col0, col1, ...].
+    // Each col entry indexes into x at groups of 4.
+    for &(rows, cols, density) in &[(64, 64, 4), (128, 64, 8), (256, 128, 8)] {
+        let cols_per_block = density; // number of 4-wide column groups per 8-row block
+        let num_blocks = rows / 8;
+        let total_weights = num_blocks * cols_per_block * 32; // 8 rows * 4 cols per group
+        let w = generate_signal(total_weights, 42);
+        let x = generate_signal(cols, 123);
+        // Build idx: for each block, [cols_per_block, pos0, pos1, ...]
+        let mut idx = Vec::new();
+        for _block in 0..num_blocks {
+            idx.push(cols_per_block as i32);
+            for j in 0..cols_per_block {
+                idx.push(((j * 4) % cols) as i32);
+            }
+        }
+        let label = format!("{}x{}_d{}", rows, cols, density);
+
+        group.bench_with_input(BenchmarkId::new("scalar", &label), &rows, |b, &rows| {
+            let mut out = vec![0.0f32; rows];
+            b.iter(|| {
+                opurs::internals::sparse_sgemv8x4_scalar(
+                    &mut out,
+                    black_box(&w),
+                    &idx,
+                    rows,
+                    black_box(&x),
+                );
+                black_box(&out);
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("dispatch", &label), &rows, |b, &rows| {
+            let mut out = vec![0.0f32; rows];
+            b.iter(|| {
+                opurs::internals::sparse_sgemv8x4(
+                    &mut out,
+                    black_box(&w),
+                    &idx,
+                    rows,
+                    black_box(&x),
+                    arch,
+                );
+                black_box(&out);
+            })
+        });
+    }
+    group.finish();
+}
+
+fn bench_sparse_cgemv8x4(c: &mut Criterion) {
+    let arch = opurs::internals::opus_select_arch();
+    let mut group = c.benchmark_group("dnn_sparse_cgemv8x4");
+    for &(rows, cols, density) in &[(64, 64, 4), (128, 64, 8), (256, 128, 8)] {
+        let cols_per_block = density;
+        let num_blocks = rows / 8;
+        let total_weights = num_blocks * cols_per_block * 32;
+        let w = generate_weights_i8(total_weights, 42);
+        let scale: Vec<f32> = (0..rows).map(|i| 0.01 + 0.001 * i as f32).collect();
+        let x = generate_signal(cols, 123);
+        let mut idx = Vec::new();
+        for _block in 0..num_blocks {
+            idx.push(cols_per_block as i32);
+            for j in 0..cols_per_block {
+                idx.push(((j * 4) % cols) as i32);
+            }
+        }
+        let label = format!("{}x{}_d{}", rows, cols, density);
+
+        group.bench_with_input(BenchmarkId::new("scalar", &label), &rows, |b, &rows| {
+            let mut out = vec![0.0f32; rows];
+            b.iter(|| {
+                opurs::internals::sparse_cgemv8x4_scalar(
+                    &mut out,
+                    black_box(&w),
+                    &idx,
+                    &scale,
+                    rows,
+                    cols,
+                    black_box(&x),
+                );
+                black_box(&out);
+            })
+        });
+
+        group.bench_with_input(BenchmarkId::new("dispatch", &label), &rows, |b, &rows| {
+            let mut out = vec![0.0f32; rows];
+            b.iter(|| {
+                opurs::internals::sparse_cgemv8x4(
+                    &mut out,
+                    black_box(&w),
+                    &idx,
+                    &scale,
+                    rows,
+                    cols,
+                    black_box(&x),
+                    arch,
+                );
+                black_box(&out);
+            })
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_vec_tanh,
@@ -207,5 +315,7 @@ criterion_group!(
     bench_softmax,
     bench_sgemv,
     bench_cgemv8x4,
+    bench_sparse_sgemv8x4,
+    bench_sparse_cgemv8x4,
 );
 criterion_main!(benches);

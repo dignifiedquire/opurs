@@ -22,7 +22,7 @@ pub mod aarch64;
 
 /// SIMD-accelerated short-term prediction for noise shaping quantizer.
 /// Dispatches to NEON on aarch64, SSE4.1 on x86, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn silk_noise_shape_quantizer_short_prediction(
     buf32: &[i32],
     coef16: &[i16],
@@ -74,7 +74,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: Arch) -> f64 {
     super::float::inner_product_FLP::silk_inner_product_FLP_scalar(data1, data2)
 }
 
-/// SIMD-accelerated VAD energy accumulation: sum of (X[i] >> 3)^2.
+/// SIMD-accelerated VAD energy accumulation: sum of (X\[i\] >> 3)^2.
 /// Dispatches to SSE2 on x86, with scalar fallback.
 #[inline]
 pub fn silk_vad_energy(x: &[i16], arch: Arch) -> i32 {
@@ -99,7 +99,7 @@ pub fn silk_VAD_GetSA_Q8(psEncC: &mut super::structs::silk_encoder_state, pIn: &
 }
 
 /// Scalar implementation of VAD energy accumulation.
-fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
+pub fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
     let mut sum: i32 = 0;
     for &sample in x {
         let x_tmp = (sample as i32) >> 3;
@@ -110,7 +110,7 @@ fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
 
 /// SIMD-accelerated noise shape feedback loop.
 /// Dispatches to NEON on aarch64, with scalar fallback.
-#[inline]
+#[inline(always)]
 pub fn silk_NSQ_noise_shape_feedback_loop(
     data0: i32,
     data1: &mut [i32],

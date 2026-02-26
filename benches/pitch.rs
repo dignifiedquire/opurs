@@ -100,11 +100,66 @@ fn bench_celt_pitch_xcorr(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_comb_filter_const(c: &mut Criterion) {
+    #[cfg(feature = "simd")]
+    let arch = opurs::internals::opus_select_arch();
+    let mut group = c.benchmark_group("comb_filter_const");
+    for &(n, t) in &[(120, 15), (480, 40), (960, 100)] {
+        let total = n + t + 2;
+        let x = generate_signal(total, 42);
+        let label = format!("N{}_T{}", n, t);
+        group.bench_with_input(BenchmarkId::new("scalar", &label), &(n, t), |b, &(n, t)| {
+            let mut y = x.clone();
+            let start = t + 2;
+            b.iter(|| {
+                opurs::internals::comb_filter_const_c(
+                    &mut y,
+                    start,
+                    black_box(&x),
+                    start,
+                    t as i32,
+                    n as i32,
+                    0.3,
+                    0.2,
+                    0.1,
+                );
+                black_box(&y);
+            })
+        });
+        #[cfg(feature = "simd")]
+        group.bench_with_input(
+            BenchmarkId::new("dispatch", &label),
+            &(n, t),
+            |b, &(n, t)| {
+                let mut y = x.clone();
+                let start = t + 2;
+                b.iter(|| {
+                    opurs::internals::comb_filter_const(
+                        &mut y,
+                        start,
+                        black_box(&x),
+                        start,
+                        t as i32,
+                        n as i32,
+                        0.3,
+                        0.2,
+                        0.1,
+                        arch,
+                    );
+                    black_box(&y);
+                })
+            },
+        );
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_xcorr_kernel,
     bench_celt_inner_prod,
     bench_dual_inner_prod,
     bench_celt_pitch_xcorr,
+    bench_comb_filter_const,
 );
 criterion_main!(benches);

@@ -16,6 +16,8 @@ members = [
 ]
 
 [profile.release]
+lto = "thin"
+codegen-units = 1
 debug = true
 
 [profile.bench]
@@ -101,6 +103,16 @@ required-features = ["tools"]
 name = "dnn"
 harness = false
 required-features = ["deep-plc"]
+
+[[bench]]
+name = "dnn_codec"
+harness = false
+required-features = ["dnn", "builtin-weights"]
+
+[[bench]]
+name = "dnn_comparison"
+harness = false
+required-features = ["tools-dnn"]
 
 [features]
 default = ["simd"]
