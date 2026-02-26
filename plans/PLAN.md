@@ -1,6 +1,6 @@
 # Master Plan: Safe Idiomatic Rust libopus
 
-**Goal**: Fully safe, idiomatic Rust implementation of libopus 1.3.1 that is
+**Goal**: Fully safe, idiomatic Rust implementation of libopus 1.6.1 that is
 bit-exact with the C reference, has a complete ported test suite, and matches
 C performance.
 

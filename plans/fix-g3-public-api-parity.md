@@ -4,7 +4,7 @@
 Close remaining public API coverage gaps versus upstream core/custom/multistream/projection and related controls.
 
 ## Findings IDs
-`12,43,45,104,110,116,119,120,122`
+Open: `12,43,45,104,110,116,119,120,122`
 
 ## Scope
 - DRED public decoder/aux APIs and state lifecycle entry points.

@@ -4,7 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-`107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
+Open: `107,194,202,203,204,205,212,213,230,231,233,234,235`
+Closed in this group: `232,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.

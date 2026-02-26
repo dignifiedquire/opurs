@@ -4,7 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-`61,62,66,67,68,72,79,82,87,106,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
+Open: `61,62,72,79,82,87,106,136,137,140,141,142,143,144,145,146,148,149,153,170,171,172`
+Closed in this group: `66,67,68,135,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.

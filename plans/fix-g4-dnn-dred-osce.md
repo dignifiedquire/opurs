@@ -4,7 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-`12,45,76,94,135,136,137,175,176,177,178,179,180,181,182,187,191,192,193,194,201,206,210,211,216,217,219,220,235`
+Open: `12,45,76,136,137,179,180,187,191,192,193,194,210,211,216,235`
+Excluded (intentional API-shape): `177,178`
+Closed in this group: `94,135,175,176,181,182,201,206,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
