@@ -4,8 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-Open: `194`
-Closed in this group: `107,202,203,204,205,212,213,230,231,232,233,234,235,237`
+Open: `none`
+Closed in this group: `107,194,202,203,204,205,212,213,230,231,232,233,234,235,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.
@@ -54,3 +54,8 @@ Closed in this group: `107,202,203,204,205,212,213,230,231,232,233,234,235,237`
   - `src/silk/NSQ.rs` + `src/silk/NSQ_del_dec.rs` + `src/silk/simd/mod.rs` + `src/silk/simd/x86.rs`: added full-function dispatch wrappers for `silk_NSQ` and `silk_NSQ_del_dec` with x86 SSE4.1/AVX2 tier selection and existing scalar fallback.
   - `src/silk/float/wrappers_FLP.rs` + `src/silk/float/encode_frame_FLP.rs`: switched call sites from direct `*_c` functions to RTCD wrappers, matching upstream wrapper call-shape.
   - Validated with `cargo nextest` SILK-focused release tests and preserved DNN tier-parity tests; this closes `202`, `203`, and `233`.
+- 2026-02-26: Added explicit DNN RTCD backend surface for x86/aarch64 in `src/dnn/nnet.rs`:
+  - Split core C-equivalent kernels into `compute_*_c` internal implementations.
+  - Added architecture-tier dispatch wrappers for `compute_linear`, `compute_activation`, and `compute_conv2d` mirroring upstream x86/arm RTCD table ordering.
+  - Added x86/aarch64 backend shim modules (`x86_rtcd`, `arm_rtcd`) to represent architecture-specific compute backends while preserving current behavior.
+  - Re-validated with `clippy` + `nextest` (SILK-focused and DNN forced-tier parity suites); this closes `194`.

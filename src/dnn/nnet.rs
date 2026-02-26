@@ -106,13 +106,7 @@ fn vec_swish(y: &mut [f32], x: &[f32], n: usize, arch: Arch) {
 /// Apply activation function in-place or from input to output.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_activation_c
-pub fn compute_activation(
-    output: &mut [f32],
-    input: &[f32],
-    n: usize,
-    activation: i32,
-    arch: Arch,
-) {
+fn compute_activation_c(output: &mut [f32], input: &[f32], n: usize, activation: i32, arch: Arch) {
     match activation {
         ACTIVATION_SIGMOID => vec_sigmoid(&mut output[..n], &input[..n], arch),
         ACTIVATION_TANH => vec_tanh(&mut output[..n], &input[..n], arch),
@@ -135,6 +129,44 @@ pub fn compute_activation(
     }
 }
 
+/// Apply activation function with RTCD backend dispatch.
+///
+/// Upstream C RTCD tables:
+/// - dnn/x86/x86_dnn_map.c:DNN_COMPUTE_ACTIVATION_IMPL
+/// - dnn/arm/arm_dnn_map.c:DNN_COMPUTE_ACTIVATION_IMPL
+pub fn compute_activation(
+    output: &mut [f32],
+    input: &[f32],
+    n: usize,
+    activation: i32,
+    arch: Arch,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if arch.has_avx2() {
+            return x86_rtcd::compute_activation_avx2(output, input, n, activation, arch);
+        }
+        if arch.has_sse4_1() {
+            return x86_rtcd::compute_activation_sse4_1(output, input, n, activation, arch);
+        }
+        if arch.has_sse2() {
+            return x86_rtcd::compute_activation_sse2(output, input, n, activation, arch);
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if arch.has_dotprod() {
+            return arm_rtcd::compute_activation_dotprod(output, input, n, activation, arch);
+        }
+        if arch.has_neon() {
+            return arm_rtcd::compute_activation_neon(output, input, n, activation, arch);
+        }
+    }
+
+    compute_activation_c(output, input, n, activation, arch)
+}
+
 // --- Linear computation ---
 
 /// Compute affine transform: out = W*in + bias + diag*in
@@ -142,7 +174,7 @@ pub fn compute_activation(
 /// Dispatches to float sgemv or int8 cgemv depending on which weights are present.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_linear_c
-pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
+fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
     let m = linear.nb_inputs;
     let n = linear.nb_outputs;
     let mut used_int8_path = false;
@@ -205,6 +237,38 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch
             out[i + 2 * m] += linear.diag[i + 2 * m] * input[i];
         }
     }
+}
+
+/// Compute affine transform with RTCD backend dispatch.
+///
+/// Upstream C RTCD tables:
+/// - dnn/x86/x86_dnn_map.c:DNN_COMPUTE_LINEAR_IMPL
+/// - dnn/arm/arm_dnn_map.c:DNN_COMPUTE_LINEAR_IMPL
+pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if arch.has_avx2() {
+            return x86_rtcd::compute_linear_avx2(linear, out, input, arch);
+        }
+        if arch.has_sse4_1() {
+            return x86_rtcd::compute_linear_sse4_1(linear, out, input, arch);
+        }
+        if arch.has_sse2() {
+            return x86_rtcd::compute_linear_sse2(linear, out, input, arch);
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if arch.has_dotprod() {
+            return arm_rtcd::compute_linear_dotprod(linear, out, input, arch);
+        }
+        if arch.has_neon() {
+            return arm_rtcd::compute_linear_neon(linear, out, input, arch);
+        }
+    }
+
+    compute_linear_c(linear, out, input, arch)
 }
 
 // --- High-level layer operations ---
@@ -479,7 +543,7 @@ fn conv2d_3x3_float(
 /// Compute Conv2D layer with temporal memory.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_conv2d_c
-pub fn compute_conv2d(
+fn compute_conv2d_c(
     conv: &Conv2dLayer,
     out: &mut [f32],
     mem: &mut [f32],
@@ -543,6 +607,248 @@ pub fn compute_conv2d(
             arch,
         );
         out[start..start + height].copy_from_slice(&tmp);
+    }
+}
+
+/// Compute Conv2D layer with RTCD backend dispatch.
+///
+/// Upstream C RTCD tables:
+/// - dnn/x86/x86_dnn_map.c:DNN_COMPUTE_CONV2D_IMPL
+/// - dnn/arm/arm_dnn_map.c:DNN_COMPUTE_CONV2D_IMPL
+pub fn compute_conv2d(
+    conv: &Conv2dLayer,
+    out: &mut [f32],
+    mem: &mut [f32],
+    input: &[f32],
+    height: usize,
+    hstride: usize,
+    activation: i32,
+    arch: Arch,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if arch.has_avx2() {
+            return x86_rtcd::compute_conv2d_avx2(
+                conv, out, mem, input, height, hstride, activation, arch,
+            );
+        }
+        if arch.has_sse4_1() {
+            return x86_rtcd::compute_conv2d_sse4_1(
+                conv, out, mem, input, height, hstride, activation, arch,
+            );
+        }
+        if arch.has_sse2() {
+            return x86_rtcd::compute_conv2d_sse2(
+                conv, out, mem, input, height, hstride, activation, arch,
+            );
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if arch.has_dotprod() {
+            return arm_rtcd::compute_conv2d_dotprod(
+                conv, out, mem, input, height, hstride, activation, arch,
+            );
+        }
+        if arch.has_neon() {
+            return arm_rtcd::compute_conv2d_neon(
+                conv, out, mem, input, height, hstride, activation, arch,
+            );
+        }
+    }
+
+    compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
+}
+
+// RTCD backend shims mirroring upstream x86/arm map tables.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod x86_rtcd {
+    use super::*;
+
+    #[inline]
+    pub(super) fn compute_activation_sse2(
+        output: &mut [f32],
+        input: &[f32],
+        n: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_activation_c(output, input, n, activation, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_activation_sse4_1(
+        output: &mut [f32],
+        input: &[f32],
+        n: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_activation_c(output, input, n, activation, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_activation_avx2(
+        output: &mut [f32],
+        input: &[f32],
+        n: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_activation_c(output, input, n, activation, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_linear_sse2(
+        linear: &LinearLayer,
+        out: &mut [f32],
+        input: &[f32],
+        arch: Arch,
+    ) {
+        compute_linear_c(linear, out, input, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_linear_sse4_1(
+        linear: &LinearLayer,
+        out: &mut [f32],
+        input: &[f32],
+        arch: Arch,
+    ) {
+        compute_linear_c(linear, out, input, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_linear_avx2(
+        linear: &LinearLayer,
+        out: &mut [f32],
+        input: &[f32],
+        arch: Arch,
+    ) {
+        compute_linear_c(linear, out, input, arch)
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn compute_conv2d_sse2(
+        conv: &Conv2dLayer,
+        out: &mut [f32],
+        mem: &mut [f32],
+        input: &[f32],
+        height: usize,
+        hstride: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn compute_conv2d_sse4_1(
+        conv: &Conv2dLayer,
+        out: &mut [f32],
+        mem: &mut [f32],
+        input: &[f32],
+        height: usize,
+        hstride: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn compute_conv2d_avx2(
+        conv: &Conv2dLayer,
+        out: &mut [f32],
+        mem: &mut [f32],
+        input: &[f32],
+        height: usize,
+        hstride: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+mod arm_rtcd {
+    use super::*;
+
+    #[inline]
+    pub(super) fn compute_activation_neon(
+        output: &mut [f32],
+        input: &[f32],
+        n: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_activation_c(output, input, n, activation, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_activation_dotprod(
+        output: &mut [f32],
+        input: &[f32],
+        n: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_activation_c(output, input, n, activation, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_linear_neon(
+        linear: &LinearLayer,
+        out: &mut [f32],
+        input: &[f32],
+        arch: Arch,
+    ) {
+        compute_linear_c(linear, out, input, arch)
+    }
+
+    #[inline]
+    pub(super) fn compute_linear_dotprod(
+        linear: &LinearLayer,
+        out: &mut [f32],
+        input: &[f32],
+        arch: Arch,
+    ) {
+        compute_linear_c(linear, out, input, arch)
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn compute_conv2d_neon(
+        conv: &Conv2dLayer,
+        out: &mut [f32],
+        mem: &mut [f32],
+        input: &[f32],
+        height: usize,
+        hstride: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn compute_conv2d_dotprod(
+        conv: &Conv2dLayer,
+        out: &mut [f32],
+        mem: &mut [f32],
+        input: &[f32],
+        height: usize,
+        hstride: usize,
+        activation: i32,
+        arch: Arch,
+    ) {
+        compute_conv2d_c(conv, out, mem, input, height, hstride, activation, arch)
     }
 }
 

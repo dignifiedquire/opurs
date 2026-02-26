@@ -20,10 +20,10 @@ IDs: `none (resolved)`
 IDs: `12,43,45,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,179,180,191,192,193,194`
+IDs: `12,45,76,179,180,191,192,193`
 
 5. SIMD/arch-dispatch/build-flag parity
-IDs: `194`
+IDs: `none (resolved)`
 
 6. Documentation/version/metadata drift
 IDs: `95,134,222,225,226`
@@ -840,10 +840,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/osce.h:102`, `libopus-sys/opus/dnn/osce.c:1410`
 - Detail: Upstream reset API takes only `silk_OSCE_BWE_struct*`. Rust requires both `OSCEBWEState` and `OSCEBWEFeatureState`, changing reset-call contract and API parity.
 
-194. [LOW][Arch Dispatch Coverage][DNN] Upstream RTCD x86/ARM specialized NNet kernels are not mirrored as architecture-specific backends.
-- Rust: `src/dnn/` (no `src/dnn/x86/*` or `src/dnn/arm/*` backend modules for `compute_linear/activation/conv2d`)
+194. [RESOLVED][Arch Dispatch Coverage][DNN] Upstream RTCD x86/ARM NNet backend surface is now mirrored.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/x86/dnn_x86.h`, `libopus-sys/opus/dnn/x86/x86_dnn_map.c`, `libopus-sys/opus/dnn/x86/nnet_sse2.c`, `libopus-sys/opus/dnn/x86/nnet_sse4_1.c`, `libopus-sys/opus/dnn/x86/nnet_avx2.c`, `libopus-sys/opus/dnn/arm/nnet_dotprod.c`, `libopus-sys/opus/dnn/arm/nnet_neon.c`, `libopus-sys/opus/dnn/arm/arm_dnn_map.c`
-- Detail: Upstream provides RTCD-selected architecture-specific implementations for core NNet ops beyond generic C. Rust currently provides generic kernels plus a vec-level SIMD layer, but no equivalent x86/ARM NNet backend surface.
+- Detail: Added explicit RTCD backend shims (`x86_rtcd`, `arm_rtcd`) and arch-tier dispatch wrappers for `compute_linear`, `compute_activation`, and `compute_conv2d`, with table-order matching upstream x86/arm maps while preserving existing kernel behavior.
 
 195. [RESOLVED][Validation Semantics][DNN Weights] `linear_init` now mirrors upstream sparse-index structural validation.
 - Rust: `src/dnn/nnet.rs`
