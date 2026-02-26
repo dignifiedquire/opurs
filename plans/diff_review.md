@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,141,142,144,145,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,142,144,145,146,148,149,153,170,171,172`
 
 ## Findings
 
@@ -579,10 +579,10 @@ IDs: `61,62,72,79,82,87,106,141,142,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/celt/entenc.c`, `libopus-sys/opus/celt/entdec.c`, `libopus-sys/opus/celt/laplace.c`, `libopus-sys/opus/celt/cwrs.c`, `libopus-sys/opus/celt/rate.c`, `libopus-sys/opus/celt/vq.c`
 - Detail: Converted these internal invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
-141. [LOW][Runtime Semantics][CELT LPC/Pitch/Bands] Additional internal invariants are unconditional in Rust.
-- Rust: `src/celt/celt_lpc.rs:18`, `src/celt/celt_lpc.rs:103`, `src/celt/celt_lpc.rs:175-176`, `src/celt/pitch.rs:327`, `src/celt/pitch.rs:349-350`, `src/celt/bands.rs:265`, `src/celt/bands.rs:441`, `src/celt/bands.rs:505-506`, `src/celt/bands.rs:531`, `src/celt/bands.rs:626`, `src/celt/bands.rs:803`, `src/celt/bands.rs:1314`, `src/celt/bands.rs:1959`
-- Upstream: `libopus-sys/opus/celt/celt_lpc.c:225`, `libopus-sys/opus/celt/celt_lpc.c:302-303`, `libopus-sys/opus/celt/pitch.c:265`, `libopus-sys/opus/celt/pitch.c:325-326`, `libopus-sys/opus/celt/bands.c:254`, `libopus-sys/opus/celt/bands.c:480`, `libopus-sys/opus/celt/bands.c:536-537`, `libopus-sys/opus/celt/bands.c:582`, `libopus-sys/opus/celt/bands.c:660`, `libopus-sys/opus/celt/bands.c:840`, `libopus-sys/opus/celt/bands.c:1182`, `libopus-sys/opus/celt/bands.c:1705`
-- Detail: These upstream checks are `celt_assert(...)` invariants; Rust turns them into unconditional `assert!`, so invariant violations can terminate runtime processing in configurations where upstream non-assert builds would not.
+141. [RESOLVED][Runtime Semantics][CELT LPC/Pitch/Bands] Internal invariant checks now follow assert-gated semantics.
+- Rust: `src/celt/celt_lpc.rs`, `src/celt/pitch.rs`, `src/celt/bands.rs`
+- Upstream: `libopus-sys/opus/celt/celt_lpc.c`, `libopus-sys/opus/celt/pitch.c`, `libopus-sys/opus/celt/bands.c`
+- Detail: Converted tracked internal invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
 142. [LOW][Runtime Semantics][SILK] Additional SILK invariant checks are unconditional `assert!` in Rust.
 - Rust: `src/silk/control_codec.rs:167-168`, `src/silk/control_codec.rs:222`, `src/silk/control_codec.rs:228`, `src/silk/control_codec.rs:307-312`, `src/silk/decode_frame.rs:49`, `src/silk/decode_frame.rs:84`, `src/silk/decode_frame.rs:110`, `src/silk/decode_frame.rs:132`, `src/silk/decode_core.rs:133`, `src/silk/decode_core.rs:204`, `src/silk/NSQ.rs:220`, `src/silk/NSQ.rs:423`, `src/silk/NSQ.rs:441`, `src/silk/NSQ_del_dec.rs:311`, `src/silk/NSQ_del_dec.rs:541`, `src/silk/NSQ_del_dec.rs:608`, `src/silk/float/pitch_analysis_core_FLP.rs:90-92`, `src/silk/float/pitch_analysis_core_FLP.rs:218`, `src/silk/float/pitch_analysis_core_FLP.rs:244`, `src/silk/float/find_pred_coefs_FLP.rs:42`

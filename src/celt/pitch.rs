@@ -105,7 +105,7 @@ pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> 
 /// in `celt::simd::xcorr_kernel` instead of calling this directly.
 #[inline]
 pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
-    assert!(len >= 3);
+    debug_assert!(len >= 3);
     let mut y_0: f32;
     let mut y_1: f32;
     let mut y_2: f32;
@@ -281,10 +281,10 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
 /// `x_lp` receives the downsampled output of length `len`.
 pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usize, arch: Arch) {
     let C = x.len();
-    assert!(C == 1 || C == 2);
-    assert!(factor >= 2 && factor.is_multiple_of(2));
-    assert!(x[0].len() >= len * factor);
-    assert!(x_lp.len() >= len);
+    debug_assert!(C == 1 || C == 2);
+    debug_assert!(factor >= 2 && factor.is_multiple_of(2));
+    debug_assert!(x[0].len() >= len * factor);
+    debug_assert!(x_lp.len() >= len);
     let offset = factor >> 1;
 
     let mut ac: [f32; 5] = [0.0; 5];
@@ -340,7 +340,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
 /// in `celt::simd::celt_pitch_xcorr` instead of calling this directly.
 pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
-    assert!(max_pitch > 0);
+    debug_assert!(max_pitch > 0);
     let mut i = 0i32;
     while i < max_pitch as i32 - 3 {
         let mut sum: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
@@ -362,8 +362,8 @@ pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usi
 /// Pitch search: finds the best pitch period.
 /// Returns the pitch index.
 pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arch) -> i32 {
-    assert!(len > 0);
-    assert!(max_pitch > 0);
+    debug_assert!(len > 0);
+    debug_assert!(max_pitch > 0);
     let lag: i32 = len + max_pitch;
 
     let mut x_lp4: Vec<f32> = vec![0.0; (len >> 2) as usize];

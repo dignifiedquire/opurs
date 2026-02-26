@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,141,142,144,145,146,148,149,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,143,168`
+Open: `61,62,72,79,82,87,106,142,144,145,146,148,149,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,143,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,9 @@ Closed in this group: `66,67,68,135,136,137,140,143,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed additional CELT LPC/pitch/bands assert-gating parity items:
+  - `src/celt/celt_lpc.rs`, `src/celt/pitch.rs`, `src/celt/bands.rs`: converted tracked invariant checks from `assert!` to `debug_assert!` to mirror upstream `celt_assert` release semantics.
+  - closes `141`.
 - 2026-02-26: Closed additional assert-gating parity items in CELT and DNN frequency paths:
   - `src/celt/entenc.rs`, `src/celt/entdec.rs`, `src/celt/laplace.rs`, `src/celt/cwrs.rs`, `src/celt/rate.rs`, `src/celt/vq.rs`: converted tracked internal invariant checks from `assert!` to `debug_assert!` to mirror upstream `celt_assert` release semantics.
   - `src/dnn/osce.rs`, `src/dnn/freq.rs`: converted tracked OSCE/Freq invariant checks from `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.

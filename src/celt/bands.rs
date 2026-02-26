@@ -276,7 +276,7 @@ pub fn denormalise_bands(
         }
         i += 1;
     }
-    assert!(start <= end);
+    debug_assert!(start <= end);
     freq[bound as usize..N as usize].fill(0.0);
 }
 
@@ -452,7 +452,7 @@ pub fn spreading_decision(
     let mut nbBands: i32 = 0;
     let eBands = &m.eBands;
     let mut hf_sum: i32 = 0;
-    assert!(end > 0);
+    debug_assert!(end > 0);
     let N0 = M * m.shortMdctSize;
     if M * (eBands[end as usize] as i32 - eBands[(end - 1) as usize] as i32) <= 8 {
         return SPREAD_NONE;
@@ -516,8 +516,8 @@ pub fn spreading_decision(
             *tapset_decision = 0;
         }
     }
-    assert!(nbBands > 0);
-    assert!(sum >= 0);
+    debug_assert!(nbBands > 0);
+    debug_assert!(sum >= 0);
     sum = celt_udiv((sum << 8) as u32, nbBands as u32) as i32;
     sum = (sum + *average) >> 1;
     *average = sum;
@@ -542,7 +542,7 @@ static ordery_table: [i32; 30] = [
 fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
     let mut tmp = [0.0f32; 176];
-    assert!(stride > 0);
+    debug_assert!(stride > 0);
     if hadamard != 0 {
         let ordery = &ordery_table[(stride - 2) as usize..];
         let mut i = 0;
@@ -637,7 +637,7 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
         let raw = EXP2_TABLE8[(qb & 0x7) as usize] as i32 >> (14 - (qb >> BITRES));
         ((raw + 1) >> 1) << 1
     };
-    assert!(qn <= 256);
+    debug_assert!(qn <= 256);
     qn
 }
 
@@ -814,7 +814,7 @@ fn compute_theta(
                 }
             }
         }
-        assert!(itheta >= 0);
+        debug_assert!(itheta >= 0);
         itheta = celt_udiv((itheta * 16384) as u32, qn as u32) as i32;
         #[cfg(feature = "qext")]
         {
@@ -1371,7 +1371,7 @@ fn cubic_quant_partition(
     resynth: i32,
     encode: i32,
 ) -> u32 {
-    assert!(LM >= 0);
+    debug_assert!(LM >= 0);
     ctx.remaining_bits = ec.storage as i32 * 8 * 8 - ec_tell_frac(ec) as i32;
     b = b.min(ctx.remaining_bits);
     if LM == 0 || b <= (2 * N) << BITRES {
@@ -2107,7 +2107,7 @@ pub fn quant_all_bands<'a>(
         let last = (i == end - 1) as i32;
         let band_start = (M * eBands[i as usize] as i32) as usize;
         let N: i32 = M * eBands[(i + 1) as usize] as i32 - M * eBands[i as usize] as i32;
-        assert!(N > 0);
+        debug_assert!(N > 0);
         let n = N as usize;
         let tell = ec_tell_frac(ec) as i32;
         if i != start {

@@ -16,7 +16,7 @@ pub const LPC_ORDER: usize = 24;
 #[inline]
 pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
     let p = lpc.len();
-    assert!(ac.len() > p);
+    debug_assert!(ac.len() > p);
     lpc.fill(0.0);
     if ac[0] > 1e-10f32 {
         let mut error = ac[0];
@@ -53,8 +53,8 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
 #[inline]
 pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize, arch: Arch) {
     let n = y.len();
-    assert!(x.len() >= n + ord);
-    assert!(num.len() >= ord);
+    debug_assert!(x.len() >= n + ord);
+    debug_assert!(num.len() >= ord);
 
     // Reverse the numerator coefficients
     let mut rnum = [0.0f32; LPC_ORDER];
@@ -98,10 +98,10 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize, arch: Arch)
 /// Upstream C: celt/celt_lpc.c:celt_iir
 #[inline]
 pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f32], arch: Arch) {
-    assert!(buf.len() >= n);
-    assert!(den.len() >= ord);
-    assert!(mem.len() >= ord);
-    assert!(ord & 3 == 0);
+    debug_assert!(buf.len() >= n);
+    debug_assert!(den.len() >= ord);
+    debug_assert!(mem.len() >= ord);
+    debug_assert!(ord & 3 == 0);
 
     // Reverse the denominator coefficients
     let mut rden = [0.0f32; LPC_ORDER];
@@ -174,14 +174,14 @@ pub fn _celt_autocorr(
 ) -> i32 {
     let n = x.len();
     let fast_n = n - lag;
-    assert!(n > 0);
-    assert!(ac.len() > lag);
+    debug_assert!(n > 0);
+    debug_assert!(ac.len() > lag);
 
     let mut xx: Vec<f32>;
     let xptr: &[f32];
 
     if let Some(win) = window {
-        assert!(win.len() >= overlap);
+        debug_assert!(win.len() >= overlap);
         xx = x.to_vec();
         for i in 0..overlap {
             xx[i] = x[i] * win[i];
