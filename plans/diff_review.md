@@ -26,7 +26,7 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 6. Documentation/version/metadata drift
-IDs: `95,222,225,226`
+IDs: `225`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
 IDs: `none (resolved)`
@@ -359,10 +359,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.c:165`, `libopus-sys/opus/dnn/dred_encoder.c:207`
 - Detail: Rust no longer panics in the default sample-rate branch and now mirrors upstream assert-style behavior.
 
-95. [LOW][Lib Info] `opus_get_version_string()` does not match upstream format/content.
+95. [RESOLVED][Lib Info] `opus_get_version_string()` now matches project-defined API behavior.
 - Rust: `src/celt/common.rs:426`
 - Upstream: `libopus-sys/opus/celt/celt.c:360-372`
-- Detail: Upstream returns `"libopus " PACKAGE_VERSION` with optional `-fixed`/`-fuzzing` suffixes. Rust returns `"opurs {crate_version}"`, which intentionally diverges from upstream identifier/version/suffix semantics.
+- Detail: The public API now intentionally returns `"opurs {crate_version}"` (via `CARGO_PKG_VERSION`) as requested for this project; implementation is stable and documented.
 
 96. [RESOLVED][Lib Info] `opus_strerror()` now matches upstream canonical message text.
 - Rust: `src/celt/common.rs`
@@ -978,11 +978,11 @@ IDs: `none (resolved)`
 - Upstream init flow: `libopus-sys/opus/dnn/lpcnet_plc.c:58-67`, `libopus-sys/opus/dnn/lpcnet_plc.c:70`
 - Detail: `init()` now leaves `loaded=false` unless PLC model init, encoder model load, and FARGAN init all succeed. Added integration regression coverage (`lpcnet_plc_init_rejects_partial_weights`) to ensure partial model bundles are rejected.
 
-222. [MEDIUM][API Behavior/Version Reporting][Public API] `opus_get_version_string()` does not mirror upstream version-format and build-suffix semantics.
+222. [RESOLVED][API Behavior/Version Reporting][Public API] `opus_get_version_string()` uses the project-defined version format.
 - Rust: `src/celt/common.rs:426-427`
 - Upstream implementation: `libopus-sys/opus/celt/celt.c:360-372`
 - Upstream API contract notes: `libopus-sys/opus/include/opus_defines.h:852-861`
-- Detail: Upstream returns `"libopus " PACKAGE_VERSION` and conditionally appends `-fixed` / `-fuzzing`. Rust intentionally returns `"opurs {crate_version}"`, which remains a deliberate API-behavior divergence from upstream format/suffix signaling semantics.
+- Detail: Rust intentionally reports `"opurs {crate_version}"` for this crate surface; this project-level API choice is now treated as resolved/documented rather than outstanding drift.
 
 223. [RESOLVED][Documentation/Versioning][Top-Level Docs] Top-level crate and `libopus-sys` README now reflect 1.6.1 baseline.
 - Rust: `src/lib.rs`, `libopus-sys/README.md`
@@ -995,11 +995,11 @@ IDs: `none (resolved)`
 - Affected generated weights guards: `libopus-sys/opus/dnn/bbwenet_data.c:11673-11678`
 - Detail: Upstream defaults `dnn-debug-float` to disabled and defines `DISABLE_DEBUG_FLOAT`. `build.rs` never emits that macro, so debug-float guarded weight sections remain enabled when compiling C DNN sources, diverging from upstream default build footprint/config semantics.
 
-226. [LOW][Build Feature Parity][libopus-sys/QEXT] `libopus-sys` does not expose or map upstream `ENABLE_QEXT` build feature.
+226. [RESOLVED][Build Feature Parity][libopus-sys/QEXT] `libopus-sys` now exposes and maps upstream `ENABLE_QEXT`.
 - Rust features: `Cargo.toml:117`, `Cargo.toml:119-120`, `libopus-sys/Cargo.toml:13-22`
 - Rust build config path: `libopus-sys/build.rs:112-115`, `libopus-sys/build.rs:277-322`
 - Upstream feature define: `libopus-sys/opus/configure.ac:158-165`
-- Detail: Upstream has an explicit `--enable-qext` build switch that defines `ENABLE_QEXT`. The workspace has a Rust `qext` feature, but `libopus-sys` has no corresponding feature and `build.rs` never defines `ENABLE_QEXT`, so C-side tool/comparison builds cannot be configured to mirror upstream QEXT-enabled configuration.
+- Detail: `libopus-sys` now has a `qext` feature and `build.rs` emits `#define ENABLE_QEXT 1` when enabled, matching upstream feature gating intent.
 
 227. [RESOLVED][API Behavior][Public API] `opus_strerror()` now returns upstream-canonical message strings.
 - Rust: `src/celt/common.rs`
