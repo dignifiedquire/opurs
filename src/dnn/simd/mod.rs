@@ -31,10 +31,8 @@ pub fn sgemv(
     x: &[f32],
     arch: Arch,
 ) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             aarch64::sgemv_neon(out, weights, rows, cols, col_stride, x);
         }
@@ -67,10 +65,8 @@ pub fn sparse_sgemv8x4(
     x: &[f32],
     arch: Arch,
 ) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             aarch64::sparse_sgemv8x4_neon(out, w, idx, rows, x);
         }
@@ -104,10 +100,8 @@ pub fn cgemv8x4(
     x: &[f32],
     arch: Arch,
 ) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             if arch.has_dotprod() {
                 aarch64::cgemv8x4_dotprod(out, w, scale, rows, cols, x);
@@ -158,10 +152,8 @@ pub fn sparse_cgemv8x4(
     x: &[f32],
     arch: Arch,
 ) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             if arch.has_dotprod() {
                 aarch64::sparse_cgemv8x4_dotprod(out, w, idx, scale, rows, cols, x);
@@ -215,10 +207,8 @@ pub fn sparse_cgemv8x4(
 /// reciprocal) rather than true division, producing slightly different results.
 #[inline]
 pub fn tanh_approx(x: f32, arch: Arch) -> f32 {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         return unsafe { aarch64::tanh_approx_neon(x) };
     }
 
@@ -244,10 +234,8 @@ pub fn tanh_approx(x: f32, arch: Arch) -> f32 {
 /// On x86 with AVX2: broadcasts into __m256, calls sigmoid8_approx, extracts lane 0.
 #[inline]
 pub fn sigmoid_approx(x: f32, arch: Arch) -> f32 {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         return unsafe { aarch64::sigmoid_approx_neon(x) };
     }
 
@@ -273,10 +261,8 @@ pub fn sigmoid_approx(x: f32, arch: Arch) -> f32 {
 /// On x86 with AVX2: broadcasts into __m256, calls exp8_approx, extracts lane 0.
 #[inline]
 pub fn lpcnet_exp(x: f32, arch: Arch) -> f32 {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         return unsafe { aarch64::lpcnet_exp_neon(x) };
     }
 
@@ -296,10 +282,8 @@ pub fn lpcnet_exp(x: f32, arch: Arch) -> f32 {
 /// SIMD-accelerated batch tanh approximation.
 #[inline]
 pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             aarch64::vec_tanh_neon(y, x);
         }
@@ -331,10 +315,8 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32], arch: Arch) {
 /// SIMD-accelerated batch sigmoid approximation.
 #[inline]
 pub fn vec_sigmoid(y: &mut [f32], x: &[f32], arch: Arch) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             aarch64::vec_sigmoid_neon(y, x);
         }
@@ -396,10 +378,8 @@ pub fn use_su_bias(arch: Arch) -> bool {
 /// SIMD-accelerated batch softmax (unnormalized exp).
 #[inline]
 pub fn softmax(y: &mut [f32], x: &[f32], arch: Arch) {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
-    {
+    if arch.has_neon() {
         unsafe {
             aarch64::softmax_neon(y, x);
         }

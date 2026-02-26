@@ -30,10 +30,10 @@ use crate::opus::opus_defines::{
     OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
-use crate::opus::packet::opus_packet_parse_impl;
+use crate::opus::packet::{opus_packet_parse_impl, opus_pcm_soft_clip_impl};
+use crate::opus_packet_get_samples_per_frame;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
 use crate::silk::dec_API::{silk_Decode, silk_InitDecoder, silk_ResetDecoder};
-use crate::{opus_packet_get_samples_per_frame, opus_pcm_soft_clip};
 
 #[derive(Clone)]
 #[repr(C)]
@@ -1136,7 +1136,13 @@ pub fn opus_decode_native(
     st.last_packet_duration = nb_samples as i32;
     let _ = _opus_false() != 0;
     if soft_clip != 0 {
-        opus_pcm_soft_clip(pcm, nb_samples, st.channels as usize, &mut st.softclip_mem);
+        opus_pcm_soft_clip_impl(
+            pcm,
+            nb_samples,
+            st.channels as usize,
+            &mut st.softclip_mem,
+            st.celt_dec.arch,
+        );
     } else {
         st.softclip_mem[1_usize] = 0 as opus_val16;
         st.softclip_mem[0_usize] = st.softclip_mem[1_usize];

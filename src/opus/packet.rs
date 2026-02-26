@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `src/opus.c`
 
+use crate::arch::Arch;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
 /// Applies soft-clipping to bring a float signal within the [-1,1] range. If
@@ -13,12 +14,16 @@ use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 /// - `frame_size`: Number of samples per channel to process
 /// - `channels`: Number of channels
 /// - `softclip_mem`: State memory for the soft clipping process (one float per channel, initialized to zero)
-pub fn opus_pcm_soft_clip(
+// Upstream C: src/opus.c:opus_pcm_soft_clip_impl
+pub(crate) fn opus_pcm_soft_clip_impl(
     pcm: &mut [f32],
     frame_size: usize,
     channels: usize,
     softclip_mem: &mut [f32],
+    arch: Arch,
 ) {
+    let _ = arch;
+
     if channels < 1 || frame_size < 1 {
         return;
     }
@@ -111,6 +116,15 @@ pub fn opus_pcm_soft_clip(
         }
         softclip_mem[c] = a;
     }
+}
+
+pub fn opus_pcm_soft_clip(
+    pcm: &mut [f32],
+    frame_size: usize,
+    channels: usize,
+    softclip_mem: &mut [f32],
+) {
+    opus_pcm_soft_clip_impl(pcm, frame_size, channels, softclip_mem, Arch::default());
 }
 
 pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {

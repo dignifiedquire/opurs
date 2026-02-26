@@ -60,14 +60,11 @@ pub fn silk_inner_prod_aligned_scale(
 }
 
 /// SIMD-accelerated f32→f64 inner product.
-/// Dispatches to NEON on aarch64, AVX2 on x86, with scalar fallback.
+/// Dispatches to AVX2 on x86, with scalar fallback on other targets.
+///
+/// Upstream only overrides this path on x86 AVX2.
 #[inline]
 pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: Arch) -> f64 {
-    #[cfg(target_arch = "aarch64")]
-    if arch.has_neon() {
-        return unsafe { aarch64::silk_inner_product_flp_neon(data1, data2) };
-    }
-
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_avx2() {
         return unsafe { x86::silk_inner_product_flp_avx2(data1, data2) };
