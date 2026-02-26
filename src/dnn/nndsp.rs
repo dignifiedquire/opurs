@@ -170,8 +170,8 @@ pub fn adaconv_process_frame(
     window: &[f32],
     arch: Arch,
 ) {
-    assert_eq!(left_padding, kernel_size - 1); // only causal version supported
-    assert!(kernel_size < frame_size);
+    debug_assert_eq!(left_padding, kernel_size - 1); // only causal version supported
+    debug_assert!(kernel_size < frame_size);
 
     let mut output_buffer = vec![0.0f32; ADACONV_MAX_FRAME_SIZE * ADACONV_MAX_OUTPUT_CHANNELS];
     let mut kernel_buffer =
@@ -412,12 +412,12 @@ pub fn adashape_process_frame(
     interpolate_k: usize,
     arch: Arch,
 ) {
-    assert!(frame_size.is_multiple_of(avg_pool_k));
-    assert!(frame_size.is_multiple_of(interpolate_k));
+    debug_assert!(frame_size.is_multiple_of(avg_pool_k));
+    debug_assert!(frame_size.is_multiple_of(interpolate_k));
     let hidden_dim = frame_size / interpolate_k;
     let tenv_size = frame_size / avg_pool_k;
     let f = 1.0f32 / avg_pool_k as f32;
-    assert!(feature_dim + tenv_size + 1 < ADASHAPE_MAX_INPUT_DIM);
+    debug_assert!(feature_dim + tenv_size + 1 < ADASHAPE_MAX_INPUT_DIM);
 
     let mut in_buffer = vec![0.0f32; ADASHAPE_MAX_INPUT_DIM + ADASHAPE_MAX_FRAME_SIZE];
     let mut out_buffer = vec![0.0f32; ADASHAPE_MAX_FRAME_SIZE];

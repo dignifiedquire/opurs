@@ -96,7 +96,7 @@ const MAX_ACTIVATIONS: usize = 4096;
 
 fn vec_swish(y: &mut [f32], x: &[f32], n: usize, arch: Arch) {
     let mut tmp = [0.0f32; MAX_ACTIVATIONS];
-    assert!(n <= MAX_ACTIVATIONS);
+    debug_assert!(n <= MAX_ACTIVATIONS);
     vec_sigmoid(&mut tmp[..n], &x[..n], arch);
     for i in 0..n {
         y[i] = x[i] * tmp[i];
@@ -198,7 +198,7 @@ pub fn compute_linear(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch
 
     if !linear.diag.is_empty() {
         // Diag is only used for GRU recurrent weights: 3*M == N
-        assert!(3 * m == n);
+        debug_assert!(3 * m == n);
         for i in 0..m {
             out[i] += linear.diag[i] * input[i];
             out[i + m] += linear.diag[i + m] * input[i];
@@ -237,8 +237,8 @@ pub fn compute_generic_gru(
     input: &[f32],
     arch: Arch,
 ) {
-    assert!(3 * recurrent_weights.nb_inputs == recurrent_weights.nb_outputs);
-    assert!(input_weights.nb_outputs == recurrent_weights.nb_outputs);
+    debug_assert!(3 * recurrent_weights.nb_inputs == recurrent_weights.nb_outputs);
+    debug_assert!(input_weights.nb_outputs == recurrent_weights.nb_outputs);
 
     let n = recurrent_weights.nb_inputs;
     let mut zrh = vec![0.0f32; 3 * n];
@@ -271,7 +271,7 @@ pub fn compute_generic_gru(
 ///
 /// Upstream C: dnn/nnet.c:compute_glu
 pub fn compute_glu(layer: &LinearLayer, output: &mut [f32], input: &[f32], arch: Arch) {
-    assert!(layer.nb_inputs == layer.nb_outputs);
+    debug_assert!(layer.nb_inputs == layer.nb_outputs);
     let n = layer.nb_outputs;
     let mut act = vec![0.0f32; n];
     compute_linear(layer, &mut act, input, arch);
@@ -298,7 +298,7 @@ pub fn compute_gated_activation(
     activation: i32,
     arch: Arch,
 ) {
-    assert!(layer.nb_inputs == layer.nb_outputs);
+    debug_assert!(layer.nb_inputs == layer.nb_outputs);
     let n = layer.nb_outputs;
     let mut act = vec![0.0f32; n];
     compute_linear(layer, &mut act, input, arch);
@@ -332,7 +332,7 @@ pub fn compute_generic_conv1d(
     arch: Arch,
 ) {
     let mut tmp = vec![0.0f32; MAX_CONV_INPUTS_ALL];
-    assert!(layer.nb_inputs <= MAX_CONV_INPUTS_ALL);
+    debug_assert!(layer.nb_inputs <= MAX_CONV_INPUTS_ALL);
     let hist_size = layer.nb_inputs - input_size;
     if hist_size > 0 {
         tmp[..hist_size].copy_from_slice(&mem[..hist_size]);
@@ -362,7 +362,7 @@ pub fn compute_generic_conv1d_dilation(
 ) {
     let mut tmp = vec![0.0f32; MAX_CONV_INPUTS_ALL];
     let ksize = layer.nb_inputs / input_size;
-    assert!(layer.nb_inputs <= MAX_CONV_INPUTS_ALL);
+    debug_assert!(layer.nb_inputs <= MAX_CONV_INPUTS_ALL);
 
     if dilation == 1 {
         let hist_size = layer.nb_inputs - input_size;
@@ -450,7 +450,7 @@ pub fn compute_conv2d(
     arch: Arch,
 ) {
     let time_stride = conv.in_channels * (height + conv.kheight - 1);
-    assert!(conv.ktime * time_stride <= MAX_CONV2D_INPUTS);
+    debug_assert!(conv.ktime * time_stride <= MAX_CONV2D_INPUTS);
     let mut in_buf = vec![0.0f32; MAX_CONV2D_INPUTS];
 
     // Copy history from mem, then current input

@@ -636,7 +636,7 @@ pub fn lpcnet_plc_fec_clear(st: &mut LPCNetPLCState) {
 
 /// Compute PLC prediction from features.
 fn compute_plc_pred(st: &mut LPCNetPLCState, out: &mut [f32], input: &[f32], arch: Arch) {
-    assert!(st.loaded);
+    debug_assert!(st.loaded);
     let mut tmp = vec![0.0f32; PLC_DENSE_IN_OUT_SIZE];
     compute_generic_dense(
         &st.model.plc_dense_in,
@@ -748,7 +748,7 @@ static ATT_TABLE: [f32; 10] = [0.0, 0.0, -0.2, -0.2, -0.4, -0.4, -0.8, -0.8, -1.
 ///
 /// Upstream C: dnn/lpcnet_plc.c:lpcnet_plc_conceal
 pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) {
-    assert!(st.loaded);
+    debug_assert!(st.loaded);
 
     if st.blend == 0 {
         let mut count = 0;
@@ -756,7 +756,7 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
 
         while st.analysis_pos + FRAME_SIZE <= PLC_BUF_SIZE {
             let mut x = vec![0.0f32; FRAME_SIZE];
-            assert!(st.analysis_pos < PLC_BUF_SIZE);
+            debug_assert!(st.analysis_pos < PLC_BUF_SIZE);
             for i in 0..FRAME_SIZE {
                 x[i] = 32768.0 * st.pcm[st.analysis_pos + i];
             }

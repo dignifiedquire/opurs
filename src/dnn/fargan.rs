@@ -459,7 +459,7 @@ fn run_fargan_subframe(
     period: i32,
     arch: Arch,
 ) {
-    assert!(st.cont_initialized);
+    debug_assert!(st.cont_initialized);
     let model = &st.model;
 
     // Gain from conditioning
@@ -707,7 +707,7 @@ pub fn fargan_cont(st: &mut FARGANState, pcm0: &[f32], features0: &[f32], arch: 
 ///
 /// Upstream C: dnn/fargan.c:fargan_synthesize
 pub fn fargan_synthesize(st: &mut FARGANState, pcm: &mut [f32], features: &[f32], arch: Arch) {
-    assert!(st.cont_initialized);
+    debug_assert!(st.cont_initialized);
     let mut cond = vec![0.0f32; COND_NET_FDENSE2_OUT_SIZE];
     let period = (0.5
         + 256.0 / 2.0f64.powf((1.0 / 60.0) * ((features[NB_BANDS] as f64 + 1.5) * 60.0)))
