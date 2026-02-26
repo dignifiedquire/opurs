@@ -9,7 +9,7 @@ use libopus_sys::{
     opus_custom_encoder_ctl, opus_custom_encoder_destroy, opus_custom_mode_create,
     opus_custom_mode_destroy,
 };
-use opurs::arch::Arch;
+use opurs::arch::opus_select_arch;
 use opurs::{OpusCustomDecoder, OpusCustomEncoder, OPUS_OK};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -39,8 +39,9 @@ fn custom_encode24_matches_upstream_c() {
     let frame_size = 960;
     let channels = 2;
     let pcm = deterministic_pcm24(frame_size, channels as usize);
+    let arch = opus_select_arch();
 
-    let mut rust_enc = OpusCustomEncoder::new(48000, channels, Arch::Scalar)
+    let mut rust_enc = OpusCustomEncoder::new(48000, channels, arch)
         .unwrap_or_else(|err| panic!("rust custom encoder init failed: {err}"));
 
     let mut err = OPUS_OK;
@@ -91,8 +92,9 @@ fn custom_decode24_matches_upstream_c() {
     let frame_size = 960;
     let channels = 2;
     let pcm = deterministic_pcm24(frame_size, channels as usize);
+    let arch = opus_select_arch();
 
-    let mut rust_dec = OpusCustomDecoder::new(48000, channels as usize, Arch::Scalar)
+    let mut rust_dec = OpusCustomDecoder::new(48000, channels as usize, arch)
         .unwrap_or_else(|err| panic!("rust custom decoder init failed: {err}"));
 
     let mut err = OPUS_OK;

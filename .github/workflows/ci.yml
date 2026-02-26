@@ -244,6 +244,7 @@ jobs:
         run: cargo test --features tools --test opus_projection_encoder_api
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
@@ -455,6 +456,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
@@ -557,6 +559,7 @@ jobs:
         run: cargo build --release --features tools --target ${{ matrix.target }}
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
