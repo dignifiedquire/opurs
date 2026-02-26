@@ -74,7 +74,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: Arch) -> f64 {
     super::float::inner_product_FLP::silk_inner_product_FLP_scalar(data1, data2)
 }
 
-/// SIMD-accelerated VAD energy accumulation: sum of (X[i] >> 3)^2.
+/// SIMD-accelerated VAD energy accumulation: sum of (X\[i\] >> 3)^2.
 /// Dispatches to SSE2 on x86, with scalar fallback.
 #[inline]
 pub fn silk_vad_energy(x: &[i16], arch: Arch) -> i32 {

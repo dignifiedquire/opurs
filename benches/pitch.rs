@@ -101,6 +101,7 @@ fn bench_celt_pitch_xcorr(c: &mut Criterion) {
 }
 
 fn bench_comb_filter_const(c: &mut Criterion) {
+    #[cfg(feature = "simd")]
     let arch = opurs::internals::opus_select_arch();
     let mut group = c.benchmark_group("comb_filter_const");
     for &(n, t) in &[(120, 15), (480, 40), (960, 100)] {

@@ -134,7 +134,7 @@ fn bench_vq_wmat_ec(c: &mut Criterion) {
     // LTP_ORDER = 5, typical codebook sizes
     let ltp_order = 5;
     for &l in &[8, 32] {
-        let xx_q17 = generate_i32_signal(ltp_order * (ltp_order + 1) / 2, 42);
+        let xx_q17 = generate_i32_signal(ltp_order * ltp_order, 42);
         let xx_q17: Vec<i32> = xx_q17.iter().map(|&v| v.abs() >> 8).collect();
         let x_x_q17 = generate_i32_signal(ltp_order, 123);
         let cb_q7: Vec<i8> = generate_i16_signal(l * ltp_order, 77)
