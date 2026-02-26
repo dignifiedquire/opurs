@@ -59,10 +59,19 @@ pub use crate::opus::opus_projection_encoder::{
     opus_projection_encoder_get_encoder_state, OpusProjectionEncoder,
 };
 // opus_decoder
+#[cfg(feature = "dred")]
+pub use crate::dnn::dred::decoder::{OpusDRED, OpusDREDDecoder};
 pub use crate::opus::opus_decoder::{
     opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
     opus_packet_get_nb_channels, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
     OpusDecoder,
+};
+#[cfg(feature = "dred")]
+pub use crate::opus::opus_decoder::{
+    opus_decoder_dred_decode, opus_decoder_dred_decode24, opus_decoder_dred_decode_float,
+    opus_dred_alloc, opus_dred_decoder_create, opus_dred_decoder_ctl, opus_dred_decoder_destroy,
+    opus_dred_decoder_get_size, opus_dred_decoder_init, opus_dred_free, opus_dred_get_size,
+    opus_dred_parse, opus_dred_process,
 };
 
 pub use crate::opus::packet::{

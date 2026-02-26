@@ -4,9 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-Open: `12,45,76,179,180,191,192,193,194`
+Open: `179,180,191,192,193`
 Excluded (intentional API-shape): `177,178`
-Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,215,216,217,219,220,221`
+Closed in this group: `12,45,76,94,135,136,137,175,176,181,182,187,194,201,206,210,211,215,216,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
@@ -44,3 +44,15 @@ Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,215,21
   - `211`: `PitchDNNState` now includes `xcorr_mem3` (state-layout parity).
   - `216`: LPCNet feature extraction entry points thread `arch`.
 - 2026-02-26: Aligned DNN conv2d algorithmic path with upstream by adding the `ktime==3 && kheight==3` fast-path branch (`conv2d_3x3_float`) in `compute_conv2d`, and added `tests/osce_nndsp.rs:test_compute_conv2d_3x3` for bit-exact C-vs-Rust coverage.
+- 2026-02-26: Aligned decoder DRED-assisted decode path with upstream:
+  - `src/opus/opus_decoder.rs`: `opus_decode_native` now accepts DRED inputs and threads the upstream pre-PLC DRED feature staging flow (`dred` + `dred_offset`) before PLC/FEC decode.
+  - `src/opus/opus_decoder.rs`: added public `opus_decoder_dred_decode`, `opus_decoder_dred_decode24`, `opus_decoder_dred_decode_float` entry points plus `OpusDecoder` convenience methods.
+  - `src/lib.rs`: re-exported new DRED decode entry points.
+  - `tests/dred_decode_parity.rs`: added tools-dnn C-vs-Rust parity check for DRED decode wrapper path.
+  - closes `12` and `76`.
+- 2026-02-26: Added the remaining DRED object lifecycle and parse/process API wrappers in `src/opus/opus_decoder.rs`:
+  - `opus_dred_decoder_get_size`, `opus_dred_decoder_create`, `opus_dred_decoder_init`, `opus_dred_decoder_destroy`, `opus_dred_decoder_ctl`
+  - `opus_dred_get_size`, `opus_dred_alloc`, `opus_dred_free`, `opus_dred_parse`, `opus_dred_process`
+  - `src/lib.rs` now re-exports `OpusDRED`, `OpusDREDDecoder`, and these wrapper APIs.
+  - Added focused unit coverage for DRED parse/control behavior and kept tools-dnn parity test coverage for DRED decode wrapper flow.
+  - closes `45`.

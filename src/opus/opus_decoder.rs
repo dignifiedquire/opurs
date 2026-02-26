@@ -29,11 +29,26 @@ use crate::opus::opus_defines::{
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BUFFER_TOO_SMALL,
     OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
+#[cfg(feature = "dred")]
+use crate::opus::opus_defines::{OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::opus::packet::{opus_packet_parse_impl, opus_pcm_soft_clip_impl};
 use crate::opus_packet_get_samples_per_frame;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
 use crate::silk::dec_API::{silk_Decode, silk_InitDecoder, silk_ResetDecoder};
+#[cfg(feature = "dred")]
+use crate::{
+    dnn::dred::{
+        config::{
+            DRED_EXPERIMENTAL_BYTES, DRED_EXPERIMENTAL_VERSION, DRED_EXTENSION_ID,
+            DRED_NUM_FEATURES, DRED_NUM_REDUNDANCY_FRAMES,
+        },
+        decoder::{
+            dred_ec_decode, opus_dred_process as dred_process_impl, OpusDRED, OpusDREDDecoder,
+        },
+    },
+    dnn::lpcnet::{lpcnet_plc_fec_add, lpcnet_plc_fec_clear},
+};
 
 #[derive(Clone)]
 #[repr(C)]
@@ -162,6 +177,42 @@ impl OpusDecoder {
         decode_fec: bool,
     ) -> i32 {
         opus_decode24(self, data, pcm, frame_size, decode_fec as i32)
+    }
+
+    /// Decode PLC audio using a pre-parsed DRED state into interleaved `i16`.
+    #[cfg(feature = "dred")]
+    pub fn decode_dred(
+        &mut self,
+        dred: &OpusDRED,
+        dred_offset: i32,
+        pcm: &mut [i16],
+        frame_size: i32,
+    ) -> i32 {
+        opus_decoder_dred_decode(self, dred, dred_offset, pcm, frame_size)
+    }
+
+    /// Decode PLC audio using a pre-parsed DRED state into interleaved `i32` (24-bit range).
+    #[cfg(feature = "dred")]
+    pub fn decode_dred24(
+        &mut self,
+        dred: &OpusDRED,
+        dred_offset: i32,
+        pcm: &mut [i32],
+        frame_size: i32,
+    ) -> i32 {
+        opus_decoder_dred_decode24(self, dred, dred_offset, pcm, frame_size)
+    }
+
+    /// Decode PLC audio using a pre-parsed DRED state into interleaved `f32`.
+    #[cfg(feature = "dred")]
+    pub fn decode_dred_float(
+        &mut self,
+        dred: &OpusDRED,
+        dred_offset: i32,
+        pcm: &mut [f32],
+        frame_size: i32,
+    ) -> i32 {
+        opus_decoder_dred_decode_float(self, dred, dred_offset, pcm, frame_size)
     }
 
     // -- Type-safe CTL getters and setters --
@@ -919,6 +970,49 @@ fn opus_decode_frame(
         audiosize
     }
 }
+
+#[cfg(feature = "dred")]
+fn stage_dred_features_for_decode(
+    st: &mut OpusDecoder,
+    frame_size: i32,
+    dred: &OpusDRED,
+    dred_offset: i32,
+) {
+    // Upstream C: src/opus_decoder.c:opus_decode_native (ENABLE_DRED block)
+    if dred.process_stage != 2 {
+        return;
+    }
+
+    lpcnet_plc_fec_clear(&mut st.lpcnet);
+    let f10 = st.Fs / 100;
+    let init_frames = if st.lpcnet.blend == 0 { 2 } else { 0 };
+    let features_per_frame = 1.max(frame_size / f10);
+    let needed_feature_frames = init_frames + features_per_frame;
+    let dred_shift_samples = dred_offset + dred.dred_offset * f10 / 4;
+    let dred_frame_shift = (dred_shift_samples as f32 / f10 as f32).floor() as i32;
+
+    for i in 0..needed_feature_frames {
+        // Floor matches upstream; 5 ms overlap compensates for the 0.5 rounding.
+        let feature_offset = init_frames - i - 2 + dred_frame_shift;
+        if feature_offset >= 0 && feature_offset < 4 * dred.nb_latents {
+            let start = feature_offset as usize * DRED_NUM_FEATURES;
+            let end = start + DRED_NUM_FEATURES;
+            if end <= dred.fec_features.len() {
+                lpcnet_plc_fec_add(&mut st.lpcnet, Some(&dred.fec_features[start..end]));
+            } else {
+                debug_assert!(
+                    false,
+                    "libopus: DRED feature buffer bounds mismatch (start={start}, end={end}, len={})",
+                    dred.fec_features.len()
+                );
+                lpcnet_plc_fec_add(&mut st.lpcnet, None);
+            }
+        } else if feature_offset >= 0 {
+            lpcnet_plc_fec_add(&mut st.lpcnet, None);
+        }
+    }
+}
+
 pub fn opus_decode_native(
     st: &mut OpusDecoder,
     data: &[u8],
@@ -928,6 +1022,9 @@ pub fn opus_decode_native(
     self_delimited: bool,
     packet_offset: Option<&mut i32>,
     soft_clip: i32,
+    #[cfg(feature = "dred")] dred: Option<&OpusDRED>,
+    #[cfg(not(feature = "dred"))] _dred: Option<&()>,
+    dred_offset: i32,
 ) -> i32 {
     let mut i: i32 = 0;
     let mut nb_samples: usize = 0;
@@ -946,6 +1043,13 @@ pub fn opus_decode_native(
     if (decode_fec != 0 || data.is_empty()) && frame_size % (st.Fs / 400) != 0 {
         return OPUS_BAD_ARG;
     }
+    #[cfg(feature = "dred")]
+    if let Some(dred) = dred {
+        stage_dred_features_for_decode(st, frame_size, dred, dred_offset);
+    }
+    #[cfg(not(feature = "dred"))]
+    let _ = dred_offset;
+
     if data.is_empty() {
         let mut pcm_count: i32 = 0;
         loop {
@@ -1019,7 +1123,18 @@ pub fn opus_decode_native(
             || packet_mode == MODE_CELT_ONLY
             || st.mode == MODE_CELT_ONLY
         {
-            return opus_decode_native(st, &[][..], pcm, frame_size, 0, false, None, soft_clip);
+            return opus_decode_native(
+                st,
+                &[][..],
+                pcm,
+                frame_size,
+                0,
+                false,
+                None,
+                soft_clip,
+                None,
+                0,
+            );
         }
         duration_copy = st.last_packet_duration;
         if frame_size - packet_frame_size != 0 {
@@ -1032,6 +1147,8 @@ pub fn opus_decode_native(
                 false,
                 None,
                 soft_clip,
+                None,
+                0,
             );
             if ret_0 < 0 {
                 st.last_packet_duration = duration_copy;
@@ -1176,7 +1293,9 @@ pub fn opus_decode(
     debug_assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 1);
+    let ret = opus_decode_native(
+        st, data, &mut out, frame_size, decode_fec, false, None, 1, None, 0,
+    );
     if ret > 0 {
         celt_float2int16(&out, pcm, (ret * st.channels) as usize);
     }
@@ -1193,7 +1312,9 @@ pub fn opus_decode_float(
     if frame_size <= 0 {
         return OPUS_BAD_ARG;
     }
-    opus_decode_native(st, data, pcm, frame_size, decode_fec, false, None, 0)
+    opus_decode_native(
+        st, data, pcm, frame_size, decode_fec, false, None, 0, None, 0,
+    )
 }
 
 /// Upstream C: src/opus_decoder.c:opus_decode24
@@ -1218,13 +1339,319 @@ pub fn opus_decode24(
     debug_assert!(st.channels == 1 || st.channels == 2);
     let vla = (frame_size * st.channels) as usize;
     let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret = opus_decode_native(st, data, &mut out, frame_size, decode_fec, false, None, 0);
+    let ret = opus_decode_native(
+        st, data, &mut out, frame_size, decode_fec, false, None, 0, None, 0,
+    );
     if ret > 0 {
         for i in 0..(ret * st.channels) as usize {
             pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
         }
     }
     ret
+}
+
+/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode
+#[cfg(feature = "dred")]
+pub fn opus_decoder_dred_decode(
+    st: &mut OpusDecoder,
+    dred: &OpusDRED,
+    dred_offset: i32,
+    pcm: &mut [i16],
+    frame_size: i32,
+) -> i32 {
+    if frame_size <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    debug_assert!(st.channels == 1 || st.channels == 2);
+    let mut out = vec![0.0f32; (frame_size * st.channels) as usize];
+    let ret = opus_decode_native(
+        st,
+        &[],
+        &mut out,
+        frame_size,
+        0,
+        false,
+        None,
+        1,
+        Some(dred),
+        dred_offset,
+    );
+    if ret > 0 {
+        celt_float2int16(&out, pcm, (ret * st.channels) as usize);
+    }
+    ret
+}
+
+/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode24
+#[cfg(feature = "dred")]
+pub fn opus_decoder_dred_decode24(
+    st: &mut OpusDecoder,
+    dred: &OpusDRED,
+    dred_offset: i32,
+    pcm: &mut [i32],
+    frame_size: i32,
+) -> i32 {
+    if frame_size <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    debug_assert!(st.channels == 1 || st.channels == 2);
+    let mut out = vec![0.0f32; (frame_size * st.channels) as usize];
+    let ret = opus_decode_native(
+        st,
+        &[],
+        &mut out,
+        frame_size,
+        0,
+        false,
+        None,
+        1,
+        Some(dred),
+        dred_offset,
+    );
+    if ret > 0 {
+        for i in 0..(ret * st.channels) as usize {
+            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+        }
+    }
+    ret
+}
+
+/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode_float
+#[cfg(feature = "dred")]
+pub fn opus_decoder_dred_decode_float(
+    st: &mut OpusDecoder,
+    dred: &OpusDRED,
+    dred_offset: i32,
+    pcm: &mut [f32],
+    frame_size: i32,
+) -> i32 {
+    if frame_size <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    opus_decode_native(
+        st,
+        &[],
+        pcm,
+        frame_size,
+        0,
+        false,
+        None,
+        0,
+        Some(dred),
+        dred_offset,
+    )
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_decoder_get_size
+#[cfg(feature = "dred")]
+pub fn opus_dred_decoder_get_size() -> i32 {
+    std::mem::size_of::<OpusDREDDecoder>() as i32
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_decoder_init
+#[cfg(feature = "dred")]
+pub fn opus_dred_decoder_init(dec: &mut OpusDREDDecoder) -> i32 {
+    *dec = OpusDREDDecoder::new();
+    #[cfg(feature = "builtin-weights")]
+    {
+        if !dec.load_dnn_weights() {
+            return OPUS_INTERNAL_ERROR;
+        }
+    }
+    OPUS_OK
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_decoder_create
+#[cfg(feature = "dred")]
+pub fn opus_dred_decoder_create() -> Result<OpusDREDDecoder, i32> {
+    let mut dec = OpusDREDDecoder::new();
+    let ret = opus_dred_decoder_init(&mut dec);
+    if ret != OPUS_OK {
+        return Err(ret);
+    }
+    Ok(dec)
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_decoder_destroy
+#[cfg(feature = "dred")]
+pub fn opus_dred_decoder_destroy(_dec: OpusDREDDecoder) {}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_decoder_ctl
+#[cfg(feature = "dred")]
+pub fn opus_dred_decoder_ctl(
+    dred_dec: &mut OpusDREDDecoder,
+    request: i32,
+    dnn_blob: Option<&[u8]>,
+) -> i32 {
+    match request {
+        crate::opus::opus_defines::OPUS_SET_DNN_BLOB_REQUEST => {
+            let Some(blob) = dnn_blob else {
+                return OPUS_BAD_ARG;
+            };
+            if blob.is_empty() {
+                return OPUS_BAD_ARG;
+            }
+            if dred_dec.set_dnn_blob(blob) {
+                OPUS_OK
+            } else {
+                OPUS_INTERNAL_ERROR
+            }
+        }
+        _ => OPUS_UNIMPLEMENTED,
+    }
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_get_size
+#[cfg(feature = "dred")]
+pub fn opus_dred_get_size() -> i32 {
+    std::mem::size_of::<OpusDRED>() as i32
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_alloc
+#[cfg(feature = "dred")]
+pub fn opus_dred_alloc() -> OpusDRED {
+    OpusDRED::new()
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_free
+#[cfg(feature = "dred")]
+pub fn opus_dred_free(_dred: OpusDRED) {}
+
+#[cfg(feature = "dred")]
+fn dred_find_payload(data: &[u8]) -> Result<Option<(usize, usize, i32)>, i32> {
+    if data.is_empty() {
+        return Ok(None);
+    }
+
+    let mut sizes = [0i16; 48];
+    let mut packet_offset = 0i32;
+    let mut padding_len = 0i32;
+    let nb_frames = opus_packet_parse_impl(
+        data,
+        false,
+        None,
+        None,
+        &mut sizes,
+        None,
+        Some(&mut packet_offset),
+        Some(&mut padding_len),
+    );
+    if nb_frames < 0 {
+        return Err(nb_frames);
+    }
+    if padding_len <= 0 {
+        return Ok(None);
+    }
+
+    let packet_len = if packet_offset > 0 {
+        packet_offset as usize
+    } else {
+        data.len()
+    };
+    if packet_len > data.len() || packet_len < padding_len as usize {
+        return Err(OPUS_INVALID_PACKET);
+    }
+    let padding_start = packet_len - padding_len as usize;
+    let padding = &data[padding_start..packet_len];
+    let frame_size = opus_packet_get_samples_per_frame(data[0], 48_000);
+    let mut iter = crate::opus::extensions::OpusExtensionIterator::new(padding, nb_frames);
+
+    loop {
+        match iter.find(DRED_EXTENSION_ID)? {
+            None => return Ok(None),
+            Some(ext) => {
+                let payload_start = ext.data_offset;
+                let payload_end = payload_start + ext.len;
+                let payload = &padding[payload_start..payload_end];
+                if payload.len() > DRED_EXPERIMENTAL_BYTES
+                    && payload[0] == b'D'
+                    && payload[1] == DRED_EXPERIMENTAL_VERSION as u8
+                {
+                    let dred_frame_offset = ext.frame * frame_size / 120;
+                    return Ok(Some((
+                        padding_start + payload_start + DRED_EXPERIMENTAL_BYTES,
+                        payload.len() - DRED_EXPERIMENTAL_BYTES,
+                        dred_frame_offset,
+                    )));
+                }
+            }
+        }
+    }
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_parse
+#[cfg(feature = "dred")]
+pub fn opus_dred_parse(
+    dred_dec: &mut OpusDREDDecoder,
+    dred: &mut OpusDRED,
+    data: &[u8],
+    max_dred_samples: i32,
+    sampling_rate: i32,
+    dred_end: Option<&mut i32>,
+    defer_processing: bool,
+) -> i32 {
+    if sampling_rate <= 0 {
+        return OPUS_BAD_ARG;
+    }
+    if !dred_dec.loaded {
+        return OPUS_UNIMPLEMENTED;
+    }
+
+    dred.process_stage = -1;
+    let payload = match dred_find_payload(data) {
+        Ok(payload) => payload,
+        Err(err) => return err,
+    };
+
+    let Some((start, payload_len, dred_frame_offset)) = payload else {
+        if let Some(end) = dred_end {
+            *end = 0;
+        }
+        return 0;
+    };
+
+    let offset = 100 * max_dred_samples / sampling_rate;
+    let min_feature_frames = (2 + offset)
+        .min((2 * DRED_NUM_REDUNDANCY_FRAMES) as i32)
+        .max(0) as usize;
+    dred_ec_decode(
+        dred,
+        &data[start..start + payload_len],
+        payload_len,
+        min_feature_frames,
+        dred_frame_offset,
+    );
+    if !defer_processing {
+        if dred.process_stage == 1 {
+            dred_process_impl(dred_dec, dred);
+        } else if dred.process_stage != 2 {
+            return OPUS_BAD_ARG;
+        }
+    }
+    if let Some(end) = dred_end {
+        *end = 0.max(-dred.dred_offset * sampling_rate / 400);
+    }
+    0.max(dred.nb_latents * sampling_rate / 25 - dred.dred_offset * sampling_rate / 400)
+}
+
+/// Upstream C: src/opus_decoder.c:opus_dred_process
+#[cfg(feature = "dred")]
+pub fn opus_dred_process(dred_dec: &OpusDREDDecoder, src: &OpusDRED, dst: &mut OpusDRED) -> i32 {
+    if src.process_stage != 1 && src.process_stage != 2 {
+        return OPUS_BAD_ARG;
+    }
+    if !dred_dec.loaded {
+        return OPUS_UNIMPLEMENTED;
+    }
+
+    if !std::ptr::eq(src as *const OpusDRED, dst as *const OpusDRED) {
+        *dst = src.clone();
+    }
+    if dst.process_stage == 2 {
+        return OPUS_OK;
+    }
+    dred_process_impl(dred_dec, dst);
+    OPUS_OK
 }
 
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
@@ -1283,4 +1710,78 @@ pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
 }
 pub fn opus_decoder_get_nb_samples(dec: &mut OpusDecoder, packet: &[u8]) -> i32 {
     opus_packet_get_nb_samples(packet, dec.Fs)
+}
+
+#[cfg(all(test, feature = "dred"))]
+mod tests {
+    use super::*;
+    use crate::opus::opus_defines::OPUS_SET_DNN_BLOB_REQUEST;
+
+    #[test]
+    fn stage_dred_features_blend_zero_queues_expected_frames() {
+        let mut dec = OpusDecoder::new(48_000, 1).expect("decoder");
+        dec.lpcnet.blend = 0;
+
+        let mut dred = OpusDRED::new();
+        dred.process_stage = 2;
+        dred.nb_latents = 1;
+        for frame_idx in 0..4 {
+            let start = frame_idx * DRED_NUM_FEATURES;
+            dred.fec_features[start] = frame_idx as f32;
+        }
+
+        stage_dred_features_for_decode(&mut dec, 960, &dred, 960);
+
+        assert_eq!(dec.lpcnet.fec_fill_pos, 3);
+        assert_eq!(dec.lpcnet.fec_skip, 0);
+        assert_eq!(dec.lpcnet.fec[0][0], 2.0);
+        assert_eq!(dec.lpcnet.fec[1][0], 1.0);
+        assert_eq!(dec.lpcnet.fec[2][0], 0.0);
+    }
+
+    #[test]
+    fn stage_dred_features_non_processed_noop() {
+        let mut dec = OpusDecoder::new(48_000, 1).expect("decoder");
+        dec.lpcnet.fec_fill_pos = 2;
+        dec.lpcnet.fec_skip = 7;
+
+        let dred = OpusDRED::new();
+        stage_dred_features_for_decode(&mut dec, 960, &dred, 0);
+
+        assert_eq!(dec.lpcnet.fec_fill_pos, 2);
+        assert_eq!(dec.lpcnet.fec_skip, 7);
+    }
+
+    #[test]
+    fn dred_decoder_ctl_rejects_missing_blob() {
+        let mut dred_dec = OpusDREDDecoder::new();
+        let ret = opus_dred_decoder_ctl(&mut dred_dec, OPUS_SET_DNN_BLOB_REQUEST, None);
+        assert_eq!(ret, OPUS_BAD_ARG);
+    }
+
+    #[test]
+    fn dred_decoder_ctl_unknown_request_unimplemented() {
+        let mut dred_dec = OpusDREDDecoder::new();
+        let ret = opus_dred_decoder_ctl(&mut dred_dec, 0x7fff, None);
+        assert_eq!(ret, OPUS_UNIMPLEMENTED);
+    }
+
+    #[cfg(feature = "builtin-weights")]
+    #[test]
+    fn dred_parse_empty_packet_returns_zero() {
+        let mut dred_dec = opus_dred_decoder_create().expect("dred decoder");
+        let mut dred = opus_dred_alloc();
+        let mut dred_end = -1;
+        let ret = opus_dred_parse(
+            &mut dred_dec,
+            &mut dred,
+            &[],
+            960,
+            48_000,
+            Some(&mut dred_end),
+            false,
+        );
+        assert_eq!(ret, 0);
+        assert_eq!(dred_end, 0);
+    }
 }

@@ -4,7 +4,7 @@
 Close remaining public API coverage gaps versus upstream core/custom/multistream/projection and related controls.
 
 ## Findings IDs
-Open: `12,43,45,104,110,116,119,120,122`
+Open: `43,104,110,116,119,120,122`
 
 ## Scope
 - DRED public decoder/aux APIs and state lifecycle entry points.
@@ -53,3 +53,12 @@ Open: `12,43,45,104,110,116,119,120,122`
   - `src/silk/init_decoder.rs` + `src/silk/dec_API.rs`: switched low-level decoder init/reset to in-place status-return flow and updated decode-path call sites.
   - `src/dnn/nnet.rs`: added `compute_gated_activation` and unit tests, and aligned `compute_glu` in-place behavior with upstream pointer-alias semantics.
 - 2026-02-25: Confirmed Group 3 tracking excludes C-specific API-shape-only comparisons (`177,178,186`) and focuses on functional behavior parity.
+- 2026-02-26: Added missing DRED decoder API entry points in `src/opus/opus_decoder.rs` and re-exported them in `src/lib.rs`:
+  - `opus_decoder_dred_decode`
+  - `opus_decoder_dred_decode24`
+  - `opus_decoder_dred_decode_float`
+  - Added parity coverage in `tests/dred_decode_parity.rs` (`dred_decode_float_stage0_matches_c_null_dred_path`).
+- 2026-02-26: Added full DRED object workflow API wrappers in `src/opus/opus_decoder.rs` and re-exported in `src/lib.rs`:
+  - decoder lifecycle/control: `opus_dred_decoder_get_size`, `opus_dred_decoder_create`, `opus_dred_decoder_init`, `opus_dred_decoder_destroy`, `opus_dred_decoder_ctl`
+  - DRED object lifecycle/parse/process: `opus_dred_get_size`, `opus_dred_alloc`, `opus_dred_free`, `opus_dred_parse`, `opus_dred_process`
+  - Added unit coverage for parse/control paths in `src/opus/opus_decoder.rs` tests.

@@ -16,6 +16,7 @@ use super::stats::*;
 /// DRED data parsed from a packet.
 ///
 /// Upstream C: dnn/dred_decoder.h:OpusDRED
+#[derive(Clone)]
 pub struct OpusDRED {
     pub fec_features: Vec<f32>,
     pub state: Vec<f32>,

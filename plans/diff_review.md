@@ -17,10 +17,10 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 3. Public API surface parity (core, custom, multistream/projection, 24-bit)
-IDs: `12,43,45,104,110,116,119,120,122`
+IDs: `43,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,179,180,191,192,193`
+IDs: `179,180,191,192,193`
 
 5. SIMD/arch-dispatch/build-flag parity
 IDs: `none (resolved)`
@@ -63,10 +63,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
   - `OPUS_GET_OSCE_BWE_REQUEST`
 - Detail: API surface parity for CTL constants is incomplete.
 
-12. [MEDIUM][DRED] Missing decoder DRED API entry points.
-- Rust: `src/opus/opus_decoder.rs`
+12. [RESOLVED][DRED] Decoder DRED API entry points are implemented.
+- Rust: `src/opus/opus_decoder.rs`, `src/lib.rs`, `tests/dred_decode_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:1609`, `libopus-sys/opus/src/opus_decoder.c:1643`, `libopus-sys/opus/src/opus_decoder.c:1677`
-- Detail: Upstream exports `opus_decoder_dred_decode`, `opus_decoder_dred_decode24`, and `opus_decoder_dred_decode_float`; matching public Rust entry points were not found.
+- Detail: Rust now exports `opus_decoder_dred_decode`, `opus_decoder_dred_decode24`, and `opus_decoder_dred_decode_float` (plus `OpusDecoder` convenience methods), with tools-dnn parity coverage against C decode behavior.
 
 13. [LOW] C-style `opus_encoder_ctl` / `opus_decoder_ctl` API entry points not mirrored as direct functions.
 - Rust: `src/opus/opus_encoder.rs`, `src/opus/opus_decoder.rs`
@@ -128,10 +128,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/celt/celt_encoder.c:260`, `libopus-sys/opus/celt/celt_encoder.c:2941`, `libopus-sys/opus/celt/celt_decoder.c:278`, `libopus-sys/opus/celt/celt_decoder.c:1722`
 - Detail: Upstream exposes direct C-style `opus_custom_encoder_ctl` / `opus_custom_decoder_ctl` and explicit destroy functions. Rust exposes struct-based APIs but does not mirror these direct entry points.
 
-45. [MEDIUM][DRED] Missing full DRED object API surface (`opus_dred_*` / `opus_dred_decoder_*`).
-- Rust: `src/opus/` (no matching `opus_dred_decoder_get_size/init/create/destroy/ctl`, `opus_dred_get_size/alloc/free`, `opus_dred_parse`, `opus_dred_process`)
+45. [RESOLVED][DRED] Full DRED object API surface is now mirrored in Rust wrappers.
+- Rust: `src/opus/opus_decoder.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:1363`, `libopus-sys/opus/src/opus_decoder.c:1381`, `libopus-sys/opus/src/opus_decoder.c:1395`, `libopus-sys/opus/src/opus_decoder.c:1417`, `libopus-sys/opus/src/opus_decoder.c:1423`, `libopus-sys/opus/src/opus_decoder.c:1511`, `libopus-sys/opus/src/opus_decoder.c:1520`, `libopus-sys/opus/src/opus_decoder.c:1539`, `libopus-sys/opus/src/opus_decoder.c:1548`, `libopus-sys/opus/src/opus_decoder.c:1587`
-- Detail: Upstream exposes a complete parsed-DRED object workflow API in addition to direct `opus_decoder_dred_decode*` calls. Rust does not mirror this object lifecycle/parse/process API surface.
+- Detail: Rust now provides `opus_dred_decoder_get_size/init/create/destroy/ctl`, `opus_dred_get_size/alloc/free`, `opus_dred_parse`, and `opus_dred_process` wrappers, re-exported at crate root for public API parity.
 
 46. [LOW] Missing direct CELT custom encode/decode entry point functions.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (no direct `opus_custom_encode`, `opus_custom_encode_float`, `opus_custom_decode`, `opus_custom_decode_float` free-function exports)
@@ -274,10 +274,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:229`
 - Detail: This is a code-shape/API-call difference. In practice both calls resolve to the same static mode via `opus_custom_mode_create` frame-size shift matching, so this is not expected to change behavior but remains a direct source-level divergence.
 
-76. [MEDIUM][DRED] `opus_decode_native` signature/flow omits upstream DRED input arguments and pre-processing path.
-- Rust: `src/opus/opus_decoder.rs:898-907`
+76. [RESOLVED][DRED] `opus_decode_native` now mirrors upstream DRED input flow and pre-processing path.
+- Rust: `src/opus/opus_decoder.rs:1006`, `src/opus/opus_multistream_decoder.rs:235`
 - Upstream: `libopus-sys/opus/src/opus_decoder.c:718` plus DRED pre-processing block at `:732-766`
-- Detail: Upstream `opus_decode_native` accepts `const OpusDRED *dred` and `dred_offset`, with explicit feature-frame staging for deep PLC when provided. Rust `opus_decode_native` has no DRED object arguments and therefore cannot mirror this decode-time DRED-assisted flow.
+- Detail: Rust `opus_decode_native` now accepts DRED input (`dred`, `dred_offset`) and stages DRED feature frames into Deep PLC state before decode, matching upstream decode-time DRED-assisted flow. Existing non-DRED call sites explicitly pass `None, 0` to preserve behavior.
 
 77. [LOW][Decoder API] `opus_decoder_get_nb_samples` requires mutable decoder reference in Rust.
 - Rust: `src/opus/opus_decoder.rs:1211`

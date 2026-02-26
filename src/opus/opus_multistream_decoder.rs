@@ -245,6 +245,8 @@ impl OpusMSDecoder {
                     Some(&mut packet_offset)
                 },
                 soft_clip,
+                None,
+                0,
             );
             if ret <= 0 {
                 return Err(ret);
