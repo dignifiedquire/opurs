@@ -132,6 +132,7 @@ pub struct PitchDNNState {
     pub gru_state: Vec<f32>,
     pub xcorr_mem1: Vec<f32>,
     pub xcorr_mem2: Vec<f32>,
+    pub xcorr_mem3: Vec<f32>,
 }
 
 impl Default for PitchDNNState {
@@ -147,6 +148,7 @@ impl PitchDNNState {
             gru_state: vec![0.0; GRU_1_STATE_SIZE],
             xcorr_mem1: vec![0.0; (NB_XCORR_FEATURES + 2) * 2],
             xcorr_mem2: vec![0.0; (NB_XCORR_FEATURES + 2) * 2 * 8],
+            xcorr_mem3: vec![0.0; (NB_XCORR_FEATURES + 2) * 2 * 8],
         }
     }
 
@@ -160,6 +162,7 @@ impl PitchDNNState {
                 self.gru_state.fill(0.0);
                 self.xcorr_mem1.fill(0.0);
                 self.xcorr_mem2.fill(0.0);
+                self.xcorr_mem3.fill(0.0);
                 true
             }
             None => false,
