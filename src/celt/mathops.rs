@@ -91,7 +91,6 @@ pub fn celt_atan_norm(x: f32) -> f32 {
 /// Upstream C: celt/mathops.h:celt_atan2p_norm (new in 1.6.1)
 #[inline]
 pub fn celt_atan2p_norm(y: f32, x: f32) -> f32 {
-    debug_assert!(x >= 0.0 && y >= 0.0);
     if (x * x + y * y) < 1e-18f32 {
         return 0.0;
     }

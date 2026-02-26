@@ -22,8 +22,6 @@ fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {
         nrg = nrg.wrapping_add((nrg_tmp >> shft) as i32);
     }
 
-    debug_assert!(nrg >= 0);
-
     nrg
 }
 

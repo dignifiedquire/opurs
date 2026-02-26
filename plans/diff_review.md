@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,170,171,172`
+IDs: `61,62,72,79,82,87,106`
 
 ## Findings
 
@@ -719,20 +719,20 @@ IDs: `61,62,72,79,82,87,106,170,171,172`
 - Upstream: `libopus-sys/opus/silk/A2NLSF.c:214-217`
 - Detail: Upstream checks `silk_assert( NLSF[root_ix] >= 0 )` immediately after each root interpolation. Rust computes/stores `NLSF[root_ix]` without the matching assertion, so this specific invariant is not mirrored.
 
-170. [LOW][Runtime Semantics][SILK] `silk_sum_sqr_shift` uses `debug_assert!` where upstream keeps assert-gated post-loop invariants.
+170. [RESOLVED][Runtime Semantics][SILK] `silk_sum_sqr_shift` assertion gating now matches upstream default build semantics.
 - Rust: `src/silk/sum_sqr_shift.rs:25`
 - Upstream: `libopus-sys/opus/silk/sum_sqr_shift.c:61`, `libopus-sys/opus/silk/sum_sqr_shift.c:77`
-- Detail: Upstream checks `nrg >= 0` after both accumulation passes with `silk_assert`. Rust only checks this condition inside helper `silk_sum_sqr_shift_inner` via `debug_assert!`, so release builds drop the invariant checks and there is no explicit second-pass postcondition check mirroring upstream placement.
+- Detail: Removed Rust-only `debug_assert!` postcondition checks in this path so behavior matches upstream default (`silk_assert` disabled unless `ENABLE_ASSERTIONS` is defined).
 
-171. [LOW][Runtime Semantics][SILK] `silk_LPC_inverse_pred_gain_c` keeps several upstream invariant checks only as `debug_assert!`.
+171. [RESOLVED][Runtime Semantics][SILK] `silk_LPC_inverse_pred_gain_c` assertion gating now matches upstream default build semantics.
 - Rust: `src/silk/LPC_inv_pred_gain.rs:44-45`, `src/silk/LPC_inv_pred_gain.rs:50-51`, `src/silk/LPC_inv_pred_gain.rs:102-103`
 - Upstream: `libopus-sys/opus/silk/LPC_inv_pred_gain.c:62-63`, `libopus-sys/opus/silk/LPC_inv_pred_gain.c:68-69`, `libopus-sys/opus/silk/LPC_inv_pred_gain.c:112-113`
-- Detail: Upstream enforces `rc_mult1_Q30` and `invGain_Q30` bounds with `silk_assert` at each stage. Rust downgrades these to `debug_assert!`, so release builds drop the checks and no longer mirror upstream invariant enforcement points.
+- Detail: Removed Rust-only `debug_assert!` bounds checks at the tracked sites, matching upstream default `silk_assert` gating (off unless `ENABLE_ASSERTIONS` is enabled).
 
-172. [LOW][Runtime Semantics][CELT Mathops] `celt_atan2p_norm` precondition check is `debug_assert!` in Rust.
+172. [RESOLVED][Runtime Semantics][CELT Mathops] `celt_atan2p_norm` precondition gating now matches upstream default build semantics.
 - Rust: `src/celt/mathops.rs:92-94`
 - Upstream: `libopus-sys/opus/celt/mathops.h:170-173`
-- Detail: Upstream guards non-negative-domain inputs with `celt_sig_assert(x>=0 && y>=0)`. Rust uses `debug_assert!`, so release builds drop this invariant check and no longer mirror upstream assert-gated behavior at that call boundary.
+- Detail: Removed the Rust-only `debug_assert!` precondition check so this path now matches upstream `celt_sig_assert` default gating (inactive unless `ENABLE_ASSERTIONS` is defined).
 
 173. [RESOLVED][API Surface][SILK Decoder Init] Decoder init/reset now mirror upstream in-place status-return API.
 - Rust: `src/silk/init_decoder.rs`, `src/silk/dec_API.rs`

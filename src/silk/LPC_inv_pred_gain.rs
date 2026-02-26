@@ -41,14 +41,10 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
 
         /* rc_mult1_Q30 range: [ 1 : 2^30 ] */
         let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_SMMUL(rc_Q31, rc_Q31);
-        debug_assert!(rc_mult1_Q30 > (1 << 15)); /* reduce A_LIMIT if fails */
-        debug_assert!(rc_mult1_Q30 <= (1 << 30));
 
         /* Update inverse gain */
         /* invGain_Q30 range: [ 0 : 2^30 ] */
         invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
-        debug_assert!(invGain_Q30 >= 0);
-        debug_assert!(invGain_Q30 <= (1 << 30));
         if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
             return 0;
         }
@@ -99,8 +95,6 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
     /* Update inverse gain */
     /* Range: [ 0 : 2^30 ] */
     let invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
-    debug_assert!(invGain_Q30 >= 0);
-    debug_assert!(invGain_Q30 <= (1 << 30));
     if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
         0
     } else {

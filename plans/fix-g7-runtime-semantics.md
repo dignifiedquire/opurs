@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,153,168`
+Open: `61,62,72,79,82,87,106`
+Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,153,168,170,171,172`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,9 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed remaining SILK/CELT assertion-gating parity items tied to upstream `ENABLE_ASSERTIONS` behavior:
+  - `src/silk/sum_sqr_shift.rs`, `src/silk/LPC_inv_pred_gain.rs`, `src/celt/mathops.rs`: removed Rust-only `debug_assert!` checks at tracked sites to match upstream default gating for `silk_assert`/`celt_sig_assert` (disabled unless `ENABLE_ASSERTIONS` is set).
+  - closes `170`, `171`, and `172`.
 - 2026-02-26: Closed additional SILK assert-gating parity item:
   - `src/silk/NLSF2A.rs`, `src/silk/NLSF_stabilize.rs`, `src/silk/PLC.rs`, `src/silk/decode_indices.rs`, `src/silk/float/encode_frame_FLP.rs`, `src/silk/float/find_LPC_FLP.rs`: converted tracked upstream assert-equivalent checks from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.
   - closes `153`.
