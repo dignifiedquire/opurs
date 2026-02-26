@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,148,149,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,168`
+Open: `61,62,72,79,82,87,106,148,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,149,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,9 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed DNN Burg assert-gating parity item:
+  - `src/dnn/burg.rs`: converted tracked invariants from `assert!` to `debug_assert!`.
+  - closes `149`.
 - 2026-02-26: Closed additional CELT FFT/MDCT assert-gating parity items:
   - `src/celt/kiss_fft.rs`: converted tracked KISS FFT precondition checks from `assert_eq!` to `debug_assert_eq!`.
   - `src/celt/mdct.rs`: converted tracked MDCT size/precondition checks from `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.

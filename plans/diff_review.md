@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,148,153,170,171,172`
 
 ## Findings
 
@@ -619,10 +619,10 @@ IDs: `61,62,72,79,82,87,106,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/silk/CNG.c:153`, `libopus-sys/opus/silk/VAD.c:104-106`, `libopus-sys/opus/silk/interpolate.c:45-46`, `libopus-sys/opus/silk/NLSF_VQ_weights_laroia.c:51-52`, `libopus-sys/opus/silk/decode_pulses.c:56,59`, `libopus-sys/opus/silk/encode_pulses.c:86,89`, `libopus-sys/opus/silk/encode_indices.c:59-60,93`, `libopus-sys/opus/silk/stereo_encode_pred.c:44,47-48`, `libopus-sys/opus/silk/sort.c:51-53`, `libopus-sys/opus/silk/resampler_down2.c:46-47`, `libopus-sys/opus/silk/resampler_private_up2_HQ.c:48-53`, `libopus-sys/opus/silk/shell_coder.c:86,128`
 - Detail: These helper paths rely on assert-gated invariants upstream. Rust either enforces them with unconditional `assert!` (hard-abort behavior) or omits some of the assert checks entirely, creating mixed divergence in failure semantics under invalid/internal-corrupt states.
 
-149. [LOW][Runtime Semantics][DNN Burg] Burg-analysis invariants are unconditional `assert!` in Rust.
-- Rust: `src/dnn/burg.rs:29`, `src/dnn/burg.rs:76-77`, `src/dnn/burg.rs:139-140`, `src/dnn/burg.rs:144`
-- Upstream: `libopus-sys/opus/dnn/burg.c:66`, `libopus-sys/opus/dnn/burg.c:115`, `libopus-sys/opus/dnn/burg.c:173-174`, `libopus-sys/opus/dnn/burg.c:178`
-- Detail: Upstream uses C `assert(...)` invariants in this path. Rust uses unconditional `assert!`, so invalid-state handling remains abortive rather than explicit error returns and mirrors assert-enabled behavior only.
+149. [RESOLVED][Runtime Semantics][DNN Burg] Burg-analysis invariants now follow assert-gated semantics.
+- Rust: `src/dnn/burg.rs`
+- Upstream: `libopus-sys/opus/dnn/burg.c`
+- Detail: Converted tracked Burg invariants from unconditional `assert!` to `debug_assert!`, matching upstream assert-gated release behavior.
 
 151. [LOW][Validation Semantics][SILK LP] `silk_LP_variable_cutoff` omits multiple upstream invariant checks.
 - Rust: `src/silk/LP_variable_cutoff.rs:97-104`, `src/silk/LP_variable_cutoff.rs:120`

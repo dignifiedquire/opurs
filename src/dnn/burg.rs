@@ -26,7 +26,7 @@ fn silk_energy_flp(data: &[f32]) -> f64 {
     for &x in remainder {
         result += x as f64 * x as f64;
     }
-    assert!(result >= 0.0);
+    debug_assert!(result >= 0.0);
     result
 }
 
@@ -73,8 +73,8 @@ pub fn silk_burg_analysis(
     nb_subfr: usize,
     d: usize,
 ) -> f32 {
-    assert!(subfr_length * nb_subfr <= MAX_FRAME_SIZE);
-    assert!(d <= SILK_MAX_ORDER_LPC);
+    debug_assert!(subfr_length * nb_subfr <= MAX_FRAME_SIZE);
+    debug_assert!(d <= SILK_MAX_ORDER_LPC);
 
     // Compute autocorrelations, added over subframes
     let mut c0 = silk_energy_flp(&x[..nb_subfr * subfr_length]);
@@ -136,12 +136,12 @@ pub fn silk_burg_analysis(
             nrg_b += cab[k + 1] * atmp;
             nrg_f += caf[k + 1] * atmp;
         }
-        assert!(nrg_f > 0.0);
-        assert!(nrg_b > 0.0);
+        debug_assert!(nrg_f > 0.0);
+        debug_assert!(nrg_b > 0.0);
 
         // Calculate reflection coefficient
         let mut rc = -2.0 * num / (nrg_f + nrg_b);
-        assert!(rc > -1.0 && rc < 1.0);
+        debug_assert!(rc > -1.0 && rc < 1.0);
 
         // Update inverse prediction gain
         let tmp1 = inv_gain * (1.0 - rc * rc);
