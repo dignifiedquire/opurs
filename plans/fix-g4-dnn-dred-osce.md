@@ -4,9 +4,9 @@
 Align DNN/DRED/OSCE model loading, constants, dispatch signatures, and behavior with upstream.
 
 ## Findings IDs
-Open: `12,45,76,179,180,187,191,192,193,194,210,211,216,235`
+Open: `12,45,76,179,180,191,192,193,194,235`
 Excluded (intentional API-shape): `177,178`
-Closed in this group: `94,135,136,137,175,176,181,182,201,206,217,219,220,221`
+Closed in this group: `94,135,136,137,175,176,181,182,187,201,206,210,211,216,217,219,220,221`
 
 ## Scope
 - DRED API and behavior parity in decode and state transitions.
@@ -38,3 +38,8 @@ Closed in this group: `94,135,136,137,175,176,181,182,201,206,217,219,220,221`
   - `src/dnn/lpcnet.rs` / `src/dnn/fargan.rs` (loaded/continuation preconditions)
   - `src/dnn/nnet.rs` / `src/dnn/nndsp.rs` (internal dimension/invariant checks)
   - closes `136` and `137`.
+- 2026-02-26: Closed additional stale API/state-shape gaps after code re-audit:
+  - `187`: LPCNet single-frame feature helpers include `arch`.
+  - `210`: `compute_pitchdnn` includes `arch`.
+  - `211`: `PitchDNNState` now includes `xcorr_mem3` (state-layout parity).
+  - `216`: LPCNet feature extraction entry points thread `arch`.

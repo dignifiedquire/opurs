@@ -20,7 +20,7 @@ IDs: `none (resolved)`
 IDs: `12,43,45,104,110,116,119,120,122`
 
 4. DNN/DRED/OSCE model loading and constant parity
-IDs: `12,45,76,179,180,187,191,192,193,194,210,211,216,235`
+IDs: `12,45,76,179,180,191,192,193,194,235`
 
 5. SIMD/arch-dispatch/build-flag parity
 IDs: `194,202,203,204,205,212,213,230,233,234,235`
@@ -804,10 +804,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/nndsp.h:80-84`, `libopus-sys/opus/dnn/nndsp.c:48-60`
 - Detail: Rust state reset behavior is functionally equivalent via defaults/resets in active runtime paths; standalone init-function API parity is excluded.
 
-187. [LOW][API Signature][LPCNet] Single-frame feature extraction helpers omit upstream `arch` argument.
-- Rust: `src/dnn/lpcnet.rs:435`, `src/dnn/lpcnet.rs:454`
+187. [RESOLVED][API Signature][LPCNet] Single-frame feature extraction helpers thread upstream `arch` argument.
+- Rust: `src/dnn/lpcnet.rs`
 - Upstream: `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
-- Detail: Upstream `lpcnet_compute_single_frame_features*` signatures include an explicit `arch` parameter. Rust helpers expose no `arch` input, so API call shape differs and does not mirror upstream arch-parameterized entry points.
+- Detail: Rust `lpcnet_compute_single_frame_features` and `lpcnet_compute_single_frame_features_float` take and pass `arch`, matching upstream call-shape semantics.
 
 188. [LOW][Tooling Coverage][Compare] Rust compare utility does not mirror upstream QEXT compare tool path (`qext_compare`).
 - Rust: `src/tools/compare.rs:100-106`, `src/tools/demo/input.rs:41-47` (band table/sample-rate model tops out at 48 kHz)
@@ -924,15 +924,15 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/fargan.c:174-185` (`fargan_init` builtin auto-load), `libopus-sys/opus/dnn/fargan.c:187-195` (`fargan_load_model(const void*, len)`), `libopus-sys/opus/dnn/fargan.h:59-60`
 - Detail: Upstream exposes C entry points that initialize state (including builtin-model load when compiled) and a direct blob loader. Rust exposes constructor/reset plus array-based init only, without equivalent one-call blob loader or builtin auto-load behavior at init entry.
 
-210. [LOW][API Signature][PitchDNN] `compute_pitchdnn` omits upstream `arch` parameter.
-- Rust: `src/dnn/pitchdnn.rs:174-178`
+210. [RESOLVED][API Signature][PitchDNN] `compute_pitchdnn` includes upstream `arch` parameter.
+- Rust: `src/dnn/pitchdnn.rs`
 - Upstream: `libopus-sys/opus/dnn/pitchdnn.h:27-31`, `libopus-sys/opus/dnn/pitchdnn.c:12-17`
-- Detail: Upstream pitch estimator entry point takes explicit run-time `arch` for DNN op dispatch. Rust `compute_pitchdnn` has no `arch` argument, so function signature and arch-control surface differ.
+- Detail: Rust `compute_pitchdnn(..., arch)` now matches upstream signature shape and threads `arch` through DNN compute paths.
 
-211. [LOW][State Layout][PitchDNN] `PitchDNNState` omits upstream `xcorr_mem3` field.
-- Rust: `src/dnn/pitchdnn.rs:129-134`
+211. [RESOLVED][State Layout][PitchDNN] `PitchDNNState` now includes upstream `xcorr_mem3` field.
+- Rust: `src/dnn/pitchdnn.rs`
 - Upstream: `libopus-sys/opus/dnn/pitchdnn.h:18-20`
-- Detail: Upstream `PitchDNNState` includes `xcorr_mem1`, `xcorr_mem2`, and `xcorr_mem3`. Rust state currently stores only `xcorr_mem1` and `xcorr_mem2`, so struct/state-surface parity is incomplete.
+- Detail: Added `xcorr_mem3` storage and initialization/reset behavior to mirror upstream state layout.
 
 212. [MEDIUM][Arch Dispatch/API Surface][DNN Core] Core DNN compute APIs omit upstream `arch` parameter and lose explicit RTCD control surface.
 - Rust: `src/dnn/nnet.rs:108`, `src/dnn/nnet.rs:137`, `src/dnn/nnet.rs:197-202`, `src/dnn/nnet.rs:214-219`, `src/dnn/nnet.rs:253`, `src/dnn/nnet.rs:272-279`, `src/dnn/nnet.rs:299-307`, `src/dnn/nnet.rs:386-394`
@@ -951,10 +951,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/dnn/nnet_arch.h:230-233`
 - Detail: Upstream selects `conv2d_3x3_float` when `ktime == 3 && kheight == 3`; otherwise it uses generic `conv2d_float`. Rust always executes the generic loop nest, so operation ordering/optimization path differs for the common 3x3 case.
 
-216. [LOW][API Signature][LPCNet] LPCNet feature extraction entry points omit upstream `arch` parameter.
-- Rust: `src/dnn/lpcnet.rs:277`, `src/dnn/lpcnet.rs:435-439`, `src/dnn/lpcnet.rs:454-458`
+216. [RESOLVED][API Signature][LPCNet] LPCNet feature extraction entry points include upstream `arch` parameter.
+- Rust: `src/dnn/lpcnet.rs`
 - Upstream: `libopus-sys/opus/dnn/lpcnet_private.h:76`, `libopus-sys/opus/dnn/lpcnet.h:123`, `libopus-sys/opus/dnn/lpcnet.h:132`
-- Detail: Upstream `compute_frame_features`, `lpcnet_compute_single_frame_features`, and `lpcnet_compute_single_frame_features_float` all take explicit run-time `arch`. Rust equivalents do not expose `arch`, so API surface and explicit RTCD control differ.
+- Detail: Rust `compute_frame_features` and the public single-frame helpers take and thread `arch`, matching upstream API-shape semantics.
 
 217. [RESOLVED][Documentation/Versioning][DNN] DNN module documentation now references Opus 1.6.1 baseline.
 - Rust: `src/dnn/README.md`
