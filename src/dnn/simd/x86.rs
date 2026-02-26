@@ -756,9 +756,7 @@ mod tests {
         let rows = 8usize;
         let x_len = 12usize;
         let idx: Vec<i32> = vec![2, 0, 4];
-        let w: Vec<f32> = (0..64)
-            .map(|i| ((i as i32 % 13) - 6) as f32 * 0.015625)
-            .collect();
+        let w: Vec<f32> = (0..64).map(|i| ((i % 13) - 6) as f32 * 0.015625).collect();
         let x: Vec<f32> = (0..x_len)
             .map(|i| ((i as i32 % 9) - 4) as f32 * 0.09375)
             .collect();
