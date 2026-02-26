@@ -13,7 +13,6 @@ pub mod arch_h {
     pub type opus_val32 = f32;
     pub type celt_sig = f32;
     pub type celt_norm = f32;
-    pub type celt_ener = f32;
     pub const CELT_SIG_SCALE: f32 = 32768.0f32;
     pub const EPSILON: f32 = 1e-15f32;
 }
@@ -24,9 +23,7 @@ pub struct SILKInfo {
     pub offset: i32,
 }
 
-pub use self::arch_h::{
-    celt_ener, celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON,
-};
+pub use self::arch_h::{celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON};
 use crate::celt::common::{
     comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
 };
@@ -1972,9 +1969,21 @@ fn run_prefilter(
             let ch0 = &_pre[..ds_len];
             if CC == 2 {
                 let ch1 = &_pre[pre_chan_len..pre_chan_len + ds_len];
-                pitch_downsample(&[ch0, ch1], &mut pitch_buf[..pitch_buf_len], pitch_buf_len, 2, st.arch);
+                pitch_downsample(
+                    &[ch0, ch1],
+                    &mut pitch_buf[..pitch_buf_len],
+                    pitch_buf_len,
+                    2,
+                    st.arch,
+                );
             } else {
-                pitch_downsample(&[ch0], &mut pitch_buf[..pitch_buf_len], pitch_buf_len, 2, st.arch);
+                pitch_downsample(
+                    &[ch0],
+                    &mut pitch_buf[..pitch_buf_len],
+                    pitch_buf_len,
+                    2,
+                    st.arch,
+                );
             }
         }
         pitch_index = pitch_search(
