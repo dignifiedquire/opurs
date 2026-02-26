@@ -608,7 +608,8 @@ pub fn dred_encode_silk_frame(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    #[cfg(feature = "qext")]
+    use super::{dred_convert_to_16k, RESAMPLING_ORDER};
 
     #[cfg(feature = "qext")]
     #[test]
