@@ -649,10 +649,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/silk/decode_pitch.c:49-66`
 - Detail: Replaced strict tuple match + `unreachable!` with upstream-style branching: `Fs_kHz==8` uses stage2 tables, otherwise stage3 tables, with debug-assert-gated `nb_subfr` checks on 10 ms fallback branches.
 
-157. [MEDIUM][Module Coverage][SILK FLP] `silk_residual_energy_covar_FLP` is not implemented in Rust.
-- Rust: `src/silk/float/residual_energy_FLP.rs` (contains `silk_residual_energy_FLP` only)
+157. [RESOLVED][Module Coverage][SILK FLP] `silk_residual_energy_covar_FLP` is implemented in Rust with C parity tests.
+- Rust: `src/silk/float/residual_energy_FLP.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/silk/float/residual_energy_FLP.c:38-87`, declaration in `libopus-sys/opus/silk/float/main_FLP.h:199`
-- Detail: Upstream provides both `silk_residual_energy_FLP` and `silk_residual_energy_covar_FLP` (weighted covariance-form residual energy with regularization loop). Rust ports only the former, leaving this helper absent from the FLP module surface.
+- Detail: Added the covariance-form residual-energy helper with upstream regularization loop semantics and direct `tools` C-vs-Rust parity coverage for randomized and regularization-fallback cases.
 
 158. [LOW][Validation Semantics][CELT Quant Bands] Upstream channel-index invariant check is not mirrored in Rust.
 - Rust: `src/celt/quant_bands.rs` (`unquant_coarse_energy` path; no equivalent `c < 2` assert check found)

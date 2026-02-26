@@ -220,6 +220,7 @@ pub mod internals {
     // -- SILK functions (for benchmarks) --
     // Dispatch wrappers:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
+    pub use crate::silk::float::residual_energy_FLP::silk_residual_energy_covar_FLP;
     pub use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
     pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction_c;
     // SIMD dispatch wrapper for short prediction:
