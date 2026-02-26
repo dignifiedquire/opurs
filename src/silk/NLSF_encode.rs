@@ -40,7 +40,12 @@ pub fn silk_NLSF_encode(
     assert!((0..=2).contains(&signalType));
     silk_NLSF_stabilize(&mut pNLSF_Q15[..order], psNLSF_CB.deltaMin_Q15);
     let vla = psNLSF_CB.nVectors as usize;
-    let mut err_Q24: Vec<i32> = ::std::vec::from_elem(0, vla);
+    // nVectors max: 32; nSurvivors max: 16
+    const MAX_VECTORS: usize = 32;
+    const MAX_SURVIVORS: usize = 16;
+    debug_assert!(vla <= MAX_VECTORS);
+    debug_assert!(nSurvivors as usize <= MAX_SURVIVORS);
+    let mut err_Q24 = [0i32; MAX_VECTORS];
     silk_NLSF_VQ(
         &mut err_Q24,
         &pNLSF_Q15[..order],
@@ -49,18 +54,15 @@ pub fn silk_NLSF_encode(
         psNLSF_CB.nVectors as usize,
         order,
     );
-    let vla_0 = nSurvivors as usize;
-    let mut tempIndices1: Vec<i32> = ::std::vec::from_elem(0, vla_0);
+    let mut tempIndices1 = [0i32; MAX_SURVIVORS];
     silk_insertion_sort_increasing(
         &mut err_Q24,
         &mut tempIndices1,
         psNLSF_CB.nVectors as i32,
         nSurvivors,
     );
-    let vla_1 = nSurvivors as usize;
-    let mut RD_Q25: Vec<i32> = ::std::vec::from_elem(0, vla_1);
-    let vla_2 = (nSurvivors * 16) as usize;
-    let mut tempIndices2: Vec<i8> = ::std::vec::from_elem(0, vla_2);
+    let mut RD_Q25 = [0i32; MAX_SURVIVORS];
+    let mut tempIndices2 = [0i8; MAX_SURVIVORS * MAX_LPC_ORDER];
     s = 0;
     while s < nSurvivors {
         ind1 = tempIndices1[s as usize];

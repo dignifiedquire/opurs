@@ -53,7 +53,10 @@ pub fn silk_encode_pulses(
     let iter = iter;
     let padded_frame_length = iter * SHELL_CODEC_FRAME_LENGTH;
     debug_assert!(frame_length <= pulses_buffer.len());
-    let mut pulses_padded_storage = Vec::new();
+    // padded_frame_length max: 320
+    const MAX_PADDED: usize = 320;
+    debug_assert!(padded_frame_length <= MAX_PADDED);
+    let mut pulses_padded_storage = [0i8; MAX_PADDED];
     let pulses_frame = if padded_frame_length <= pulses_buffer.len() {
         let pulses_frame = &mut pulses_buffer[..padded_frame_length];
         if frame_length < padded_frame_length {
@@ -63,25 +66,30 @@ pub fn silk_encode_pulses(
         pulses_frame
     } else {
         debug_assert_eq!(pulses_buffer.len(), frame_length);
-        pulses_padded_storage = vec![0i8; padded_frame_length];
         pulses_padded_storage[..frame_length].copy_from_slice(&pulses_buffer[..frame_length]);
-        pulses_padded_storage.as_mut_slice()
+        &mut pulses_padded_storage[..padded_frame_length]
     };
 
     /* Take the absolute value of the pulses */
-    let mut abs_pulses = pulses_frame
-        .iter()
-        .map(|&v| (v as i32).abs())
-        .collect::<Vec<_>>();
+    let mut abs_pulses = [0i32; MAX_PADDED];
+    for (dst, src) in abs_pulses[..padded_frame_length]
+        .iter_mut()
+        .zip(pulses_frame.iter())
+    {
+        *dst = (*src as i32).abs();
+    }
 
     /* Calc sum pulses per shell code frame */
-    let mut sum_pulses: Vec<i32> = ::std::vec::from_elem(0, iter);
-    let mut nRshifts: Vec<i32> = ::std::vec::from_elem(0, iter);
+    // iter max: MAX_PADDED / SHELL_CODEC_FRAME_LENGTH = 320 / 16 = 20
+    const MAX_ITER: usize = 20;
+    debug_assert!(iter <= MAX_ITER);
+    let mut sum_pulses = [0i32; MAX_ITER];
+    let mut nRshifts = [0i32; MAX_ITER];
 
     for (abs_pulses_ptr, nRshifts, sum_pulses) in izip!(
-        abs_pulses.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH),
-        nRshifts.iter_mut(),
-        sum_pulses.iter_mut()
+        abs_pulses[..padded_frame_length].chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH),
+        nRshifts[..iter].iter_mut(),
+        sum_pulses[..iter].iter_mut()
     ) {
         *nRshifts = 0;
         loop {
@@ -135,7 +143,9 @@ pub fn silk_encode_pulses(
         {
             let mut sumBits_Q5 = sumBits_Q5 as i32;
 
-            for (&nRshifts, &sum_pulses) in izip!(nRshifts.iter(), sum_pulses.iter()) {
+            for (&nRshifts, &sum_pulses) in
+                izip!(nRshifts[..iter].iter(), sum_pulses[..iter].iter())
+            {
                 sumBits_Q5 += nBits_ptr[if nRshifts > 0 {
                     SILK_MAX_PULSES + 1
                 } else {
@@ -163,7 +173,7 @@ pub fn silk_encode_pulses(
     /* Sum-Weighted-Pulses Encoding                    */
     /***************************************************/
     let cdf_ptr = &silk_pulses_per_block_iCDF[RateLevelIndex];
-    for (&sum_pulse, &nRshifts) in izip!(&sum_pulses, &nRshifts) {
+    for (&sum_pulse, &nRshifts) in izip!(&sum_pulses[..iter], &nRshifts[..iter]) {
         if nRshifts == 0 {
             ec_enc_icdf(psRangeEnc, sum_pulse, cdf_ptr, 8);
         } else {
@@ -191,8 +201,8 @@ pub fn silk_encode_pulses(
     /* Shell Encoding */
     /******************/
     for (&sum_pulses, abs_pulses_frame) in izip!(
-        &sum_pulses,
-        abs_pulses.chunks_exact(SHELL_CODEC_FRAME_LENGTH)
+        &sum_pulses[..iter],
+        abs_pulses[..padded_frame_length].chunks_exact(SHELL_CODEC_FRAME_LENGTH)
     ) {
         if sum_pulses > 0 {
             silk_shell_encoder(psRangeEnc, abs_pulses_frame);
@@ -204,7 +214,7 @@ pub fn silk_encode_pulses(
     /****************/
     for (pulse_frame, &nRshifts) in izip!(
         pulses_frame.chunks_exact(SHELL_CODEC_FRAME_LENGTH),
-        &nRshifts
+        &nRshifts[..iter]
     ) {
         if nRshifts > 0 {
             let nLS = nRshifts - 1;
@@ -230,6 +240,6 @@ pub fn silk_encode_pulses(
         pulses_frame,
         signalType,
         quantOffsetType,
-        &sum_pulses,
+        &sum_pulses[..iter],
     );
 }

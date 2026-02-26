@@ -283,8 +283,10 @@ pub fn silk_NSQ_del_dec_c(
 
     lag = NSQ.lagPrev;
 
-    let mut psDelDec: Vec<NSQ_del_dec_struct> =
-        vec![NSQ_del_dec_struct::default(); nStates as usize];
+    // MAX_DEL_DEC_STATES = 4; nStates <= 4
+    const MAX_STATES: usize = 4;
+    debug_assert!(nStates as usize <= MAX_STATES);
+    let mut psDelDec = [NSQ_del_dec_struct::default(); MAX_STATES];
 
     #[allow(clippy::needless_range_loop)]
     for k in 0..nStates as usize {
@@ -317,9 +319,15 @@ pub fn silk_NSQ_del_dec_c(
         1
     };
 
-    let mut sLTP_Q15: Vec<i32> = vec![0; ltp_mem_len + frame_len];
-    let mut sLTP: Vec<i16> = vec![0; ltp_mem_len + frame_len];
-    let mut x_sc_Q10: Vec<i32> = vec![0; subfr_len];
+    // ltp_mem_len + frame_len max: 320 + 320 = 640
+    const MAX_LTP_FRAME: usize = 640;
+    debug_assert!(ltp_mem_len + frame_len <= MAX_LTP_FRAME);
+    let mut sLTP_Q15 = [0i32; MAX_LTP_FRAME];
+    let mut sLTP = [0i16; MAX_LTP_FRAME];
+    // subfr_len max: MAX_SUB_FRAME_LENGTH = 80
+    const MAX_SUBFR: usize = 80;
+    debug_assert!(subfr_len <= MAX_SUBFR);
+    let mut x_sc_Q10 = [0i32; MAX_SUBFR];
     let mut delayedGain_Q10: [i32; 40] = [0; 40];
 
     let mut pxq_off: usize = ltp_mem_len;
@@ -623,7 +631,10 @@ fn silk_noise_shape_quantizer_del_dec(
     let nStates = nStatesDelayedDecision as usize;
     let length = length as usize;
 
-    let mut psSampleState: Vec<NSQ_sample_pair> = vec![[NSQ_sample_struct::default(); 2]; nStates];
+    const MAX_STATES: usize = 4;
+    debug_assert!(nStates <= MAX_STATES);
+    let mut psSampleState: [NSQ_sample_pair; MAX_STATES] =
+        [[NSQ_sample_struct::default(); 2]; MAX_STATES];
 
     let mut shp_lag_idx = (NSQ.sLTP_shp_buf_idx - lag + HARM_SHAPE_FIR_TAPS / 2) as usize;
     let mut pred_lag_idx = (NSQ.sLTP_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;

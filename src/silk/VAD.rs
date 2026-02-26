@@ -92,7 +92,10 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     X_offset[2_usize] = X_offset[1_usize] + decimated_framelength;
     X_offset[3_usize] = X_offset[2_usize] + decimated_framelength2;
     let vla = (X_offset[3_usize] + decimated_framelength1) as usize;
-    let mut X: Vec<i16> = ::std::vec::from_elem(0, vla);
+    // frame_length <= 512 → vla max = 640
+    const MAX_X_VAD: usize = 640;
+    debug_assert!(vla <= MAX_X_VAD);
+    let mut X = [0i16; MAX_X_VAD];
     // First call: pIn -> X[0..] and X[X_offset[3]..] — no aliasing with input
     {
         let (outL, rest) = X.split_at_mut(X_offset[3] as usize);
@@ -108,8 +111,10 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     // in_0[2*k+1] before writing outL[k], so in-place is safe.
     // Copy input to temp buffer to avoid aliasing.
     {
-        let mut tmp_in = vec![0i16; decimated_framelength1 as usize];
-        tmp_in.copy_from_slice(&X[..decimated_framelength1 as usize]);
+        // decimated_framelength1 max: 256
+        let mut tmp_in = [0i16; 256];
+        tmp_in[..decimated_framelength1 as usize]
+            .copy_from_slice(&X[..decimated_framelength1 as usize]);
         let (outL, rest) = X.split_at_mut(X_offset[2] as usize);
         silk_ana_filt_bank_1(
             &tmp_in,
@@ -120,8 +125,10 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         );
     }
     {
-        let mut tmp_in = vec![0i16; decimated_framelength2 as usize];
-        tmp_in.copy_from_slice(&X[..decimated_framelength2 as usize]);
+        // decimated_framelength2 max: 128
+        let mut tmp_in = [0i16; 128];
+        tmp_in[..decimated_framelength2 as usize]
+            .copy_from_slice(&X[..decimated_framelength2 as usize]);
         let (outL, rest) = X.split_at_mut(X_offset[1] as usize);
         silk_ana_filt_bank_1(
             &tmp_in,

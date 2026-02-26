@@ -211,10 +211,13 @@ pub fn normalise_bands(
         let mut i = 0;
         while i < end {
             let g = 1.0f32 / (1e-27f32 + bandE[(i + c * m.nbEBands as i32) as usize]);
-            let mut j = M * eBands[i as usize] as i32;
-            while j < M * eBands[(i + 1) as usize] as i32 {
-                X[(j + c * N) as usize] = freq[(j + c * N) as usize] * g;
-                j += 1;
+            let band_start = (M * eBands[i as usize] as i32 + c * N) as usize;
+            let band_end = (M * eBands[(i + 1) as usize] as i32 + c * N) as usize;
+            for (x, &f) in X[band_start..band_end]
+                .iter_mut()
+                .zip(&freq[band_start..band_end])
+            {
+                *x = f * g;
             }
             i += 1;
         }
@@ -254,27 +257,24 @@ pub fn denormalise_bands(
         start = end;
     }
     let start_bin = (M * eBands[start as usize] as i32) as usize;
-    let mut f_idx = start_bin;
-    let mut x_idx = start_bin;
     if start != 0 {
         freq[..start_bin].fill(0.0);
     }
-    let mut i = start;
-    while i < end {
-        let band_end = M * eBands[(i + 1) as usize] as i32;
+    let end_bin = (M * eBands[end as usize] as i32) as usize;
+    let freq_band = &mut freq[start_bin..end_bin];
+    let x_band = &X[start_bin..end_bin];
+    let mut off = 0usize;
+    for i in start..end {
+        let band_len = (M * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) as usize;
         let lg = bandLogE[i as usize] + eMeans[i as usize];
         let g = celt_exp2(if 32.0 < lg { 32.0f32 } else { lg });
-        let mut j = M * eBands[i as usize] as i32;
-        loop {
-            freq[f_idx] = X[x_idx] * g;
-            f_idx += 1;
-            x_idx += 1;
-            j += 1;
-            if j >= band_end {
-                break;
-            }
+        for (f, &x) in freq_band[off..off + band_len]
+            .iter_mut()
+            .zip(&x_band[off..off + band_len])
+        {
+            *f = x * g;
         }
-        i += 1;
+        off += band_len;
     }
     debug_assert!(start <= end);
     freq[bound as usize..N as usize].fill(0.0);
@@ -336,19 +336,15 @@ pub fn anti_collapse(
             let x_off = (c * size + ((m.eBands[i as usize] as i32) << LM)) as usize;
             let x_len = (N0 << LM) as usize;
             let mut renormalize = 0;
-            let mut k = 0;
-            while k < (1) << LM {
+            let x_sub = &mut X_[x_off..x_off + x_len];
+            for k in 0..(1i32 << LM) {
                 if collapse_masks[(i * C + c) as usize] as i32 & (1) << k == 0 {
-                    let mut j = 0;
-                    while j < N0 {
+                    for j in 0..N0 {
                         seed = celt_lcg_rand(seed);
-                        X_[x_off + ((j << LM) + k) as usize] =
-                            if seed & 0x8000 != 0 { r } else { -r };
-                        j += 1;
+                        x_sub[((j << LM) + k) as usize] = if seed & 0x8000 != 0 { r } else { -r };
                     }
                     renormalize = 1;
                 }
-                k += 1;
             }
             if renormalize != 0 {
                 renormalise_vector(&mut X_[x_off..x_off + x_len], N0 << LM, Q15ONE, arch);
@@ -387,25 +383,20 @@ fn intensity_stereo(
     let norm = EPSILON + celt_sqrt(1e-15f32 + left * left + right * right);
     let a1 = left / norm;
     let a2 = right / norm;
-    let mut j = 0;
-    while j < N {
-        let l = X[j as usize];
-        let r = Y[j as usize];
-        X[j as usize] = a1 * l + a2 * r;
-        j += 1;
+    for (x, &r) in X[..N as usize].iter_mut().zip(&Y[..N as usize]) {
+        let l = *x;
+        *x = a1 * l + a2 * r;
     }
 }
 
 /// Upstream C: celt/bands.c:stereo_split
 #[inline]
 fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
-    let mut j = 0;
-    while j < N {
-        let l = std::f32::consts::FRAC_1_SQRT_2 * X[j as usize];
-        let r = std::f32::consts::FRAC_1_SQRT_2 * Y[j as usize];
-        X[j as usize] = l + r;
-        Y[j as usize] = r - l;
-        j += 1;
+    for (x, y) in X[..N as usize].iter_mut().zip(Y[..N as usize].iter_mut()) {
+        let l = std::f32::consts::FRAC_1_SQRT_2 * *x;
+        let r = std::f32::consts::FRAC_1_SQRT_2 * *y;
+        *x = l + r;
+        *y = r - l;
     }
 }
 
@@ -424,13 +415,11 @@ fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: Arch) {
     }
     let lgain = celt_rsqrt_norm(El);
     let rgain = celt_rsqrt_norm(Er);
-    let mut j = 0;
-    while j < N {
-        let l = mid * X[j as usize];
-        let r = Y[j as usize];
-        X[j as usize] = lgain * (l - r);
-        Y[j as usize] = rgain * (l + r);
-        j += 1;
+    for (x, y) in X[..N as usize].iter_mut().zip(Y[..N as usize].iter_mut()) {
+        let l = mid * *x;
+        let r = *y;
+        *x = lgain * (l - r);
+        *y = rgain * (l + r);
     }
 }
 
@@ -465,9 +454,9 @@ pub fn spreading_decision(
             if N > 8 {
                 let x_off = (M * eBands[i as usize] as i32 + c * N0) as usize;
                 let mut tcount: [i32; 3] = [0, 0, 0];
-                let mut j = 0;
-                while j < N {
-                    let x2N = X[x_off + j as usize] * X[x_off + j as usize] * N as f32;
+                let x_band = &X[x_off..x_off + N as usize];
+                for &xv in x_band {
+                    let x2N = xv * xv * N as f32;
                     if x2N < 0.25f32 {
                         tcount[0] += 1;
                     }
@@ -477,7 +466,6 @@ pub fn spreading_decision(
                     if x2N < 0.015625f32 {
                         tcount[2] += 1;
                     }
-                    j += 1;
                 }
                 if i > m.nbEBands as i32 - 4 {
                     hf_sum = (hf_sum as u32)
@@ -543,29 +531,25 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
     let mut tmp = [0.0f32; 176];
     debug_assert!(stride > 0);
+    let tmp = &mut tmp[..N];
+    let x = &X[..N];
     if hadamard != 0 {
         let ordery = &ordery_table[(stride - 2) as usize..];
-        let mut i = 0;
-        while i < stride {
-            let mut j = 0;
-            while j < N0 {
-                tmp[(ordery[i as usize] * N0 + j) as usize] = X[(j * stride + i) as usize];
-                j += 1;
+        for i in 0..stride as usize {
+            let dst_base = (ordery[i] * N0) as usize;
+            for j in 0..N0 as usize {
+                tmp[dst_base + j] = x[j * stride as usize + i];
             }
-            i += 1;
         }
     } else {
-        let mut i = 0;
-        while i < stride {
-            let mut j = 0;
-            while j < N0 {
-                tmp[(i * N0 + j) as usize] = X[(j * stride + i) as usize];
-                j += 1;
+        for i in 0..stride as usize {
+            let dst_base = i * N0 as usize;
+            for j in 0..N0 as usize {
+                tmp[dst_base + j] = x[j * stride as usize + i];
             }
-            i += 1;
         }
     }
-    X[..N].copy_from_slice(&tmp[..N]);
+    X[..N].copy_from_slice(tmp);
 }
 
 /// Upstream C: celt/bands.c:interleave_hadamard
@@ -573,46 +557,42 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
 fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
     let mut tmp = [0.0f32; 176];
+    let tmp = &mut tmp[..N];
+    let x = &X[..N];
     if hadamard != 0 {
         let ordery = &ordery_table[(stride - 2) as usize..];
-        let mut i = 0;
-        while i < stride {
-            let mut j = 0;
-            while j < N0 {
-                tmp[(j * stride + i) as usize] = X[(ordery[i as usize] * N0 + j) as usize];
-                j += 1;
+        for i in 0..stride as usize {
+            let src_base = (ordery[i] * N0) as usize;
+            for j in 0..N0 as usize {
+                tmp[j * stride as usize + i] = x[src_base + j];
             }
-            i += 1;
         }
     } else {
-        let mut i = 0;
-        while i < stride {
-            let mut j = 0;
-            while j < N0 {
-                tmp[(j * stride + i) as usize] = X[(i * N0 + j) as usize];
-                j += 1;
+        for i in 0..stride as usize {
+            let src_base = i * N0 as usize;
+            for j in 0..N0 as usize {
+                tmp[j * stride as usize + i] = x[src_base + j];
             }
-            i += 1;
         }
     }
-    X[..N].copy_from_slice(&tmp[..N]);
+    X[..N].copy_from_slice(tmp);
 }
 
 /// Upstream C: celt/bands.c:haar1
 #[inline]
 pub fn haar1(X: &mut [f32], mut N0: i32, stride: i32) {
+    let total = N0 as usize * stride as usize;
+    let X = &mut X[..total];
     N0 >>= 1;
-    let mut i = 0;
-    while i < stride {
-        let mut j = 0;
-        while j < N0 {
-            let tmp1 = std::f32::consts::FRAC_1_SQRT_2 * X[(stride * 2 * j + i) as usize];
-            let tmp2 = std::f32::consts::FRAC_1_SQRT_2 * X[(stride * (2 * j + 1) + i) as usize];
-            X[(stride * 2 * j + i) as usize] = tmp1 + tmp2;
-            X[(stride * (2 * j + 1) + i) as usize] = tmp1 - tmp2;
-            j += 1;
+    for i in 0..stride as usize {
+        for j in 0..N0 as usize {
+            let idx0 = stride as usize * 2 * j + i;
+            let idx1 = stride as usize * (2 * j + 1) + i;
+            let tmp1 = std::f32::consts::FRAC_1_SQRT_2 * X[idx0];
+            let tmp2 = std::f32::consts::FRAC_1_SQRT_2 * X[idx1];
+            X[idx0] = tmp1 + tmp2;
+            X[idx1] = tmp1 - tmp2;
         }
-        i += 1;
     }
 }
 
@@ -646,7 +626,7 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
 /// Uses raw pointers internally for X/Y because the caller (`quant_partition`)
 /// needs to split X at varying offsets and pass sub-slices. The pointer
 /// arithmetic is confined to this function.
-#[inline]
+#[inline(never)]
 fn compute_theta(
     ctx: &mut band_ctx,
     sctx: &mut split_ctx,
@@ -867,10 +847,8 @@ fn compute_theta(
         if encode != 0 {
             inv = (itheta > 8192 && ctx.disable_inv == 0) as i32;
             if inv != 0 {
-                let mut j = 0;
-                while j < N {
-                    Y[j as usize] = -Y[j as usize];
-                    j += 1;
+                for y in &mut Y[..N as usize] {
+                    *y = -*y;
                 }
             }
             intensity_stereo(m, X, Y, bandE, i, N);
@@ -1281,26 +1259,23 @@ fn quant_partition(
                     if fill == 0 {
                         X[..N as usize].fill(0.0);
                     } else {
+                        let n = N as usize;
                         if let Some(lb) = lowband {
-                            let mut j = 0;
-                            while j < N {
+                            for (x, &l) in X[..n].iter_mut().zip(&lb[..n]) {
                                 let mut tmp = 1.0f32 / 256.0f32;
                                 ctx.seed = celt_lcg_rand(ctx.seed);
                                 tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
-                                X[j as usize] = lb[j as usize] + tmp;
-                                j += 1;
+                                *x = l + tmp;
                             }
                             cm = fill as u32;
                         } else {
-                            let mut j = 0;
-                            while j < N {
+                            for x in &mut X[..n] {
                                 ctx.seed = celt_lcg_rand(ctx.seed);
-                                X[j as usize] = (ctx.seed as i32 >> 20) as f32;
-                                j += 1;
+                                *x = (ctx.seed as i32 >> 20) as f32;
                             }
                             cm = cm_mask;
                         }
-                        renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
+                        renormalise_vector(&mut X[..n], N, gain, ctx.arch);
                     }
                 }
             }
@@ -1310,29 +1285,26 @@ fn quant_partition(
                 if ctx.resynth != 0 {
                     let cm_mask = (((1_u64) << B) as u32).wrapping_sub(1);
                     fill = (fill as u32 & cm_mask) as i32;
+                    let n = N as usize;
                     if fill == 0 {
-                        X[..N as usize].fill(0.0);
+                        X[..n].fill(0.0);
                     } else {
                         if let Some(lb) = lowband {
-                            let mut j = 0;
-                            while j < N {
+                            for (x, &l) in X[..n].iter_mut().zip(&lb[..n]) {
                                 let mut tmp = 1.0f32 / 256.0f32;
                                 ctx.seed = celt_lcg_rand(ctx.seed);
                                 tmp = if ctx.seed & 0x8000 != 0 { tmp } else { -tmp };
-                                X[j as usize] = lb[j as usize] + tmp;
-                                j += 1;
+                                *x = l + tmp;
                             }
                             cm = fill as u32;
                         } else {
-                            let mut j = 0;
-                            while j < N {
+                            for x in &mut X[..n] {
                                 ctx.seed = celt_lcg_rand(ctx.seed);
-                                X[j as usize] = (ctx.seed as i32 >> 20) as f32;
-                                j += 1;
+                                *x = (ctx.seed as i32 >> 20) as f32;
                             }
                             cm = cm_mask;
                         }
-                        renormalise_vector(&mut X[..N as usize], N, gain, ctx.arch);
+                        renormalise_vector(&mut X[..n], N, gain, ctx.arch);
                     }
                 }
             }
@@ -1598,7 +1570,6 @@ fn quant_band(
 }
 
 /// Upstream C: celt/bands.c:quant_band_stereo
-#[inline]
 fn quant_band_stereo(
     ctx: &mut band_ctx,
     X: &mut [f32],

@@ -283,9 +283,15 @@ pub fn silk_NSQ_c(
     let frame_len = psEncC.frame_length;
     let subfr_len = psEncC.subfr_length;
 
-    let mut sLTP_Q15: Vec<i32> = vec![0; ltp_mem_len + frame_len];
-    let mut sLTP: Vec<i16> = vec![0; ltp_mem_len + frame_len];
-    let mut x_sc_Q10: Vec<i32> = vec![0; subfr_len];
+    // ltp_mem_len + frame_len max: 320 + 320 = 640
+    const MAX_LTP_FRAME: usize = 640;
+    debug_assert!(ltp_mem_len + frame_len <= MAX_LTP_FRAME);
+    let mut sLTP_Q15 = [0i32; MAX_LTP_FRAME];
+    let mut sLTP = [0i16; MAX_LTP_FRAME];
+    // subfr_len max: MAX_SUB_FRAME_LENGTH = 80
+    const MAX_SUBFR: usize = 80;
+    debug_assert!(subfr_len <= MAX_SUBFR);
+    let mut x_sc_Q10 = [0i32; MAX_SUBFR];
 
     NSQ.sLTP_shp_buf_idx = ltp_mem_len as i32;
     NSQ.sLTP_buf_idx = ltp_mem_len as i32;
