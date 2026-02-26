@@ -4,6 +4,27 @@
 //! runtime loading via `parse_weights()`.
 
 use super::nnet::{parse_weights, WeightArray};
+use std::collections::HashSet;
+
+#[inline]
+fn mirrored_int8_name(name: &str) -> Option<String> {
+    let stem = name.strip_suffix("_weights_float")?;
+    Some(format!("{stem}_weights_int8"))
+}
+
+fn strip_debug_float_mirrors(mut arrays: Vec<WeightArray>) -> Vec<WeightArray> {
+    // Upstream DISABLE_DEBUG_FLOAT omits only the float mirrors for quantized
+    // layers (those that also provide *_weights_int8). Keep pure-float layers.
+    let names: HashSet<String> = arrays.iter().map(|a| a.name.clone()).collect();
+    arrays.retain(|a| {
+        if let Some(int8_name) = mirrored_int8_name(&a.name) {
+            !names.contains(int8_name.as_str())
+        } else {
+            true
+        }
+    });
+    arrays
+}
 
 /// Return all compiled-in weight arrays.
 ///
@@ -28,7 +49,7 @@ pub fn compiled_weights() -> Vec<WeightArray> {
         arrays.extend(super::osce_nolace_data::nolacelayers_arrays());
         arrays.extend(super::bbwenet_data::bbwenetlayers_arrays());
     }
-    arrays
+    strip_debug_float_mirrors(arrays)
 }
 
 /// Parse a binary weight blob into weight arrays.
@@ -36,5 +57,5 @@ pub fn compiled_weights() -> Vec<WeightArray> {
 /// The blob must be in the upstream "DNNw" format (as produced by
 /// `write_lpcnet_weights` or `write_weights()`).
 pub fn load_weights(data: &[u8]) -> Option<Vec<WeightArray>> {
-    parse_weights(data)
+    parse_weights(data).map(strip_debug_float_mirrors)
 }

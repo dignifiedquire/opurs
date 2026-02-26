@@ -4,8 +4,8 @@
 Remove user-facing and metadata drift for versioning, docs, and release semantics.
 
 ## Findings IDs
-Open: `225`
-Closed in this group: `95,96,108,131,133,134,217,222,223,226,227,228`
+Open: `none (resolved)`
+Closed in this group: `95,96,108,131,133,134,217,222,223,225,226,227,228`
 
 ## Scope
 - Version strings and package metadata alignment to current upstream baseline.
@@ -26,6 +26,10 @@ Closed in this group: `95,96,108,131,133,134,217,222,223,226,227,228`
 - Docs/metadata accurately describe current compatibility scope.
 
 ## Progress
+- 2026-02-26: Closed build-config default parity item `225`:
+  - `libopus-sys/build.rs`: default config now defines `DISABLE_DEBUG_FLOAT 1` (upstream-default DNN build behavior).
+  - `src/dnn/weights.rs`: Rust weight loading now removes only mirrored `*_weights_float` arrays when matching `*_weights_int8` arrays exist, preserving float-only layers while matching upstream quantized defaults.
+  - Verified with `CARGO_TARGET_DIR=target-local cargo nextest run -p opurs --release --features tools-dnn --test osce_nndsp` (20/20 pass).
 - 2026-02-26: Closed additional stale docs/metadata findings:
   - `95` / `222`: `opus_get_version_string()` is intentionally project-scoped to `"opurs {crate_version}"` and now tracked as resolved behavior.
   - `226`: confirmed `libopus-sys` exposes `qext` feature and `build.rs` emits `ENABLE_QEXT` when enabled.
@@ -37,4 +41,4 @@ Closed in this group: `95,96,108,131,133,134,217,222,223,226,227,228`
   - `133`: top-level README parity text targets 1.6.1.
   - `223`: top-level crate docs and `libopus-sys/README.md` align to 1.6.1.
   - `228`: package metadata in `Cargo.toml` targets 1.6.1.
-- Remaining open in Group 6: `225` (`DISABLE_DEBUG_FLOAT` default parity in C DNN build config).
+- Group 6 is fully resolved.

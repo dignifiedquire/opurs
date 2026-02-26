@@ -26,7 +26,7 @@ IDs: `none (resolved)`
 IDs: `none (resolved)`
 
 6. Documentation/version/metadata drift
-IDs: `225`
+IDs: `none (resolved)`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
 IDs: `none (resolved)`
@@ -989,11 +989,11 @@ IDs: `none (resolved)`
 - Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
 - Detail: Updated user-facing crate/module docs to 1.6.1, matching in-tree vendored/build baseline metadata.
 
-225. [LOW][Build Config Defaults][libopus-sys DNN] `DISABLE_DEBUG_FLOAT` default from upstream build systems is not mirrored in generated config.
+225. [RESOLVED][Build Config Defaults][libopus-sys DNN] `DISABLE_DEBUG_FLOAT` default is now mirrored and parity-validated.
 - Rust build config: `libopus-sys/build.rs:45-84`, `libopus-sys/build.rs:277-322`
 - Upstream default option and define path: `libopus-sys/opus/meson_options.txt:13`, `libopus-sys/opus/meson.build:191-193`
 - Affected generated weights guards: `libopus-sys/opus/dnn/bbwenet_data.c:11673-11678`
-- Detail: Upstream defaults `dnn-debug-float` to disabled and defines `DISABLE_DEBUG_FLOAT`. `build.rs` never emits that macro, so debug-float guarded weight sections remain enabled when compiling C DNN sources, diverging from upstream default build footprint/config semantics.
+- Detail: `libopus-sys` now defines `DISABLE_DEBUG_FLOAT` by default, and Rust weight loading drops only mirrored `*_weights_float` arrays that have matching `*_weights_int8` companions. This preserves float-only layers while matching upstream quantized-path defaults. C-vs-Rust `tools-dnn` parity (`osce_nndsp`) passes with this configuration.
 
 226. [RESOLVED][Build Feature Parity][libopus-sys/QEXT] `libopus-sys` now exposes and maps upstream `ENABLE_QEXT`.
 - Rust features: `Cargo.toml:117`, `Cargo.toml:119-120`, `libopus-sys/Cargo.toml:13-22`
