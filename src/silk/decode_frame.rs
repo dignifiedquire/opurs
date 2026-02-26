@@ -47,8 +47,8 @@ pub fn silk_decode_frame(
         LTPCoef_Q14: [0; 20],
         LTP_scale_Q14: 0,
     };
-    assert!(L > 0 && L <= 5 * 4 * 16);
-    assert!(pOut.len() >= L as usize);
+    debug_assert!(L > 0 && L <= 5 * 4 * 16);
+    debug_assert!(pOut.len() >= L as usize);
     let pOut_slice = &mut pOut[..L as usize];
     if lostFlag == FLAG_DECODE_NORMAL
         || lostFlag == FLAG_DECODE_LBRR && psDec.LBRR_flags[psDec.nFramesDecoded as usize] == 1
@@ -82,7 +82,7 @@ pub fn silk_decode_frame(
         );
 
         // Update output buffer
-        assert!(psDec.ltp_mem_length >= psDec.frame_length);
+        debug_assert!(psDec.ltp_mem_length >= psDec.frame_length);
         let mv_len = psDec.ltp_mem_length - psDec.frame_length;
         psDec
             .outBuf
@@ -108,7 +108,7 @@ pub fn silk_decode_frame(
         );
         psDec.lossCnt = 0;
         psDec.prevSignalType = psDec.indices.signalType as i32;
-        assert!(psDec.prevSignalType >= 0 && psDec.prevSignalType <= 2);
+        debug_assert!(psDec.prevSignalType >= 0 && psDec.prevSignalType <= 2);
         psDec.first_frame_after_reset = 0;
     } else {
         psDec.indices.signalType = psDec.prevSignalType as i8;
@@ -130,7 +130,7 @@ pub fn silk_decode_frame(
         }
 
         // Update output buffer
-        assert!(psDec.ltp_mem_length >= psDec.frame_length);
+        debug_assert!(psDec.ltp_mem_length >= psDec.frame_length);
         let mv_len = psDec.ltp_mem_length - psDec.frame_length;
         psDec
             .outBuf

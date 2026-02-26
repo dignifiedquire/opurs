@@ -89,9 +89,9 @@ pub fn silk_pitch_analysis_core_FLP(
 
     let mut nb_cbk_search: i32;
     let Lag_CB: &[i8];
-    assert!(Fs_kHz == 8 || Fs_kHz == 12 || Fs_kHz == 16);
-    assert!(complexity >= 0);
-    assert!(complexity <= 2);
+    debug_assert!(Fs_kHz == 8 || Fs_kHz == 12 || Fs_kHz == 16);
+    debug_assert!(complexity >= 0);
+    debug_assert!(complexity <= 2);
     let frame_length: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * Fs_kHz;
     let frame_length_4kHz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 4;
     let frame_length_8kHz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 8;
@@ -138,7 +138,7 @@ pub fn silk_pitch_analysis_core_FLP(
             &frame_8_FIX[..frame_length_8kHz as usize],
         );
     } else {
-        assert!(Fs_kHz == 8);
+        debug_assert!(Fs_kHz == 8);
         silk_float2short_array(
             &mut frame_8_FIX[..frame_length_8kHz as usize],
             &frame[..frame_length_8kHz as usize],
@@ -178,9 +178,9 @@ pub fn silk_pitch_analysis_core_FLP(
     let mut target_off: usize = ((sf_length_4kHz as u32) << 2) as usize;
     k = 0;
     while k < nb_subfr >> 1 {
-        assert!(target_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
+        debug_assert!(target_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
         let basis_off = target_off - min_lag_4kHz as usize;
-        assert!(basis_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
+        debug_assert!(basis_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
         {
             let xcorr_len = (max_lag_4kHz - min_lag_4kHz + 1) as usize;
             celt_pitch_xcorr(
@@ -218,7 +218,7 @@ pub fn silk_pitch_analysis_core_FLP(
         i -= 1;
     }
     length_d_srch = 4 + 2 * complexity;
-    assert!(3 * length_d_srch <= 24);
+    debug_assert!(3 * length_d_srch <= 24);
     silk_insertion_sort_decreasing_FLP(
         &mut C[0][min_lag_4kHz as usize..],
         &mut d_srch,
@@ -244,7 +244,7 @@ pub fn silk_pitch_analysis_core_FLP(
             break;
         }
     }
-    assert!(length_d_srch > 0);
+    debug_assert!(length_d_srch > 0);
     i = min_lag_8kHz - 5;
     while i < max_lag_8kHz + 5 {
         d_comp[i as usize] = 0;
@@ -525,7 +525,7 @@ pub fn silk_pitch_analysis_core_FLP(
         *lagIndex = (lag - min_lag_8kHz) as i16;
         *contourIndex = CBimax as i8;
     }
-    assert!(*lagIndex as i32 >= 0);
+    debug_assert!(*lagIndex as i32 >= 0);
     0
 }
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_corr_st3
@@ -552,15 +552,15 @@ fn silk_P_Ana_calc_corr_st3(
     let mut xcorr: [opus_val32; 22] = [0.; 22];
     let Lag_range: &[[i8; 2]];
     let Lag_CB: &[i8];
-    assert!(complexity >= 0);
-    assert!(complexity <= 2);
+    debug_assert!(complexity >= 0);
+    debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
         Lag_range = &silk_Lag_range_stage3[complexity as usize];
         Lag_CB = &silk_CB_lags_stage3;
         nb_cbk_search = silk_nb_cbk_searchs_stage3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
-        assert!(nb_subfr == 4 >> 1);
+        debug_assert!(nb_subfr == 4 >> 1);
         Lag_range = &silk_Lag_range_stage3_10_ms;
         Lag_CB = &silk_CB_lags_stage3_10_ms;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
@@ -627,15 +627,15 @@ fn silk_P_Ana_calc_energy_st3(
     let mut scratch_mem: [f32; 22] = [0.; 22];
     let Lag_range: &[[i8; 2]];
     let Lag_CB: &[i8];
-    assert!(complexity >= 0);
-    assert!(complexity <= 2);
+    debug_assert!(complexity >= 0);
+    debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
         Lag_range = &silk_Lag_range_stage3[complexity as usize];
         Lag_CB = &silk_CB_lags_stage3;
         nb_cbk_search = silk_nb_cbk_searchs_stage3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
-        assert!(nb_subfr == 4 >> 1);
+        debug_assert!(nb_subfr == 4 >> 1);
         Lag_range = &silk_Lag_range_stage3_10_ms;
         Lag_CB = &silk_CB_lags_stage3_10_ms;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;

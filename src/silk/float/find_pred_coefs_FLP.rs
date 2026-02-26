@@ -39,7 +39,7 @@ pub fn silk_find_pred_coefs_FLP(
         i += 1;
     }
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
-        assert!(
+        debug_assert!(
             psEnc.sCmn.ltp_mem_length as i32 - psEnc.sCmn.predictLPCOrder
                 >= psEncCtrl.pitchL[0_usize] + 5 / 2
         );

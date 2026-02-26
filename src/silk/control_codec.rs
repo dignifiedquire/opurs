@@ -174,8 +174,8 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
         psEnc.sCmn.PacketSize_ms = PacketSize_ms;
         psEnc.sCmn.TargetRate_bps = 0;
     }
-    assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
-    assert!(psEnc.sCmn.nb_subfr == 2 || psEnc.sCmn.nb_subfr == 4);
+    debug_assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
+    debug_assert!(psEnc.sCmn.nb_subfr == 2 || psEnc.sCmn.nb_subfr == 4);
     if psEnc.sCmn.fs_kHz != fs_kHz {
         psEnc.sShape = Default::default();
         psEnc.sCmn.sNSQ = Default::default();
@@ -229,13 +229,13 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
             psEnc.sCmn.pitch_lag_low_bits_iCDF = &silk_uniform4_iCDF;
         }
     }
-    assert!(psEnc.sCmn.subfr_length * psEnc.sCmn.nb_subfr == psEnc.sCmn.frame_length);
+    debug_assert!(psEnc.sCmn.subfr_length * psEnc.sCmn.nb_subfr == psEnc.sCmn.frame_length);
     ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_complexity
 fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i32 {
     let ret: i32 = 0;
-    assert!((0..=10).contains(&Complexity));
+    debug_assert!((0..=10).contains(&Complexity));
     if Complexity < 1 {
         psEncC.pitchEstimationComplexity = SILK_PE_MIN_COMPLEX;
         psEncC.pitchEstimationThreshold_Q16 = (0.8f64 * ((1) << 16) as f64 + 0.5f64) as i32;
@@ -314,12 +314,12 @@ fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i3
         silk_min_int(psEncC.pitchEstimationLPCOrder, psEncC.predictLPCOrder);
     psEncC.shapeWinLength = SUB_FRAME_LENGTH_MS as i32 * psEncC.fs_kHz + 2 * psEncC.la_shape;
     psEncC.Complexity = Complexity;
-    assert!(psEncC.pitchEstimationLPCOrder <= 16);
-    assert!(psEncC.shapingLPCOrder <= 24);
-    assert!(psEncC.nStatesDelayedDecision <= 4);
-    assert!(psEncC.warping_Q16 <= 32767);
-    assert!(psEncC.la_shape <= 5 * 16);
-    assert!(psEncC.shapeWinLength <= 15 * 16);
+    debug_assert!(psEncC.pitchEstimationLPCOrder <= 16);
+    debug_assert!(psEncC.shapingLPCOrder <= 24);
+    debug_assert!(psEncC.nStatesDelayedDecision <= 4);
+    debug_assert!(psEncC.warping_Q16 <= 32767);
+    debug_assert!(psEncC.la_shape <= 5 * 16);
+    debug_assert!(psEncC.shapeWinLength <= 15 * 16);
     ret
 }
 /// Upstream C: silk/control_codec.c:silk_setup_LBRR

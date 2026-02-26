@@ -130,7 +130,7 @@ pub fn silk_decode_core(
             if k == 0 || k == 2 && NLSF_interpolation_flag != 0 {
                 /* Rewhiten with new A coefs */
                 let start_idx = psDec.ltp_mem_length - lag - psDec.LPC_order - LTP_ORDER / 2;
-                assert!(start_idx > 0);
+                debug_assert!(start_idx > 0);
 
                 if k == 2 {
                     psDec.outBuf[psDec.ltp_mem_length..][..2 * psDec.subfr_length]
@@ -201,7 +201,7 @@ pub fn silk_decode_core(
         let mut i = 0;
         while i < psDec.subfr_length {
             /* Short-term prediction */
-            assert!(psDec.LPC_order == 10 || psDec.LPC_order == 16);
+            debug_assert!(psDec.LPC_order == 10 || psDec.LPC_order == 16);
             /* Avoids introducing a bias because silk_SMLAWB() always rounds to -inf */
             let mut LPC_pred_Q10 = psDec.LPC_order as i32 / 2;
             LPC_pred_Q10 = silk_SMLAWB(

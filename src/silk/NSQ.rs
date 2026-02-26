@@ -302,7 +302,7 @@ pub fn silk_NSQ_c(
             if k & (3 - ((LSF_interpolation_flag as u32) << 1) as i32) == 0 {
                 start_idx =
                     ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
-                assert!(start_idx > 0);
+                debug_assert!(start_idx > 0);
                 silk_LPC_analysis_filter(
                     &mut sLTP[start_idx as usize..ltp_mem_len],
                     &NSQ.xq[(start_idx + k * subfr_len as i32) as usize..]
@@ -506,7 +506,7 @@ fn silk_noise_shape_quantizer(
         }
 
         // Noise shape feedback
-        assert!(shapingLPCOrder & 1 == 0);
+        debug_assert!(shapingLPCOrder & 1 == 0);
         n_AR_Q12 = silk_NSQ_noise_shape_feedback_loop(
             NSQ.sDiff_shp_Q14,
             &mut NSQ.sAR2_Q14,
@@ -525,7 +525,7 @@ fn silk_noise_shape_quantizer(
             + ((NSQ.sLF_AR_shp_Q14 as i64 * (LF_shp_Q14 as i64 >> 16)) >> 16))
             as i32;
 
-        assert!(lag > 0 || signalType != 2);
+        debug_assert!(lag > 0 || signalType != 2);
 
         tmp1 = (((LPC_pred_Q10 as u32) << 2) as i32).wrapping_sub(n_AR_Q12);
         tmp1 = tmp1.wrapping_sub(n_LF_Q12);

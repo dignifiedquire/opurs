@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,142,144,146,148,149,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,144,146,148,149,153,170,171,172`
 
 ## Findings
 
@@ -584,10 +584,10 @@ IDs: `61,62,72,79,82,87,106,142,144,146,148,149,153,170,171,172`
 - Upstream: `libopus-sys/opus/celt/celt_lpc.c`, `libopus-sys/opus/celt/pitch.c`, `libopus-sys/opus/celt/bands.c`
 - Detail: Converted tracked internal invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert` release behavior.
 
-142. [LOW][Runtime Semantics][SILK] Additional SILK invariant checks are unconditional `assert!` in Rust.
-- Rust: `src/silk/control_codec.rs:167-168`, `src/silk/control_codec.rs:222`, `src/silk/control_codec.rs:228`, `src/silk/control_codec.rs:307-312`, `src/silk/decode_frame.rs:49`, `src/silk/decode_frame.rs:84`, `src/silk/decode_frame.rs:110`, `src/silk/decode_frame.rs:132`, `src/silk/decode_core.rs:133`, `src/silk/decode_core.rs:204`, `src/silk/NSQ.rs:220`, `src/silk/NSQ.rs:423`, `src/silk/NSQ.rs:441`, `src/silk/NSQ_del_dec.rs:311`, `src/silk/NSQ_del_dec.rs:541`, `src/silk/NSQ_del_dec.rs:608`, `src/silk/float/pitch_analysis_core_FLP.rs:90-92`, `src/silk/float/pitch_analysis_core_FLP.rs:218`, `src/silk/float/pitch_analysis_core_FLP.rs:244`, `src/silk/float/find_pred_coefs_FLP.rs:42`
-- Upstream: `libopus-sys/opus/silk/control_codec.c:241-242`, `libopus-sys/opus/silk/control_codec.c:302`, `libopus-sys/opus/silk/control_codec.c:315`, `libopus-sys/opus/silk/control_codec.c:393-398`, `libopus-sys/opus/silk/decode_frame.c:68`, `libopus-sys/opus/silk/decode_frame.c:104`, `libopus-sys/opus/silk/decode_frame.c:127`, `libopus-sys/opus/silk/decode_frame.c:145`, `libopus-sys/opus/silk/NSQ.c:402`, `libopus-sys/opus/silk/NSQ_del_dec.c:686`, `libopus-sys/opus/silk/float/pitch_analysis_core_FLP.c:118-119`, `libopus-sys/opus/silk/float/pitch_analysis_core_FLP.c:532`, `libopus-sys/opus/silk/float/find_pred_coefs_FLP.c:55`
-- Detail: Upstream uses `celt_assert`/`silk_assert` for many of these invariants. Rust promotes them to unconditional `assert!`, which can hard-abort runtime encode/decode flows in non-assert configurations where upstream would usually not.
+142. [RESOLVED][Runtime Semantics][SILK] Additional SILK invariant checks now follow assert-gated semantics.
+- Rust: `src/silk/control_codec.rs`, `src/silk/decode_frame.rs`, `src/silk/decode_core.rs`, `src/silk/NSQ.rs`, `src/silk/NSQ_del_dec.rs`, `src/silk/float/pitch_analysis_core_FLP.rs`, `src/silk/float/find_pred_coefs_FLP.rs`
+- Upstream: `libopus-sys/opus/silk/control_codec.c`, `libopus-sys/opus/silk/decode_frame.c`, `libopus-sys/opus/silk/NSQ.c`, `libopus-sys/opus/silk/NSQ_del_dec.c`, `libopus-sys/opus/silk/float/pitch_analysis_core_FLP.c`, `libopus-sys/opus/silk/float/find_pred_coefs_FLP.c`
+- Detail: Converted the tracked SILK invariant checks from unconditional `assert!` to `debug_assert!`, matching upstream `celt_assert`/`silk_assert` release-mode behavior.
 
 143. [RESOLVED][Runtime Semantics][OSCE/Freq/SILK-FLP] OSCE/Freq invariant checks now follow assert-gated semantics.
 - Rust: `src/dnn/osce.rs`, `src/dnn/freq.rs`

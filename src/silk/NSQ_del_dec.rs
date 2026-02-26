@@ -389,7 +389,7 @@ pub fn silk_NSQ_del_dec_c(
                 }
                 start_idx =
                     ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
-                assert!(start_idx > 0);
+                debug_assert!(start_idx > 0);
                 silk_LPC_analysis_filter(
                     &mut sLTP[start_idx as usize..ltp_mem_len],
                     &NSQ.xq[(start_idx + k * subfr_len as i32) as usize..]
@@ -619,7 +619,7 @@ fn silk_noise_shape_quantizer_del_dec(
     let mut tmp2: i32;
     let mut sLF_AR_shp_Q14: i32;
 
-    assert!(nStatesDelayedDecision > 0);
+    debug_assert!(nStatesDelayedDecision > 0);
     let nStates = nStatesDelayedDecision as usize;
 
     let mut psSampleState: Vec<NSQ_sample_pair> = vec![[NSQ_sample_struct::default(); 2]; nStates];
@@ -687,7 +687,7 @@ fn silk_noise_shape_quantizer_del_dec(
             LPC_pred_Q14 = ((LPC_pred_Q14 as u32) << 4) as i32;
 
             // Noise shaping with warping
-            assert!(shapingLPCOrder & 1 == 0);
+            debug_assert!(shapingLPCOrder & 1 == 0);
             tmp2 = (psDD.Diff_Q14 as i64
                 + ((psDD.sAR2_Q14[0] as i64 * warping_Q16 as i16 as i64) >> 16))
                 as i32;
