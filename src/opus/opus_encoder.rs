@@ -156,6 +156,16 @@ static fec_thresholds: [i32; 10] = [
 ];
 
 impl OpusEncoder {
+    #[inline]
+    fn sync_celt_controls(&mut self) {
+        self.celt_enc.lfe = self.lfe;
+        self.celt_enc.energy_mask_len = self.energy_masking_len;
+        if self.energy_masking_len > 0 {
+            self.celt_enc.energy_mask[..self.energy_masking_len]
+                .copy_from_slice(&self.energy_masking[..self.energy_masking_len]);
+        }
+    }
+
     pub fn new(Fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
         let valid_fs = Fs == 48000
             || Fs == 24000
@@ -422,6 +432,42 @@ impl OpusEncoder {
             }
         };
         self.user_bandwidth = raw;
+    }
+
+    /// Upstream C: src/opus_encoder.c:OPUS_SET_LFE_REQUEST
+    pub fn set_lfe(&mut self, enabled: bool) {
+        self.lfe = enabled as i32;
+        self.sync_celt_controls();
+    }
+
+    pub fn lfe(&self) -> bool {
+        self.lfe != 0
+    }
+
+    /// Upstream C: src/opus_encoder.c:OPUS_SET_ENERGY_MASK_REQUEST
+    pub fn set_energy_mask(&mut self, mask: Option<&[opus_val16]>) -> Result<(), i32> {
+        if let Some(mask) = mask {
+            let expected = (self.channels * 21) as usize;
+            if mask.len() != expected {
+                return Err(OPUS_BAD_ARG);
+            }
+            self.energy_masking.fill(0.0);
+            self.energy_masking[..expected].copy_from_slice(mask);
+            self.energy_masking_len = expected;
+        } else {
+            self.energy_masking.fill(0.0);
+            self.energy_masking_len = 0;
+        }
+        self.sync_celt_controls();
+        Ok(())
+    }
+
+    pub fn energy_mask(&self) -> Option<&[opus_val16]> {
+        if self.energy_masking_len == 0 {
+            None
+        } else {
+            Some(&self.energy_masking[..self.energy_masking_len])
+        }
     }
 
     pub fn get_bandwidth(&self) -> i32 {
@@ -702,6 +748,7 @@ impl OpusEncoder {
         self.rangeFinal = 0;
 
         self.celt_enc.reset();
+        self.sync_celt_controls();
         silk_InitEncoder(&mut self.silk_enc, self.arch, &mut dummy);
         self.stream_channels = self.channels;
         self.hybrid_stereo_width_Q14 = ((1) << 14) as i16;

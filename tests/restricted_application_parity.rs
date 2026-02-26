@@ -12,6 +12,9 @@ use opurs::{
 };
 use opurs::{Bitrate, OPUS_AUTO, OPUS_BITRATE_MAX};
 
+const OPUS_SET_LFE_REQUEST: i32 = 10024;
+const OPUS_SET_ENERGY_MASK_REQUEST: i32 = 10026;
+
 struct CEncoder(*mut COpusEncoder);
 
 impl CEncoder {
@@ -43,6 +46,15 @@ impl CEncoder {
 
     fn set_bitrate(&mut self, bitrate: i32) -> i32 {
         unsafe { c_opus_encoder_ctl(self.0, OPUS_SET_BITRATE_REQUEST, bitrate) }
+    }
+
+    fn set_lfe(&mut self, enabled: bool) -> i32 {
+        unsafe { c_opus_encoder_ctl(self.0, OPUS_SET_LFE_REQUEST, enabled as i32) }
+    }
+
+    fn set_energy_mask(&mut self, mask: Option<&[f32]>) -> i32 {
+        let ptr = mask.map_or(std::ptr::null(), |m| m.as_ptr());
+        unsafe { c_opus_encoder_ctl(self.0, OPUS_SET_ENERGY_MASK_REQUEST, ptr) }
     }
 
     fn bitrate(&mut self) -> i32 {
@@ -170,4 +182,89 @@ fn bitrate_ctl_semantics_match_c() {
     rust_enc.set_bitrate(Bitrate::Max);
     assert_eq!(c_ret_max, 0);
     assert_eq!(rust_enc.bitrate(), c_enc.bitrate());
+}
+
+#[test]
+fn lfe_ctl_semantics_match_c() {
+    let mut rust_enc =
+        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_CELT).expect("rust create");
+    let mut c_enc = CEncoder::new(OPUS_APPLICATION_RESTRICTED_CELT);
+    let pcm = vec![0i16; 960];
+    let mut rust_packet = vec![0u8; 1276];
+    let mut c_packet = vec![0u8; 1276];
+
+    rust_enc.set_lfe(true);
+    assert_eq!(c_enc.set_lfe(true), 0, "C OPUS_SET_LFE(1) failed");
+
+    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let c_len = c_enc.encode(&pcm, &mut c_packet);
+    assert_eq!(rust_len, c_len, "LFE encode length mismatch");
+    assert_eq!(
+        &rust_packet[..rust_len as usize],
+        &c_packet[..c_len as usize],
+        "LFE encode payload mismatch"
+    );
+
+    rust_enc.set_lfe(false);
+    assert_eq!(c_enc.set_lfe(false), 0, "C OPUS_SET_LFE(0) failed");
+
+    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let c_len = c_enc.encode(&pcm, &mut c_packet);
+    assert_eq!(rust_len, c_len, "LFE-clear encode length mismatch");
+    assert_eq!(
+        &rust_packet[..rust_len as usize],
+        &c_packet[..c_len as usize],
+        "LFE-clear encode payload mismatch"
+    );
+}
+
+#[test]
+fn energy_mask_ctl_semantics_match_c() {
+    let mut rust_enc =
+        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_CELT).expect("rust create");
+    let mut c_enc = CEncoder::new(OPUS_APPLICATION_RESTRICTED_CELT);
+    let pcm = vec![0i16; 960];
+    let mut rust_packet = vec![0u8; 1276];
+    let mut c_packet = vec![0u8; 1276];
+
+    let mut mask = vec![0.0f32; 21];
+    for (i, value) in mask.iter_mut().enumerate() {
+        *value = -0.2 + i as f32 * 0.01;
+    }
+
+    rust_enc
+        .set_energy_mask(Some(&mask))
+        .expect("rust set_energy_mask");
+    assert_eq!(
+        c_enc.set_energy_mask(Some(&mask)),
+        0,
+        "C OPUS_SET_ENERGY_MASK failed"
+    );
+
+    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let c_len = c_enc.encode(&pcm, &mut c_packet);
+    assert_eq!(rust_len, c_len, "energy-mask encode length mismatch");
+    assert_eq!(
+        &rust_packet[..rust_len as usize],
+        &c_packet[..c_len as usize],
+        "energy-mask encode payload mismatch"
+    );
+
+    rust_enc
+        .set_energy_mask(None)
+        .expect("rust clear energy_mask");
+    assert_eq!(
+        c_enc.set_energy_mask(None),
+        0,
+        "C OPUS_SET_ENERGY_MASK(NULL) failed"
+    );
+
+    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let c_len = c_enc.encode(&pcm, &mut c_packet);
+    assert_eq!(rust_len, c_len, "energy-mask-clear encode length mismatch");
+    assert_eq!(
+        &rust_packet[..rust_len as usize],
+        &c_packet[..c_len as usize],
+        "energy-mask-clear encode payload mismatch"
+    );
 }

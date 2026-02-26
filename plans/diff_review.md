@@ -239,15 +239,15 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2118`, `libopus-sys/opus/src/opus_encoder.c:2230`, `libopus-sys/opus/src/opus_encoder.c:2628`
 - Detail: Rust now uses debug-only assertions for these internal invariants, eliminating unconditional runtime abort risk in release builds.
 
-69. [LOW][Encoder CTL] LFE control request parity is missing.
-- Rust: `src/opus/opus_encoder.rs` (no `set_lfe`/`OPUS_SET_LFE`-equivalent public control path found)
+69. [RESOLVED][Encoder CTL] LFE control request parity is implemented in typed API with C parity coverage.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:3283-3289`
-- Detail: Upstream supports `OPUS_SET_LFE_REQUEST` and forwards it to CELT when applicable. Rust has an internal `lfe` field but no matching public/direct control entry point.
+- Detail: Rust now exposes `set_lfe()/lfe()` and synchronizes Opus/CELT control state; parity test validates `OPUS_SET_LFE_REQUEST` behavior against upstream C encode outputs.
 
-70. [LOW][Encoder CTL] Energy-mask control request parity is missing.
-- Rust: `src/opus/opus_encoder.rs` (no `set_energy_mask`/`OPUS_SET_ENERGY_MASK`-equivalent public control path found)
+70. [RESOLVED][Encoder CTL] Energy-mask control request parity is implemented in typed API with C parity coverage.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:3291-3296`
-- Detail: Upstream supports `OPUS_SET_ENERGY_MASK_REQUEST` to inject per-band masking. Rust encoder contains energy-mask storage but lacks a matching external control entry point.
+- Detail: Rust now exposes `set_energy_mask()/energy_mask()` with upstream-compatible shape validation and propagation to CELT state; parity test validates `OPUS_SET_ENERGY_MASK_REQUEST` encode behavior against C.
 
 71. [LOW][Typed API] Rust `Application` enum omits upstream restricted application variants.
 - Rust: `src/enums.rs:19-31`, `src/enums.rs:36-40`, `src/enums.rs:47-51`

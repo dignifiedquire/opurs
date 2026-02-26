@@ -67,3 +67,7 @@ Open: `none (resolved/excluded)`
   - Enabled and exposed upstream C custom symbols in `libopus-sys` needed for parity tests (`opus_custom_*` + custom ctl).
   - Marked C-ABI-only findings (`110,116,122`) as excluded from functional-equivalence tracking per project policy.
   - Marked stale/resolved API findings (`104,119,120`) as resolved in `plans/diff_review.md`.
+- 2026-02-26: Added typed control coverage for encoder LFE and energy-mask requests:
+  - `OpusEncoder::set_lfe()/lfe()`
+  - `OpusEncoder::set_energy_mask()/energy_mask()`
+  - Added C-vs-Rust parity checks in `tests/restricted_application_parity.rs` for `OPUS_SET_LFE_REQUEST` and `OPUS_SET_ENERGY_MASK_REQUEST`.
