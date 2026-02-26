@@ -852,20 +852,20 @@ IDs (representative): `61,62,72,79,82,87,106,135,136,137,140,141,142,143,144,145
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:99-120`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:151`
 - Detail: Rust now uses `find_idx_check`-equivalent validation before accepting sparse indices, including stream-shape (`remain < nb_blocks+1`), 4-column alignment (`pos&0x3`), per-index bounds (`pos+3 < nb_in`), and output-group accounting. Added unit tests for short streams, unaligned indices, out-of-bounds indices, and a valid sparse layout.
 
-196. [LOW][Initialization Semantics][DNN Weights] Optional float-weight size mismatches are silently ignored instead of treated as init errors.
-- Rust: `src/dnn/nnet.rs:523-526`, `src/dnn/nnet.rs:534-538`, `src/dnn/nnet.rs:578-582`
+196. [RESOLVED][Initialization Semantics][DNN Weights] Optional float-weight size mismatches now fail init like upstream.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:92`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:155-157`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:163-165`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:193-195`
-- Detail: Upstream uses `opt_array_check(..., &err)` and fails initialization when an optional named float array exists with wrong size. Rust uses `if let Some(...)` and simply leaves fields empty when size check fails, changing error behavior and potentially masking corrupted/incompatible blobs.
+- Detail: Rust now uses `opt_array_check`-equivalent validation for optional float arrays in `linear_init` and `conv2d_init`: missing optional arrays are allowed, but present arrays with wrong size cause initialization failure. Added regression tests for dense/sparse `linear_init` and `conv2d_init` mismatch cases.
 
-197. [LOW][Validation Semantics][DNN Weights] `parse_weights` accepts zero-sized records that upstream rejects.
-- Rust: `src/dnn/nnet.rs:629-635`
+197. [RESOLVED][Validation Semantics][DNN Weights] `parse_weights` now rejects zero-sized records like upstream.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:52`, `libopus-sys/opus/dnn/parse_lpcnet_weights.c:64`
-- Detail: Upstream `parse_record` returns `array->size` and `parse_weights` only accepts `ret > 0`; records with `size == 0` are treated as parse failure. Rust currently pushes arrays regardless of `size` (including zero), so malformed/empty records can be accepted where upstream rejects the blob.
+- Detail: Rust now enforces `size > 0` when parsing each record, matching upstream `ret > 0` acceptance semantics. Added regression coverage for a zero-sized record header.
 
-198. [LOW][Validation Semantics][DNN Weights] Record-name termination check is weaker than upstream.
-- Rust: `src/dnn/nnet.rs:620-623`
+198. [RESOLVED][Validation Semantics][DNN Weights] Record-name termination check now matches upstream.
+- Rust: `src/dnn/nnet.rs`
 - Upstream: `libopus-sys/opus/dnn/parse_lpcnet_weights.c:43`
-- Detail: Upstream requires `h->name[43] == 0` (fixed-field null termination) and rejects records otherwise. Rust scans for the first NUL and allows fully non-terminated 44-byte names (`unwrap_or(44)`), so some headers rejected upstream are accepted in Rust.
+- Detail: Rust now enforces `name[43] == 0` in the 44-byte record name field before accepting a record, matching upstream parse rejection semantics. Added regression coverage for non-terminated name fields.
 
 199. [RESOLVED][API Coverage][DNN NNet] `compute_gated_activation` helper is now mirrored.
 - Rust: `src/dnn/nnet.rs`

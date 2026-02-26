@@ -511,6 +511,21 @@ fn find_array_check<'a>(arrays: &'a [WeightArray], name: &str, size: usize) -> O
     }
 }
 
+/// Find an optional named array and validate size when present.
+///
+/// Upstream C: dnn/parse_lpcnet_weights.c:opt_array_check
+fn opt_array_check<'a>(
+    arrays: &'a [WeightArray],
+    name: &str,
+    size: usize,
+) -> Option<Option<&'a [u8]>> {
+    match find_array(arrays, name) {
+        None => Some(None),
+        Some(a) if a.size == size => Some(Some(&a.data)),
+        Some(_) => None,
+    }
+}
+
 /// Helper to interpret raw bytes as a slice of f32.
 fn bytes_as_f32(data: &[u8]) -> Vec<f32> {
     data.chunks_exact(4)
@@ -613,7 +628,7 @@ pub fn linear_init(
             layer.weights = bytes_as_i8(data);
         }
         if !float_weights_name.is_empty() {
-            if let Some(data) = find_array_check(arrays, float_weights_name, 32 * total_blocks * 4)
+            if let Some(data) = opt_array_check(arrays, float_weights_name, 32 * total_blocks * 4)?
             {
                 layer.float_weights = bytes_as_f32(data);
             }
@@ -625,7 +640,7 @@ pub fn linear_init(
         }
         if !float_weights_name.is_empty() {
             if let Some(data) =
-                find_array_check(arrays, float_weights_name, nb_inputs * nb_outputs * 4)
+                opt_array_check(arrays, float_weights_name, nb_inputs * nb_outputs * 4)?
             {
                 layer.float_weights = bytes_as_f32(data);
             }
@@ -669,7 +684,7 @@ pub fn conv2d_init(
     }
     if !float_weights_name.is_empty() {
         let size = in_channels * out_channels * ktime * kheight * 4;
-        if let Some(data) = find_array_check(arrays, float_weights_name, size) {
+        if let Some(data) = opt_array_check(arrays, float_weights_name, size)? {
             layer.float_weights = bytes_as_f32(data);
         }
     }
@@ -696,22 +711,31 @@ pub fn parse_weights(data: &[u8]) -> Option<Vec<WeightArray>> {
         // type at offset 8
         let type_id =
             i32::from_le_bytes([data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11]]);
-        let size = i32::from_le_bytes([
+        let size_i32 = i32::from_le_bytes([
             data[pos + 12],
             data[pos + 13],
             data[pos + 14],
             data[pos + 15],
-        ]) as usize;
-        let block_size = i32::from_le_bytes([
+        ]);
+        let block_size_i32 = i32::from_le_bytes([
             data[pos + 16],
             data[pos + 17],
             data[pos + 18],
             data[pos + 19],
-        ]) as usize;
+        ]);
+
+        if size_i32 <= 0 || block_size_i32 < 0 {
+            return None;
+        }
+        let size = size_i32 as usize;
+        let block_size = block_size_i32 as usize;
 
         // Name at offset 20, 44 bytes, null-terminated
         let name_bytes = &data[pos + 20..pos + 64];
-        let name_end = name_bytes.iter().position(|&b| b == 0).unwrap_or(44);
+        if name_bytes[43] != 0 {
+            return None;
+        }
+        let name_end = name_bytes.iter().position(|&b| b == 0).unwrap_or(43);
         let name = String::from_utf8_lossy(&name_bytes[..name_end]).to_string();
 
         if block_size < size || block_size > data.len() - pos - WEIGHT_BLOCK_SIZE {
@@ -915,5 +939,89 @@ mod tests {
         assert_eq!(layer.weights_idx, vec![2, 0, 4]);
         assert_eq!(layer.nb_inputs, 16);
         assert_eq!(layer.nb_outputs, 8);
+    }
+
+    #[test]
+    fn linear_init_rejects_dense_optional_float_weight_size_mismatch() {
+        let arrays = vec![
+            WeightArray {
+                name: "w".into(),
+                type_id: WEIGHT_TYPE_INT8,
+                size: 16 * 8,
+                data: vec![0; 16 * 8],
+            },
+            WeightArray {
+                name: "fw".into(),
+                type_id: WEIGHT_TYPE_FLOAT,
+                size: 4,
+                data: vec![0; 4],
+            },
+        ];
+        let layer = linear_init(&arrays, "", "", "w", "fw", "", "", "", 16, 8);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn linear_init_rejects_sparse_optional_float_weight_size_mismatch() {
+        let arrays = vec![
+            WeightArray {
+                name: "idx".into(),
+                type_id: WEIGHT_TYPE_INT,
+                size: 2 * 4,
+                data: i32_bytes(&[1, 0]),
+            },
+            WeightArray {
+                name: "w".into(),
+                type_id: WEIGHT_TYPE_INT8,
+                size: 32,
+                data: vec![0; 32],
+            },
+            WeightArray {
+                name: "fw".into(),
+                type_id: WEIGHT_TYPE_FLOAT,
+                size: 4,
+                data: vec![0; 4],
+            },
+        ];
+        let layer = linear_init(&arrays, "", "", "w", "fw", "idx", "", "", 16, 8);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn conv2d_init_rejects_optional_float_weight_size_mismatch() {
+        let arrays = vec![WeightArray {
+            name: "fw".into(),
+            type_id: WEIGHT_TYPE_FLOAT,
+            size: 4,
+            data: vec![0; 4],
+        }];
+        let layer = conv2d_init(&arrays, "", "fw", 2, 3, 3, 3);
+        assert!(layer.is_none());
+    }
+
+    #[test]
+    fn parse_weights_rejects_zero_size_record() {
+        let arrays = vec![WeightArray {
+            name: "r".into(),
+            type_id: WEIGHT_TYPE_INT8,
+            size: 1,
+            data: vec![1],
+        }];
+        let mut blob = write_weights(&arrays);
+        blob[12..16].copy_from_slice(&0i32.to_le_bytes());
+        assert!(parse_weights(&blob).is_none());
+    }
+
+    #[test]
+    fn parse_weights_rejects_non_terminated_name_field() {
+        let arrays = vec![WeightArray {
+            name: "r".into(),
+            type_id: WEIGHT_TYPE_INT8,
+            size: 1,
+            data: vec![1],
+        }];
+        let mut blob = write_weights(&arrays);
+        blob[63] = b'X';
+        assert!(parse_weights(&blob).is_none());
     }
 }
