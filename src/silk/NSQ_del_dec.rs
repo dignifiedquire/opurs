@@ -110,6 +110,86 @@ fn rshift_round_sat16(val: i32, shift: i32) -> i16 {
     }
 }
 
+/// Dispatch wrapper for NSQ delayed-decision, matching upstream `silk_NSQ_del_dec`.
+#[cfg(feature = "simd")]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ_del_dec(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    super::simd::silk_NSQ_del_dec(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
+/// Scalar-only build wrapper for NSQ delayed-decision.
+#[cfg(not(feature = "simd"))]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ_del_dec(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    silk_NSQ_del_dec_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
 /// Upstream C: silk/NSQ_del_dec.c:silk_NSQ_del_dec_c
 pub fn silk_NSQ_del_dec_c(
     psEncC: &NsqConfig,

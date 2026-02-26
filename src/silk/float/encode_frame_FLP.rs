@@ -22,14 +22,14 @@ use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
 use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
 use crate::silk::SigProc_FIX::silk_min_int;
-use crate::silk::VAD::silk_VAD_GetSA_Q8_c;
+use crate::silk::VAD::silk_VAD_GetSA_Q8;
 
 /// Upstream C: silk/float/encode_frame_FLP.c:silk_encode_do_VAD_FLP
 pub fn silk_encode_do_VAD_FLP(psEnc: &mut silk_encoder_state_FLP, activity: i32) {
     let activity_threshold: i32 =
         ((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32;
     let vad_input: Vec<i16> = psEnc.sCmn.inputBuf[1..].to_vec();
-    silk_VAD_GetSA_Q8_c(&mut psEnc.sCmn, &vad_input);
+    silk_VAD_GetSA_Q8(&mut psEnc.sCmn, &vad_input);
     if activity == VAD_NO_ACTIVITY && psEnc.sCmn.speech_activity_Q8 >= activity_threshold {
         psEnc.sCmn.speech_activity_Q8 = activity_threshold - 1;
     }

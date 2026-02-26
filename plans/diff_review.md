@@ -23,7 +23,7 @@ IDs: `12,43,45,104,110,116,119,120,122`
 IDs: `12,45,76,179,180,191,192,193,194`
 
 5. SIMD/arch-dispatch/build-flag parity
-IDs: `194,202,203,233`
+IDs: `194`
 
 6. Documentation/version/metadata drift
 IDs: `95,134,222,225,226`
@@ -882,15 +882,15 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream builtin path initializes BBWENet arrays alongside LACE/NoLACE: `libopus-sys/opus/dnn/osce.c:1465-1468`
 - Detail: `compiled_weights()` now extends OSCE builtin arrays with `bbwenetlayers_arrays` under the `osce` feature, matching upstream one-shot built-in model aggregation semantics.
 
-202. [LOW][Arch Dispatch Coverage][SILK VAD] Full-function SSE4.1 VAD RTCD path is not mirrored.
-- Rust: `src/silk/VAD.rs:60`, `src/silk/VAD.rs:154`, `src/silk/simd/mod.rs:101-113`
-- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:61-69`
-- Detail: Upstream x86 RTCD dispatches `silk_VAD_GetSA_Q8` to an SSE4.1 implementation at higher arch levels. Rust keeps `silk_VAD_GetSA_Q8_c` as the top-level path and only SIMD-accelerates the inner energy accumulator helper, so full-function RTCD parity for VAD is incomplete.
+202. [RESOLVED][Arch Dispatch Coverage][SILK VAD] Full-function SSE4.1 VAD RTCD path is now mirrored.
+- Rust: `src/silk/VAD.rs`, `src/silk/simd/mod.rs`, `src/silk/simd/x86.rs`, `src/silk/float/encode_frame_FLP.rs`
+- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:61-69`, `libopus-sys/opus/silk/x86/main_sse.h:248-269`
+- Detail: Added function-level `silk_VAD_GetSA_Q8` dispatch wrapper and x86 SSE4.1 entrypoint, and switched encode path call-sites to wrapper dispatch (instead of hard-calling `_c`). This mirrors upstream RTCD call-shape semantics.
 
-203. [LOW][Arch Dispatch Coverage][SILK NSQ] Full-function SSE4.1 NSQ RTCD replacement is not mirrored.
-- Rust: `src/silk/NSQ.rs:170-176`, `src/silk/NSQ.rs:244-270`, `src/silk/simd/mod.rs:226-233`, `src/silk/simd/mod.rs:241`
-- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:72-92`
-- Detail: Upstream x86 RTCD can dispatch the entire `silk_NSQ` function to SSE4.1. Rust uses scalar `silk_NSQ_c` as the top-level flow and conditionally swaps only the inner `silk_noise_shape_quantizer_10_16` kernel, so function-level RTCD parity is partial.
+203. [RESOLVED][Arch Dispatch Coverage][SILK NSQ] Full-function SSE4.1 NSQ RTCD replacement surface is now mirrored.
+- Rust: `src/silk/NSQ.rs`, `src/silk/NSQ_del_dec.rs`, `src/silk/simd/mod.rs`, `src/silk/simd/x86.rs`, `src/silk/float/wrappers_FLP.rs`
+- Upstream: `libopus-sys/opus/silk/x86/x86_silk_map.c:72-116`, `libopus-sys/opus/silk/x86/main_sse.h:198-246`
+- Detail: Added function-level dispatch wrappers for `silk_NSQ` and `silk_NSQ_del_dec` with x86 SSE4.1/AVX2 tier selection and moved FLP wrapper call-sites to these RTCD wrappers, aligning upstream top-level dispatch surface.
 
 204. [RESOLVED][Arch Dispatch Semantics][CELT x86] `celt_pitch_xcorr` non-AVX2 dispatch now matches upstream scalar fallback.
 - Rust: `src/celt/simd/mod.rs`
@@ -1033,10 +1033,10 @@ IDs: `61,62,72,79,82,87,106,140,141,142,143,144,145,146,148,149,153,170,171,172`
 - Upstream CMake AVX2 flags for same source group: `libopus-sys/opus/CMakeLists.txt:528`, `libopus-sys/opus/CMakeLists.txt:531`
 - Detail: Upstream applies `-mavx2 -mfma -mavx` to `silk_sources_avx2`; `build.rs` applies only `-mavx2` for `SILK_SOURCES_AVX2` (while using `-mavx2 -mfma` for `SILK_SOURCES_FLOAT_AVX2`). This is a compile-flag parity drift in SIMD build configuration.
 
-233. [LOW][SIMD Coverage][SILK VAD] Rust SIMD path accelerates only VAD energy inner loop, not upstream full-function SSE4.1 override surface.
-- Rust: `src/silk/VAD.rs:59-60`, `src/silk/VAD.rs:154`, `src/silk/simd/mod.rs:99-124`
+233. [RESOLVED][SIMD Coverage][SILK VAD] Rust now exposes the upstream-style full-function SSE4.1 override surface.
+- Rust: `src/silk/VAD.rs`, `src/silk/simd/mod.rs`, `src/silk/simd/x86.rs`
 - Upstream SIMD override: `libopus-sys/opus/silk/x86/main_sse.h:250-269`, `libopus-sys/opus/silk/x86/VAD_sse4_1.c:45-260`
-- Detail: Upstream x86 can replace the full `silk_VAD_GetSA_Q8` routine with `silk_VAD_GetSA_Q8_sse4_1` via RTCD/presume macros. Rust keeps the scalar `silk_VAD_GetSA_Q8_c` control flow and only swaps in SIMD for the subframe energy accumulation helper, so SIMD coverage and dispatch granularity differ from upstream.
+- Detail: Rust now dispatches `silk_VAD_GetSA_Q8` through an x86 SSE4.1 full-function entrypoint selected by runtime arch tier, rather than bypassing RTCD at call sites.
 
 234. [RESOLVED][SIMD Coverage][DNN x86] Rust DNN runtime dispatch no longer AVX2-only and now matches upstream tiering.
 - Rust dispatch: `src/dnn/simd/mod.rs`

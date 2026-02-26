@@ -87,6 +87,17 @@ pub fn silk_vad_energy(x: &[i16], arch: Arch) -> i32 {
     silk_vad_energy_scalar(x)
 }
 
+/// Full-function VAD dispatch, matching upstream RTCD `silk_VAD_GetSA_Q8`.
+#[inline]
+pub fn silk_VAD_GetSA_Q8(psEncC: &mut super::structs::silk_encoder_state, pIn: &[i16]) -> i32 {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if psEncC.arch.has_sse4_1() {
+        return unsafe { x86::silk_VAD_GetSA_Q8_sse4_1(psEncC, pIn) };
+    }
+
+    super::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
+}
+
 /// Scalar implementation of VAD energy accumulation.
 fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
     let mut sum: i32 = 0;
@@ -200,6 +211,184 @@ pub fn use_nsq_sse4_1(arch: Arch) -> bool {
         let _ = arch;
         false
     }
+}
+
+/// Full-function NSQ dispatch, matching upstream RTCD `silk_NSQ`.
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ(
+    psEncC: &super::structs::NsqConfig,
+    NSQ: &mut super::structs::silk_nsq_state,
+    psIndices: &mut super::structs::SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if psEncC.arch.has_sse4_1() {
+        unsafe {
+            x86::silk_NSQ_sse4_1(
+                psEncC,
+                NSQ,
+                psIndices,
+                x16,
+                pulses,
+                PredCoef_Q12,
+                LTPCoef_Q14,
+                AR_Q13,
+                HarmShapeGain_Q14,
+                Tilt_Q14,
+                LF_shp_Q14,
+                Gains_Q16,
+                pitchL,
+                Lambda_Q10,
+                LTP_scale_Q14,
+            );
+        }
+        return;
+    }
+
+    super::NSQ::silk_NSQ_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
+/// Full-function NSQ-del-dec dispatch, matching upstream RTCD `silk_NSQ_del_dec`.
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ_del_dec(
+    psEncC: &super::structs::NsqConfig,
+    NSQ: &mut super::structs::silk_nsq_state,
+    psIndices: &mut super::structs::SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if psEncC.arch.has_avx2()
+            && use_nsq_del_dec_avx2(psEncC.arch, psEncC.nStatesDelayedDecision)
+        {
+            unsafe {
+                x86::silk_NSQ_del_dec_avx2(
+                    psEncC,
+                    NSQ,
+                    psIndices,
+                    x16,
+                    pulses,
+                    PredCoef_Q12,
+                    LTPCoef_Q14,
+                    AR_Q13,
+                    HarmShapeGain_Q14,
+                    Tilt_Q14,
+                    LF_shp_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    Lambda_Q10,
+                    LTP_scale_Q14,
+                );
+            }
+            return;
+        }
+        if psEncC.arch.has_sse4_1() {
+            unsafe {
+                x86::silk_NSQ_del_dec_sse4_1(
+                    psEncC,
+                    NSQ,
+                    psIndices,
+                    x16,
+                    pulses,
+                    PredCoef_Q12,
+                    LTPCoef_Q14,
+                    AR_Q13,
+                    HarmShapeGain_Q14,
+                    Tilt_Q14,
+                    LF_shp_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    Lambda_Q10,
+                    LTP_scale_Q14,
+                );
+            }
+            return;
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if use_neon_nsq_del_dec(psEncC.arch, psEncC.nStatesDelayedDecision) {
+            unsafe {
+                aarch64::silk_NSQ_del_dec_neon(
+                    psEncC,
+                    NSQ,
+                    psIndices,
+                    x16,
+                    pulses,
+                    PredCoef_Q12,
+                    LTPCoef_Q14,
+                    AR_Q13,
+                    HarmShapeGain_Q14,
+                    Tilt_Q14,
+                    LF_shp_Q14,
+                    Gains_Q16,
+                    pitchL,
+                    Lambda_Q10,
+                    LTP_scale_Q14,
+                );
+            }
+            return;
+        }
+    }
+
+    super::NSQ_del_dec::silk_NSQ_del_dec_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
 }
 
 /// Run the SSE4.1 NSQ inner quantizer (specialized for order 10/16).

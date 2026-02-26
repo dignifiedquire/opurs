@@ -145,6 +145,86 @@ use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::silk_RAND;
 
+/// Dispatch wrapper for NSQ, matching upstream `silk_NSQ` RTCD surface.
+#[cfg(feature = "simd")]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    super::simd::silk_NSQ(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
+/// Scalar-only build wrapper for NSQ.
+#[cfg(not(feature = "simd"))]
+#[inline]
+#[allow(clippy::too_many_arguments)]
+pub fn silk_NSQ(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    silk_NSQ_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
 /// Upstream C: silk/NSQ.c:silk_NSQ_c
 pub fn silk_NSQ_c(
     psEncC: &NsqConfig,

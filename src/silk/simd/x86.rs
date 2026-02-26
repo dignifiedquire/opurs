@@ -15,7 +15,7 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
-use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
+use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::NSQ_del_dec::{
     copy_del_dec_state_partial, NSQ_del_dec_struct, NSQ_sample_pair, NSQ_sample_struct,
@@ -170,6 +170,102 @@ pub unsafe fn silk_vad_energy_sse2(x: &[i16]) -> i32 {
     }
 
     result
+}
+
+/// SSE4.1 full-function VAD entry.
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_VAD_GetSA_Q8`.
+///
+/// # Safety
+/// Requires SSE4.1 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn silk_VAD_GetSA_Q8_sse4_1(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+    crate::silk::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
+}
+
+/// SSE4.1 full-function NSQ entry.
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_NSQ`.
+///
+/// # Safety
+/// Requires SSE4.1 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn silk_NSQ_sse4_1(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    crate::silk::NSQ::silk_NSQ_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
+}
+
+/// SSE4.1 full-function NSQ-del-dec entry.
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_NSQ_del_dec` (SSE tier).
+///
+/// # Safety
+/// Requires SSE4.1 support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn silk_NSQ_del_dec_sse4_1(
+    psEncC: &NsqConfig,
+    NSQ: &mut silk_nsq_state,
+    psIndices: &mut SideInfoIndices,
+    x16: &[i16],
+    pulses: &mut [i8],
+    PredCoef_Q12: &[i16],
+    LTPCoef_Q14: &[i16],
+    AR_Q13: &[i16],
+    HarmShapeGain_Q14: &[i32],
+    Tilt_Q14: &[i32],
+    LF_shp_Q14: &[i32],
+    Gains_Q16: &[i32],
+    pitchL: &[i32],
+    Lambda_Q10: i32,
+    LTP_scale_Q14: i32,
+) {
+    crate::silk::NSQ_del_dec::silk_NSQ_del_dec_c(
+        psEncC,
+        NSQ,
+        psIndices,
+        x16,
+        pulses,
+        PredCoef_Q12,
+        LTPCoef_Q14,
+        AR_Q13,
+        HarmShapeGain_Q14,
+        Tilt_Q14,
+        LF_shp_Q14,
+        Gains_Q16,
+        pitchL,
+        Lambda_Q10,
+        LTP_scale_Q14,
+    );
 }
 
 /// AVX2+FMA implementation of `silk_inner_product_FLP`.

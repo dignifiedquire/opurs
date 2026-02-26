@@ -249,6 +249,21 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     }
     ret
 }
+
+/// Dispatch wrapper for VAD speech activity, matching upstream `silk_VAD_GetSA_Q8`.
+#[cfg(feature = "simd")]
+#[inline]
+pub fn silk_VAD_GetSA_Q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+    super::simd::silk_VAD_GetSA_Q8(psEncC, pIn)
+}
+
+/// Scalar-only build wrapper for VAD speech activity.
+#[cfg(not(feature = "simd"))]
+#[inline]
+pub fn silk_VAD_GetSA_Q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+    silk_VAD_GetSA_Q8_c(psEncC, pIn)
+}
+
 /// Upstream C: silk/VAD.c:silk_VAD_GetNoiseLevels
 #[inline]
 fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {

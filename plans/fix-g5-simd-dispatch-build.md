@@ -4,8 +4,8 @@
 Resolve remaining SIMD dispatch semantics and build-flag parity gaps after D1-D9 alignment.
 
 ## Findings IDs
-Open: `194,202,203,233`
-Closed in this group: `107,204,205,212,213,230,231,232,234,235,237`
+Open: `194`
+Closed in this group: `107,202,203,204,205,212,213,230,231,232,233,234,235,237`
 
 ## Scope
 - Remaining arch-threading and arch-index semantics differences.
@@ -49,3 +49,8 @@ Closed in this group: `107,204,205,212,213,230,231,232,234,235,237`
   - `src/dnn/simd/mod.rs`: `lpcnet_exp` and `softmax` now dispatch AVX2 -> SSE4.1 -> SSE2 -> scalar on x86.
   - `tests/osce_nndsp.rs` + `libopus-sys/src/osce_test_harness.c`: added forced-tier C-vs-Rust regression `test_compute_activation_exp_arch_tiers_match_c` to lock scalar/SSE/SSE2/SSE4.1/AVX2 arch-table parity.
   - This closes dispatch findings `213` and `234`.
+- 2026-02-26: Aligned SILK full-function RTCD dispatch surface with upstream x86 maps:
+  - `src/silk/VAD.rs` + `src/silk/simd/mod.rs` + `src/silk/simd/x86.rs`: added `silk_VAD_GetSA_Q8` dispatch wrapper and x86 SSE4.1 full-function entry.
+  - `src/silk/NSQ.rs` + `src/silk/NSQ_del_dec.rs` + `src/silk/simd/mod.rs` + `src/silk/simd/x86.rs`: added full-function dispatch wrappers for `silk_NSQ` and `silk_NSQ_del_dec` with x86 SSE4.1/AVX2 tier selection and existing scalar fallback.
+  - `src/silk/float/wrappers_FLP.rs` + `src/silk/float/encode_frame_FLP.rs`: switched call sites from direct `*_c` functions to RTCD wrappers, matching upstream wrapper call-shape.
+  - Validated with `cargo nextest` SILK-focused release tests and preserved DNN tier-parity tests; this closes `202`, `203`, and `233`.
