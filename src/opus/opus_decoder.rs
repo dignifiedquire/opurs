@@ -526,13 +526,18 @@ fn opus_decode_frame(
     // Use stack buffer to avoid heap allocation. Max 1275 bytes per standard packet,
     // up to QEXT_PACKET_SIZE_CAP (3825) with QEXT.
     #[cfg(feature = "qext")]
-    let mut data_copy = [0u8; 3828]; // QEXT_PACKET_SIZE_CAP (3825) rounded up
+    const MAX_DATA_COPY: usize = 3828; // QEXT_PACKET_SIZE_CAP (3825) rounded up
     #[cfg(not(feature = "qext"))]
-    let mut data_copy = [0u8; 1275];
-    let data_copy_len = data.map_or(0, |d| {
-        data_copy[..d.len()].copy_from_slice(d);
-        d.len()
-    });
+    const MAX_DATA_COPY: usize = 1275;
+    let mut data_copy = [0u8; MAX_DATA_COPY];
+    let data_copy_len = match data {
+        Some(d) if d.len() > MAX_DATA_COPY => return OPUS_INVALID_PACKET,
+        Some(d) => {
+            data_copy[..d.len()].copy_from_slice(d);
+            d.len()
+        }
+        None => 0,
+    };
     let mut dec: ec_dec = ec_dec {
         buf: &mut [],
         storage: 0,
