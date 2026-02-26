@@ -814,11 +814,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/dnn/dred_compare.c`
 - Detail: Upstream provides `dred_compare` for DRED-focused quality evaluation workflows. Rust tools module has no dedicated equivalent utility surface for this comparison path.
 
-190. [MEDIUM][Runtime Semantics][DNN Vec x86] x86 non-AVX2 quantization/bias path diverges from upstream `USE_SU_BIAS` behavior.
-- Rust: `src/dnn/simd/mod.rs:100`, `src/dnn/simd/mod.rs:110`, `src/dnn/simd/mod.rs:135`, `src/dnn/simd/mod.rs:145`, `src/dnn/simd/mod.rs:302`
-- Rust fallback kernels: `src/dnn/vec.rs:202`, `src/dnn/vec.rs:216`
-- Upstream: `libopus-sys/opus/dnn/vec.h:38-39`, `libopus-sys/opus/dnn/vec_avx.h:41`, `libopus-sys/opus/dnn/vec.h:187`, `libopus-sys/opus/dnn/vec.h:221`
-- Detail: Upstream x86/SSE2 builds include `vec_avx.h` and use `USE_SU_BIAS` unsigned-input quantization (`127+round(127*x)`) for int8 GEMV paths. Rust only enables SU-bias semantics when AVX2 is detected and otherwise falls back to signed scalar GEMV, so x86 non-AVX2 behavior is not upstream-equivalent.
+190. [RESOLVED][Runtime Semantics][DNN Vec x86] Non-AVX2 x86 tiers use upstream `USE_SU_BIAS` quantization/bias behavior.
+- Rust: `src/dnn/simd/mod.rs` (`cgemv8x4`, `sparse_cgemv8x4`, `use_su_bias`), `src/dnn/vec.rs` (`*_scalar_su`, `*_scalar_su_ssse3`)
+- Upstream: `libopus-sys/opus/dnn/vec.h`, `libopus-sys/opus/dnn/vec_avx.h`
+- Detail: Rust x86 dispatch applies SU-bias quantization across SSE2/SSE4.1/non-AVX2 fallback tiers (matching upstream `vec_avx.h` inclusion semantics), and forced-tier C-vs-Rust parity coverage is in place (`tests/osce_nndsp.rs:test_compute_linear_int8_arch_tiers_match_c`).
 
 191. [RESOLVED][API Signature][OSCE] `osce_load_models` now mirrors upstream blob-loading entry point.
 - Rust: `src/dnn/osce.rs`, `src/opus/opus_decoder.rs`, `tests/dnn_integration.rs`
@@ -912,10 +911,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/dnn/dred_encoder.h:67`, `libopus-sys/opus/dnn/dred_encoder.h:69`
 - Detail: Upstream `dred_compute_latents(...)` and `dred_encode_silk_frame(...)` include explicit run-time `arch` arguments for dispatch parity. Rust equivalents do not expose `arch`, so call signatures and arch-control surface differ.
 
-209. [MEDIUM][Initialization/API Semantics][FARGAN] Rust state init does not mirror upstream built-in auto-load and blob loader entry points.
-- Rust: `src/dnn/fargan.rs:345-370` (`FARGANState::new`, `FARGANState::init(&[WeightArray])`)
+209. [RESOLVED][Initialization/API Semantics][FARGAN] Rust state init now mirrors upstream built-in auto-load and blob loader entry points.
+- Rust: `src/dnn/fargan.rs`, `tests/dnn_integration.rs`
 - Upstream: `libopus-sys/opus/dnn/fargan.c:174-185` (`fargan_init` builtin auto-load), `libopus-sys/opus/dnn/fargan.c:187-195` (`fargan_load_model(const void*, len)`), `libopus-sys/opus/dnn/fargan.h:59-60`
-- Detail: Upstream exposes C entry points that initialize state (including builtin-model load when compiled) and a direct blob loader. Rust exposes constructor/reset plus array-based init only, without equivalent one-call blob loader or builtin auto-load behavior at init entry.
+- Detail: Added explicit `fargan_init` and `fargan_load_model` entrypoints, `FARGANState::load_model`, and upstream-style builtin auto-load on state initialization when `builtin-weights` is enabled; integration tests cover array-vs-blob parity, builtin-init parity, and invalid-blob rejection.
 
 210. [RESOLVED][API Signature][PitchDNN] `compute_pitchdnn` includes upstream `arch` parameter.
 - Rust: `src/dnn/pitchdnn.rs`

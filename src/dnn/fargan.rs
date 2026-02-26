@@ -8,6 +8,7 @@
 use super::freq::{FRAME_SIZE as LPCNET_FRAME_SIZE, NB_BANDS};
 use super::nnet::*;
 use super::pitchdnn::PITCH_MAX_PERIOD;
+use super::weights::load_weights;
 use crate::arch::Arch;
 
 // --- Constants from fargan_data.h ---
@@ -344,7 +345,7 @@ impl Default for FARGANState {
 
 impl FARGANState {
     pub fn new() -> Self {
-        FARGANState {
+        let mut st = FARGANState {
             model: FARGAN::default(),
             cont_initialized: false,
             deemph_mem: 0.0,
@@ -355,12 +356,30 @@ impl FARGANState {
             gru2_state: vec![0.0; SIG_NET_GRU2_STATE_SIZE],
             gru3_state: vec![0.0; SIG_NET_GRU3_STATE_SIZE],
             last_period: 0,
+        };
+        let _ = fargan_init(&mut st);
+        st
+    }
+
+    /// Initialize state like upstream `fargan_init` (including builtin auto-load when enabled).
+    ///
+    /// Upstream C: dnn/fargan.c:fargan_init
+    pub fn init_state(&mut self) -> bool {
+        self.reset();
+        #[cfg(feature = "builtin-weights")]
+        {
+            let arrays = crate::dnn::weights::compiled_weights();
+            self.init(&arrays)
+        }
+        #[cfg(not(feature = "builtin-weights"))]
+        {
+            true
         }
     }
 
-    /// Initialize with weights.
+    /// Initialize model from parsed weight arrays.
     ///
-    /// Upstream C: dnn/fargan.c:fargan_init
+    /// Upstream C: dnn/fargan_data.c:init_fargan
     pub fn init(&mut self, arrays: &[WeightArray]) -> bool {
         match init_fargan(arrays) {
             Some(model) => {
@@ -370,6 +389,13 @@ impl FARGANState {
             }
             None => false,
         }
+    }
+
+    /// Initialize from a serialized DNN weight blob in one call.
+    ///
+    /// Upstream C: dnn/fargan.c:fargan_load_model
+    pub fn load_model(&mut self, data: &[u8]) -> bool {
+        fargan_load_model(self, data)
     }
 
     /// Reset state without reloading model.
@@ -384,6 +410,23 @@ impl FARGANState {
         self.gru3_state.fill(0.0);
         self.last_period = 0;
     }
+}
+
+/// Initialize FARGAN state, loading built-in weights when that feature is enabled.
+///
+/// Upstream C: dnn/fargan.c:fargan_init
+pub fn fargan_init(st: &mut FARGANState) -> bool {
+    st.init_state()
+}
+
+/// One-shot FARGAN model loading from a serialized weight blob.
+///
+/// Upstream C: dnn/fargan.c:fargan_load_model
+pub fn fargan_load_model(st: &mut FARGANState, data: &[u8]) -> bool {
+    let Some(arrays) = load_weights(data) else {
+        return false;
+    };
+    st.init(&arrays)
 }
 
 // --- Conditioning network ---

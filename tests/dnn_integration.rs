@@ -62,6 +62,78 @@ fn fargan_model_loads() {
 }
 
 #[test]
+fn fargan_blob_loader_matches_array_init() {
+    let arrays = get_weights();
+    let blob = write_weights(&arrays);
+
+    let mut from_arrays = opurs::dnn::fargan::FARGANState::new();
+    assert!(from_arrays.init(&arrays));
+
+    let mut from_blob = opurs::dnn::fargan::FARGANState::new();
+    assert!(from_blob.load_model(&blob));
+
+    let mut pcm0 = vec![0.0f32; opurs::dnn::fargan::FARGAN_CONT_SAMPLES];
+    for (i, sample) in pcm0.iter_mut().enumerate() {
+        *sample = ((i as f32) * 0.013).sin() * 0.03;
+    }
+    let mut cont_features = vec![0.0f32; 5 * opurs::dnn::freq::NB_FEATURES];
+    for (i, feature) in cont_features.iter_mut().enumerate() {
+        *feature = ((i as f32) * 0.021).cos() * 0.05;
+    }
+    let mut features = vec![0.0f32; opurs::dnn::freq::NB_FEATURES];
+    for (i, feature) in features.iter_mut().enumerate() {
+        *feature = ((i as f32) * 0.017).sin() * 0.04;
+    }
+
+    let arch = opurs::arch::Arch::default();
+    opurs::dnn::fargan::fargan_cont(&mut from_arrays, &pcm0, &cont_features, arch);
+    opurs::dnn::fargan::fargan_cont(&mut from_blob, &pcm0, &cont_features, arch);
+
+    let mut out_arrays = vec![0i16; opurs::dnn::fargan::FARGAN_FRAME_SIZE];
+    let mut out_blob = vec![0i16; opurs::dnn::fargan::FARGAN_FRAME_SIZE];
+    opurs::dnn::fargan::fargan_synthesize_int(&mut from_arrays, &mut out_arrays, &features, arch);
+    opurs::dnn::fargan::fargan_synthesize_int(&mut from_blob, &mut out_blob, &features, arch);
+    assert_eq!(out_arrays, out_blob);
+}
+
+#[test]
+fn fargan_new_matches_builtin_init_entrypoint() {
+    let arrays = get_weights();
+    let mut from_new = opurs::dnn::fargan::FARGANState::new();
+    let mut from_arrays = opurs::dnn::fargan::FARGANState::new();
+    assert!(from_arrays.init(&arrays));
+
+    let mut pcm0 = vec![0.0f32; opurs::dnn::fargan::FARGAN_CONT_SAMPLES];
+    for (i, sample) in pcm0.iter_mut().enumerate() {
+        *sample = ((i as f32) * 0.019).sin() * 0.02;
+    }
+    let mut cont_features = vec![0.0f32; 5 * opurs::dnn::freq::NB_FEATURES];
+    for (i, feature) in cont_features.iter_mut().enumerate() {
+        *feature = ((i as f32) * 0.011).cos() * 0.03;
+    }
+    let mut features = vec![0.0f32; opurs::dnn::freq::NB_FEATURES];
+    for (i, feature) in features.iter_mut().enumerate() {
+        *feature = ((i as f32) * 0.015).sin() * 0.02;
+    }
+
+    let arch = opurs::arch::Arch::default();
+    opurs::dnn::fargan::fargan_cont(&mut from_new, &pcm0, &cont_features, arch);
+    opurs::dnn::fargan::fargan_cont(&mut from_arrays, &pcm0, &cont_features, arch);
+
+    let mut out_new = vec![0i16; opurs::dnn::fargan::FARGAN_FRAME_SIZE];
+    let mut out_arrays = vec![0i16; opurs::dnn::fargan::FARGAN_FRAME_SIZE];
+    opurs::dnn::fargan::fargan_synthesize_int(&mut from_new, &mut out_new, &features, arch);
+    opurs::dnn::fargan::fargan_synthesize_int(&mut from_arrays, &mut out_arrays, &features, arch);
+    assert_eq!(out_new, out_arrays);
+}
+
+#[test]
+fn fargan_blob_loader_rejects_invalid_blob() {
+    let mut st = opurs::dnn::fargan::FARGANState::new();
+    assert!(!st.load_model(&[0x00, 0x01, 0x02, 0x03]));
+}
+
+#[test]
 fn plcmodel_loads() {
     let arrays = get_weights();
     let model = opurs::dnn::lpcnet::init_plcmodel(&arrays);
