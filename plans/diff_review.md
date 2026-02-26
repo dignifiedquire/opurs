@@ -43,25 +43,20 @@ IDs: `none (resolved)`
 - Upstream refs: `libopus-sys/opus/src/opus_encoder.c:1746`, `libopus-sys/opus/src/opus_encoder.c:1792`, `libopus-sys/opus/src/opus_encoder.c:2394`
 - Detail: Rust now computes QEXT allocation, passes `qext_payload`/`qext_bytes` into `celt_encode_with_ec`, and emits extension ID `124` in packet padding.
 
-7. [MEDIUM] Missing upstream application constants in Rust defines.
-- Rust: `src/opus/opus_defines.rs`
+7. [RESOLVED][Constants] Restricted application constants are present in Rust defines.
+- Rust: `src/opus/opus_defines.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus_defines.h:224`, `libopus-sys/opus/include/opus_defines.h:226`
-- Detail: `OPUS_APPLICATION_RESTRICTED_SILK` (2052) and `OPUS_APPLICATION_RESTRICTED_CELT` (2053) are defined upstream but absent in Rust constants, contributing to encoder mode-parity gaps.
+- Detail: `OPUS_APPLICATION_RESTRICTED_SILK` (2052) and `OPUS_APPLICATION_RESTRICTED_CELT` (2053) are now exported and used by typed/encoder paths.
 
-8. [LOW] Missing ignore-extensions CTL request constants in Rust defines.
-- Rust: `src/opus/opus_defines.rs`
+8. [RESOLVED][Constants] Ignore-extensions CTL request constants are present in Rust defines.
+- Rust: `src/opus/opus_defines.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus_defines.h` (`OPUS_SET_IGNORE_EXTENSIONS_REQUEST`=4058, `OPUS_GET_IGNORE_EXTENSIONS_REQUEST`=4059)
-- Detail: Upstream defines these CTLs, but Rust constant surface currently omits them.
+- Detail: Rust constant surface exports both ignore-extensions request IDs.
 
-9. [LOW] Additional upstream CTL constants missing in Rust defines.
-- Rust: `src/opus/opus_defines.rs`
+9. [RESOLVED][Constants] Additional 1.6.1 CTL request constants are present in Rust defines.
+- Rust: `src/opus/opus_defines.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus_defines.h`
-- Missing names (present upstream, absent in Rust constants):
-  - `OPUS_SET_QEXT_REQUEST`
-  - `OPUS_GET_QEXT_REQUEST`
-  - `OPUS_SET_OSCE_BWE_REQUEST`
-  - `OPUS_GET_OSCE_BWE_REQUEST`
-- Detail: API surface parity for CTL constants is incomplete.
+- Detail: Rust now exports `OPUS_SET/GET_QEXT_REQUEST` and `OPUS_SET/GET_OSCE_BWE_REQUEST`.
 
 12. [RESOLVED][DRED] Decoder DRED API entry points are implemented.
 - Rust: `src/opus/opus_decoder.rs`, `src/lib.rs`, `tests/dred_decode_parity.rs`
@@ -73,15 +68,15 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c` (`opus_encoder_ctl`), `libopus-sys/opus/src/opus_decoder.c:1031` (`opus_decoder_ctl`)
 - Detail: Rust provides typed setters/getters on structs, but direct C-style variadic CTL function parity is not present.
 
-19. [MEDIUM] Multistream/projection API surface parity missing.
-- Rust: `src/` (no `opus_multistream_*` / `opus_projection_*` implementation files found)
+19. [RESOLVED][API Coverage] Multistream/projection API surface is implemented.
+- Rust: `src/opus/opus_multistream*.rs`, `src/opus/opus_projection*.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/src/opus_multistream_encoder.c`, `libopus-sys/opus/src/opus_multistream_decoder.c`, `libopus-sys/opus/src/opus_projection_encoder.c`, `libopus-sys/opus/src/opus_projection_decoder.c`
-- Detail: Upstream includes full multistream/projection encoder/decoder APIs (including 24-bit variants and ctl paths); matching Rust API surface is not present.
+- Detail: Rust exposes multistream/projection encoder/decoder APIs, including 24-bit variants and control paths.
 
-20. [LOW] Multistream packet pad/unpad helpers parity missing.
-- Rust: `src/opus/repacketizer.rs` (single-stream repacketizer only; notes no multistream manipulation)
+20. [RESOLVED][Packet API] Multistream packet pad/unpad helpers are implemented.
+- Rust: `src/opus/repacketizer.rs`, `src/lib.rs`, `tests/opus_multistream_packet.rs`
 - Upstream: `libopus-sys/opus/src/repacketizer.c` (`opus_multistream_packet_pad`, `opus_multistream_packet_unpad`)
-- Detail: Upstream multistream packet pad/unpad helpers are not mirrored as Rust public functions.
+- Detail: Rust exposes both helper APIs with parity coverage.
 
 35. [RESOLVED][Extensions] Public extension parse/count path now uses iterator semantics including repeat-extension expansion.
 - Rust: `src/opus/extensions.rs`, `tests/extensions_repacketizer_parity.rs`
@@ -153,26 +148,26 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/opus.c:239-244`
 - Detail: Rust now zeroes `padding_out` before validation, matching upstream deterministic error-path behavior; parity test compares Rust vs C `opus_packet_parse_impl` outputs for invalid packets.
 
-50. [MEDIUM] Encoder analysis gating misses upstream restricted-SILK application guard.
-- Rust: `src/opus/opus_encoder.rs:1677-1681`
+50. [RESOLVED][Encoder] Analysis gating includes upstream restricted-SILK application guard.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:1252`
 
-51. [HIGH][Bitexact] CELT float math path used `FLOAT_APPROX` polynomial implementations unconditionally.
+51. [RESOLVED][Bitexact] CELT float math path now matches upstream default non-`FLOAT_APPROX` behavior.
 - Rust (before fix): `src/celt/mathops.rs:celt_log2`, `src/celt/mathops.rs:celt_exp2`
 - Upstream: `libopus-sys/opus/celt/mathops.h:346-351` (default non-`FLOAT_APPROX` uses libc `log/exp`)
 - Detail: Rust always used the Remez polynomial path for `celt_log2/celt_exp2`, while upstream C in this build uses the non-`FLOAT_APPROX` path (`1.442695...*log(x)` and `exp(0.693147...*x)`). This produced systematic CELT encode drift.
 - Validation: after switching Rust to the upstream default float path, `opus_newvectors` improved from `109/228` to `216/228` (remaining failures are all `ENC @ 010kbps`, SILK-mode dominated).
-- Detail: Upstream only runs `run_analysis(...)` when `application != OPUS_APPLICATION_RESTRICTED_SILK`. Rust gating currently checks only complexity/Fs and can run analysis in restricted-SILK mode, diverging from upstream mode behavior.
+- Detail: Rust now skips analysis for `OPUS_APPLICATION_RESTRICTED_SILK`, matching upstream application gating.
 
-51. [HIGH] `frame_size_select` omits application-dependent restricted-SILK minimum-frame rule.
-- Rust: `src/opus/opus_encoder.rs:942-974`
+51. [RESOLVED][Frame Size Selection] `frame_size_select` enforces restricted-SILK minimum-frame rule.
+- Rust: `src/opus/opus_encoder.rs`, `src/opus/opus_encoder.rs` tests
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:827-851` (notably `:849-850`)
-- Detail: Upstream rejects frame sizes below 10 ms for `OPUS_APPLICATION_RESTRICTED_SILK` (`new_size < Fs/100`). Rust `frame_size_select` has no `application` parameter and therefore cannot enforce this rule, allowing frame-size selections upstream would reject.
+- Detail: Rust threads `application` through `frame_size_select` and rejects sub-10 ms frame sizes for `OPUS_APPLICATION_RESTRICTED_SILK`.
 
-53. [MEDIUM] Encoder init sets `encoder_buffer` unconditionally, missing restricted-app zero-buffer behavior.
-- Rust: `src/opus/opus_encoder.rs:222`
+53. [RESOLVED][Encoder Init] `encoder_buffer` initialization matches restricted-application behavior.
+- Rust: `src/opus/opus_encoder.rs`, `src/opus/opus_encoder.rs` tests
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:304-307`
-- Detail: Upstream sets `encoder_buffer=0` for restricted CELT/SILK applications and `Fs/100` otherwise. Rust initializes `encoder_buffer` to `Fs/100` unconditionally, diverging from restricted-application startup behavior.
+- Detail: Rust sets `encoder_buffer=0` for restricted SILK/CELT and `Fs/100` otherwise, with test coverage.
 
 54. [LOW] Missing CELT custom create/get_size entry points.
 - Rust: `src/celt/celt_encoder.rs`, `src/celt/celt_decoder.rs` (struct constructors only)
@@ -394,15 +389,15 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/src/opus_private.h:213-223`
 - Detail: Rust now computes alignment from a C-repr union equivalent (`i32/i64/f32/pointer`) via `align_of`, matching upstream platform-dependent alignment intent instead of hardcoding 8.
 
-102. [MEDIUM][Constants/CTL Coverage] New upstream 1.6.1 request IDs are missing from Rust `opus_defines`.
-- Rust: `src/opus/opus_defines.rs:55-57` (stops at `OPUS_SET_DNN_BLOB_REQUEST`)
+102. [RESOLVED][Constants/CTL Coverage] Upstream 1.6.1 request IDs are present in Rust `opus_defines`.
+- Rust: `src/opus/opus_defines.rs`, `src/lib.rs`
 - Upstream: `libopus-sys/opus/include/opus_defines.h:176-181`
-- Detail: Rust omits `OPUS_SET/GET_OSCE_BWE_REQUEST` (4054/4055), `OPUS_SET/GET_QEXT_REQUEST` (4056/4057), and `OPUS_SET/GET_IGNORE_EXTENSIONS_REQUEST` (4058/4059).
+- Detail: Rust exports `OPUS_SET/GET_OSCE_BWE_REQUEST`, `OPUS_SET/GET_QEXT_REQUEST`, and `OPUS_SET/GET_IGNORE_EXTENSIONS_REQUEST`.
 
-103. [MEDIUM][Constants/Application Coverage] Restricted application constants are missing (`OPUS_APPLICATION_RESTRICTED_SILK`, `OPUS_APPLICATION_RESTRICTED_CELT`).
-- Rust: `src/opus/opus_defines.rs:62-64`, `src/enums.rs:22-29`
+103. [RESOLVED][Constants/Application Coverage] Restricted application constants and typed variants are present.
+- Rust: `src/opus/opus_defines.rs`, `src/enums.rs`
 - Upstream: `libopus-sys/opus/include/opus_defines.h:223-226`
-- Detail: Upstream defines application IDs 2052 and 2053. Rust constants and typed `Application` enum only include VoIP/Audio/Restricted-LowDelay.
+- Detail: Rust constants and `Application` enum include `RestrictedSilk` (2052) and `RestrictedCelt` (2053).
 
 104. [RESOLVED][API Coverage][Multistream/Projection] Multistream/projection modules are implemented and exported.
 - Rust: `src/lib.rs`, `src/opus/opus_multistream*.rs`, `src/opus/opus_projection*.rs`
@@ -424,30 +419,30 @@ IDs: `none (resolved)`
 - Upstream target for this review: `libopus-sys/opus` (1.6.1 line)
 - Detail: Top-level crate docs now state bit-exactness against libopus 1.6.1, removing version-target drift.
 
-109. [MEDIUM][Error Handling] CELT decoder init path can panic on invalid sampling rate/channel config instead of returning Opus error codes.
-- Rust: `src/celt/celt_decoder.rs:141-152`
+109. [RESOLVED][Error Handling] CELT decoder init path returns status codes for invalid args.
+- Rust: `src/celt/celt_decoder.rs`
 - Upstream: `libopus-sys/opus/celt/celt_decoder.c:224-245`
-- Detail: Upstream `celt_decoder_init`/`opus_custom_decoder_init` return `OPUS_BAD_ARG` (or other status) for invalid sampling rate/channel inputs. Rust uses `panic!` branches for unsupported sample rates and channel validation, changing error semantics from return-code to abort.
+- Detail: `celt_decoder_init` / custom init return `Err(OPUS_BAD_ARG)` for invalid sample-rate/channel combinations.
 
 110. [EXCLUDED][C API Surface] C-style create/destroy/ctl entrypoints are not exposed in the Rust API layer.
 - Rust: `src/lib.rs` exports typed structs/methods, but no `opus_encoder_create/destroy/ctl` or `opus_decoder_create/destroy/ctl` symbols
 - Upstream: `libopus-sys/opus/include/opus.h:211`, `libopus-sys/opus/include/opus.h:351`, `libopus-sys/opus/include/opus.h:367`, `libopus-sys/opus/include/opus.h:477`, `libopus-sys/opus/include/opus.h:586`, `libopus-sys/opus/include/opus.h:591`
 - Detail: Excluded from functional-equivalence tracking by project policy (`no C-ABI-only parity requirements`).
 
-111. [HIGH][QEXT][Encoder Path] QEXT payload path is not wired in main Opus encoder call-site.
-- Rust: `src/opus/opus_encoder.rs:2810-2820`, `src/celt/celt_encoder.rs:3283-3287`
-- Upstream: `libopus-sys/opus/src/opus_encoder.c:2491-2495` (enables QEXT via ctl before CELT encode)
-- Detail: Rust sets `enable_qext` on CELT state but always calls `celt_encode_with_ec(..., qext_payload=None, qext_bytes=0)`. Rust CELT QEXT path is gated on `qext_bytes > 0`, so no QEXT payload is produced through this path despite QEXT enable state.
+111. [RESOLVED][QEXT][Encoder Path] QEXT payload path is wired in the main Opus encoder call-site.
+- Rust: `src/opus/opus_encoder.rs`, `src/celt/celt_encoder.rs`
+- Upstream: `libopus-sys/opus/src/opus_encoder.c:2491-2495`
+- Detail: Rust computes QEXT allocation and passes `qext_payload`/`qext_bytes` into `celt_encode_with_ec`, enabling upstream-equivalent QEXT coding branches.
 
 113. [LOW][MLP Runtime Semantics] GRU layer neuron bound check is stricter than upstream (`< 32` vs allowing `== 32`).
 - Rust: `src/opus/mlp/layers.rs:95-103`
 - Upstream: `libopus-sys/opus/src/mlp.c:97-103`
 - Detail: Upstream allocates local arrays of size `MAX_NEURONS` and allows `N` up to that bound. Rust asserts `n < MAX_NEURONS`, which rejects the edge case `n == 32` and can panic where upstream would proceed.
 
-114. [HIGH][Frame Size Selection] `frame_size_select` omits upstream restricted-SILK application guard.
-- Rust: `src/opus/opus_encoder.rs:942-974`
+114. [RESOLVED][Frame Size Selection] Restricted-SILK application guard is present in `frame_size_select`.
+- Rust: `src/opus/opus_encoder.rs`, `src/opus/opus_encoder.rs` tests
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:827-851`
-- Detail: Upstream signature includes `application` and rejects sub-10 ms frames for `OPUS_APPLICATION_RESTRICTED_SILK` (`new_size < Fs/100`). Rust function omits `application` entirely and therefore cannot enforce this branch.
+- Detail: Rust includes the application parameter and enforces sub-10 ms rejection for restricted SILK.
 
 115. [RESOLVED][Repacketizer][Extensions Preservation] Repacketizer ingest captures padding metadata and preserves extensions through output.
 - Rust: `src/opus/repacketizer.rs`, `tests/extensions_repacketizer_parity.rs`
@@ -459,15 +454,15 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/include/opus_custom.h:122-373`
 - Detail: Excluded from functional-equivalence tracking by project policy; Rust tracks functional behavior via typed APIs and parity tests.
 
-117. [HIGH][Application Modes] Encoder initialization rejects upstream restricted application modes.
-- Rust: `src/opus/opus_encoder.rs:162-165`
+117. [RESOLVED][Application Modes] Encoder initialization accepts upstream restricted application modes.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:218-221`, `libopus-sys/opus/src/opus_encoder.c:632-635`
-- Detail: Upstream accepts `OPUS_APPLICATION_RESTRICTED_SILK` (2052) and `OPUS_APPLICATION_RESTRICTED_CELT` (2053) in both init and create paths. Rust validation only allows VoIP/Audio/Restricted-LowDelay and returns `OPUS_BAD_ARG` for restricted SILK/CELT.
+- Detail: Rust init/create paths accept restricted SILK/CELT and apply matching mode/behavior rules.
 
-118. [MEDIUM][CTL Semantics] Encoder bitrate setter clamps to a lower maximum than upstream.
-- Rust: `src/opus/opus_encoder.rs:321-322`
+118. [RESOLVED][CTL Semantics] Encoder bitrate setter clamp matches upstream maximum.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2826-2827`
-- Detail: Upstream clamps explicit bitrate to `750000 * channels`. Rust clamps to `300000 * channels`, reducing accepted bitrate range and changing CTL behavior for high-bitrate configurations.
+- Detail: Explicit bitrate clamp uses `750000 * channels` with parity coverage.
 
 119. [RESOLVED][DRED API Coverage] Public DRED API from `opus.h` is exposed in Rust wrappers.
 - Rust: `src/opus/opus_decoder.rs`, `src/lib.rs`
@@ -479,10 +474,10 @@ IDs: `none (resolved)`
 - Upstream: `libopus-sys/opus/include/opus.h:1152`, `libopus-sys/opus/include/opus.h:1167`
 - Detail: Rust exports `opus_multistream_packet_pad` / `opus_multistream_packet_unpad` and has C-vs-Rust parity coverage.
 
-121. [MEDIUM][CTL Semantics] Rust bitrate setter does not preserve upstream `<=0` rejection semantics.
-- Rust: `src/opus/opus_encoder.rs:318-325`
+121. [RESOLVED][CTL Semantics] Rust bitrate setter preserves upstream non-positive rejection behavior.
+- Rust: `src/opus/opus_encoder.rs`, `tests/restricted_application_parity.rs`
 - Upstream: `libopus-sys/opus/src/opus_encoder.c:2820-2825`
-- Detail: Upstream returns `OPUS_BAD_ARG` for explicit bitrate values `<= 0` (except sentinels `OPUS_AUTO`/`OPUS_BITRATE_MAX`). Rust `set_bitrate()` accepts any `Bitrate::Bits(v)` and clamps values below 500 up to 500, including non-positive values.
+- Detail: Non-positive explicit bitrates leave state unchanged (except sentinels), matching upstream effective behavior; parity tests cover this path.
 
 122. [EXCLUDED][API Coverage][Sizing/Lifecycle] `*_get_size`/C-style lifecycle functions are broadly missing for core and repacketizer APIs.
 - Rust: no exported `opus_encoder_get_size`, `opus_decoder_get_size`, `opus_repacketizer_get_size` in `src/lib.rs`
@@ -1011,11 +1006,11 @@ IDs: `none (resolved)`
 - Upstream baseline being tracked in-tree: `libopus-sys/build.rs:65`, `libopus-sys/build.rs:68`
 - Detail: Package description now references 1.6.1, removing stale baseline metadata drift.
 
-229. [HIGH][Feature Behavior][QEXT Encoder] Rust Opus encoder never provisions QEXT extension payload bytes, effectively disabling upstream QEXT bitstream path.
-- Rust caller path: `src/opus/opus_encoder.rs:2810-2820`
-- Rust CELT entry shape: `src/celt/celt_encoder.rs:2119-2127`, `src/celt/celt_encoder.rs:3283`
+229. [RESOLVED][Feature Behavior][QEXT Encoder] Rust provisions QEXT extension payload bytes in the main encoder path.
+- Rust caller path: `src/opus/opus_encoder.rs`
+- Rust CELT entry shape: `src/celt/celt_encoder.rs`
 - Upstream behavior: `libopus-sys/opus/celt/celt_encoder.c:2535-2590`, `libopus-sys/opus/celt/celt_encoder.c:2816-2818`
-- Detail: Upstream `celt_encode_with_ec` computes `qext_bytes`, carves extension payload space from the packet, and entropy-codes QEXT data when `st->enable_qext` is set. Rust currently calls `celt_encode_with_ec` with `qext_payload=None` and `qext_bytes=0` (TODO noted), so QEXT coding branches guarded by `qext_bytes > 0` never activate, diverging from upstream QEXT-enabled encoding behavior.
+- Detail: Rust now computes QEXT byte budget, passes payload storage to `celt_encode_with_ec`, and emits encoded extension data in packet padding.
 
 230. [RESOLVED][Arch Dispatch Semantics][CELT/SILK SIMD] Runtime SIMD dispatch honors upstream arch-tier control path.
 - Rust: `src/celt/simd/mod.rs`, `src/silk/simd/mod.rs`
@@ -1054,7 +1049,7 @@ IDs: `none (resolved)`
 - Upstream AVX2 flags assignment and usage: `libopus-sys/opus/CMakeLists.txt:528`, `libopus-sys/opus/CMakeLists.txt:530`, `libopus-sys/opus/CMakeLists.txt:535`, `libopus-sys/opus/meson.build:509`
 - Detail: Upstream builds AVX2 groups with `-mavx -mfma -mavx2`; Rust uses `-mavx2 -mfma` for `CELT_SOURCES_AVX2` and `DNN_SOURCES_AVX2` (and only `-mavx2` for one SILK group in finding 232). This is additional AVX2 compile-flag parity drift.
 
-238. [HIGH][Encode Input Semantics][SILK API] Rust `silk_Encode` accepted quantized `i16` input while upstream float build consumes `opus_res` and quantizes after stereo summation, causing SILK mono downmix divergence (resolved).
+238. [RESOLVED][Encode Input Semantics][SILK API] `silk_Encode` input path matches upstream float-build ordering.
 - Rust pre-fix path: `src/opus/opus_encoder.rs:2332`, `src/opus/opus_encoder.rs:2525`, `src/opus/opus_encoder.rs:2542`, `src/silk/enc_API.rs:120`, `src/silk/enc_API.rs:314`
 - Upstream float path: `libopus-sys/opus/src/opus_encoder.c:2246`, `libopus-sys/opus/silk/enc_API.c:327`
 - Fix: `src/silk/enc_API.rs:120`, `src/silk/enc_API.rs:276`, `src/silk/enc_API.rs:299`, `src/silk/enc_API.rs:314`, `src/silk/enc_API.rs:368`, `src/opus/opus_encoder.rs:2332`, `src/opus/opus_encoder.rs:2525`, `src/opus/opus_encoder.rs:2542`
