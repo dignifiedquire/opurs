@@ -12,12 +12,12 @@ use crate::silk::tables_other::{
 pub fn silk_stereo_encode_pred(psRangeEnc: &mut ec_enc, ix: &[[i8; 3]]) {
     let mut n: i32 = 0;
     n = 5 * ix[0][2_usize] as i32 + ix[1][2_usize] as i32;
-    assert!(n < 25);
+    debug_assert!(n < 25);
     ec_enc_icdf(psRangeEnc, n, &silk_stereo_pred_joint_iCDF, 8);
     n = 0;
     while n < 2 {
-        assert!((ix[n as usize][0_usize] as i32) < 3);
-        assert!((ix[n as usize][1_usize] as i32) < 5);
+        debug_assert!((ix[n as usize][0_usize] as i32) < 3);
+        debug_assert!((ix[n as usize][1_usize] as i32) < 5);
         ec_enc_icdf(
             psRangeEnc,
             ix[n as usize][0_usize] as i32,

@@ -152,7 +152,7 @@ pub fn silk_CNG(
 
         /* Generate CNG signal, by synthesis filtering */
         CNG_sig_Q14[..MAX_LPC_ORDER].copy_from_slice(&psCNG.CNG_synth_state);
-        assert!(psDec.LPC_order == 10 || psDec.LPC_order == 16);
+        debug_assert!(psDec.LPC_order == 10 || psDec.LPC_order == 16);
         for i in 0..frame.len() {
             /* Avoids introducing a bias because silk_SMLAWB() always rounds to -inf */
             let mut LPC_pred_Q10 = psDec.LPC_order as i32 >> 1;

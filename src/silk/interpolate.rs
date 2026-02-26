@@ -11,10 +11,10 @@ pub fn silk_interpolate(
     // interp. factor, weight on 2nd vector
     ifact_Q2: i32,
 ) {
-    assert_eq!(xi.len(), x0.len());
-    assert_eq!(xi.len(), x1.len());
+    debug_assert_eq!(xi.len(), x0.len());
+    debug_assert_eq!(xi.len(), x1.len());
 
-    assert!((0..=4).contains(&ifact_Q2));
+    debug_assert!((0..=4).contains(&ifact_Q2));
 
     for ((xi, &x0), &x1) in xi.iter_mut().zip(x0.iter()).zip(x1.iter()) {
         let x0 = x0 as i32;

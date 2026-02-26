@@ -38,8 +38,8 @@ pub fn silk_encode_indices(
         psEncC.indices
     };
     typeOffset = 2 * psIndices.signalType as i32 + psIndices.quantOffsetType as i32;
-    assert!((0..6).contains(&typeOffset));
-    assert!(encode_LBRR == 0 || typeOffset >= 2);
+    debug_assert!((0..6).contains(&typeOffset));
+    debug_assert!(encode_LBRR == 0 || typeOffset >= 2);
     if encode_LBRR != 0 || typeOffset >= 2 {
         ec_enc_icdf(psRangeEnc, typeOffset - 2, &silk_type_offset_VAD_iCDF, 8);
     } else {
@@ -89,7 +89,7 @@ pub fn silk_encode_indices(
         psEncC.psNLSF_CB,
         psIndices.NLSFIndices[0_usize] as i32,
     );
-    assert!(psEncC.psNLSF_CB.order as i32 == psEncC.predictLPCOrder);
+    debug_assert!(psEncC.psNLSF_CB.order as i32 == psEncC.predictLPCOrder);
     i = 0;
     while i < psEncC.psNLSF_CB.order as i32 {
         if psIndices.NLSFIndices[(i + 1) as usize] as i32 >= NLSF_QUANT_MAX_AMPLITUDE {

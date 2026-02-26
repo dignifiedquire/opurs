@@ -21,11 +21,11 @@ pub fn silk_NLSF_VQ_weights_laroia(pNLSFW_Q_OUT: &mut [i16], pNLSF_Q15: &[i16]) 
     let mut tmp1_int: i32 = 0;
     let mut tmp2_int: i32 = 0;
 
-    assert_eq!(pNLSF_Q15.len(), pNLSFW_Q_OUT.len());
+    debug_assert_eq!(pNLSF_Q15.len(), pNLSFW_Q_OUT.len());
     let D = pNLSF_Q15.len();
 
-    assert!(D > 0);
-    assert_eq!(D & 1, 0);
+    debug_assert!(D > 0);
+    debug_assert_eq!(D & 1, 0);
 
     // First value
     tmp1_int = silk_max_int(pNLSF_Q15[0] as i32, 1);

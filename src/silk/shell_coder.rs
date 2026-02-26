@@ -17,7 +17,7 @@ use crate::silk::tables_pulses_per_block::{
 /// Upstream C: silk/shell_coder.c:combine_pulses
 #[inline]
 fn combine_pulses(out: &mut [i32], in_: &[i32]) {
-    assert_eq!(out.len() * 2, in_.len());
+    debug_assert_eq!(out.len() * 2, in_.len());
 
     for (out, in_) in out.iter_mut().zip(in_.chunks_exact(2)) {
         *out = in_.iter().sum::<i32>();
@@ -40,7 +40,7 @@ fn encode_split(psRangeEnc: &mut ec_enc, p_child1: i32, p: i32, shell_table: &[u
 /// Upstream C: silk/shell_coder.c:decode_split
 #[inline]
 fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_table: &[u8]) {
-    assert_eq!(p_child.len(), 2);
+    debug_assert_eq!(p_child.len(), 2);
 
     if p > 0 {
         p_child[0] = ec_dec_icdf(
@@ -64,8 +64,8 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
     let mut pulses3: [i32; 2] = [0; 2];
     let mut pulses4: [i32; 1] = [0; 1];
 
-    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
-    assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
+    debug_assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
+    debug_assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
 
     combine_pulses(&mut pulses1, pulses0);
     combine_pulses(&mut pulses2, &pulses1);
@@ -91,8 +91,8 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
 /// Upstream C: silk/shell_coder.c:silk_shell_decoder
 #[inline]
 pub fn silk_shell_decoder(pulses0: &mut [i16], psRangeDec: &mut ec_dec, pulses4: i32) {
-    assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
-    assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
+    debug_assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
+    debug_assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
 
     let mut pulses3: [i16; 2] = [0; 2];
     let mut pulses2: [i16; 4] = [0; 4];

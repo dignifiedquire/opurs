@@ -81,9 +81,9 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     let mut X_offset: [i32; 4] = [0; 4];
     let ret: i32 = 0;
     let psSilk_VAD: &mut silk_VAD_state = &mut psEncC.sVAD;
-    assert!(5 * 4 * 16 >= psEncC.frame_length);
-    assert!(psEncC.frame_length <= 512);
-    assert!(psEncC.frame_length == 8 * (psEncC.frame_length >> 3));
+    debug_assert!(5 * 4 * 16 >= psEncC.frame_length);
+    debug_assert!(psEncC.frame_length <= 512);
+    debug_assert!(psEncC.frame_length == 8 * (psEncC.frame_length >> 3));
     decimated_framelength1 = psEncC.frame_length as i32 / 2;
     decimated_framelength2 = psEncC.frame_length as i32 / 4;
     decimated_framelength = psEncC.frame_length as i32 / 8;

@@ -4,8 +4,8 @@
 Align runtime error semantics with upstream by replacing panic/assert-only behavior where upstream returns status or uses assert-gated checks.
 
 ## Findings IDs
-Open: `61,62,72,79,82,87,106,148,153,170,171,172`
-Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,149,168`
+Open: `61,62,72,79,82,87,106,153,170,171,172`
+Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,148,149,168`
 
 ## Scope
 - Decoder/encoder/CELT/SILK/DNN invariant handling.
@@ -26,6 +26,11 @@ Closed in this group: `66,67,68,135,136,137,140,141,142,143,144,145,146,149,168`
 - Runtime behavior on invalid/edge inputs matches upstream status semantics for covered paths.
 
 ## Progress
+- 2026-02-26: Closed SILK helper assert-gating parity item:
+  - `src/silk/CNG.rs`, `src/silk/VAD.rs`, `src/silk/interpolate.rs`, `src/silk/NLSF_VQ_weights_laroia.rs`, `src/silk/encode_indices.rs`, `src/silk/stereo_encode_pred.rs`, `src/silk/sort.rs`, `src/silk/resampler/down2.rs`, `src/silk/shell_coder.rs`: converted tracked helper invariants from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`.
+  - `src/silk/resampler/up2_hq.rs`: added upstream-equivalent coefficient-sign debug assertions and converted length precondition check to debug-gated semantics.
+  - `src/silk/decode_pulses.rs` and `src/silk/encode_pulses.rs`: aligned 10 ms @ 12 kHz partial-shell handling with upstream assert-gated branch semantics while preserving non-panicking release behavior.
+  - closes `148`.
 - 2026-02-26: Closed DNN Burg assert-gating parity item:
   - `src/dnn/burg.rs`: converted tracked invariants from `assert!` to `debug_assert!`.
   - closes `149`.

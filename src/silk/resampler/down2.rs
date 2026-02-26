@@ -11,10 +11,10 @@ use super::rom::{silk_resampler_down2_0, silk_resampler_down2_1};
 
 /// Upstream C: silk/resampler_down2.c:silk_resampler_down2
 pub fn silk_resampler_down2(S: &mut [i32; 2], out: &mut [i16], in_0: &[i16]) {
-    assert_eq!(out.len() * 2, in_0.len());
+    debug_assert_eq!(out.len() * 2, in_0.len());
 
-    assert!(silk_resampler_down2_0 as i32 > 0);
-    assert!((silk_resampler_down2_1 as i32) < 0);
+    debug_assert!(silk_resampler_down2_0 as i32 > 0);
+    debug_assert!((silk_resampler_down2_1 as i32) < 0);
     for k in 0..out.len() {
         let in32 = ((in_0[2 * k] as i32 as u32) << 10) as i32;
         let Y = in32 - S[0];

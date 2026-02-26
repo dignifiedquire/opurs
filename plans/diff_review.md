@@ -29,7 +29,7 @@ IDs: `none (resolved)`
 IDs: `95,222,225,226`
 
 7. Runtime semantics/assert-vs-status cleanup (non-blocking but broad)
-IDs: `61,62,72,79,82,87,106,148,153,170,171,172`
+IDs: `61,62,72,79,82,87,106,153,170,171,172`
 
 ## Findings
 
@@ -614,10 +614,10 @@ IDs: `61,62,72,79,82,87,106,148,153,170,171,172`
 - Upstream: `libopus-sys/opus/silk/process_NLSFs.c:49-51`, `libopus-sys/opus/silk/process_NLSFs.c:63-64`, `libopus-sys/opus/silk/process_NLSFs.c:84`, `libopus-sys/opus/silk/LPC_analysis_filter.c:67-72`, `libopus-sys/opus/silk/NLSF_encode.c:63-64`
 - Detail: Upstream includes additional invariant/range checks (for example speech-activity bounds, `NLSF_mu_Q20` upper bound, per-weight lower bounds, and `d <= SILK_MAX_ORDER_LPC`) in these paths. Rust validates only a subset, so behavior on malformed/internal-state-corrupt inputs diverges from the upstream assert-guard model.
 
-148. [LOW][Runtime Semantics][SILK Helpers] Additional helper-module invariants are unconditional in Rust.
+148. [RESOLVED][Runtime Semantics][SILK Helpers] Additional helper-module invariants now follow assert-gated semantics.
 - Rust: `src/silk/CNG.rs:154`, `src/silk/VAD.rs:82-84`, `src/silk/interpolate.rs:17`, `src/silk/NLSF_VQ_weights_laroia.rs:27`, `src/silk/decode_pulses.rs` (no equivalent frame-length assert branch), `src/silk/encode_pulses.rs` (no equivalent frame-length assert branch), `src/silk/encode_indices.rs:41-42`, `src/silk/encode_indices.rs:92`, `src/silk/stereo_encode_pred.rs:15`, `src/silk/stereo_encode_pred.rs:19-20`, `src/silk/sort.rs:10-12`, `src/silk/resampler/down2.rs:16-17`, `src/silk/resampler/up2_hq.rs` (coefficient-sign asserts absent), `src/silk/shell_coder.rs` (shell-frame-length assert not mirrored)
 - Upstream: `libopus-sys/opus/silk/CNG.c:153`, `libopus-sys/opus/silk/VAD.c:104-106`, `libopus-sys/opus/silk/interpolate.c:45-46`, `libopus-sys/opus/silk/NLSF_VQ_weights_laroia.c:51-52`, `libopus-sys/opus/silk/decode_pulses.c:56,59`, `libopus-sys/opus/silk/encode_pulses.c:86,89`, `libopus-sys/opus/silk/encode_indices.c:59-60,93`, `libopus-sys/opus/silk/stereo_encode_pred.c:44,47-48`, `libopus-sys/opus/silk/sort.c:51-53`, `libopus-sys/opus/silk/resampler_down2.c:46-47`, `libopus-sys/opus/silk/resampler_private_up2_HQ.c:48-53`, `libopus-sys/opus/silk/shell_coder.c:86,128`
-- Detail: These helper paths rely on assert-gated invariants upstream. Rust either enforces them with unconditional `assert!` (hard-abort behavior) or omits some of the assert checks entirely, creating mixed divergence in failure semantics under invalid/internal-corrupt states.
+- Detail: Converted tracked helper invariants from unconditional `assert!`/`assert_eq!` to `debug_assert!`/`debug_assert_eq!`, added the missing `resampler_private_up2_HQ` coefficient-sign assertion set, and aligned partial-shell (10 ms @ 12 kHz) pulse handling to the upstream assert-gated branch behavior without introducing release panics.
 
 149. [RESOLVED][Runtime Semantics][DNN Burg] Burg-analysis invariants now follow assert-gated semantics.
 - Rust: `src/dnn/burg.rs`

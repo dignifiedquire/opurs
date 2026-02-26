@@ -25,7 +25,13 @@ pub fn silk_resampler_private_up2_HQ(
     out: &mut [i16],
     in_0: &[i16],
 ) {
-    assert_eq!(out.len(), 2 * in_0.len());
+    debug_assert_eq!(out.len(), 2 * in_0.len());
+    debug_assert!(silk_resampler_up2_hq_0[0] > 0);
+    debug_assert!(silk_resampler_up2_hq_0[1] > 0);
+    debug_assert!(silk_resampler_up2_hq_0[2] < 0);
+    debug_assert!(silk_resampler_up2_hq_1[0] > 0);
+    debug_assert!(silk_resampler_up2_hq_1[1] > 0);
+    debug_assert!(silk_resampler_up2_hq_1[2] < 0);
 
     let s = &mut state.iir_state;
 

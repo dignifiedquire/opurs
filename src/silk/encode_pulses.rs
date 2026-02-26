@@ -47,14 +47,26 @@ pub fn silk_encode_pulses(
     // special case for 10 ms @ 12 kHz: the frame length is not a multiple of SHELL_CODEC_FRAME_LENGTH
     // we expand the frame length to the next multiple of SHELL_CODEC_FRAME_LENGTH, filling the extra space with zeros
     if iter * SHELL_CODEC_FRAME_LENGTH < frame_length {
-        assert_eq!(frame_length, 12 * 10); /* Make sure only happens for 10 ms @ 12 kHz */
+        debug_assert_eq!(frame_length, 12 * 10); /* Make sure only happens for 10 ms @ 12 kHz */
         iter += 1;
-
-        // zero out the unused part of pulses_buffer
-        pulses_buffer[frame_length..].fill(0);
     }
     let iter = iter;
-    let pulses_frame = &mut pulses_buffer[..iter * SHELL_CODEC_FRAME_LENGTH];
+    let padded_frame_length = iter * SHELL_CODEC_FRAME_LENGTH;
+    debug_assert!(frame_length <= pulses_buffer.len());
+    let mut pulses_padded_storage = Vec::new();
+    let pulses_frame = if padded_frame_length <= pulses_buffer.len() {
+        let pulses_frame = &mut pulses_buffer[..padded_frame_length];
+        if frame_length < padded_frame_length {
+            // 10 ms @ 12 kHz uses a partial shell frame; upstream pads this region with zeros.
+            pulses_frame[frame_length..].fill(0);
+        }
+        pulses_frame
+    } else {
+        debug_assert_eq!(pulses_buffer.len(), frame_length);
+        pulses_padded_storage = vec![0i8; padded_frame_length];
+        pulses_padded_storage[..frame_length].copy_from_slice(&pulses_buffer[..frame_length]);
+        pulses_padded_storage.as_mut_slice()
+    };
 
     /* Take the absolute value of the pulses */
     let mut abs_pulses = pulses_frame
@@ -97,7 +109,7 @@ pub fn silk_encode_pulses(
                 continue;
             };
 
-            assert_eq!(pulses_comb.len(), 1);
+            debug_assert_eq!(pulses_comb.len(), 1);
 
             // it all went fine
             *sum_pulses = pulses_comb[0];

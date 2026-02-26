@@ -38,8 +38,12 @@ pub fn silk_decode_pulses(
         &(silk_rate_levels_iCDF[(signalType >> 1) as usize]),
         8,
     );
-    let iter = pulses.len() / SHELL_CODEC_FRAME_LENGTH;
-    assert_eq!(pulses.len(), iter * SHELL_CODEC_FRAME_LENGTH);
+    let frame_length = pulses.len();
+    let mut iter = frame_length / SHELL_CODEC_FRAME_LENGTH;
+    if iter * SHELL_CODEC_FRAME_LENGTH < frame_length {
+        debug_assert_eq!(frame_length, 12 * 10);
+        iter += 1;
+    }
 
     let mut sum_pulses: [i32; 20] = [0; 20];
     let mut nLshifts: [i32; 20] = [0; 20];
@@ -69,53 +73,64 @@ pub fn silk_decode_pulses(
         *out_sum_pulse = sum_pulses;
     }
 
-    /***************************************************/
-    /* Shell decoding                                  */
-    /***************************************************/
-    for (&sum_pulses, pulses_frame) in izip!(
-        sum_pulses.iter(),
-        pulses.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
-    ) {
-        if sum_pulses > 0 {
-            silk_shell_decoder(pulses_frame, psRangeDec, sum_pulses);
-        } else {
-            pulses_frame.fill(0);
+    let mut decode_pulse_blocks = |pulses_buf: &mut [i16]| {
+        /***************************************************/
+        /* Shell decoding                                  */
+        /***************************************************/
+        for (&sum_pulses, pulses_frame) in izip!(
+            sum_pulses.iter(),
+            pulses_buf.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
+        ) {
+            if sum_pulses > 0 {
+                silk_shell_decoder(pulses_frame, psRangeDec, sum_pulses);
+            } else {
+                pulses_frame.fill(0);
+            }
         }
-    }
 
-    /***************************************************/
-    /* LSB Decoding                                    */
-    /***************************************************/
-    for (&nLshifts, sum_pulses, pulses_frame) in izip!(
-        nLshifts.iter(),
-        sum_pulses.iter_mut(),
-        pulses.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
-    ) {
-        if nLshifts > 0 {
-            for pulse in pulses_frame {
-                let mut abs_q = *pulse as i32;
+        /***************************************************/
+        /* LSB Decoding                                    */
+        /***************************************************/
+        for (&nLshifts, sum_pulses, pulses_frame) in izip!(
+            nLshifts.iter(),
+            sum_pulses.iter_mut(),
+            pulses_buf.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
+        ) {
+            if nLshifts > 0 {
+                for pulse in pulses_frame {
+                    let mut abs_q = *pulse as i32;
 
-                for _ in 0..nLshifts {
-                    abs_q = ((abs_q as u32) << 1) as i32;
-                    abs_q += ec_dec_icdf(psRangeDec, &silk_lsb_iCDF, 8);
+                    for _ in 0..nLshifts {
+                        abs_q = ((abs_q as u32) << 1) as i32;
+                        abs_q += ec_dec_icdf(psRangeDec, &silk_lsb_iCDF, 8);
+                    }
+
+                    *pulse = abs_q as i16;
                 }
 
-                *pulse = abs_q as i16;
+                /* Mark the number of pulses non-zero for sign decoding. */
+                *sum_pulses |= nLshifts << 5;
             }
-
-            /* Mark the number of pulses non-zero for sign decoding. */
-            *sum_pulses |= nLshifts << 5;
         }
-    }
 
-    /****************************************/
-    /* Decode and add signs to pulse signal */
-    /****************************************/
-    silk_decode_signs(
-        psRangeDec,
-        pulses,
-        signalType,
-        quantOffsetType,
-        &sum_pulses[..iter],
-    );
+        /****************************************/
+        /* Decode and add signs to pulse signal */
+        /****************************************/
+        silk_decode_signs(
+            psRangeDec,
+            pulses_buf,
+            signalType,
+            quantOffsetType,
+            &sum_pulses[..iter],
+        );
+    };
+
+    let padded_frame_length = iter * SHELL_CODEC_FRAME_LENGTH;
+    if padded_frame_length == frame_length {
+        decode_pulse_blocks(pulses);
+    } else {
+        let mut pulses_padded = vec![0i16; padded_frame_length];
+        decode_pulse_blocks(&mut pulses_padded);
+        pulses.copy_from_slice(&pulses_padded[..frame_length]);
+    }
 }
