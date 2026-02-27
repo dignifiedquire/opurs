@@ -2,6 +2,7 @@
 set -euo pipefail
 
 UPSTREAM_ROOT="${1:-../libopus/opus}"
+VENDORED_ROOT="libopus-sys/opus"
 
 if [ ! -d "$UPSTREAM_ROOT" ]; then
   echo "error: upstream root not found: $UPSTREAM_ROOT" >&2
@@ -10,6 +11,17 @@ fi
 
 tmp_refs="$(mktemp)"
 trap 'rm -f "$tmp_refs"' EXIT
+
+is_generated_dnn_artifact() {
+  local p="$1"
+  if printf "%s" "$p" | rg -q '^dnn/.+_data\.(c|h)$'; then
+    return 0
+  fi
+  if [ "$p" = "dnn/dred_rdovae_constants.h" ]; then
+    return 0
+  fi
+  return 1
+}
 
 rg -n "Upstream C:" src tests > "$tmp_refs"
 
@@ -33,9 +45,15 @@ while IFS=: read -r file line text; do
 
     full="$UPSTREAM_ROOT/$path"
     if [ ! -f "$full" ]; then
-      echo "MISSING_FILE $file:$line -> $p"
-      fail=1
-      continue
+      # Some DNN model/data artifacts are generated and not always present in
+      # shallow upstream GitLab checkouts; validate against vendored libopus.
+      if is_generated_dnn_artifact "$path" && [ -f "$VENDORED_ROOT/$path" ]; then
+        full="$VENDORED_ROOT/$path"
+      else
+        echo "MISSING_FILE $file:$line -> $p"
+        fail=1
+        continue
+      fi
     fi
 
     if [ -n "$sym" ] && ! rg -n "(^|[^A-Za-z0-9_])${sym}([^A-Za-z0-9_]|$)" "$full" >/dev/null; then
