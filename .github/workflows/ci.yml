@@ -33,11 +33,13 @@ jobs:
           key: fuzz-${{ github.event_name }}
       - uses: taiki-e/install-action@cargo-fuzz
       - name: Run decode_fuzzer
+        working-directory: fuzz
         run: |
           cargo fuzz run decode_fuzzer -- \
             -max_total_time=${FUZZ_SECONDS} \
             -max_len=1000000
       - name: Run extensions_fuzzer
+        working-directory: fuzz
         run: |
           cargo fuzz run extensions_fuzzer -- \
             -max_total_time=${FUZZ_SECONDS}
@@ -71,7 +73,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout upstream libopus tree
-        run: git clone --depth=1 https://gitlab.xiph.org/xiph/opus.git ../libopus/opus
+        run: |
+          mkdir -p ../libopus
+          git clone --depth=1 https://gitlab.xiph.org/xiph/opus.git ../libopus/opus
       - name: Validate Upstream C references
         run: ./scripts/check_upstream_refs.sh
 
