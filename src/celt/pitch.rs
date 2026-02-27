@@ -380,11 +380,11 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
     let mut y_lp4: Vec<f32> = vec![0.0; (lag >> 2) as usize];
     let mut xcorr: Vec<f32> = vec![0.0; (max_pitch >> 1) as usize];
 
-    for j in 0..(len >> 2) as usize {
-        x_lp4[j] = x_lp[2 * j];
+    for (dst, src) in x_lp4[..(len >> 2) as usize].iter_mut().zip(x_lp.chunks_exact(2)) {
+        *dst = src[0];
     }
-    for j in 0..(lag >> 2) as usize {
-        y_lp4[j] = y[2 * j];
+    for (dst, src) in y_lp4[..(lag >> 2) as usize].iter_mut().zip(y.chunks_exact(2)) {
+        *dst = src[0];
     }
 
     // Coarse search with 4x decimation.
@@ -499,11 +499,19 @@ pub fn remove_doubling(
     xy = xy_val;
     yy_lookup[0] = xx;
     yy = xx;
-    for i in 1..=maxperiod as usize {
-        // Match C left-associative evaluation: (yy + add) - sub.
-        yy += x[x_off - i] * x[x_off - i];
-        yy -= x[x_off + N as usize - i] * x[x_off + N as usize - i];
-        yy_lookup[i] = celt_max32(0.0f32, yy);
+    {
+        // Pre-slice to eliminate per-iteration bounds checks.
+        // x_left[k] == x[x_off - 1 - k], x_right[k] == x[x_off + N - 1 - k]
+        let mp = maxperiod as usize;
+        let n = N as usize;
+        let x_left = &x[x_off - mp..x_off];
+        let x_right = &x[x_off + n - mp..x_off + n];
+        let yy_out = &mut yy_lookup[1..=mp];
+        for ((xl, xr), yy_dest) in x_left.iter().rev().zip(x_right.iter().rev()).zip(yy_out.iter_mut()) {
+            // Match C: yy = yy + x[-i]*x[-i] - x[N-i]*x[N-i]  (left-associative)
+            yy = yy + xl * xl - xr * xr;
+            *yy_dest = celt_max32(0.0f32, yy);
+        }
     }
     yy = yy_lookup[T0 as usize];
     best_xy = xy;

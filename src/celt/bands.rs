@@ -1620,8 +1620,8 @@ fn quant_band(
         B <<= recombine;
         if let Some(lbo) = lowband_out {
             let n = celt_sqrt(N0 as f32);
-            for j in 0..N0 as usize {
-                lbo[j] = n * X[j];
+            for (lo, &x) in lbo[..N0 as usize].iter_mut().zip(&X[..N0 as usize]) {
+                *lo = n * x;
             }
         }
         cm &= (((1) << B) - 1) as u32;

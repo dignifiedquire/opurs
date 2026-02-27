@@ -68,23 +68,25 @@ fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f
 #[inline]
 fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
+    let len = len as usize;
+    let stride = stride as usize;
+    // Pre-slice to hoist bounds checks out of the hot loops.
+    let X = &mut X[..len];
     // Forward pass
-    let fwd_end = len - stride;
-    if fwd_end > 0 {
-        for i in 0..fwd_end as usize {
+    if stride < len {
+        for i in 0..len - stride {
             let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
             X[i] = c * x1 + ms * x2;
         }
     }
     // Backward pass
-    let bwd_end = len - 2 * stride - 1;
-    if bwd_end >= 0 {
-        for i in (0..=bwd_end as usize).rev() {
+    if len >= 2 * stride + 1 {
+        for i in (0..=len - 2 * stride - 1).rev() {
             let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
             X[i] = c * x1 + ms * x2;
         }
     }
@@ -131,8 +133,9 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
 #[inline]
 fn normalise_residual(iy: &[i32], X: &mut [f32], N: i32, Ryy: f32, gain: f32) {
     let g = celt_rsqrt_norm(Ryy) * gain;
-    for i in 0..N as usize {
-        X[i] = g * iy[i] as f32;
+    let n = N as usize;
+    for (x, &y) in X[..n].iter_mut().zip(&iy[..n]) {
+        *x = g * y as f32;
     }
 }
 
@@ -827,10 +830,11 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
+    let n = N as usize;
     if stereo != 0 {
-        for i in 0..N as usize {
-            let m = X[i] + Y[i];
-            let s = X[i] - Y[i];
+        for (&x, &y) in X[..n].iter().zip(&Y[..n]) {
+            let m = x + y;
+            let s = x - y;
             Emid += m * m;
             Eside += s * s;
         }
