@@ -156,6 +156,7 @@ static fec_thresholds: [i32; 10] = [
 ];
 
 impl OpusEncoder {
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[inline]
     fn sync_celt_controls(&mut self) {
         self.celt_enc.lfe = self.lfe;
@@ -1086,12 +1087,14 @@ fn bitrate_to_bits(bitrate: i32, fs: i32, frame_size: i32) -> i32 {
 }
 
 #[cfg(feature = "qext")]
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[inline]
 fn qext_padding_len(qext_total_bytes: i32) -> i32 {
     (qext_total_bytes + 253) / 254
 }
 
 #[cfg(feature = "qext")]
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 fn qext_allocation(total_celt_bytes: i32, fs: i32, frame_size: i32, channels: i32) -> (i32, i32) {
     // Mirror upstream CELT QEXT allocation split from celt_encode_with_ec:
     // compute total QEXT bytes (including extension ID), then derive
@@ -1122,6 +1125,7 @@ fn qext_allocation(total_celt_bytes: i32, fs: i32, frame_size: i32, channels: i3
 }
 
 #[cfg(all(feature = "qext", feature = "dred"))]
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[inline]
 fn qext_reserved_packet_bytes(qext_payload_bytes: i32) -> i32 {
     if qext_payload_bytes <= 0 {

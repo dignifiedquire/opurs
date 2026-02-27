@@ -509,6 +509,7 @@ fn opus_packet_get_mode(data: &[u8]) -> i32 {
         MODE_SILK_ONLY
     }
 }
+/// Upstream C: src/opus_decoder.c:opus_decode_frame
 fn opus_decode_frame(
     st: &mut OpusDecoder,
     data: Option<&[u8]>,
