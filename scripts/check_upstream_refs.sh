@@ -45,10 +45,15 @@ while IFS=: read -r file line text; do
 
     full="$UPSTREAM_ROOT/$path"
     if [ ! -f "$full" ]; then
-      # Some DNN model/data artifacts are generated and not always present in
-      # shallow upstream GitLab checkouts; validate against vendored libopus.
-      if is_generated_dnn_artifact "$path" && [ -f "$VENDORED_ROOT/$path" ]; then
-        full="$VENDORED_ROOT/$path"
+      # Some DNN model/data artifacts are generated and are not guaranteed to
+      # exist in a shallow upstream checkout or in vendored sources.
+      if is_generated_dnn_artifact "$path"; then
+        if [ -f "$VENDORED_ROOT/$path" ]; then
+          full="$VENDORED_ROOT/$path"
+        else
+          # Treat missing generated artifacts as valid references.
+          continue
+        fi
       else
         echo "MISSING_FILE $file:$line -> $p"
         fail=1
