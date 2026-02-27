@@ -1930,8 +1930,8 @@ fn tone_detect(
     const MAX_TONE: usize = 2400;
     debug_assert!(n <= MAX_TONE);
     let mut x = [0.0 as opus_val16; MAX_TONE];
-    // In float build, SHR32/PSHR32/ADD32 are identity ops, so the
-    // downscaling is just averaging channels for stereo.
+    // Shift by SIG_SHIFT+2 (+3 for stereo) to account for HF gain from the
+    // preemphasis filter. In float build this reduces to averaging channels.
     if CC == 2 {
         for i in 0..n {
             x[i] = (input[i] * 0.5) + (input[i + n] * 0.5);
@@ -2054,6 +2054,8 @@ fn run_prefilter(
                 );
             }
         }
+        // Don't search over the first/last ~1.5 octaves because short-term
+        // correlation creates too many false positives there.
         pitch_index = pitch_search(
             &pitch_buf[(max_period >> 1) as usize..],
             pitch_buf.as_slice(),
@@ -2123,6 +2125,9 @@ fn run_prefilter(
         pf_on = 0;
         qg = 0;
     } else {
+        // This block is intentionally not additionally gated by a total-bits
+        // check because the `nbAvailableBytes` thresholding above already
+        // handles the low-bitrate edge.
         if ((gain1 - st.prefilter_gain).abs()) < 0.1f32 {
             gain1 = st.prefilter_gain;
         }

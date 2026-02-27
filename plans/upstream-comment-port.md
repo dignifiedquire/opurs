@@ -46,3 +46,10 @@ comment anchored to a valid `Upstream C:` reference.
 - 2026-02-27: Continued B7 in `src/celt/pitch.rs` by porting upstream rationale
   comments for noise-floor handling, lag windowing, coarse/fine pitch search
   stages, pseudo-interpolation refinement, and xcorr loop strategy.
+- 2026-02-27: Added checker enforcement that `Upstream C:` appears at the end
+  of each contiguous comment block (`scripts/check_upstream_refs.sh`) and
+  reordered existing comments in `src/` and `tests/` to comply.
+- 2026-02-27: Expanded `src/celt/celt_encoder.rs` comment parity in
+  `transient_analysis`, `patch_transient_decision`, `tone_detect`, and
+  `run_prefilter` with upstream intent notes for masking, thresholding,
+  tone-dominance handling, and pitch-search guardrails.
