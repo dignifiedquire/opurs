@@ -1476,7 +1476,7 @@ fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_
     }
     0
 }
-/// Upstream C: src/opus_encoder.c:encode_multiframe_packet
+/// Upstream C: src/opus_encoder.c:opus_encode_native (multiframe branch)
 #[inline(never)]
 fn encode_multiframe_packet(
     st: &mut OpusEncoder,

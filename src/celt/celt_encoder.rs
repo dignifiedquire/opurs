@@ -2285,6 +2285,9 @@ fn run_prefilter(
     *qgain = qg;
     pf_on
 }
+/// Compute the per-frame VBR target (in 1/8-bit units) from analysis and
+/// coding context.
+///
 /// Upstream C: celt/celt_encoder.c:compute_vbr
 fn compute_vbr(
     mode: &OpusCustomMode,
@@ -2306,6 +2309,7 @@ fn compute_vbr(
     surround_masking: opus_val16,
     temporal_vbr: opus_val16,
 ) -> i32 {
+    // The target rate in 8th bits per frame.
     let mut target: i32 = 0;
     let mut coded_bins: i32 = 0;
     let mut coded_bands: i32 = 0;
@@ -2331,6 +2335,7 @@ fn compute_vbr(
     if analysis.valid != 0 && (analysis.activity as f64) < 0.4f64 {
         target -= ((coded_bins << BITRES) as f32 * (0.4f32 - analysis.activity)) as i32;
     }
+    // Stereo savings.
     if C == 2 {
         let mut coded_stereo_bands: i32 = 0;
         let mut coded_stereo_dof: i32 = 0;
@@ -2342,6 +2347,7 @@ fn compute_vbr(
         };
         coded_stereo_dof =
             ((eBands[coded_stereo_bands as usize] as i32) << LM) - coded_stereo_bands;
+        // Maximum fraction of bits we can save if the signal is effectively mono.
         max_frac = 0.8f32 * coded_stereo_dof as opus_val32 / coded_bins as opus_val16;
         stereo_saving = if stereo_saving < 1.0f32 {
             stereo_saving
@@ -2356,12 +2362,15 @@ fn compute_vbr(
             (stereo_saving - 0.1f32) * (coded_stereo_dof << 3) as opus_val32
         }) as i32;
     }
+    // Boost according to dynalloc (minus average calibration term).
     target += tot_boost - ((19) << LM);
+    // Apply transient boost, compensating for average boost.
     tf_calibration = 0.044f32;
     target += ((tf_estimate - tf_calibration) * target as f32) as i32;
     if analysis.valid != 0 && lfe == 0 {
         let mut tonal_target: i32 = 0;
         let mut tonal: f32 = 0.;
+        // Tonality boost (compensating for the average).
         tonal = (if 0.0f32 > analysis.tonality - 0.15f32 {
             0.0f32
         } else {
@@ -2396,6 +2405,8 @@ fn compute_vbr(
     } else {
         floor_depth
     };
+    // Make VBR less aggressive for constrained VBR because we cannot sustain
+    // long high-rate excursions.
     if (has_surround_mask == 0 || lfe != 0) && constrained_vbr != 0 {
         target = base_target + (0.67f32 * (target - base_target) as f32) as i32;
     }
@@ -2419,6 +2430,7 @@ fn compute_vbr(
         tvbr_factor = temporal_vbr * amount;
         target += (tvbr_factor * target as f32) as i32;
     }
+    // Don't allow more than doubling the base target.
     target = if 2 * base_target < target {
         2 * base_target
     } else {
