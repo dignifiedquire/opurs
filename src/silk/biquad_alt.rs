@@ -5,7 +5,6 @@
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB};
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
 
-/// Upstream C: silk/biquad_alt.c:silk_biquad_alt_stride1
 ///
 /// Second order ARMA filter, alternative implementation
 ///
@@ -18,6 +17,7 @@ use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
 /// S      I/O   State vector [2]
 /// in     I/O   input/output signal, length must be even
 /// ```
+/// Upstream C: silk/biquad_alt.c:silk_biquad_alt_stride1
 pub fn silk_biquad_alt_stride1(
     B_Q28: &[i32; 3],
     A_Q28: &[i32; 2],

@@ -1,7 +1,7 @@
 //! Multistream layout/config validation helpers.
 //!
-//! Upstream C: `src/opus_multistream.c`, `src/opus_multistream_encoder.c`,
 //! `src/opus_multistream_decoder.c`
+//! Upstream C: `src/opus_multistream.c`, `src/opus_multistream_encoder.c`,
 
 use crate::opus::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,

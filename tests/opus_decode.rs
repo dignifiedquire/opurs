@@ -1,10 +1,10 @@
 //! Integration tests for the Opus decoder.
 //!
-//! Upstream C: tests/test_opus_decode.c
 //!
 //! Split from the original monolithic `test_decoder_code0()` and `test_soft_clip()`.
 //! The fuzz sections that depend on chained RNG state remain in a single test
 //! to preserve the exact random sequence from the upstream C test.
+//! Upstream C: tests/test_opus_decode.c
 
 mod test_common;
 
@@ -263,7 +263,6 @@ fn test_decoder_all_2byte_prefixes() {
 // Test: decoder fuzzing with chained RNG state
 // ---------------------------------------------------------------------------
 
-/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (fuzz sections)
 ///
 /// This test preserves the exact RNG sequence from the upstream C test
 /// (seed=42) because the checksum regression values depend on it.
@@ -274,6 +273,8 @@ fn test_decoder_all_2byte_prefixes() {
 /// - De Bruijn mode pairs (4096)
 /// - De Bruijn mode pairs ×10
 /// - Pre-selected random packets
+///
+/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (fuzz sections)
 #[test]
 #[allow(clippy::needless_range_loop)]
 fn test_decoder_fuzz() {

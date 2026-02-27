@@ -11,7 +11,6 @@ use nalgebra::{Const, Dim, DimMul, DimProd, Dyn, VectorView};
 const LTP_ORDER: usize = crate::silk::define::LTP_ORDER;
 type LTP_ORDER = Const<{ LTP_ORDER }>;
 
-/// Upstream C: silk/float/find_LTP_FLP.c:silk_find_LTP_FLP
 ///
 /// LTP analysis
 ///
@@ -23,6 +22,7 @@ type LTP_ORDER = Const<{ LTP_ORDER }>;
 /// subfr_length                                /* I    Subframe length
 /// nb_subfr                                    /* I    number of subframes
 /// ```
+/// Upstream C: silk/float/find_LTP_FLP.c:silk_find_LTP_FLP
 pub fn silk_find_LTP_FLP<NbSubfr>(
     XX: &mut MatrixViewRMut<f32, DimProd<NbSubfr, LTP_ORDER>, LTP_ORDER>,
     xX: &mut MatrixViewRMut<f32, NbSubfr, LTP_ORDER>,

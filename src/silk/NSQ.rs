@@ -7,12 +7,12 @@ pub mod typedef_h {
     pub const silk_int16_MIN: i32 = i16::MIN as i32;
 }
 pub mod NSQ_h {
-    /// Upstream C: silk/NSQ.h:silk_noise_shape_quantizer_short_prediction_c
     ///
     /// Short-term prediction using LPC coefficients. `buf32` is indexed as
     /// `buf32[pos], buf32[pos-1], ..., buf32[pos-order+1]` and `coef16` has
     /// `order` entries. Here we take `buf32` as a slice ending at `pos+1`
     /// (i.e. the element at `buf32[buf32.len()-1]` is `buf32[pos]`).
+    /// Upstream C: silk/NSQ.h:silk_noise_shape_quantizer_short_prediction_c
     #[inline(always)]
     pub fn silk_noise_shape_quantizer_short_prediction_c(
         buf32: &[i32],
@@ -48,11 +48,11 @@ pub mod NSQ_h {
         out
     }
 
-    /// Upstream C: silk/NSQ.h:silk_NSQ_noise_shape_feedback_loop_c
     ///
     /// Noise shape feedback loop. `data0` is the new input value,
     /// `data1` is the shift register (length `order`), `coef` has `order` entries.
     /// Shifts new value into data1 while computing the weighted sum.
+    /// Upstream C: silk/NSQ.h:silk_NSQ_noise_shape_feedback_loop_c
     #[inline]
     pub fn silk_NSQ_noise_shape_feedback_loop_c(
         data0: i32,
@@ -423,10 +423,10 @@ pub fn silk_NSQ_c(
         .copy_within(frame_len..frame_len + ltp_mem_len, 0);
 }
 
-/// Upstream C: silk/NSQ.c:silk_noise_shape_quantizer
 ///
 /// Core noise-shape quantizer inner loop. Processes one subframe of samples.
 /// `xq_off` is the offset into `NSQ.xq` where output samples are written.
+/// Upstream C: silk/NSQ.c:silk_noise_shape_quantizer
 #[inline]
 fn silk_noise_shape_quantizer(
     NSQ: &mut silk_nsq_state,

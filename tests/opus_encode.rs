@@ -1,11 +1,12 @@
 //! Integration tests for the Opus encoder.
 //!
-//! Upstream C: tests/test_opus_encode.c
 //!
 //! Split into:
 //! - 3 regression tests (independent, no RNG)
 //! - 1 encode+decode test (chained RNG state from seed 42)
 //! - 1 fuzz test (chained RNG state, skippable via TEST_OPUS_NOFUZZ)
+//!
+//! Upstream C: tests/test_opus_encode.c
 
 mod test_common;
 
@@ -251,10 +252,10 @@ fn test_regression_silk_gain_assert() {
 // Main encode+decode test with chained RNG
 // ---------------------------------------------------------------------------
 
-/// Upstream C: tests/test_opus_encode.c:run_test1 + fuzz_encoder_settings
 ///
 /// This test combines run_test1() and fuzz_encoder_settings() because they
 /// share chained RNG state from seed 42.
+/// Upstream C: tests/test_opus_encode.c:run_test1 + fuzz_encoder_settings
 #[test]
 fn test_opus_encode() {
     let mut rng = TestRng::from_iseed(TEST_SEED);

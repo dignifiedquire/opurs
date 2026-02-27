@@ -14,11 +14,11 @@ use crate::silk::structs::stereo_enc_state;
 use crate::silk::Inlines::silk_DIV32_varQ;
 use crate::silk::SigProc_FIX::silk_max_int;
 
-/// Upstream C: silk/stereo_LR_to_MS.c:silk_stereo_LR_to_MS
 ///
 /// `x1` and `x2` are slices starting 2 samples before the frame data
 /// (i.e., they include 2 history samples at index 0..1, frame at 2..frame_length+1).
 /// Total length must be `frame_length + 2`.
+/// Upstream C: silk/stereo_LR_to_MS.c:silk_stereo_LR_to_MS
 pub fn silk_stereo_LR_to_MS(
     state: &mut stereo_enc_state,
     x1: &mut [i16],

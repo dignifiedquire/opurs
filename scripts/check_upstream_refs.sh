@@ -45,6 +45,57 @@ while IFS=: read -r file line text; do
   done
 done < "$tmp_refs"
 
+# Enforce style: `Upstream C:` must be the last non-empty line in its
+# contiguous comment block.
+while IFS= read -r file; do
+  if ! awk -v file="$file" '
+function is_comment(line) {
+  return line ~ /^[[:space:]]*\/\/[\/!]?[[:space:]]*/
+}
+function payload(line, s) {
+  s = line
+  sub(/^[[:space:]]*\/\/[\/!]?[[:space:]]*/, "", s)
+  return s
+}
+{
+  lines[NR] = $0
+}
+END {
+  i = 1
+  while (i <= NR) {
+    if (!is_comment(lines[i])) {
+      i++
+      continue
+    }
+    start = i
+    while (i <= NR && is_comment(lines[i])) i++
+    end = i - 1
+
+    has_ref = 0
+    last_ref = 0
+    for (k = start; k <= end; k++) {
+      if (index(lines[k], "Upstream C:") > 0) {
+        has_ref = 1
+        last_ref = k
+      }
+    }
+    if (!has_ref) continue
+
+    for (k = last_ref + 1; k <= end; k++) {
+      if (payload(lines[k]) ~ /[^[:space:]]/) {
+        printf("REF_NOT_LAST %s:%d -> %s\n", file, last_ref, lines[last_ref])
+        bad = 1
+        break
+      }
+    }
+  }
+  exit bad
+}
+  ' "$file"; then
+    fail=1
+  fi
+done < <(rg -l "Upstream C:" src tests)
+
 if [ "$fail" -ne 0 ]; then
   exit 1
 fi

@@ -40,12 +40,12 @@ static silk_TargetRate_WB_21: [u8; 191] = [
     243, 243, 244, 245, 246, 246, 247, 248, 249, 249, 250, 251, 252, 253, 255,
 ];
 
-/// Upstream C: silk/control_SNR.c:silk_control_SNR
 ///
 /// Control SNR of residual quantizer
 ///
 /// psEncC         I/O  Pointer to Silk encoder state
 /// TargetRate_bps I    Target max bitrate (bps)
+/// Upstream C: silk/control_SNR.c:silk_control_SNR
 pub fn silk_control_SNR(psEncC: &mut silk_encoder_state, mut TargetRate_bps: i32) {
     psEncC.TargetRate_bps = TargetRate_bps;
     if psEncC.nb_subfr == 2 {

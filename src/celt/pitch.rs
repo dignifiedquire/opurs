@@ -76,13 +76,13 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, _ar
     celt_pitch_xcorr_scalar(x, y, xcorr, len)
 }
 
-/// Upstream C: celt/pitch.h:dual_inner_prod_c
 ///
 /// Computes two inner products simultaneously: `(x . y01, x . y02)`.
 /// All slices must have at least `n` elements.
 ///
 /// When the `simd` feature is enabled, callers should use the dispatch layer
 /// in `celt::simd::dual_inner_prod` instead of calling this directly.
+/// Upstream C: celt/pitch.h:dual_inner_prod_c
 #[inline]
 pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
     let mut xy01: f32 = 0.0;
@@ -94,7 +94,6 @@ pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> 
     (xy01, xy02)
 }
 
-/// Upstream C: celt/pitch.c:xcorr_kernel_c
 ///
 /// 4-way cross-correlation kernel. Computes 4 consecutive correlation values.
 /// `x` must have at least `len` elements.
@@ -103,6 +102,7 @@ pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> 
 ///
 /// When the `simd` feature is enabled, callers should use the dispatch layer
 /// in `celt::simd::xcorr_kernel` instead of calling this directly.
+/// Upstream C: celt/pitch.c:xcorr_kernel_c
 #[inline]
 pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     debug_assert!(len >= 3);
@@ -193,13 +193,13 @@ pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize)
     }
 }
 
-/// Upstream C: celt/pitch.h:celt_inner_prod_c
 ///
 /// Computes the inner product (dot product) of `x` and `y`.
 /// Both slices must have at least `N` elements.
 ///
 /// When the `simd` feature is enabled, callers should use the dispatch layer
 /// in `celt::simd::celt_inner_prod` instead of calling this directly.
+/// Upstream C: celt/pitch.h:celt_inner_prod_c
 #[inline]
 pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     let mut xy: f32 = 0.0;
@@ -211,10 +211,10 @@ pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     xy
 }
 
-/// Upstream C: celt/pitch.c:find_best_pitch
 ///
 /// Finds the two best pitch candidates from cross-correlation values.
 /// Returns `[best_pitch_0, best_pitch_1]`.
+/// Upstream C: celt/pitch.c:find_best_pitch
 fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i32; 2] {
     let mut Syy: f32 = 1.0;
     let mut best_num: [f32; 2] = [-1.0, -1.0];
@@ -249,9 +249,9 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
     best_pitch
 }
 
-/// Upstream C: celt/pitch.c:celt_fir5
 ///
 /// 5-tap FIR filter applied in-place.
+/// Upstream C: celt/pitch.c:celt_fir5
 fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
     let num0 = num[0];
     let num1 = num[1];
@@ -279,11 +279,11 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
     }
 }
 
-/// Upstream C: celt/pitch.c:pitch_downsample
 ///
 /// Downsamples and LPC-filters audio for pitch analysis.
 /// `x` contains 1 or 2 channel slices of length at least `len*factor`.
 /// `x_lp` receives the downsampled output of length `len`.
+/// Upstream C: celt/pitch.c:pitch_downsample
 pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usize, arch: Arch) {
     let C = x.len();
     debug_assert!(C == 1 || C == 2);
@@ -337,7 +337,6 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
     celt_fir5(&mut x_lp[..len], &lpc2);
 }
 
-/// Upstream C: celt/pitch.c:celt_pitch_xcorr_c
 ///
 /// Cross-correlation for pitch analysis.
 /// `x` must have at least `len` elements.
@@ -346,6 +345,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
 ///
 /// When the `simd` feature is enabled, callers should use the dispatch layer
 /// in `celt::simd::celt_pitch_xcorr` instead of calling this directly.
+/// Upstream C: celt/pitch.c:celt_pitch_xcorr_c
 pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
     debug_assert!(max_pitch > 0);
@@ -367,10 +367,10 @@ pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usi
     }
 }
 
-/// Upstream C: celt/pitch.c:pitch_search
 ///
 /// Pitch search: finds the best pitch period.
 /// Returns the pitch index.
+/// Upstream C: celt/pitch.c:pitch_search
 pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arch) -> i32 {
     debug_assert!(len > 0);
     debug_assert!(max_pitch > 0);
@@ -445,13 +445,13 @@ fn compute_pitch_gain(xy: f32, xx: f32, yy: f32) -> f32 {
 
 const SECOND_CHECK: [i32; 16] = [0, 0, 3, 2, 3, 2, 5, 2, 3, 2, 3, 2, 5, 2, 3, 2];
 
-/// Upstream C: celt/pitch.c:remove_doubling
 ///
 /// Removes pitch period doubling/tripling.
 /// `x` is the full pitch buffer; `maxperiod` is the offset into `x` where
 /// the current frame starts (corresponding to `x += maxperiod` in the C code).
 /// `T0` is the initial pitch period (modified in place).
 /// Returns the pitch gain.
+/// Upstream C: celt/pitch.c:remove_doubling
 pub fn remove_doubling(
     x: &[f32],
     mut maxperiod: i32,

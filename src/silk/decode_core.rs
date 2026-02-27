@@ -15,7 +15,6 @@ use crate::silk::SigProc_FIX::{
     silk_LSHIFT_SAT32, silk_RAND, silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST,
 };
 
-/// Upstream C: silk/decode_core.c:silk_decode_core
 ///
 /// Core decoder. Performs inverse NSQ operation LTP + LPC
 ///
@@ -26,6 +25,7 @@ use crate::silk::SigProc_FIX::{
 /// pulses[ MAX_FRAME_LENGTH ]   I     Pulse signal
 /// arch                         I     Run-time architecture
 /// ```
+/// Upstream C: silk/decode_core.c:silk_decode_core
 #[inline]
 pub fn silk_decode_core(
     psDec: &mut silk_decoder_state,

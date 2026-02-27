@@ -621,11 +621,11 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
     qn
 }
 
-/// Upstream C: celt/bands.c:compute_theta
 ///
 /// Uses raw pointers internally for X/Y because the caller (`quant_partition`)
 /// needs to split X at varying offsets and pass sub-slices. The pointer
 /// arithmetic is confined to this function.
+/// Upstream C: celt/bands.c:compute_theta
 #[inline(never)]
 fn compute_theta(
     ctx: &mut band_ctx,
@@ -1326,10 +1326,10 @@ fn quant_partition(
     cm
 }
 
-/// Upstream C: celt/bands.c:cubic_quant_partition
 ///
 /// Alternative quantization path for QEXT at very high bitrates.
 /// Uses cubic quantization instead of PVQ.
+/// Upstream C: celt/bands.c:cubic_quant_partition
 #[cfg(feature = "qext")]
 fn cubic_quant_partition(
     ctx: &mut band_ctx,

@@ -8,7 +8,6 @@ use nalgebra::{Dim, DimAdd, DimDiff, DimSub, DimSum, VectorView, U1};
 
 // Correlation matrix computations for LS estimate.
 
-/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrVector_FLP
 ///
 /// Calculates correlation vector X'*t
 ///
@@ -19,6 +18,7 @@ use nalgebra::{Dim, DimAdd, DimDiff, DimSub, DimSum, VectorView, U1};
 /// Order   I    Max lag for correlation
 /// Xt      O    X'*t correlation vector [order]
 /// ```
+/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrVector_FLP
 pub fn silk_corrVector_FLP<L, Order>(
     x: &VectorView<f32, DimDiff<DimSum<L, Order>, U1>>,
     t: &VectorView<f32, L>,
@@ -41,7 +41,6 @@ pub fn silk_corrVector_FLP<L, Order>(
     }
 }
 
-/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrMatrix_FLP
 ///
 /// Calculates correlation matrix X'*X
 ///
@@ -51,6 +50,7 @@ pub fn silk_corrVector_FLP<L, Order>(
 /// Order   I   Max lag for correlation
 /// XX      O   X'*X correlation matrix [order x order]
 /// ```
+/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrMatrix_FLP
 pub fn silk_corrMatrix_FLP<Dx, L, Order>(
     x: &VectorView<f32, Dx>,
     L: L,

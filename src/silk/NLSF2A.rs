@@ -15,7 +15,6 @@ use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_RSHIFT_ROUND64, SILK_MAX_
 
 pub const QA: i32 = 16;
 
-/// Upstream C: silk/NLSF2A.c:silk_NLSF2A_find_poly
 ///
 /// helper function for NLSF2A(..)
 ///
@@ -24,6 +23,7 @@ pub const QA: i32 = 16;
 /// cLSF    I   vector of interleaved 2*cos(LSFs), QA [d]
 /// dd      I   polynomial order (= 1/2 * filter order)
 /// ```
+/// Upstream C: silk/NLSF2A.c:silk_NLSF2A_find_poly
 #[inline]
 fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
     let d = cLSF.len();
@@ -45,7 +45,6 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
     }
 }
 
-/// Upstream C: silk/NLSF2A.c:silk_NLSF2A
 ///
 /// compute whitening filter coefficients from normalized line spectral frequencies
 ///
@@ -55,6 +54,7 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
 /// d       I   filter order (should be even)
 /// arch    I   Run-time architecture
 /// ```
+/// Upstream C: silk/NLSF2A.c:silk_NLSF2A
 #[inline]
 pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     let d = a_Q12.len();

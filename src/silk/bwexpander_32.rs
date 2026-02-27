@@ -5,7 +5,6 @@
 use crate::silk::macros::silk_SMULWW;
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND;
 
-/// Upstream C: silk/bwexpander_32.c:silk_bwexpander_32
 ///
 /// Chirp (bandwidth expand) LP AR filter
 ///
@@ -14,6 +13,7 @@ use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND;
 /// d           I     Length of ar
 /// chirp_Q16   I     Chirp factor in Q16
 /// ```
+/// Upstream C: silk/bwexpander_32.c:silk_bwexpander_32
 pub fn silk_bwexpander_32(ar: &mut [i32], mut chirp_Q16: i32) {
     let d = ar.len();
 

@@ -55,9 +55,9 @@ fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_tabl
     };
 }
 
-/// Upstream C: silk/shell_coder.c:silk_shell_encoder
 ///
 /// Shell encoder, operates on one shell code frame of 16 pulses
+/// Upstream C: silk/shell_coder.c:silk_shell_encoder
 pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
     let mut pulses1: [i32; 8] = [0; 8];
     let mut pulses2: [i32; 4] = [0; 4];

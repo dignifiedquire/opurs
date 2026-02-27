@@ -8,10 +8,10 @@ pub mod typedef_h {
 
 pub use self::typedef_h::silk_int32_MAX;
 
-/// Upstream C: silk/log2lin.c:silk_log2lin
 ///
 /// Approximation of 2^() (very close inverse of silk_lin2log()) */
 /// Convert input to a linear scale
+/// Upstream C: silk/log2lin.c:silk_log2lin
 pub fn silk_log2lin(inLog_Q7: i32) -> i32 {
     let mut out: i32 = 0;
     let mut frac_Q7: i32 = 0;

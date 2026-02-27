@@ -17,7 +17,6 @@ const SCALE_Q16: i32 =
 const INV_SCALE_Q16: i32 =
     (65536 * (((MAX_QGAIN_DB - MIN_QGAIN_DB) * 128) / 6)) / (N_LEVELS_QGAIN as i32 - 1);
 
-/// Upstream C: silk/gain_quant.c:silk_gains_quant
 ///
 /// Gain scalar quantization with hysteresis, uniform on log scale
 ///
@@ -28,6 +27,7 @@ const INV_SCALE_Q16: i32 =
 /// conditional                I     first gain is delta coded if 1
 /// nb_subfr                   I     number of subframes
 /// ```
+/// Upstream C: silk/gain_quant.c:silk_gains_quant
 pub fn silk_gains_quant(
     ind: &mut [i8],
     gain_Q16: &mut [i32],
@@ -83,7 +83,6 @@ pub fn silk_gains_quant(
     }
 }
 
-/// Upstream C: silk/gain_quant.c:silk_gains_dequant
 ///
 /// Gains scalar dequantization, uniform on log scale
 ///
@@ -94,6 +93,7 @@ pub fn silk_gains_quant(
 /// conditional                I     first gain is delta coded if 1
 /// nb_subfr                   I     number of subframes
 /// ```
+/// Upstream C: silk/gain_quant.c:silk_gains_dequant
 pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, conditional: bool) {
     for (k, (out, &ind)) in gain_Q16.iter_mut().zip(ind.iter()).enumerate() {
         if k == 0 && !conditional {
@@ -121,9 +121,9 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
     }
 }
 
-/// Upstream C: silk/gain_quant.c:silk_gains_ID
 ///
 /// Compute unique identifier of gain indices vector
+/// Upstream C: silk/gain_quant.c:silk_gains_ID
 #[inline]
 pub fn silk_gains_ID(ind: &[i8]) -> i32 {
     assert!(ind.len() <= 4);

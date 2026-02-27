@@ -10,7 +10,6 @@ use crate::silk::tables_other::silk_lsb_iCDF;
 use crate::silk::tables_pulses_per_block::{silk_pulses_per_block_iCDF, silk_rate_levels_iCDF};
 use itertools::izip;
 
-/// Upstream C: silk/decode_pulses.c:silk_decode_pulses
 ///
 /// Decode quantization indices of excitation
 ///
@@ -23,6 +22,7 @@ use itertools::izip;
 /// quantOffsetType   I     quantOffsetType
 /// frame_length      I     Frame length
 /// ```
+/// Upstream C: silk/decode_pulses.c:silk_decode_pulses
 #[inline]
 pub fn silk_decode_pulses(
     psRangeDec: &mut ec_dec,

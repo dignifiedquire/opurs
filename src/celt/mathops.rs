@@ -143,11 +143,11 @@ pub fn celt_rsqrt_norm(x: f32) -> f32 {
     celt_rsqrt(x)
 }
 
-/// Upstream C: celt/mathops.h:celt_cos_norm
 ///
 /// C definition: `((float)cos((.5f*PI)*(x)))` where PI is a double literal.
 /// In C, `.5f * PI` promotes to double (since PI is 3.1415926535897931, a double),
 /// then `* x` also promotes x to double. So the entire argument is computed in f64.
+/// Upstream C: celt/mathops.h:celt_cos_norm
 #[inline]
 pub fn celt_cos_norm(x: f32) -> f32 {
     (0.5 * std::f64::consts::PI * x as f64).cos() as f32
@@ -186,9 +186,9 @@ pub fn celt_cos_norm2(x: f32) -> f32 {
                         * (COS_COEFF_A4 + x_norm_sq * (COS_COEFF_A6 + x_norm_sq * COS_COEFF_A8))))
 }
 
-/// Upstream C: celt/mathops.h:celt_log
 ///
 /// C 1.6.1: `celt_log2(x) * 0.6931471805599453f`
+/// Upstream C: celt/mathops.h:celt_log
 #[inline]
 #[allow(dead_code)]
 pub fn celt_log(x: f32) -> f32 {
@@ -201,19 +201,19 @@ pub fn celt_log10(x: f32) -> f32 {
     (x as f64).log10() as f32
 }
 
-/// Upstream C: celt/mathops.h:celt_log2
 ///
 /// We match the default non-FLOAT_APPROX float path:
 /// `((float)(1.442695040888963387*log(x)))`.
+/// Upstream C: celt/mathops.h:celt_log2
 #[inline]
 pub fn celt_log2(x: f32) -> f32 {
     (1.442695040888963387_f64 * (x as f64).ln()) as f32
 }
 
-/// Upstream C: celt/mathops.h:celt_exp2
 ///
 /// We match the default non-FLOAT_APPROX float path:
 /// `((float)exp(0.6931471805599453094*(x)))`.
+/// Upstream C: celt/mathops.h:celt_exp2
 #[inline]
 pub fn celt_exp2(x: f32) -> f32 {
     (0.6931471805599453094_f64 * x as f64).exp() as f32

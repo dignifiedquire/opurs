@@ -819,10 +819,10 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
     }
 }
 
-/// Upstream C: celt/vq.c:stereo_itheta
 ///
 /// Returns Q30 value in range [0, 1073741824] (= 2^30).
 /// Callers that need Q14 should right-shift by 16.
+/// Upstream C: celt/vq.c:stereo_itheta
 #[inline(never)]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;

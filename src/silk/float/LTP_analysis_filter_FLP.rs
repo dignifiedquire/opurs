@@ -3,12 +3,12 @@
 //! Upstream C: `silk/float/LTP_analysis_filter_FLP.c`
 
 use crate::silk::define::LTP_ORDER;
-/// Upstream C: silk/float/LTP_analysis_filter_FLP.c:silk_LTP_analysis_filter_FLP
 ///
 /// `x_offset` is the index within `x` where the first subframe's data starts
 /// (corresponding to the `x` pointer in the original C code). The slice `x`
 /// must extend backwards from `x_offset` by at least `max(pitchL) + LTP_ORDER/2`
 /// samples to cover pitch lag history.
+/// Upstream C: silk/float/LTP_analysis_filter_FLP.c:silk_LTP_analysis_filter_FLP
 pub fn silk_LTP_analysis_filter_FLP(
     LTP_res: &mut [f32],
     x: &[f32],

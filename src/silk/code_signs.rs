@@ -18,7 +18,6 @@ fn silk_dec_map(a: i32) -> i16 {
     ((a << 1) - 1) as i16
 }
 
-/// Upstream C: silk/code_signs.c:silk_encode_signs
 ///
 /// Encodes signs of excitation
 ///
@@ -30,6 +29,7 @@ fn silk_dec_map(a: i32) -> i16 {
 /// quantOffsetType                     I     Quantization offset type
 /// sum_pulses[ MAX_NB_SHELL_BLOCKS ]   I     Sum of absolute pulses per block
 /// ```
+/// Upstream C: silk/code_signs.c:silk_encode_signs
 pub fn silk_encode_signs(
     psRangeEnc: &mut ec_enc,
     pulses: &[i8],
@@ -54,7 +54,6 @@ pub fn silk_encode_signs(
     }
 }
 
-/// Upstream C: silk/code_signs.c:silk_decode_signs
 ///
 /// Decodes signs of excitation
 ///
@@ -66,6 +65,7 @@ pub fn silk_encode_signs(
 /// quantOffsetType                     I     Quantization offset type
 /// sum_pulses[ MAX_NB_SHELL_BLOCKS ]   I     Sum of absolute pulses per block
 /// ```
+/// Upstream C: silk/code_signs.c:silk_decode_signs
 #[inline]
 pub fn silk_decode_signs(
     psRangeDec: &mut ec_dec,

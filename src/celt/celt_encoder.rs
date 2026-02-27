@@ -50,12 +50,12 @@ use crate::opus::analysis::AnalysisInfo;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 use crate::silk::macros::EC_CLZ0;
 
-/// Upstream C: celt/celt_encoder.c:OpusCustomEncoder
 ///
 /// The C version uses a flexible array member (`in_mem[1]`) at the end of the struct
 /// to store overlap memory, prefilter memory, and band energy arrays in a contiguous
 /// allocation. This Rust version uses fixed-size arrays sized for the maximum case
 /// (2 channels, overlap=240 with QEXT 96 kHz, nbEBands=21, COMBFILTER_MAXPERIOD=1024).
+/// Upstream C: celt/celt_encoder.c:OpusCustomEncoder
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusCustomEncoder {
@@ -545,7 +545,9 @@ fn transient_analysis(
     let mut c: i32 = 0;
     let mut tf_max: opus_val16 = 0.;
     let mut len2: i32 = 0;
+    // Forward masking: 6.7 dB/ms.
     let mut forward_decay: opus_val16 = 0.0625f32;
+    // Table of 6*64/x, trained on real data to minimize average error.
     static inv_table: [u8; 128] = [
         255, 255, 156, 110, 86, 70, 59, 51, 45, 40, 37, 33, 31, 28, 26, 25, 23, 22, 21, 20, 19, 18,
         17, 16, 16, 15, 15, 14, 13, 13, 12, 12, 12, 12, 11, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9,
@@ -558,6 +560,9 @@ fn transient_analysis(
     debug_assert!((len as usize) <= MAX_TRANSIENT);
     let mut tmp = [0.0f32; MAX_TRANSIENT];
     *weak_transient = 0;
+    // For lower bitrates, be more conservative (3.3 dB/ms forward masking).
+    // This avoids coding weak transients at very low bitrate where they can
+    // cause unstable energy and/or partial collapse.
     if allow_weak_transients != 0 {
         forward_decay = 0.03125f32;
     }
@@ -570,6 +575,7 @@ fn transient_analysis(
         let mut maxE: opus_val16 = 0.;
         mem0 = 0 as opus_val32;
         mem1 = 0 as opus_val32;
+        // High-pass filter: (1 - 2*z^-1 + z^-2) / (1 - z^-1 + .5*z^-2).
         i = 0;
         while i < len {
             let mut x: opus_val32 = 0.;
@@ -583,9 +589,12 @@ fn transient_analysis(
             tmp[i as usize] = y;
             i += 1;
         }
+        // First few samples are unreliable because filter memory isn't propagated.
         tmp[..12].fill(0.0);
         mean = 0 as opus_val32;
         mem0 = 0 as opus_val32;
+        // Group by two to reduce complexity.
+        // Forward pass to compute the post-echo threshold.
         i = 0;
         while i < len2 {
             let x2: opus_val16 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
@@ -597,8 +606,10 @@ fn transient_analysis(
         }
         mem0 = 0 as opus_val32;
         maxE = 0 as opus_val16;
+        // Backward pass to compute the pre-echo threshold.
         i = len2 - 1;
         while i >= 0 {
+            // Backward masking: 13.9 dB/ms.
             mem0 = tmp[i as usize] + 0.875f32 * mem0;
             tmp[i as usize] = 0.125f32 * mem0;
             maxE = if maxE > 0.125f32 * mem0 {
@@ -608,9 +619,19 @@ fn transient_analysis(
             };
             i -= 1;
         }
+        // Ratio of frame energy over harmonic mean energy.
+        // This is effectively a bitrate-normalized temporal noise-to-mask ratio.
+        //
+        // As a compromise with the old transient detector, frame energy is the
+        // geometric mean of total energy and half the local max.
         mean = celt_sqrt((mean * maxE) * 0.5f32 * len2 as f32);
+        // Inverse of mean energy (floating-point equivalent of Q15+6 path).
         norm = len2 as f32 / (1e-15f32 + mean);
+        // Compute harmonic mean while discarding unreliable boundaries.
+        // Data is smooth enough here that taking 1/4 samples is sufficient.
         unmask = 0;
+        // NaNs here indicate severe upstream-state corruption.
+        // Keep the assert before table lookup to avoid out-of-bounds indexing.
         assert!(!(tmp[0]).is_nan());
         assert!(!norm.is_nan());
         i = 12;
@@ -631,6 +652,9 @@ fn transient_analysis(
             unmask += inv_table[id as usize] as i32;
             i += 4;
         }
+        // Normalize and compensate for:
+        // - 1/4 sample stride
+        // - factor of 6 baked into inv_table
         unmask = 64 * unmask * 4 / (6 * (len2 - 17));
         if unmask > mask_metric {
             *tf_chan = c;
@@ -645,10 +669,13 @@ fn transient_analysis(
         is_transient = 0;
         mask_metric = 0;
     }
+    // For low bitrates, classify weak transients separately so later stages
+    // can avoid partial-collapse artifacts.
     if allow_weak_transients != 0 && is_transient != 0 && mask_metric < 600 {
         is_transient = 0;
         *weak_transient = 1;
     }
+    // Arbitrary metric used for VBR boost behavior.
     tf_max = if 0 as f32 > celt_sqrt((27 * mask_metric) as f32) - 42_f32 {
         0 as f32
     } else {
@@ -667,6 +694,9 @@ fn transient_analysis(
     .sqrt() as f32;
     is_transient
 }
+///
+/// Looks for sudden increases in band energy to decide whether to patch
+/// the transient decision.
 /// Upstream C: celt/celt_encoder.c:patch_transient_decision
 fn patch_transient_decision(
     newE: &[opus_val16],
@@ -680,6 +710,8 @@ fn patch_transient_decision(
     let mut c: i32 = 0;
     let mut mean_diff: opus_val32 = 0 as opus_val32;
     let mut spread_old: [opus_val16; 26] = [0.; 26];
+    // Apply an aggressive (-6 dB/Bark) spreading to old-frame energies to
+    // avoid false positives caused by irrelevant narrowband peaks.
     if C == 1 {
         spread_old[start as usize] = oldE[start as usize];
         i = start + 1;
@@ -723,6 +755,7 @@ fn patch_transient_decision(
         };
         i -= 1;
     }
+    // Compute mean increase versus spread old energies.
     c = 0;
     loop {
         i = if 2 > start { 2 } else { start };

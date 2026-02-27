@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/interpolate.c`
 
-/// Upstream C: silk/interpolate.c:silk_interpolate
 // Interpolate two vectors
+/// Upstream C: silk/interpolate.c:silk_interpolate
 pub fn silk_interpolate(
     xi: &mut [i16],
     x0: &[i16],

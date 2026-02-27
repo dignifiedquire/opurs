@@ -5,10 +5,10 @@
 /// Upstream C: celt/float_cast.h:CELT_SIG_SCALE
 pub const CELT_SIG_SCALE: f32 = 32768.0f32;
 
-/// Upstream C: celt/float_cast.h:FLOAT2INT16
 ///
 /// Per-sample scalar conversion. On all platforms, C uses `float2int` which is
 /// ties-to-even (aarch64: `vcvtns_s32_f32`, x86: `cvtss2si`, or `lrintf`).
+/// Upstream C: celt/float_cast.h:FLOAT2INT16
 #[inline]
 pub fn FLOAT2INT16(x: f32) -> i16 {
     let x = x * CELT_SIG_SCALE;
@@ -49,11 +49,12 @@ pub fn celt_float2int16(input: &[f32], output: &mut [i16], cnt: usize) {
     }
 }
 
-/// Upstream C: celt/float_cast.h:float2int
 ///
 /// Matches upstream conversion semantics by target:
 /// - x86/x86_64: use SSE `cvtss2si` (honors current MXCSR rounding mode)
 /// - other targets: round-to-nearest-even
+///
+/// Upstream C: celt/float_cast.h:float2int
 #[inline]
 pub fn float2int(x: f32) -> i32 {
     float2int_impl(x)

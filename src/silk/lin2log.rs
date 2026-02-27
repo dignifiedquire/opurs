@@ -4,10 +4,10 @@
 
 use crate::silk::Inlines::silk_CLZ_FRAC;
 
-/// Upstream C: silk/lin2log.c:silk_lin2log
 ///
 // Approximation of 128 * log2() (very close inverse of silk_log2lin())
 // Convert input to a log scale
+/// Upstream C: silk/lin2log.c:silk_lin2log
 pub fn silk_lin2log(inLin: i32) -> i32 {
     let mut lz: i32 = 0;
     let mut frac_Q7: i32 = 0;

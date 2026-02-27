@@ -5,18 +5,18 @@
 use nalgebra::constraint::{DimEq, ShapeConstraint};
 use nalgebra::{Dim, Matrix, RawStorage, U1};
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 ///
 /// Inner product of two silk_float arrays, with result as double.
 /// When the `simd` feature is enabled, dispatches to AVX2/NEON on supported platforms.
+/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 #[cfg(feature = "simd")]
 pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32], arch: crate::arch::Arch) -> f64 {
     crate::silk::simd::silk_inner_product_flp(data1, data2, arch)
 }
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 ///
 /// Inner product of two silk_float arrays, with result as double (scalar-only build).
+/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 #[cfg(not(feature = "simd"))]
 pub fn silk_inner_product_FLP(data1: &[f32], data2: &[f32], _arch: crate::arch::Arch) -> f64 {
     silk_inner_product_FLP_scalar(data1, data2)

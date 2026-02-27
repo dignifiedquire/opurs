@@ -99,10 +99,10 @@ pub fn resampling_factor(rate: i32) -> i32 {
     }
 }
 
-/// Upstream C: celt/celt.c:comb_filter_const_c
 ///
 /// Constant-coefficient comb filter inner loop.
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
+/// Upstream C: celt/celt.c:comb_filter_const_c
 #[inline]
 pub fn comb_filter_const_c(
     y: &mut [f32],
@@ -131,12 +131,12 @@ pub fn comb_filter_const_c(
     }
 }
 
-/// Upstream C: celt/celt.c:comb_filter
 ///
 /// Comb filter with separate input/output buffers. The input buffer `x`
 /// must have lookback data: `x[x_start - T - 2]` through `x[x_start + N - 1]`
 /// must be valid. Output is written to `y[y_start..y_start + N]`.
 /// `window` may be empty if `overlap` is 0.
+/// Upstream C: celt/celt.c:comb_filter
 #[inline]
 pub fn comb_filter(
     y: &mut [f32],
@@ -245,11 +245,11 @@ pub fn comb_filter(
         .for_each(|v| *v = saturate_sig(*v));
 }
 
-/// Upstream C: celt/celt.c:comb_filter (in-place variant)
 ///
 /// In-place comb filter where input and output are in the same buffer.
 /// The buffer must have lookback data before `start`. Reads from
 /// `buf[start - T - 2..]` and writes to `buf[start..start + N]`.
+/// Upstream C: celt/celt.c:comb_filter (in-place variant)
 #[inline]
 pub fn comb_filter_inplace(
     buf: &mut [f32],

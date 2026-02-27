@@ -2,8 +2,8 @@
 //!
 //! Post-processes SILK decoded frames using adaptive filtering networks.
 //!
-//! Upstream C: `dnn/osce.c`, `dnn/osce.h`, `dnn/osce_features.c`,
 //! `dnn/osce_config.h`, `dnn/osce_structs.h`
+//! Upstream C: `dnn/osce.c`, `dnn/osce.h`, `dnn/osce_features.c`,
 
 use crate::arch::Arch;
 use crate::dnn::freq::{forward_transform, NB_BANDS};

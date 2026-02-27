@@ -5,7 +5,6 @@
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
 
-/// Upstream C: silk/LPC_fit.c:silk_LPC_fit
 ///
 /// Convert int32 coefficients to int16 coefs and make sure there's no wrap-around
 ///
@@ -16,6 +15,7 @@ use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
 /// QIN      I     Input Q domain
 /// d        I     Filter order
 /// ```
+/// Upstream C: silk/LPC_fit.c:silk_LPC_fit
 #[inline]
 pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) {
     let d = a_QOUT.len();

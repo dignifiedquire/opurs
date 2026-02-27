@@ -15,9 +15,9 @@ use crate::silk::SigProc_FIX::silk_SAT16;
     [0.95 : 0.15 : 0.35] normalized cut off frequencies.
 */
 
-/// Upstream C: silk/LP_variable_cutoff.c:silk_LP_interpolate_filter_taps
 ///
 /// Helper function, interpolates the filter taps
+/// Upstream C: silk/LP_variable_cutoff.c:silk_LP_interpolate_filter_taps
 #[inline]
 fn silk_LP_interpolate_filter_taps(
     B_Q28: &mut [i32; 3],
@@ -75,7 +75,6 @@ fn silk_LP_interpolate_filter_taps(
     };
 }
 
-/// Upstream C: silk/LP_variable_cutoff.c:silk_LP_variable_cutoff
 ///
 /// Low-pass filter with variable cutoff frequency based on
 /// piece-wise linear interpolation between elliptic filters
@@ -88,6 +87,7 @@ fn silk_LP_interpolate_filter_taps(
 /// frame        I/O  Low-pass filtered output signal
 /// frame_length I    Frame length
 /// ```
+/// Upstream C: silk/LP_variable_cutoff.c:silk_LP_variable_cutoff
 pub fn silk_LP_variable_cutoff(psLP: &mut silk_LP_state, frame: &mut [i16]) {
     assert!(psLP.transition_frame_no >= 0 && psLP.transition_frame_no <= TRANSITION_FRAMES as i32);
 

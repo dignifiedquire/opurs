@@ -9,7 +9,6 @@ use crate::silk::pitch_est_tables::{
 };
 use crate::silk::SigProc_FIX::silk_LIMIT;
 
-/// Upstream C: silk/decode_pitch.c:silk_decode_pitch
 ///
 /// Pitch analyzer function
 ///
@@ -20,6 +19,7 @@ use crate::silk::SigProc_FIX::silk_LIMIT;
 /// Fs_kHz         I   sampling frequency (kHz)
 /// nb_subfr       I   number of sub frames
 /// ```
+/// Upstream C: silk/decode_pitch.c:silk_decode_pitch
 pub fn silk_decode_pitch(lagIndex: i16, contourIndex: i8, pitch_lags: &mut [i32], Fs_kHz: i32) {
     let nb_subfr = pitch_lags.len();
 

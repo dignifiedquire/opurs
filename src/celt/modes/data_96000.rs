@@ -1,8 +1,8 @@
 //! 96 kHz mode tables for QEXT support.
 //!
-//! Upstream C: `celt/static_modes_float.h` (ENABLE_QEXT sections)
 //!
 //! This file is auto-generated from the C static mode tables.
+//! Upstream C: `celt/static_modes_float.h` (ENABLE_QEXT sections)
 
 #![allow(
     clippy::excessive_precision,

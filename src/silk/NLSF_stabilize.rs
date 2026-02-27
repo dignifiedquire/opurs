@@ -19,9 +19,9 @@ pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 
 pub const MAX_LOOPS: i32 = 20;
 
-/// Upstream C: silk/NLSF_stabilize.c:silk_NLSF_stabilize
 ///
 /// NLSF stabilizer, for a single input data vector
+/// Upstream C: silk/NLSF_stabilize.c:silk_NLSF_stabilize
 pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
     let mut i: usize = 0;
     let mut I: usize = 0;

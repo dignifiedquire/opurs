@@ -23,10 +23,10 @@ use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
 #[cfg(feature = "deep-plc")]
 use crate::dnn::lpcnet::LPCNetPLCState;
 
-/// Upstream C: silk/decode_frame.c:silk_decode_frame
 ///
 /// Decodes a SILK frame, writing `psDec.frame_length` samples to `pOut`.
 /// Returns `(error_code, num_samples_written)`.
+/// Upstream C: silk/decode_frame.c:silk_decode_frame
 #[inline]
 pub fn silk_decode_frame(
     psDec: &mut silk_decoder_state,

@@ -12,7 +12,6 @@ use crate::silk::tables_other::silk_LTPScales_table_Q14;
 use crate::silk::NLSF_decode::silk_NLSF_decode;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
-/// Upstream C: silk/decode_parameters.c:silk_decode_parameters
 ///
 /// Decode parameters from payload
 ///
@@ -21,6 +20,7 @@ use crate::silk::NLSF2A::silk_NLSF2A;
 /// psDecCtrl    I/O   Decoder control
 /// condCoding   I     The type of conditional coding to use
 /// ```
+/// Upstream C: silk/decode_parameters.c:silk_decode_parameters
 #[inline]
 pub fn silk_decode_parameters(
     psDec: &mut silk_decoder_state,

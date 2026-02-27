@@ -5,7 +5,6 @@
 use crate::arch::Arch;
 use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 
-/// Upstream C: silk/float/autocorrelation_FLP.c:silk_autocorrelation_FLP
 ///
 /// Compute autocorrelation
 ///
@@ -15,6 +14,7 @@ use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 /// inputDataSize    I  length of input
 /// correlationCount I  number of correlation taps to compute
 /// ```
+/// Upstream C: silk/float/autocorrelation_FLP.c:silk_autocorrelation_FLP
 pub fn silk_autocorrelation_FLP(results: &mut [f32], input: &[f32], arch: Arch) {
     let results = if results.len() > input.len() {
         &mut results[0..input.len()]

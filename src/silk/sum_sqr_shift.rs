@@ -25,7 +25,6 @@ fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {
     nrg
 }
 
-/// Upstream C: silk/sum_sqr_shift.c:silk_sum_sqr_shift
 ///
 /// Compute number of bits to right shift the sum of squares of a vector of int16s to make it fit in an int32
 ///
@@ -35,6 +34,7 @@ fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {
 /// x        I   Input vector
 /// len      I   Length of input vector
 /// ```
+/// Upstream C: silk/sum_sqr_shift.c:silk_sum_sqr_shift
 pub fn silk_sum_sqr_shift(energy: &mut i32, shift: &mut i32, x: &[i16]) {
     let len = x.len();
 

@@ -7,10 +7,10 @@
 /// Upstream C: celt/tests/test_unit_mathops.c
 use opurs::internals::{bitexact_cos, bitexact_log2tan, celt_exp2, celt_log2, celt_sqrt};
 
-/// Upstream C: testbitexactcos()
 ///
 /// Validates the bitexact_cos() lookup/interpolation table by computing a
 /// running checksum and tracking min/max deltas between consecutive outputs.
+/// Upstream C: testbitexactcos()
 #[test]
 fn test_bitexact_cos() {
     let mut chk: i32 = 0;
@@ -47,10 +47,10 @@ fn test_bitexact_cos() {
     );
 }
 
-/// Upstream C: testbitexactlog2tan()
 ///
 /// Validates bitexact_log2tan() using cos/sin pairs and checks symmetry,
 /// running checksum, and min/max deltas.
+/// Upstream C: testbitexactlog2tan()
 #[test]
 fn test_bitexact_log2tan() {
     let mut chk: i32 = 0;
@@ -104,10 +104,10 @@ fn test_bitexact_log2tan() {
     );
 }
 
-/// Upstream C: testsqrt() (float path)
 ///
 /// Tests celt_sqrt() accuracy over a wide range with adaptive step sizes.
 /// Allows up to 0.05% relative error or 2 unit absolute error.
+/// Upstream C: testsqrt() (float path)
 #[test]
 fn test_celt_sqrt() {
     let mut i: i64 = 1;
@@ -124,9 +124,9 @@ fn test_celt_sqrt() {
     }
 }
 
-/// Upstream C: testlog2() (float path)
 ///
 /// Tests celt_log2() against reference log2 over a wide positive range.
+/// Upstream C: testlog2() (float path)
 #[test]
 fn test_celt_log2() {
     let mut x: f32 = 0.001;
@@ -142,9 +142,9 @@ fn test_celt_log2() {
     }
 }
 
-/// Upstream C: testexp2() (float path)
 ///
 /// Tests celt_exp2() by verifying log2(exp2(x)) ≈ x.
+/// Upstream C: testexp2() (float path)
 #[test]
 fn test_celt_exp2() {
     let mut x: f32 = -11.0;
@@ -159,9 +159,9 @@ fn test_celt_exp2() {
     }
 }
 
-/// Upstream C: testexp2log2() (float path)
 ///
 /// Tests roundtrip: celt_log2(celt_exp2(x)) ≈ x.
+/// Upstream C: testexp2log2() (float path)
 #[test]
 fn test_celt_exp2_log2_roundtrip() {
     let mut x: f32 = -11.0;

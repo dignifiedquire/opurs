@@ -16,7 +16,6 @@ fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
     silk_RSHIFT_ROUND64(a32 as i64 * b32 as i64, Q) as i32
 }
 
-/// Upstream C: silk/LPC_inv_pred_gain.c:LPC_inverse_pred_gain_QA_c
 ///
 /// Compute inverse of LPC prediction gain, and test if LPC coefficients are stable (all poles within unit circle)
 ///
@@ -25,6 +24,7 @@ fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
 /// A_QA[ SILK_MAX_ORDER_LPC ]   I   Prediction coefficients
 /// order                        I   Prediction order
 /// ```
+/// Upstream C: silk/LPC_inv_pred_gain.c:LPC_inverse_pred_gain_QA_c
 fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
     let order = A_QA.len();
 
@@ -102,7 +102,6 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
     }
 }
 
-/// Upstream C: silk/LPC_inv_pred_gain.c:silk_LPC_inverse_pred_gain_c
 ///
 /// Compute inverse of LPC prediction gain, and test if LPC coefficients are stable (all poles within unit circle).
 ///
@@ -111,6 +110,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
 /// A_Q12   I   Prediction coefficients, Q12 [order]
 /// order   I   Prediction order
 /// ```
+/// Upstream C: silk/LPC_inv_pred_gain.c:silk_LPC_inverse_pred_gain_c
 #[inline]
 pub fn silk_LPC_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
     let mut Atmp_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];

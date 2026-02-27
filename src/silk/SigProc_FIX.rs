@@ -5,12 +5,12 @@
 /// max order of the LPC analysis in schur() and k2a()
 pub const SILK_MAX_ORDER_LPC: usize = 24;
 
-/// Upstream C: silk/SigProc_FIX.h:silk_ROR32
 ///
 /// Rotate a32 right by 'rot' bits. Negative rot values result in rotating left. Output is 32bit int.
 ///
 /// Note: contemporary compilers recognize the C expression below and
 /// compile it into a 'ror' instruction if available. No need for OPUS_INLINE ASM!
+/// Upstream C: silk/SigProc_FIX.h:silk_ROR32
 #[inline]
 pub fn silk_ROR32(a32: i32, rot: i32) -> i32 {
     let x: u32 = a32 as u32;
@@ -43,9 +43,9 @@ pub fn silk_SAT16(a: i32) -> i32 {
     }
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_LSHIFT_SAT32
 ///
 /// saturates before shifting
+/// Upstream C: silk/SigProc_FIX.h:silk_LSHIFT_SAT32
 #[inline]
 pub fn silk_LSHIFT_SAT32(a: i32, shift: i32) -> i32 {
     silk_LIMIT(a, i32::MIN >> shift, i32::MAX >> shift) << shift
@@ -130,13 +130,13 @@ pub fn silk_LIMIT<T: Ord>(a: T, limit1: T, limit2: T) -> T {
 pub const RAND_MULTIPLIER: i32 = 196314165;
 pub const RAND_INCREMENT: i32 = 907633515;
 
-/// Upstream C: silk/SigProc_FIX.h:silk_RAND
 ///
 /// PSEUDO-RANDOM GENERATOR
 ///
 /// Make sure to store the result as the seed for the next call (also in between
 /// frames), otherwise the result won't be random at all. When only using some of the
 /// bits, take the most significant bits by right-shifting.
+/// Upstream C: silk/SigProc_FIX.h:silk_RAND
 #[inline]
 pub fn silk_RAND(seed: i32) -> i32 {
     seed.wrapping_mul(RAND_MULTIPLIER)
