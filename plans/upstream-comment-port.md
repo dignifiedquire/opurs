@@ -21,8 +21,8 @@ comment anchored to a valid `Upstream C:` reference.
 - [x] B2: `src/opus/packet.rs` detailed parse/soft-clip comment port.
 - [x] B3: `src/opus/repacketizer.rs` inline algorithm/comment parity pass.
 - [x] B4: `src/opus/extensions.rs` iterator/repeat semantics full comment parity pass.
-- [ ] B5: `src/opus/opus_decoder.rs` decode-state/PLC/FEC comment parity pass.
-- [ ] B6: `src/opus/opus_encoder.rs` mode-switch/redundancy/dtx comment parity pass.
+- [x] B5: `src/opus/opus_decoder.rs` decode-state/PLC/FEC comment parity pass.
+- [x] B6: `src/opus/opus_encoder.rs` mode-switch/redundancy/dtx comment parity pass.
 - [ ] B7: `src/celt/*` and `src/silk/*` remaining algorithm comments.
 - [ ] B8: `src/dnn/*` comments and model-loading notes alignment.
 - [ ] B9: Final audit run + CI green + move plan to `plans/done/`.
@@ -39,3 +39,7 @@ comment anchored to a valid `Upstream C:` reference.
   methods in `impl OpusDecoder` and `impl OpusEncoder` (decode/encode wrappers
   and CTL-style setters/getters), and fixed rustdoc list formatting in
   `src/opus/repacketizer.rs` so clippy passes with `-D warnings`.
+- 2026-02-27: Started B7 with a substantive `src/celt/celt_decoder.rs` comment
+  pass (ported upstream rationale comments for state validation, init/reset
+  semantics, silence handling, global-flag decode ordering, band-energy stage,
+  and IMDCT saturation safety), while keeping anchors valid.

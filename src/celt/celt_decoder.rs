@@ -185,6 +185,11 @@ const FRAME_PLC_PERIODIC: i32 = 3;
 const FRAME_PLC_NEURAL: i32 = 4;
 #[cfg(feature = "deep-plc")]
 const FRAME_DRED: i32 = 5;
+
+/// Make basic checks on the CELT state to ensure we don't end up writing all
+/// over memory.
+///
+/// Upstream C: celt/celt_decoder.c:validate_celt_decoder
 pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     #[cfg(feature = "qext")]
     debug_assert!(st.mode.Fs == 48000 || st.mode.Fs == 96000);
@@ -213,6 +218,11 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     debug_assert!(st.postfilter_tapset_old <= 2);
     debug_assert!(st.postfilter_tapset_old >= 0);
 }
+
+/// Initialize a CELT decoder using the standard Opus mode and derive the
+/// downsampling factor from the caller sample rate.
+///
+/// Upstream C: celt/celt_decoder.c:celt_decoder_init
 pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCustomDecoder, i32> {
     #[cfg(feature = "qext")]
     let (mode, downsample) = if sampling_rate == 96000 {
@@ -236,6 +246,15 @@ pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCust
 
     Ok(st)
 }
+
+/// Initialize a CELT decoder for a specific custom mode.
+///
+/// Mirrors the upstream flow:
+/// 1. Validate channel count.
+/// 2. Fill static configuration from `mode`.
+/// 3. Reset dynamic decode state.
+///
+/// Upstream C: celt/celt_decoder.c:opus_custom_decoder_init
 #[inline]
 fn opus_custom_decoder_init(
     mode: &'static OpusCustomMode,
@@ -306,6 +325,8 @@ impl OpusCustomDecoder {
     /// Zeros all transient state fields (rng, error, postfilter, decode memory,
     /// LPC, band energies, etc.) while preserving configuration fields (mode,
     /// channels, overlap, downsample, start, end, signalling, disable_inv, arch).
+    ///
+    /// Upstream C: celt/celt_decoder.c:opus_custom_decoder_ctl (OPUS_RESET_STATE)
     pub fn reset(&mut self) {
         self.rng = 0;
         self.error = 0;
@@ -891,6 +912,8 @@ fn celt_synthesis(
             }
         }
     }
+    /* Saturate IMDCT output so that we can't overflow in the pitch postfilter
+    and in deemphasis. */
     for v in &mut out_syn_ch0[..n] {
         *v = saturate_sig(*v);
     }
@@ -1642,6 +1665,9 @@ pub fn celt_decode_with_ec(
 
 #[allow(clippy::too_many_arguments)]
 #[inline]
+/// Core entropy decode path shared by packet and external-decoder entry points.
+///
+/// Upstream C: celt/celt_decoder.c:celt_decode_with_ec_dred
 fn celt_decode_body(
     st: &mut OpusCustomDecoder,
     pcm: &mut [opus_val16],
@@ -1704,6 +1730,7 @@ fn celt_decode_body(
         0
     };
     if silence != 0 {
+        // Pretend we've read all the remaining bits.
         tell = len * 8;
         dec.nbits_total += tell - ec_tell(dec);
     }
@@ -1734,6 +1761,7 @@ fn celt_decode_body(
         0
     };
     let shortBlocks: i32 = if isTransient != 0 { M } else { 0 };
+    // Decode the global flags (first symbols in the stream).
     let intra_ener: i32 = if tell + 3 <= total_bits {
         ec_dec_bit_logp(dec, 3)
     } else {
@@ -1794,6 +1822,7 @@ fn celt_decode_body(
             }
         }
     }
+    // Get band energies.
     unquant_coarse_energy(
         mode,
         start,
