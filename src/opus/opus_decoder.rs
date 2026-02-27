@@ -521,18 +521,25 @@ fn opus_decode_frame(
     let mut i: i32;
     let mut silk_ret: i32;
     let mut celt_ret: i32 = 0;
+    // F2_5 * channels max: 240 * 2 = 480 (QEXT 96kHz stereo).
+    const MAX_F2_5_CH: usize = 480;
     // data_copy must be declared before dec so it outlives the borrow.
     // ec_dec_init requires &mut [u8]; decoder only reads from it.
     // Use stack buffer to avoid heap allocation. Max 1275 bytes per standard packet,
     // up to QEXT_PACKET_SIZE_CAP (3825) with QEXT.
     #[cfg(feature = "qext")]
-    let mut data_copy = vec![0u8; data.map_or(0, |d| d.len())];
+    const MAX_DATA_COPY: usize = 3825; // QEXT_PACKET_SIZE_CAP
     #[cfg(not(feature = "qext"))]
-    let mut data_copy = [0u8; 1275];
-    let data_copy_len = data.map_or(0, |d| {
-        data_copy[..d.len()].copy_from_slice(d);
-        d.len()
-    });
+    const MAX_DATA_COPY: usize = 1275;
+    let mut data_copy = [0u8; MAX_DATA_COPY];
+    let data_copy_len = match data {
+        Some(d) if d.len() > MAX_DATA_COPY => return OPUS_INVALID_PACKET,
+        Some(d) => {
+            data_copy[..d.len()].copy_from_slice(d);
+            d.len()
+        }
+        None => 0,
+    };
     let mut dec: ec_dec = ec_dec {
         buf: &mut [],
         storage: 0,
@@ -649,8 +656,11 @@ fn opus_decode_frame(
             pcm_transition_silk_size = F5 * st.channels;
         }
     }
+    // F5 * channels max: 480 * 2 = 960 (QEXT 96kHz stereo).
+    const MAX_F5_CH: usize = 960;
     let vla = pcm_transition_celt_size as usize;
-    let mut pcm_transition_celt: Vec<opus_val16> = ::std::vec::from_elem(0., vla);
+    debug_assert!(vla <= MAX_F5_CH);
+    let mut pcm_transition_celt = [0.0f32; MAX_F5_CH];
     if transition != 0 && mode == MODE_CELT_ONLY {
         opus_decode_frame(
             st,
@@ -675,8 +685,11 @@ fn opus_decode_frame(
     } else {
         ALLOC_NONE
     };
+    // F10 * channels max: 960 * 2 = 1920 (QEXT 96kHz stereo).
+    const MAX_F10_CH: usize = 1920;
     let vla_0 = pcm_silk_size as usize;
-    let mut pcm_silk: Vec<f32> = ::std::vec::from_elem(0., vla_0);
+    debug_assert!(vla_0 <= MAX_F10_CH);
+    let mut pcm_silk = [0.0f32; MAX_F10_CH];
     if mode != MODE_CELT_ONLY {
         let mut decoded_samples: i32;
         let mut pcm_ptr_off: usize = 0;
@@ -827,7 +840,8 @@ fn opus_decode_frame(
         pcm_transition_silk_size = ALLOC_NONE;
     }
     let vla_1 = pcm_transition_silk_size as usize;
-    let mut pcm_transition_silk: Vec<opus_val16> = ::std::vec::from_elem(0., vla_1);
+    debug_assert!(vla_1 <= MAX_F5_CH);
+    let mut pcm_transition_silk = [0.0f32; MAX_F5_CH];
     if transition != 0 && mode != MODE_CELT_ONLY {
         opus_decode_frame(
             st,
@@ -870,7 +884,8 @@ fn opus_decode_frame(
         ALLOC_NONE
     };
     let vla_2 = redundant_audio_size as usize;
-    let mut redundant_audio: Vec<opus_val16> = ::std::vec::from_elem(0., vla_2);
+    debug_assert!(vla_2 <= MAX_F5_CH);
+    let mut redundant_audio = [0.0f32; MAX_F5_CH];
     if redundancy != 0 && celt_to_silk != 0 {
         celt_dec.start = 0;
         celt_decode_with_ec(
@@ -965,8 +980,10 @@ fn opus_decode_frame(
         let fade_off = (st.channels * (frame_size - F2_5)) as usize;
         let red_off = (st.channels * F2_5) as usize;
         // Need a temporary copy for the in1 argument since pcm is also out
-        let in1_copy: Vec<opus_val16> =
-            pcm[fade_off..fade_off + (F2_5 * st.channels) as usize].to_vec();
+        let copy_len = (F2_5 * st.channels) as usize;
+        debug_assert!(copy_len <= MAX_F2_5_CH);
+        let mut in1_copy = [0.0f32; MAX_F2_5_CH];
+        in1_copy[..copy_len].copy_from_slice(&pcm[fade_off..fade_off + copy_len]);
         smooth_fade(
             &in1_copy,
             &redundant_audio[red_off..],
@@ -993,11 +1010,13 @@ fn opus_decode_frame(
         }
         let red_off = (st.channels * F2_5) as usize;
         // Need a temporary copy for the in2 argument since pcm is also out
-        let in2_copy: Vec<opus_val16> =
-            pcm[red_off..red_off + (F2_5 * st.channels) as usize].to_vec();
+        let copy_len2 = (F2_5 * st.channels) as usize;
+        debug_assert!(copy_len2 <= MAX_F2_5_CH);
+        let mut in2_copy = [0.0f32; MAX_F2_5_CH];
+        in2_copy[..copy_len2].copy_from_slice(&pcm[red_off..red_off + copy_len2]);
         smooth_fade(
             &redundant_audio[red_off..],
-            &in2_copy,
+            &in2_copy[..copy_len2],
             &mut pcm[red_off..],
             F2_5,
             st.channels,
@@ -1015,7 +1034,9 @@ fn opus_decode_frame(
             let ch_f2_5 = (st.channels * F2_5) as usize;
             pcm[..ch_f2_5].copy_from_slice(&pcm_transition[..ch_f2_5]);
             // Need a temporary copy for the in2 argument since pcm is also out
-            let in2_copy: Vec<opus_val16> = pcm[ch_f2_5..ch_f2_5 * 2].to_vec();
+            debug_assert!(ch_f2_5 <= MAX_F2_5_CH);
+            let mut in2_copy = [0.0f32; MAX_F2_5_CH];
+            in2_copy[..ch_f2_5].copy_from_slice(&pcm[ch_f2_5..ch_f2_5 * 2]);
             smooth_fade(
                 &pcm_transition[ch_f2_5..],
                 &in2_copy,
@@ -1027,10 +1048,13 @@ fn opus_decode_frame(
             );
         } else {
             // Need a temporary copy since pcm is both in2 and out
-            let in2_copy: Vec<opus_val16> = pcm[..(F2_5 * st.channels) as usize].to_vec();
+            let fade_len = (F2_5 * st.channels) as usize;
+            debug_assert!(fade_len <= MAX_F2_5_CH);
+            let mut in2_copy = [0.0f32; MAX_F2_5_CH];
+            in2_copy[..fade_len].copy_from_slice(&pcm[..fade_len]);
             smooth_fade(
                 pcm_transition,
-                &in2_copy,
+                &in2_copy[..fade_len],
                 pcm,
                 F2_5,
                 st.channels,
