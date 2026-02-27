@@ -124,7 +124,7 @@ pub fn celt_lcg_rand(seed: u32) -> u32 {
 }
 
 /// Upstream C: celt/bands.c:bitexact_cos
-#[inline(never)]
+#[inline]
 pub fn bitexact_cos(x: i16) -> i16 {
     let tmp = (4096 + x as i32 * x as i32) >> 13;
     let x2 = tmp as i16;

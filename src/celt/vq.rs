@@ -160,6 +160,7 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     let mut yy: f32;
     let N = N as usize;
     // Max CELT band size is 176; use stack buffers.
+    debug_assert!(N <= 176);
     let mut y = [0.0f32; 176];
     let mut signx = [0i32; 176];
     // Pre-slice to hoist bounds checks out of the hot loops.
@@ -603,6 +604,7 @@ pub fn alg_quant(
     debug_assert!(K > 0);
     debug_assert!(N > 1);
     // Max CELT band size is 176, N+3 <= 179; use stack buffer.
+    debug_assert!((N as usize + 3) <= 180);
     let mut iy = [0i32; 180];
     exp_rotation(X, N, 1, B, K, spread);
 
