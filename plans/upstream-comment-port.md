@@ -32,3 +32,10 @@ comment anchored to a valid `Upstream C:` reference.
 - `cargo fmt --all --check`
 - `cargo clippy -p opurs --all-targets --features tools -- -D warnings`
 - `./scripts/check_upstream_refs.sh`
+
+## Progress Notes
+
+- 2026-02-27: Added `Upstream C:` anchors for all public decoder/encoder API
+  methods in `impl OpusDecoder` and `impl OpusEncoder` (decode/encode wrappers
+  and CTL-style setters/getters), and fixed rustdoc list formatting in
+  `src/opus/repacketizer.rs` so clippy passes with `-D warnings`.

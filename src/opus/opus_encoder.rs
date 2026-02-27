@@ -166,6 +166,7 @@ impl OpusEncoder {
         }
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_init
     pub fn new(Fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
         let valid_fs = Fs == 48000
             || Fs == 24000
@@ -318,6 +319,8 @@ impl OpusEncoder {
     ///
     /// Returns the number of bytes written into `output` on success, or a
     /// negative Opus error code on failure.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encode
     pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
         let frame_size = pcm.len() as i32 / self.channels;
         opus_encode(self, pcm, frame_size, output)
@@ -333,6 +336,8 @@ impl OpusEncoder {
     ///
     /// Returns the number of bytes written into `output` on success, or a
     /// negative Opus error code on failure.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encode_float
     pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> i32 {
         let frame_size = pcm.len() as i32 / self.channels;
         opus_encode_float(self, pcm, frame_size, output)
@@ -342,6 +347,8 @@ impl OpusEncoder {
     ///
     /// Input samples are expected to represent 24-bit values (typically left-
     /// aligned in i32 as in upstream `opus_encode24` APIs).
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encode24
     pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
         let frame_size = pcm.len() as i32 / self.channels;
         opus_encode24(self, pcm, frame_size, output)
@@ -349,6 +356,7 @@ impl OpusEncoder {
 
     // -- Type-safe CTL getters and setters --
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_application(&mut self, app: Application) -> Result<(), i32> {
         let value = i32::from(app);
         if self.application == OPUS_APPLICATION_RESTRICTED_SILK
@@ -368,10 +376,12 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn application(&self) -> Application {
         Application::try_from(self.application).unwrap()
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_bitrate(&mut self, bitrate: Bitrate) {
         let value: i32 = bitrate.into();
         if value != OPUS_AUTO && value != OPUS_BITRATE_MAX {
@@ -387,10 +397,12 @@ impl OpusEncoder {
         }
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn bitrate(&self) -> i32 {
         user_bitrate_to_bitrate(self, self.prev_framesize, 1276)
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
         if !(0..=10).contains(&complexity) {
             return Err(OPUS_BAD_ARG);
@@ -400,10 +412,12 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn complexity(&self) -> i32 {
         self.silk_mode.complexity
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_signal(&mut self, signal: Option<Signal>) {
         self.signal_type = match signal {
             Some(s) => s.into(),
@@ -411,10 +425,12 @@ impl OpusEncoder {
         };
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn signal(&self) -> Option<Signal> {
         Signal::try_from(self.signal_type).ok()
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_bandwidth(&mut self, bw: Option<Bandwidth>) {
         let raw = match bw {
             Some(b) => {
@@ -462,6 +478,7 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn energy_mask(&self) -> Option<&[opus_val16]> {
         if self.energy_masking_len == 0 {
             None
@@ -470,10 +487,12 @@ impl OpusEncoder {
         }
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn get_bandwidth(&self) -> i32 {
         self.bandwidth
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_max_bandwidth(&mut self, bw: Bandwidth) {
         self.max_bandwidth = bw.into();
         match bw {
@@ -483,27 +502,33 @@ impl OpusEncoder {
         }
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn max_bandwidth(&self) -> Bandwidth {
         Bandwidth::try_from(self.max_bandwidth).unwrap()
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_vbr(&mut self, enabled: bool) {
         self.use_vbr = enabled as i32;
         self.silk_mode.useCBR = (!enabled) as i32;
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn vbr(&self) -> bool {
         self.use_vbr != 0
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_vbr_constraint(&mut self, enabled: bool) {
         self.vbr_constraint = enabled as i32;
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn vbr_constraint(&self) -> bool {
         self.vbr_constraint != 0
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
         let raw = match channels {
             Some(c) => {
@@ -519,6 +544,7 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn force_channels(&self) -> Option<Channels> {
         if self.force_channels == OPUS_AUTO {
             None
@@ -527,6 +553,7 @@ impl OpusEncoder {
         }
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
         if !(0..=2).contains(&value) {
             return Err(OPUS_BAD_ARG);
@@ -536,10 +563,12 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn inband_fec(&self) -> i32 {
         self.fec_config
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
         if !(0..=100).contains(&pct) {
             return Err(OPUS_BAD_ARG);
@@ -549,18 +578,22 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn packet_loss_perc(&self) -> i32 {
         self.silk_mode.packetLossPercentage
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_dtx(&mut self, enabled: bool) {
         self.use_dtx = enabled as i32;
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn dtx(&self) -> bool {
         self.use_dtx != 0
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
         if !(8..=24).contains(&depth) {
             return Err(OPUS_BAD_ARG);
@@ -569,30 +602,37 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn lsb_depth(&self) -> i32 {
         self.lsb_depth
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_expert_frame_duration(&mut self, fs: FrameSize) {
         self.variable_duration = fs.into();
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn expert_frame_duration(&self) -> FrameSize {
         FrameSize::try_from(self.variable_duration).unwrap()
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_prediction_disabled(&mut self, disabled: bool) {
         self.silk_mode.reducedDependency = disabled as i32;
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn prediction_disabled(&self) -> bool {
         self.silk_mode.reducedDependency != 0
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
         self.celt_enc.disable_inv = disabled as i32;
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn phase_inversion_disabled(&self) -> bool {
         self.celt_enc.disable_inv != 0
     }
@@ -602,17 +642,22 @@ impl OpusEncoder {
     /// When enabled, the encoder can produce extended-quality packets with
     /// 96 kHz support, extra frequency bands, and higher precision.
     /// Requires the `qext` feature.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "qext")]
     pub fn set_qext(&mut self, enabled: bool) {
         self.enable_qext = enabled as i32;
     }
 
     /// Returns whether QEXT is enabled.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "qext")]
     pub fn qext(&self) -> bool {
         self.enable_qext != 0
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_force_mode(&mut self, mode: i32) -> Result<(), i32> {
         if !(MODE_SILK_ONLY..=MODE_CELT_ONLY).contains(&mode) && mode != OPUS_AUTO {
             return Err(OPUS_BAD_ARG);
@@ -621,14 +666,17 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn channels(&self) -> i32 {
         self.channels
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn sample_rate(&self) -> i32 {
         self.Fs
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn lookahead(&self) -> i32 {
         let mut la = self.Fs / 400;
         if self.application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
@@ -639,10 +687,12 @@ impl OpusEncoder {
         la
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn final_range(&self) -> u32 {
         self.rangeFinal
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn in_dtx(&self) -> bool {
         if self.silk_mode.useDTX != 0
             && (self.prev_mode == MODE_SILK_ONLY || self.prev_mode == MODE_HYBRID)
@@ -666,6 +716,8 @@ impl OpusEncoder {
     }
 
     /// Set the DRED duration in frames (0 to disable, max DRED_MAX_FRAMES).
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "dred")]
     pub fn set_dred_duration(&mut self, value: i32) -> Result<(), i32> {
         if value < 0 || value > DRED_MAX_FRAMES as i32 {
@@ -677,6 +729,8 @@ impl OpusEncoder {
     }
 
     /// Get the current DRED duration setting.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "dred")]
     pub fn dred_duration(&self) -> i32 {
         self.dred_duration
@@ -688,6 +742,8 @@ impl OpusEncoder {
     /// or `Err(OPUS_INTERNAL_ERROR)` if loading failed.
     ///
     /// Requires the `builtin-weights` feature.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(all(feature = "dred", feature = "builtin-weights"))]
     pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
         let arrays = crate::dnn::weights::compiled_weights();
@@ -697,6 +753,8 @@ impl OpusEncoder {
     /// Load DNN models from an external binary weight blob.
     ///
     /// The blob must be in the upstream "DNNw" format.
+    ///
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "dred")]
     pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
         let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
@@ -714,6 +772,7 @@ impl OpusEncoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn reset(&mut self) {
         let mut dummy = silk_EncControlStruct::default();
         tonality_analysis_reset(&mut self.analysis);
@@ -2046,6 +2105,7 @@ fn encode_celt_to_silk_redundancy(
     Ok((redundant_rng, 1 + *nb_compr_bytes as usize))
 }
 
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 pub fn opus_encode_native(
     st: &mut OpusEncoder,
     pcm: &[opus_val16],

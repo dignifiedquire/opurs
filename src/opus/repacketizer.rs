@@ -207,6 +207,7 @@ impl OpusRepacketizer {
     /// - `begin`: The index of the first frame in the current repacketizer state to include in the output.
     /// - `end`: One past the index of the last frame in the current repacketizer state to include in the output.
     /// - `data`: The buffer in which to store the output packet.
+    ///
     /// The output budget is `data.len()`. To guarantee success, it should be at
     /// least `1276` for a single frame, or for multiple frames,
     /// `1277*(end-begin)`. A tighter bound is also possible: `1*(end-begin)`
@@ -238,6 +239,7 @@ impl OpusRepacketizer {
     /// `rp.out_range(0, rp.get_nb_frames(), data)`.
     ///
     /// - `data`: The buffer in which to store the output packet.
+    ///
     /// The output budget is `data.len()`. To guarantee success, it should be at
     /// least `1276` for a single frame, or for multiple frames,
     /// `1277 * rp.get_nb_frames()`.

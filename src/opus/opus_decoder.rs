@@ -10,6 +10,7 @@ pub mod stddef_h {}
 pub mod stack_alloc_h {
     pub const ALLOC_NONE: i32 = 1;
     #[inline]
+    /// Upstream C: celt/stack_alloc.h:_opus_false
     pub fn _opus_false() -> i32 {
         0
     }
@@ -74,9 +75,11 @@ pub struct OpusDecoder {
     pub(crate) ignore_extensions: bool,
 }
 impl OpusDecoder {
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn channels(&self) -> i32 {
         self.channels
     }
+    /// Upstream C: src/opus_decoder.c:opus_decoder_init
     pub fn new(Fs: i32, channels: usize) -> Result<OpusDecoder, i32> {
         let valid_fs = Fs == 48000
             || Fs == 24000
@@ -182,6 +185,8 @@ impl OpusDecoder {
     ///
     /// Returns the number of decoded samples per channel on success, or a
     /// negative Opus error code on failure.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decode
     pub fn decode(
         &mut self,
         data: &[u8],
@@ -200,6 +205,8 @@ impl OpusDecoder {
     ///
     /// Returns the number of decoded samples per channel on success, or a
     /// negative Opus error code on failure.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decode_float
     pub fn decode_float(
         &mut self,
         data: &[u8],
@@ -211,6 +218,8 @@ impl OpusDecoder {
     }
 
     /// Decode an Opus packet into interleaved 24-bit PCM samples in `i32`.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decode24
     pub fn decode24(
         &mut self,
         data: &[u8],
@@ -222,6 +231,8 @@ impl OpusDecoder {
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `i16`.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode
     #[cfg(feature = "dred")]
     pub fn decode_dred(
         &mut self,
@@ -234,6 +245,8 @@ impl OpusDecoder {
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `i32` (24-bit range).
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode24
     #[cfg(feature = "dred")]
     pub fn decode_dred24(
         &mut self,
@@ -246,6 +259,8 @@ impl OpusDecoder {
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `f32`.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode_float
     #[cfg(feature = "dred")]
     pub fn decode_dred_float(
         &mut self,
@@ -259,6 +274,7 @@ impl OpusDecoder {
 
     // -- Type-safe CTL getters and setters --
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
         if !(-32768..=32767).contains(&gain) {
             return Err(OPUS_BAD_ARG);
@@ -267,22 +283,27 @@ impl OpusDecoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn gain(&self) -> i32 {
         self.decode_gain
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn get_bandwidth(&self) -> i32 {
         self.bandwidth
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn sample_rate(&self) -> i32 {
         self.Fs
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn final_range(&self) -> u32 {
         self.rangeFinal
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn pitch(&mut self) -> i32 {
         if self.prev_mode == MODE_CELT_ONLY {
             self.celt_dec.postfilter_period
@@ -291,18 +312,22 @@ impl OpusDecoder {
         }
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn last_packet_duration(&self) -> i32 {
         self.last_packet_duration
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
         self.celt_dec.disable_inv = disabled as i32;
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn phase_inversion_disabled(&self) -> bool {
         self.celt_dec.disable_inv != 0
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn set_complexity(&mut self, value: i32) -> Result<(), i32> {
         if !(0..=10).contains(&value) {
             return Err(OPUS_BAD_ARG);
@@ -312,14 +337,17 @@ impl OpusDecoder {
         Ok(())
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn complexity(&self) -> i32 {
         self.complexity
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn set_ignore_extensions(&mut self, value: bool) {
         self.ignore_extensions = value;
     }
 
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn ignore_extensions(&self) -> bool {
         self.ignore_extensions
     }
@@ -329,12 +357,15 @@ impl OpusDecoder {
     /// When enabled and conditions are met (complexity >= 4, 48kHz output,
     /// 16kHz internal, SILK-only mode), the decoder extends SILK wideband
     /// audio to fullband using a neural network.
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(feature = "osce")]
     pub fn set_osce_bwe(&mut self, value: bool) {
         self.DecControl.enable_osce_bwe = value;
     }
 
     /// Returns whether OSCE bandwidth extension is enabled.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(feature = "osce")]
     pub fn osce_bwe(&self) -> bool {
         self.DecControl.enable_osce_bwe
@@ -346,6 +377,8 @@ impl OpusDecoder {
     /// weights. Returns `Ok(())` on success.
     ///
     /// Requires the `builtin-weights` feature.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
     pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
         let arrays = crate::dnn::weights::compiled_weights();
@@ -355,6 +388,8 @@ impl OpusDecoder {
     /// Load DNN models from an external binary weight blob.
     ///
     /// The blob must be in the upstream "DNNw" format.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(feature = "deep-plc")]
     pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
         let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
