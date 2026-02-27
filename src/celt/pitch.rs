@@ -316,7 +316,9 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
 
     _celt_autocorr(&x_lp[..len], &mut ac, None, 0, 4, arch);
 
+    // Noise floor -40 dB.
     ac[0] *= 1.0001f32;
+    // Lag windowing.
     #[allow(clippy::needless_range_loop)]
     for i in 1..=4 {
         ac[i] -= ac[i] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
@@ -326,6 +328,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
         tmp *= 0.9f32;
         *lpc_val *= tmp;
     }
+    // Add a zero.
     lpc2[0] = lpc[0] + 0.8f32;
     lpc2[1] = lpc[1] + c1 * lpc[0];
     lpc2[2] = lpc[2] + c1 * lpc[1];
@@ -346,6 +349,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
 pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
     let max_pitch = xcorr.len();
     debug_assert!(max_pitch > 0);
+    // Unrolled version of pitch correlation (faster on x86/ARM in upstream).
     let mut i = 0i32;
     while i < max_pitch as i32 - 3 {
         let mut sum: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
@@ -356,6 +360,7 @@ pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usi
         xcorr[i as usize + 3] = sum[3];
         i += 4;
     }
+    // In case max_pitch isn't a multiple of 4, do the non-unrolled tail.
     while (i as usize) < max_pitch {
         xcorr[i as usize] = celt_inner_prod_scalar(x, &y[i as usize..], len);
         i += 1;
@@ -382,6 +387,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
         y_lp4[j] = y[2 * j];
     }
 
+    // Coarse search with 4x decimation.
     celt_pitch_xcorr(
         &x_lp4,
         &y_lp4,
@@ -397,6 +403,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
         (max_pitch >> 2) as usize,
     );
 
+    // Finer search with 2x decimation around coarse candidates.
     for i in 0..(max_pitch >> 1) as usize {
         xcorr[i] = 0.0;
         if !((i as i32 - 2 * best_pitch[0]).abs() > 2 && (i as i32 - 2 * best_pitch[1]).abs() > 2) {
@@ -412,6 +419,7 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
         (max_pitch >> 1) as usize,
     );
 
+    // Refine by pseudo-interpolation.
     let offset;
     if best_pitch[0] > 0 && best_pitch[0] < (max_pitch >> 1) - 1 {
         let a = xcorr[(best_pitch[0] - 1) as usize];

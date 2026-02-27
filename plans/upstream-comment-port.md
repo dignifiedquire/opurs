@@ -43,3 +43,6 @@ comment anchored to a valid `Upstream C:` reference.
   pass (ported upstream rationale comments for state validation, init/reset
   semantics, silence handling, global-flag decode ordering, band-energy stage,
   and IMDCT saturation safety), while keeping anchors valid.
+- 2026-02-27: Continued B7 in `src/celt/pitch.rs` by porting upstream rationale
+  comments for noise-floor handling, lag windowing, coarse/fine pitch search
+  stages, pseudo-interpolation refinement, and xcorr loop strategy.
