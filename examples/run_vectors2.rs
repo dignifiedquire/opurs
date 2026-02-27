@@ -696,6 +696,7 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
         options: EncoderOptions,
         seed: u32,
         full_only: bool,
+        seed_sweep: bool,
     }
 
     fn build_multistream_vector(def: &Def, name: String, seed: u32, full_only: bool) -> TestVector {
@@ -731,6 +732,46 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
 
     let defs = [
         Def {
+            name: "ms_1ch_1s0c_mono",
+            application: Application::Audio,
+            sample_rate: SampleRate::R16000,
+            channels: 1,
+            streams: 1,
+            coupled_streams: 0,
+            mapping: &[0],
+            bitrate: 24_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 11,
+            full_only: false,
+            seed_sweep: false,
+        },
+        Def {
+            name: "ms_2ch_1s1c_stereo_coupled",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 2,
+            streams: 1,
+            coupled_streams: 1,
+            mapping: &[0, 1],
+            bitrate: 64_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 12,
+            full_only: false,
+            seed_sweep: false,
+        },
+        Def {
             name: "ms_3ch_2s1c_default",
             application: Application::Audio,
             sample_rate: SampleRate::R48000,
@@ -748,6 +789,7 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 1,
             full_only: false,
+            seed_sweep: false,
         },
         Def {
             name: "ms_4ch_4s0c_cbr_wb",
@@ -769,6 +811,7 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 2,
             full_only: false,
+            seed_sweep: false,
         },
         Def {
             name: "ms_5ch_3s2c_cvbr_dtx",
@@ -790,6 +833,7 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 3,
             full_only: true,
+            seed_sweep: true,
         },
         Def {
             name: "ms_6ch_4s2c_rld_fb",
@@ -810,6 +854,47 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 4,
             full_only: false,
+            seed_sweep: true,
+        },
+        Def {
+            name: "ms_7ch_4s3c_surround",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 7,
+            streams: 4,
+            coupled_streams: 3,
+            mapping: &[0, 4, 1, 2, 3, 5, 6],
+            bitrate: 224_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 13,
+            full_only: true,
+            seed_sweep: true,
+        },
+        Def {
+            name: "ms_8ch_5s3c_surround_71",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 8,
+            streams: 5,
+            coupled_streams: 3,
+            mapping: &[0, 6, 1, 2, 3, 4, 5, 7],
+            bitrate: 256_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 14,
+            full_only: true,
+            seed_sweep: true,
         },
         Def {
             name: "ms_4ch_with_silent_mapping",
@@ -829,6 +914,7 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 5,
             full_only: true,
+            seed_sweep: true,
         },
         Def {
             name: "ms_2ch_dual_mono_swapped",
@@ -848,6 +934,27 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             },
             seed: 6,
             full_only: false,
+            seed_sweep: false,
+        },
+        Def {
+            name: "ms_6ch_4s2c_sr24_40ms",
+            application: Application::Audio,
+            sample_rate: SampleRate::R24000,
+            channels: 6,
+            streams: 4,
+            coupled_streams: 2,
+            mapping: &[0, 4, 1, 2, 3, 5],
+            bitrate: 96_000,
+            frame_size: FrameSize::Ms40,
+            packet_count: 6,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms40,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 15,
+            full_only: true,
+            seed_sweep: false,
         },
     ];
 
@@ -859,16 +966,18 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             def.seed,
             def.full_only,
         ));
-        for seed in FULL_MATRIX_SEED_SWEEP {
-            if seed == def.seed {
-                continue;
+        if def.seed_sweep {
+            for seed in FULL_MATRIX_SEED_SWEEP {
+                if seed == def.seed {
+                    continue;
+                }
+                vectors.push(build_multistream_vector(
+                    &def,
+                    format!("{}_seed_{seed}", def.name),
+                    seed,
+                    true,
+                ));
             }
-            vectors.push(build_multistream_vector(
-                &def,
-                format!("{}_seed_{seed}", def.name),
-                seed,
-                true,
-            ));
         }
     }
     vectors
@@ -1114,6 +1223,17 @@ fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: true,
         },
         Def {
+            name: "proj_6ch_20ms_112k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 6,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            bitrate: 112_000,
+            seed: 8,
+            full_only: true,
+            seed_sweep: true,
+        },
+        Def {
             name: "proj_9ch_20ms_128k_sr48",
             sample_rate: SampleRate::R48000,
             channels: 9,
@@ -1147,6 +1267,17 @@ fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: true,
         },
         Def {
+            name: "proj_18ch_20ms_224k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 18,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            bitrate: 224_000,
+            seed: 18,
+            full_only: true,
+            seed_sweep: true,
+        },
+        Def {
             name: "proj_25ch_20ms_256k_sr48",
             sample_rate: SampleRate::R48000,
             channels: 25,
@@ -1156,6 +1287,17 @@ fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
             seed: 4,
             full_only: true,
             seed_sweep: true,
+        },
+        Def {
+            name: "proj_27ch_20ms_288k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 27,
+            frame_size: FrameSize::Ms20,
+            packet_count: 5,
+            bitrate: 288_000,
+            seed: 27,
+            full_only: true,
+            seed_sweep: false,
         },
         Def {
             name: "proj_36ch_20ms_320k_sr48",
@@ -1169,6 +1311,17 @@ fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: false,
         },
         Def {
+            name: "proj_38ch_20ms_352k_sr48",
+            sample_rate: SampleRate::R48000,
+            channels: 38,
+            frame_size: FrameSize::Ms20,
+            packet_count: 4,
+            bitrate: 352_000,
+            seed: 38,
+            full_only: true,
+            seed_sweep: false,
+        },
+        Def {
             name: "proj_4ch_40ms_80k_sr24",
             sample_rate: SampleRate::R24000,
             channels: 4,
@@ -1177,6 +1330,39 @@ fn load_projection_vectors(vector_dir: &Path) -> Vec<TestVector> {
             bitrate: 80_000,
             seed: 10,
             full_only: false,
+            seed_sweep: false,
+        },
+        Def {
+            name: "proj_4ch_20ms_64k_sr16",
+            sample_rate: SampleRate::R16000,
+            channels: 4,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            bitrate: 64_000,
+            seed: 16,
+            full_only: true,
+            seed_sweep: false,
+        },
+        Def {
+            name: "proj_4ch_20ms_48k_sr12",
+            sample_rate: SampleRate::R12000,
+            channels: 4,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            bitrate: 48_000,
+            seed: 21,
+            full_only: true,
+            seed_sweep: false,
+        },
+        Def {
+            name: "proj_4ch_20ms_40k_sr8",
+            sample_rate: SampleRate::R8000,
+            channels: 4,
+            frame_size: FrameSize::Ms20,
+            packet_count: 6,
+            bitrate: 40_000,
+            seed: 22,
+            full_only: true,
             seed_sweep: false,
         },
     ];
