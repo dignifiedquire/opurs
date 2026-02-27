@@ -4,8 +4,8 @@ Last updated: 2026-02-27
 
 ## Progress
 
-- Completed: `S1`, `S2`, `S3`, `S4`, `S5`, `S6`
-- Remaining: `S7`
+- Completed: `S1`, `S2`, `S3`, `S4`, `S5`, `S6`, `S7`
+- Remaining: none
 
 ## Goal
 
@@ -169,6 +169,28 @@ Acceptance:
 Commit:
 
 - `chore: close upstream full-match test plan`
+
+Status:
+
+- Completed on 2026-02-27.
+- Plan moved to `plans/done/upstream-tests-full-match.md`.
+
+### S7 Mapping Table (Closure Audit)
+
+| Upstream source | Function(s) | Rust test location |
+|---|---|---|
+| `tests/opus_encode_regressions.c` | `analysis_overflow`, `projection_overflow2`, `projection_overflow3`, `mscbr_encode_fail10`, `mscbr_encode_fail`, `qext_stereo_overflow`, `qext_repacketize_fail`, `celt_ec_internal_error`, `surround_analysis_uninit`, `projection_overflow`, `projection_overflow4`, `qext_dred_combination` | `tests/opus_encode_regressions_upstream.rs` |
+| `tests/test_opus_extensions.c` | `test_extensions_generate_success`, `test_extensions_generate_zero`, `test_extensions_generate_no_padding`, `test_extensions_generate_fail`, `test_extensions_parse_success`, `test_extensions_parse_zero`, `test_extensions_parse_fail`, `test_extensions_repeating`, `test_random_extensions_parse`, `test_opus_repacketizer_out_range_impl` | `tests/extensions_upstream_port.rs` |
+| `tests/test_opus_custom.c` | Upstream custom API matrix/fuzz parity scenarios (mixed API encode/decode permutations, CTL mutation loop, corrupt-stream constraints) | `tests/opus_custom_upstream_port.rs` |
+| `tests/test_opus_dred.c` | `test_random_dred` | `tests/dred_upstream_port.rs` |
+| `tests/test_opus_projection.c` | `test_simple_matrix`, `test_creation_arguments`, `generate_music`, `test_encode_decode` | `tests/opus_projection_upstream_port.rs` |
+
+### Residual Deltas
+
+- No unresolved required gaps for this plan scope.
+- Non-goals remain unchanged:
+  - no C ABI shim re-introduction,
+  - no unbounded/non-deterministic fuzz loops in default CI lanes.
 
 ## Validation Gate for This Plan
 

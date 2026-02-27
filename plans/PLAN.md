@@ -180,6 +180,7 @@ Supporting references for the active plan:
 
 Completed parity tracking:
 - [Parity Diff Review](done/diff_review.md) — grouped parity findings snapshot.
+- [Upstream Tests Full-Match](done/upstream-tests-full-match.md) — S1-S7 closure audit and mapping.
 - [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — fail-first
   parity test strategy and baseline history.
 - [SIMD Dispatch Alignment Diff](done/simd_diff.md) — D1-D9 dispatch alignment log.

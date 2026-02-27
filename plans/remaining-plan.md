@@ -11,6 +11,7 @@ This is the single active plan. It replaces multi-file active planning.
 | `done/diff_review.md` + `done/fix-g1..g7` | Closed | No | Functional parity groups are resolved. |
 | `parity-test-fail-first.md` | Green baseline | No new workstream | Keep as historical red/green methodology and baseline context. |
 | `missing-impl-test-coverage.md` | Covered/green | No new workstream | Items M01-M09 are covered; keep CI checks in place. |
+| `done/upstream-tests-full-match.md` | Closed | No | S1-S7 complete; upstream test full-match audit recorded and moved to `done/`. |
 | `phase5-performance.md` + `perf-status.md` | Open | Yes | Decode-side perf gap remains vs C target. |
 | `api-expansion-upstream-parity.md` | Mostly reconciled | Yes (final closure move) | Snapshot/checklist now refreshed; final step is moving it to `done/` once closure is reconfirmed in CI. |
 | `phase4-integration-safety.md` + `remove-all-unsafe.md` | Mostly done | Yes (policy closure only) | Must finalize unsafe policy and mdct unsafe-block rationale. |
