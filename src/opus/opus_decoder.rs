@@ -32,7 +32,7 @@ use crate::opus::opus_defines::{
 #[cfg(feature = "dred")]
 use crate::opus::opus_defines::{OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
-use crate::opus::packet::{opus_packet_parse_impl, opus_pcm_soft_clip_impl};
+use crate::opus::packet::{opus_packet_parse, opus_packet_parse_impl, opus_pcm_soft_clip_impl};
 use crate::opus_packet_get_samples_per_frame;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
 use crate::silk::dec_API::{silk_Decode, silk_InitDecoder, silk_ResetDecoder};
@@ -130,6 +130,48 @@ impl OpusDecoder {
         st.celt_dec.arch = opus_select_arch();
 
         Ok(st)
+    }
+
+    /// Check whether an Opus packet carries LBRR (in-band FEC) data.
+    ///
+    /// Returns:
+    /// - `1` if LBRR is present
+    /// - `0` if LBRR is not present
+    /// - a negative Opus error code on parse failure
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_packet_has_lbrr
+    pub fn packet_has_lbrr(packet: &[u8]) -> i32 {
+        if packet.is_empty() {
+            return OPUS_BAD_ARG;
+        }
+
+        let packet_mode = opus_packet_get_mode(packet);
+        if packet_mode == MODE_CELT_ONLY {
+            return 0;
+        }
+
+        let packet_frame_size = opus_packet_get_samples_per_frame(packet[0], 48_000);
+        let mut nb_frames = 1;
+        if packet_frame_size > 960 {
+            nb_frames = packet_frame_size / 960;
+        }
+
+        let packet_stream_channels = opus_packet_get_nb_channels(packet[0]);
+        let mut frames = [0usize; 48];
+        let mut size = [0i16; 48];
+        let ret = opus_packet_parse(packet, None, Some(&mut frames), &mut size, None);
+        if ret <= 0 {
+            return ret;
+        }
+        if size[0] == 0 {
+            return 0;
+        }
+
+        let mut lbrr = ((packet[frames[0]] >> (7 - nb_frames)) & 0x1) as i32;
+        if packet_stream_channels == 2 {
+            lbrr |= ((packet[frames[0]] >> (6 - 2 * nb_frames)) & 0x1) as i32;
+        }
+        lbrr
     }
 
     /// Decode an Opus packet into interleaved `i16` PCM samples.

@@ -28,6 +28,33 @@ Primary target headers:
   - New psychoacoustic tuning/performance optimization passes
   - API redesign unrelated to upstream parity
 
+## Functional Parity Policy (Rust API First)
+
+Parity is measured by **available functionality**, not by exporting the same
+C free-function surface.
+
+- Required:
+  - Every upstream behavior is reachable through idiomatic Rust APIs
+    (`new`/methods/typed setters/getters/`Drop` ownership semantics).
+  - Error semantics and bitexact behavior match upstream.
+- Explicitly not required:
+  - One-to-one free-function exports for `opus_*_create/init/destroy/ctl`.
+
+Current mapping status:
+
+- Covered via Rust methods/types:
+  - Encoder/decoder lifecycle + encode/decode + CTL behavior via
+    `OpusEncoder` / `OpusDecoder` methods.
+  - Multistream/projection lifecycle + encode/decode + CTL behavior via
+    `OpusMSEncoder` / `OpusMSDecoder` / `OpusProjectionEncoder` /
+    `OpusProjectionDecoder` methods.
+  - Repacketizer behavior via `OpusRepacketizer::{init,cat,get_nb_frames,out,out_range}`.
+  - Custom encoder/decoder encode/decode lifecycle via
+    `OpusCustomEncoder` / `OpusCustomDecoder` methods.
+- Still missing behavior (true functional gaps):
+  - Custom mode/CTL parity scope should be explicitly finalized (either
+    implemented as Rust methods or marked intentionally unsupported by policy).
+
 ## Current Status Snapshot (2026-02-27)
 
 - Vector parity baseline:
