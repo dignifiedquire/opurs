@@ -31,7 +31,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: fuzz-${{ github.event_name }}
-      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
       - name: Run decode_fuzzer
         working-directory: fuzz
         run: |
