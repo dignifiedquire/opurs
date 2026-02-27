@@ -639,7 +639,7 @@ impl Default for ResampState {
 
 /// BBWENet model layers.
 ///
-/// Upstream C: dnn/bbwenet_data.h:BBWENETLayers
+/// Upstream C: dnn/osce_structs.h:BBWENETLayers
 #[derive(Clone)]
 pub struct BBWENETLayers {
     pub fnet_conv1: LinearLayer,
@@ -1380,7 +1380,7 @@ pub fn init_nolace(arrays: &[WeightArray]) -> Option<NoLACE> {
 
 /// Initialize BBWENet model from weight arrays.
 ///
-/// Upstream C: dnn/bbwenet_data.c:init_bbwenetlayers
+/// Upstream C: dnn/osce.c:init_bbwenet
 pub fn init_bbwenet(arrays: &[WeightArray]) -> Option<BBWENet> {
     let layers = BBWENETLayers {
         fnet_conv1: linear_init(

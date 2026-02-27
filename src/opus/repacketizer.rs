@@ -48,7 +48,7 @@ pub struct OpusRepacketizer {
 impl Default for OpusRepacketizer {
     /// Create a zeroed repacketizer state.
     ///
-    /// Upstream C: storage initialization done by `src/repacketizer.c:opus_repacketizer_init`.
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_init
     fn default() -> Self {
         Self {
             toc: 0,
@@ -259,7 +259,7 @@ impl OpusRepacketizer {
 
     /// Internal wrapper for `out_range_impl_ext` when no extensions are supplied.
     ///
-    /// Upstream C: wrapper behavior around `src/repacketizer.c:opus_repacketizer_out_range_impl`.
+    /// Upstream C: src/repacketizer.c:opus_repacketizer_out_range_impl
     pub(crate) fn out_range_impl(
         &mut self,
         begin: i32,

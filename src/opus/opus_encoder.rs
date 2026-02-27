@@ -789,7 +789,7 @@ fn gen_toc(mode: i32, mut framerate: i32, bandwidth: i32, channels: i32) -> u8 {
     toc = (toc as i32 | ((channels == 2) as i32) << 2) as u8;
     toc
 }
-/// Upstream C: src/opus_encoder.c:silk_biquad_float
+/// Upstream C: src/opus_encoder.c:silk_biquad_res
 fn silk_biquad_float(
     in_0: &[opus_val16],
     B_Q28: &[i32],
@@ -1409,7 +1409,7 @@ fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_
     }
     0
 }
-/// Upstream C: src/opus_encoder.c:encode_multiframe_packet
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 fn encode_multiframe_packet(
     st: &mut OpusEncoder,
     pcm: &[opus_val16],
@@ -1792,7 +1792,7 @@ fn compute_redundancy_bytes(
 }
 
 /// Cold path: produce a minimal packet when bitrate is too low to encode.
-/// Upstream C: opus_encoder.c — inline in opus_encode_native (low-bitrate early return).
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn encode_low_bitrate_frame(
@@ -1861,7 +1861,7 @@ fn encode_low_bitrate_frame(
 }
 
 /// Cold path: reinitialize SILK encoder after switching from CELT-only mode.
-/// Upstream C: opus_encoder.c — inline in opus_encode_native (mode transition).
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn init_silk_after_celt(st: &mut OpusEncoder) {
@@ -1897,7 +1897,7 @@ fn init_silk_after_celt(st: &mut OpusEncoder) {
 }
 
 /// Cold path: apply HB gain fade when gain is changing.
-/// Upstream C: opus_encoder.c — inline in opus_encode_native.
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn apply_hb_gain_fade(
@@ -1924,7 +1924,7 @@ fn apply_hb_gain_fade(
 }
 
 /// Cold path: apply stereo fade when stereo width is changing.
-/// Upstream C: opus_encoder.c — inline in opus_encode_native.
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn apply_stereo_fade(
@@ -1951,7 +1951,7 @@ fn apply_stereo_fade(
 }
 
 /// Cold path: encode SILK→CELT redundancy frame.
-/// Upstream C: opus_encoder.c — inline in opus_encode_native.
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn encode_silk_to_celt_redundancy(
@@ -1986,7 +1986,7 @@ fn encode_silk_to_celt_redundancy(
 }
 
 /// Cold path: encode CELT→SILK redundancy frame (two CELT encode calls).
-/// Upstream C: opus_encoder.c — inline in opus_encode_native.
+/// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
 fn encode_celt_to_silk_redundancy(

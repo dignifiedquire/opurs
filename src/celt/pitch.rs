@@ -76,7 +76,7 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, _ar
     celt_pitch_xcorr_scalar(x, y, xcorr, len)
 }
 
-/// Upstream C: celt/pitch.c:dual_inner_prod_c
+/// Upstream C: celt/pitch.h:dual_inner_prod_c
 ///
 /// Computes two inner products simultaneously: `(x . y01, x . y02)`.
 /// All slices must have at least `n` elements.
@@ -193,7 +193,7 @@ pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize)
     }
 }
 
-/// Upstream C: celt/pitch.c:celt_inner_prod_c
+/// Upstream C: celt/pitch.h:celt_inner_prod_c
 ///
 /// Computes the inner product (dot product) of `x` and `y`.
 /// Both slices must have at least `N` elements.

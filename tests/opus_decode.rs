@@ -64,7 +64,7 @@ fn create_test_decoders() -> (Vec<OpusDecoder>, OpusDecoder) {
 // Test: decoder creation and copy
 // ---------------------------------------------------------------------------
 
-/// Upstream C: test_opus_decode.c:test_decoder_code0 (decoder creation section)
+/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (decoder creation section)
 #[test]
 fn test_decoder_creation_and_copy() {
     let (decoders, _) = create_test_decoders();
@@ -76,7 +76,7 @@ fn test_decoder_creation_and_copy() {
 // Test: initial PLC frames
 // ---------------------------------------------------------------------------
 
-/// Upstream C: test_opus_decode.c:test_decoder_code0 (initial PLC section, lines 106–163)
+/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (initial PLC section, lines 106–163)
 #[test]
 fn test_decoder_initial_plc() {
     let (mut decoders, _) = create_test_decoders();
@@ -162,7 +162,7 @@ fn test_decoder_initial_plc() {
 // Test: all 2-byte prefixes for all 64 modes
 // ---------------------------------------------------------------------------
 
-/// Upstream C: test_opus_decode.c:test_decoder_code0 (2-byte prefix section, lines 167–219)
+/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (2-byte prefix section, lines 167–219)
 #[test]
 fn test_decoder_all_2byte_prefixes() {
     let (mut decoders, _) = create_test_decoders();
@@ -263,7 +263,7 @@ fn test_decoder_all_2byte_prefixes() {
 // Test: decoder fuzzing with chained RNG state
 // ---------------------------------------------------------------------------
 
-/// Upstream C: test_opus_decode.c:test_decoder_code0 (fuzz sections)
+/// Upstream C: tests/test_opus_decode.c:test_decoder_code0 (fuzz sections)
 ///
 /// This test preserves the exact RNG sequence from the upstream C test
 /// (seed=42) because the checksum regression values depend on it.
@@ -523,7 +523,7 @@ fn test_decoder_fuzz() {
 // Test: opus_pcm_soft_clip
 // ---------------------------------------------------------------------------
 
-/// Upstream C: test_opus_decode.c:test_soft_clip
+/// Upstream C: tests/test_opus_decode.c:test_soft_clip
 #[test]
 #[allow(clippy::needless_range_loop)]
 fn test_soft_clip() {

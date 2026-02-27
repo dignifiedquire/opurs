@@ -101,7 +101,7 @@ pub fn vec_sigmoid_scalar(y: &mut [f32], x: &[f32]) {
 /// Upstream C defines `USE_SU_BIAS` for all x86 `vec_avx.h` variants (AVX2 and
 /// SSE2/SSE4 emulation paths), not just AVX2.
 ///
-/// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
+/// Upstream C: dnn/vec_avx.h:USE_SU_BIAS
 #[cfg(feature = "simd")]
 #[inline]
 pub fn use_su_bias(arch: Arch) -> bool {

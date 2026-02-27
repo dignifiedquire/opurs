@@ -6,19 +6,19 @@
 
 use crate::silk::macros::EC_CLZ0;
 
-/// Upstream C: celt/entcode.h:EC_SYM_BITS
+/// Upstream C: celt/entcode.h
 pub const EC_SYM_BITS: i32 = 8;
-/// Upstream C: celt/entcode.h:EC_CODE_BITS
+/// Upstream C: celt/entcode.h
 pub const EC_CODE_BITS: i32 = 32;
-/// Upstream C: celt/entcode.h:EC_SYM_MAX
+/// Upstream C: celt/entcode.h
 pub const EC_SYM_MAX: u32 = (1_u32 << EC_SYM_BITS).wrapping_sub(1);
-/// Upstream C: celt/entcode.h:EC_CODE_SHIFT
+/// Upstream C: celt/entcode.h
 pub const EC_CODE_SHIFT: i32 = EC_CODE_BITS - EC_SYM_BITS - 1;
-/// Upstream C: celt/entcode.h:EC_CODE_TOP
+/// Upstream C: celt/entcode.h
 pub const EC_CODE_TOP: u32 = 1_u32 << (EC_CODE_BITS - 1);
-/// Upstream C: celt/entcode.h:EC_CODE_BOT
+/// Upstream C: celt/entcode.h
 pub const EC_CODE_BOT: u32 = EC_CODE_TOP >> EC_SYM_BITS;
-/// Upstream C: celt/entcode.h:EC_CODE_EXTRA
+/// Upstream C: celt/entcode.h
 pub const EC_CODE_EXTRA: i32 = (EC_CODE_BITS - 2) % EC_SYM_BITS + 1;
 
 /// Upstream C: celt/entcode.h:ec_window
@@ -95,7 +95,7 @@ impl ec_ctx<'_> {
 pub const EC_UINT_BITS: i32 = 8;
 /// Upstream C: celt/entcode.h:EC_WINDOW_SIZE
 pub const EC_WINDOW_SIZE: i32 = ::core::mem::size_of::<ec_window>() as i32 * 8;
-/// Upstream C: celt/celt.h:BITRES
+/// Upstream C: celt/entcode.h:BITRES
 pub const BITRES: i32 = 3;
 
 /// Upstream C: celt/entcode.h:ec_get_error (macro in C)

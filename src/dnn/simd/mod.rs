@@ -369,7 +369,7 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
 /// On aarch64 NEON (signed i8) and non-x86 scalar fallback, regular `bias` is
 /// used.
 ///
-/// Upstream C: `#define USE_SU_BIAS` in `vec_avx.h` (x86 only).
+/// Upstream C: dnn/vec_avx.h:USE_SU_BIAS
 #[inline]
 pub fn use_su_bias(arch: Arch) -> bool {
     let _ = arch;

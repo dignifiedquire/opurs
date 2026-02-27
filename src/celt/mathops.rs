@@ -195,7 +195,7 @@ pub fn celt_log(x: f32) -> f32 {
     celt_log2(x) * 0.6931471805599453f32
 }
 
-/// Upstream C: celt/mathops.h:celt_log10
+/// Upstream C: celt/mathops.h
 #[inline]
 pub fn celt_log10(x: f32) -> f32 {
     (x as f64).log10() as f32

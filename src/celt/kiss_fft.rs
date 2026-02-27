@@ -5,12 +5,12 @@
 #![forbid(unsafe_code)]
 
 use num_traits::Zero;
-/// Upstream C: kiss_fft.h:kiss_fft_cpx
+/// Upstream C: celt/kiss_fft.h:kiss_fft_cpx
 pub type kiss_fft_cpx = num_complex::Complex32;
-/// Upstream C: kiss_fft.h:kiss_twiddle_cpx
+/// Upstream C: celt/kiss_fft.h:kiss_twiddle_cpx
 pub type kiss_twiddle_cpx = num_complex::Complex32;
 
-/// Upstream C: kiss_fft.h:kiss_fft_state
+/// Upstream C: celt/kiss_fft.h:kiss_fft_state
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct kiss_fft_state<'a> {
     pub nfft: usize,
@@ -21,7 +21,7 @@ pub struct kiss_fft_state<'a> {
     pub twiddles: &'a [kiss_twiddle_cpx],
 }
 
-/// Upstream C: kiss_fft.c:kf_bfly2
+/// Upstream C: celt/kiss_fft.c:kf_bfly2
 #[inline]
 fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
     let tw: f32 = std::f32::consts::FRAC_1_SQRT_2;
@@ -54,7 +54,7 @@ fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
         Fout[3] += t;
     }
 }
-/// Upstream C: kiss_fft.c:kf_bfly4
+/// Upstream C: celt/kiss_fft.c:kf_bfly4
 #[inline]
 fn kf_bfly4(
     Fout: &mut [kiss_fft_cpx],
@@ -110,7 +110,7 @@ fn kf_bfly4(
         }
     };
 }
-/// Upstream C: kiss_fft.c:kf_bfly3
+/// Upstream C: celt/kiss_fft.c:kf_bfly3
 #[inline]
 fn kf_bfly3(
     Fout: &mut [kiss_fft_cpx],
@@ -149,7 +149,7 @@ fn kf_bfly3(
         }
     }
 }
-/// Upstream C: kiss_fft.c:kf_bfly5
+/// Upstream C: celt/kiss_fft.c:kf_bfly5
 #[inline]
 fn kf_bfly5(
     Fout: &mut [kiss_fft_cpx],
@@ -206,7 +206,7 @@ fn kf_bfly5(
     }
 }
 
-/// Upstream C: kiss_fft.c:opus_fft_impl
+/// Upstream C: celt/kiss_fft.c:opus_fft_impl
 #[inline]
 pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
     debug_assert_eq!(st.nfft, fout.len());
@@ -239,7 +239,7 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
     }
 }
 
-/// Upstream C: kiss_fft.c:opus_fft_c
+/// Upstream C: celt/kiss_fft.c:opus_fft_c
 #[inline]
 pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
     let mut scale: f32 = 0.;

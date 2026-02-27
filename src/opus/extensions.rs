@@ -226,7 +226,7 @@ struct ExtWriter<'a> {
 impl<'a> ExtWriter<'a> {
     /// Construct a writer over an optional output buffer.
     ///
-    /// Upstream C: local `data`/`ptr`/`len` state in `src/extensions.c:opus_packet_extensions_generate`.
+    /// Upstream C: src/extensions.c:opus_packet_extensions_generate
     fn new(out: Option<&'a mut [u8]>) -> Self {
         let len = out.as_ref().map_or(0, |b| b.len());
         Self { out, len, pos: 0 }
@@ -234,14 +234,14 @@ impl<'a> ExtWriter<'a> {
 
     /// Return the number of bytes emitted so far.
     ///
-    /// Upstream C: pointer arithmetic on `ptr` in `src/extensions.c:opus_packet_extensions_generate`.
+    /// Upstream C: src/extensions.c:opus_packet_extensions_generate
     fn pos(&self) -> usize {
         self.pos
     }
 
     /// Write a single byte and advance the output cursor.
     ///
-    /// Upstream C: byte stores through `*ptr++` in `src/extensions.c:opus_packet_extensions_generate`.
+    /// Upstream C: src/extensions.c:opus_packet_extensions_generate
     fn put(&mut self, byte: u8) -> Result<(), i32> {
         if self.out.is_some() && self.pos >= self.len {
             return Err(OPUS_BUFFER_TOO_SMALL);
@@ -255,7 +255,7 @@ impl<'a> ExtWriter<'a> {
 
     /// Write a byte slice and advance the output cursor.
     ///
-    /// Upstream C: `OPUS_COPY(...)`/`memmove(...)` regions in `src/extensions.c:opus_packet_extensions_generate`.
+    /// Upstream C: src/extensions.c:opus_packet_extensions_generate
     fn put_slice(&mut self, data: &[u8]) -> Result<(), i32> {
         if self.out.is_some() && self.len.saturating_sub(self.pos) < data.len() {
             return Err(OPUS_BUFFER_TOO_SMALL);
@@ -270,7 +270,7 @@ impl<'a> ExtWriter<'a> {
 
 /// Emit only the payload bytes for one extension.
 ///
-/// Upstream C: payload-writing branches in `src/extensions.c:opus_packet_extensions_generate`.
+/// Upstream C: src/extensions.c:opus_packet_extensions_generate
 fn write_extension_payload(
     writer: &mut ExtWriter<'_>,
     ext: &OpusExtensionData,
@@ -305,7 +305,7 @@ fn write_extension_payload(
 
 /// Emit one extension header and payload.
 ///
-/// Upstream C: per-extension header+payload emission in `src/extensions.c:opus_packet_extensions_generate`.
+/// Upstream C: src/extensions.c:opus_packet_extensions_generate
 fn write_extension(
     writer: &mut ExtWriter<'_>,
     ext: &OpusExtensionData,
@@ -502,7 +502,7 @@ pub fn opus_packet_extension_find(
 /// Extension data referencing a slice of the original padding buffer.
 ///
 /// Like `OpusExtensionData` but borrows the payload instead of copying it.
-/// Upstream C: `opus_extension_data` (pointer-based).
+/// Upstream C: src/opus_private.h:opus_extension_data
 #[derive(Clone, Debug)]
 pub struct ExtensionRef {
     pub id: i32,
@@ -600,7 +600,7 @@ fn skip_extension_full(data: &[u8], pos: usize, len: i32) -> Result<(usize, i32,
 /// multi-frame packets. Uses byte offsets into the original data slice
 /// rather than raw pointers.
 ///
-/// Upstream C: `OpusExtensionIterator` in `opus_private.h`
+/// Upstream C: src/opus_private.h:OpusExtensionIterator
 #[derive(Clone)]
 pub struct OpusExtensionIterator<'a> {
     data: &'a [u8],
@@ -637,7 +637,7 @@ pub struct OpusExtensionIterator<'a> {
 impl<'a> OpusExtensionIterator<'a> {
     /// Create a new extension iterator over the given padding data.
     ///
-    /// Upstream C: `opus_extension_iterator_init`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_init
     pub fn new(data: &'a [u8], nb_frames: i32) -> Self {
         debug_assert!((0..=48).contains(&nb_frames));
         let len = data.len() as i32;
@@ -662,7 +662,7 @@ impl<'a> OpusExtensionIterator<'a> {
 
     /// Reset iterator state to the first extension.
     ///
-    /// Upstream C: `opus_extension_iterator_reset`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_reset
     pub fn reset(&mut self) {
         self.repeat_pos = 0;
         self.curr_pos = 0;
@@ -675,7 +675,7 @@ impl<'a> OpusExtensionIterator<'a> {
 
     /// Set an exclusive maximum frame index to return extensions for.
     ///
-    /// Upstream C: `opus_extension_iterator_set_frame_max`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_set_frame_max
     pub fn set_frame_max(&mut self, frame_max: i32) {
         self.frame_max = frame_max;
     }
@@ -683,7 +683,7 @@ impl<'a> OpusExtensionIterator<'a> {
     /// Return the next repeated extension, or 0 if repeat is finished,
     /// or negative on error.
     ///
-    /// Upstream C: `opus_extension_iterator_next_repeat`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_next_repeat
     fn next_repeat(&mut self) -> Result<Option<ExtensionRef>, i32> {
         debug_assert!(self.repeat_frame > 0);
         while self.repeat_frame < self.nb_frames {
@@ -763,7 +763,7 @@ impl<'a> OpusExtensionIterator<'a> {
     /// `Ok(None)` when iteration is complete,
     /// or `Err(OPUS_INVALID_PACKET)` on parse error.
     ///
-    /// Upstream C: `opus_extension_iterator_next`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_next
     pub fn next(&mut self) -> Result<Option<ExtensionRef>, i32> {
         if self.curr_len < 0 {
             return Err(OPUS_INVALID_PACKET);
@@ -848,7 +848,7 @@ impl<'a> OpusExtensionIterator<'a> {
 
     /// Find the next extension with the given ID.
     ///
-    /// Upstream C: `opus_extension_iterator_find`
+    /// Upstream C: src/extensions.c:opus_extension_iterator_find
     pub fn find(&mut self, target_id: i32) -> Result<Option<ExtensionRef>, i32> {
         loop {
             match self.next()? {

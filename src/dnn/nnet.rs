@@ -105,7 +105,7 @@ fn vec_swish(y: &mut [f32], x: &[f32], n: usize, arch: Arch) {
 
 /// Apply activation function in-place or from input to output.
 ///
-/// Upstream C: dnn/nnet_arch.h:compute_activation_c
+/// Upstream C: dnn/nnet_arch.h:compute_activation_
 fn compute_activation_c(output: &mut [f32], input: &[f32], n: usize, activation: i32, arch: Arch) {
     match activation {
         ACTIVATION_SIGMOID => vec_sigmoid(&mut output[..n], &input[..n], arch),
@@ -173,7 +173,7 @@ pub fn compute_activation(
 ///
 /// Dispatches to float sgemv or int8 cgemv depending on which weights are present.
 ///
-/// Upstream C: dnn/nnet_arch.h:compute_linear_c
+/// Upstream C: dnn/nnet_arch.h:compute_linear_
 fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: Arch) {
     let m = linear.nb_inputs;
     let n = linear.nb_outputs;
@@ -542,7 +542,7 @@ fn conv2d_3x3_float(
 
 /// Compute Conv2D layer with temporal memory.
 ///
-/// Upstream C: dnn/nnet_arch.h:compute_conv2d_c
+/// Upstream C: dnn/nnet_arch.h:compute_conv2d_
 fn compute_conv2d_c(
     conv: &Conv2dLayer,
     out: &mut [f32],

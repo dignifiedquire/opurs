@@ -7,11 +7,11 @@ use crate::celt::entdec::{ec_dec, ec_dec_icdf16, ec_dec_update, ec_decode_bin};
 #[allow(unused_imports)]
 use crate::celt::entenc::{ec_enc, ec_enc_icdf16, ec_encode_bin};
 
-/// Upstream C: celt/laplace.h:LAPLACE_LOG_MINP
+/// Upstream C: celt/laplace.c
 pub const LAPLACE_LOG_MINP: i32 = 0;
-/// Upstream C: celt/laplace.h:LAPLACE_MINP
+/// Upstream C: celt/laplace.c
 pub const LAPLACE_MINP: i32 = (1) << LAPLACE_LOG_MINP;
-/// Upstream C: celt/laplace.h:LAPLACE_NMIN
+/// Upstream C: celt/laplace.c
 pub const LAPLACE_NMIN: i32 = 16;
 
 /// Upstream C: celt/laplace.c:ec_laplace_get_freq1

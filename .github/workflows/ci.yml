@@ -65,6 +65,16 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
 
+  upstream-refs:
+    name: Upstream References
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout upstream libopus tree
+        run: git clone --depth=1 https://gitlab.xiph.org/xiph/opus.git ../libopus/opus
+      - name: Validate Upstream C references
+        run: ./scripts/check_upstream_refs.sh
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

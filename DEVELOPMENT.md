@@ -50,6 +50,9 @@ cargo run --release --features tools-dnn --example run_vectors2 -- opus_newvecto
 
 # Dump directory for debugging mismatches
 cargo run --release --features tools --example run_vectors2 -- opus_newvectors --dump-dir dump/
+
+# Validate Upstream C reference anchors in Rust comments
+./scripts/check_upstream_refs.sh
 ```
 
 CI coverage notes:
