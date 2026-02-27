@@ -37,13 +37,13 @@ jobs:
       - name: Run decode_fuzzer
         working-directory: fuzz
         run: |
-          cargo fuzz run decode_fuzzer -- \
+          cargo fuzz run decode_fuzzer --target x86_64-unknown-linux-gnu -- \
             -max_total_time=${FUZZ_SECONDS} \
             -max_len=1000000
       - name: Run extensions_fuzzer
         working-directory: fuzz
         run: |
-          cargo fuzz run extensions_fuzzer -- \
+          cargo fuzz run extensions_fuzzer --target x86_64-unknown-linux-gnu -- \
             -max_total_time=${FUZZ_SECONDS}
 
   msrv:
