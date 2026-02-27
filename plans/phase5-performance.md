@@ -9,15 +9,15 @@ with safe code makes performance optimization easier to reason about.
 
 ---
 
-## Current State (updated 2026-02-13)
+## Current State (updated 2026-02-27)
 
-- C version with inline assembly + intrinsics + RTCD is ~20% faster
+- C version with inline assembly + intrinsics + RTCD is still faster on key decode paths.
 - Rust version now has **full SIMD parity** with C reference (PR #3 + fixups)
   - All C SIMD functions ported to Rust `std::arch` intrinsics
   - Runtime CPU detection via `is_x86_feature_detected!`
   - 228/228 standard vector tests pass with SIMD enabled on all 6 CI targets
-- No benchmark suite exists yet
-- Performance gap likely reduced significantly (SIMD was the main contributor)
+- Benchmark suite exists in `benches/` and has Rust-vs-C comparison benches.
+- Latest measurements are tracked in `perf-status.md` (2026-02-26 arm64 run).
 
 ---
 
@@ -25,18 +25,18 @@ with safe code makes performance optimization easier to reason about.
 
 ### Stage 5.1 — Establish Benchmark Suite
 
-- [ ] Create `benches/` directory with `criterion` benchmarks
-- [ ] Benchmark encode at multiple bitrates (10k, 60k, 120k, 240k bps)
-- [ ] Benchmark decode at multiple sample rates (8k, 16k, 48k Hz)
-- [ ] Benchmark individual hot functions (identified by profiling):
+- [x] Create `benches/` directory with `criterion` benchmarks
+- [x] Benchmark encode at multiple bitrates (10k, 60k, 120k, 240k bps)
+- [x] Benchmark decode at multiple sample rates (8k, 16k, 48k Hz)
+- [x] Benchmark individual hot functions (identified by profiling):
   - FFT/IFFT (`kiss_fft`)
   - MDCT forward/backward
   - Pitch analysis (`pitch_search`, `xcorr_kernel`)
   - Inner products (`celt_inner_prod`, `dual_inner_prod`)
   - SILK noise shaping quantizer (NSQ)
   - Band energy computation
-- [ ] Benchmark against upstream C via tools examples timing
-- [ ] Document baseline numbers in this file
+- [x] Benchmark against upstream C via tools examples timing
+- [x] Document baseline numbers (tracked in `perf-status.md`)
 - [ ] **Commit**: `perf: add criterion benchmark suite`
 
 ### Stage 5.2 — Profile and Identify Hot Paths
@@ -103,10 +103,10 @@ All C SIMD functions ported in PR #3 + fixups. Bit-exact with C reference.
 
 ### Stage 5.6 — Validate Performance Parity
 
-- [ ] Re-run full benchmark suite
-- [ ] Compare against C baseline
+- [x] Re-run full benchmark suite
+- [x] Compare against C baseline
 - [ ] Target: within 5% of C with ASM/intrinsics
-- [ ] Document final numbers:
+- [x] Document final numbers (see `perf-status.md`):
 
 | Workload | C (ms) | Rust before (ms) | Rust after (ms) | Δ |
 |----------|--------|------------------|-----------------|---|
@@ -114,7 +114,7 @@ All C SIMD functions ported in PR #3 + fixups. Bit-exact with C reference.
 | Decode 48kHz stereo | | | | |
 | ... | | | | |
 
-- [ ] Run vector tests — verify SIMD paths produce bit-exact results
+- [x] Run vector tests — verify SIMD paths produce bit-exact results
 - [ ] **Commit**: `perf: document performance parity results`
 
 ---
@@ -149,9 +149,9 @@ with explicit `#[allow(unsafe_code)]` on SIMD modules only.
 
 ## Definition of Done
 
-- [ ] Benchmark suite in `benches/` with criterion
+- [x] Benchmark suite in `benches/` with criterion
 - [ ] Performance within 5% of C reference on x86_64 and aarch64
 - [ ] SIMD for top-5 hottest functions
-- [ ] Runtime CPU detection
-- [ ] All vector tests pass (bit-exact output preserved)
-- [ ] Documented benchmark results
+- [x] Runtime CPU detection
+- [x] All vector tests pass (bit-exact output preserved)
+- [x] Documented benchmark results

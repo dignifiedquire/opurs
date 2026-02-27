@@ -4,7 +4,7 @@
 Make every known upstream parity gap produce a deterministic failing test before fixing implementation. Focus on bit-exactness and behavior parity with C reference.
 
 ## Scope Source
-- Findings source: `diff_review.md`
+- Findings source: `done/diff_review.md`
 - Current grouped priorities: QEXT blockers, extensions/repacketizer parity, API parity, DNN parity, SIMD/dispatch parity, runtime semantics
 
 ## Guardrails
@@ -59,7 +59,7 @@ Make every known upstream parity gap produce a deterministic failing test before
 - Use this as the regression baseline for upcoming API expansion and multistream/projection work.
 
 ## Completed Summary: SIMD/Dispatch Alignment
-- Full divergence tracker moved to `plans/simd_diff.md`.
+- Full divergence tracker moved to `done/simd_diff.md`.
 - Upstream parity divergences `D1` through `D9` are fixed and committed.
 - Implemented alignment includes:
   - DNN arch threading for dispatch on x86/ARM paths.
@@ -77,7 +77,7 @@ Make every known upstream parity gap produce a deterministic failing test before
 ## Workstreams
 
 ### 1) QEXT Fail-First Coverage (Highest Risk)
-Target findings: grouped QEXT blockers in `diff_review.md` (notably IDs `3,4,5,15,16,17,21,22,23,24,25,26,28,29,30,31,32,34,42,52,88,111,150,166,175,229`).
+Target findings: grouped QEXT blockers in `done/diff_review.md` (notably IDs `3,4,5,15,16,17,21,22,23,24,25,26,28,29,30,31,32,34,42,52,88,111,150,166,175,229`).
 
 Add tests first:
 - New file: `tests/qext_parity.rs` behind `#[cfg(all(feature = "tools", feature = "qext"))]`.
@@ -148,7 +148,7 @@ Add tests first:
 Acceptance:
 - SIMD and scalar outputs remain parity-equivalent (or within upstream-defined tolerance where not bit-exact).
 - Current status:
-  - Primary dispatch/build/detection divergences resolved (see `plans/simd_diff.md`).
+  - Primary dispatch/build/detection divergences resolved (see `done/simd_diff.md`).
   - Remaining work in this stream is regression hardening and additional targeted SIMD/scalar parity coverage.
 
 ### 6) Runtime Semantics / Error Contract Parity

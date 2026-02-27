@@ -2,6 +2,8 @@
 
 **Goal**: Eliminate all remaining `unsafe` occurrences, reaching `#![forbid(unsafe_code)]`.
 
+> Execution priority for this plan is tracked in `active-workstreams.md`.
+
 **Current state (2026-02-13)**: Non-SIMD: 2 `unsafe` blocks across 1 file.
 SIMD: 4 `unsafe fn` + 73 `unsafe` blocks across 2 files (expected for intrinsics).
 Down from 47/9 at plan creation.

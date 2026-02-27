@@ -1,7 +1,9 @@
 # Deferred: Multistream / Ambisonics / Projection
 
+> Archived historical note.
+>
 > Superseded by active plan:
-> [`plans/api-expansion-upstream-parity.md`](api-expansion-upstream-parity.md).
+> [`api-expansion-upstream-parity.md`](../api-expansion-upstream-parity.md).
 > Keep this file as historical context only.
 
 ## What's Missing

@@ -14,11 +14,11 @@ touching codec internals.
 
 | # | Phase | Plan File | Status |
 |---|-------|-----------|--------|
-| 1 | [Test Suite Expansion](#phase-1) | [phase1-test-expansion.md](phase1-test-expansion.md) | Complete (62 tests) |
-| 2 | [CELT Safety](#phase-2) | [phase2-celt-safety.md](phase2-celt-safety.md) | ~Complete (0 unsafe fn, 2 residual unsafe blocks in mdct.rs) |
-| 3 | [SILK Safety](#phase-3) | [phase3-silk-safety.md](phase3-silk-safety.md) | Complete (0 unsafe fn, 0 unsafe blocks) |
-| 4 | [Integration Layer Safety](#phase-4) | [phase4-integration-safety.md](phase4-integration-safety.md) | In progress (~60% done) |
-| 5 | [Performance Parity](#phase-5) | [phase5-performance.md](phase5-performance.md) | In progress (SIMD ported, benchmarks not started) |
+| 1 | [Test Suite Expansion](#phase-1) | [done/phase1-test-expansion.md](done/phase1-test-expansion.md) | Complete (62 tests) |
+| 2 | [CELT Safety](#phase-2) | [done/phase2-celt-safety.md](done/phase2-celt-safety.md) | Complete (with `mdct.rs` unsafe policy follow-up tracked separately) |
+| 3 | [SILK Safety](#phase-3) | [done/phase3-silk-safety.md](done/phase3-silk-safety.md) | Complete (0 unsafe fn, 0 unsafe blocks) |
+| 4 | [Integration Layer Safety](#phase-4) | [phase4-integration-safety.md](phase4-integration-safety.md) | Mostly complete; remaining ergonomic/wrapper scope pending decision |
+| 5 | [Performance Parity](#phase-5) | [phase5-performance.md](phase5-performance.md) | In progress (bench infra exists; decode/perf closure remains) |
 
 ---
 
@@ -46,7 +46,7 @@ named constants instead of magic numbers.
 - `test_opus_projection` explicitly deferred (multistream not ported)
 - `opus_decode_fuzzer` ported as a cargo-fuzz target
 
-See [phase1-test-expansion.md](phase1-test-expansion.md) for details.
+See [done/phase1-test-expansion.md](done/phase1-test-expansion.md) for details.
 
 ---
 
@@ -62,7 +62,7 @@ math primitives → entropy coding → mid-level DSP → bands → encoder/decod
 - `celt_encoder.rs` (3523 lines, 20 unsafe fn) is the integration point
 - Heavy pointer arithmetic in pitch analysis and FFT
 
-See [phase2-celt-safety.md](phase2-celt-safety.md) for details.
+See [done/phase2-celt-safety.md](done/phase2-celt-safety.md) for details.
 
 ---
 
@@ -79,7 +79,7 @@ have independent dependency trees. Many SILK leaf modules are already safe on
 - `enc_API.rs` (877 lines) — SILK encoder hub
 - `float/encode_frame_FLP.rs` (571 lines) — float encoding integration
 
-See [phase3-silk-safety.md](phase3-silk-safety.md) for details.
+See [done/phase3-silk-safety.md](done/phase3-silk-safety.md) for details.
 
 ---
 
@@ -155,32 +155,37 @@ issues.
 
 ## Progress Tracking
 
-Each phase plan file contains a checklist. Mark items `[x]` as they are
-completed. Update the status column in the table above when a phase
-transitions between Not started / In progress / Complete.
+Current execution source of truth:
+
+- [Active Workstreams](active-workstreams.md)
+
+Legacy phase files remain useful context, but they contain historical checklists
+that are not always synchronized with current implementation state.
 
 ## Supplemental Plans
 
-- [Parity Diff Review](diff_review.md) — current open parity findings and
-  grouped priorities.
-- [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — maps
-  `diff_review.md` findings to targeted red→green parity tests and CI gates.
-- [SIMD Dispatch Alignment Diff](simd_diff.md) — detailed upstream-vs-Rust
-  SIMD/RTCD/build-detection diff log with completed D1–D9 fixes and commit
-  trace.
-- [API Expansion: Upstream Parity](api-expansion-upstream-parity.md) — milestone
-  plan for multistream/projection API coverage plus tooling/examples parity.
-- [Fix Plan G1: QEXT Correctness](fix-g1-qext-correctness.md) — closes QEXT
-  bitstream/PLC/sizing blockers.
-- [Fix Plan G2: Extensions/Repacketizer](fix-g2-extensions-repacketizer.md) —
-  extension parse/generate/repacketizer parity.
-- [Fix Plan G3: Public API Parity](fix-g3-public-api-parity.md) — missing
-  public APIs/constants and multistream/projection surface.
-- [Fix Plan G4: DNN/DRED/OSCE](fix-g4-dnn-dred-osce.md) — model path,
-  signature, and behavior parity for DNN features.
-- [Fix Plan G5: SIMD/Dispatch/Build](fix-g5-simd-dispatch-build.md) —
-  remaining SIMD semantic and build-flag parity.
-- [Fix Plan G6: Docs/Version Metadata](fix-g6-docs-version-metadata.md) —
-  documentation and metadata drift cleanup.
-- [Fix Plan G7: Runtime Semantics](fix-g7-runtime-semantics.md) — assert-vs-
-  status behavior parity and error-contract alignment.
+Active:
+- [Active Workstreams](active-workstreams.md) — consolidated current outstanding
+  items and priorities.
+- [API Expansion: Upstream Parity](api-expansion-upstream-parity.md) — open
+  multistream/projection/tooling milestones.
+- [Performance Parity](phase5-performance.md) — performance-stage checklist.
+- [Performance Status](perf-status.md) — latest benchmark measurements.
+- [Remove All Unsafe](remove-all-unsafe.md) — remaining unsafe-policy and
+  cleanup work.
+
+Completed parity tracking:
+- [Parity Diff Review](done/diff_review.md) — grouped parity findings snapshot.
+- [Parity Test Expansion (Fail-First)](parity-test-fail-first.md) — fail-first
+  parity test strategy and baseline history.
+- [SIMD Dispatch Alignment Diff](done/simd_diff.md) — D1-D9 dispatch alignment log.
+- [Fix Plan G1: QEXT Correctness](done/fix-g1-qext-correctness.md)
+- [Fix Plan G2: Extensions/Repacketizer](done/fix-g2-extensions-repacketizer.md)
+- [Fix Plan G3: Public API Parity](done/fix-g3-public-api-parity.md)
+- [Fix Plan G4: DNN/DRED/OSCE](done/fix-g4-dnn-dred-osce.md)
+- [Fix Plan G5: SIMD/Dispatch/Build](done/fix-g5-simd-dispatch-build.md)
+- [Fix Plan G6: Docs/Version Metadata](done/fix-g6-docs-version-metadata.md)
+- [Fix Plan G7: Runtime Semantics](done/fix-g7-runtime-semantics.md)
+
+Archived historical plans:
+- [archive/](archive/) — superseded or one-off status documents.

@@ -391,7 +391,7 @@ pub fn version() -> &'static str;
 
 ---
 
-## Current State (updated 2026-02-13)
+## Current State (updated 2026-02-27)
 
 | File | unsafe fn | unsafe {} | Key issues |
 |------|-----------|-----------|------------|
@@ -407,6 +407,12 @@ pub fn version() -> &'static str;
 | `varargs.rs` | — | — | **Deleted** ✓ |
 
 **Total remaining in src/src/**: 0 unsafe fn + 0 unsafe blocks = 0 ✓
+
+Status note:
+- Functional parity work is complete; remaining unchecked items in this file are
+  mostly ergonomic/public-surface wishlist tasks.
+- C symbol-level parity shims are intentionally out of scope unless explicitly
+  re-scoped in `active-workstreams.md`.
 
 ---
 
