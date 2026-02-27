@@ -2,6 +2,11 @@
 
 Last updated: 2026-02-27
 
+## Progress
+
+- Completed: `S1`, `S2`, `S3`, `S4`
+- Remaining: `S5`, `S6`, `S7`
+
 ## Goal
 
 Reach functional test parity with upstream `../libopus/opus/tests` (plus relevant
@@ -168,4 +173,3 @@ Commit:
 - `cargo nextest run -p opurs --cargo-profile=release`
 - `cargo nextest run --features tools --cargo-profile=release`
 - `cargo nextest run --features tools-dnn --cargo-profile=release`
-
