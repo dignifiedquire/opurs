@@ -814,6 +814,26 @@ fn load_multistream_vectors(_vector_dir: &Path) -> Vec<TestVector> {
             seed_sweep: false,
         },
         Def {
+            name: "ms_4ch_2s2c_surround",
+            application: Application::Audio,
+            sample_rate: SampleRate::R48000,
+            channels: 4,
+            streams: 2,
+            coupled_streams: 2,
+            mapping: &[0, 1, 2, 3],
+            bitrate: 96_000,
+            frame_size: FrameSize::Ms20,
+            packet_count: 8,
+            options: EncoderOptions {
+                framesize: FrameSize::Ms20,
+                max_payload: 4000,
+                ..EncoderOptions::default()
+            },
+            seed: 23,
+            full_only: false,
+            seed_sweep: false,
+        },
+        Def {
             name: "ms_5ch_3s2c_cvbr_dtx",
             application: Application::Audio,
             sample_rate: SampleRate::R48000,
