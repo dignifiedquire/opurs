@@ -28,7 +28,8 @@ use crate::silk::VAD::silk_VAD_GetSA_Q8;
 pub fn silk_encode_do_VAD_FLP(psEnc: &mut silk_encoder_state_FLP, activity: i32) {
     let activity_threshold: i32 =
         ((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32;
-    let vad_input: Vec<i16> = psEnc.sCmn.inputBuf[1..].to_vec();
+    let mut vad_input = [0i16; 321];
+    vad_input.copy_from_slice(&psEnc.sCmn.inputBuf[1..]);
     silk_VAD_GetSA_Q8(&mut psEnc.sCmn, &vad_input);
     if activity == VAD_NO_ACTIVITY && psEnc.sCmn.speech_activity_Q8 >= activity_threshold {
         psEnc.sCmn.speech_activity_Q8 = activity_threshold - 1;

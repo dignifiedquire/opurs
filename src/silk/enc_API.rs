@@ -265,7 +265,10 @@ pub fn silk_Encode(
     let nSamplesToBufferMax = 10 * nBlocksOf10ms * psEnc.state_Fxx[0].sCmn.fs_kHz;
     let nSamplesFromInputMax = nSamplesToBufferMax * psEnc.state_Fxx[0].sCmn.API_fs_Hz
         / (psEnc.state_Fxx[0].sCmn.fs_kHz * 1000);
-    let mut buf: Vec<i16> = vec![0; nSamplesFromInputMax as usize];
+    // nSamplesFromInputMax max: 10 * 6 * 16 * 48000 / (16 * 1000) = 2880
+    const MAX_BUF: usize = 2880;
+    debug_assert!((nSamplesFromInputMax as usize) <= MAX_BUF);
+    let mut buf = [0i16; MAX_BUF];
     loop {
         let mut curr_nBitsUsedLBRR: i32 = 0;
         nSamplesToBuffer =
