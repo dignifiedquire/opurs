@@ -1548,29 +1548,55 @@ fn build_classic_standard_kinds(
     kinds
 }
 
-fn build_dnn_kinds(ignore_extensions: bool) -> Vec<TestKind> {
+fn build_dnn_kinds(ignore_extensions: bool, matrix: MatrixMode) -> Vec<TestKind> {
     let mut kinds = Vec::new();
 
-    kinds.extend(
-        iproduct!([32_000u32, 64_000, 128_000].iter(), [5i32, 10].iter()).map(
-            |(&bitrate, &dred_duration)| TestKind::ParityEncodeDred {
-                bitrate,
-                dred_duration,
-            },
-        ),
-    );
+    let dred_bitrates: &[u32] = match matrix {
+        MatrixMode::Quick => &[32_000, 64_000, 128_000],
+        MatrixMode::Full => &[24_000, 32_000, 48_000, 64_000, 96_000, 128_000],
+    };
+    let dred_durations: &[i32] = match matrix {
+        MatrixMode::Quick => &[5, 10],
+        MatrixMode::Full => &[2, 5, 10, 20],
+    };
+    kinds.extend(iproduct!(dred_bitrates.iter(), dred_durations.iter()).map(
+        |(&bitrate, &dred_duration)| TestKind::ParityEncodeDred {
+            bitrate,
+            dred_duration,
+        },
+    ));
 
+    let dnn_sample_rates: &[SampleRate] = match matrix {
+        MatrixMode::Quick => &[SampleRate::R48000, SampleRate::R16000],
+        MatrixMode::Full => &[
+            SampleRate::R48000,
+            SampleRate::R24000,
+            SampleRate::R16000,
+            SampleRate::R12000,
+            SampleRate::R8000,
+        ],
+    };
+    let dnn_complexities: &[Complexity] = match matrix {
+        MatrixMode::Quick => &[
+            Complexity::C5,
+            Complexity::C6,
+            Complexity::C7,
+            Complexity::C10,
+        ],
+        MatrixMode::Full => &[
+            Complexity::C5,
+            Complexity::C6,
+            Complexity::C7,
+            Complexity::C8,
+            Complexity::C9,
+            Complexity::C10,
+        ],
+    };
     kinds.extend(
         iproduct!(
-            [SampleRate::R48000, SampleRate::R16000].iter(),
+            dnn_sample_rates.iter(),
             [Channels::Mono, Channels::Stereo].iter(),
-            [
-                Complexity::C5,
-                Complexity::C6,
-                Complexity::C7,
-                Complexity::C10
-            ]
-            .iter()
+            dnn_complexities.iter()
         )
         .map(
             |(&sample_rate, &channels, &complexity)| TestKind::ParityDecodeDnn {
@@ -2881,7 +2907,7 @@ fn main() {
     let run_standard = !args.dnn_only;
     let classic_standard_kinds =
         build_classic_standard_kinds(args.mode, args.matrix, args.ignore_extensions);
-    let dnn_kinds = build_dnn_kinds(args.ignore_extensions);
+    let dnn_kinds = build_dnn_kinds(args.ignore_extensions, args.matrix);
 
     let mut tests = Vec::<(&TestVector, TestKind)>::new();
 

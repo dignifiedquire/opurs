@@ -615,8 +615,8 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
-      - name: Run DNN vector tests (72 DRED encode + 192 DNN decode)
-        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- --dnn-only opus_newvectors
+      - name: Run DNN vector tests (full matrix)
+        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- --dnn-only --matrix full opus_newvectors
 
   test-no-simd:
     name: Test no-simd (linux-x86_64)
