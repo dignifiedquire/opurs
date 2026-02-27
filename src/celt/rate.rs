@@ -665,7 +665,10 @@ pub fn clt_compute_extra_allocation(
         tot_samples = ((m.eBands[end as usize] as i32 - m.eBands[start as usize] as i32) * C) << LM;
     }
 
-    let mut cap = vec![0i32; tot_bands as usize];
+    // Max bands: 21 standard + 14 QEXT = 35; use stack buffers.
+    const MAX_BANDS: usize = 40;
+    debug_assert!((tot_bands as usize) <= MAX_BANDS);
+    let mut cap = [0i32; MAX_BANDS];
     for i in start..end {
         cap[i as usize] = 12;
     }
@@ -683,13 +686,13 @@ pub fn clt_compute_extra_allocation(
         return;
     }
 
-    let mut depth = vec![0i32; tot_bands as usize];
+    let mut depth = [0i32; MAX_BANDS];
 
     if encode != 0 {
         let bandLogE = bandLogE.unwrap();
-        let mut flatE = vec![0.0f32; tot_bands as usize];
-        let mut min_arr = vec![0.0f32; tot_bands as usize];
-        let mut Ncoef = vec![0i32; tot_bands as usize];
+        let mut flatE = [0.0f32; MAX_BANDS];
+        let mut min_arr = [0.0f32; MAX_BANDS];
+        let mut Ncoef = [0i32; MAX_BANDS];
 
         for i in start..end {
             let iu = i as usize;
@@ -756,7 +759,7 @@ pub fn clt_compute_extra_allocation(
         }
 
         // Median filter to smooth spectrum
-        let mut follower = vec![0.0f32; tot_bands as usize];
+        let mut follower = [0.0f32; MAX_BANDS];
         for i in (start + 2)..(tot_bands - 2) {
             follower[i as usize] = median_of_5_val16(&flatE[(i - 2) as usize..]);
         }

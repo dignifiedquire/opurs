@@ -298,7 +298,7 @@ pub unsafe fn dual_inner_prod_sse(x: &[f32], y01: &[f32], y02: &[f32], n: usize)
 #[target_feature(enable = "sse2")]
 pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32) -> f32 {
     let n = N as usize;
-    // Pad to N+3 for safe SIMD overread + sentinel values
+    // Pad to N+3 for safe SIMD overread + sentinel values.
     let mut X = vec![0.0f32; n + 3];
     let mut y = vec![0.0f32; n + 3];
     let mut signy = vec![0.0f32; n + 3];

@@ -272,8 +272,11 @@ pub fn quant_coarse_energy(
         max_decay = 3.0f32;
     }
     let enc_start_state = enc.save();
-    let mut oldEBands_intra: Vec<f32> = vec![0.0; band_size];
-    let mut error_intra: Vec<f32> = vec![0.0; band_size];
+    // band_size = C * nbEBands; max is 2 * 21 = 42; use stack buffers.
+    const MAX_BAND_SIZE: usize = 48;
+    debug_assert!(band_size <= MAX_BAND_SIZE);
+    let mut oldEBands_intra = [0.0f32; MAX_BAND_SIZE];
+    let mut error_intra = [0.0f32; MAX_BAND_SIZE];
     oldEBands_intra[..band_size].copy_from_slice(&oldEBands[..band_size]);
 
     if two_pass != 0 || intra != 0 {
@@ -305,7 +308,10 @@ pub fn quant_coarse_energy(
         } else {
             nintra_bytes - nstart_bytes
         };
-        let mut intra_bits: Vec<u8> = vec![0; save_bytes];
+        // save_bytes bounded by Opus max packet size (~1275 bytes).
+        const MAX_SAVE: usize = 1280;
+        debug_assert!(save_bytes <= MAX_SAVE);
+        let mut intra_bits = [0u8; MAX_SAVE];
         intra_bits[..nintra_bytes - nstart_bytes]
             .copy_from_slice(&enc.buf[nstart_bytes..nintra_bytes]);
 

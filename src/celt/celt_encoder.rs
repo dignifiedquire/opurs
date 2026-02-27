@@ -1552,7 +1552,8 @@ fn dynalloc_analysis(
         spread_weight[i as usize] = 32 >> shift;
         i += 1;
     }
-    let mut bandLogE3: Vec<opus_val16> = vec![0.0; nbEBands as usize];
+    // nbEBands max is 21; use stack buffer.
+    let mut bandLogE3 = [0.0 as opus_val16; 24];
     if effectiveBytes >= (30 + 5 * LM) && lfe == 0 {
         let mut last: i32 = 0;
         c = 0;
@@ -1892,7 +1893,10 @@ fn tone_detect(
     let n = N as usize;
     let mut delay: usize = 1;
     let mut lpc = [0.0f32; 2];
-    let mut x: Vec<opus_val16> = vec![0.0; n];
+    // N + overlap max: 1920 + 240 = 2160 (QEXT 96kHz); use stack buffer.
+    const MAX_TONE: usize = 2400;
+    debug_assert!(n <= MAX_TONE);
+    let mut x = [0.0 as opus_val16; MAX_TONE];
     // In float build, SHR32/PSHR32/ADD32 are identity ops, so the
     // downscaling is just averaging channels for stereo.
     if CC == 2 {

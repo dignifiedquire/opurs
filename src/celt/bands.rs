@@ -2460,8 +2460,11 @@ pub fn quant_all_bands<'a>(
                     let nstart_bytes = ec_save.offs as usize;
                     let nend_bytes = ec.storage as usize;
                     let save_bytes = nend_bytes - nstart_bytes;
-                    let mut bytes_save = vec![0u8; save_bytes];
-                    bytes_save.copy_from_slice(&ec.buf[nstart_bytes..nend_bytes]);
+                    // save_bytes bounded by ec.storage (max Opus packet ~1275 bytes).
+                    const MAX_SAVE: usize = 1280;
+                    debug_assert!(save_bytes <= MAX_SAVE);
+                    let mut bytes_save = [0u8; MAX_SAVE];
+                    bytes_save[..save_bytes].copy_from_slice(&ec.buf[nstart_bytes..nend_bytes]);
                     // Restore state for round +1
                     ec.restore(ec_save);
                     ctx = ctx_save;
@@ -2536,7 +2539,7 @@ pub fn quant_all_bands<'a>(
                             _norm[norm_band_out_off..norm_band_out_off + n]
                                 .copy_from_slice(&_norm_save2[..n]);
                         }
-                        ec.buf[nstart_bytes..nend_bytes].copy_from_slice(&bytes_save);
+                        ec.buf[nstart_bytes..nend_bytes].copy_from_slice(&bytes_save[..save_bytes]);
                     }
                 } else {
                     ctx.theta_round = 0;

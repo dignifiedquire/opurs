@@ -1197,6 +1197,7 @@ pub fn frame_size_select(
 }
 
 /// Upstream C: src/opus_encoder.c:compute_stereo_width
+#[inline(never)]
 pub fn compute_stereo_width(
     pcm: &[opus_val16],
     frame_size: i32,
@@ -1294,6 +1295,7 @@ pub fn compute_stereo_width(
     }
 }
 /// Upstream C: src/opus_encoder.c:decide_fec
+#[inline(never)]
 fn decide_fec(
     useInBandFEC: i32,
     PacketLoss_perc: i32,
@@ -1402,6 +1404,7 @@ fn compute_silk_rate_for_hybrid(
     silk_rate
 }
 /// Upstream C: src/opus_encoder.c:compute_equiv_rate
+#[inline(never)]
 fn compute_equiv_rate(
     bitrate: i32,
     channels: i32,
@@ -1445,6 +1448,7 @@ pub fn is_digital_silence(
     (sample_max <= 1 as opus_val16 / ((1) << lsb_depth) as f32) as i32
 }
 /// Upstream C: src/opus_encoder.c:compute_frame_energy
+#[inline(never)]
 fn compute_frame_energy(
     pcm: &[opus_val16],
     frame_size: i32,
@@ -1472,7 +1476,8 @@ fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_
     }
     0
 }
-/// Upstream C: src/opus_encoder.c:opus_encode_native
+/// Upstream C: src/opus_encoder.c:encode_multiframe_packet
+#[inline(never)]
 fn encode_multiframe_packet(
     st: &mut OpusEncoder,
     pcm: &[opus_val16],
@@ -2287,13 +2292,9 @@ pub fn opus_encode_native(
         && is_silence == 0
     {
         let pcm_slice = &pcm[..(frame_size * st.channels) as usize];
-        st.peak_signal_energy = if 0.999f32 * st.peak_signal_energy
-            > compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-        {
-            0.999f32 * st.peak_signal_energy
-        } else {
-            compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch)
-        };
+        let energy = compute_frame_energy(pcm_slice, frame_size, st.channels, st.arch);
+        let decayed = 0.999f32 * st.peak_signal_energy;
+        st.peak_signal_energy = if decayed > energy { decayed } else { energy };
     }
     if !multiframe_fixed && st.channels == 2 && st.force_channels != 1 {
         stereo_width = compute_stereo_width(
