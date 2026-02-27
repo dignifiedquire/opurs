@@ -489,8 +489,12 @@ impl OpusMSEncoder {
         stream_offset = stream_offset.clamp(0, 20_000);
 
         let total = (uncoupled << 8) + 512 * coupled;
+        // Keep C-style two's-complement overflow behavior explicit so debug/release match.
         let channel_rate = if total > 0 {
-            (256 * (bitrate - stream_offset * streams - channel_offset * normal_channels)) / total
+            let inner = bitrate
+                .wrapping_sub(stream_offset.wrapping_mul(streams))
+                .wrapping_sub(channel_offset.wrapping_mul(normal_channels));
+            (256i32).wrapping_mul(inner) / total
         } else {
             0
         };
@@ -498,7 +502,7 @@ impl OpusMSEncoder {
         let mut rates = Vec::with_capacity(streams as usize);
         for stream_id in 0..streams {
             let rate = if stream_id < coupled {
-                2 * channel_offset + (stream_offset + ((channel_rate * 512) >> 8)).max(0)
+                2 * channel_offset + (stream_offset + (channel_rate.wrapping_mul(512) >> 8)).max(0)
             } else {
                 channel_offset + (stream_offset + channel_rate).max(0)
             };

@@ -28,15 +28,13 @@ Primary target headers:
   - New psychoacoustic tuning/performance optimization passes
   - API redesign unrelated to upstream parity
 
-## Current Status Snapshot (2026-02-21)
+## Current Status Snapshot (2026-02-27)
 
 - Vector parity baseline:
   - classic vectors: `228/228` passing
   - classic full matrix parity: `1416/1416` passing
   - DNN-only vectors: `264/264` passing
 - Current implementation focus:
-  - `M1.2` multistream lifecycle/encode/decode wrappers in progress
-  - `M1.4` multistream parity-test expansion in progress
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.3` projection benchmark suite added (`projection_encode_cmp`, `projection_decode_cmp`, `projection_matrix_apply`) with `tools` bench target
   - `M4.4` benchmark smoke lane with artifact upload added to CI
@@ -55,8 +53,8 @@ Primary target headers:
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
   - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`14/14`, including `--strict-bitexact`)
   - `M2.5` CI now gates multistream/projection full-matrix strict-bitexact parity in `test-tools-smoke`, and runs strict full-matrix multistream/projection vector parity on major-platform vector jobs
-  - `M2.5` `test-tools-smoke` now includes an optional manifest-backed projection strict-bitexact lane (auto-enabled when `${OPUS_PROJECTION_VECTORS_DIR}/projection_vectors.csv` is present from cache/download)
-  - `M2.5` major-platform `test-vectors` jobs now include an optional manifest-backed projection strict-bitexact lane (auto-enabled when `${OPUS_PROJECTION_VECTORS_DIR}/projection_vectors.csv` is present from cache/download)
+  - `M2.5` `test-tools-smoke` runs projection strict full-matrix bitexact parity against the official `opus_newvectors` corpus
+  - `M2.5` major-platform `test-vectors` jobs run projection strict full-matrix bitexact parity against the official `opus_newvectors` corpus
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing
@@ -75,22 +73,29 @@ Primary target headers:
   - `M3.3` projection encoder now exports a child-state helper wrapper (`opus_projection_encoder_get_encoder_state`) mirroring decoder-side state access
   - `M3.3` projection API parity tests now have a dedicated CI lane on major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`)
   - `M3.3` projection encoder error-path parity now covers invalid frame-size and tiny-buffer return codes across i16/f32/i24 encode entrypoints
-- Next ordered slices:
-  1. Validate and wire real upstream projection assets into `projection_vectors.csv` once those assets are published.
-  2. Validate runtime/cache-hit behavior with real projection assets, then decide when to make manifest-backed projection parity required on major platforms.
-  3. Fold projection vector parity lanes into additional CI targets once runtime budget is validated.
+
+## Milestone Closure Audit (2026-02-27)
+
+| Milestone | Status | Disposition | Evidence |
+|---|---|---|---|
+| `M1.2` multistream lifecycle + encode/decode parity | Implemented | `done` | `src/opus/opus_multistream_encoder.rs`, `src/opus/opus_multistream_decoder.rs`, `tests/opus_multistream_api.rs` |
+| `M1.4` multistream fail-first tests | Implemented | `done` | `tests/opus_multistream_api.rs`, `tests/opus_multistream_packet.rs`, `.github/workflows/ci.yml` (`test-tools-smoke`) |
+| `M1.5` multistream API surface completion | Implemented | `done` | `src/lib.rs` multistream exports + `tests/opus_multistream_api.rs` CTL/state/encode/decode parity coverage |
+| `M3` projection/ambisonics parity | Implemented | `done` | `src/opus/opus_projection_*.rs`, `src/opus/mapping_matrix.rs`, `tests/opus_projection_*_api.rs`, `.github/workflows/ci.yml` (`test-projection-parity`) |
+| `M4` benchmark expansion and baselines | Implemented | `done` | `benches/multistream.rs`, `benches/projection.rs`, `.github/workflows/ci.yml` (`bench-smoke` + summaries/artifacts) |
+| Projection strict parity policy | Decided and enforced | `done` | `.github/workflows/ci.yml` gates projection strict full-matrix bitexact parity on `opus_newvectors` (tools-smoke + major-platform vector jobs), without external projection asset URL requirements |
 
 ## Milestone Checklist
 
 - [x] Baseline vector parity stabilized before API expansion work
 - [x] M1.1 Public API types and module wiring
-- [ ] M1.2 Encoder/decoder lifecycle + encode/decode parity
+- [x] M1.2 Encoder/decoder lifecycle + encode/decode parity
 - [x] M1.3 Multistream packet helpers
-- [ ] M1.4 Tests (fail-first then green)
-- [ ] M1.5 Multistream API surface completion checklist
+- [x] M1.4 Tests (fail-first then green)
+- [x] M1.5 Multistream API surface completion checklist
 - [x] M2 Tooling and examples parity
-- [ ] M3 Projection / ambisonics parity
-- [ ] M4 Benchmark expansion and baselines
+- [x] M3 Projection / ambisonics parity
+- [x] M4 Benchmark expansion and baselines
 
 ## Milestones
 

@@ -12,9 +12,9 @@ This is the single active plan. It replaces multi-file active planning.
 | `parity-test-fail-first.md` | Green baseline | No new workstream | Keep as historical red/green methodology and baseline context. |
 | `missing-impl-test-coverage.md` | Covered/green | No new workstream | Items M01-M09 are covered; keep CI checks in place. |
 | `phase5-performance.md` + `perf-status.md` | Open | Yes | Decode-side perf gap remains vs C target. |
-| `api-expansion-upstream-parity.md` | Mixed (many done, milestone boxes stale) | Yes (closure audit) | Need checklist reconciliation and explicit closure of any real gaps (especially projection asset policy). |
+| `api-expansion-upstream-parity.md` | Mixed (many done, milestone boxes stale) | Yes (closure audit) | Need checklist reconciliation and explicit closure of any real gaps (projection policy now URL-independent). |
 | `phase4-integration-safety.md` + `remove-all-unsafe.md` | Mostly done | Yes (policy closure only) | Must finalize unsafe policy and mdct unsafe-block rationale. |
-| `upgrade-1.6.1.md` | Historical migration plan | No (unless new upstream delta appears) | Not an active blocker for current parity/perf closure. |
+| `done/upgrade-1.6.1.md` | Historical migration plan | No (unless new upstream delta appears) | Not an active blocker for current parity/perf closure. |
 
 ## Scope Exclusions (explicit)
 
@@ -37,14 +37,15 @@ Owner objective: close meaningful decode-side gap while preserving vector bit-ex
 
 Owner objective: prove remaining unchecked milestone items are either complete or truly missing.
 
-- [ ] R2.1 Audit `api-expansion-upstream-parity.md` checklist (`M1.2`, `M1.4`, `M1.5`, `M3`, `M4`) against code/tests/CI.
-- [ ] R2.2 For each unchecked item, classify as one of:
+- [x] R2.1 Audit `api-expansion-upstream-parity.md` checklist (`M1.2`, `M1.4`, `M1.5`, `M3`, `M4`) against code/tests/CI.
+- [x] R2.2 For each unchecked item, classify as one of:
   - implemented (checkbox stale),
   - missing and required,
   - deferred by policy (document rationale).
-- [ ] R2.3 Resolve any truly missing required item(s).
-- [ ] R2.4 Finalize projection asset-backed parity policy (optional vs required CI lane) and document decision.
-- [ ] R2.5 Mark milestone status accurately; move `api-expansion-upstream-parity.md` to `done/` once closed.
+- [x] R2.3 Resolve any truly missing required item(s).
+- [x] R2.4 Finalize projection strict parity policy (major-platform CI lanes, URL-independent) and document decision.
+- [x] R2.5 Mark milestone status accurately.
+- [ ] R2.6 Move `api-expansion-upstream-parity.md` to `done/` once final milestone reconciliation is confirmed in CI.
 
 ## Workstream R3: Unsafe Policy Closure (Required)
 
