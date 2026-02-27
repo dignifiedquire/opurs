@@ -4,8 +4,8 @@ Last updated: 2026-02-27
 
 ## Progress
 
-- Completed: `S1`, `S2`, `S3`, `S4`
-- Remaining: `S5`, `S6`, `S7`
+- Completed: `S1`, `S2`, `S3`, `S4`, `S5`
+- Remaining: `S6`, `S7`
 
 ## Goal
 
