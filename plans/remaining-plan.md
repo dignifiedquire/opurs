@@ -12,7 +12,7 @@ This is the single active plan. It replaces multi-file active planning.
 | `parity-test-fail-first.md` | Green baseline | No new workstream | Keep as historical red/green methodology and baseline context. |
 | `missing-impl-test-coverage.md` | Covered/green | No new workstream | Items M01-M09 are covered; keep CI checks in place. |
 | `phase5-performance.md` + `perf-status.md` | Open | Yes | Decode-side perf gap remains vs C target. |
-| `api-expansion-upstream-parity.md` | Mixed (many done, milestone boxes stale) | Yes (closure audit) | Need checklist reconciliation and explicit closure of any real gaps (projection policy now URL-independent). |
+| `api-expansion-upstream-parity.md` | Mostly reconciled | Yes (final closure move) | Snapshot/checklist now refreshed; final step is moving it to `done/` once closure is reconfirmed in CI. |
 | `phase4-integration-safety.md` + `remove-all-unsafe.md` | Mostly done | Yes (policy closure only) | Must finalize unsafe policy and mdct unsafe-block rationale. |
 | `done/upgrade-1.6.1.md` | Historical migration plan | No (unless new upstream delta appears) | Not an active blocker for current parity/perf closure. |
 
@@ -64,7 +64,7 @@ Owner objective: close remaining policy ambiguity around unsafe usage.
 - [ ] `cargo nextest run -p opurs --cargo-profile=release`
 - [ ] `cargo nextest run --features tools-dnn --cargo-profile=release`
 - [ ] `cargo run --release --features tools --example run_vectors2 -- opus_newvectors`
-- [ ] `cargo run --release --features tools-dnn --example run_vectors2 -- --dnn-only opus_newvectors`
+- [ ] `cargo run --release --features tools-dnn --example run_vectors2 -- --dnn-only --matrix full opus_newvectors`
 
 ## Exit Criteria
 

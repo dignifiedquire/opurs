@@ -176,7 +176,7 @@ Supporting references for the active plan:
 - [Remove All Unsafe](remove-all-unsafe.md)
 - [Missing Impl + Test Coverage Matrix](missing-impl-test-coverage.md)
 - [Parity Test Expansion (Fail-First)](parity-test-fail-first.md)
-- [Upgrade 1.6.1 Migration Plan](upgrade-1.6.1.md)
+- [Upgrade 1.6.1 Migration Plan](done/upgrade-1.6.1.md)
 
 Completed parity tracking:
 - [Parity Diff Review](done/diff_review.md) — grouped parity findings snapshot.

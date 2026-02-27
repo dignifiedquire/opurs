@@ -33,7 +33,7 @@ Primary target headers:
 - Vector parity baseline:
   - classic vectors: `228/228` passing
   - classic full matrix parity: `1416/1416` passing
-  - DNN-only vectors: `264/264` passing
+  - DNN-only vectors (full matrix): `1008/1008` passing
 - Current implementation focus:
   - `M4.1` multistream benchmark matrix completed and documented (`1/2/6ch`, `10/20ms`, low/med/high bitrate)
   - `M4.3` projection benchmark suite added (`projection_encode_cmp`, `projection_decode_cmp`, `projection_matrix_apply`) with `tools` bench target
@@ -45,20 +45,21 @@ Primary target headers:
   - `M2.4` multistream mapping parser is now shared in `tools::demo` and covered by deterministic integration tests
   - `M2.4` tooling multistream integration test suite now has a dedicated CI smoke lane (`test-tools-smoke`)
   - `M2` tooling/examples parity milestone is now green for the planned multistream scope
-  - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable and adds deterministic full-matrix seed-sweep variants (`30/30` full parity green locally)
+  - `M2.5` `run_vectors2` multistream suite now keeps baseline seeds stable, includes canonical layout coverage (including `4ch 2s2c surround`), and adds deterministic full-matrix seed-sweep variants (`32/32` full parity green locally)
   - `M2.5` multistream parity reporting now emits bitstream mismatch diagnostics (mismatched-byte count + first mismatch byte) for faster root-cause analysis of non-bitexact outputs
   - `M2.5` `run_vectors2` projection suite now supports asset-backed loading via `projection_vectors.csv` (auto-discovered when present) with synthetic fallback vectors
-  - `M2.5` projection synthetic vector matrix now covers broader channel/frame-size/sample-rate combinations (`4/9/11/16/25/36ch`, `10/20/40ms`, `48k/24k`) with tuned full-matrix seed sweeps (`17/42`)
+  - `M2.5` projection synthetic vector matrix now covers full valid ambisonics channel orders (`4/6/9/11/16/18/25/27/36/38ch`) with broader frame-size/sample-rate combinations (`10/20/40ms`, `48k/24k`) and tuned full-matrix seed sweeps
   - `M2.5` projection parity reporting now emits bitstream mismatch diagnostics (mismatch packet count + first mismatch packet/byte) to make remaining non-bitexact deltas actionable
   - `M2.5` `run_vectors2` now supports `--strict-bitexact` to turn non-bitexact multistream/projection parity deltas into hard test failures for fail-first gating
-  - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`14/14`, including `--strict-bitexact`)
+  - `M3.3` projection synthetic full-matrix parity is now bitexact against upstream (`25/25`, including `--strict-bitexact`)
   - `M2.5` CI now gates multistream/projection full-matrix strict-bitexact parity in `test-tools-smoke`, and runs strict full-matrix multistream/projection vector parity on major-platform vector jobs
   - `M2.5` `test-tools-smoke` runs projection strict full-matrix bitexact parity against the official `opus_newvectors` corpus
   - `M2.5` major-platform `test-vectors` jobs run projection strict full-matrix bitexact parity against the official `opus_newvectors` corpus
+  - `M2.5` major-platform `test-vectors-dnn` jobs run DNN parity in full matrix mode against the official `opus_newvectors` corpus
   - `M1.5` explicit child-state wrapper entry points added for encoder/decoder stream-state access
   - `M1.5` multistream per-call frame-size validation parity expanded with C-backed matrices across i16/f32/i24 encode/decode entrypoints
   - `M1.2` multistream encoder per-stream payload budgeting now follows upstream-style remaining-byte accounting, and CBR max-payload sizing now applies bitrate-based caps before stream packing
-  - `M1.2` multistream encode now applies upstream-style per-frame stream-rate allocation and upstream-aligned self-delimited repacketization; synthetic multistream full-matrix runs are now bitexact against upstream (`30/30`, including `--strict-bitexact`)
+  - `M1.2` multistream encode now applies upstream-style per-frame stream-rate allocation and upstream-aligned self-delimited repacketization; synthetic multistream full-matrix runs are now bitexact against upstream (`32/32`, including `--strict-bitexact`)
   - `M4.4` Criterion summary script wired into bench-smoke CI step summary and artifacts
   - `M3.1` projection decoder scaffolding added (`OpusProjectionDecoder` wrappers + decode paths for i16/f32/i24)
   - `M3.2` mapping-matrix core added in Rust with upstream `test_simple_matrix` parity checks
