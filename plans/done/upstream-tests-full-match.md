@@ -192,6 +192,18 @@ Status:
   - no C ABI shim re-introduction,
   - no unbounded/non-deterministic fuzz loops in default CI lanes.
 
+### Random/Fuzz Coverage Parity Snapshot
+
+| Upstream source | Upstream random/fuzz path | Rust location | Status |
+|---|---|---|---|
+| `tests/test_opus_decode.c` | `test_decoder_code0` fuzz sections | `tests/opus_decode.rs:test_decoder_fuzz` | Ported |
+| `tests/test_opus_encode.c` | `run_test1` random packet mutation + `fuzz_encoder_settings` | `tests/opus_encode.rs` | Ported |
+| `tests/test_opus_custom.c` | custom API setting mutation/fuzz matrix | `tests/opus_custom_upstream_port.rs` | Ported |
+| `tests/test_opus_extensions.c` | `test_random_extensions_parse` | `tests/extensions_upstream_port.rs:random_extensions_parse` | Ported |
+| `tests/test_opus_dred.c` | `test_random_dred` | `tests/dred_upstream_port.rs:dred_random_parse_process` | Ported |
+| `celt/tests/test_unit_entropy.c` | random stream entropy checks | `tests/celt_entropy.rs:test_entropy_random_streams` | Ported |
+| `tests/opus_decode_fuzzer.c` | libFuzzer decode target | `fuzz/fuzz_targets/decode_fuzzer.rs` | Ported |
+
 ## Validation Gate for This Plan
 
 - `cargo fmt --all --check`

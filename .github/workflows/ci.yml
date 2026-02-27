@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 4 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,6 +19,29 @@ env:
   OPUS_TEST_VECTORS_CACHE_KEY: opus-newvectors-materials98-v1
 
 jobs:
+  fuzz:
+    name: Fuzz (${{ github.event_name == 'schedule' && 'daily-10m' || 'ci-60s' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '600' || '60' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: fuzz-${{ github.event_name }}
+      - uses: taiki-e/install-action@cargo-fuzz
+      - name: Run decode_fuzzer
+        run: |
+          cargo fuzz run decode_fuzzer -- \
+            -max_total_time=${FUZZ_SECONDS} \
+            -max_len=1000000
+      - name: Run extensions_fuzzer
+        run: |
+          cargo fuzz run extensions_fuzzer -- \
+            -max_total_time=${FUZZ_SECONDS}
+
   msrv:
     name: MSRV (1.87.0)
     runs-on: ubuntu-latest

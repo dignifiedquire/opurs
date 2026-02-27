@@ -55,6 +55,7 @@ cargo run --release --features tools --example run_vectors2 -- opus_newvectors -
 CI coverage notes:
 - Major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`) run full-matrix suites for `classic`, `multistream`, `projection`, `qext`, `qext-fuzz`, and `dred-opus`; missing suite assets fail CI.
 - Non-major platforms run quick classic vectors.
+- libFuzzer jobs run `decode_fuzzer` and `extensions_fuzzer` for 60s on push/PR and 600s on daily scheduled CI.
 
 ### Entropy coder debugging
 
