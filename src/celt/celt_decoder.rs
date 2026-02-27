@@ -219,8 +219,8 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
     debug_assert!(st.postfilter_tapset_old >= 0);
 }
 
-/// Initialize a CELT decoder using the standard Opus mode and derive the
-/// downsampling factor from the caller sample rate.
+/// Initialize a CELT decoder in the standard Opus configuration and derive the
+/// output downsampling factor from the caller sample rate.
 ///
 /// Upstream C: celt/celt_decoder.c:celt_decoder_init
 pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCustomDecoder, i32> {
@@ -326,7 +326,7 @@ impl OpusCustomDecoder {
     /// LPC, band energies, etc.) while preserving configuration fields (mode,
     /// channels, overlap, downsample, start, end, signalling, disable_inv, arch).
     ///
-    /// Upstream C: celt/celt_decoder.c:opus_custom_decoder_ctl (OPUS_RESET_STATE)
+    /// Upstream C: celt/celt_decoder.c:opus_custom_decoder_ctl (OPUS_RESET_STATE path)
     pub fn reset(&mut self) {
         self.rng = 0;
         self.error = 0;
@@ -919,8 +919,8 @@ fn celt_synthesis(
             }
         }
     }
-    /* Saturate IMDCT output so that we can't overflow in the pitch postfilter
-    and in deemphasis. */
+    // Saturate IMDCT output so that we can't overflow in the pitch postfilter
+    // and in deemphasis.
     for v in &mut out_syn_ch0[..n] {
         *v = saturate_sig(*v);
     }
@@ -1678,10 +1678,13 @@ pub fn celt_decode_with_ec(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 /// Core entropy decode path shared by packet and external-decoder entry points.
 ///
+/// Extracted from the main upstream decode routine.
+///
 /// Upstream C: celt/celt_decoder.c:celt_decode_with_ec_dred
+#[allow(clippy::too_many_arguments)]
+#[inline]
 fn celt_decode_body(
     st: &mut OpusCustomDecoder,
     pcm: &mut [opus_val16],
