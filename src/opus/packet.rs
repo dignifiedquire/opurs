@@ -5,16 +5,25 @@
 use crate::arch::Arch;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
-/// Applies soft-clipping to bring a float signal within the [-1,1] range. If
-/// the signal is already in that range, nothing is done. If there are values
-/// outside of [-1,1], then the signal is clipped as smoothly as possible to
-/// both fit in the range and avoid creating excessive distortion in the
-/// process.
+/// Applies soft-clipping to bring a float signal within `[-1, 1]`.
+///
+/// Upstream behavior notes (ported from `src/opus.c`):
+/// - Input is first clamped to `[-2, 2]`, the domain supported by the
+///   non-linearity.
+/// - The previous-frame `declip_mem` state is continued first to avoid
+///   derivative discontinuities between frames.
+/// - When clipping is needed, coefficient `a` is chosen so
+///   `maxval + a*maxval^2 = 1`, with a tiny safety boost to keep outputs
+///   within range under aggressive math optimizations.
+/// - A startup ramp is applied in the special no-initial-zero-crossing case to
+///   avoid a boundary discontinuity.
+///
 /// - `pcm`: Input PCM and modified PCM
 /// - `frame_size`: Number of samples per channel to process
 /// - `channels`: Number of channels
 /// - `softclip_mem`: State memory for the soft clipping process (one float per channel, initialized to zero)
-// Upstream C: src/opus.c:opus_pcm_soft_clip_impl
+///
+/// Upstream C: src/opus.c:opus_pcm_soft_clip_impl
 pub(crate) fn opus_pcm_soft_clip_impl(
     pcm: &mut [f32],
     frame_size: usize,
@@ -127,6 +136,11 @@ pub fn opus_pcm_soft_clip(
     opus_pcm_soft_clip_impl(pcm, frame_size, channels, softclip_mem, Arch::default());
 }
 
+/// Encode a frame size in Opus variable-length size format.
+///
+/// Uses the same 1-byte / 2-byte encoding rules as upstream packet parsing.
+///
+/// Upstream C: src/opus.c:encode_size
 pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
     if size < 252 {
         data[0] = size as u8;
@@ -138,6 +152,11 @@ pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
     }
 }
 
+/// Parse a variable-length frame size field.
+///
+/// Returns bytes consumed (`1` or `2`) or `-1` on malformed/truncated input.
+///
+/// Upstream C: src/opus.c:parse_size
 fn parse_size(data: &[u8], len: i32, size: &mut i16) -> i32 {
     if len < 1 {
         *size = -1;
@@ -183,6 +202,19 @@ pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
 
 /// Parses internal opus packets according to
 /// <https://www.rfc-editor.org/rfc/rfc6716#section-3>
+///
+/// Upstream parsing structure (`src/opus.c:opus_packet_parse_impl`):
+/// - TOC code 0: one frame
+/// - TOC code 1: two CBR frames
+/// - TOC code 2: two VBR frames
+/// - TOC code 3: N frames (CBR or VBR), optional padding, optional
+///   self-delimited trailing length
+///
+/// Returns:
+/// - positive frame count on success
+/// - negative `OPUS_*` code on invalid packet or bad arguments
+///
+/// Upstream C: src/opus.c:opus_packet_parse_impl
 pub fn opus_packet_parse_impl(
     data: &[u8],
     self_delimited: bool,
