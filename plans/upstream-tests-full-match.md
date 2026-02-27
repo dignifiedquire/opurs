@@ -4,8 +4,8 @@ Last updated: 2026-02-27
 
 ## Progress
 
-- Completed: `S1`, `S2`, `S3`, `S4`, `S5`
-- Remaining: `S6`, `S7`
+- Completed: `S1`, `S2`, `S3`, `S4`, `S5`, `S6`
+- Remaining: `S7`
 
 ## Goal
 
@@ -149,6 +149,12 @@ Acceptance:
 Commit:
 
 - `ci: add missing upstream vector suite lanes`
+
+Status:
+
+- Completed on 2026-02-27.
+- `test-vectors` now enforces (no skip-on-missing) major-platform full-matrix lanes
+  for `qext`, `qext-fuzz`, and `dred-opus` with explicit asset checks.
 
 ### S7: Closure Audit
 

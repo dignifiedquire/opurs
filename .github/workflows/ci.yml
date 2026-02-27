@@ -533,6 +533,24 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Cache DNN weight data (major platforms)
+        if: matrix.major_platform
+        id: dnn-weights-vectors
+        uses: actions/cache@v4
+        with:
+          path: |
+            libopus-sys/opus/dnn/*_data.*
+            libopus-sys/opus/dnn/dred_rdovae_constants.h
+          key: ${{ env.OPUS_DNN_DATA_CACHE_KEY }}
+      - name: Download DNN weight data (major platforms)
+        if: matrix.major_platform && steps.dnn-weights-vectors.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd libopus-sys/opus >/dev/null
+          sh dnn/download_model.sh "$OPUS_DNN_DATA_SHA256"
+          rm -f "opus_data-${OPUS_DNN_DATA_SHA256}.tar.gz"
+          popd >/dev/null
       - name: Run focused classic vector regressions (major platforms)
         if: matrix.major_platform
         run: cargo test --release --features tools --target ${{ matrix.target }} --test vector_regressions
@@ -545,6 +563,33 @@ jobs:
       - name: Run projection strict full-matrix vectors (major platforms)
         if: matrix.major_platform
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite projection --mode parity --matrix full --strict-bitexact
+      - name: Require qext vectors (major platforms)
+        if: matrix.major_platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          compgen -G "opus_newvectors/qext_vector*.bit" > /dev/null
+      - name: Run qext strict full-matrix vectors (major platforms)
+        if: matrix.major_platform
+        run: cargo run --release --features "tools,qext" --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite qext --mode parity --matrix full --strict-bitexact
+      - name: Require qext-fuzz vectors (major platforms)
+        if: matrix.major_platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          compgen -G "opus_newvectors/qext_vector*fuzz.bit" > /dev/null
+      - name: Run qext-fuzz strict full-matrix vectors (major platforms)
+        if: matrix.major_platform
+        run: cargo run --release --features "tools,qext" --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite qext-fuzz --mode parity --matrix full --strict-bitexact
+      - name: Require dred-opus vectors (major platforms)
+        if: matrix.major_platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          compgen -G "opus_newvectors/vector*_opus.bit" > /dev/null
+      - name: Run dred-opus full-matrix vectors (major platforms)
+        if: matrix.major_platform
+        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite dred-opus --mode parity --matrix full
       - name: Run test vectors (quick matrix on non-major platforms)
         if: ${{ !matrix.major_platform }}
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors

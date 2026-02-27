@@ -39,9 +39,22 @@ cargo run --release --features tools --example run_vectors2 -- opus_newvectors -
 # Projection parity vectors
 cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite projection --matrix full --strict-bitexact
 
+# QEXT parity vectors (requires qext feature + qext_vector*.bit assets)
+cargo run --release --features "tools,qext" --example run_vectors2 -- opus_newvectors --suite qext --matrix full --strict-bitexact
+
+# QEXT fuzz parity vectors (requires qext feature + qext_vector*fuzz.bit assets)
+cargo run --release --features "tools,qext" --example run_vectors2 -- opus_newvectors --suite qext-fuzz --matrix full --strict-bitexact
+
+# DRED-Opus parity vectors (requires tools-dnn + vector*_opus.bit assets)
+cargo run --release --features tools-dnn --example run_vectors2 -- opus_newvectors --suite dred-opus --matrix full
+
 # Dump directory for debugging mismatches
 cargo run --release --features tools --example run_vectors2 -- opus_newvectors --dump-dir dump/
 ```
+
+CI coverage notes:
+- Major platforms (`linux-x86_64`, `macos-arm64`, `windows-x86_64`) run full-matrix suites for `classic`, `multistream`, `projection`, `qext`, `qext-fuzz`, and `dred-opus`; missing suite assets fail CI.
+- Non-major platforms run quick classic vectors.
 
 ### Entropy coder debugging
 
