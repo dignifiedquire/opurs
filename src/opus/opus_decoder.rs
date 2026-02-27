@@ -381,6 +381,9 @@ impl OpusDecoder {
         Ok(())
     }
 
+    /// Reset decoder state to the post-init baseline.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn reset(&mut self) {
         self.celt_dec.reset();
         silk_ResetDecoder(&mut self.silk_dec);
@@ -398,6 +401,9 @@ impl OpusDecoder {
     }
 }
 
+/// Internal decoder invariant checks used in debug builds.
+///
+/// Upstream C: src/opus_decoder.c:validate_opus_decoder
 fn validate_opus_decoder(st: &OpusDecoder) {
     debug_assert!(st.channels == 1 || st.channels == 2);
     debug_assert!(
@@ -431,6 +437,9 @@ fn validate_opus_decoder(st: &OpusDecoder) {
     debug_assert!(st.stream_channels == 1 || st.stream_channels == 2);
 }
 
+/// Blend two overlapping signal segments using the CELT overlap window.
+///
+/// Upstream C: src/opus_decoder.c:smooth_fade
 fn smooth_fade(
     in1: &[opus_val16],
     in2: &[opus_val16],
@@ -453,6 +462,9 @@ fn smooth_fade(
         c += 1;
     }
 }
+/// Decode the packet mode from the TOC byte.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_mode
 fn opus_packet_get_mode(data: &[u8]) -> i32 {
     if data[0] as i32 & 0x80 != 0 {
         MODE_CELT_ONLY
@@ -1017,6 +1029,9 @@ fn opus_decode_frame(
 }
 
 #[cfg(feature = "dred")]
+/// Queue DRED features for decode-time PLC/FEC synthesis.
+///
+/// Upstream C: src/opus_decoder.c:opus_decode_native
 fn stage_dred_features_for_decode(
     st: &mut OpusDecoder,
     frame_size: i32,
@@ -1058,6 +1073,9 @@ fn stage_dred_features_for_decode(
     }
 }
 
+/// Core decode path shared by the typed decode entry points.
+///
+/// Upstream C: src/opus_decoder.c:opus_decode_native
 pub fn opus_decode_native(
     st: &mut OpusDecoder,
     data: &[u8],
