@@ -1,5 +1,8 @@
 # Phase 5: Performance Parity
 
+> Reference plan. Active execution and priority decisions are tracked in
+> `remaining-plan.md`.
+
 **Goal**: Close the ~20% performance gap between the Rust implementation and
 the C version with ASM/intrinsics. Establish a benchmark suite and achieve
 performance parity through SIMD, inlining, and allocation optimization.

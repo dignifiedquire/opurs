@@ -157,7 +157,7 @@ issues.
 
 Current execution source of truth:
 
-- [Active Workstreams](active-workstreams.md)
+- [Remaining Plan (Verified)](remaining-plan.md)
 
 Legacy phase files remain useful context, but they contain historical checklists
 that are not always synchronized with current implementation state.
@@ -165,14 +165,18 @@ that are not always synchronized with current implementation state.
 ## Supplemental Plans
 
 Active:
-- [Active Workstreams](active-workstreams.md) — consolidated current outstanding
-  items and priorities.
-- [API Expansion: Upstream Parity](api-expansion-upstream-parity.md) — open
-  multistream/projection/tooling milestones.
-- [Performance Parity](phase5-performance.md) — performance-stage checklist.
-- [Performance Status](perf-status.md) — latest benchmark measurements.
-- [Remove All Unsafe](remove-all-unsafe.md) — remaining unsafe-policy and
-  cleanup work.
+- [Remaining Plan (Verified)](remaining-plan.md) — single active plan with
+  verified required steps.
+
+Supporting references for the active plan:
+- [API Expansion: Upstream Parity](api-expansion-upstream-parity.md)
+- [Performance Parity](phase5-performance.md)
+- [Performance Status](perf-status.md)
+- [Phase 4 Integration Safety](phase4-integration-safety.md)
+- [Remove All Unsafe](remove-all-unsafe.md)
+- [Missing Impl + Test Coverage Matrix](missing-impl-test-coverage.md)
+- [Parity Test Expansion (Fail-First)](parity-test-fail-first.md)
+- [Upgrade 1.6.1 Migration Plan](upgrade-1.6.1.md)
 
 Completed parity tracking:
 - [Parity Diff Review](done/diff_review.md) — grouped parity findings snapshot.

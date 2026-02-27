@@ -1,7 +1,7 @@
 # SIMD Bit-Exactness Fixup Status
 
 > Archived historical status note. Current active planning is tracked in
-> `../active-workstreams.md`.
+> `../remaining-plan.md`.
 
 ## Context
 PR #3 ("feat: more simd") merged at commit 404612f, adding ~5K lines of SIMD

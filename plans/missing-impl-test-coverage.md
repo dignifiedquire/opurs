@@ -1,5 +1,8 @@
 # Missing Impl + Test Coverage Matrix
 
+> Reference matrix. Active execution and priority decisions are tracked in
+> `remaining-plan.md`.
+
 ## Purpose
 Track implementation gaps and untested runtime paths, with explicit tests required to close each gap.
 

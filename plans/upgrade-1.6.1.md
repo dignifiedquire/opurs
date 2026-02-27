@@ -1,5 +1,8 @@
 # Plan: Upgrade opurs from libopus previous baseline to 1.6.1
 
+> Historical migration reference. Active execution and priority decisions are
+> tracked in `remaining-plan.md`.
+
 ## Context
 
 Upstream xiph/opus has released v1.6 and v1.6.1 since our previous baseline. The diff is **222 commits, ~19,500 insertions / ~4,700 deletions across 196 C/H files**. The dominant new feature is **QEXT (Quality Extension / Opus HD)** — a CELT extension layer adding 96 kHz support, higher-precision audio (32-bit samples), and bandwidth extension via a neural network (BBWENet). There are also significant standalone bug fixes, encoder quality improvements, DNN fixes, and the extensions API rework.

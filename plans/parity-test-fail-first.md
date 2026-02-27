@@ -1,5 +1,8 @@
 # Parity Test Expansion Plan (Fail-First)
 
+> Reference plan. Active execution and priority decisions are tracked in
+> `remaining-plan.md`.
+
 ## Goal
 Make every known upstream parity gap produce a deterministic failing test before fixing implementation. Focus on bit-exactness and behavior parity with C reference.
 

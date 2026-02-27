@@ -1,5 +1,8 @@
 # API Expansion Plan: Upstream Parity (Multichannel + Tooling)
 
+> Reference plan. Active execution and priority decisions are tracked in
+> `remaining-plan.md`.
+
 ## Goal
 
 Expand the public API, tooling, and examples to cover missing upstream-facing

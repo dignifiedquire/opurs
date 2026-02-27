@@ -1,5 +1,8 @@
 # Phase 4: Integration Layer Safety & Idiomatic Public API
 
+> Reference plan. Active execution and priority decisions are tracked in
+> `remaining-plan.md`.
+
 **Goal**: Make all code under `src/src/`, `src/externs.rs`, and `src/varargs.rs`
 fully safe. Eliminate `externs.rs` entirely. Replace the C-style public API
 with an idiomatic Rust API modeled on the
@@ -412,7 +415,7 @@ Status note:
 - Functional parity work is complete; remaining unchecked items in this file are
   mostly ergonomic/public-surface wishlist tasks.
 - C symbol-level parity shims are intentionally out of scope unless explicitly
-  re-scoped in `active-workstreams.md`.
+  re-scoped in `remaining-plan.md`.
 
 ---
 
