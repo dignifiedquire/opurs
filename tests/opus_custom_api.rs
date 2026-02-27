@@ -43,6 +43,7 @@ fn custom_encode24_matches_upstream_c() {
 
     let mut rust_enc = OpusCustomEncoder::new(48000, channels, arch)
         .unwrap_or_else(|err| panic!("rust custom encoder init failed: {err}"));
+    rust_enc.signalling = 0;
 
     let mut err = OPUS_OK;
     let mode = unsafe { opus_custom_mode_create(48000, frame_size, &mut err) };
@@ -96,6 +97,7 @@ fn custom_decode24_matches_upstream_c() {
 
     let mut rust_dec = OpusCustomDecoder::new(48000, channels as usize, arch)
         .unwrap_or_else(|err| panic!("rust custom decoder init failed: {err}"));
+    rust_dec.signalling = 0;
 
     let mut err = OPUS_OK;
     let mode = unsafe { opus_custom_mode_create(48000, frame_size, &mut err) };

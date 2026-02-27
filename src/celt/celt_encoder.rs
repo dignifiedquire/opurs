@@ -147,6 +147,37 @@ const PREFILTER_MAX_SCALE: usize = 2;
 const PREFILTER_MAX_SCALE: usize = 1;
 const PREFILTER_MEM_CHAN_CAP: usize = COMBFILTER_MAXPERIOD as usize * PREFILTER_MAX_SCALE;
 
+const TO_OPUS_TABLE: [u8; 20] = [
+    0xE0, 0xE8, 0xF0, 0xF8, 0xC0, 0xC8, 0xD0, 0xD8, 0xA0, 0xA8, 0xB0, 0xB8, 0x00, 0x00, 0x00, 0x00,
+    0x80, 0x88, 0x90, 0x98,
+];
+
+#[inline]
+fn should_convert_custom_signalling_header(mode: &OpusCustomMode) -> bool {
+    #[cfg(feature = "qext")]
+    {
+        let _ = mode;
+        true
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        mode.Fs == 48000 && mode.shortMdctSize == 120
+    }
+}
+
+#[inline]
+fn to_opus_header_byte(c: u8) -> Option<u8> {
+    if c >= 0xA0 {
+        return None;
+    }
+    let base = TO_OPUS_TABLE[(c >> 3) as usize];
+    if base == 0 {
+        None
+    } else {
+        Some(base | (c & 0x07))
+    }
+}
+
 impl OpusCustomEncoder {
     /// Create a new CELT encoder. Returns Err(OPUS_INTERNAL_ERROR) on failure.
     pub fn new(sampling_rate: i32, channels: i32, arch: Arch) -> Result<Self, i32> {
@@ -186,7 +217,7 @@ impl OpusCustomEncoder {
             end: mode.effEBands,
             bitrate: OPUS_BITRATE_MAX,
             vbr: 0,
-            signalling: 0,
+            signalling: 1,
             constrained_vbr: 1,
             loss_rate: 0,
             lsb_depth: 24,
@@ -2402,6 +2433,8 @@ pub fn celt_encode_with_ec<'b>(
     let mut tot_boost: i32 = 0;
     let mut sample_max: opus_val32 = 0.;
     let mut maxDepth: opus_val16 = 0.;
+    let mut wrote_custom_header = false;
+    let mut compressed_offset = 0usize;
 
     let mut nbEBands: i32 = 0;
     let mut overlap: i32 = 0;
@@ -2477,7 +2510,25 @@ pub fn celt_encode_with_ec<'b>(
         tell0_frac = tell;
         nbFilledBytes = 0;
     }
-    assert!(st.signalling == 0);
+    if st.signalling != 0 && enc.is_none() {
+        let tmp = (mode.effEBands - end) >> 1;
+        end = 1.max(mode.effEBands - tmp);
+        st.end = end;
+        if nbCompressedBytes < 2 || compressed.is_empty() {
+            return OPUS_BAD_ARG;
+        }
+        let mut c0: u8 = ((tmp << 5) | (LM << 3) | (((C == 2) as i32) << 2)) as u8;
+        if should_convert_custom_signalling_header(mode) {
+            let Some(opus_c0) = to_opus_header_byte(c0) else {
+                return OPUS_BAD_ARG;
+            };
+            c0 = opus_c0;
+        }
+        compressed[0] = c0;
+        compressed_offset = 1;
+        wrote_custom_header = true;
+        nbCompressedBytes -= 1;
+    }
     nbCompressedBytes = if nbCompressedBytes < 1275 {
         nbCompressedBytes
     } else {
@@ -2486,6 +2537,9 @@ pub fn celt_encode_with_ec<'b>(
     nbAvailableBytes = nbCompressedBytes - nbFilledBytes;
     if st.vbr != 0 && st.bitrate != OPUS_BITRATE_MAX {
         vbr_rate = (st.bitrate * 6 / (6 * mode.Fs / frame_size)) << BITRES;
+        if st.signalling != 0 {
+            vbr_rate -= 8 << BITRES;
+        }
         effectiveBytes = vbr_rate >> (3 + BITRES);
     } else {
         let mut tmp: i32 = 0;
@@ -2528,7 +2582,8 @@ pub fn celt_encode_with_ec<'b>(
     let enc = if let Some(enc) = enc {
         enc
     } else {
-        _enc = ec_enc_init(&mut compressed[..nbCompressedBytes as usize]);
+        let end_off = compressed_offset + nbCompressedBytes as usize;
+        _enc = ec_enc_init(&mut compressed[compressed_offset..end_off]);
         &mut _enc
     };
     if vbr_rate > 0 && st.constrained_vbr != 0 {
@@ -3942,6 +3997,9 @@ pub fn celt_encode_with_ec<'b>(
         }
     }
     ec_enc_done(enc);
+    if wrote_custom_header {
+        nbCompressedBytes += 1;
+    }
     if ec_get_error(enc) != 0 {
         OPUS_INTERNAL_ERROR
     } else {

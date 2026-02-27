@@ -26,7 +26,9 @@ use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
 use crate::arch::{opus_select_arch, Arch};
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INTERNAL_ERROR};
+use crate::opus::opus_defines::{
+    OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
+};
 
 pub use self::arch_h::{
     celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
@@ -121,10 +123,35 @@ pub const PLC_PITCH_LAG_MAX: i32 = 720;
 pub const PLC_PITCH_LAG_MIN: i32 = 100;
 pub const DECODE_BUFFER_SIZE: usize = 2048;
 const SIG_SAT: f32 = 536_870_911.0;
+const FROM_OPUS_TABLE: [u8; 16] = [
+    0x80, 0x88, 0x90, 0x98, 0x40, 0x48, 0x50, 0x58, 0x20, 0x28, 0x30, 0x38, 0x00, 0x08, 0x10, 0x18,
+];
 
 #[inline]
 fn saturate_sig(x: f32) -> f32 {
     x.clamp(-SIG_SAT, SIG_SAT)
+}
+
+#[inline]
+fn should_convert_custom_signalling_header(mode: &OpusCustomMode) -> bool {
+    #[cfg(feature = "qext")]
+    {
+        let _ = mode;
+        true
+    }
+    #[cfg(not(feature = "qext"))]
+    {
+        mode.Fs == 48000 && mode.shortMdctSize == 120
+    }
+}
+
+#[inline]
+fn from_opus_header_byte(c: u8) -> Option<u8> {
+    if c < 0x80 {
+        None
+    } else {
+        Some(FROM_OPUS_TABLE[((c >> 3) - 16) as usize] | (c & 0x07))
+    }
 }
 
 #[inline]
@@ -228,7 +255,7 @@ fn opus_custom_decoder_init(
         downsample: 1,
         start: 0,
         end: mode.effEBands,
-        signalling: 0,
+        signalling: 1,
         disable_inv: (channels == 1) as i32,
         complexity: 0,
         arch: opus_select_arch(),
@@ -1410,28 +1437,101 @@ pub fn celt_decode_with_ec(
     #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
 ) -> i32 {
     let CC: i32 = st.channels as i32;
-    let C: i32 = st.stream_channels as i32;
-    let len: i32 = data.map_or(0, |d| d.len() as i32);
+    let mut C: i32 = st.stream_channels as i32;
+    let mut len: i32 = data.map_or(0, |d| d.len() as i32);
     validate_celt_decoder(&*st);
     let mode = st.mode;
     let nbEBands = mode.nbEBands as i32;
     let overlap = mode.overlap as i32;
     let eBands = &mode.eBands;
     let start = st.start;
-    let end = st.end;
+    let mut end = st.end;
     let decode_buffer_size = decoder_buffer_size(st);
     frame_size *= st.downsample;
     let chan_stride = decode_buffer_size + overlap as usize;
+    let mut packet_data = data;
 
     let mut LM: i32 = 0;
-    while LM <= mode.maxLM {
-        if mode.shortMdctSize << LM == frame_size {
-            break;
+    if st.signalling != 0 {
+        if let Some(d) = packet_data {
+            let mut cursor = 0usize;
+            let mut data0 = d[cursor];
+            if should_convert_custom_signalling_header(mode) {
+                let Some(v) = from_opus_header_byte(data0) else {
+                    return OPUS_INVALID_PACKET;
+                };
+                data0 = v;
+            }
+            end = 1.max(mode.effEBands - 2 * ((data0 as i32) >> 5));
+            st.end = end;
+            LM = ((data0 as i32) >> 3) & 0x3;
+            C = 1 + (((data0 as i32) >> 2) & 0x1);
+            if (d[0] & 0x03) == 0x03 {
+                cursor += 1;
+                len -= 1;
+                if len <= 0 {
+                    return OPUS_INVALID_PACKET;
+                }
+                if d[cursor] & 0x40 != 0 {
+                    cursor += 1;
+                    len -= 1;
+                    let mut p: i32;
+                    let mut padding = 0i32;
+                    loop {
+                        if len <= 0 || cursor >= d.len() {
+                            return OPUS_INVALID_PACKET;
+                        }
+                        p = d[cursor] as i32;
+                        cursor += 1;
+                        len -= 1;
+                        let tmp = if p == 255 { 254 } else { p };
+                        len -= tmp;
+                        padding += tmp;
+                        if p != 255 {
+                            break;
+                        }
+                    }
+                    padding -= 1;
+                    if len <= 0 || padding < 0 {
+                        return OPUS_INVALID_PACKET;
+                    }
+                }
+            } else {
+                cursor += 1;
+                len -= 1;
+            }
+            if LM > mode.maxLM {
+                return OPUS_INVALID_PACKET;
+            }
+            if frame_size < (mode.shortMdctSize << LM) {
+                return OPUS_BUFFER_TOO_SMALL;
+            }
+            frame_size = mode.shortMdctSize << LM;
+            if len < 0 || cursor + len as usize > d.len() {
+                return OPUS_INVALID_PACKET;
+            }
+            packet_data = Some(&d[cursor..cursor + len as usize]);
+        } else {
+            while LM <= mode.maxLM {
+                if mode.shortMdctSize << LM == frame_size {
+                    break;
+                }
+                LM += 1;
+            }
+            if LM > mode.maxLM {
+                return OPUS_BAD_ARG;
+            }
         }
-        LM += 1;
-    }
-    if LM > mode.maxLM {
-        return OPUS_BAD_ARG;
+    } else {
+        while LM <= mode.maxLM {
+            if mode.shortMdctSize << LM == frame_size {
+                break;
+            }
+            LM += 1;
+        }
+        if LM > mode.maxLM {
+            return OPUS_BAD_ARG;
+        }
     }
     let M: i32 = (1) << LM;
     if !(0..=1275).contains(&len) {
@@ -1444,7 +1544,7 @@ pub fn celt_decode_with_ec(
     if effEnd > mode.effEBands {
         effEnd = mode.effEBands;
     }
-    if data.is_none() || len <= 1 {
+    if packet_data.is_none() || len <= 1 {
         celt_decode_lost(
             st,
             N,
@@ -1477,7 +1577,7 @@ pub fn celt_decode_with_ec(
     }
     // Copy data into a stack buffer so ec_dec_init can take &mut [u8] without
     // a const-to-mut cast. Max 1275 bytes per validation above.
-    let data_slice = data.unwrap();
+    let data_slice = packet_data.unwrap();
     let mut data_copy = [0u8; 1275];
     data_copy[..data_slice.len()].copy_from_slice(data_slice);
     // When the caller provides a dec, use it; otherwise create a local one.
