@@ -19,19 +19,19 @@ use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
 /// framing overhead becomes negligible.
 ///
 /// The repacketizer currently only operates on elementary Opus
-/// streams. It will not manipualte multistream packets successfully, except in
+/// streams. It will not manipulate multistream packets successfully, except in
 /// the degenerate case where they consist of data from a single stream.
 ///
 /// The repacketizing process starts with creating a repacketizer state.
 ///
 /// Then the application should submit packets with [`OpusRepacketizer::cat`],
-/// extract new packets with `opus_repacketizer_out` or
-/// `opus_repacketizer_out_range`, and then reset the state for the next set of
+/// extract new packets with [`OpusRepacketizer::out`] or
+/// [`OpusRepacketizer::out_range`], and then reset the state for the next set of
 /// input packets via [`OpusRepacketizer::init`].
 ///
 /// An alternate way of merging packets is to simply call [`OpusRepacketizer::cat`]
 /// unconditionally until it fails. At that point, the merged packet can be
-/// obtained with `opus_repacketizer_out` and the input packet for which
+/// obtained with [`OpusRepacketizer::out`] and the input packet for which
 /// [`OpusRepacketizer::cat`] needs to be re-added to a newly reinitialized
 /// repacketizer state.
 #[derive(Debug, Clone)]
@@ -91,7 +91,7 @@ impl OpusRepacketizer {
     /// 120 ms, the maximum duration of a single packet, after adding this packet.
     ///
     /// The contents of the current repacketizer state can be extracted into new
-    /// packets using `opus_repacketizer_out` or `opus_repacketizer_out_range`.
+    /// packets using [`OpusRepacketizer::out`] or [`OpusRepacketizer::out_range`].
     ///
     /// In order to add a packet with a different configuration or to add more
     /// audio beyond 120 ms, you must clear the repacketizer state by calling
@@ -120,7 +120,7 @@ impl OpusRepacketizer {
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_cat_impl
     fn cat_impl(&mut self, data: &[u8], self_delimited: bool) -> i32 {
-        // Set of check ToC
+        // Validate TOC compatibility with previously queued frames.
         if data.is_empty() {
             return OPUS_INVALID_PACKET;
         }
@@ -191,7 +191,7 @@ impl OpusRepacketizer {
     /// the repacketizer state so far via `OpusRepacketizer::cat` since the last
     /// call to `OpusRepacketizer::init` or creation.
     /// This defines the valid range of packets that can be extracted with
-    /// `OpusRrepacketizer::out_range` or `OpusRepacketizer::out`.
+    /// [`OpusRepacketizer::out_range`] or [`OpusRepacketizer::out`].
     ///
     /// Returns the total number of frames contained in the packet data submitted
     /// to the repacketizer state.
@@ -207,10 +207,11 @@ impl OpusRepacketizer {
     /// - `begin`: The index of the first frame in the current repacketizer state to include in the output.
     /// - `end`: One past the index of the last frame in the current repacketizer state to include in the output.
     /// - `data`: The buffer in which to store the output packet.
-    /// - `maxlen`: The maximum number of bytes to store in the output buffer. In order to guarantee
-    ///   success, this should be at least `1276` for a single frame, or for multiple frames,
-    ///   `1277*(end-begin)`. However, `1*(end-begin)` plus the size of all packet data submitted to the repacketizer since the last call to
-    ///   `OpusRepacketizer::init` or creation is also sufficient, and possibly much smaller.
+    /// The output budget is `data.len()`. To guarantee success, it should be at
+    /// least `1276` for a single frame, or for multiple frames,
+    /// `1277*(end-begin)`. A tighter bound is also possible: `1*(end-begin)`
+    /// plus the size of all packet data submitted since the last
+    /// [`OpusRepacketizer::init`].
     ///
     /// Returns the total size of the output packet on success, or an error code on failure.
     /// - `OPUS_BAD_ARG`: `[begin,end)` was an invalid range of frames (begin < 0, begin >= end, or end >
@@ -230,16 +231,16 @@ impl OpusRepacketizer {
     }
 
     /// Construct a new packet from data previously submitted to the repacketizer
-    /// state via opus_repacketizer_cat().
+    /// state via [`OpusRepacketizer::cat`].
     /// This is a convenience routine that returns all the data submitted so far
     /// in a single packet.
-    /// It is equivalent to calling `rp.out_range(rp, 0, rp.get_nb_frames(rp), data, maxlen)`.
+    /// It is equivalent to calling
+    /// `rp.out_range(0, rp.get_nb_frames(), data)`.
     ///
     /// - `data`: The buffer in which to store the output packet.
-    /// - `maxlen`: The maximum number of bytes to store in the output buffer. In order to guarantee
-    ///   success, this should be at least `1276` for a single frame, or for multiple frames,
-    ///   `1277*(end-begin)`. However, `1*(end-begin)` plus the size of all packet data submitted to the repacketizer since the last call to
-    ///   `OpusRepacketizer::init` or creation is also sufficient, and possibly much smaller.
+    /// The output budget is `data.len()`. To guarantee success, it should be at
+    /// least `1276` for a single frame, or for multiple frames,
+    /// `1277 * rp.get_nb_frames()`.
     ///
     /// Returns the total size of the output packet on success, or an error code
     ///          on failure.
@@ -365,7 +366,7 @@ impl OpusRepacketizer {
             let mut ones_begin: usize = 0;
             let mut ones_end: usize = 0;
 
-            // Restart the process for the padding case
+            // Restart the header sizing process for the Code 3 / padding path.
             ptr = 0;
             if self_delimited {
                 tot_size = 1 + (len[(count - 1) as usize] >= 252) as i32;
@@ -442,7 +443,7 @@ impl OpusRepacketizer {
                 }
             }
 
-            // Copy the actual data
+            // Copy payload frames.
             if self_delimited {
                 let sdlen =
                     encode_size(len[(count - 1) as usize] as i32, &mut data[ptr..]) as usize;
@@ -477,7 +478,7 @@ impl OpusRepacketizer {
             }
             // Fill 0x01 padding bytes between header and extensions
             data[ones_begin..ones_end].fill(0x01);
-            // Fill remaining padding with zeros (only when pad and no extensions)
+            // Fill remaining padding with zeros (only when `pad` and no extensions).
             if pad && ext_count == 0 {
                 while ptr < data.len() {
                     data[ptr] = 0;
@@ -492,7 +493,7 @@ impl OpusRepacketizer {
             ptr += sdlen;
         }
 
-        // Copy the actual data (non-Code 3 path)
+        // Copy payload frames (non-Code 3 path).
         for (i, (len, frame)) in len.iter().zip(frames).enumerate().take(count as _) {
             let len = *len as usize;
             let frame = *frame;

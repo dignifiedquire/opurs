@@ -3,6 +3,7 @@
 //! Extensions are carried in the padding area of Opus packets.
 //! Each extension has an ID (3..127), a frame number, and variable-length data.
 //! IDs 0-1 are reserved (padding/separator), ID 2 is "Repeat These Extensions".
+//! Due to the repeat mechanism, bitstream order is not always frame order.
 //!
 //! Upstream C: `src/extensions.c`
 
@@ -11,7 +12,7 @@
 
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
 
-/// Extension ID 2: "Repeat These Extensions" (reserved, not yet implemented).
+/// Extension ID 2: "Repeat These Extensions" indicator.
 pub const EXTENSION_ID_REPEAT: i32 = 2;
 
 /// Minimum valid user extension ID.
@@ -30,6 +31,9 @@ pub struct OpusExtensionData {
 /// Given an extension payload, advance past the current extension and return
 /// the length of the remaining data. Returns `(remaining_len, header_size)` or
 /// negative on error.
+///
+/// `ID=2` (RTE) only advances past the indicator itself; skipping repeated
+/// payloads is handled by higher-level iterator logic.
 ///
 /// Upstream C: src/extensions.c:skip_extension
 fn skip_extension(data: &[u8], mut pos: usize, len: usize) -> Result<(usize, usize), i32> {
@@ -101,6 +105,9 @@ pub fn opus_packet_extensions_count(data: &[u8], nb_frames: i32) -> Result<i32, 
 
 /// Count the number of extensions for each frame.
 ///
+/// Counts exclude real padding, frame separators, and repeat indicators, but
+/// include repeated extension payloads.
+///
 /// Upstream C: src/extensions.c:opus_packet_extensions_count_ext
 pub fn opus_packet_extensions_count_ext(
     data: &[u8],
@@ -124,6 +131,9 @@ pub fn opus_packet_extensions_count_ext(
 }
 
 /// Parse extensions from Opus padding data in bitstream order.
+///
+/// Output order intentionally mirrors the encoded order. Because of repeated
+/// extensions, this is not always frame order.
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_parse
 pub fn opus_packet_extensions_parse(
@@ -152,6 +162,7 @@ pub fn opus_packet_extensions_parse(
 ///
 /// `nb_frame_exts` must contain the output of
 /// [`opus_packet_extensions_count_ext`].
+/// Like the C API, this excludes padding/separator/repeat-indicator entries.
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_parse_ext
 pub fn opus_packet_extensions_parse_ext(
@@ -759,7 +770,8 @@ impl<'a> OpusExtensionIterator<'a> {
 
     /// Return the next extension.
     ///
-    /// Returns `Ok(Some(ext))` for each extension found,
+    /// Returns `Ok(Some(ext))` for each extension found (excluding real padding,
+    /// frame separators, and repeat indicators),
     /// `Ok(None)` when iteration is complete,
     /// or `Err(OPUS_INVALID_PACKET)` on parse error.
     ///

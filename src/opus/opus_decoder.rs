@@ -1699,6 +1699,9 @@ pub fn opus_dred_process(dred_dec: &OpusDREDDecoder, src: &OpusDRED, dst: &mut O
     OPUS_OK
 }
 
+/// Return packet bandwidth from the TOC byte.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_bandwidth
 pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
     let mut bandwidth: i32;
     if toc as i32 & 0x80 != 0 {
@@ -1717,6 +1720,9 @@ pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
     }
     bandwidth
 }
+/// Return the stream channel count encoded in the TOC byte (`1` or `2`).
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_channels
 pub fn opus_packet_get_nb_channels(toc: u8) -> i32 {
     if toc as i32 & 0x4 != 0 {
         2
@@ -1724,6 +1730,11 @@ pub fn opus_packet_get_nb_channels(toc: u8) -> i32 {
         1
     }
 }
+/// Return the number of frames in an Opus packet.
+///
+/// Returns a negative `OPUS_*` code on malformed/truncated headers.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_frames
 pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
     if packet.is_empty() {
         return OPUS_BAD_ARG;
@@ -1740,6 +1751,11 @@ pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
     }
 }
 
+/// Return decoded sample count for a packet at the given sample rate.
+///
+/// Enforces the Opus 120 ms maximum packet duration.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_samples
 pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
     let mut samples: i32 = 0;
     let count: i32 = opus_packet_get_nb_frames(packet);
@@ -1753,6 +1769,9 @@ pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
         samples
     }
 }
+/// Return decoded sample count for a packet using the decoder sample rate.
+///
+/// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
 pub fn opus_decoder_get_nb_samples(dec: &mut OpusDecoder, packet: &[u8]) -> i32 {
     opus_packet_get_nb_samples(packet, dec.Fs)
 }

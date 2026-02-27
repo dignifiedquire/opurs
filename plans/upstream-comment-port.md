@@ -19,7 +19,7 @@ comment anchored to a valid `Upstream C:` reference.
 
 - [x] B1: Reference hygiene + checker/CI enforcement.
 - [x] B2: `src/opus/packet.rs` detailed parse/soft-clip comment port.
-- [ ] B3: `src/opus/repacketizer.rs` inline algorithm/comment parity pass.
+- [x] B3: `src/opus/repacketizer.rs` inline algorithm/comment parity pass.
 - [ ] B4: `src/opus/extensions.rs` iterator/repeat semantics full comment parity pass.
 - [ ] B5: `src/opus/opus_decoder.rs` decode-state/PLC/FEC comment parity pass.
 - [ ] B6: `src/opus/opus_encoder.rs` mode-switch/redundancy/dtx comment parity pass.
