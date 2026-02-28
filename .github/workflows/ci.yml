@@ -16,7 +16,9 @@ env:
   OPUS_DNN_DATA_SHA256: a5177ec6fb7d15058e99e57029746100121f68e4890b1467d4094aa336b6013e
   OPUS_DNN_DATA_CACHE_KEY: dnn-weights-opus-upstream-a5177ec6-v2
   OPUS_TEST_VECTORS_URL: https://www.ietf.org/proceedings/98/slides/materials-98-codec-opus-newvectors-00.tar.gz
-  OPUS_TEST_VECTORS_CACHE_KEY: opus-newvectors-materials98-v1
+  OPUS_OPUSHD_TEST_VECTORS_URL: https://media.xiph.org/opus/ietf/opushd_testvectors.tar.gz
+  OPUS_DRED_TEST_VECTORS_URL: https://media.xiph.org/opus/ietf/dred_testvectors.tar.gz
+  OPUS_TEST_VECTORS_CACHE_KEY: opus-newvectors-materials98-v2
 
 jobs:
   fuzz:
@@ -267,6 +269,8 @@ jobs:
           path: |
             opus_newvectors
             vectors.tar.gz
+            opushd_testvectors.tar.gz
+            dred_testvectors.tar.gz
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Run multistream tooling tests
         run: cargo test --features tools --test tools_multistream
@@ -282,6 +286,9 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Ensure OpusHD and DRED vectors
+        shell: bash
+        run: ./scripts/ensure_extended_vectors.sh
       - name: Run multistream strict full-matrix vector parity
         run: cargo run --release --features tools --example run_vectors2 -- opus_newvectors --suite multistream --mode parity --matrix full --strict-bitexact
       - name: Run projection strict full-matrix vector parity
@@ -476,6 +483,8 @@ jobs:
           path: |
             opus_newvectors
             vectors.tar.gz
+            opushd_testvectors.tar.gz
+            dred_testvectors.tar.gz
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Download test vectors
         if: steps.test-vectors-cache.outputs.cache-hit != 'true'
@@ -483,6 +492,9 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Ensure OpusHD and DRED vectors
+        shell: bash
+        run: ./scripts/ensure_extended_vectors.sh
       - name: Cache DNN weight data
         id: dnn-weights
         uses: actions/cache@v4
@@ -559,6 +571,8 @@ jobs:
           path: |
             opus_newvectors
             vectors.tar.gz
+            opushd_testvectors.tar.gz
+            dred_testvectors.tar.gz
           key: ${{ runner.os }}-${{ env.OPUS_TEST_VECTORS_CACHE_KEY }}
       - name: Install multilib (Linux i686)
         if: matrix.packages
@@ -578,6 +592,10 @@ jobs:
         run: |
           curl -L "$OPUS_TEST_VECTORS_URL" -o vectors.tar.gz
           tar -xzf vectors.tar.gz
+      - name: Ensure OpusHD and DRED vectors (major platforms)
+        if: matrix.major_platform
+        shell: bash
+        run: ./scripts/ensure_extended_vectors.sh
       - name: Cache DNN weight data (major platforms)
         if: matrix.major_platform
         id: dnn-weights-vectors
