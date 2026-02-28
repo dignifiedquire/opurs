@@ -529,10 +529,40 @@ pub unsafe fn comb_filter_const_inplace_sse(
     g11: f32,
     g12: f32,
 ) {
-    let ptr = buf.as_mut_ptr();
-    let len = buf.len();
-    let x = core::slice::from_raw_parts(ptr as *const f32, len);
-    comb_filter_const_sse(buf, start, x, start, T, N, g10, g11, g12);
+    debug_assert!(T >= 15);
+
+    let t = T as usize;
+    let n = N as usize;
+    let g10v = _mm_set1_ps(g10);
+    let g11v = _mm_set1_ps(g11);
+    let g12v = _mm_set1_ps(g12);
+
+    // x0v = buf[start - T - 2 .. start - T + 2]
+    let mut x0v = _mm_loadu_ps(buf.as_ptr().add(start - t - 2));
+
+    let mut i = 0usize;
+    while i + 3 < n {
+        let xp = start + i - t - 2;
+        let yi = _mm_loadu_ps(buf.as_ptr().add(start + i));
+        let x4v = _mm_loadu_ps(buf.as_ptr().add(xp + 4));
+
+        let x2v = _mm_shuffle_ps(x0v, x4v, 0x4e);
+        let x1v = _mm_shuffle_ps(x0v, x2v, 0x99);
+        let x3v = _mm_shuffle_ps(x2v, x4v, 0x99);
+
+        let yi = _mm_add_ps(yi, _mm_mul_ps(g10v, x2v));
+        let yi2 = _mm_add_ps(
+            _mm_mul_ps(g11v, _mm_add_ps(x3v, x1v)),
+            _mm_mul_ps(g12v, _mm_add_ps(x4v, x0v)),
+        );
+        let yi = _mm_add_ps(yi, yi2);
+
+        x0v = x4v;
+        _mm_storeu_ps(buf.as_mut_ptr().add(start + i), yi);
+        i += 4;
+    }
+
+    // Intentionally no scalar tail: upstream SSE path only processes i < N-3.
 }
 
 /// SSE implementation of `celt_pitch_xcorr`.
@@ -568,6 +598,7 @@ mod tests {
     use super::{
         celt_inner_prod_sse as rust_celt_inner_prod_sse,
         celt_pitch_xcorr_avx2 as rust_celt_pitch_xcorr_avx2,
+        comb_filter_const_inplace_sse as rust_comb_filter_const_inplace_sse,
         comb_filter_const_sse as rust_comb_filter_const_sse,
         dual_inner_prod_sse as rust_dual_inner_prod_sse,
         op_pvq_search_sse2 as rust_op_pvq_search_sse2, xcorr_kernel_sse as rust_xcorr_kernel_sse,
@@ -774,9 +805,6 @@ mod tests {
                     buf_r[i] = v;
                 }
                 unsafe {
-                    let x_ptr = buf_r.as_ptr();
-                    let x_len = buf_r.len();
-                    let x_alias = core::slice::from_raw_parts(x_ptr, x_len);
                     c_comb(
                         buf_c.as_mut_ptr().add(x_start),
                         buf_c.as_mut_ptr().add(x_start),
@@ -786,9 +814,7 @@ mod tests {
                         g11,
                         g12,
                     );
-                    rust_comb_filter_const_sse(
-                        &mut buf_r, x_start, x_alias, x_start, t, n, g10, g11, g12,
-                    );
+                    rust_comb_filter_const_inplace_sse(&mut buf_r, x_start, t, n, g10, g11, g12);
                 }
                 for i in 0..n as usize {
                     assert_eq!(
