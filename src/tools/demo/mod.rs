@@ -198,7 +198,7 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
 
     let mut frame_idx = 0;
 
-    let mut data = vec![0u8; MAX_PACKET];
+    let mut packet = vec![0u8; MAX_PACKET];
     let mut samples = vec![0i16; MAX_FRAME_SIZE * channels];
     let mut output = Vec::<u8>::new();
 
@@ -206,10 +206,19 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
         let data_bytes = cursor.read_u32::<BigEndian>().unwrap();
         let enc_final_range = cursor.read_u32::<BigEndian>().unwrap();
 
-        let data = &mut data[..data_bytes as usize];
-        cursor.read_exact(data).unwrap();
+        if data_bytes as usize > packet.len() {
+            packet.resize(data_bytes as usize, 0);
+        }
+        let packet_slice = &mut packet[..data_bytes as usize];
+        cursor.read_exact(packet_slice).unwrap();
 
-        let output_samples = B::opus_decode(&mut dec, data, &mut samples, MAX_FRAME_SIZE as i32, 0);
+        let output_samples = B::opus_decode(
+            &mut dec,
+            packet_slice,
+            &mut samples,
+            MAX_FRAME_SIZE as i32,
+            0,
+        );
         if output_samples < 0 {
             panic!("opus_decode failed: {}", opus_strerror(output_samples));
         }
@@ -450,4 +459,49 @@ fn opus_demo_decode_multistream_impl<B: OpusBackendTrait>(
     B::opus_multistream_decoder_destroy(dec);
 
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{self, AssertUnwindSafe};
+
+    fn panic_message(err: Box<dyn std::any::Any + Send>) -> String {
+        if let Some(s) = err.downcast_ref::<&str>() {
+            (*s).to_owned()
+        } else if let Some(s) = err.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "<non-string panic>".to_owned()
+        }
+    }
+
+    #[test]
+    fn decode_large_packet_does_not_panic_on_packet_slice_bounds() {
+        let packet_len = MAX_PACKET + 1024;
+        let mut stream = Vec::new();
+        stream.write_u32::<BigEndian>(packet_len as u32).unwrap();
+        stream.write_u32::<BigEndian>(0).unwrap();
+        stream.resize(stream.len() + packet_len, 0);
+
+        let args = DecodeArgs {
+            sample_rate: SampleRate::R48000,
+            channels: Channels::Mono,
+            options: CommonOptions::default(),
+            complexity: None,
+        };
+        let dnn = DnnOptions::default();
+
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _ = opus_demo_decode(OpusBackend::Rust, &stream, args, &dnn);
+        }));
+
+        if let Err(err) = result {
+            let msg = panic_message(err);
+            assert!(
+                !msg.contains("out of range for slice"),
+                "unexpected slice panic: {msg}"
+            );
+        }
+    }
 }
