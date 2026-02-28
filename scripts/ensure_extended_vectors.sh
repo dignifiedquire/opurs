@@ -16,6 +16,9 @@ fi
 if ! compgen -G "opus_newvectors/vector*_opus.bit" > /dev/null; then
   need_dred=1
 fi
+if ! compgen -G "opus_newvectors/vector*_orig.sw" > /dev/null; then
+  need_dred=1
+fi
 
 if [ "$need_opushd" -eq 1 ]; then
   if [ ! -f opushd_testvectors.tar.gz ]; then
@@ -36,9 +39,11 @@ if [ "$need_dred" -eq 1 ]; then
   mkdir -p dred_tmp
   tar -xzf dred_testvectors.tar.gz -C dred_tmp
   find dred_tmp -type f -name 'vector*_opus.bit' -exec cp -f {} opus_newvectors/ \;
+  find dred_tmp -type f -name 'vector*_orig.sw' -exec cp -f {} opus_newvectors/ \;
   rm -rf dred_tmp
 fi
 
 compgen -G "opus_newvectors/qext_vector[0-9][0-9].bit" > /dev/null
 compgen -G "opus_newvectors/qext_vector[0-9][0-9]fuzz.bit" > /dev/null
 compgen -G "opus_newvectors/vector*_opus.bit" > /dev/null
+compgen -G "opus_newvectors/vector*_orig.sw" > /dev/null

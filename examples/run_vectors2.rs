@@ -649,13 +649,16 @@ fn load_dred_opus_vectors(vector_dir: &Path) -> Vec<TestVector> {
         if !encoded_path.exists() {
             continue;
         }
+        let decoded_path = vector_dir.join(format!("{}_orig.sw", stem.trim_end_matches("_opus")));
 
         vectors.push(TestVector {
             suite: VectorSuite::DredOpus,
             name: stem,
             encoded: std::fs::read(encoded_path).expect("reading dred-opus bitstream"),
             decoded_stereo: None,
-            decoded_mono: None,
+            decoded_mono: decoded_path
+                .exists()
+                .then(|| std::fs::read(decoded_path).expect("reading dred-opus mono reference")),
             multistream_case: None,
             projection_case: None,
         });
@@ -1416,6 +1419,9 @@ fn load_vectors_by_suite(vector_dir: &Path) -> BTreeMap<VectorSuite, Vec<TestVec
     let mut suites = BTreeMap::new();
 
     for definition in SUITE_DEFINITIONS {
+        if !suite_supported(definition.suite) {
+            continue;
+        }
         let vectors = (definition.discover)(vector_dir);
         if !vectors.is_empty() {
             suites.insert(definition.suite, vectors);
@@ -1644,14 +1650,23 @@ fn build_standard_kinds_dred_opus(
     run_standard: bool,
     _unused: &[TestKind],
 ) -> Vec<TestKind> {
-    if run_standard && matches!(args.mode, RunMode::Parity | RunMode::Both) {
-        vec![TestKind::ParityDecode {
+    if run_standard && matches!(args.mode, RunMode::Compliance | RunMode::Both) {
+        vec![TestKind::ComplianceDecode {
             sample_rate: SampleRate::R16000,
             channels: Channels::Mono,
             ignore_extensions: args.ignore_extensions,
         }]
     } else {
         Vec::new()
+    }
+}
+
+fn suite_supported(suite: VectorSuite) -> bool {
+    match suite {
+        VectorSuite::Classic | VectorSuite::Multistream | VectorSuite::Projection => true,
+        VectorSuite::Qext | VectorSuite::QextFuzz => cfg!(feature = "qext"),
+        // DRED suites require deep PLC + built-in weights for decoder-side DNN paths.
+        VectorSuite::DredOpus => cfg!(all(feature = "deep-plc", feature = "builtin-weights")),
     }
 }
 
@@ -1827,6 +1842,24 @@ fn first_mux_packet_diff(upstream: &[u8], rust: &[u8]) -> Option<String> {
     None
 }
 
+fn dred_compare_reference(reference_mono_16k: &[u8]) -> Vec<u8> {
+    assert!(
+        reference_mono_16k.len().is_multiple_of(2),
+        "DRED reference PCM must be 16-bit mono"
+    );
+    // `opus_compare` expects the reference at 48 kHz stereo and the tested signal
+    // at the requested output rate/channels. DRED refs are 16 kHz mono, so we
+    // synthesize a reference stream by 3x sample replication and mono->stereo copy.
+    let mut out = Vec::with_capacity(reference_mono_16k.len() * 6);
+    for sample in reference_mono_16k.chunks_exact(2) {
+        for _ in 0..3 {
+            out.extend_from_slice(sample);
+            out.extend_from_slice(sample);
+        }
+    }
+    out
+}
+
 fn run_test(
     test_vector: &TestVector,
     test_kind: TestKind,
@@ -1898,11 +1931,19 @@ fn run_test(
             channels,
             ignore_extensions,
         } => {
-            let Some(true_stereo) = test_vector.decoded_stereo.as_deref() else {
-                return TestResult::skip("missing compliance stereo reference");
+            let reference = match channels {
+                Channels::Mono => test_vector
+                    .decoded_mono
+                    .as_deref()
+                    .ok_or("missing compliance mono reference"),
+                Channels::Stereo => test_vector
+                    .decoded_stereo
+                    .as_deref()
+                    .ok_or("missing compliance stereo reference"),
             };
-            let Some(true_mono) = test_vector.decoded_mono.as_deref() else {
-                return TestResult::skip("missing compliance mono reference");
+            let true_ref = match reference {
+                Ok(v) => v,
+                Err(reason) => return TestResult::skip(reason),
             };
 
             let decode_args = DecodeArgs {
@@ -1922,6 +1963,96 @@ fn run_test(
                 decode_args,
                 &no_dnn,
             );
+
+            if test_vector.suite == VectorSuite::DredOpus {
+                if !matches!(channels, Channels::Mono) || usize::from(sample_rate) != 16_000 {
+                    return TestResult::skip(
+                        "dred-opus compliance expects mono 16k decode configuration",
+                    );
+                }
+                if !rust_decoded.len().is_multiple_of(2) || !true_ref.len().is_multiple_of(2) {
+                    return TestResult::fail("invalid PCM byte alignment for dred-opus comparison");
+                }
+
+                let upstream_decoded = opus_demo_decode(
+                    OpusBackend::Upstream,
+                    &test_vector.encoded,
+                    decode_args,
+                    &no_dnn,
+                );
+                if !upstream_decoded.len().is_multiple_of(2) {
+                    return TestResult::fail(
+                        "invalid upstream PCM byte alignment for dred-opus comparison",
+                    );
+                }
+
+                let ref_samples = true_ref.len() / 2;
+                let rust_samples = rust_decoded.len() / 2;
+                let upstream_samples = upstream_decoded.len() / 2;
+                let max_extra_samples = 320usize;
+
+                if rust_samples < ref_samples || upstream_samples < ref_samples {
+                    return TestResult::fail(format!(
+                        "decoded audio too short for dred-opus reference: rust/upstream/ref={}/{}/{} samples",
+                        rust_samples, upstream_samples, ref_samples
+                    ));
+                }
+                if rust_samples > ref_samples + max_extra_samples
+                    || upstream_samples > ref_samples + max_extra_samples
+                {
+                    return TestResult::fail(format!(
+                        "decoded audio too long for dred-opus reference: rust/upstream/ref={}/{}/{} samples",
+                        rust_samples, upstream_samples, ref_samples
+                    ));
+                }
+
+                let compare_ref = dred_compare_reference(true_ref);
+                let rust_trimmed = &rust_decoded[..ref_samples * 2];
+                let upstream_trimmed = &upstream_decoded[..ref_samples * 2];
+                let params = CompareParams {
+                    sample_rate,
+                    channels,
+                };
+                let cmp_rust = opus_compare(params, &compare_ref, rust_trimmed);
+                let cmp_upstream = opus_compare(params, &compare_ref, upstream_trimmed);
+
+                if let Some(dump_directory) = dump_directory {
+                    let name_base = format!(
+                        "{}_cmp_{}_{}_{}",
+                        test_vector.suite.as_str(),
+                        test_vector.name,
+                        usize::from(sample_rate),
+                        "mono"
+                    );
+                    std::fs::write(
+                        dump_directory.join(format!("{}_rust.dec", &name_base)),
+                        &rust_decoded,
+                    )
+                    .expect("writing compliance decode dump");
+                    std::fs::write(
+                        dump_directory.join(format!("{}_upstream.dec", &name_base)),
+                        &upstream_decoded,
+                    )
+                    .expect("writing upstream compliance decode dump");
+                }
+
+                let max_quality_drop = 64.0;
+                let pass = cmp_rust.quality + max_quality_drop >= cmp_upstream.quality;
+                let detail = format!(
+                    "quality rust/upstream={:.2}%/{:.2}% (delta={:.2}, max_drop={:.2}) rust/upstream/ref_samples={}/{}/{}",
+                    cmp_rust.quality,
+                    cmp_upstream.quality,
+                    cmp_rust.quality - cmp_upstream.quality,
+                    max_quality_drop,
+                    rust_samples,
+                    upstream_samples,
+                    ref_samples
+                );
+                if pass {
+                    return TestResult::pass(detail);
+                }
+                return TestResult::fail(detail);
+            }
 
             if let Some(dump_directory) = dump_directory {
                 let name_base = format!(
@@ -1946,14 +2077,9 @@ fn run_test(
                 sample_rate,
                 channels,
             };
-            let stereo_cmp = opus_compare(params, true_stereo, &rust_decoded);
-            let mono_cmp = opus_compare(params, true_mono, &rust_decoded);
-            let pass = stereo_cmp.is_success() || mono_cmp.is_success();
-
-            let detail = format!(
-                "quality stereo={:.2}% mono={:.2}%",
-                stereo_cmp.quality, mono_cmp.quality
-            );
+            let cmp = opus_compare(params, true_ref, &rust_decoded);
+            let pass = cmp.is_success();
+            let detail = format!("quality={:.2}%", cmp.quality);
 
             if pass {
                 TestResult::pass(detail)

@@ -652,7 +652,7 @@ jobs:
           compgen -G "opus_newvectors/vector*_opus.bit" > /dev/null
       - name: Run dred-opus full-matrix vectors (major platforms)
         if: matrix.major_platform
-        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite dred-opus --mode parity --matrix full
+        run: cargo run --release --features tools-dnn --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors --suite dred-opus --mode compliance --matrix full
       - name: Run test vectors (quick matrix on non-major platforms)
         if: ${{ !matrix.major_platform }}
         run: cargo run --release --features tools --target ${{ matrix.target }} --example run_vectors2 -- opus_newvectors

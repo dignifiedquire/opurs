@@ -185,21 +185,48 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
     }
     B::dec_set_ignore_extensions(&mut dec, options.ignore_extensions as i32);
 
+    let dnn_blob = dnn
+        .weights_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("failed to read weights file"));
+
     // DNN weight loading and decoder complexity
     if let Some(c) = complexity {
         B::dec_set_complexity(&mut dec, i32::from(c));
-        if let Some(ref path) = dnn.weights_file {
-            let blob = std::fs::read(path).expect("failed to read weights file");
-            B::dec_set_dnn_blob(&mut dec, &blob).expect("failed to load DNN weights blob");
+        if let Some(blob) = dnn_blob.as_ref() {
+            B::dec_set_dnn_blob(&mut dec, blob).expect("failed to load DNN weights blob");
         } else {
             B::dec_load_dnn_weights(&mut dec).expect("failed to load compiled-in DNN weights");
         }
     }
+    #[cfg(feature = "dred")]
+    if let Some(blob) = dnn_blob.as_ref() {
+        B::dec_set_dnn_blob(&mut dec, blob).expect("failed to load decoder DNN weights blob");
+    } else {
+        B::dec_load_dnn_weights(&mut dec).expect("failed to load compiled-in decoder DNN weights");
+    }
+
+    #[cfg(feature = "dred")]
+    let mut dred_state = match (B::dred_decoder_create(), B::dred_alloc()) {
+        (Ok(mut dred_dec), Ok(dred)) => {
+            if let Some(blob) = dnn_blob.as_ref() {
+                B::dred_set_dnn_blob(&mut dred_dec, blob)
+                    .expect("failed to load DRED decoder DNN weights blob");
+            } else {
+                B::dred_load_dnn_weights(&mut dred_dec)
+                    .expect("failed to load compiled-in DRED decoder DNN weights");
+            }
+            Some((dred_dec, dred))
+        }
+        _ => None,
+    };
 
     let mut frame_idx = 0;
+    let mut lost_count = 0i32;
+    let mut lost_prev = true;
 
     let mut packet = vec![0u8; MAX_PACKET];
-    let mut samples = vec![0i16; MAX_FRAME_SIZE * channels];
+    let mut samples = vec![0i32; MAX_FRAME_SIZE * channels];
     let mut output = Vec::<u8>::new();
 
     while cursor.position() < len as u64 {
@@ -212,31 +239,116 @@ fn opus_demo_decode_impl<B: OpusBackendTrait>(
         let packet_slice = &mut packet[..data_bytes as usize];
         cursor.read_exact(packet_slice).unwrap();
 
-        let output_samples = B::opus_decode(
-            &mut dec,
-            packet_slice,
-            &mut samples,
-            MAX_FRAME_SIZE as i32,
-            0,
-        );
-        if output_samples < 0 {
-            panic!("opus_decode failed: {}", opus_strerror(output_samples));
+        let lost = data_bytes == 0;
+        let run_decoder = if lost {
+            lost_count += 1;
+            0
+        } else {
+            1 + lost_count
+        };
+
+        #[cfg(feature = "dred")]
+        let mut dred_input = 0i32;
+        #[cfg(feature = "dred")]
+        if !lost && lost_count > 0 {
+            if let Some((dred_dec, dred)) = dred_state.as_mut() {
+                let mut output_samples = B::dec_get_last_packet_duration(&mut dec);
+                if output_samples <= 0 {
+                    output_samples = (usize::from(sample_rate) as i32 / 50).max(1);
+                }
+                let max_dred_samples =
+                    (usize::from(sample_rate) as i32).min((lost_count * output_samples).max(0));
+                let mut dred_end = 0;
+                let ret = B::dred_parse(
+                    dred_dec,
+                    dred,
+                    packet_slice,
+                    max_dred_samples,
+                    usize::from(sample_rate) as i32,
+                    &mut dred_end,
+                );
+                dred_input = if ret > 0 { ret } else { 0 };
+            }
         }
-        let samples = &samples[..output_samples as usize * channels];
 
-        let dec_final_range = B::dec_get_final_range(&mut dec);
+        for fr in 0..run_decoder {
+            let output_samples = if fr == lost_count - 1 && B::packet_has_lbrr(packet_slice) > 0 {
+                // Upstream opus_demo prefers FEC decode for the final lost frame when LBRR is present.
+                let mut frame_size = B::dec_get_last_packet_duration(&mut dec);
+                if frame_size <= 0 {
+                    frame_size = (usize::from(sample_rate) as i32 / 50).max(1);
+                }
+                B::opus_decode24(&mut dec, packet_slice, &mut samples, frame_size, 1)
+            } else if fr < lost_count {
+                // Mirror opus_demo loss handling: concealment decode uses
+                // last packet duration rather than an oversized frame cap.
+                let mut frame_size = B::dec_get_last_packet_duration(&mut dec);
+                if frame_size <= 0 {
+                    frame_size = (usize::from(sample_rate) as i32 / 50).max(1);
+                }
+                #[cfg(feature = "dred")]
+                {
+                    if dred_input > 0 {
+                        if let Some((_, dred)) = dred_state.as_ref() {
+                            let dred_offset = (lost_count - fr) * frame_size;
+                            B::dec_dred_decode24(
+                                &mut dec,
+                                dred,
+                                dred_offset,
+                                &mut samples,
+                                frame_size,
+                            )
+                        } else {
+                            B::opus_decode24(&mut dec, &[][..], &mut samples, frame_size, 0)
+                        }
+                    } else {
+                        B::opus_decode24(&mut dec, &[][..], &mut samples, frame_size, 0)
+                    }
+                }
+                #[cfg(not(feature = "dred"))]
+                {
+                    B::opus_decode24(&mut dec, &[][..], &mut samples, frame_size, 0)
+                }
+            } else {
+                B::opus_decode24(
+                    &mut dec,
+                    packet_slice,
+                    &mut samples,
+                    MAX_FRAME_SIZE as i32,
+                    0,
+                )
+            };
+            if output_samples < 0 {
+                panic!("opus_decode failed: {}", opus_strerror(output_samples));
+            }
+            let decoded = &samples[..output_samples as usize * channels];
+            for sample in decoded {
+                let s = (*sample).clamp(-0x007fff00, 0x007fff00);
+                let s16 = ((s + 128) >> 8) as i16;
+                output.extend_from_slice(&s16.to_le_bytes());
+            }
+        }
 
-        assert_eq!(
-            enc_final_range, dec_final_range,
-            "Range coder state mismatch between encoder and decoder in frame {}",
-            frame_idx
-        );
-
-        for sample in samples {
-            output.extend_from_slice(&sample.to_le_bytes());
+        if enc_final_range != 0 && !lost && !lost_prev {
+            let dec_final_range = B::dec_get_final_range(&mut dec);
+            assert_eq!(
+                enc_final_range, dec_final_range,
+                "Range coder state mismatch between encoder and decoder in frame {}",
+                frame_idx
+            );
         }
 
         frame_idx += 1;
+        lost_prev = lost;
+        if !lost {
+            lost_count = 0;
+        }
+    }
+
+    #[cfg(feature = "dred")]
+    if let Some((dred_dec, dred)) = dred_state {
+        B::dred_free(dred);
+        B::dred_decoder_destroy(dred_dec);
     }
 
     B::opus_decoder_destroy(dec);
