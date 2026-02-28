@@ -375,19 +375,30 @@ pub fn silk_NSQ_del_dec_c(
                             last_smple_idx += DECISION_DELAY;
                         }
                         let p_idx = (pulses_off as isize + (i - decisionDelay) as isize) as usize;
-                        pulses[p_idx] = (if 10 == 1 {
-                            (psDD.Q_Q10[last_smple_idx as usize] >> 1)
-                                + (psDD.Q_Q10[last_smple_idx as usize] & 1)
-                        } else {
-                            ((psDD.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
-                        }) as i8;
-                        let xq_val = (psDD.Xq_Q14[last_smple_idx as usize] as i64
+                        unsafe {
+                            *pulses.get_unchecked_mut(p_idx) = (if 10 == 1 {
+                                (*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) >> 1)
+                                    + (*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) & 1)
+                            } else {
+                                ((*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) >> (10 - 1))
+                                    + 1)
+                                    >> 1
+                            }) as i8;
+                        }
+                        let xq_val = (unsafe { *psDD.Xq_Q14.get_unchecked(last_smple_idx as usize) }
+                            as i64
                             * Gains_Q16[1] as i64)
                             >> 16;
                         let xq_idx = (pxq_off as isize + (i - decisionDelay) as isize) as usize;
-                        NSQ.xq[xq_idx] = rshift_round_sat16(xq_val as i32, 14);
-                        NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize] =
-                            psDD.Shape_Q14[last_smple_idx as usize];
+                        unsafe {
+                            *NSQ.xq.get_unchecked_mut(xq_idx) =
+                                rshift_round_sat16(xq_val as i32, 14);
+                        }
+                        unsafe {
+                            *NSQ.sLTP_shp_Q14.get_unchecked_mut(
+                                (NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize,
+                            ) = *psDD.Shape_Q14.get_unchecked(last_smple_idx as usize);
+                        }
                     }
                     subfr = 0;
                 }
@@ -535,16 +546,26 @@ pub fn silk_NSQ_del_dec_c(
             last_smple_idx += DECISION_DELAY;
         }
         let p_idx = (pulses_off as isize + (i - decisionDelay) as isize) as usize;
-        pulses[p_idx] = (if 10 == 1 {
-            (psDD.Q_Q10[last_smple_idx as usize] >> 1) + (psDD.Q_Q10[last_smple_idx as usize] & 1)
-        } else {
-            ((psDD.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
-        }) as i8;
-        let xq_val = (psDD.Xq_Q14[last_smple_idx as usize] as i64 * Gain_Q10 as i64) >> 16;
+        unsafe {
+            *pulses.get_unchecked_mut(p_idx) = (if 10 == 1 {
+                (*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) >> 1)
+                    + (*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) & 1)
+            } else {
+                ((*psDD.Q_Q10.get_unchecked(last_smple_idx as usize) >> (10 - 1)) + 1) >> 1
+            }) as i8;
+        }
+        let xq_val = (unsafe { *psDD.Xq_Q14.get_unchecked(last_smple_idx as usize) } as i64
+            * Gain_Q10 as i64)
+            >> 16;
         let xq_idx = (pxq_off as isize + (i - decisionDelay) as isize) as usize;
-        NSQ.xq[xq_idx] = rshift_round_sat16(xq_val as i32, 8);
-        NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize] =
-            psDD.Shape_Q14[last_smple_idx as usize];
+        unsafe {
+            *NSQ.xq.get_unchecked_mut(xq_idx) = rshift_round_sat16(xq_val as i32, 8);
+        }
+        unsafe {
+            *NSQ.sLTP_shp_Q14
+                .get_unchecked_mut((NSQ.sLTP_shp_buf_idx - decisionDelay + i) as usize) =
+                *psDD.Shape_Q14.get_unchecked(last_smple_idx as usize);
+        }
     }
 
     // Copy winner's state back to NSQ
@@ -642,20 +663,34 @@ fn silk_noise_shape_quantizer_del_dec(
         if signalType == TYPE_VOICED {
             LTP_pred_Q14 = 2;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + ((sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64) >> 16))
-                as i32;
+                + (unsafe {
+                    (*sLTP_Q15.get_unchecked(pred_lag_idx) as i64 * *b_Q14.get_unchecked(0) as i64)
+                        >> 16
+                })) as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + ((sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64) >> 16))
-                as i32;
+                + (unsafe {
+                    (*sLTP_Q15.get_unchecked(pred_lag_idx - 1) as i64
+                        * *b_Q14.get_unchecked(1) as i64)
+                        >> 16
+                })) as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + ((sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64) >> 16))
-                as i32;
+                + (unsafe {
+                    (*sLTP_Q15.get_unchecked(pred_lag_idx - 2) as i64
+                        * *b_Q14.get_unchecked(2) as i64)
+                        >> 16
+                })) as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + ((sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64) >> 16))
-                as i32;
+                + (unsafe {
+                    (*sLTP_Q15.get_unchecked(pred_lag_idx - 3) as i64
+                        * *b_Q14.get_unchecked(3) as i64)
+                        >> 16
+                })) as i32;
             LTP_pred_Q14 = (LTP_pred_Q14 as i64
-                + ((sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64) >> 16))
-                as i32;
+                + (unsafe {
+                    (*sLTP_Q15.get_unchecked(pred_lag_idx - 4) as i64
+                        * *b_Q14.get_unchecked(4) as i64)
+                        >> 16
+                })) as i32;
             LTP_pred_Q14 = ((LTP_pred_Q14 as u32) << 1) as i32;
             pred_lag_idx += 1;
         } else {
@@ -664,13 +699,14 @@ fn silk_noise_shape_quantizer_del_dec(
 
         // Harmonic noise shaping (shared)
         if lag > 0 {
-            n_LTP_Q14 = (((NSQ.sLTP_shp_Q14[shp_lag_idx]
-                .saturating_add(NSQ.sLTP_shp_Q14[shp_lag_idx - 2]))
-                as i64
+            n_LTP_Q14 = ((unsafe {
+                (*NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx))
+                    .saturating_add(*NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx - 2))
+            } as i64
                 * HarmShapeFIRPacked_Q14 as i16 as i64)
                 >> 16) as i32;
             n_LTP_Q14 = (n_LTP_Q14 as i64
-                + ((NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
+                + ((unsafe { *NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx - 1) } as i64
                     * (HarmShapeFIRPacked_Q14 as i64 >> 16))
                     >> 16)) as i32;
             n_LTP_Q14 = LTP_pred_Q14 - ((n_LTP_Q14 as u32) << 2) as i32;
@@ -697,42 +733,59 @@ fn silk_noise_shape_quantizer_del_dec(
             // Noise shaping with warping
             debug_assert!(shapingLPCOrder & 1 == 0);
             tmp2 = (psDD.Diff_Q14 as i64
-                + ((psDD.sAR2_Q14[0] as i64 * warping_Q16 as i16 as i64) >> 16))
-                as i32;
-            tmp1 = (psDD.sAR2_Q14[0] as i64
-                + (((psDD.sAR2_Q14[1].wrapping_sub(tmp2)) as i64 * warping_Q16 as i16 as i64)
+                + (unsafe {
+                    (*psDD.sAR2_Q14.get_unchecked(0) as i64 * warping_Q16 as i16 as i64) >> 16
+                })) as i32;
+            tmp1 = (unsafe { *psDD.sAR2_Q14.get_unchecked(0) } as i64
+                + ((unsafe { psDD.sAR2_Q14.get_unchecked(1).wrapping_sub(tmp2) } as i64
+                    * warping_Q16 as i16 as i64)
                     >> 16)) as i32;
-            psDD.sAR2_Q14[0] = tmp2;
+            unsafe {
+                *psDD.sAR2_Q14.get_unchecked_mut(0) = tmp2;
+            }
             n_AR_Q14 = shapingLPCOrder >> 1;
-            n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[0] as i64) >> 16)) as i32;
+            n_AR_Q14 = (n_AR_Q14 as i64
+                + ((tmp2 as i64 * unsafe { *AR_shp_Q13.get_unchecked(0) } as i64) >> 16))
+                as i32;
 
             let shaping_order = shapingLPCOrder as usize;
             let mut j = 2usize;
             while j < shaping_order {
-                tmp2 = (psDD.sAR2_Q14[j - 1] as i64
-                    + (((psDD.sAR2_Q14[j].wrapping_sub(tmp1)) as i64 * warping_Q16 as i16 as i64)
-                        >> 16)) as i32;
-                psDD.sAR2_Q14[j - 1] = tmp1;
-                n_AR_Q14 =
-                    (n_AR_Q14 as i64 + ((tmp1 as i64 * AR_shp_Q13[j - 1] as i64) >> 16)) as i32;
-                tmp1 = (psDD.sAR2_Q14[j] as i64
-                    + (((psDD.sAR2_Q14[j + 1].wrapping_sub(tmp2)) as i64
+                tmp2 = (unsafe { *psDD.sAR2_Q14.get_unchecked(j - 1) } as i64
+                    + ((unsafe { psDD.sAR2_Q14.get_unchecked(j).wrapping_sub(tmp1) } as i64
                         * warping_Q16 as i16 as i64)
                         >> 16)) as i32;
-                psDD.sAR2_Q14[j] = tmp2;
-                n_AR_Q14 = (n_AR_Q14 as i64 + ((tmp2 as i64 * AR_shp_Q13[j] as i64) >> 16)) as i32;
+                unsafe {
+                    *psDD.sAR2_Q14.get_unchecked_mut(j - 1) = tmp1;
+                }
+                n_AR_Q14 = (n_AR_Q14 as i64
+                    + ((tmp1 as i64 * unsafe { *AR_shp_Q13.get_unchecked(j - 1) } as i64) >> 16))
+                    as i32;
+                tmp1 = (unsafe { *psDD.sAR2_Q14.get_unchecked(j) } as i64
+                    + ((unsafe { psDD.sAR2_Q14.get_unchecked(j + 1).wrapping_sub(tmp2) } as i64
+                        * warping_Q16 as i16 as i64)
+                        >> 16)) as i32;
+                unsafe {
+                    *psDD.sAR2_Q14.get_unchecked_mut(j) = tmp2;
+                }
+                n_AR_Q14 = (n_AR_Q14 as i64
+                    + ((tmp2 as i64 * unsafe { *AR_shp_Q13.get_unchecked(j) } as i64) >> 16))
+                    as i32;
                 j += 2;
             }
-            psDD.sAR2_Q14[shaping_order - 1] = tmp1;
+            unsafe {
+                *psDD.sAR2_Q14.get_unchecked_mut(shaping_order - 1) = tmp1;
+            }
             n_AR_Q14 = (n_AR_Q14 as i64
-                + ((tmp1 as i64 * AR_shp_Q13[shaping_order - 1] as i64) >> 16))
-                as i32;
+                + ((tmp1 as i64 * unsafe { *AR_shp_Q13.get_unchecked(shaping_order - 1) } as i64)
+                    >> 16)) as i32;
             n_AR_Q14 = ((n_AR_Q14 as u32) << 1) as i32;
             n_AR_Q14 =
                 (n_AR_Q14 as i64 + ((psDD.LF_AR_Q14 as i64 * Tilt_Q14 as i16 as i64) >> 16)) as i32;
             n_AR_Q14 = ((n_AR_Q14 as u32) << 2) as i32;
 
-            n_LF_Q14 = ((psDD.Shape_Q14[*smpl_buf_idx as usize] as i64 * LF_shp_Q14 as i16 as i64)
+            n_LF_Q14 = ((unsafe { *psDD.Shape_Q14.get_unchecked(*smpl_buf_idx as usize) } as i64
+                * LF_shp_Q14 as i16 as i64)
                 >> 16) as i32;
             n_LF_Q14 = (n_LF_Q14 as i64
                 + ((psDD.LF_AR_Q14 as i64 * (LF_shp_Q14 as i64 >> 16)) >> 16))
@@ -748,7 +801,7 @@ fn silk_noise_shape_quantizer_del_dec(
                 ((tmp1 >> (4 - 1)) + 1) >> 1
             };
 
-            r_Q10 = x_Q10[i] - tmp1;
+            r_Q10 = unsafe { *x_Q10.get_unchecked(i) } - tmp1;
             if psDD.Seed < 0 {
                 r_Q10 = -r_Q10;
             }
@@ -811,44 +864,45 @@ fn silk_noise_shape_quantizer_del_dec(
             rr_Q10 = r_Q10 - q2_Q10;
             rd2_Q10 = (rd2_Q10 + rr_Q10 as i16 as i32 * rr_Q10 as i16 as i32) >> 10;
 
+            let psSS = unsafe { psSampleState.get_unchecked_mut(k) };
             if rd1_Q10 < rd2_Q10 {
-                psSampleState[k][0].RD_Q10 = psDD.RD_Q10 + rd1_Q10;
-                psSampleState[k][1].RD_Q10 = psDD.RD_Q10 + rd2_Q10;
-                psSampleState[k][0].Q_Q10 = q1_Q10;
-                psSampleState[k][1].Q_Q10 = q2_Q10;
+                psSS[0].RD_Q10 = psDD.RD_Q10 + rd1_Q10;
+                psSS[1].RD_Q10 = psDD.RD_Q10 + rd2_Q10;
+                psSS[0].Q_Q10 = q1_Q10;
+                psSS[1].Q_Q10 = q2_Q10;
             } else {
-                psSampleState[k][0].RD_Q10 = psDD.RD_Q10 + rd2_Q10;
-                psSampleState[k][1].RD_Q10 = psDD.RD_Q10 + rd1_Q10;
-                psSampleState[k][0].Q_Q10 = q2_Q10;
-                psSampleState[k][1].Q_Q10 = q1_Q10;
+                psSS[0].RD_Q10 = psDD.RD_Q10 + rd2_Q10;
+                psSS[1].RD_Q10 = psDD.RD_Q10 + rd1_Q10;
+                psSS[0].Q_Q10 = q2_Q10;
+                psSS[1].Q_Q10 = q1_Q10;
             }
 
             // Compute output for best and second-best candidate
-            exc_Q14 = ((psSampleState[k][0].Q_Q10 as u32) << 4) as i32;
+            exc_Q14 = ((psSS[0].Q_Q10 as u32) << 4) as i32;
             if psDD.Seed < 0 {
                 exc_Q14 = -exc_Q14;
             }
             LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
-            sLF_AR_shp_Q14 = psSampleState[k][0].Diff_Q14 - n_AR_Q14;
-            psSampleState[k][0].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
-            psSampleState[k][0].LF_AR_Q14 = sLF_AR_shp_Q14;
-            psSampleState[k][0].LPC_exc_Q14 = LPC_exc_Q14;
-            psSampleState[k][0].xq_Q14 = xq_Q14;
+            psSS[0].Diff_Q14 = xq_Q14 - ((unsafe { *x_Q10.get_unchecked(i) } as u32) << 4) as i32;
+            sLF_AR_shp_Q14 = psSS[0].Diff_Q14 - n_AR_Q14;
+            psSS[0].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
+            psSS[0].LF_AR_Q14 = sLF_AR_shp_Q14;
+            psSS[0].LPC_exc_Q14 = LPC_exc_Q14;
+            psSS[0].xq_Q14 = xq_Q14;
 
-            exc_Q14 = ((psSampleState[k][1].Q_Q10 as u32) << 4) as i32;
+            exc_Q14 = ((psSS[1].Q_Q10 as u32) << 4) as i32;
             if psDD.Seed < 0 {
                 exc_Q14 = -exc_Q14;
             }
             LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
-            sLF_AR_shp_Q14 = psSampleState[k][1].Diff_Q14 - n_AR_Q14;
-            psSampleState[k][1].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
-            psSampleState[k][1].LF_AR_Q14 = sLF_AR_shp_Q14;
-            psSampleState[k][1].LPC_exc_Q14 = LPC_exc_Q14;
-            psSampleState[k][1].xq_Q14 = xq_Q14;
+            psSS[1].Diff_Q14 = xq_Q14 - ((unsafe { *x_Q10.get_unchecked(i) } as u32) << 4) as i32;
+            sLF_AR_shp_Q14 = psSS[1].Diff_Q14 - n_AR_Q14;
+            psSS[1].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
+            psSS[1].LF_AR_Q14 = sLF_AR_shp_Q14;
+            psSS[1].LPC_exc_Q14 = LPC_exc_Q14;
+            psSS[1].xq_Q14 = xq_Q14;
         }
 
         // Update sample buffer index
@@ -859,38 +913,49 @@ fn silk_noise_shape_quantizer_del_dec(
         last_smple_idx = (*smpl_buf_idx + decisionDelay) % DECISION_DELAY;
 
         // Find winner among best candidates
-        RDmin_Q10 = psSampleState[0][0].RD_Q10;
+        RDmin_Q10 = unsafe { psSampleState.get_unchecked(0) }[0].RD_Q10;
         Winner_ind = 0;
         #[allow(clippy::needless_range_loop)]
         for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][0].RD_Q10;
+            if unsafe { psSampleState.get_unchecked(k) }[0].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = unsafe { psSampleState.get_unchecked(k) }[0].RD_Q10;
                 Winner_ind = k as i32;
             }
         }
 
         // Prune states with different rand state than winner
-        Winner_rand_state = psDelDec[Winner_ind as usize].RandState[last_smple_idx as usize];
+        Winner_rand_state = unsafe {
+            *psDelDec
+                .get_unchecked(Winner_ind as usize)
+                .RandState
+                .get_unchecked(last_smple_idx as usize)
+        };
         for k in 0..nStates {
-            if psDelDec[k].RandState[last_smple_idx as usize] != Winner_rand_state {
-                psSampleState[k][0].RD_Q10 += 0x7fffffff >> 4;
-                psSampleState[k][1].RD_Q10 += 0x7fffffff >> 4;
+            if unsafe {
+                *psDelDec
+                    .get_unchecked(k)
+                    .RandState
+                    .get_unchecked(last_smple_idx as usize)
+            } != Winner_rand_state
+            {
+                (unsafe { psSampleState.get_unchecked_mut(k) })[0].RD_Q10 += 0x7fffffff >> 4;
+                (unsafe { psSampleState.get_unchecked_mut(k) })[1].RD_Q10 += 0x7fffffff >> 4;
             }
         }
 
         // Find worst-best and best-second for state replacement
-        RDmax_Q10 = psSampleState[0][0].RD_Q10;
-        RDmin_Q10 = psSampleState[0][1].RD_Q10;
+        RDmax_Q10 = (unsafe { psSampleState.get_unchecked(0) })[0].RD_Q10;
+        RDmin_Q10 = (unsafe { psSampleState.get_unchecked(0) })[1].RD_Q10;
         RDmax_ind = 0;
         RDmin_ind = 0;
         #[allow(clippy::needless_range_loop)]
         for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 > RDmax_Q10 {
-                RDmax_Q10 = psSampleState[k][0].RD_Q10;
+            if (unsafe { psSampleState.get_unchecked(k) })[0].RD_Q10 > RDmax_Q10 {
+                RDmax_Q10 = (unsafe { psSampleState.get_unchecked(k) })[0].RD_Q10;
                 RDmax_ind = k as i32;
             }
-            if psSampleState[k][1].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][1].RD_Q10;
+            if (unsafe { psSampleState.get_unchecked(k) })[1].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = (unsafe { psSampleState.get_unchecked(k) })[1].RD_Q10;
                 RDmin_ind = k as i32;
             }
         }
@@ -909,42 +974,65 @@ fn silk_noise_shape_quantizer_del_dec(
                 };
                 copy_del_dec_state_partial(left, right, i);
             }
-            psSampleState[RDmax_ind as usize][0] = psSampleState[RDmin_ind as usize][1];
+            (unsafe { psSampleState.get_unchecked_mut(RDmax_ind as usize) })[0] =
+                (unsafe { psSampleState.get_unchecked(RDmin_ind as usize) })[1];
         }
 
         // Output delayed samples
         if subfr > 0 || i as i32 >= decisionDelay {
-            let psDD_w = &psDelDec[Winner_ind as usize];
+            let psDD_w = unsafe { psDelDec.get_unchecked(Winner_ind as usize) };
             let out_idx = pulses_off + i - decisionDelay as usize;
-            pulses[out_idx] = (if 10 == 1 {
-                (psDD_w.Q_Q10[last_smple_idx as usize] >> 1)
-                    + (psDD_w.Q_Q10[last_smple_idx as usize] & 1)
-            } else {
-                ((psDD_w.Q_Q10[last_smple_idx as usize] >> (10 - 1)) + 1) >> 1
-            }) as i8;
-            let xq_val = (psDD_w.Xq_Q14[last_smple_idx as usize] as i64
-                * delayedGain_Q10[last_smple_idx as usize] as i64)
+            unsafe {
+                *pulses.get_unchecked_mut(out_idx) = (if 10 == 1 {
+                    (*psDD_w.Q_Q10.get_unchecked(last_smple_idx as usize) >> 1)
+                        + (*psDD_w.Q_Q10.get_unchecked(last_smple_idx as usize) & 1)
+                } else {
+                    ((*psDD_w.Q_Q10.get_unchecked(last_smple_idx as usize) >> (10 - 1)) + 1) >> 1
+                }) as i8;
+            }
+            let xq_val = (unsafe { *psDD_w.Xq_Q14.get_unchecked(last_smple_idx as usize) } as i64
+                * unsafe { *delayedGain_Q10.get_unchecked(last_smple_idx as usize) } as i64)
                 >> 16;
-            NSQ.xq[xq_off + i - decisionDelay as usize] = rshift_round_sat16(xq_val as i32, 8);
-            NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - decisionDelay) as usize] =
-                psDD_w.Shape_Q14[last_smple_idx as usize];
-            sLTP_Q15[(NSQ.sLTP_buf_idx - decisionDelay) as usize] =
-                psDD_w.Pred_Q15[last_smple_idx as usize];
+            unsafe {
+                *NSQ.xq
+                    .get_unchecked_mut(xq_off + i - decisionDelay as usize) =
+                    rshift_round_sat16(xq_val as i32, 8);
+            }
+            unsafe {
+                *NSQ.sLTP_shp_Q14
+                    .get_unchecked_mut((NSQ.sLTP_shp_buf_idx - decisionDelay) as usize) =
+                    *psDD_w.Shape_Q14.get_unchecked(last_smple_idx as usize);
+            }
+            unsafe {
+                *sLTP_Q15.get_unchecked_mut((NSQ.sLTP_buf_idx - decisionDelay) as usize) =
+                    *psDD_w.Pred_Q15.get_unchecked(last_smple_idx as usize);
+            }
         }
         NSQ.sLTP_shp_buf_idx += 1;
         NSQ.sLTP_buf_idx += 1;
 
         // Update all states with their best candidate
         for k in 0..nStates {
-            let psSS = &psSampleState[k][0];
-            let psDD = &mut psDelDec[k];
+            let psSS = &unsafe { psSampleState.get_unchecked(k) }[0];
+            let psDD = unsafe { psDelDec.get_unchecked_mut(k) };
             psDD.LF_AR_Q14 = psSS.LF_AR_Q14;
             psDD.Diff_Q14 = psSS.Diff_Q14;
-            psDD.sLPC_Q14[NSQ_LPC_BUF_LENGTH + i] = psSS.xq_Q14;
-            psDD.Xq_Q14[*smpl_buf_idx as usize] = psSS.xq_Q14;
-            psDD.Q_Q10[*smpl_buf_idx as usize] = psSS.Q_Q10;
-            psDD.Pred_Q15[*smpl_buf_idx as usize] = ((psSS.LPC_exc_Q14 as u32) << 1) as i32;
-            psDD.Shape_Q14[*smpl_buf_idx as usize] = psSS.sLTP_shp_Q14;
+            unsafe {
+                *psDD.sLPC_Q14.get_unchecked_mut(NSQ_LPC_BUF_LENGTH + i) = psSS.xq_Q14;
+            }
+            unsafe {
+                *psDD.Xq_Q14.get_unchecked_mut(*smpl_buf_idx as usize) = psSS.xq_Q14;
+            }
+            unsafe {
+                *psDD.Q_Q10.get_unchecked_mut(*smpl_buf_idx as usize) = psSS.Q_Q10;
+            }
+            unsafe {
+                *psDD.Pred_Q15.get_unchecked_mut(*smpl_buf_idx as usize) =
+                    ((psSS.LPC_exc_Q14 as u32) << 1) as i32;
+            }
+            unsafe {
+                *psDD.Shape_Q14.get_unchecked_mut(*smpl_buf_idx as usize) = psSS.sLTP_shp_Q14;
+            }
             psDD.Seed = (psDD.Seed as u32).wrapping_add(
                 (if 10 == 1 {
                     (psSS.Q_Q10 >> 1) + (psSS.Q_Q10 & 1)
@@ -952,10 +1040,14 @@ fn silk_noise_shape_quantizer_del_dec(
                     ((psSS.Q_Q10 >> (10 - 1)) + 1) >> 1
                 }) as u32,
             ) as i32;
-            psDD.RandState[*smpl_buf_idx as usize] = psDD.Seed;
+            unsafe {
+                *psDD.RandState.get_unchecked_mut(*smpl_buf_idx as usize) = psDD.Seed;
+            }
             psDD.RD_Q10 = psSS.RD_Q10;
         }
-        delayedGain_Q10[*smpl_buf_idx as usize] = Gain_Q10;
+        unsafe {
+            *delayedGain_Q10.get_unchecked_mut(*smpl_buf_idx as usize) = Gain_Q10;
+        }
     }
 
     // Copy LPC state for next subframe
@@ -999,7 +1091,10 @@ fn silk_nsq_del_dec_scale_states(
     };
 
     for i in 0..psEncC.subfr_length {
-        x_sc_Q10[i] = ((x16[i] as i64 * inv_gain_Q26 as i64) >> 16) as i32;
+        unsafe {
+            *x_sc_Q10.get_unchecked_mut(i) =
+                ((*x16.get_unchecked(i) as i64 * inv_gain_Q26 as i64) >> 16) as i32;
+        }
     }
 
     if NSQ.rewhite_flag != 0 {
@@ -1011,7 +1106,10 @@ fn silk_nsq_del_dec_scale_states(
         let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let end = NSQ.sLTP_buf_idx as usize;
         for i in start..end {
-            sLTP_Q15[i] = ((inv_gain_Q31 as i64 * sLTP[i] as i64) >> 16) as i32;
+            unsafe {
+                *sLTP_Q15.get_unchecked_mut(i) =
+                    ((inv_gain_Q31 as i64 * *sLTP.get_unchecked(i) as i64) >> 16) as i32;
+            }
         }
     }
 
@@ -1021,7 +1119,11 @@ fn silk_nsq_del_dec_scale_states(
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;
         for i in shp_start..shp_end {
-            NSQ.sLTP_shp_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64) >> 16) as i32;
+            unsafe {
+                let v = *NSQ.sLTP_shp_Q14.get_unchecked(i);
+                *NSQ.sLTP_shp_Q14.get_unchecked_mut(i) =
+                    ((gain_adj_Q16 as i64 * v as i64) >> 16) as i32;
+            }
         }
 
         if signal_type == TYPE_VOICED && NSQ.rewhite_flag == 0 {
@@ -1036,14 +1138,28 @@ fn silk_nsq_del_dec_scale_states(
             psDD.LF_AR_Q14 = ((gain_adj_Q16 as i64 * psDD.LF_AR_Q14 as i64) >> 16) as i32;
             psDD.Diff_Q14 = ((gain_adj_Q16 as i64 * psDD.Diff_Q14 as i64) >> 16) as i32;
             for j in 0..NSQ_LPC_BUF_LENGTH {
-                psDD.sLPC_Q14[j] = ((gain_adj_Q16 as i64 * psDD.sLPC_Q14[j] as i64) >> 16) as i32;
+                unsafe {
+                    let v = *psDD.sLPC_Q14.get_unchecked(j);
+                    *psDD.sLPC_Q14.get_unchecked_mut(j) =
+                        ((gain_adj_Q16 as i64 * v as i64) >> 16) as i32;
+                }
             }
             for j in 0..MAX_SHAPE_LPC_ORDER as usize {
-                psDD.sAR2_Q14[j] = ((gain_adj_Q16 as i64 * psDD.sAR2_Q14[j] as i64) >> 16) as i32;
+                unsafe {
+                    let v = *psDD.sAR2_Q14.get_unchecked(j);
+                    *psDD.sAR2_Q14.get_unchecked_mut(j) =
+                        ((gain_adj_Q16 as i64 * v as i64) >> 16) as i32;
+                }
             }
             for j in 0..DECISION_DELAY as usize {
-                psDD.Pred_Q15[j] = ((gain_adj_Q16 as i64 * psDD.Pred_Q15[j] as i64) >> 16) as i32;
-                psDD.Shape_Q14[j] = ((gain_adj_Q16 as i64 * psDD.Shape_Q14[j] as i64) >> 16) as i32;
+                unsafe {
+                    let v = *psDD.Pred_Q15.get_unchecked(j);
+                    *psDD.Pred_Q15.get_unchecked_mut(j) =
+                        ((gain_adj_Q16 as i64 * v as i64) >> 16) as i32;
+                    let v2 = *psDD.Shape_Q14.get_unchecked(j);
+                    *psDD.Shape_Q14.get_unchecked_mut(j) =
+                        ((gain_adj_Q16 as i64 * v2 as i64) >> 16) as i32;
+                }
             }
         }
 

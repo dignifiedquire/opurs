@@ -33,7 +33,7 @@ use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
     ec_enc_uint,
 };
-use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
+use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt, float2int_nonneg};
 use crate::celt::mdct::mdct_forward;
 #[cfg(feature = "qext")]
 use crate::celt::modes::compute_qext_mode;
@@ -391,7 +391,9 @@ pub fn opus_custom_encode(
     }
     let mut input = vec![0.0f32; required];
     for i in 0..required {
-        input[i] = (1.0f32 / 32768.0f32) * pcm[i] as f32;
+        unsafe {
+            *input.get_unchecked_mut(i) = (1.0f32 / 32768.0f32) * *pcm.get_unchecked(i) as f32;
+        }
     }
     celt_encode_with_ec(
         st,
@@ -457,7 +459,10 @@ pub fn opus_custom_encode24(
     }
     let mut input = vec![0.0f32; required];
     for i in 0..required {
-        input[i] = (1.0f32 / 32768.0f32 / 256.0f32) * pcm[i] as f32;
+        unsafe {
+            *input.get_unchecked_mut(i) =
+                (1.0f32 / 32768.0f32 / 256.0f32) * *pcm.get_unchecked(i) as f32;
+        }
     }
     celt_encode_with_ec(
         st,
@@ -580,13 +585,15 @@ fn transient_analysis(
         while i < len {
             let mut x: opus_val32 = 0.;
             let mut y: opus_val32 = 0.;
-            x = in_0[(i + c * len) as usize];
+            x = unsafe { *in_0.get_unchecked((i + c * len) as usize) };
             y = mem0 + x;
             /* Modified code to shorten dependency chains: */
             let mem00: f32 = mem0;
             mem0 = mem0 - x + 0.5f32 * mem1;
             mem1 = x - mem00;
-            tmp[i as usize] = y;
+            unsafe {
+                *tmp.get_unchecked_mut(i as usize) = y;
+            }
             i += 1;
         }
         // First few samples are unreliable because filter memory isn't propagated.
@@ -597,11 +604,15 @@ fn transient_analysis(
         // Forward pass to compute the post-echo threshold.
         i = 0;
         while i < len2 {
-            let x2: opus_val16 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
-                + tmp[(2 * i + 1) as usize] * tmp[(2 * i + 1) as usize];
+            let x2: opus_val16 = unsafe { *tmp.get_unchecked((2 * i) as usize) }
+                * unsafe { *tmp.get_unchecked((2 * i) as usize) }
+                + unsafe { *tmp.get_unchecked((2 * i + 1) as usize) }
+                    * unsafe { *tmp.get_unchecked((2 * i + 1) as usize) };
             mean += x2;
             mem0 = x2 + (1.0f32 - forward_decay) * mem0;
-            tmp[i as usize] = forward_decay * mem0;
+            unsafe {
+                *tmp.get_unchecked_mut(i as usize) = forward_decay * mem0;
+            }
             i += 1;
         }
         mem0 = 0 as opus_val32;
@@ -610,8 +621,10 @@ fn transient_analysis(
         i = len2 - 1;
         while i >= 0 {
             // Backward masking: 13.9 dB/ms.
-            mem0 = tmp[i as usize] + 0.875f32 * mem0;
-            tmp[i as usize] = 0.125f32 * mem0;
+            mem0 = unsafe { *tmp.get_unchecked(i as usize) } + 0.875f32 * mem0;
+            unsafe {
+                *tmp.get_unchecked_mut(i as usize) = 0.125f32 * mem0;
+            }
             maxE = if maxE > 0.125f32 * mem0 {
                 maxE
             } else {
@@ -637,17 +650,18 @@ fn transient_analysis(
         i = 12;
         while i < len2 - 5 {
             let mut id: i32 = 0;
+            let tmp_i = unsafe { *tmp.get_unchecked(i as usize) };
             id = (if 0.0
-                > (if 127.0 < (64.0 * norm * (tmp[i as usize] + 1e-15f32)).floor() {
+                > (if 127.0 < (64.0 * norm * (tmp_i + 1e-15f32)).floor() {
                     127.0
                 } else {
-                    (64.0 * norm * (tmp[i as usize] + 1e-15f32)).floor()
+                    (64.0 * norm * (tmp_i + 1e-15f32)).floor()
                 }) {
                 0.0
-            } else if 127.0 < (64.0 * norm * (tmp[i as usize] + 1e-15f32)).floor() {
+            } else if 127.0 < (64.0 * norm * (tmp_i + 1e-15f32)).floor() {
                 127.0
             } else {
-                (64.0 * norm * (tmp[i as usize] + 1e-15f32)).floor()
+                (64.0 * norm * (tmp_i + 1e-15f32)).floor()
             }) as i32;
             unmask += inv_table[id as usize] as i32;
             i += 4;
@@ -716,11 +730,15 @@ fn patch_transient_decision(
         spread_old[start as usize] = oldE[start as usize];
         i = start + 1;
         while i < end {
-            spread_old[i as usize] = if spread_old[(i - 1) as usize] - 1.0f32 > oldE[i as usize] {
-                spread_old[(i - 1) as usize] - 1.0f32
-            } else {
-                oldE[i as usize]
-            };
+            let prev = unsafe { *spread_old.get_unchecked((i - 1) as usize) };
+            let old_i = unsafe { *oldE.get_unchecked(i as usize) };
+            unsafe {
+                *spread_old.get_unchecked_mut(i as usize) = if prev - 1.0f32 > old_i {
+                    prev - 1.0f32
+                } else {
+                    old_i
+                };
+            }
             i += 1;
         }
     } else {
@@ -731,28 +749,31 @@ fn patch_transient_decision(
         };
         i = start + 1;
         while i < end {
-            spread_old[i as usize] = if spread_old[(i - 1) as usize] - 1.0f32
-                > (if oldE[i as usize] > oldE[(i + nbEBands) as usize] {
-                    oldE[i as usize]
+            let prev = unsafe { *spread_old.get_unchecked((i - 1) as usize) };
+            let old_i = unsafe { *oldE.get_unchecked(i as usize) };
+            let old_i2 = unsafe { *oldE.get_unchecked((i + nbEBands) as usize) };
+            let max_old = if old_i > old_i2 { old_i } else { old_i2 };
+            unsafe {
+                *spread_old.get_unchecked_mut(i as usize) = if prev - 1.0f32 > max_old {
+                    prev - 1.0f32
                 } else {
-                    oldE[(i + nbEBands) as usize]
-                }) {
-                spread_old[(i - 1) as usize] - 1.0f32
-            } else if oldE[i as usize] > oldE[(i + nbEBands) as usize] {
-                oldE[i as usize]
-            } else {
-                oldE[(i + nbEBands) as usize]
-            };
+                    max_old
+                };
+            }
             i += 1;
         }
     }
     i = end - 2;
     while i >= start {
-        spread_old[i as usize] = if spread_old[i as usize] > spread_old[(i + 1) as usize] - 1.0f32 {
-            spread_old[i as usize]
-        } else {
-            spread_old[(i + 1) as usize] - 1.0f32
-        };
+        let cur = unsafe { *spread_old.get_unchecked(i as usize) };
+        let next = unsafe { *spread_old.get_unchecked((i + 1) as usize) };
+        unsafe {
+            *spread_old.get_unchecked_mut(i as usize) = if cur > next - 1.0f32 {
+                cur
+            } else {
+                next - 1.0f32
+            };
+        }
         i -= 1;
     }
     // Compute mean increase versus spread old energies.
@@ -762,15 +783,17 @@ fn patch_transient_decision(
         while i < end - 1 {
             let mut x1: opus_val16 = 0.;
             let mut x2: opus_val16 = 0.;
-            x1 = if 0 as f32 > newE[(i + c * nbEBands) as usize] {
+            let new_val = unsafe { *newE.get_unchecked((i + c * nbEBands) as usize) };
+            x1 = if 0 as f32 > new_val {
                 0 as f32
             } else {
-                newE[(i + c * nbEBands) as usize]
+                new_val
             };
-            x2 = if 0 as f32 > spread_old[i as usize] {
+            let spread_val = unsafe { *spread_old.get_unchecked(i as usize) };
+            x2 = if 0 as f32 > spread_val {
                 0 as f32
             } else {
-                spread_old[i as usize]
+                spread_val
             };
             mean_diff += if 0 as f32 > x1 - x2 {
                 0 as f32
@@ -843,7 +866,11 @@ fn compute_mdcts(
     if CC == 2 && C == 1 {
         i = 0;
         while i < B * N {
-            out[i as usize] = 0.5f32 * out[i as usize] + 0.5f32 * out[(B * N + i) as usize];
+            unsafe {
+                let a = *out.get_unchecked(i as usize);
+                let b = *out.get_unchecked((B * N + i) as usize);
+                *out.get_unchecked_mut(i as usize) = 0.5f32 * a + 0.5f32 * b;
+            }
             i += 1;
         }
     }
@@ -853,7 +880,9 @@ fn compute_mdcts(
             let bound: i32 = B * N / upsample;
             i = 0;
             while i < bound {
-                out[(c * B * N + i) as usize] *= upsample as f32;
+                unsafe {
+                    *out.get_unchecked_mut((c * B * N + i) as usize) *= upsample as f32;
+                }
                 i += 1;
             }
             let base = (c * B * N + bound) as usize;
@@ -887,8 +916,10 @@ fn celt_preemphasis(
         i = 0;
         while i < N {
             let mut x: opus_val16 = 0.;
-            x = pcmp[(CC * i) as usize] * CELT_SIG_SCALE;
-            inp[i as usize] = x - m;
+            x = unsafe { *pcmp.get_unchecked((CC * i) as usize) } * CELT_SIG_SCALE;
+            unsafe {
+                *inp.get_unchecked_mut(i as usize) = x - m;
+            }
             m = coef0 * x;
             i += 1;
         }
@@ -901,32 +932,37 @@ fn celt_preemphasis(
     }
     i = 0;
     while i < Nu {
-        inp[(i * upsample) as usize] = pcmp[(CC * i) as usize] * CELT_SIG_SCALE;
+        unsafe {
+            *inp.get_unchecked_mut((i * upsample) as usize) =
+                *pcmp.get_unchecked((CC * i) as usize) * CELT_SIG_SCALE;
+        }
         i += 1;
     }
     if clip != 0 {
         i = 0;
         while i < Nu {
-            inp[(i * upsample) as usize] = if -65536.0f32
-                > (if 65536.0f32 < inp[(i * upsample) as usize] {
-                    65536.0f32
-                } else {
-                    inp[(i * upsample) as usize]
-                }) {
-                -65536.0f32
-            } else if 65536.0f32 < inp[(i * upsample) as usize] {
-                65536.0f32
-            } else {
-                inp[(i * upsample) as usize]
-            };
+            let idx = (i * upsample) as usize;
+            let val = unsafe { *inp.get_unchecked(idx) };
+            unsafe {
+                *inp.get_unchecked_mut(idx) =
+                    if -65536.0f32 > (if 65536.0f32 < val { 65536.0f32 } else { val }) {
+                        -65536.0f32
+                    } else if 65536.0f32 < val {
+                        65536.0f32
+                    } else {
+                        val
+                    };
+            }
             i += 1;
         }
     }
     i = 0;
     while i < N {
         let mut x_0: opus_val16 = 0.;
-        x_0 = inp[i as usize];
-        inp[i as usize] = x_0 - m;
+        x_0 = unsafe { *inp.get_unchecked(i as usize) };
+        unsafe {
+            *inp.get_unchecked_mut(i as usize) = x_0 - m;
+        }
         m = coef0 * x_0;
         i += 1;
     }
@@ -937,7 +973,7 @@ fn l1_metric(tmp: &[celt_norm], N: i32, LM: i32, bias: opus_val16) -> opus_val32
     let mut L1: opus_val32 = 0 as opus_val32;
     let mut i: i32 = 0;
     while i < N {
-        L1 += tmp[i as usize].abs();
+        L1 += unsafe { *tmp.get_unchecked(i as usize) }.abs();
         i += 1;
     }
     L1 = L1 + LM as f32 * bias * L1;
@@ -991,9 +1027,15 @@ fn tf_analysis(
         let mut L1: opus_val32 = 0.;
         let mut best_L1: opus_val32 = 0.;
         let mut best_level: i32 = 0;
-        N = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM;
-        narrow = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32 == 1) as i32;
-        let x_offset = (tf_chan * N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
+        N = (unsafe { *m.eBands.get_unchecked((i + 1) as usize) } as i32
+            - unsafe { *m.eBands.get_unchecked(i as usize) } as i32)
+            << LM;
+        narrow = (unsafe { *m.eBands.get_unchecked((i + 1) as usize) } as i32
+            - unsafe { *m.eBands.get_unchecked(i as usize) } as i32
+            == 1) as i32;
+        let x_offset = (tf_chan * N0
+            + ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM))
+            as usize;
         tmp[..N as usize].copy_from_slice(&X[x_offset..x_offset + N as usize]);
         L1 = l1_metric(&tmp, N, if isTransient != 0 { LM } else { 0 }, bias);
         best_L1 = L1;
@@ -1023,12 +1065,19 @@ fn tf_analysis(
             k += 1;
         }
         if isTransient != 0 {
-            metric[i as usize] = 2 * best_level;
+            unsafe {
+                *metric.get_unchecked_mut(i as usize) = 2 * best_level;
+            }
         } else {
-            metric[i as usize] = -(2) * best_level;
+            unsafe {
+                *metric.get_unchecked_mut(i as usize) = -(2) * best_level;
+            }
         }
-        if narrow != 0 && (metric[i as usize] == 0 || metric[i as usize] == -(2) * LM) {
-            metric[i as usize] -= 1;
+        let m_i = unsafe { *metric.get_unchecked(i as usize) };
+        if narrow != 0 && (m_i == 0 || m_i == -(2) * LM) {
+            unsafe {
+                *metric.get_unchecked_mut(i as usize) -= 1;
+            }
         }
         i += 1;
     }
@@ -1059,22 +1108,26 @@ fn tf_analysis(
             } else {
                 cost1
             };
+            let imp_i = unsafe { *importance.get_unchecked(i as usize) };
+            let met_i = unsafe { *metric.get_unchecked(i as usize) };
             cost0 = curr0
-                + importance[i as usize]
-                    * (metric[i as usize]
+                + imp_i
+                    * (met_i
                         - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel) as usize]
                             as i32)
                         .abs();
             cost1 = curr1
-                + importance[i as usize]
-                    * (metric[i as usize]
+                + imp_i
+                    * (met_i
                         - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
                             as i32)
                         .abs();
             i += 1;
         }
         cost0 = if cost0 < cost1 { cost0 } else { cost1 };
-        selcost[sel as usize] = cost0;
+        unsafe {
+            *selcost.get_unchecked_mut(sel as usize) = cost0;
+        }
         sel += 1;
     }
     if selcost[1_usize] < selcost[0_usize] && isTransient != 0 {
@@ -1100,42 +1153,58 @@ fn tf_analysis(
         from1 = cost1 + lambda;
         if from0 < from1 {
             curr0_0 = from0;
-            path0[i as usize] = 0;
+            unsafe {
+                *path0.get_unchecked_mut(i as usize) = 0;
+            }
         } else {
             curr0_0 = from1;
-            path0[i as usize] = 1;
+            unsafe {
+                *path0.get_unchecked_mut(i as usize) = 1;
+            }
         }
         from0 = cost0 + lambda;
         from1 = cost1;
         if from0 < from1 {
             curr1_0 = from0;
-            path1[i as usize] = 0;
+            unsafe {
+                *path1.get_unchecked_mut(i as usize) = 0;
+            }
         } else {
             curr1_0 = from1;
-            path1[i as usize] = 1;
+            unsafe {
+                *path1.get_unchecked_mut(i as usize) = 1;
+            }
         }
+        let imp_i = unsafe { *importance.get_unchecked(i as usize) };
+        let met_i = unsafe { *metric.get_unchecked(i as usize) };
         cost0 = curr0_0
-            + importance[i as usize]
-                * (metric[i as usize]
+            + imp_i
+                * (met_i
                     - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select) as usize]
                         as i32)
                     .abs();
         cost1 = curr1_0
-            + importance[i as usize]
-                * (metric[i as usize]
+            + imp_i
+                * (met_i
                     - 2 * tf_select_table[LM as usize]
                         [(4 * isTransient + 2 * tf_select + 1) as usize]
                         as i32)
                     .abs();
         i += 1;
     }
-    tf_res[(len - 1) as usize] = if cost0 < cost1 { 0 } else { 1 };
+    unsafe {
+        *tf_res.get_unchecked_mut((len - 1) as usize) = if cost0 < cost1 { 0 } else { 1 };
+    }
     i = len - 2;
     while i >= 0 {
-        if tf_res[(i + 1) as usize] == 1 {
-            tf_res[i as usize] = path1[(i + 1) as usize];
+        if unsafe { *tf_res.get_unchecked((i + 1) as usize) } == 1 {
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = *path1.get_unchecked((i + 1) as usize);
+            }
         } else {
-            tf_res[i as usize] = path0[(i + 1) as usize];
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = *path0.get_unchecked((i + 1) as usize);
+            }
         }
         i -= 1;
     }
@@ -1168,12 +1237,15 @@ fn tf_encode(
     i = start;
     while i < end {
         if tell.wrapping_add(logp as u32) <= budget {
-            ec_enc_bit_logp(enc, tf_res[i as usize] ^ curr, logp as u32);
+            let tf_i = unsafe { *tf_res.get_unchecked(i as usize) };
+            ec_enc_bit_logp(enc, tf_i ^ curr, logp as u32);
             tell = ec_tell(enc) as u32;
-            curr = tf_res[i as usize];
+            curr = tf_i;
             tf_changed |= curr;
         } else {
-            tf_res[i as usize] = curr;
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = curr;
+            }
         }
         logp = if isTransient != 0 { 4 } else { 5 };
         i += 1;
@@ -1188,9 +1260,12 @@ fn tf_encode(
     }
     i = start;
     while i < end {
-        tf_res[i as usize] = tf_select_table[LM as usize]
-            [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
-            as i32;
+        let tf_i = unsafe { *tf_res.get_unchecked(i as usize) };
+        unsafe {
+            *tf_res.get_unchecked_mut(i as usize) = tf_select_table[LM as usize]
+                [(4 * isTransient + 2 * tf_select + tf_i) as usize]
+                as i32;
+        }
         i += 1;
     }
 }
@@ -1230,10 +1305,12 @@ fn alloc_trim_analysis(
         i = 0;
         while i < 8 {
             let mut partial: opus_val32 = 0.;
-            let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
-            let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
-            let band_len =
-                ((m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM) as usize;
+            let band_off = ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM) as usize;
+            let band_off2 =
+                (N0 + ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM)) as usize;
+            let band_len = ((unsafe { *m.eBands.get_unchecked((i + 1) as usize) } as i32
+                - unsafe { *m.eBands.get_unchecked(i as usize) } as i32)
+                << LM) as usize;
             partial = celt_inner_prod(
                 &X[band_off..band_off + band_len],
                 &X[band_off2..band_off2 + band_len],
@@ -1253,10 +1330,12 @@ fn alloc_trim_analysis(
         i = 8;
         while i < intensity {
             let mut partial_0: opus_val32 = 0.;
-            let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
-            let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
-            let band_len =
-                ((m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM) as usize;
+            let band_off = ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM) as usize;
+            let band_off2 =
+                (N0 + ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM)) as usize;
+            let band_len = ((unsafe { *m.eBands.get_unchecked((i + 1) as usize) } as i32
+                - unsafe { *m.eBands.get_unchecked(i as usize) } as i32)
+                << LM) as usize;
             partial_0 = celt_inner_prod(
                 &X[band_off..band_off + band_len],
                 &X[band_off2..band_off2 + band_len],
@@ -1296,7 +1375,8 @@ fn alloc_trim_analysis(
     loop {
         i = 0;
         while i < end - 1 {
-            diff += bandLogE[(i + c * m.nbEBands as i32) as usize] * (2 + 2 * i - end) as f32;
+            diff += unsafe { *bandLogE.get_unchecked((i + c * m.nbEBands as i32) as usize) }
+                * (2 + 2 * i - end) as f32;
             i += 1;
         }
         c += 1;
@@ -1352,14 +1432,14 @@ fn stereo_analysis(m: &OpusCustomMode, X: &[celt_norm], LM: i32, N0: i32) -> i32
     i = 0;
     while i < 13 {
         let mut j: i32 = 0;
-        j = (m.eBands[i as usize] as i32) << LM;
-        while j < (m.eBands[(i + 1) as usize] as i32) << LM {
+        j = (unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM;
+        while j < (unsafe { *m.eBands.get_unchecked((i + 1) as usize) } as i32) << LM {
             let mut L: opus_val32 = 0.;
             let mut R: opus_val32 = 0.;
             let mut M: opus_val32 = 0.;
             let mut S: opus_val32 = 0.;
-            L = X[j as usize];
-            R = X[(N0 + j) as usize];
+            L = unsafe { *X.get_unchecked(j as usize) };
+            R = unsafe { *X.get_unchecked((N0 + j) as usize) };
             M = L + R;
             S = L - R;
             sumLR += (L).abs() + (R).abs();
@@ -1490,21 +1570,26 @@ fn dynalloc_analysis(
     maxDepth = -31.9f32;
     i = 0;
     while i < end {
-        noise_floor[i as usize] =
-            0.0625f32 * logN[i as usize] as opus_val32 + 0.5f32 + (9 - lsb_depth) as f32
+        unsafe {
+            *noise_floor.get_unchecked_mut(i as usize) = 0.0625f32
+                * *logN.get_unchecked(i as usize) as opus_val32
+                + 0.5f32
+                + (9 - lsb_depth) as f32
                 - eMeans[i as usize]
                 + 0.0062f64 as opus_val32 * ((i + 5) * (i + 5)) as opus_val32;
+        }
         i += 1;
     }
     c = 0;
     loop {
         i = 0;
         while i < end {
-            maxDepth = if maxDepth > bandLogE[(c * nbEBands + i) as usize] - noise_floor[i as usize]
-            {
+            let bl = unsafe { *bandLogE.get_unchecked((c * nbEBands + i) as usize) };
+            let nf = unsafe { *noise_floor.get_unchecked(i as usize) };
+            maxDepth = if maxDepth > bl - nf {
                 maxDepth
             } else {
-                bandLogE[(c * nbEBands + i) as usize] - noise_floor[i as usize]
+                bl - nf
             };
             i += 1;
         }
@@ -1519,48 +1604,61 @@ fn dynalloc_analysis(
     let mut sig = [0.0f32; MAX_BANDS_DA];
     i = 0;
     while i < end {
-        mask[i as usize] = bandLogE[i as usize] - noise_floor[i as usize];
+        unsafe {
+            *mask.get_unchecked_mut(i as usize) =
+                *bandLogE.get_unchecked(i as usize) - *noise_floor.get_unchecked(i as usize);
+        }
         i += 1;
     }
     if C == 2 {
         i = 0;
         while i < end {
-            mask[i as usize] =
-                if mask[i as usize] > bandLogE[(nbEBands + i) as usize] - noise_floor[i as usize] {
-                    mask[i as usize]
-                } else {
-                    bandLogE[(nbEBands + i) as usize] - noise_floor[i as usize]
-                };
+            let m_i = unsafe { *mask.get_unchecked(i as usize) };
+            let bl = unsafe { *bandLogE.get_unchecked((nbEBands + i) as usize) }
+                - unsafe { *noise_floor.get_unchecked(i as usize) };
+            unsafe {
+                *mask.get_unchecked_mut(i as usize) = if m_i > bl { m_i } else { bl };
+            }
             i += 1;
         }
     }
     sig[..end as usize].copy_from_slice(&mask[..end as usize]);
     i = 1;
     while i < end {
-        mask[i as usize] = if mask[i as usize] > mask[(i - 1) as usize] - 2.0f32 {
-            mask[i as usize]
-        } else {
-            mask[(i - 1) as usize] - 2.0f32
-        };
+        let cur = unsafe { *mask.get_unchecked(i as usize) };
+        let prev = unsafe { *mask.get_unchecked((i - 1) as usize) };
+        unsafe {
+            *mask.get_unchecked_mut(i as usize) = if cur > prev - 2.0f32 {
+                cur
+            } else {
+                prev - 2.0f32
+            };
+        }
         i += 1;
     }
     i = end - 2;
     while i >= 0 {
-        mask[i as usize] = if mask[i as usize] > mask[(i + 1) as usize] - 3.0f32 {
-            mask[i as usize]
-        } else {
-            mask[(i + 1) as usize] - 3.0f32
-        };
+        let cur = unsafe { *mask.get_unchecked(i as usize) };
+        let next = unsafe { *mask.get_unchecked((i + 1) as usize) };
+        unsafe {
+            *mask.get_unchecked_mut(i as usize) = if cur > next - 3.0f32 {
+                cur
+            } else {
+                next - 3.0f32
+            };
+        }
         i -= 1;
     }
     i = 0;
     while i < end {
-        let smr: opus_val16 = sig[i as usize]
+        let sig_i = unsafe { *sig.get_unchecked(i as usize) };
+        let mask_i = unsafe { *mask.get_unchecked(i as usize) };
+        let smr: opus_val16 = sig_i
             - (if (if 0 as f32 > maxDepth - 12.0f32 {
                 0 as f32
             } else {
                 maxDepth - 12.0f32
-            }) > mask[i as usize]
+            }) > mask_i
             {
                 if 0 as f32 > maxDepth - 12.0f32 {
                     0 as f32
@@ -1568,7 +1666,7 @@ fn dynalloc_analysis(
                     maxDepth - 12.0f32
                 }
             } else {
-                mask[i as usize]
+                mask_i
             });
         let shift: i32 = if (5)
             < (if 0 > -((0.5f32 + smr).floor() as i32) {
@@ -1582,7 +1680,9 @@ fn dynalloc_analysis(
         } else {
             -((0.5f32 + smr).floor() as i32)
         };
-        spread_weight[i as usize] = 32 >> shift;
+        unsafe {
+            *spread_weight.get_unchecked_mut(i as usize) = 32 >> shift;
+        }
         i += 1;
     }
     // nbEBands max is 21; use stack buffer.
@@ -1594,61 +1694,66 @@ fn dynalloc_analysis(
             let mut offset: opus_val16 = 0.;
             let mut tmp: opus_val16 = 0.;
             let fb = (c * nbEBands) as usize;
-            bandLogE3[..end as usize].copy_from_slice(&bandLogE2[fb..fb + end as usize]);
+            unsafe { bandLogE3.get_unchecked_mut(..end as usize) }
+                .copy_from_slice(unsafe { bandLogE2.get_unchecked(fb..fb + end as usize) });
             if LM == 0 {
                 // For 2.5 ms frames, the first 8 bands have just one bin, so the
                 // energy is highly unreliable (high variance). For that reason,
                 // we take the max with the previous energy so that at least 2 bins
                 // are getting used.
                 for i in 0..std::cmp::min(8, end as usize) {
-                    bandLogE3[i] = if bandLogE2[(c * nbEBands) as usize + i]
-                        > oldBandE[(c * nbEBands) as usize + i]
-                    {
-                        bandLogE2[(c * nbEBands) as usize + i]
-                    } else {
-                        oldBandE[(c * nbEBands) as usize + i]
-                    };
+                    let bl = unsafe { *bandLogE2.get_unchecked((c * nbEBands) as usize + i) };
+                    let ob = unsafe { *oldBandE.get_unchecked((c * nbEBands) as usize + i) };
+                    unsafe {
+                        *bandLogE3.get_unchecked_mut(i) = if bl > ob { bl } else { ob };
+                    }
                 }
             }
             follower[fb] = bandLogE3[0];
             i = 1;
             while i < end {
-                if bandLogE3[i as usize] > bandLogE3[(i - 1) as usize] + 0.5f32 {
+                let bl_i = unsafe { *bandLogE3.get_unchecked(i as usize) };
+                let bl_prev = unsafe { *bandLogE3.get_unchecked((i - 1) as usize) };
+                if bl_i > bl_prev + 0.5f32 {
                     last = i;
                 }
-                follower[fb + i as usize] =
-                    if follower[fb + (i - 1) as usize] + 1.5f32 < bandLogE3[i as usize] {
-                        follower[fb + (i - 1) as usize] + 1.5f32
+                let f_prev = unsafe { *follower.get_unchecked(fb + (i - 1) as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(fb + i as usize) = if f_prev + 1.5f32 < bl_i {
+                        f_prev + 1.5f32
                     } else {
-                        bandLogE3[i as usize]
+                        bl_i
                     };
+                }
                 i += 1;
             }
             i = last - 1;
             while i >= 0 {
-                follower[fb + i as usize] = if follower[fb + i as usize]
-                    < (if follower[fb + (i + 1) as usize] + 2.0f32 < bandLogE3[i as usize] {
-                        follower[fb + (i + 1) as usize] + 2.0f32
-                    } else {
-                        bandLogE3[i as usize]
-                    }) {
-                    follower[fb + i as usize]
-                } else if follower[fb + (i + 1) as usize] + 2.0f32 < bandLogE3[i as usize] {
-                    follower[fb + (i + 1) as usize] + 2.0f32
+                let f_i = unsafe { *follower.get_unchecked(fb + i as usize) };
+                let f_next = unsafe { *follower.get_unchecked(fb + (i + 1) as usize) };
+                let bl_i = unsafe { *bandLogE3.get_unchecked(i as usize) };
+                let back = if f_next + 2.0f32 < bl_i {
+                    f_next + 2.0f32
                 } else {
-                    bandLogE3[i as usize]
+                    bl_i
                 };
+                unsafe {
+                    *follower.get_unchecked_mut(fb + i as usize) =
+                        if f_i < back { f_i } else { back };
+                }
                 i -= 1;
             }
             offset = 1.0f32;
             i = 2;
             while i < end - 2 {
-                let med = median_of_5(&bandLogE3[(i - 2) as usize..(i + 3) as usize]) - offset;
-                follower[fb + i as usize] = if follower[fb + i as usize] > med {
-                    follower[fb + i as usize]
-                } else {
-                    med
-                };
+                let med = median_of_5(unsafe {
+                    bandLogE3.get_unchecked((i - 2) as usize..(i + 3) as usize)
+                }) - offset;
+                let f_i = unsafe { *follower.get_unchecked(fb + i as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(fb + i as usize) =
+                        if f_i > med { f_i } else { med };
+                }
                 i += 1;
             }
             tmp = median_of_3(&bandLogE3[0..3]) - offset;
@@ -1662,24 +1767,30 @@ fn dynalloc_analysis(
             } else {
                 tmp
             };
-            tmp = median_of_3(&bandLogE3[(end - 3) as usize..end as usize]) - offset;
-            follower[fb + (end - 2) as usize] = if follower[fb + (end - 2) as usize] > tmp {
-                follower[fb + (end - 2) as usize]
-            } else {
-                tmp
-            };
-            follower[fb + (end - 1) as usize] = if follower[fb + (end - 1) as usize] > tmp {
-                follower[fb + (end - 1) as usize]
-            } else {
-                tmp
-            };
+            tmp = median_of_3(unsafe { bandLogE3.get_unchecked((end - 3) as usize..end as usize) })
+                - offset;
+            unsafe {
+                let idx2 = fb + (end - 2) as usize;
+                let idx1 = fb + (end - 1) as usize;
+                *follower.get_unchecked_mut(idx2) = if *follower.get_unchecked(idx2) > tmp {
+                    *follower.get_unchecked(idx2)
+                } else {
+                    tmp
+                };
+                *follower.get_unchecked_mut(idx1) = if *follower.get_unchecked(idx1) > tmp {
+                    *follower.get_unchecked(idx1)
+                } else {
+                    tmp
+                };
+            }
             i = 0;
             while i < end {
-                follower[fb + i as usize] = if follower[fb + i as usize] > noise_floor[i as usize] {
-                    follower[fb + i as usize]
-                } else {
-                    noise_floor[i as usize]
-                };
+                let f_i = unsafe { *follower.get_unchecked(fb + i as usize) };
+                let nf_i = unsafe { *noise_floor.get_unchecked(i as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(fb + i as usize) =
+                        if f_i > nf_i { f_i } else { nf_i };
+                }
                 i += 1;
             }
             c += 1;
@@ -1690,78 +1801,96 @@ fn dynalloc_analysis(
         if C == 2 {
             i = start;
             while i < end {
-                follower[(nbEBands + i) as usize] =
-                    if follower[(nbEBands + i) as usize] > follower[i as usize] - 4.0f32 {
-                        follower[(nbEBands + i) as usize]
-                    } else {
-                        follower[i as usize] - 4.0f32
-                    };
-                follower[i as usize] =
-                    if follower[i as usize] > follower[(nbEBands + i) as usize] - 4.0f32 {
-                        follower[i as usize]
-                    } else {
-                        follower[(nbEBands + i) as usize] - 4.0f32
-                    };
-                follower[i as usize] = 0.5f32
-                    * ((if 0 as f32 > bandLogE[i as usize] - follower[i as usize] {
-                        0 as f32
-                    } else {
-                        bandLogE[i as usize] - follower[i as usize]
-                    }) + (if 0 as f32
-                        > bandLogE[(nbEBands + i) as usize] - follower[(nbEBands + i) as usize]
+                let f_nb_i = unsafe { *follower.get_unchecked((nbEBands + i) as usize) };
+                let f_i = unsafe { *follower.get_unchecked(i as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut((nbEBands + i) as usize) = if f_nb_i > f_i - 4.0f32
                     {
-                        0 as f32
+                        f_nb_i
                     } else {
-                        bandLogE[(nbEBands + i) as usize] - follower[(nbEBands + i) as usize]
-                    }));
+                        f_i - 4.0f32
+                    };
+                }
+                let f_nb_i = unsafe { *follower.get_unchecked((nbEBands + i) as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) = if f_i > f_nb_i - 4.0f32 {
+                        f_i
+                    } else {
+                        f_nb_i - 4.0f32
+                    };
+                }
+                let f_i = unsafe { *follower.get_unchecked(i as usize) };
+                let f_nb_i = unsafe { *follower.get_unchecked((nbEBands + i) as usize) };
+                let bl_i = unsafe { *bandLogE.get_unchecked(i as usize) };
+                let bl_nb_i = unsafe { *bandLogE.get_unchecked((nbEBands + i) as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) = 0.5f32
+                        * ((if 0 as f32 > bl_i - f_i {
+                            0 as f32
+                        } else {
+                            bl_i - f_i
+                        }) + (if 0 as f32 > bl_nb_i - f_nb_i {
+                            0 as f32
+                        } else {
+                            bl_nb_i - f_nb_i
+                        }));
+                }
                 i += 1;
             }
         } else {
             i = start;
             while i < end {
-                follower[i as usize] = if 0 as f32 > bandLogE[i as usize] - follower[i as usize] {
-                    0 as f32
-                } else {
-                    bandLogE[i as usize] - follower[i as usize]
-                };
+                let f_i = unsafe { *follower.get_unchecked(i as usize) };
+                let bl_i = unsafe { *bandLogE.get_unchecked(i as usize) };
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) = if 0 as f32 > bl_i - f_i {
+                        0 as f32
+                    } else {
+                        bl_i - f_i
+                    };
+                }
                 i += 1;
             }
         }
         i = start;
         while i < end {
-            follower[i as usize] = if follower[i as usize] > surround_dynalloc[i as usize] {
-                follower[i as usize]
-            } else {
-                surround_dynalloc[i as usize]
-            };
+            let f_i = unsafe { *follower.get_unchecked(i as usize) };
+            let sd_i = unsafe { *surround_dynalloc.get_unchecked(i as usize) };
+            unsafe {
+                *follower.get_unchecked_mut(i as usize) = if f_i > sd_i { f_i } else { sd_i };
+            }
             i += 1;
         }
         i = start;
         while i < end {
-            importance[i as usize] = (0.5f32
-                + 13.0
-                    * celt_exp2(if follower[i as usize] < 4.0f32 {
-                        follower[i as usize]
-                    } else {
-                        4.0f32
-                    }))
-            .floor() as i32;
+            let f_i = unsafe { *follower.get_unchecked(i as usize) };
+            unsafe {
+                *importance.get_unchecked_mut(i as usize) = (0.5f32
+                    + 13.0 * celt_exp2(if f_i < 4.0f32 { f_i } else { 4.0f32 }))
+                .floor() as i32;
+            }
             i += 1;
         }
         if (vbr == 0 || constrained_vbr != 0) && isTransient == 0 {
             i = start;
             while i < end {
-                follower[i as usize] *= 0.5f32;
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) *= 0.5f32;
+                }
                 i += 1;
             }
         }
         i = start;
         while i < end {
             if i < 8 {
-                follower[i as usize] *= 2_f32;
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) *= 2_f32;
+                }
             }
             if i >= 12 {
-                follower[i as usize] *= 0.5f32;
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) *= 0.5f32;
+                }
             }
             i += 1;
         }
@@ -1769,25 +1898,27 @@ fn dynalloc_analysis(
         if toneishness > 0.98 {
             let freq_bin = (0.5 + tone_freq as f64 * 120.0 / std::f64::consts::PI) as i32;
             for i in start..end {
-                if freq_bin >= eBands[i as usize] as i32
-                    && freq_bin <= eBands[(i + 1) as usize] as i32
-                {
-                    follower[i as usize] += 2.0;
+                let eb_i = unsafe { *eBands.get_unchecked(i as usize) } as i32;
+                let eb_i1 = unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32;
+                if freq_bin >= eb_i && freq_bin <= eb_i1 {
+                    unsafe {
+                        *follower.get_unchecked_mut(i as usize) += 2.0;
+                    }
                 }
-                if freq_bin >= eBands[i as usize] as i32 - 1
-                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 1
-                {
-                    follower[i as usize] += 1.0;
+                if freq_bin >= eb_i - 1 && freq_bin <= eb_i1 + 1 {
+                    unsafe {
+                        *follower.get_unchecked_mut(i as usize) += 1.0;
+                    }
                 }
-                if freq_bin >= eBands[i as usize] as i32 - 2
-                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 2
-                {
-                    follower[i as usize] += 1.0;
+                if freq_bin >= eb_i - 2 && freq_bin <= eb_i1 + 2 {
+                    unsafe {
+                        *follower.get_unchecked_mut(i as usize) += 1.0;
+                    }
                 }
-                if freq_bin >= eBands[i as usize] as i32 - 3
-                    && freq_bin <= eBands[(i + 1) as usize] as i32 + 3
-                {
-                    follower[i as usize] += 0.5;
+                if freq_bin >= eb_i - 3 && freq_bin <= eb_i1 + 3 {
+                    unsafe {
+                        *follower.get_unchecked_mut(i as usize) += 0.5;
+                    }
                 }
             }
             if freq_bin >= eBands[end as usize] as i32 {
@@ -1798,8 +1929,10 @@ fn dynalloc_analysis(
         if analysis.valid != 0 {
             i = start;
             while i < (if (19) < end { 19 } else { end }) {
-                follower[i as usize] +=
-                    1.0f32 / 64.0f32 * analysis.leak_boost[i as usize] as i32 as f32;
+                unsafe {
+                    *follower.get_unchecked_mut(i as usize) += 1.0f32 / 64.0f32
+                        * *analysis.leak_boost.get_unchecked(i as usize) as i32 as f32;
+                }
                 i += 1;
             }
         }
@@ -1808,31 +1941,37 @@ fn dynalloc_analysis(
             let mut width: i32 = 0;
             let mut boost: i32 = 0;
             let mut boost_bits: i32 = 0;
-            follower[i as usize] = if follower[i as usize] < 4_f32 {
-                follower[i as usize]
-            } else {
-                4_f32
-            };
-            width = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
+            let f_i = unsafe { *follower.get_unchecked(i as usize) };
+            let f_clamped = if f_i < 4_f32 { f_i } else { 4_f32 };
+            unsafe {
+                *follower.get_unchecked_mut(i as usize) = f_clamped;
+            }
+            let eb_i = unsafe { *eBands.get_unchecked(i as usize) } as i32;
+            let eb_i1 = unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32;
+            width = (C * (eb_i1 - eb_i)) << LM;
             if width < 6 {
-                boost = follower[i as usize] as i32;
+                boost = f_clamped as i32;
                 boost_bits = (boost * width) << BITRES;
             } else if width > 48 {
-                boost = (follower[i as usize] * 8_f32) as i32;
+                boost = (f_clamped * 8_f32) as i32;
                 boost_bits = ((boost * width) << BITRES) / 8;
             } else {
-                boost = (follower[i as usize] * width as f32 / 6_f32) as i32;
+                boost = (f_clamped * width as f32 / 6_f32) as i32;
                 boost_bits = (boost * 6) << BITRES;
             }
             if (vbr == 0 || constrained_vbr != 0 && isTransient == 0)
                 && (tot_boost + boost_bits) >> BITRES >> 3 > 2 * effectiveBytes / 3
             {
                 let cap: i32 = (2 * effectiveBytes / 3) << BITRES << 3;
-                offsets[i as usize] = cap - tot_boost;
+                unsafe {
+                    *offsets.get_unchecked_mut(i as usize) = cap - tot_boost;
+                }
                 tot_boost = cap;
                 break;
             } else {
-                offsets[i as usize] = boost;
+                unsafe {
+                    *offsets.get_unchecked_mut(i as usize) = boost;
+                }
                 tot_boost += boost_bits;
                 i += 1;
             }
@@ -1840,7 +1979,9 @@ fn dynalloc_analysis(
     } else {
         i = start;
         while i < end {
-            importance[i as usize] = 13;
+            unsafe {
+                *importance.get_unchecked_mut(i as usize) = 13;
+            }
             i += 1;
         }
     }
@@ -1858,23 +1999,34 @@ fn tone_lpc(x: &[opus_val16], len: usize, delay: usize, lpc: &mut [opus_val32; 2
     let mut r01: opus_val32 = 0.0;
     let mut r02: opus_val32 = 0.0;
     for i in 0..len - 2 * delay {
-        r00 += x[i] * x[i];
-        r01 += x[i] * x[i + delay];
-        r02 += x[i] * x[i + 2 * delay];
+        let xi = unsafe { *x.get_unchecked(i) };
+        let xd = unsafe { *x.get_unchecked(i + delay) };
+        let x2d = unsafe { *x.get_unchecked(i + 2 * delay) };
+        r00 += xi * xi;
+        r01 += xi * xd;
+        r02 += xi * x2d;
     }
     let mut edges: opus_val32 = 0.0;
     for i in 0..delay {
-        edges += x[len + i - 2 * delay] * x[len + i - 2 * delay] - x[i] * x[i];
+        let a = unsafe { *x.get_unchecked(len + i - 2 * delay) };
+        let b = unsafe { *x.get_unchecked(i) };
+        edges += a * a - b * b;
     }
     let r11 = r00 + edges;
     edges = 0.0;
     for i in 0..delay {
-        edges += x[len + i - delay] * x[len + i - delay] - x[i + delay] * x[i + delay];
+        let a = unsafe { *x.get_unchecked(len + i - delay) };
+        let b = unsafe { *x.get_unchecked(i + delay) };
+        edges += a * a - b * b;
     }
     let r22 = r11 + edges;
     edges = 0.0;
     for i in 0..delay {
-        edges += x[len + i - 2 * delay] * x[len + i - delay] - x[i] * x[i + delay];
+        let a = unsafe { *x.get_unchecked(len + i - 2 * delay) };
+        let b = unsafe { *x.get_unchecked(len + i - delay) };
+        let c = unsafe { *x.get_unchecked(i) };
+        let d = unsafe { *x.get_unchecked(i + delay) };
+        edges += a * b - c * d;
     }
     let r12 = r01 + edges;
     // Reverse and sum to get the backward contribution.
@@ -1934,7 +2086,11 @@ fn tone_detect(
     // preemphasis filter. In float build this reduces to averaging channels.
     if CC == 2 {
         for i in 0..n {
-            x[i] = (input[i] * 0.5) + (input[i + n] * 0.5);
+            let a = unsafe { *input.get_unchecked(i) };
+            let b = unsafe { *input.get_unchecked(i + n) };
+            unsafe {
+                *x.get_unchecked_mut(i) = (a * 0.5) + (b * 0.5);
+            }
         }
     } else {
         x[..n].copy_from_slice(&input[..n]);
@@ -1996,11 +2152,17 @@ fn run_prefilter(
     for c in 0..CC as usize {
         let pre_base = c * pre_chan_len;
         let max_period_u = max_period as usize;
-        _pre[pre_base..pre_base + max_period_u]
-            .copy_from_slice(&st.prefilter_mem[c * max_period_u..(c + 1) * max_period_u]);
+        unsafe { _pre.get_unchecked_mut(pre_base..pre_base + max_period_u) }.copy_from_slice(
+            unsafe {
+                st.prefilter_mem
+                    .get_unchecked(c * max_period_u..(c + 1) * max_period_u)
+            },
+        );
         let in_src = c * (N + overlap) as usize + overlap as usize;
-        _pre[pre_base + max_period_u..pre_base + max_period_u + N as usize]
-            .copy_from_slice(&in_0[in_src..in_src + N as usize]);
+        unsafe {
+            _pre.get_unchecked_mut(pre_base + max_period_u..pre_base + max_period_u + N as usize)
+        }
+        .copy_from_slice(unsafe { in_0.get_unchecked(in_src..in_src + N as usize) });
     }
     if enabled != 0 && toneishness > 0.99 {
         // If we detect that the signal is dominated by a single tone, don't rely
@@ -2131,7 +2293,7 @@ fn run_prefilter(
         if ((gain1 - st.prefilter_gain).abs()) < 0.1f32 {
             gain1 = st.prefilter_gain;
         }
-        qg = (0.5f32 + gain1 * 32_f32 / 3_f32).floor() as i32 - 1;
+        qg = float2int_nonneg(0.5f32 + gain1 * 32_f32 / 3_f32) - 1;
         qg = if 0 > (if (7) < qg { 7 } else { qg }) {
             0
         } else if (7) < qg {
@@ -2151,17 +2313,24 @@ fn run_prefilter(
         st.prefilter_period = st.prefilter_period.max(COMBFILTER_MINPERIOD);
         // Copy in_mem overlap into in_0
         let in_dst = c * (N + overlap) as usize;
-        in_0[in_dst..in_dst + overlap as usize]
-            .copy_from_slice(&st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]);
+        unsafe { in_0.get_unchecked_mut(in_dst..in_dst + overlap as usize) }.copy_from_slice(
+            unsafe {
+                st.in_mem
+                    .get_unchecked(c * overlap as usize..(c + 1) * overlap as usize)
+            },
+        );
         // Measure energy before comb filter
         for i in 0..N as usize {
-            before[c] += in_0[c * (N + overlap) as usize + overlap as usize + i].abs();
+            unsafe {
+                *before.get_unchecked_mut(c) +=
+                    (*in_0.get_unchecked(c * (N + overlap) as usize + overlap as usize + i)).abs();
+            }
         }
         {
             let pre_base = c * pre_chan_len;
             let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
             let in_base = c * (N + overlap) as usize + overlap as usize;
-            let in_slice = &mut in_0[in_base..in_base + N as usize];
+            let in_slice = unsafe { in_0.get_unchecked_mut(in_base..in_base + N as usize) };
             if offset != 0 {
                 comb_filter(
                     in_slice,
@@ -2199,7 +2368,10 @@ fn run_prefilter(
         }
         // Measure energy after comb filter
         for i in 0..N as usize {
-            after[c] += in_0[c * (N + overlap) as usize + overlap as usize + i].abs();
+            unsafe {
+                *after.get_unchecked_mut(c) +=
+                    (*in_0.get_unchecked(c * (N + overlap) as usize + overlap as usize + i)).abs();
+            }
         }
     }
 
@@ -2230,10 +2402,13 @@ fn run_prefilter(
             let pre_slice = &_pre[pre_base..pre_base + pre_chan_len];
             let in_base = c * (N + overlap) as usize + overlap as usize;
             // Revert: copy original pre data back
-            in_0[in_base..in_base + N as usize]
-                .copy_from_slice(&pre_slice[max_period as usize..max_period as usize + N as usize]);
+            unsafe { in_0.get_unchecked_mut(in_base..in_base + N as usize) }.copy_from_slice(
+                unsafe {
+                    pre_slice.get_unchecked(max_period as usize..max_period as usize + N as usize)
+                },
+            );
             // Re-apply transition with gain=0
-            let in_slice = &mut in_0[in_base..in_base + N as usize];
+            let in_slice = unsafe { in_0.get_unchecked_mut(in_base..in_base + N as usize) };
             comb_filter(
                 in_slice,
                 offset as usize,
@@ -2259,25 +2434,36 @@ fn run_prefilter(
     for c in 0..CC as usize {
         // Copy end of in_0 back into in_mem overlap
         let in_src = c * (N + overlap) as usize + N as usize;
-        st.in_mem[c * overlap as usize..(c + 1) * overlap as usize]
-            .copy_from_slice(&in_0[in_src..in_src + overlap as usize]);
+        unsafe {
+            st.in_mem
+                .get_unchecked_mut(c * overlap as usize..(c + 1) * overlap as usize)
+        }
+        .copy_from_slice(unsafe { in_0.get_unchecked(in_src..in_src + overlap as usize) });
         // Update prefilter_mem from _pre
         let pre_base = c * pre_chan_len;
         let max_period_u = max_period as usize;
         let pfm_base = c * max_period_u;
         if N > max_period {
-            st.prefilter_mem[pfm_base..pfm_base + max_period_u].copy_from_slice(
-                &_pre[pre_base + N as usize..pre_base + N as usize + max_period_u],
-            );
+            unsafe {
+                st.prefilter_mem
+                    .get_unchecked_mut(pfm_base..pfm_base + max_period_u)
+            }
+            .copy_from_slice(unsafe {
+                _pre.get_unchecked(pre_base + N as usize..pre_base + N as usize + max_period_u)
+            });
         } else {
             // Shift prefilter_mem left by N
             st.prefilter_mem
                 .copy_within(pfm_base + N as usize..pfm_base + max_period_u, pfm_base);
             // Copy last N samples from _pre
-            st.prefilter_mem[pfm_base + max_period_u - N as usize..pfm_base + max_period_u]
-                .copy_from_slice(
-                    &_pre[pre_base + max_period_u..pre_base + max_period_u + N as usize],
-                );
+            unsafe {
+                st.prefilter_mem.get_unchecked_mut(
+                    pfm_base + max_period_u - N as usize..pfm_base + max_period_u,
+                )
+            }
+            .copy_from_slice(unsafe {
+                _pre.get_unchecked(pre_base + max_period_u..pre_base + max_period_u + N as usize)
+            });
         }
     }
     *gain = gain1;
@@ -2744,20 +2930,24 @@ pub fn celt_encode_with_ec<'b>(
         let mut need_clip: i32 = 0;
         need_clip = (st.clip != 0 && sample_max > 65536.0f32) as i32;
         celt_preemphasis(
-            &pcm[c as usize..],
-            &mut in_0[(c * (N + overlap) + overlap) as usize..],
+            unsafe { pcm.get_unchecked(c as usize..) },
+            unsafe { in_0.get_unchecked_mut((c * (N + overlap) + overlap) as usize..) },
             N,
             CC,
             st.upsample,
             &mode.preemph,
-            &mut st.preemph_memE[c as usize],
+            unsafe { st.preemph_memE.get_unchecked_mut(c as usize) },
             need_clip,
         );
         // Copy overlap from prefilter_mem into in_0 (must be before tone_detect/transient_analysis)
         let in_dst = (c * (N + overlap)) as usize;
         let pfm_src = ((c + 1) * max_period - overlap) as usize;
-        in_0[in_dst..in_dst + overlap as usize]
-            .copy_from_slice(&st.prefilter_mem[pfm_src..pfm_src + overlap as usize]);
+        unsafe { in_0.get_unchecked_mut(in_dst..in_dst + overlap as usize) }.copy_from_slice(
+            unsafe {
+                st.prefilter_mem
+                    .get_unchecked(pfm_src..pfm_src + overlap as usize)
+            },
+        );
         c += 1;
         if c >= CC {
             break;
@@ -2863,7 +3053,9 @@ pub fn celt_encode_with_ec<'b>(
         while c < C {
             i = 0;
             while i < end {
-                bandLogE2[(nbEBands * c + i) as usize] += 0.5f32 * LM as f32;
+                unsafe {
+                    *bandLogE2.get_unchecked_mut((nbEBands * c + i) as usize) += 0.5f32 * LM as f32;
+                }
                 i += 1;
             }
             c += 1;
@@ -2887,16 +3079,20 @@ pub fn celt_encode_with_ec<'b>(
     if st.lfe != 0 {
         i = 2;
         while i < end {
-            bandE[i as usize] = if bandE[i as usize] < 1e-4f32 * bandE[0_usize] {
-                bandE[i as usize]
-            } else {
-                1e-4f32 * bandE[0_usize]
-            };
-            bandE[i as usize] = if bandE[i as usize] > 1e-15f32 {
-                bandE[i as usize]
-            } else {
-                1e-15f32
-            };
+            let be_i = unsafe { *bandE.get_unchecked(i as usize) };
+            let be_0 = bandE[0_usize];
+            unsafe {
+                *bandE.get_unchecked_mut(i as usize) = if be_i < 1e-4f32 * be_0 {
+                    be_i
+                } else {
+                    1e-4f32 * be_0
+                };
+            }
+            let be_i = unsafe { *bandE.get_unchecked(i as usize) };
+            unsafe {
+                *bandE.get_unchecked_mut(i as usize) =
+                    if be_i > 1e-15f32 { be_i } else { 1e-15f32 };
+            }
             i += 1;
         }
     }
@@ -2926,14 +3122,10 @@ pub fn celt_encode_with_ec<'b>(
                 i = 0;
                 while i < mask_end {
                     let mut mask: opus_val16 = 0.;
-                    mask = if (if energy_mask[(nbEBands * c + i) as usize] < 0.25f32 {
-                        energy_mask[(nbEBands * c + i) as usize]
-                    } else {
-                        0.25f32
-                    }) > -2.0f32
-                    {
-                        if energy_mask[(nbEBands * c + i) as usize] < 0.25f32 {
-                            energy_mask[(nbEBands * c + i) as usize]
+                    let em_val = unsafe { *energy_mask.get_unchecked((nbEBands * c + i) as usize) };
+                    mask = if (if em_val < 0.25f32 { em_val } else { 0.25f32 }) > -2.0f32 {
+                        if em_val < 0.25f32 {
+                            em_val
                         } else {
                             0.25f32
                         }
@@ -2943,10 +3135,10 @@ pub fn celt_encode_with_ec<'b>(
                     if mask > 0 as f32 {
                         mask *= 0.5f32;
                     }
-                    mask_avg += mask
-                        * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)
-                            as opus_val32;
-                    count += eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32;
+                    let eb_i1 = unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32;
+                    let eb_i = unsafe { *eBands.get_unchecked(i as usize) } as i32;
+                    mask_avg += mask * (eb_i1 - eb_i) as opus_val32;
+                    count += eb_i1 - eb_i;
                     diff += mask * (1 + 2 * i - mask_end) as opus_val32;
                     i += 1;
                 }
@@ -2967,7 +3159,9 @@ pub fn celt_encode_with_ec<'b>(
                 -0.031f32
             };
             midband = 0;
-            while (eBands[(midband + 1) as usize] as i32) < eBands[mask_end as usize] as i32 / 2 {
+            while (unsafe { *eBands.get_unchecked((midband + 1) as usize) } as i32)
+                < unsafe { *eBands.get_unchecked(mask_end as usize) } as i32 / 2
+            {
                 midband += 1;
             }
             count_dynalloc = 0;
@@ -2977,18 +3171,18 @@ pub fn celt_encode_with_ec<'b>(
                 let mut unmask: opus_val16 = 0.;
                 lin = mask_avg + diff * (i - midband) as f32;
                 if C == 2 {
-                    unmask = if energy_mask[i as usize] > energy_mask[(nbEBands + i) as usize] {
-                        energy_mask[i as usize]
-                    } else {
-                        energy_mask[(nbEBands + i) as usize]
-                    };
+                    let em_i = unsafe { *energy_mask.get_unchecked(i as usize) };
+                    let em_nb_i = unsafe { *energy_mask.get_unchecked((nbEBands + i) as usize) };
+                    unmask = if em_i > em_nb_i { em_i } else { em_nb_i };
                 } else {
-                    unmask = energy_mask[i as usize];
+                    unmask = unsafe { *energy_mask.get_unchecked(i as usize) };
                 }
                 unmask = if unmask < 0.0f32 { unmask } else { 0.0f32 };
                 unmask -= lin;
                 if unmask > 0.25f32 {
-                    surround_dynalloc[i as usize] = unmask - 0.25f32;
+                    unsafe {
+                        *surround_dynalloc.get_unchecked_mut(i as usize) = unmask - 0.25f32;
+                    }
                     count_dynalloc += 1;
                 }
                 i += 1;
@@ -3002,12 +3196,15 @@ pub fn celt_encode_with_ec<'b>(
                 } else {
                     i = 0;
                     while i < mask_end {
-                        surround_dynalloc[i as usize] =
-                            if 0 as f32 > surround_dynalloc[i as usize] - 0.25f32 {
-                                0 as f32
-                            } else {
-                                surround_dynalloc[i as usize] - 0.25f32
-                            };
+                        let sd_i = unsafe { *surround_dynalloc.get_unchecked(i as usize) };
+                        unsafe {
+                            *surround_dynalloc.get_unchecked_mut(i as usize) =
+                                if 0 as f32 > sd_i - 0.25f32 {
+                                    0 as f32
+                                } else {
+                                    sd_i - 0.25f32
+                                };
+                        }
                         i += 1;
                     }
                 }
@@ -3027,16 +3224,18 @@ pub fn celt_encode_with_ec<'b>(
         };
         i = start;
         while i < end {
-            follow = if follow - 1.0f32 > bandLogE[i as usize] - offset {
+            let bl_i = unsafe { *bandLogE.get_unchecked(i as usize) };
+            follow = if follow - 1.0f32 > bl_i - offset {
                 follow - 1.0f32
             } else {
-                bandLogE[i as usize] - offset
+                bl_i - offset
             };
             if C == 2 {
-                follow = if follow > bandLogE[(i + nbEBands) as usize] - offset {
+                let bl_nb_i = unsafe { *bandLogE.get_unchecked((i + nbEBands) as usize) };
+                follow = if follow > bl_nb_i - offset {
                     follow
                 } else {
-                    bandLogE[(i + nbEBands) as usize] - offset
+                    bl_nb_i - offset
                 };
             }
             frame_avg += follow;
@@ -3095,7 +3294,9 @@ pub fn celt_encode_with_ec<'b>(
         while c < C {
             i = 0;
             while i < end {
-                bandLogE2[(nbEBands * c + i) as usize] += 0.5f32 * LM as f32;
+                unsafe {
+                    *bandLogE2.get_unchecked_mut((nbEBands * c + i) as usize) += 0.5f32 * LM as f32;
+                }
                 i += 1;
             }
             c += 1;
@@ -3167,29 +3368,38 @@ pub fn celt_encode_with_ec<'b>(
             tf_chan,
             &importance,
         );
+        let tf_last = unsafe { *tf_res.get_unchecked((effEnd - 1) as usize) };
         i = effEnd;
         while i < end {
-            tf_res[i as usize] = tf_res[(effEnd - 1) as usize];
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = tf_last;
+            }
             i += 1;
         }
     } else if hybrid != 0 && weak_transient != 0 {
         i = 0;
         while i < end {
-            tf_res[i as usize] = 1;
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = 1;
+            }
             i += 1;
         }
         tf_select = 0;
     } else if hybrid != 0 && effectiveBytes < 15 && st.silk_info.signalType != 2 {
         i = 0;
         while i < end {
-            tf_res[i as usize] = 0;
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = 0;
+            }
             i += 1;
         }
         tf_select = isTransient;
     } else {
         i = 0;
         while i < end {
-            tf_res[i as usize] = isTransient;
+            unsafe {
+                *tf_res.get_unchecked_mut(i as usize) = isTransient;
+            }
             i += 1;
         }
         tf_select = 0;
@@ -3200,8 +3410,13 @@ pub fn celt_encode_with_ec<'b>(
         i = start;
         while i < end {
             let idx = (i + c * nbEBands) as usize;
-            if (bandLogE[idx] - st.oldBandE[idx]).abs() < 2.0f32 {
-                bandLogE[idx] -= st.energyError[idx] * 0.25f32;
+            let bl = unsafe { *bandLogE.get_unchecked(idx) };
+            let ob = unsafe { *st.oldBandE.get_unchecked(idx) };
+            if (bl - ob).abs() < 2.0f32 {
+                let ee = unsafe { *st.energyError.get_unchecked(idx) };
+                unsafe {
+                    *bandLogE.get_unchecked_mut(idx) -= ee * 0.25f32;
+                }
             }
             i += 1;
         }
@@ -3287,7 +3502,9 @@ pub fn celt_encode_with_ec<'b>(
         let mut dynalloc_loop_logp: i32 = 0;
         let mut boost: i32 = 0;
         let mut j: i32 = 0;
-        width = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
+        let eb_i = unsafe { *eBands.get_unchecked(i as usize) } as i32;
+        let eb_i1 = unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32;
+        width = (C * (eb_i1 - eb_i)) << LM;
         quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
@@ -3298,11 +3515,10 @@ pub fn celt_encode_with_ec<'b>(
         dynalloc_loop_logp = dynalloc_logp;
         boost = 0;
         j = 0;
-        while tell + (dynalloc_loop_logp << BITRES) < total_bits - total_boost
-            && boost < cap[i as usize]
-        {
+        let cap_i = unsafe { *cap.get_unchecked(i as usize) };
+        while tell + (dynalloc_loop_logp << BITRES) < total_bits - total_boost && boost < cap_i {
             let mut flag: i32 = 0;
-            flag = (j < offsets[i as usize]) as i32;
+            flag = (j < unsafe { *offsets.get_unchecked(i as usize) }) as i32;
             ec_enc_bit_logp(enc, flag, dynalloc_loop_logp as u32);
             tell = ec_tell_frac(enc) as i32;
             if flag == 0 {
@@ -3320,7 +3536,9 @@ pub fn celt_encode_with_ec<'b>(
                 dynalloc_logp - 1
             };
         }
-        offsets[i as usize] = boost;
+        unsafe {
+            *offsets.get_unchecked_mut(i as usize) = boost;
+        }
         i += 1;
     }
     if C == 2 {
@@ -3821,8 +4039,10 @@ pub fn celt_encode_with_ec<'b>(
             // Compute ext_balance
             let mut ext_balance = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_enc) as i32;
             for j in 0..qext_end {
-                ext_balance -= extra_pulses[nbEBands as usize + j as usize]
-                    + C * (extra_quant[nbEBands as usize + 1] << BITRES);
+                ext_balance -=
+                    unsafe { *extra_pulses.get_unchecked(nbEBands as usize + j as usize) }
+                        + C * (unsafe { *extra_quant.get_unchecked(nbEBands as usize + 1) }
+                            << BITRES);
             }
 
             // Fine energy for QEXT bands
@@ -3964,7 +4184,10 @@ pub fn celt_encode_with_ec<'b>(
         i = start;
         while i < end {
             let idx = (i + c * nbEBands) as usize;
-            st.energyError[idx] = error[idx].clamp(-0.5f32, 0.5f32);
+            let err = unsafe { *error.get_unchecked(idx) };
+            unsafe {
+                *st.energyError.get_unchecked_mut(idx) = err.clamp(-0.5f32, 0.5f32);
+            }
             i += 1;
         }
         c += 1;
@@ -3995,7 +4218,9 @@ pub fn celt_encode_with_ec<'b>(
     if silence != 0 {
         i = 0;
         while i < C * nbEBands {
-            st.oldBandE[i as usize] = -28.0f32;
+            unsafe {
+                *st.oldBandE.get_unchecked_mut(i as usize) = -28.0f32;
+            }
             i += 1;
         }
     }
@@ -4014,11 +4239,11 @@ pub fn celt_encode_with_ec<'b>(
         i = 0;
         while i < CC * nbEBands {
             let idx = i as usize;
-            st.oldLogE[idx] = if st.oldLogE[idx] < st.oldBandE[idx] {
-                st.oldLogE[idx]
-            } else {
-                st.oldBandE[idx]
-            };
+            let ole = unsafe { *st.oldLogE.get_unchecked(idx) };
+            let obe = unsafe { *st.oldBandE.get_unchecked(idx) };
+            unsafe {
+                *st.oldLogE.get_unchecked_mut(idx) = if ole < obe { ole } else { obe };
+            }
             i += 1;
         }
     }
@@ -4027,17 +4252,21 @@ pub fn celt_encode_with_ec<'b>(
         i = 0;
         while i < start {
             let idx = (c * nbEBands + i) as usize;
-            st.oldBandE[idx] = 0 as opus_val16;
-            st.oldLogE2[idx] = -28.0f32;
-            st.oldLogE[idx] = -28.0f32;
+            unsafe {
+                *st.oldBandE.get_unchecked_mut(idx) = 0 as opus_val16;
+                *st.oldLogE2.get_unchecked_mut(idx) = -28.0f32;
+                *st.oldLogE.get_unchecked_mut(idx) = -28.0f32;
+            }
             i += 1;
         }
         i = end;
         while i < nbEBands {
             let idx = (c * nbEBands + i) as usize;
-            st.oldBandE[idx] = 0 as opus_val16;
-            st.oldLogE2[idx] = -28.0f32;
-            st.oldLogE[idx] = -28.0f32;
+            unsafe {
+                *st.oldBandE.get_unchecked_mut(idx) = 0 as opus_val16;
+                *st.oldLogE2.get_unchecked_mut(idx) = -28.0f32;
+                *st.oldLogE.get_unchecked_mut(idx) = -28.0f32;
+            }
             i += 1;
         }
         c += 1;

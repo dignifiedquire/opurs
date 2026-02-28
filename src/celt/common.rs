@@ -57,13 +57,17 @@ fn comb_filter_qext_inplace(
     for s in 0..2usize {
         let mut new_window = vec![0.0f32; overlap2];
         for i in 0..overlap2 {
-            new_window[i] = window[2 * i + s];
+            unsafe {
+                *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s);
+            }
         }
         let mem_len = COMBFILTER_MAXPERIOD as usize + n2;
         let mut mem_buf = vec![0.0f32; mem_len];
         for (i, mem) in mem_buf.iter_mut().enumerate() {
             let src_idx = start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
-            *mem = buf[src_idx as usize];
+            unsafe {
+                *mem = *buf.get_unchecked(src_idx as usize);
+            }
         }
         let cf_start = COMBFILTER_MAXPERIOD as usize;
         comb_filter_inplace(
@@ -81,7 +85,9 @@ fn comb_filter_qext_inplace(
             arch,
         );
         for i in 0..n2 {
-            buf[start + 2 * i + s] = mem_buf[cf_start + i];
+            unsafe {
+                *buf.get_unchecked_mut(start + 2 * i + s) = *mem_buf.get_unchecked(cf_start + i);
+            }
         }
     }
 }
@@ -121,13 +127,16 @@ pub fn comb_filter_const_c(
     let mut x2 = x[x_start - t];
     let mut x1 = x[x_start - t + 1];
     for i in 0..N as usize {
-        let x0 = x[x_start + i - t + 2];
-        y[y_start + i] =
-            saturate_sig(x[x_start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4));
-        x4 = x3;
-        x3 = x2;
-        x2 = x1;
-        x1 = x0;
+        unsafe {
+            let x0 = *x.get_unchecked(x_start + i - t + 2);
+            *y.get_unchecked_mut(y_start + i) = saturate_sig(
+                *x.get_unchecked(x_start + i) + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4),
+            );
+            x4 = x3;
+            x3 = x2;
+            x2 = x1;
+            x1 = x0;
+        }
     }
 }
 
@@ -183,25 +192,29 @@ pub fn comb_filter(
     let mut i = 0;
     while i < overlap {
         let iu = i as usize;
-        let x0 = x[x_start + iu - T1 as usize + 2];
-        let f = window[iu] * window[iu];
-        y[y_start + iu] = saturate_sig(
-            x[x_start + iu]
-                + (1.0f32 - f) * g00 * x[x_start + iu - T0 as usize]
-                + (1.0f32 - f)
-                    * g01
-                    * (x[x_start + iu - T0 as usize + 1] + x[x_start + iu - T0 as usize - 1])
-                + (1.0f32 - f)
-                    * g02
-                    * (x[x_start + iu - T0 as usize + 2] + x[x_start + iu - T0 as usize - 2])
-                + f * g10 * x2
-                + f * g11 * (x1 + x3)
-                + f * g12 * (x0 + x4),
-        );
-        x4 = x3;
-        x3 = x2;
-        x2 = x1;
-        x1 = x0;
+        unsafe {
+            let x0 = *x.get_unchecked(x_start + iu - T1 as usize + 2);
+            let f = *window.get_unchecked(iu) * *window.get_unchecked(iu);
+            *y.get_unchecked_mut(y_start + iu) = saturate_sig(
+                *x.get_unchecked(x_start + iu)
+                    + (1.0f32 - f) * g00 * *x.get_unchecked(x_start + iu - T0 as usize)
+                    + (1.0f32 - f)
+                        * g01
+                        * (*x.get_unchecked(x_start + iu - T0 as usize + 1)
+                            + *x.get_unchecked(x_start + iu - T0 as usize - 1))
+                    + (1.0f32 - f)
+                        * g02
+                        * (*x.get_unchecked(x_start + iu - T0 as usize + 2)
+                            + *x.get_unchecked(x_start + iu - T0 as usize - 2))
+                    + f * g10 * x2
+                    + f * g11 * (x1 + x3)
+                    + f * g12 * (x0 + x4),
+            );
+            x4 = x3;
+            x3 = x2;
+            x2 = x1;
+            x1 = x0;
+        }
         i += 1;
     }
     if g1 == 0.0f32 {
@@ -293,26 +306,30 @@ pub fn comb_filter_inplace(
     }
     let mut i: usize = 0;
     while i < overlap as usize {
-        let x0 = buf[start + i - T1 as usize + 2];
-        let f = window[i] * window[i];
-        // Since T >= 15, reads at [start + i - T] are always before writes at [start + i]
-        buf[start + i] = saturate_sig(
-            buf[start + i]
-                + (1.0f32 - f) * g00 * buf[start + i - T0 as usize]
-                + (1.0f32 - f)
-                    * g01
-                    * (buf[start + i - T0 as usize + 1] + buf[start + i - T0 as usize - 1])
-                + (1.0f32 - f)
-                    * g02
-                    * (buf[start + i - T0 as usize + 2] + buf[start + i - T0 as usize - 2])
-                + f * g10 * x2
-                + f * g11 * (x1 + x3)
-                + f * g12 * (x0 + x4),
-        );
-        x4 = x3;
-        x3 = x2;
-        x2 = x1;
-        x1 = x0;
+        unsafe {
+            let x0 = *buf.get_unchecked(start + i - T1 as usize + 2);
+            let f = *window.get_unchecked(i) * *window.get_unchecked(i);
+            // Since T >= 15, reads at [start + i - T] are always before writes at [start + i]
+            *buf.get_unchecked_mut(start + i) = saturate_sig(
+                *buf.get_unchecked(start + i)
+                    + (1.0f32 - f) * g00 * *buf.get_unchecked(start + i - T0 as usize)
+                    + (1.0f32 - f)
+                        * g01
+                        * (*buf.get_unchecked(start + i - T0 as usize + 1)
+                            + *buf.get_unchecked(start + i - T0 as usize - 1))
+                    + (1.0f32 - f)
+                        * g02
+                        * (*buf.get_unchecked(start + i - T0 as usize + 2)
+                            + *buf.get_unchecked(start + i - T0 as usize - 2))
+                    + f * g10 * x2
+                    + f * g11 * (x1 + x3)
+                    + f * g12 * (x0 + x4),
+            );
+            x4 = x3;
+            x3 = x2;
+            x2 = x1;
+            x1 = x0;
+        }
         i += 1;
     }
     if g1 == 0.0f32 {
@@ -337,12 +354,15 @@ pub fn comb_filter_inplace(
         let mut xv2 = buf[pos - t];
         let mut xv1 = buf[pos - t + 1];
         for j in 0..remain {
-            let xv0 = buf[pos + j - t + 2];
-            buf[pos + j] = buf[pos + j] + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
-            xv4 = xv3;
-            xv3 = xv2;
-            xv2 = xv1;
-            xv1 = xv0;
+            unsafe {
+                let xv0 = *buf.get_unchecked(pos + j - t + 2);
+                *buf.get_unchecked_mut(pos + j) =
+                    *buf.get_unchecked(pos + j) + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
+                xv4 = xv3;
+                xv3 = xv2;
+                xv2 = xv1;
+                xv1 = xv0;
+            }
         }
     }
     let tail_start = start + i;
@@ -382,7 +402,9 @@ pub fn comb_filter_qext(
     for s in 0..2usize {
         let mut new_window = vec![0.0f32; overlap2];
         for i in 0..overlap2 {
-            new_window[i] = window[2 * i + s];
+            unsafe {
+                *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s);
+            }
         }
 
         // Build deinterleaved memory buffer: mem_buf[0..COMBFILTER_MAXPERIOD + N2]
@@ -392,7 +414,9 @@ pub fn comb_filter_qext(
             // x[x_start + 2*i + s - 2*COMBFILTER_MAXPERIOD]
             let src_idx =
                 x_start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
-            *mem = x[src_idx as usize];
+            unsafe {
+                *mem = *x.get_unchecked(src_idx as usize);
+            }
         }
 
         let in_place = std::ptr::eq(
@@ -419,13 +443,18 @@ pub fn comb_filter_qext(
             );
             // Write back interleaved
             for i in 0..N2 {
-                y[y_start + 2 * i + s] = mem_buf[cf_start + i];
+                unsafe {
+                    *y.get_unchecked_mut(y_start + 2 * i + s) =
+                        *mem_buf.get_unchecked(cf_start + i);
+                }
             }
         } else {
             // Separate output: deinterleave y into buf, apply filter, reinterleave
             let mut buf = vec![0.0f32; N2];
             for i in 0..N2 {
-                buf[i] = y[y_start + 2 * i + s];
+                unsafe {
+                    *buf.get_unchecked_mut(i) = *y.get_unchecked(y_start + 2 * i + s);
+                }
             }
             let cf_start = COMBFILTER_MAXPERIOD as usize;
             comb_filter(
@@ -445,7 +474,9 @@ pub fn comb_filter_qext(
                 arch,
             );
             for i in 0..N2 {
-                y[y_start + 2 * i + s] = buf[i];
+                unsafe {
+                    *y.get_unchecked_mut(y_start + 2 * i + s) = *buf.get_unchecked(i);
+                }
             }
         }
     }

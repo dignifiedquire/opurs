@@ -2,13 +2,17 @@
 //!
 //! Upstream C: `celt/vq.c`
 
+use smallvec::{smallvec, SmallVec};
+
 use crate::arch::Arch;
 use crate::celt::bands::SPREAD_NONE;
 use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entenc::ec_enc;
-use crate::celt::mathops::{celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt};
+use crate::celt::mathops::{
+    celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt, float2int_nonneg,
+};
 use crate::celt::pitch::celt_inner_prod;
 
 #[cfg(feature = "qext")]
@@ -68,23 +72,25 @@ fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f
 #[inline]
 fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
-    // Forward pass
-    let fwd_end = len - stride;
-    if fwd_end > 0 {
-        for i in 0..fwd_end as usize {
+    let len = len as usize;
+    let stride = stride as usize;
+    // Pre-slice so LLVM knows X.len() == len and can elide bounds checks.
+    let X = &mut X[..len];
+    // Forward pass: i < len - stride, so i + stride < len = X.len().
+    if stride < len {
+        for i in 0..len - stride {
             let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
             X[i] = c * x1 + ms * x2;
         }
     }
     // Backward pass
-    let bwd_end = len - 2 * stride - 1;
-    if bwd_end >= 0 {
-        for i in (0..=bwd_end as usize).rev() {
+    if len > 2 * stride {
+        for i in (0..=len - 2 * stride - 1).rev() {
             let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
             X[i] = c * x1 + ms * x2;
         }
     }
@@ -110,6 +116,9 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
         }
     }
     len = celt_udiv(len as u32, stride as u32) as i32;
+    let total = (stride * len) as usize;
+    debug_assert!(total <= X.len());
+    let X = &mut X[..total]; // pre-slice so LLVM can prove sub-slice bounds
     for i in 0..stride {
         let off = (i * len) as usize;
         let sub = &mut X[off..off + len as usize];
@@ -131,8 +140,10 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
 #[inline]
 fn normalise_residual(iy: &[i32], X: &mut [f32], N: i32, Ryy: f32, gain: f32) {
     let g = celt_rsqrt_norm(Ryy) * gain;
-    for i in 0..N as usize {
-        X[i] = g * iy[i] as f32;
+    let n = N as usize;
+    // Pre-slice both to n, then .zip() avoids all bounds checks.
+    for (x, &y) in X[..n].iter_mut().zip(&iy[..n]) {
+        *x = g * y as f32;
     }
 }
 
@@ -146,7 +157,9 @@ fn extract_collapse_mask(iy: &[i32], N: i32, B: i32) -> u32 {
     for i in 0..B {
         let mut tmp: u32 = 0;
         for j in 0..N0 {
-            tmp |= iy[(i * N0 + j) as usize] as u32;
+            unsafe {
+                tmp |= *iy.get_unchecked((i * N0 + j) as usize) as u32;
+            }
         }
         collapse_mask |= ((tmp != 0) as u32) << i;
     }
@@ -159,19 +172,20 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     let mut xy: f32;
     let mut yy: f32;
     let N = N as usize;
-    // Max CELT band size is 176; use stack buffers.
-    debug_assert!(N <= 176);
-    let mut y = [0.0f32; 176];
-    let mut signx = [0i32; 176];
+    // Stack-allocate for typical CELT band sizes (≤176), heap-fallback for larger N.
+    let mut y: SmallVec<[f32; 176]> = smallvec![0.0f32; N];
+    let mut signx: SmallVec<[i32; 176]> = smallvec![0i32; N];
     // Pre-slice to hoist bounds checks out of the hot loops.
     let X = &mut X[..N];
     let iy = &mut iy[..N];
 
     for j in 0..N {
-        signx[j] = (X[j] < 0.0) as i32;
-        X[j] = X[j].abs();
-        iy[j] = 0;
-        y[j] = 0.0;
+        unsafe {
+            *signx.get_unchecked_mut(j) = (*X.get_unchecked(j) < 0.0) as i32;
+            *X.get_unchecked_mut(j) = X.get_unchecked(j).abs();
+            *iy.get_unchecked_mut(j) = 0;
+            *y.get_unchecked_mut(j) = 0.0;
+        }
     }
     yy = 0.0;
     xy = 0.0;
@@ -189,12 +203,14 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
         }
         let rcp: f32 = (K as f32 + 0.8f32) * (1.0f32 / sum);
         for j in 0..N {
-            iy[j] = (rcp * X[j]).floor() as i32;
-            y[j] = iy[j] as f32;
-            yy += y[j] * y[j];
-            xy += X[j] * y[j];
-            y[j] *= 2.0;
-            pulsesLeft -= iy[j];
+            unsafe {
+                *iy.get_unchecked_mut(j) = (rcp * *X.get_unchecked(j)).floor() as i32;
+                *y.get_unchecked_mut(j) = *iy.get_unchecked(j) as f32;
+                yy += *y.get_unchecked(j) * *y.get_unchecked(j);
+                xy += *X.get_unchecked(j) * *y.get_unchecked(j);
+                *y.get_unchecked_mut(j) *= 2.0;
+                pulsesLeft -= *iy.get_unchecked(j);
+            }
         }
     }
     if pulsesLeft > N as i32 + 3 {
@@ -209,27 +225,36 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
         let mut best_num: f32;
         let mut best_den: f32;
         yy += 1.0;
-        let Rxy = xy + X[0];
-        let Ryy = yy + y[0];
-        best_den = Ryy;
-        best_num = Rxy * Rxy;
+        unsafe {
+            let Rxy = xy + *X.get_unchecked(0);
+            let Ryy = yy + *y.get_unchecked(0);
+            best_den = Ryy;
+            best_num = Rxy * Rxy;
+        }
         for j in 1..N {
-            let Rxy = xy + X[j];
-            let Ryy = yy + y[j];
-            let Rxy2 = Rxy * Rxy;
-            if best_den * Rxy2 > Ryy * best_num {
-                best_den = Ryy;
-                best_num = Rxy2;
-                best_id = j;
+            unsafe {
+                let Rxy = xy + *X.get_unchecked(j);
+                let Ryy = yy + *y.get_unchecked(j);
+                let Rxy2 = Rxy * Rxy;
+                if best_den * Rxy2 > Ryy * best_num {
+                    best_den = Ryy;
+                    best_num = Rxy2;
+                    best_id = j;
+                }
             }
         }
-        xy += X[best_id];
-        yy += y[best_id];
-        y[best_id] += 2.0;
-        iy[best_id] += 1;
+        unsafe {
+            xy += *X.get_unchecked(best_id);
+            yy += *y.get_unchecked(best_id);
+            *y.get_unchecked_mut(best_id) += 2.0;
+            *iy.get_unchecked_mut(best_id) += 1;
+        }
     }
     for j in 0..N {
-        iy[j] = (iy[j] ^ -signx[j]) + signx[j];
+        unsafe {
+            let s = *signx.get_unchecked(j);
+            *iy.get_unchecked_mut(j) = (*iy.get_unchecked(j) ^ -s) + s;
+        }
     }
     yy
 }
@@ -296,17 +321,25 @@ fn op_pvq_refine(
     let mut iysum: i32 = 0;
 
     for i in 0..N as usize {
-        let tmp = (K as f32 * 256.0) * Xn[i]; // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
-        iy[i] = (0.5 + tmp).floor() as i32;
-        rounding[i] = tmp - (iy[i] as f32 * 128.0); // tmp - SHL32(iy[i], 7)
+        unsafe {
+            let tmp = (K as f32 * 256.0) * *Xn.get_unchecked(i); // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
+            *iy.get_unchecked_mut(i) = (0.5 + tmp).floor() as i32;
+            *rounding.get_unchecked_mut(i) = tmp - (*iy.get_unchecked(i) as f32 * 128.0);
+            // tmp - SHL32(iy[i], 7)
+        }
     }
     if !same {
         for i in 0..N as usize {
-            iy[i] = (up * iy0[i] + up - 1).min((up * iy0[i] - up + 1).max(iy[i]));
+            unsafe {
+                *iy.get_unchecked_mut(i) = (up * *iy0.get_unchecked(i) + up - 1)
+                    .min((up * *iy0.get_unchecked(i) - up + 1).max(*iy.get_unchecked(i)));
+            }
         }
     }
     for i in 0..N as usize {
-        iysum += iy[i];
+        unsafe {
+            iysum += *iy.get_unchecked(i);
+        }
     }
     if (iysum - K).abs() > 32 {
         return true; // failed
@@ -316,16 +349,20 @@ fn op_pvq_refine(
         let mut roundval: f32 = -1000000.0 * dir as f32;
         let mut roundpos: usize = 0;
         for i in 0..N as usize {
-            if (rounding[i] - roundval) * dir as f32 > 0.0
-                && (iy[i] - up * iy0[i]).abs() < (margin - 1)
-                && !(dir == -1 && iy[i] == 0)
-            {
-                roundval = rounding[i];
-                roundpos = i;
+            unsafe {
+                if (*rounding.get_unchecked(i) - roundval) * dir as f32 > 0.0
+                    && (*iy.get_unchecked(i) - up * *iy0.get_unchecked(i)).abs() < (margin - 1)
+                    && !(dir == -1 && *iy.get_unchecked(i) == 0)
+                {
+                    roundval = *rounding.get_unchecked(i);
+                    roundpos = i;
+                }
             }
         }
-        iy[roundpos] += dir;
-        rounding[roundpos] -= dir as f32 * 32768.0; // SHL32(dir, 15)
+        unsafe {
+            *iy.get_unchecked_mut(roundpos) += dir;
+            *rounding.get_unchecked_mut(roundpos) -= dir as f32 * 32768.0; // SHL32(dir, 15)
+        }
         iysum += dir;
     }
     false // success
@@ -350,7 +387,9 @@ fn op_pvq_search_extra(
     let n = N as usize;
 
     for i in 0..n {
-        sum += X[i].abs();
+        unsafe {
+            sum += X.get_unchecked(i).abs();
+        }
     }
     let mut Xn = vec![0.0f32; n];
     if sum < EPSILON {
@@ -358,7 +397,9 @@ fn op_pvq_search_extra(
     } else {
         let rcp_sum = 1.0f32 / sum;
         for i in 0..n {
-            Xn[i] = X[i].abs() * rcp_sum;
+            unsafe {
+                *Xn.get_unchecked_mut(i) = X.get_unchecked(i).abs() * rcp_sum;
+            }
         }
     }
     // First pass: refine base quantization
@@ -370,21 +411,27 @@ fn op_pvq_search_extra(
     if failed {
         iy[0] = K;
         for i in 1..n {
-            iy[i] = 0;
+            unsafe {
+                *iy.get_unchecked_mut(i) = 0;
+            }
         }
         up_iy[0] = up * K;
         for i in 1..n {
-            up_iy[i] = 0;
+            unsafe {
+                *up_iy.get_unchecked_mut(i) = 0;
+            }
         }
     }
     let mut yy: f64 = 0.0;
     for i in 0..n {
-        yy += up_iy[i] as f64 * up_iy[i] as f64;
-        if X[i] < 0.0 {
-            iy[i] = -iy[i];
-            up_iy[i] = -up_iy[i];
+        unsafe {
+            yy += *up_iy.get_unchecked(i) as f64 * *up_iy.get_unchecked(i) as f64;
+            if *X.get_unchecked(i) < 0.0 {
+                *iy.get_unchecked_mut(i) = -*iy.get_unchecked(i);
+                *up_iy.get_unchecked_mut(i) = -*up_iy.get_unchecked(i);
+            }
+            *refine.get_unchecked_mut(i) = *up_iy.get_unchecked(i) - up * *iy.get_unchecked(i);
         }
-        refine[i] = up_iy[i] - up * iy[i];
     }
     yy as f32
 }
@@ -437,11 +484,15 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
     #[cfg(feature = "qext")]
     let trace = qext_trace_enabled_vq();
     for i in 0..n {
-        X[i] = (1 + 2 * iy[i]) as f32 - K as f32;
+        unsafe {
+            *X.get_unchecked_mut(i) = (1 + 2 * *iy.get_unchecked(i)) as f32 - K as f32;
+        }
     }
     X[face] = if sign { -(K as f32) } else { K as f32 };
     for i in 0..n {
-        sum += X[i] * X[i];
+        unsafe {
+            sum += *X.get_unchecked(i) * *X.get_unchecked(i);
+        }
     }
     // Match upstream float path semantics: C computes `1.f/sqrt(sum)` with `sqrt`
     // operating in double precision before rounding back to float.
@@ -460,7 +511,9 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
         );
     }
     for i in 0..n {
-        X[i] *= mag * gain;
+        unsafe {
+            *X.get_unchecked_mut(i) *= mag * gain;
+        }
     }
     #[cfg(feature = "qext")]
     if trace {
@@ -506,9 +559,11 @@ pub fn cubic_quant(
     let mut face: usize = 0;
     let mut faceval: f32 = -1.0;
     for i in 0..n {
-        if X[i].abs() > faceval {
-            faceval = X[i].abs();
-            face = i;
+        unsafe {
+            if X.get_unchecked(i).abs() > faceval {
+                faceval = X.get_unchecked(i).abs();
+                face = i;
+            }
         }
     }
     let sign = X[face] < 0.0;
@@ -517,11 +572,16 @@ pub fn cubic_quant(
     let norm = 0.5 * K as f32 / (faceval + EPSILON);
     let mut iy = vec![0i32; n];
     for i in 0..n {
-        iy[i] = (K - 1).min(((X[i] + faceval) * norm).floor() as i32);
+        unsafe {
+            *iy.get_unchecked_mut(i) =
+                (K - 1).min(((*X.get_unchecked(i) + faceval) * norm).floor() as i32);
+        }
     }
     for i in 0..n {
         if i != face {
-            ec_enc_bits(enc, iy[i] as u32, res as u32);
+            unsafe {
+                ec_enc_bits(enc, *iy.get_unchecked(i) as u32, res as u32);
+            }
         }
     }
     if resynth != 0 {
@@ -552,7 +612,9 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
     let mut iy = vec![0i32; n];
     for i in 0..n {
         if i != face {
-            iy[i] = ec_dec_bits(dec, res as u32) as i32;
+            unsafe {
+                *iy.get_unchecked_mut(i) = ec_dec_bits(dec, res as u32) as i32;
+            }
         }
     }
     iy[face] = 0;
@@ -638,7 +700,15 @@ pub fn alg_quant(
             let use_entropy =
                 (ext_enc.storage as i32 * 8 - ec_tell(ext_enc)) > (N - 1) * (extra_bits + 3) + 1;
             for i in 0..(N - 1) as usize {
-                ec_enc_refine(ext_enc, refine[i], up, extra_bits, use_entropy);
+                unsafe {
+                    ec_enc_refine(
+                        ext_enc,
+                        *refine.get_unchecked(i),
+                        up,
+                        extra_bits,
+                        use_entropy,
+                    );
+                }
             }
             if iy[(N - 1) as usize] == 0 {
                 ec_enc_bits(ext_enc, (up_iy[(N - 1) as usize] < 0) as u32, 1);
@@ -690,6 +760,7 @@ pub fn alg_unquant(
     debug_assert!(N > 1);
     let mut iy = [0i32; 176];
     #[allow(unused_mut)]
+    // N <= 176 (max CELT band size, iy is [i32; 176]).
     let mut Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
     #[allow(unused_assignments, unused_mut)]
     let mut yy_shift: i32 = 0;
@@ -725,7 +796,10 @@ pub fn alg_unquant(
                 (ext_dec.storage as i32 * 8 - ec_tell(ext_dec)) > (N - 1) * (extra_bits + 3) + 1;
             let mut refine = vec![0i32; n];
             for i in 0..(N - 1) as usize {
-                refine[i] = ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
+                unsafe {
+                    *refine.get_unchecked_mut(i) =
+                        ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
+                }
             }
             let sign = if iy[(N - 1) as usize] == 0 {
                 ec_dec_bits(ext_dec, 1) != 0
@@ -733,18 +807,24 @@ pub fn alg_unquant(
                 iy[(N - 1) as usize] < 0
             };
             for i in 0..(N - 1) as usize {
-                iy[i] = iy[i] * up + refine[i];
+                unsafe {
+                    *iy.get_unchecked_mut(i) = *iy.get_unchecked(i) * up + *refine.get_unchecked(i);
+                }
             }
             iy[(N - 1) as usize] = up * K;
             for i in 0..(N - 1) as usize {
-                iy[(N - 1) as usize] -= iy[i].abs();
+                unsafe {
+                    *iy.get_unchecked_mut((N - 1) as usize) -= iy.get_unchecked(i).abs();
+                }
             }
             if sign {
                 iy[(N - 1) as usize] = -iy[(N - 1) as usize];
             }
             let mut yy64: f32 = 0.0;
             for i in 0..n {
-                yy64 += iy[i] as f32 * iy[i] as f32;
+                unsafe {
+                    yy64 += *iy.get_unchecked(i) as f32 * *iy.get_unchecked(i) as f32;
+                }
             }
             Ryy = yy64;
         }
@@ -812,7 +892,9 @@ pub fn alg_unquant(
 /// Upstream C: celt/vq.c:renormalise_vector
 #[inline]
 pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
-    let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
+    // Pre-slice to N; iterator avoids bounds checks in the loop.
+    let x_n = &X[..N as usize];
+    let E = EPSILON + celt_inner_prod(x_n, x_n, N as usize, _arch);
     let g = celt_rsqrt_norm(E) * gain;
     for xi in X[..N as usize].iter_mut() {
         *xi *= g;
@@ -823,22 +905,25 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
 /// Returns Q30 value in range [0, 1073741824] (= 2^30).
 /// Callers that need Q14 should right-shift by 16.
 /// Upstream C: celt/vq.c:stereo_itheta
-#[inline(never)]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
+    let n = N as usize;
+    // Pre-slice both to n; .zip() and celt_inner_prod avoid bounds checks.
     if stereo != 0 {
-        for i in 0..N as usize {
-            let m = X[i] + Y[i];
-            let s = X[i] - Y[i];
+        for (&x, &y) in X[..n].iter().zip(&Y[..n]) {
+            let m = x + y;
+            let s = x - y;
             Emid += m * m;
             Eside += s * s;
         }
     } else {
-        Emid += celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
-        Eside += celt_inner_prod(&Y[..N as usize], &Y[..N as usize], N as usize, _arch);
+        let x_n = &X[..n];
+        let y_n = &Y[..n];
+        Emid += celt_inner_prod(x_n, x_n, n, _arch);
+        Eside += celt_inner_prod(y_n, y_n, n, _arch);
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);
-    (0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid)).floor() as i32
+    float2int_nonneg(0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid))
 }

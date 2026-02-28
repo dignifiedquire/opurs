@@ -2,8 +2,6 @@
 //!
 //! Upstream C: `celt/entdec.c`
 
-#![forbid(unsafe_code)]
-
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 use crate::silk::macros::EC_CLZ0;
 
@@ -18,7 +16,7 @@ use crate::celt::entcode::{
 #[inline]
 fn ec_read_byte(this: &mut ec_dec) -> i32 {
     if this.offs < this.storage {
-        let res = this.buf[this.offs as usize] as i32;
+        let res = unsafe { *this.buf.get_unchecked(this.offs as usize) } as i32;
 
         this.offs += 1;
 
@@ -34,7 +32,11 @@ fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
     if this.end_offs < this.storage {
         this.end_offs += 1;
 
-        this.buf[(this.storage - this.end_offs) as usize] as i32
+        (unsafe {
+            *this
+                .buf
+                .get_unchecked((this.storage - this.end_offs) as usize)
+        }) as i32
     } else {
         0
     }
@@ -158,7 +160,7 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
     loop {
         t = s;
         ret += 1;
-        s = r.wrapping_mul(icdf[ret as usize] as u32);
+        s = r.wrapping_mul(unsafe { *icdf.get_unchecked(ret as usize) } as u32);
         if d >= s {
             break;
         }
@@ -183,7 +185,7 @@ pub fn ec_dec_icdf16(this: &mut ec_dec, icdf: &[u16], ftb: u32) -> i32 {
     loop {
         t = s;
         ret += 1;
-        s = r.wrapping_mul(icdf[ret as usize] as u32);
+        s = r.wrapping_mul(unsafe { *icdf.get_unchecked(ret as usize) } as u32);
         if d >= s {
             break;
         }

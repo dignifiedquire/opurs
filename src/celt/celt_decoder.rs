@@ -450,7 +450,10 @@ pub fn opus_custom_decode24(
     let ret = opus_custom_decode_float(st, data, &mut out, frame_size);
     if ret > 0 {
         for i in 0..(ret as usize * channels) {
-            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+            unsafe {
+                *pcm.get_unchecked_mut(i) =
+                    float2int(32768.0f32 * 256.0f32 * *out.get_unchecked(i));
+            }
         }
     }
     ret
@@ -522,43 +525,55 @@ fn deemphasis(
     let mut c = 0;
     loop {
         let mut j: i32;
-        let mut m: celt_sig = mem[c as usize];
-        let x = in_channels[c as usize];
+        let mut m: celt_sig = unsafe { *mem.get_unchecked(c as usize) };
+        let x = unsafe { *in_channels.get_unchecked(c as usize) };
         #[cfg(feature = "qext")]
         if use_custom_iir {
             let coef1: opus_val16 = coef[1];
             let coef3: opus_val16 = coef.get(3).copied().unwrap_or(0.0);
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
-                m = coef0 * tmp - coef1 * x[j as usize];
-                scratch[j as usize] = coef3 * tmp;
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
+                m = coef0 * tmp - coef1 * unsafe { *x.get_unchecked(j as usize) };
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = coef3 * tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp;
-                scratch[j as usize] = tmp;
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
                 m = coef0 * tmp;
-                pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp_0: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp_0;
-                pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         }
@@ -566,43 +581,60 @@ fn deemphasis(
         if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp;
-                scratch[j as usize] = tmp;
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
                 m = coef0 * tmp;
-                pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp_0: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp_0;
-                pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         }
-        mem[c as usize] = m;
+        unsafe {
+            *mem.get_unchecked_mut(c as usize) = m;
+        }
         if apply_downsampling != 0 {
             if accum != 0 {
                 j = 0;
                 while j < Nd {
-                    pcm[(c + j * C) as usize] +=
-                        scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
+                    unsafe {
+                        *pcm.get_unchecked_mut((c + j * C) as usize) += *scratch
+                            .get_unchecked((j * downsample) as usize)
+                            * (1_f32 / CELT_SIG_SCALE);
+                    }
                     j += 1;
                 }
             } else {
                 j = 0;
                 while j < Nd {
-                    pcm[(c + j * C) as usize] =
-                        scratch[(j * downsample) as usize] * (1_f32 / CELT_SIG_SCALE);
+                    unsafe {
+                        *pcm.get_unchecked_mut((c + j * C) as usize) = *scratch
+                            .get_unchecked((j * downsample) as usize)
+                            * (1_f32 / CELT_SIG_SCALE);
+                    }
                     j += 1;
                 }
             }
@@ -777,7 +809,10 @@ fn celt_synthesis(
         }
         let mut i = 0;
         while i < n {
-            freq[i] = 0.5f32 * freq[i] + 0.5f32 * freq2[i];
+            unsafe {
+                *freq.get_unchecked_mut(i) =
+                    0.5f32 * *freq.get_unchecked(i) + 0.5f32 * *freq2.get_unchecked(i);
+            }
             i += 1;
         }
         b = 0;
@@ -958,22 +993,29 @@ fn tf_decode(
             tell = ec_tell(dec) as u32;
             tf_changed |= curr;
         }
-        tf_res[i as usize] = curr;
+        unsafe {
+            *tf_res.get_unchecked_mut(i as usize) = curr;
+        }
         logp = if isTransient != 0 { 4 } else { 5 };
         i += 1;
     }
     tf_select = 0;
+    // LM in [0,3], isTransient/tf_changed/tf_select in {0,1}.
+    // & 3 / & 7 masks let LLVM prove table indices in-bounds for [4][8].
+    let lm_idx = LM as usize & 3;
     if tf_select_rsv != 0
-        && tf_select_table[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
-            != tf_select_table[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
+        && tf_select_table[lm_idx][((4 * isTransient) + tf_changed) as usize & 7] as i32
+            != tf_select_table[lm_idx][(4 * isTransient + 2 + tf_changed) as usize & 7] as i32
     {
         tf_select = ec_dec_bit_logp(dec, 1);
     }
     i = start;
     while i < end {
-        tf_res[i as usize] = tf_select_table[LM as usize]
-            [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
-            as i32;
+        unsafe {
+            *tf_res.get_unchecked_mut(i as usize) = tf_select_table[lm_idx]
+                [(4 * isTransient + 2 * tf_select + *tf_res.get_unchecked(i as usize)) as usize & 7]
+                as i32;
+        }
         i += 1;
     }
 }
@@ -1051,8 +1093,12 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
         // Simulate TDAC on the concealed audio so that it blends with the
         // MDCT of the next frame.
         for i in 0..overlap_u / 2 {
-            st.decode_mem[ch_off + decode_buffer_size - n + i] =
-                mode.window[i] * etmp[overlap_u - 1 - i] + mode.window[overlap_u - i - 1] * etmp[i];
+            unsafe {
+                *st.decode_mem
+                    .get_unchecked_mut(ch_off + decode_buffer_size - n + i) =
+                    *mode.window.get_unchecked(i) * *etmp.get_unchecked(overlap_u - 1 - i)
+                        + *mode.window.get_unchecked(overlap_u - i - 1) * *etmp.get_unchecked(i);
+            }
         }
 
         c += 1;
@@ -1147,11 +1193,15 @@ fn celt_decode_lost(
             let mut i = start;
             while i < end {
                 let idx = (c * nbEBands + i) as usize;
-                st.oldEBands[idx] = if st.backgroundLogE[idx] > st.oldEBands[idx] - decay {
-                    st.backgroundLogE[idx]
-                } else {
-                    st.oldEBands[idx] - decay
-                };
+                unsafe {
+                    *st.oldEBands.get_unchecked_mut(idx) = if *st.backgroundLogE.get_unchecked(idx)
+                        > *st.oldEBands.get_unchecked(idx) - decay
+                    {
+                        *st.backgroundLogE.get_unchecked(idx)
+                    } else {
+                        *st.oldEBands.get_unchecked(idx) - decay
+                    };
+                }
                 i += 1;
             }
             c += 1;
@@ -1164,13 +1214,17 @@ fn celt_decode_lost(
         while c < C {
             let mut i = start;
             while i < effEnd {
-                let boffs = (N * c + ((eBands[i as usize] as i32) << LM)) as usize;
-                let blen =
-                    ((eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) << LM) as usize;
+                let boffs = (N * c + ((unsafe { *eBands.get_unchecked(i as usize) } as i32) << LM))
+                    as usize;
+                let blen = ((unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32
+                    - unsafe { *eBands.get_unchecked(i as usize) } as i32)
+                    << LM) as usize;
                 let mut j = 0;
                 while j < blen {
                     seed = celt_lcg_rand(seed);
-                    X[boffs + j] = (seed as i32 >> 20) as celt_norm;
+                    unsafe {
+                        *X.get_unchecked_mut(boffs + j) = (seed as i32 >> 20) as celt_norm;
+                    }
                     j += 1;
                 }
                 renormalise_vector(&mut X[boffs..boffs + blen], blen as i32, Q15ONE, st.arch);
@@ -1316,8 +1370,11 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < max_period as usize + LPC_ORDER {
-                    _exc[i] = st.decode_mem
-                        [ch_off + decode_buffer_size - max_period as usize - LPC_ORDER + i];
+                    unsafe {
+                        *_exc.get_unchecked_mut(i) = *st.decode_mem.get_unchecked(
+                            ch_off + decode_buffer_size - max_period as usize - LPC_ORDER + i,
+                        );
+                    }
                     i += 1;
                 }
             }
@@ -1334,7 +1391,11 @@ fn celt_decode_lost(
                 ac[0] *= 1.0001f32;
                 let mut i = 1i32;
                 while i <= LPC_ORDER as i32 {
-                    ac[i as usize] -= ac[i as usize] * (0.008f32 * 0.008f32) * i as f32 * i as f32;
+                    unsafe {
+                        let v = *ac.get_unchecked(i as usize);
+                        *ac.get_unchecked_mut(i as usize) -=
+                            v * (0.008f32 * 0.008f32) * i as f32 * i as f32;
+                    }
                     i += 1;
                 }
                 let lpc_start = c as usize * LPC_ORDER;
@@ -1365,9 +1426,13 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < decay_length {
-                    let e = _exc[exc_off + (max_period - decay_length + i) as usize];
+                    let e = unsafe {
+                        *_exc.get_unchecked(exc_off + (max_period - decay_length + i) as usize)
+                    };
                     E1 += e * e;
-                    let e = _exc[exc_off + (max_period - 2 * decay_length + i) as usize];
+                    let e = unsafe {
+                        *_exc.get_unchecked(exc_off + (max_period - 2 * decay_length + i) as usize)
+                    };
                     E2 += e * e;
                     i += 1;
                 }
@@ -1387,11 +1452,17 @@ fn celt_decode_lost(
                     j_0 -= pitch_index;
                     attenuation *= decay_0;
                 }
-                st.decode_mem[ch_off + decode_buffer_size - n + i as usize] =
-                    attenuation * _exc[exc_off + (extrapolation_offset + j_0) as usize];
-                let tmp = st.decode_mem[ch_off + decode_buffer_size - max_period as usize - n
-                    + (extrapolation_offset + j_0) as usize];
-                S1 += tmp * tmp;
+                unsafe {
+                    *st.decode_mem
+                        .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) =
+                        attenuation
+                            * *_exc.get_unchecked(exc_off + (extrapolation_offset + j_0) as usize);
+                    let tmp = *st.decode_mem.get_unchecked(
+                        ch_off + decode_buffer_size - max_period as usize - n
+                            + (extrapolation_offset + j_0) as usize,
+                    );
+                    S1 += tmp * tmp;
+                }
                 i += 1;
                 j_0 += 1;
             }
@@ -1399,7 +1470,11 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < LPC_ORDER {
-                    lpc_mem[i] = st.decode_mem[ch_off + decode_buffer_size - n - 1 - i];
+                    unsafe {
+                        *lpc_mem.get_unchecked_mut(i) = *st
+                            .decode_mem
+                            .get_unchecked(ch_off + decode_buffer_size - n - 1 - i);
+                    }
                     i += 1;
                 }
             }
@@ -1420,8 +1495,10 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    let tmp_0: opus_val16 =
-                        st.decode_mem[ch_off + decode_buffer_size - n + i as usize];
+                    let tmp_0: opus_val16 = unsafe {
+                        *st.decode_mem
+                            .get_unchecked(ch_off + decode_buffer_size - n + i as usize)
+                    };
                     S2 += tmp_0 * tmp_0;
                     i += 1;
                 }
@@ -1430,20 +1507,32 @@ fn celt_decode_lost(
             if !(S1 > 0.2f32 * S2) {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] = 0.0;
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) = 0.0;
+                    }
                     i += 1;
                 }
             } else if S1 < S2 {
                 let ratio: opus_val16 = celt_sqrt((0.5 * S1 + 1.0) / (S2 + 1.0));
                 let mut i = 0;
                 while i < overlap {
-                    let tmp_g: opus_val16 = Q15ONE - window[i as usize] * (1.0f32 - ratio);
-                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] *= tmp_g;
+                    let tmp_g: opus_val16 =
+                        Q15ONE - unsafe { *window.get_unchecked(i as usize) } * (1.0f32 - ratio);
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *=
+                            tmp_g;
+                    }
                     i += 1;
                 }
                 i = overlap;
                 while i < extrapolation_len {
-                    st.decode_mem[ch_off + decode_buffer_size - n + i as usize] *= ratio;
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *=
+                            ratio;
+                    }
                     i += 1;
                 }
             }
@@ -1729,11 +1818,16 @@ fn celt_decode_body(
         i = 0;
         let nb = nbEBands as usize;
         while i < nbEBands {
-            st.oldEBands[i as usize] = if st.oldEBands[i as usize] > st.oldEBands[nb + i as usize] {
-                st.oldEBands[i as usize]
-            } else {
-                st.oldEBands[nb + i as usize]
-            };
+            unsafe {
+                *st.oldEBands.get_unchecked_mut(i as usize) =
+                    if *st.oldEBands.get_unchecked(i as usize)
+                        > *st.oldEBands.get_unchecked(nb + i as usize)
+                    {
+                        *st.oldEBands.get_unchecked(i as usize)
+                    } else {
+                        *st.oldEBands.get_unchecked(nb + i as usize)
+                    };
+            }
             i += 1;
         }
     }
@@ -1800,37 +1894,41 @@ fn celt_decode_body(
             i = start;
             while i < end {
                 let idx = (c * nbEBands + i) as usize;
-                if st.oldEBands[idx]
-                    < if st.oldLogE[idx] > st.oldLogE2[idx] {
-                        st.oldLogE[idx]
-                    } else {
-                        st.oldLogE2[idx]
-                    }
-                {
-                    // If energy is going down already, continue the trend.
-                    let e0 = st.oldEBands[idx];
-                    let e1 = st.oldLogE[idx];
-                    let e2 = st.oldLogE2[idx];
-                    let slope = if e1 - e0 > 0.5f32 * (e2 - e0) {
-                        e1 - e0
-                    } else {
-                        0.5f32 * (e2 - e0)
-                    };
-                    let slope = slope.min(2.0f32);
-                    let new_e = e0
-                        - (if 0.0f32 > (1 + missing) as f32 * slope {
-                            0.0f32
+                unsafe {
+                    if *st.oldEBands.get_unchecked(idx)
+                        < if *st.oldLogE.get_unchecked(idx) > *st.oldLogE2.get_unchecked(idx) {
+                            *st.oldLogE.get_unchecked(idx)
                         } else {
-                            (1 + missing) as f32 * slope
-                        });
-                    st.oldEBands[idx] = if -20.0f32 > new_e { -20.0f32 } else { new_e };
-                } else {
-                    // Otherwise take the min of the last frames.
-                    st.oldEBands[idx] =
-                        st.oldEBands[idx].min(st.oldLogE[idx]).min(st.oldLogE2[idx]);
+                            *st.oldLogE2.get_unchecked(idx)
+                        }
+                    {
+                        // If energy is going down already, continue the trend.
+                        let e0 = *st.oldEBands.get_unchecked(idx);
+                        let e1 = *st.oldLogE.get_unchecked(idx);
+                        let e2 = *st.oldLogE2.get_unchecked(idx);
+                        let slope = if e1 - e0 > 0.5f32 * (e2 - e0) {
+                            e1 - e0
+                        } else {
+                            0.5f32 * (e2 - e0)
+                        };
+                        let slope = slope.min(2.0f32);
+                        let new_e = e0
+                            - (if 0.0f32 > (1 + missing) as f32 * slope {
+                                0.0f32
+                            } else {
+                                (1 + missing) as f32 * slope
+                            });
+                        *st.oldEBands.get_unchecked_mut(idx) =
+                            if -20.0f32 > new_e { -20.0f32 } else { new_e };
+                    } else {
+                        // Otherwise take the min of the last frames.
+                        *st.oldEBands.get_unchecked_mut(idx) = (*st.oldEBands.get_unchecked(idx))
+                            .min(*st.oldLogE.get_unchecked(idx))
+                            .min(*st.oldLogE2.get_unchecked(idx));
+                    }
+                    // Shorter frames have more natural fluctuations -- play it safe.
+                    *st.oldEBands.get_unchecked_mut(idx) -= safety;
                 }
-                // Shorter frames have more natural fluctuations -- play it safe.
-                st.oldEBands[idx] -= safety;
                 i += 1;
             }
             c += 1;
@@ -1963,7 +2061,10 @@ fn celt_decode_body(
         let mut quanta: i32 = 0;
         let mut dynalloc_loop_logp: i32 = 0;
         let mut boost: i32 = 0;
-        width = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
+        width = (C
+            * (unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32
+                - unsafe { *eBands.get_unchecked(i as usize) } as i32))
+            << LM;
         quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
@@ -1973,7 +2074,9 @@ fn celt_decode_body(
         };
         dynalloc_loop_logp = dynalloc_logp;
         boost = 0;
-        while tell + (dynalloc_loop_logp << BITRES) < total_bits && boost < cap[i as usize] {
+        while tell + (dynalloc_loop_logp << BITRES) < total_bits
+            && boost < unsafe { *cap.get_unchecked(i as usize) }
+        {
             let mut flag: i32 = 0;
             flag = ec_dec_bit_logp(dec, dynalloc_loop_logp as u32);
             tell = ec_tell_frac(dec) as i32;
@@ -1984,7 +2087,9 @@ fn celt_decode_body(
             total_bits -= quanta;
             dynalloc_loop_logp = 1;
         }
-        offsets[i as usize] = boost;
+        unsafe {
+            *offsets.get_unchecked_mut(i as usize) = boost;
+        }
         if boost > 0 {
             dynalloc_logp = if 2 > dynalloc_logp - 1 {
                 2
@@ -2210,8 +2315,9 @@ fn celt_decode_body(
             let ext_balance = {
                 let mut bal = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_dec) as i32;
                 for j in 0..qext_end {
-                    bal -= extra_pulses[nbEBands as usize + j as usize]
-                        + C * (extra_quant[nbEBands as usize + 1] << BITRES);
+                    bal -= unsafe { *extra_pulses.get_unchecked(nbEBands as usize + j as usize) }
+                        + C * (unsafe { *extra_quant.get_unchecked(nbEBands as usize + 1) }
+                            << BITRES);
                 }
                 bal
             };
@@ -2382,7 +2488,9 @@ fn celt_decode_body(
     if silence != 0 {
         i = 0;
         while i < C * nbEBands {
-            st.oldEBands[i as usize] = -28.0f32;
+            unsafe {
+                *st.oldEBands.get_unchecked_mut(i as usize) = -28.0f32;
+            }
             i += 1;
         }
     }
@@ -2555,39 +2663,53 @@ fn celt_decode_body(
     } else {
         i = 0;
         while i < 2 * nbEBands {
-            st.oldLogE[i as usize] = if st.oldLogE[i as usize] < st.oldEBands[i as usize] {
-                st.oldLogE[i as usize]
-            } else {
-                st.oldEBands[i as usize]
-            };
+            unsafe {
+                *st.oldLogE.get_unchecked_mut(i as usize) = if *st.oldLogE.get_unchecked(i as usize)
+                    < *st.oldEBands.get_unchecked(i as usize)
+                {
+                    *st.oldLogE.get_unchecked(i as usize)
+                } else {
+                    *st.oldEBands.get_unchecked(i as usize)
+                };
+            }
             i += 1;
         }
     }
     let max_background_increase: opus_val16 = (160_i32.min(st.loss_duration + M) as f32) * 0.001f32;
     i = 0;
     while i < 2 * nbEBands {
-        st.backgroundLogE[i as usize] =
-            if st.backgroundLogE[i as usize] + max_background_increase < st.oldEBands[i as usize] {
-                st.backgroundLogE[i as usize] + max_background_increase
-            } else {
-                st.oldEBands[i as usize]
-            };
+        unsafe {
+            *st.backgroundLogE.get_unchecked_mut(i as usize) =
+                if *st.backgroundLogE.get_unchecked(i as usize) + max_background_increase
+                    < *st.oldEBands.get_unchecked(i as usize)
+                {
+                    *st.backgroundLogE.get_unchecked(i as usize) + max_background_increase
+                } else {
+                    *st.oldEBands.get_unchecked(i as usize)
+                };
+        }
         i += 1;
     }
     c = 0;
     loop {
         i = 0;
         while i < start {
-            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
-            st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
-            st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
+            let idx = (c * nbEBands + i) as usize;
+            unsafe {
+                *st.oldEBands.get_unchecked_mut(idx) = 0 as opus_val16;
+                *st.oldLogE2.get_unchecked_mut(idx) = -28.0f32;
+                *st.oldLogE.get_unchecked_mut(idx) = -28.0f32;
+            }
             i += 1;
         }
         i = end;
         while i < nbEBands {
-            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
-            st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
-            st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
+            let idx = (c * nbEBands + i) as usize;
+            unsafe {
+                *st.oldEBands.get_unchecked_mut(idx) = 0 as opus_val16;
+                *st.oldLogE2.get_unchecked_mut(idx) = -28.0f32;
+                *st.oldLogE.get_unchecked_mut(idx) = -28.0f32;
+            }
             i += 1;
         }
         c += 1;
