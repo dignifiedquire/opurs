@@ -479,7 +479,8 @@ pub fn unquant_coarse_energy(
     C: i32,
     LM: i32,
 ) {
-    let prob_model = &E_PROB_MODEL[LM as usize][intra as usize];
+    // Safety: LM in [0,3], intra in {0,1}; tables are [4], [4][2][42].
+    let prob_model = unsafe { E_PROB_MODEL.get_unchecked(LM as usize).get_unchecked(intra as usize) };
     let mut prev: [f32; 2] = [0.0, 0.0];
     let coef: f32;
     let beta: f32;
@@ -488,8 +489,8 @@ pub fn unquant_coarse_energy(
         coef = 0.0;
         beta = BETA_INTRA;
     } else {
-        beta = BETA_COEF[LM as usize];
-        coef = PRED_COEF[LM as usize];
+        beta = unsafe { *BETA_COEF.get_unchecked(LM as usize) };
+        coef = unsafe { *PRED_COEF.get_unchecked(LM as usize) };
     }
     let budget = dec.storage.wrapping_mul(8) as i32;
     for i in start..end {
@@ -499,10 +500,11 @@ pub fn unquant_coarse_energy(
             let tell = ec_tell(dec);
             if budget - tell >= 15 {
                 let pi = 2 * (i.min(20));
+                // Safety: pi = 2*min(i,20) in [0,40], pi+1 in [1,41], table has 42 elements.
                 qi = ec_laplace_decode(
                     dec,
-                    ((prob_model[pi as usize] as i32) << 7) as u32,
-                    (prob_model[(pi + 1) as usize] as i32) << 6,
+                    ((unsafe { *prob_model.get_unchecked(pi as usize) } as i32) << 7) as u32,
+                    (unsafe { *prob_model.get_unchecked((pi + 1) as usize) } as i32) << 6,
                 );
             } else if budget - tell >= 2 {
                 let raw = ec_dec_icdf(dec, &SMALL_ENERGY_ICDF, 2);

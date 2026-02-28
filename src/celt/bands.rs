@@ -176,10 +176,11 @@ pub fn hysteresis_decision(
         }
         i += 1;
     }
-    if i > prev && val < thresholds[prev as usize] + hysteresis[prev as usize] {
+    // Safety: prev is in [0, N), thresholds/hysteresis have N elements.
+    if i > prev && val < unsafe { *thresholds.get_unchecked(prev as usize) } + unsafe { *hysteresis.get_unchecked(prev as usize) } {
         i = prev;
     }
-    if i < prev && val > thresholds[(prev - 1) as usize] - hysteresis[(prev - 1) as usize] {
+    if i < prev && val > unsafe { *thresholds.get_unchecked((prev - 1) as usize) } - unsafe { *hysteresis.get_unchecked((prev - 1) as usize) } {
         i = prev;
     }
     i
@@ -312,7 +313,8 @@ pub fn denormalise_bands(
 ) {
     let eBands = &m.eBands;
     let N = M * m.shortMdctSize;
-    let mut bound = M * eBands[end as usize] as i32;
+    // Safety: end <= m.nbEBands, validated by callers.
+    let mut bound = M * unsafe { *eBands.get_unchecked(end as usize) } as i32;
     if downsample != 1 {
         bound = if bound < N / downsample {
             bound
@@ -325,11 +327,11 @@ pub fn denormalise_bands(
         end = 0;
         start = end;
     }
-    let start_bin = (M * eBands[start as usize] as i32) as usize;
+    let start_bin = (M * unsafe { *eBands.get_unchecked(start as usize) } as i32) as usize;
     if start != 0 {
         freq[..start_bin].fill(0.0);
     }
-    let end_bin = (M * eBands[end as usize] as i32) as usize;
+    let end_bin = (M * unsafe { *eBands.get_unchecked(end as usize) } as i32) as usize;
     let freq_band = &mut freq[start_bin..end_bin];
     let x_band = &X[start_bin..end_bin];
     let mut off = 0usize;
@@ -337,9 +339,11 @@ pub fn denormalise_bands(
         let band_len = (M * (unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32 - unsafe { *eBands.get_unchecked(i as usize) } as i32)) as usize;
         let lg = unsafe { *bandLogE.get_unchecked(i as usize) } + unsafe { *eMeans.get_unchecked(i as usize) };
         let g = celt_exp2(if 32.0 < lg { 32.0f32 } else { lg });
-        for (f, &x) in freq_band[off..off + band_len]
+        // Safety: off accumulates band lengths from eBands[start] to eBands[i],
+        // off + band_len = eBands[i+1] - eBands[start] <= end_bin - start_bin.
+        for (f, &x) in unsafe { freq_band.get_unchecked_mut(off..off + band_len) }
             .iter_mut()
-            .zip(&x_band[off..off + band_len])
+            .zip(unsafe { x_band.get_unchecked(off..off + band_len) })
         {
             *f = x * g;
         }
@@ -405,7 +409,8 @@ pub fn anti_collapse(
             let x_off = (c * size + ((unsafe { *m.eBands.get_unchecked(i as usize) } as i32) << LM)) as usize;
             let x_len = (N0 << LM) as usize;
             let mut renormalize = 0;
-            let x_sub = &mut X_[x_off..x_off + x_len];
+            // Safety: x_off + x_len = c*size + eBands[i+1]<<LM <= C*size = X_.len().
+            let x_sub = unsafe { X_.get_unchecked_mut(x_off..x_off + x_len) };
             for k in 0..(1i32 << LM) {
                 if unsafe { *collapse_masks.get_unchecked((i * C + c) as usize) } as i32 & (1) << k == 0 {
                     for j in 0..N0 {
@@ -416,7 +421,7 @@ pub fn anti_collapse(
                 }
             }
             if renormalize != 0 {
-                renormalise_vector(&mut X_[x_off..x_off + x_len], N0 << LM, Q15ONE, arch);
+                renormalise_vector(unsafe { X_.get_unchecked_mut(x_off..x_off + x_len) }, N0 << LM, Q15ONE, arch);
             }
             c += 1;
             if c >= C {
@@ -516,7 +521,8 @@ pub fn spreading_decision(
     let mut hf_sum: i32 = 0;
     debug_assert!(end > 0);
     let N0 = M * m.shortMdctSize;
-    if M * (eBands[end as usize] as i32 - eBands[(end - 1) as usize] as i32) <= 8 {
+    // Safety: end <= nbEBands, (end-1) >= 0 since end > 0 (asserted above).
+    if M * (unsafe { *eBands.get_unchecked(end as usize) } as i32 - unsafe { *eBands.get_unchecked((end - 1) as usize) } as i32) <= 8 {
         return SPREAD_NONE;
     }
     let mut c = 0;
@@ -689,7 +695,8 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
     let qn = if qb < (1) << BITRES >> 1 {
         1
     } else {
-        let raw = EXP2_TABLE8[(qb & 0x7) as usize] as i32 >> (14 - (qb >> BITRES));
+        // Safety: qb & 0x7 is always in [0, 7], table has 8 entries.
+        let raw = (unsafe { *EXP2_TABLE8.get_unchecked((qb & 0x7) as usize) }) as i32 >> (14 - (qb >> BITRES));
         ((raw + 1) >> 1) << 1
     };
     debug_assert!(qn <= 256);
@@ -2066,9 +2073,10 @@ fn special_hybrid_folding(
     dual_stereo: i32,
 ) {
     let eBands = &m.eBands;
-    let n1 = (M * (eBands[(start + 1) as usize] as i32 - eBands[start as usize] as i32)) as usize;
+    // Safety: start+2 <= nbEBands, guaranteed by caller (start is the first coded band).
+    let n1 = (M * (unsafe { *eBands.get_unchecked((start + 1) as usize) } as i32 - unsafe { *eBands.get_unchecked(start as usize) } as i32)) as usize;
     let n2 =
-        (M * (eBands[(start + 2) as usize] as i32 - eBands[(start + 1) as usize] as i32)) as usize;
+        (M * (unsafe { *eBands.get_unchecked((start + 2) as usize) } as i32 - unsafe { *eBands.get_unchecked((start + 1) as usize) } as i32)) as usize;
     norm.copy_within(2 * n1 - n2..n1, n1);
     if dual_stereo != 0 {
         norm2.copy_within(2 * n1 - n2..n1, n1);
@@ -2119,7 +2127,8 @@ pub fn quant_all_bands<'a>(
     let mut lowband_offset: i32 = 0;
     let mut update_lowband: i32 = 1;
     let C: i32 = if Y_.is_some() { 2 } else { 1 };
-    let norm_offset: i32 = M * eBands[start as usize] as i32;
+    // Safety: start < end <= nbEBands, validated by debug_assert above.
+    let norm_offset: i32 = M * unsafe { *eBands.get_unchecked(start as usize) } as i32;
     #[allow(unused_mut)]
     let mut theta_rdo: i32 =
         (encode != 0 && Y_.is_some() && dual_stereo == 0 && complexity >= 8) as i32;
@@ -2131,14 +2140,14 @@ pub fn quant_all_bands<'a>(
     }
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
-    let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;
+    let norm_size = (M * unsafe { *eBands.get_unchecked(m.nbEBands - 1) } as i32 - norm_offset) as usize;
     // C * norm_size max: 2 * M * eBands[last]. Stereo QEXT 96kHz = 2 * 8 * 240 = 3840.
     const MAX_NORM: usize = 6000;
     debug_assert!(C as usize * norm_size <= MAX_NORM);
     let mut _norm = [0.0f32; MAX_NORM];
 
     let _resynth_alloc: i32 = if encode != 0 && resynth != 0 {
-        M * (eBands[m.nbEBands] as i32 - eBands[m.nbEBands - 1] as i32)
+        M * (unsafe { *eBands.get_unchecked(m.nbEBands) } as i32 - unsafe { *eBands.get_unchecked(m.nbEBands - 1) } as i32)
     } else {
         0
     };
@@ -2150,7 +2159,7 @@ pub fn quant_all_bands<'a>(
     let mut _norm_save2 = [0.0f32; 176];
 
     // In decode-only mode, lowband_scratch comes from the end of X_
-    let decode_scratch_off = (M * eBands[m.effEBands as usize - 1] as i32) as usize;
+    let decode_scratch_off = (M * unsafe { *eBands.get_unchecked(m.effEBands as usize - 1) } as i32) as usize;
     let use_alloc_scratch = encode != 0 && resynth != 0;
 
     let has_y = Y_.is_some();
@@ -2362,8 +2371,10 @@ pub fn quant_all_bands<'a>(
         // to get non-overlapping x_band and scratch. band_start + n <= decode_scratch_off
         // holds because have_scratch is only true when i < effEBands.
         let need_x_scratch = have_scratch && !use_alloc_scratch;
+        // Safety: decode_scratch_off = M * eBands[effEBands-1] <= X_.len()
+        // (only used when need_x_scratch, which requires i < effEBands).
         let (x_band_src, mut x_scratch_src) = if need_x_scratch {
-            let (coded, scratch) = X_.split_at_mut(decode_scratch_off);
+            let (coded, scratch) = unsafe { X_.split_at_mut_unchecked(decode_scratch_off) };
             (coded, Some(scratch))
         } else {
             (&mut *X_, None)
@@ -2394,7 +2405,8 @@ pub fn quant_all_bands<'a>(
             } else {
                 Some(&mut norm1[norm_band_out_off..])
             };
-            let x_band = &mut x_band_src[band_start..band_start + n];
+            // Safety: band_start + n = M * eBands[i+1] <= decode_scratch_off (i < effEBands).
+            let x_band = unsafe { x_band_src.get_unchecked_mut(band_start..band_start + n) };
             #[cfg(feature = "qext")]
             {
                 ctx.ext_b = ext_b / 2;
@@ -2437,7 +2449,8 @@ pub fn quant_all_bands<'a>(
             } else {
                 None
             };
-            let y_band = &mut y_mut.as_deref_mut().unwrap()[band_start..band_start + n];
+            // Safety: band_start + n = M * eBands[i+1] <= Y len (same size as X).
+            let y_band = unsafe { y_mut.as_deref_mut().unwrap().get_unchecked_mut(band_start..band_start + n) };
             #[cfg(feature = "qext")]
             {
                 ctx.ext_b = ext_b / 2;
@@ -2515,8 +2528,9 @@ pub fn quant_all_bands<'a>(
                 Some(&mut _norm[norm_band_out_off..])
             };
             if has_y {
-                let x_band = &mut x_band_src[band_start..band_start + n];
-                let y_band = &mut y_mut.as_deref_mut().unwrap()[band_start..band_start + n];
+                // Safety: band_start + n = M * eBands[i+1] <= X/Y len.
+                let x_band = unsafe { x_band_src.get_unchecked_mut(band_start..band_start + n) };
+                let y_band = unsafe { y_mut.as_deref_mut().unwrap().get_unchecked_mut(band_start..band_start + n) };
                 if theta_rdo != 0 && i < intensity {
                     let mut w: [f32; 2] = [0.0; 2];
                     compute_channel_weights(
@@ -2691,7 +2705,8 @@ pub fn quant_all_bands<'a>(
                 y_cm = x_cm;
             } else {
                 // Mono mode (use_norm_xy already handled above)
-                let x_band = &mut x_band_src[band_start..band_start + n];
+                // Safety: band_start + n = M * eBands[i+1] <= X len.
+                let x_band = unsafe { x_band_src.get_unchecked_mut(band_start..band_start + n) };
                 x_cm = quant_band(
                     &mut ctx,
                     x_band,

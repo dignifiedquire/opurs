@@ -34,9 +34,10 @@ pub fn mdct_forward(
     shift: usize,
     output_stride: usize,
 ) {
-    let st: &kiss_fft_state = l.kfft[shift];
+    // Safety: shift < 4 (log2 of max overlap ratio), kfft/trig have 4 entries.
+    let st: &kiss_fft_state = unsafe { l.kfft.get_unchecked(shift) };
     let scale = st.scale;
-    let trig = l.trig[shift];
+    let trig = unsafe { *l.trig.get_unchecked(shift) };
     let n = l.n >> shift;
     let n2 = n / 2;
     let n4 = n / 4;
@@ -158,7 +159,8 @@ pub fn mdct_backward(
     shift: usize,
     input_stride: usize,
 ) {
-    let trig = l.trig[shift];
+    // Safety: shift < 4 (log2 of max overlap ratio), kfft/trig have 4 entries.
+    let trig = unsafe { *l.trig.get_unchecked(shift) };
     let n = l.n >> shift;
     let n2 = n / 2;
     let n4 = n / 4;
@@ -166,7 +168,7 @@ pub fn mdct_backward(
     let o = overlap;
     let o2 = overlap / 2;
 
-    debug_assert_eq!(l.kfft[shift].nfft, n4);
+    debug_assert_eq!(unsafe { l.kfft.get_unchecked(shift) }.nfft, n4);
 
     debug_assert_eq!(window.len(), o);
     debug_assert_eq!(trig.len(), n2);
@@ -195,11 +197,11 @@ pub fn mdct_backward(
                 let t = Complex::new(*trig_real.get_unchecked(i), *trig_imag.get_unchecked(i));
                 let x = Complex::new(xr, xi);
                 let y = x * t;
-                *outmid.get_unchecked_mut(*l.kfft[shift].bitrev.get_unchecked(i) as usize) = y;
+                *outmid.get_unchecked_mut(*l.kfft.get_unchecked(shift).bitrev.get_unchecked(i) as usize) = y;
             }
         }
     }
-    opus_fft_impl(l.kfft[shift], outmid);
+    opus_fft_impl(unsafe { l.kfft.get_unchecked(shift) }, outmid);
 
     /* Post-rotate and de-shuffle from both ends of the buffer at once to make
     it in-place. */
