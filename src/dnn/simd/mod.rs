@@ -33,23 +33,17 @@ pub fn sgemv(
 ) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            aarch64::sgemv_neon(out, weights, rows, cols, col_stride, x);
-        }
+        aarch64::sgemv_neon_dispatch(out, weights, rows, cols, col_stride, x);
         return;
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::sgemv_avx2(out, weights, rows, cols, col_stride, x);
-            }
+            x86::sgemv_avx2_dispatch(out, weights, rows, cols, col_stride, x);
             return;
         }
         if _arch.has_sse2() {
-            unsafe {
-                x86::sgemv_sse2(out, weights, rows, cols, col_stride, x);
-            }
+            x86::sgemv_sse2_dispatch(out, weights, rows, cols, col_stride, x);
             return;
         }
     }
@@ -72,23 +66,17 @@ pub fn sparse_sgemv8x4(
 ) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            aarch64::sparse_sgemv8x4_neon(out, w, idx, rows, x);
-        }
+        aarch64::sparse_sgemv8x4_neon_dispatch(out, w, idx, rows, x);
         return;
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::sparse_sgemv8x4_avx2(out, w, idx, rows, x);
-            }
+            x86::sparse_sgemv8x4_avx2_dispatch(out, w, idx, rows, x);
             return;
         }
         if _arch.has_sse2() {
-            unsafe {
-                x86::sparse_sgemv8x4_sse2(out, w, idx, rows, x);
-            }
+            x86::sparse_sgemv8x4_sse2_dispatch(out, w, idx, rows, x);
             return;
         }
     }
@@ -112,12 +100,10 @@ pub fn cgemv8x4(
 ) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            if _arch.has_dotprod() {
-                aarch64::cgemv8x4_dotprod(out, w, scale, rows, cols, x);
-            } else {
-                aarch64::cgemv8x4_neon(out, w, scale, rows, cols, x);
-            }
+        if _arch.has_dotprod() {
+            aarch64::cgemv8x4_dotprod_dispatch(out, w, scale, rows, cols, x);
+        } else {
+            aarch64::cgemv8x4_neon_dispatch(out, w, scale, rows, cols, x);
         }
         return;
     }
@@ -125,9 +111,7 @@ pub fn cgemv8x4(
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::cgemv8x4_avx2(out, w, scale, rows, cols, x);
-            }
+            x86::cgemv8x4_avx2_dispatch(out, w, scale, rows, cols, x);
             return;
         }
         // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
@@ -167,12 +151,10 @@ pub fn sparse_cgemv8x4(
 ) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            if _arch.has_dotprod() {
-                aarch64::sparse_cgemv8x4_dotprod(out, w, idx, scale, rows, cols, x);
-            } else {
-                aarch64::sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x);
-            }
+        if _arch.has_dotprod() {
+            aarch64::sparse_cgemv8x4_dotprod_dispatch(out, w, idx, scale, rows, cols, x);
+        } else {
+            aarch64::sparse_cgemv8x4_neon_dispatch(out, w, idx, scale, rows, cols, x);
         }
         return;
     }
@@ -180,9 +162,7 @@ pub fn sparse_cgemv8x4(
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::sparse_cgemv8x4_avx2(out, w, idx, scale, rows, cols, x);
-            }
+            x86::sparse_cgemv8x4_avx2_dispatch(out, w, idx, scale, rows, cols, x);
             return;
         }
         // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
@@ -223,15 +203,15 @@ pub fn sparse_cgemv8x4(
 pub fn tanh_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return unsafe { aarch64::tanh_approx_neon(x) };
+        return aarch64::tanh_approx_neon_dispatch(x);
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            return unsafe { x86::tanh_approx_avx2(x) };
+            return x86::tanh_approx_avx2_dispatch(x);
         }
         if _arch.has_sse2() {
-            return unsafe { x86::tanh_approx_sse2(x) };
+            return x86::tanh_approx_sse2_dispatch(x);
         }
     }
 
@@ -249,15 +229,15 @@ pub fn tanh_approx(x: f32, _arch: Arch) -> f32 {
 pub fn sigmoid_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return unsafe { aarch64::sigmoid_approx_neon(x) };
+        return aarch64::sigmoid_approx_neon_dispatch(x);
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            return unsafe { x86::sigmoid_approx_avx2(x) };
+            return x86::sigmoid_approx_avx2_dispatch(x);
         }
         if _arch.has_sse2() {
-            return unsafe { x86::sigmoid_approx_sse2(x) };
+            return x86::sigmoid_approx_sse2_dispatch(x);
         }
     }
 
@@ -275,18 +255,18 @@ pub fn sigmoid_approx(x: f32, _arch: Arch) -> f32 {
 pub fn lpcnet_exp(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return unsafe { aarch64::lpcnet_exp_neon(x) };
+        return aarch64::lpcnet_exp_neon_dispatch(x);
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            return unsafe { x86::lpcnet_exp_avx2(x) };
+            return x86::lpcnet_exp_avx2_dispatch(x);
         }
         if _arch.has_sse4_1() {
-            return unsafe { x86::lpcnet_exp_sse4_1(x) };
+            return x86::lpcnet_exp_sse4_1_dispatch(x);
         }
         if _arch.has_sse2() {
-            return unsafe { x86::lpcnet_exp_sse2(x) };
+            return x86::lpcnet_exp_sse2_dispatch(x);
         }
     }
 
@@ -301,23 +281,17 @@ pub fn lpcnet_exp(x: f32, _arch: Arch) -> f32 {
 pub fn vec_tanh(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            aarch64::vec_tanh_neon(y, x);
-        }
+        aarch64::vec_tanh_neon_dispatch(y, x);
         return;
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::vec_tanh_avx2(y, x);
-            }
+            x86::vec_tanh_avx2_dispatch(y, x);
             return;
         }
         if _arch.has_sse2() {
-            unsafe {
-                x86::vec_tanh_sse2(y, x);
-            }
+            x86::vec_tanh_sse2_dispatch(y, x);
             return;
         }
     }
@@ -333,23 +307,17 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32], _arch: Arch) {
 pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            aarch64::vec_sigmoid_neon(y, x);
-        }
+        aarch64::vec_sigmoid_neon_dispatch(y, x);
         return;
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::vec_sigmoid_avx2(y, x);
-            }
+            x86::vec_sigmoid_avx2_dispatch(y, x);
             return;
         }
         if _arch.has_sse2() {
-            unsafe {
-                x86::vec_sigmoid_sse2(y, x);
-            }
+            x86::vec_sigmoid_sse2_dispatch(y, x);
             return;
         }
     }
@@ -396,29 +364,21 @@ pub fn use_su_bias(arch: Arch) -> bool {
 pub fn softmax(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
-        unsafe {
-            aarch64::softmax_neon(y, x);
-        }
+        aarch64::softmax_neon_dispatch(y, x);
         return;
     }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if _arch.has_avx2() {
-            unsafe {
-                x86::softmax_avx2(y, x);
-            }
+            x86::softmax_avx2_dispatch(y, x);
             return;
         }
         if _arch.has_sse4_1() {
-            unsafe {
-                x86::softmax_sse4_1(y, x);
-            }
+            x86::softmax_sse4_1_dispatch(y, x);
             return;
         }
         if _arch.has_sse2() {
-            unsafe {
-                x86::softmax_sse2(y, x);
-            }
+            x86::softmax_sse2_dispatch(y, x);
             return;
         }
     }

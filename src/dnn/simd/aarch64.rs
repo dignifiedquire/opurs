@@ -696,6 +696,121 @@ pub unsafe fn sparse_cgemv8x4_dotprod(
     }
 }
 
+#[inline(always)]
+pub fn sgemv_neon_dispatch(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { sgemv_neon(out, weights, rows, cols, col_stride, x) }
+}
+
+#[inline(always)]
+pub fn sparse_sgemv8x4_neon_dispatch(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { sparse_sgemv8x4_neon(out, w, idx, rows, x) }
+}
+
+#[inline(always)]
+pub fn cgemv8x4_dotprod_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_dotprod()`.
+    unsafe { cgemv8x4_dotprod(out, w, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn cgemv8x4_neon_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { cgemv8x4_neon(out, w, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn sparse_cgemv8x4_dotprod_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_dotprod()`.
+    unsafe { sparse_cgemv8x4_dotprod(out, w, idx, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn sparse_cgemv8x4_neon_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { sparse_cgemv8x4_neon(out, w, idx, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn tanh_approx_neon_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { tanh_approx_neon(x) }
+}
+
+#[inline(always)]
+pub fn sigmoid_approx_neon_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { sigmoid_approx_neon(x) }
+}
+
+#[inline(always)]
+pub fn lpcnet_exp_neon_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { lpcnet_exp_neon(x) }
+}
+
+#[inline(always)]
+pub fn vec_tanh_neon_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { vec_tanh_neon(y, x) }
+}
+
+#[inline(always)]
+pub fn vec_sigmoid_neon_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { vec_sigmoid_neon(y, x) }
+}
+
+#[inline(always)]
+pub fn softmax_neon_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { softmax_neon(y, x) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

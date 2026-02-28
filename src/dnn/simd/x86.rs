@@ -842,6 +842,167 @@ pub unsafe fn sparse_cgemv8x4_avx2(
     }
 }
 
+#[inline(always)]
+pub fn sgemv_avx2_dispatch(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { sgemv_avx2(out, weights, rows, cols, col_stride, x) }
+}
+
+#[inline(always)]
+pub fn sgemv_sse2_dispatch(
+    out: &mut [f32],
+    weights: &[f32],
+    rows: usize,
+    cols: usize,
+    col_stride: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { sgemv_sse2(out, weights, rows, cols, col_stride, x) }
+}
+
+#[inline(always)]
+pub fn sparse_sgemv8x4_avx2_dispatch(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { sparse_sgemv8x4_avx2(out, w, idx, rows, x) }
+}
+
+#[inline(always)]
+pub fn sparse_sgemv8x4_sse2_dispatch(
+    out: &mut [f32],
+    w: &[f32],
+    idx: &[i32],
+    rows: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { sparse_sgemv8x4_sse2(out, w, idx, rows, x) }
+}
+
+#[inline(always)]
+pub fn cgemv8x4_avx2_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { cgemv8x4_avx2(out, w, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn sparse_cgemv8x4_avx2_dispatch(
+    out: &mut [f32],
+    w: &[i8],
+    idx: &[i32],
+    scale: &[f32],
+    rows: usize,
+    cols: usize,
+    x: &[f32],
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { sparse_cgemv8x4_avx2(out, w, idx, scale, rows, cols, x) }
+}
+
+#[inline(always)]
+pub fn tanh_approx_avx2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { tanh_approx_avx2(x) }
+}
+
+#[inline(always)]
+pub fn tanh_approx_sse2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { tanh_approx_sse2(x) }
+}
+
+#[inline(always)]
+pub fn sigmoid_approx_avx2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { sigmoid_approx_avx2(x) }
+}
+
+#[inline(always)]
+pub fn sigmoid_approx_sse2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { sigmoid_approx_sse2(x) }
+}
+
+#[inline(always)]
+pub fn lpcnet_exp_avx2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { lpcnet_exp_avx2(x) }
+}
+
+#[inline(always)]
+pub fn lpcnet_exp_sse2_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { lpcnet_exp_sse2(x) }
+}
+
+#[inline(always)]
+pub fn lpcnet_exp_sse4_1_dispatch(x: f32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse4_1()`.
+    unsafe { lpcnet_exp_sse4_1(x) }
+}
+
+#[inline(always)]
+pub fn vec_tanh_avx2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { vec_tanh_avx2(y, x) }
+}
+
+#[inline(always)]
+pub fn vec_tanh_sse2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { vec_tanh_sse2(y, x) }
+}
+
+#[inline(always)]
+pub fn vec_sigmoid_avx2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { vec_sigmoid_avx2(y, x) }
+}
+
+#[inline(always)]
+pub fn vec_sigmoid_sse2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { vec_sigmoid_sse2(y, x) }
+}
+
+#[inline(always)]
+pub fn softmax_avx2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { softmax_avx2(y, x) }
+}
+
+#[inline(always)]
+pub fn softmax_sse2_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { softmax_sse2(y, x) }
+}
+
+#[inline(always)]
+pub fn softmax_sse4_1_dispatch(y: &mut [f32], x: &[f32]) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse4_1()`.
+    unsafe { softmax_sse4_1(y, x) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
