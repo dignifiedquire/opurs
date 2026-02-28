@@ -2,7 +2,6 @@
 //!
 //! Upstream C: `celt/entdec.c`
 
-
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 use crate::silk::macros::EC_CLZ0;
 
@@ -33,7 +32,11 @@ fn ec_read_byte_from_end(this: &mut ec_dec) -> i32 {
     if this.end_offs < this.storage {
         this.end_offs += 1;
 
-        (unsafe { *this.buf.get_unchecked((this.storage - this.end_offs) as usize) }) as i32
+        (unsafe {
+            *this
+                .buf
+                .get_unchecked((this.storage - this.end_offs) as usize)
+        }) as i32
     } else {
         0
     }

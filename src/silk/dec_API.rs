@@ -196,7 +196,7 @@ pub fn silk_Decode(
                     LBRR_symbol = ec_dec_icdf(
                         psRangeDec,
                         unsafe {
-                            *silk_LBRR_flags_iCDF_ptr
+                            silk_LBRR_flags_iCDF_ptr
                                 .get_unchecked((cs.nFramesPerPacket - 2) as usize)
                         },
                         8,
@@ -227,9 +227,8 @@ pub fn silk_Decode(
                         let mut pulses: [i16; 320] = [0; 320];
                         if decControl.nChannelsInternal == 2 && n == 0 {
                             silk_stereo_decode_pred(psRangeDec, &mut MS_pred_Q13);
-                            if unsafe {
-                                *channel_state[1].LBRR_flags.get_unchecked(i as usize)
-                            } == 0
+                            if unsafe { *channel_state[1].LBRR_flags.get_unchecked(i as usize) }
+                                == 0
                             {
                                 silk_stereo_decode_mid_only(psRangeDec, &mut decode_only_middle);
                             }
@@ -254,7 +253,7 @@ pub fn silk_Decode(
                             condCoding,
                         );
 
-                        let cs = unsafe { &*channel_state.get_unchecked(n as usize) };
+                        let cs = unsafe { channel_state.get_unchecked(n as usize) };
                         let frame_length = cs.frame_length;
                         let mut shell_frames = frame_length / SHELL_CODEC_FRAME_LENGTH;
                         if shell_frames * SHELL_CODEC_FRAME_LENGTH < frame_length {
@@ -336,8 +335,7 @@ pub fn silk_Decode(
                     *channel_state[1]
                         .LBRR_flags
                         .get_unchecked(channel_state[1].nFramesDecoded as usize)
-                } == 1)
-            as i32
+                } == 1) as i32
     };
     n = 0;
     while n < decControl.nChannelsInternal {
@@ -470,19 +468,11 @@ pub fn silk_Decode(
                     || decControl.prev_osce_extended_mode == OSCE_MODE_HYBRID
                 {
                     // Cross-fade with upsampled signal
-                    silk_resampler(
-                        &mut cs.resampler_state,
-                        &mut resamp_buffer,
-                        resample_input,
-                    );
+                    silk_resampler(&mut cs.resampler_state, &mut resamp_buffer, resample_input);
                     osce_bwe_cross_fade_10ms(resample_out, &resamp_buffer, 480);
                 }
             } else {
-                ret += silk_resampler(
-                    &mut cs.resampler_state,
-                    resample_out,
-                    resample_input,
-                );
+                ret += silk_resampler(&mut cs.resampler_state, resample_out, resample_input);
                 if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_BBWE
                     && decControl.internalSampleRate == 16000
                 {

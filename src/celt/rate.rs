@@ -44,8 +44,11 @@ pub fn get_pulses(i: i32) -> i32 {
 pub fn bits2pulses(m: &OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) -> i32 {
     LM += 1;
     // SAFETY: Mode table indices are bounded by mode constants.
-    let cache_off =
-        (unsafe { *m.cache.index.get_unchecked((LM * m.nbEBands as i32 + band) as usize) }) as usize;
+    let cache_off = (unsafe {
+        *m.cache
+            .index
+            .get_unchecked((LM * m.nbEBands as i32 + band) as usize)
+    }) as usize;
     let cache = unsafe { m.cache.bits.get_unchecked(cache_off..) };
     let mut lo: i32 = 0;
     let mut hi: i32 = (unsafe { *cache.get_unchecked(0) }) as i32;
@@ -77,8 +80,11 @@ pub fn bits2pulses(m: &OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) ->
 pub fn pulses2bits(m: &OpusCustomMode, band: i32, mut LM: i32, pulses: i32) -> i32 {
     LM += 1;
     // SAFETY: Mode table indices are bounded by mode constants.
-    let cache_off =
-        (unsafe { *m.cache.index.get_unchecked((LM * m.nbEBands as i32 + band) as usize) }) as usize;
+    let cache_off = (unsafe {
+        *m.cache
+            .index
+            .get_unchecked((LM * m.nbEBands as i32 + band) as usize)
+    }) as usize;
     let cache = unsafe { m.cache.bits.get_unchecked(cache_off..) };
     if pulses == 0 {
         0
@@ -175,7 +181,9 @@ fn interp_bits2pulses(
             done = 1;
         }
         tmp_0 = tmp_0.min(unsafe { *cap.get_unchecked(j as usize) });
-        unsafe { *bits.get_unchecked_mut(j as usize) = tmp_0; }
+        unsafe {
+            *bits.get_unchecked_mut(j as usize) = tmp_0;
+        }
         psum += tmp_0;
     }
     codedBands = end;
@@ -237,9 +245,13 @@ fn interp_bits2pulses(
             psum += intensity_rsv;
             if band_bits >= alloc_floor {
                 psum += alloc_floor;
-                unsafe { *bits.get_unchecked_mut(j as usize) = alloc_floor; }
+                unsafe {
+                    *bits.get_unchecked_mut(j as usize) = alloc_floor;
+                }
             } else {
-                unsafe { *bits.get_unchecked_mut(j as usize) = 0; }
+                unsafe {
+                    *bits.get_unchecked_mut(j as usize) = 0;
+                }
             }
             codedBands -= 1;
         }
@@ -295,7 +307,9 @@ fn interp_bits2pulses(
             *m.eBands.get_unchecked((j + 1) as usize) as i32
                 - *m.eBands.get_unchecked(j as usize) as i32
         });
-        unsafe { *bits.get_unchecked_mut(j as usize) += tmp_1; }
+        unsafe {
+            *bits.get_unchecked_mut(j as usize) += tmp_1;
+        }
         left -= tmp_1;
         j += 1;
     }
@@ -316,7 +330,9 @@ fn interp_bits2pulses(
         let bit: i32 = unsafe { *bits.get_unchecked(j as usize) } + balance;
         if N > 1 {
             excess = (bit - unsafe { *cap.get_unchecked(j as usize) }).max(0);
-            unsafe { *bits.get_unchecked_mut(j as usize) = bit - excess; }
+            unsafe {
+                *bits.get_unchecked_mut(j as usize) = bit - excess;
+            }
             den = C * N
                 + (if C == 2 && N > 2 && *dual_stereo == 0 && j < *intensity {
                     1
@@ -350,7 +366,9 @@ fn interp_bits2pulses(
                         *bits.get_unchecked(j as usize) >> stereo >> BITRES;
                 }
             }
-            unsafe { *ebits.get_unchecked_mut(j as usize) = (*ebits.get_unchecked(j as usize)).min(8); }
+            unsafe {
+                *ebits.get_unchecked_mut(j as usize) = (*ebits.get_unchecked(j as usize)).min(8);
+            }
             unsafe {
                 *fine_priority.get_unchecked_mut(j as usize) =
                     (*ebits.get_unchecked(j as usize) * (den << BITRES)
@@ -362,14 +380,22 @@ fn interp_bits2pulses(
             }
         } else {
             excess = (bit - (C << 3)).max(0);
-            unsafe { *bits.get_unchecked_mut(j as usize) = bit - excess; }
-            unsafe { *ebits.get_unchecked_mut(j as usize) = 0; }
-            unsafe { *fine_priority.get_unchecked_mut(j as usize) = 1; }
+            unsafe {
+                *bits.get_unchecked_mut(j as usize) = bit - excess;
+            }
+            unsafe {
+                *ebits.get_unchecked_mut(j as usize) = 0;
+            }
+            unsafe {
+                *fine_priority.get_unchecked_mut(j as usize) = 1;
+            }
         }
         if excess > 0 {
             let extra_fine: i32 = (excess >> (stereo + BITRES))
                 .min(MAX_FINE_BITS - unsafe { *ebits.get_unchecked(j as usize) });
-            unsafe { *ebits.get_unchecked_mut(j as usize) += extra_fine; }
+            unsafe {
+                *ebits.get_unchecked_mut(j as usize) += extra_fine;
+            }
             let extra_bits: i32 = (extra_fine * C) << BITRES;
             unsafe {
                 *fine_priority.get_unchecked_mut(j as usize) =
@@ -389,7 +415,9 @@ fn interp_bits2pulses(
                 *bits.get_unchecked(j as usize) >> stereo >> BITRES;
         }
         debug_assert!((C * ebits[j as usize]) << 3 == bits[j as usize]);
-        unsafe { *bits.get_unchecked_mut(j as usize) = 0; }
+        unsafe {
+            *bits.get_unchecked_mut(j as usize) = 0;
+        }
         unsafe {
             *fine_priority.get_unchecked_mut(j as usize) =
                 (*ebits.get_unchecked(j as usize) < 1) as i32;
@@ -481,7 +509,9 @@ pub fn clt_compute_allocation(
         }) << LM
             == 1
         {
-            unsafe { *trim_offset.get_unchecked_mut(j as usize) -= C << BITRES; }
+            unsafe {
+                *trim_offset.get_unchecked_mut(j as usize) -= C << BITRES;
+            }
         }
         j += 1;
     }
@@ -502,11 +532,10 @@ pub fn clt_compute_allocation(
                 *m.eBands.get_unchecked((j + 1) as usize) as i32
                     - *m.eBands.get_unchecked(j as usize) as i32
             };
-            let mut bitsj: i32 = (C
-                * N
-                * unsafe { *m.allocVectors.get_unchecked((mid * len + j) as usize) } as i32)
-                << LM
-                >> 2;
+            let mut bitsj: i32 =
+                (C * N * unsafe { *m.allocVectors.get_unchecked((mid * len + j) as usize) } as i32)
+                    << LM
+                    >> 2;
             if bitsj > 0 {
                 bitsj = (bitsj + unsafe { *trim_offset.get_unchecked(j as usize) }).max(0);
             }
@@ -536,16 +565,14 @@ pub fn clt_compute_allocation(
             *m.eBands.get_unchecked((j + 1) as usize) as i32
                 - *m.eBands.get_unchecked(j as usize) as i32
         };
-        let mut bits1j: i32 = (C
-            * N_0
-            * unsafe { *m.allocVectors.get_unchecked((lo * len + j) as usize) } as i32)
-            << LM
-            >> 2;
+        let mut bits1j: i32 =
+            (C * N_0 * unsafe { *m.allocVectors.get_unchecked((lo * len + j) as usize) } as i32)
+                << LM
+                >> 2;
         let mut bits2j: i32 = if hi >= m.nbAllocVectors {
             unsafe { *cap.get_unchecked(j as usize) }
         } else {
-            (C * N_0
-                * unsafe { *m.allocVectors.get_unchecked((hi * len + j) as usize) } as i32)
+            (C * N_0 * unsafe { *m.allocVectors.get_unchecked((hi * len + j) as usize) } as i32)
                 << LM
                 >> 2
         };
@@ -563,8 +590,12 @@ pub fn clt_compute_allocation(
             skip_start = j;
         }
         bits2j = (bits2j - bits1j).max(0);
-        unsafe { *bits1.get_unchecked_mut(j as usize) = bits1j; }
-        unsafe { *bits2.get_unchecked_mut(j as usize) = bits2j; }
+        unsafe {
+            *bits1.get_unchecked_mut(j as usize) = bits1j;
+        }
+        unsafe {
+            *bits2.get_unchecked_mut(j as usize) = bits2j;
+        }
         j += 1;
     }
 
@@ -754,18 +785,26 @@ pub fn clt_compute_extra_allocation(
     debug_assert!((tot_bands as usize) <= MAX_BANDS);
     let mut cap = [0i32; MAX_BANDS];
     for i in start..end {
-        unsafe { *cap.get_unchecked_mut(i as usize) = 12; }
+        unsafe {
+            *cap.get_unchecked_mut(i as usize) = 12;
+        }
     }
     if qext_mode.is_some() {
         for i in 0..qext_end {
-            unsafe { *cap.get_unchecked_mut((end + i) as usize) = 14; }
+            unsafe {
+                *cap.get_unchecked_mut((end + i) as usize) = 14;
+            }
         }
     }
 
     if total <= 0 {
         for i in start..(m.nbEBands as i32 + qext_end) {
-            unsafe { *extra_pulses.get_unchecked_mut(i as usize) = 0; }
-            unsafe { *extra_equant.get_unchecked_mut(i as usize) = 0; }
+            unsafe {
+                *extra_pulses.get_unchecked_mut(i as usize) = 0;
+            }
+            unsafe {
+                *extra_equant.get_unchecked_mut(i as usize) = 0;
+            }
         }
         return;
     }
@@ -781,10 +820,10 @@ pub fn clt_compute_extra_allocation(
         for i in start..end {
             let iu = i as usize;
             unsafe {
-                *Ncoef.get_unchecked_mut(iu) =
-                    ((*m.eBands.get_unchecked(iu + 1) as i32 - *m.eBands.get_unchecked(iu) as i32)
-                        * C)
-                        << LM;
+                *Ncoef.get_unchecked_mut(iu) = ((*m.eBands.get_unchecked(iu + 1) as i32
+                    - *m.eBands.get_unchecked(iu) as i32)
+                    * C)
+                    << LM;
             }
         }
 
@@ -809,7 +848,9 @@ pub fn clt_compute_extra_allocation(
                         - 0.0062 * (i + 5) as f32 * (i + 5) as f32
                 };
                 if alt > unsafe { *flatE.get_unchecked(iu) } {
-                    unsafe { *flatE.get_unchecked_mut(iu) = alt; }
+                    unsafe {
+                        *flatE.get_unchecked_mut(iu) = alt;
+                    }
                 }
             }
         }
@@ -833,11 +874,10 @@ pub fn clt_compute_extra_allocation(
                 let iu = i as usize;
                 let eid = (end + i) as usize;
                 unsafe {
-                    *Ncoef.get_unchecked_mut(eid) =
-                        ((*qm.eBands.get_unchecked(iu + 1) as i32
-                            - *qm.eBands.get_unchecked(iu) as i32)
-                            * C)
-                            << LM;
+                    *Ncoef.get_unchecked_mut(eid) = ((*qm.eBands.get_unchecked(iu + 1) as i32
+                        - *qm.eBands.get_unchecked(iu) as i32)
+                        * C)
+                        << LM;
                     *min_arr.get_unchecked_mut(eid) = min_depth;
                 }
             }
@@ -862,7 +902,9 @@ pub fn clt_compute_extra_allocation(
                             - 0.0062 * (end + i + 5) as f32 * (end + i + 5) as f32
                     };
                     if alt > unsafe { *flatE.get_unchecked(eid) } {
-                        unsafe { *flatE.get_unchecked_mut(eid) = alt; }
+                        unsafe {
+                            *flatE.get_unchecked_mut(eid) = alt;
+                        }
                     }
                 }
             }
@@ -902,8 +944,7 @@ pub fn clt_compute_extra_allocation(
         for i in start..tot_bands {
             let iu = i as usize;
             unsafe {
-                *flatE.get_unchecked_mut(iu) -=
-                    (1.0 - toneishness) * *follower.get_unchecked(iu);
+                *flatE.get_unchecked_mut(iu) -= (1.0 - toneishness) * *follower.get_unchecked(iu);
             }
         }
         // QEXT boost
@@ -921,7 +962,9 @@ pub fn clt_compute_extra_allocation(
         let mut sum: f32 = 0.0;
         for i in start..tot_bands {
             let iu = i as usize;
-            unsafe { sum += *Ncoef.get_unchecked(iu) as f32 * *flatE.get_unchecked(iu); }
+            unsafe {
+                sum += *Ncoef.get_unchecked(iu) as f32 * *flatE.get_unchecked(iu);
+            }
         }
         let total_shifted = total >> BITRES;
         let mut fill: f32 = ((total_shifted as f32) * 1024.0 + sum) / tot_samples as f32;
@@ -961,7 +1004,9 @@ pub fn clt_compute_extra_allocation(
                     );
                 }
             } else {
-                unsafe { *depth.get_unchecked_mut(iu) = 0; }
+                unsafe {
+                    *depth.get_unchecked_mut(iu) = 0;
+                }
             }
         }
     } else {
@@ -974,7 +1019,9 @@ pub fn clt_compute_extra_allocation(
                         ec_dec_depth(ec, 4 * *cap.get_unchecked(iu), &mut last);
                 }
             } else {
-                unsafe { *depth.get_unchecked_mut(iu) = 0; }
+                unsafe {
+                    *depth.get_unchecked_mut(iu) = 0;
+                }
             }
         }
     }
@@ -984,16 +1031,15 @@ pub fn clt_compute_extra_allocation(
         let iu = i as usize;
         unsafe {
             *extra_equant.get_unchecked_mut(iu) = (*depth.get_unchecked(iu) + 3) >> 2;
-            *extra_pulses.get_unchecked_mut(iu) =
-                ((((*m.eBands.get_unchecked(iu + 1) as i32
-                    - *m.eBands.get_unchecked(iu) as i32)
-                    << LM)
-                    - 1)
-                    * C
-                    * *depth.get_unchecked(iu)
-                    * (1 << BITRES)
-                    + 2)
-                    >> 2;
+            *extra_pulses.get_unchecked_mut(iu) = ((((*m.eBands.get_unchecked(iu + 1) as i32
+                - *m.eBands.get_unchecked(iu) as i32)
+                << LM)
+                - 1)
+                * C
+                * *depth.get_unchecked(iu)
+                * (1 << BITRES)
+                + 2)
+                >> 2;
         }
     }
     // Convert for QEXT bands
@@ -1003,16 +1049,16 @@ pub fn clt_compute_extra_allocation(
             let eid = (end + i) as usize;
             unsafe {
                 *extra_equant.get_unchecked_mut(eid) = (*depth.get_unchecked(eid) + 3) >> 2;
-                *extra_pulses.get_unchecked_mut(eid) =
-                    ((((*qm.eBands.get_unchecked(iu + 1) as i32
-                        - *qm.eBands.get_unchecked(iu) as i32)
-                        << LM)
-                        - 1)
-                        * C
-                        * *depth.get_unchecked(eid)
-                        * (1 << BITRES)
-                        + 2)
-                        >> 2;
+                *extra_pulses.get_unchecked_mut(eid) = ((((*qm.eBands.get_unchecked(iu + 1)
+                    as i32
+                    - *qm.eBands.get_unchecked(iu) as i32)
+                    << LM)
+                    - 1)
+                    * C
+                    * *depth.get_unchecked(eid)
+                    * (1 << BITRES)
+                    + 2)
+                    >> 2;
             }
         }
     }

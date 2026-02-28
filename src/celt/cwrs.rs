@@ -419,7 +419,9 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
             i = i.wrapping_sub(p);
             val = ((k0 - k + s) ^ s) as i16;
             // SAFETY: yi < n, y.len() >= n (loop decrements n from initial value).
-            unsafe { *y.get_unchecked_mut(yi) = val as i32; }
+            unsafe {
+                *y.get_unchecked_mut(yi) = val as i32;
+            }
             yi += 1;
             yy += val as f32 * val as f32;
         } else {
@@ -427,7 +429,9 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
             q = pvq_u((k + 1) as u32, n as u32);
             if p <= i && i < q {
                 i = i.wrapping_sub(p);
-                unsafe { *y.get_unchecked_mut(yi) = 0; }
+                unsafe {
+                    *y.get_unchecked_mut(yi) = 0;
+                }
                 yi += 1;
             } else {
                 s = -((i >= q) as i32);
@@ -442,7 +446,9 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 }
                 i = i.wrapping_sub(p);
                 val = ((k0 - k + s) ^ s) as i16;
-                unsafe { *y.get_unchecked_mut(yi) = val as i32; }
+                unsafe {
+                    *y.get_unchecked_mut(yi) = val as i32;
+                }
                 yi += 1;
                 yy += val as f32 * val as f32;
             }
@@ -458,12 +464,16 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
         i = i.wrapping_sub((2 * k - 1) as u32);
     }
     val = ((k0 - k + s) ^ s) as i16;
-    unsafe { *y.get_unchecked_mut(yi) = val as i32; }
+    unsafe {
+        *y.get_unchecked_mut(yi) = val as i32;
+    }
     yi += 1;
     yy += val as f32 * val as f32;
     s = -(i as i32);
     val = ((k + s) ^ s) as i16;
-    unsafe { *y.get_unchecked_mut(yi) = val as i32; }
+    unsafe {
+        *y.get_unchecked_mut(yi) = val as i32;
+    }
     yy += val as f32 * val as f32;
     yy
 }

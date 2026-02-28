@@ -36,7 +36,7 @@ pub fn mdct_forward(
 ) {
     // shift < 4 (log2 of max overlap ratio), kfft/trig have 4 entries.
     // & 3 lets LLVM prove in-bounds.
-    let st: &kiss_fft_state = &l.kfft[shift & 3];
+    let st: &kiss_fft_state = l.kfft[shift & 3];
     let scale = st.scale;
     let trig = l.trig[shift & 3];
     let n = l.n >> shift;
@@ -93,7 +93,8 @@ pub fn mdct_forward(
             // n2 - 1 - 2*i >= 0 and o + 2*i < n2 + o = input.len().
             unsafe {
                 f.get_unchecked_mut(o4 + i).re = *input.get_unchecked(n2 - 1 - 2 * i); /* xmidb */
-                f.get_unchecked_mut(o4 + i).im = *input.get_unchecked(o + 2 * i); /* xmidf */
+                f.get_unchecked_mut(o4 + i).im = *input.get_unchecked(o + 2 * i);
+                /* xmidf */
             }
         }
 
@@ -202,7 +203,7 @@ pub fn mdct_backward(
             }
         }
     }
-    opus_fft_impl(&l.kfft[shift & 3], outmid);
+    opus_fft_impl(l.kfft[shift & 3], outmid);
 
     /* Post-rotate and de-shuffle from both ends of the buffer at once to make
     it in-place. */
@@ -227,7 +228,10 @@ pub fn mdct_backward(
         unsafe {
             /* We swap real and imag because we're using an FFT instead of an IFFT. */
             let x = swap(*outmid.get_unchecked(yp0));
-            let t = swap(Complex::new(*trig_real.get_unchecked(i), *trig_imag.get_unchecked(i)));
+            let t = swap(Complex::new(
+                *trig_real.get_unchecked(i),
+                *trig_imag.get_unchecked(i),
+            ));
             /* We'd scale up by 2 here, but instead it's done when mixing the windows */
             let y = swap(x * t);
 
@@ -236,7 +240,10 @@ pub fn mdct_backward(
             outmid.get_unchecked_mut(yp0).re = y.re;
             outmid.get_unchecked_mut(yp1).im = y.im;
 
-            let t = swap(Complex::new(*trig_real.get_unchecked(n4 - i - 1), *trig_imag.get_unchecked(n4 - i - 1)));
+            let t = swap(Complex::new(
+                *trig_real.get_unchecked(n4 - i - 1),
+                *trig_imag.get_unchecked(n4 - i - 1),
+            ));
             /* We'd scale up by 2 here, but instead it's done when mixing the windows */
             let y = swap(x * t);
             outmid.get_unchecked_mut(yp1).re = y.re;

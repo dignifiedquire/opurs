@@ -1411,7 +1411,9 @@ fn compute_silk_rate_for_hybrid(
     }
     if i == N {
         unsafe {
-            silk_rate = *rate_table.get_unchecked((i - 1) as usize).get_unchecked(entry as usize);
+            silk_rate = *rate_table
+                .get_unchecked((i - 1) as usize)
+                .get_unchecked(entry as usize);
             silk_rate += (rate - *rate_table.get_unchecked((i - 1) as usize).get_unchecked(0)) / 2;
         }
     } else {
@@ -1420,8 +1422,12 @@ fn compute_silk_rate_for_hybrid(
         let mut x0: i32 = 0;
         let mut x1: i32 = 0;
         unsafe {
-            lo = *rate_table.get_unchecked((i - 1) as usize).get_unchecked(entry as usize);
-            hi = *rate_table.get_unchecked(i as usize).get_unchecked(entry as usize);
+            lo = *rate_table
+                .get_unchecked((i - 1) as usize)
+                .get_unchecked(entry as usize);
+            hi = *rate_table
+                .get_unchecked(i as usize)
+                .get_unchecked(entry as usize);
             x0 = *rate_table.get_unchecked((i - 1) as usize).get_unchecked(0);
             x1 = *rate_table.get_unchecked(i as usize).get_unchecked(0);
         }
@@ -2543,13 +2549,13 @@ pub fn opus_encode_native(
         i = 0;
         while i < 8 {
             unsafe {
-                *bandwidth_thresholds.get_unchecked_mut(i as usize) =
-                    *music_bandwidth_thresholds.get_unchecked(i as usize)
-                        + ((voice_est
-                            * voice_est
-                            * (*voice_bandwidth_thresholds.get_unchecked(i as usize)
-                                - *music_bandwidth_thresholds.get_unchecked(i as usize)))
-                            >> 14);
+                *bandwidth_thresholds.get_unchecked_mut(i as usize) = *music_bandwidth_thresholds
+                    .get_unchecked(i as usize)
+                    + ((voice_est
+                        * voice_est
+                        * (*voice_bandwidth_thresholds.get_unchecked(i as usize)
+                            - *music_bandwidth_thresholds.get_unchecked(i as usize)))
+                        >> 14);
             }
             i += 1;
         }

@@ -213,12 +213,19 @@ fn quant_coarse_energy_impl(
             } else {
                 qi = -1;
             }
-            unsafe { *error.get_unchecked_mut((i + c * nbEBands) as usize) = f - qi as f32; }
+            unsafe {
+                *error.get_unchecked_mut((i + c * nbEBands) as usize) = f - qi as f32;
+            }
             badness += (qi0 - qi).abs();
             let q = qi as f32;
             let tmp = coef * oldE + unsafe { *prev.get_unchecked(c as usize) } + q;
-            unsafe { *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) = tmp; }
-            unsafe { *prev.get_unchecked_mut(c as usize) = *prev.get_unchecked(c as usize) + q - beta * q; }
+            unsafe {
+                *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) = tmp;
+            }
+            unsafe {
+                *prev.get_unchecked_mut(c as usize) =
+                    *prev.get_unchecked(c as usize) + q - beta * q;
+            }
             c += 1;
             if c >= C {
                 break;
@@ -404,8 +411,12 @@ pub fn quant_fine_energy(
                 (q2 as f32 + 0.5f32) * ((1) << (14 - extra_bits)) as f32 * (1.0f32 / 16384.0)
                     - 0.5f32;
             offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
-            unsafe { *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) += offset; }
-            unsafe { *error.get_unchecked_mut((i + c * nbEBands) as usize) -= offset; }
+            unsafe {
+                *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) += offset;
+            }
+            unsafe {
+                *error.get_unchecked_mut((i + c * nbEBands) as usize) -= offset;
+            }
             c += 1;
             if c >= C {
                 break;
@@ -437,12 +448,11 @@ pub fn quant_energy_finalise(
             {
                 let mut c = 0;
                 loop {
-                    let q2 =
-                        if unsafe { *error.get_unchecked((i + c * nbEBands) as usize) } < 0.0 {
-                            0
-                        } else {
-                            1
-                        };
+                    let q2 = if unsafe { *error.get_unchecked((i + c * nbEBands) as usize) } < 0.0 {
+                        0
+                    } else {
+                        1
+                    };
                     ec_enc_bits(enc, q2 as u32, 1);
                     let offset = (q2 as f32 - 0.5f32)
                         * ((1) << (14 - unsafe { *fine_quant.get_unchecked(i as usize) } - 1))
@@ -522,7 +532,9 @@ pub fn unquant_coarse_energy(
             let tmp = coef * unsafe { *oldEBands.get_unchecked((i + c * nbEBands) as usize) }
                 + unsafe { *prev.get_unchecked(c as usize) }
                 + q;
-            unsafe { *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) = tmp; }
+            unsafe {
+                *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) = tmp;
+            }
             unsafe {
                 *prev.get_unchecked_mut(c as usize) =
                     *prev.get_unchecked(c as usize) + q - beta * q;
@@ -565,7 +577,9 @@ pub fn unquant_fine_energy(
             let mut offset =
                 (q2 as f32 + 0.5f32) * ((1) << (14 - extra)) as f32 * (1.0f32 / 16384.0) - 0.5f32;
             offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
-            unsafe { *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) += offset; }
+            unsafe {
+                *oldEBands.get_unchecked_mut((i + c * nbEBands) as usize) += offset;
+            }
             c += 1;
             if c >= C {
                 break;
@@ -638,7 +652,9 @@ pub fn amp2Log2(
             }
         }
         for i in effEnd..end {
-            unsafe { *bandLogE.get_unchecked_mut((c * nbEBands + i) as usize) = -14.0f32; }
+            unsafe {
+                *bandLogE.get_unchecked_mut((c * nbEBands + i) as usize) = -14.0f32;
+            }
         }
         c += 1;
         if c >= C {

@@ -23,7 +23,9 @@ pub fn _celt_lpc(lpc: &mut [f32], ac: &[f32]) {
         for i in 0..p {
             let mut rr = 0.0f32;
             for j in 0..i {
-                unsafe { rr += *lpc.get_unchecked(j) * *ac.get_unchecked(i - j); }
+                unsafe {
+                    rr += *lpc.get_unchecked(j) * *ac.get_unchecked(i - j);
+                }
             }
             rr += ac[i + 1];
             let r = -(rr / error);
@@ -61,7 +63,9 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize, arch: Arch)
     // Reverse the numerator coefficients
     let mut rnum = [0.0f32; LPC_ORDER];
     for i in 0..ord {
-        unsafe { *rnum.get_unchecked_mut(i) = *num.get_unchecked(ord - i - 1); }
+        unsafe {
+            *rnum.get_unchecked_mut(i) = *num.get_unchecked(ord - i - 1);
+        }
     }
 
     let mut i = 0i32;
@@ -88,9 +92,13 @@ pub fn celt_fir_c(x: &[f32], num: &[f32], y: &mut [f32], ord: usize, arch: Arch)
         let ix = i as usize;
         let mut sum = unsafe { *x.get_unchecked(ord + ix) };
         for j in 0..ord {
-            unsafe { sum += *rnum.get_unchecked(j) * *x.get_unchecked(ix + j); }
+            unsafe {
+                sum += *rnum.get_unchecked(j) * *x.get_unchecked(ix + j);
+            }
         }
-        unsafe { *y.get_unchecked_mut(ix) = sum; }
+        unsafe {
+            *y.get_unchecked_mut(ix) = sum;
+        }
         i += 1;
     }
 }
@@ -112,14 +120,18 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
     // Reverse the denominator coefficients
     let mut rden = [0.0f32; LPC_ORDER];
     for i in 0..ord {
-        unsafe { *rden.get_unchecked_mut(i) = *den.get_unchecked(ord - i - 1); }
+        unsafe {
+            *rden.get_unchecked_mut(i) = *den.get_unchecked(ord - i - 1);
+        }
     }
 
     // Upstream C allocates `N + ord` here (`celt/celt_lpc.c:celt_iir`).
     // Use the same sizing to avoid fixed-size truncation on malformed inputs.
     let mut yy = vec![0.0f32; n + ord];
     for i in 0..ord {
-        unsafe { *yy.get_unchecked_mut(i) = -*mem.get_unchecked(ord - i - 1); }
+        unsafe {
+            *yy.get_unchecked_mut(i) = -*mem.get_unchecked(ord - i - 1);
+        }
     }
 
     let mut i = 0i32;
@@ -155,7 +167,9 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
         let ix = i as usize;
         let mut sum = unsafe { *buf.get_unchecked(ix) };
         for j in 0..ord {
-            unsafe { sum -= *rden.get_unchecked(j) * *yy.get_unchecked(ix + j); }
+            unsafe {
+                sum -= *rden.get_unchecked(j) * *yy.get_unchecked(ix + j);
+            }
         }
         unsafe {
             *yy.get_unchecked_mut(ix + ord) = sum;
@@ -164,7 +178,9 @@ pub fn celt_iir(buf: &mut [f32], n: usize, den: &[f32], ord: usize, mem: &mut [f
         i += 1;
     }
     for i in 0..ord {
-        unsafe { *mem.get_unchecked_mut(i) = *buf.get_unchecked(n - i - 1); }
+        unsafe {
+            *mem.get_unchecked_mut(i) = *buf.get_unchecked(n - i - 1);
+        }
     }
 }
 
@@ -198,7 +214,8 @@ pub fn _celt_autocorr(
         for i in 0..overlap {
             unsafe {
                 *xx.get_unchecked_mut(i) = *x.get_unchecked(i) * *win.get_unchecked(i);
-                *xx.get_unchecked_mut(n - i - 1) = *x.get_unchecked(n - i - 1) * *win.get_unchecked(i);
+                *xx.get_unchecked_mut(n - i - 1) =
+                    *x.get_unchecked(n - i - 1) * *win.get_unchecked(i);
             }
         }
         xptr = &xx;
@@ -211,12 +228,14 @@ pub fn _celt_autocorr(
 
     celt_pitch_xcorr(xptr, xptr, &mut ac[..lag + 1], fast_n, arch);
 
-    for k in 0..=lag {
+    for (k, ac_k) in ac[..=lag].iter_mut().enumerate() {
         let mut d = 0.0f32;
         for i in (k + fast_n)..n {
-            unsafe { d += *xptr.get_unchecked(i) * *xptr.get_unchecked(i - k); }
+            unsafe {
+                d += *xptr.get_unchecked(i) * *xptr.get_unchecked(i - k);
+            }
         }
-        ac[k] += d;
+        *ac_k += d;
     }
 
     0 // shift (always 0 for float)

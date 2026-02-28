@@ -450,7 +450,10 @@ pub fn opus_custom_decode24(
     let ret = opus_custom_decode_float(st, data, &mut out, frame_size);
     if ret > 0 {
         for i in 0..(ret as usize * channels) {
-            unsafe { *pcm.get_unchecked_mut(i) = float2int(32768.0f32 * 256.0f32 * *out.get_unchecked(i)); }
+            unsafe {
+                *pcm.get_unchecked_mut(i) =
+                    float2int(32768.0f32 * 256.0f32 * *out.get_unchecked(i));
+            }
         }
     }
     ret
@@ -530,35 +533,47 @@ fn deemphasis(
             let coef3: opus_val16 = coef.get(3).copied().unwrap_or(0.0);
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
                 m = coef0 * tmp - coef1 * unsafe { *x.get_unchecked(j as usize) };
-                unsafe { *scratch.get_unchecked_mut(j as usize) = coef3 * tmp; }
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = coef3 * tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp;
-                unsafe { *scratch.get_unchecked_mut(j as usize) = tmp; }
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
                 m = coef0 * tmp;
-                unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE); }
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
+                let tmp_0: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp_0;
-                unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE); }
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         }
@@ -566,43 +581,60 @@ fn deemphasis(
         if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp;
-                unsafe { *scratch.get_unchecked_mut(j as usize) = tmp; }
+                unsafe {
+                    *scratch.get_unchecked_mut(j as usize) = tmp;
+                }
                 j += 1;
             }
             apply_downsampling = 1;
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
+                let tmp: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + m + VERY_SMALL);
                 m = coef0 * tmp;
-                unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE); }
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) += tmp * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
+                let tmp_0: celt_sig =
+                    saturate_sig(unsafe { *x.get_unchecked(j as usize) } + VERY_SMALL + m);
                 m = coef0 * tmp_0;
-                unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE); }
+                unsafe {
+                    *pcm.get_unchecked_mut((c + j * C) as usize) = tmp_0 * (1_f32 / CELT_SIG_SCALE);
+                }
                 j += 1;
             }
         }
-        unsafe { *mem.get_unchecked_mut(c as usize) = m; }
+        unsafe {
+            *mem.get_unchecked_mut(c as usize) = m;
+        }
         if apply_downsampling != 0 {
             if accum != 0 {
                 j = 0;
                 while j < Nd {
-                    unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) +=
-                        *scratch.get_unchecked((j * downsample) as usize) * (1_f32 / CELT_SIG_SCALE); }
+                    unsafe {
+                        *pcm.get_unchecked_mut((c + j * C) as usize) += *scratch
+                            .get_unchecked((j * downsample) as usize)
+                            * (1_f32 / CELT_SIG_SCALE);
+                    }
                     j += 1;
                 }
             } else {
                 j = 0;
                 while j < Nd {
-                    unsafe { *pcm.get_unchecked_mut((c + j * C) as usize) =
-                        *scratch.get_unchecked((j * downsample) as usize) * (1_f32 / CELT_SIG_SCALE); }
+                    unsafe {
+                        *pcm.get_unchecked_mut((c + j * C) as usize) = *scratch
+                            .get_unchecked((j * downsample) as usize)
+                            * (1_f32 / CELT_SIG_SCALE);
+                    }
                     j += 1;
                 }
             }
@@ -777,7 +809,10 @@ fn celt_synthesis(
         }
         let mut i = 0;
         while i < n {
-            unsafe { *freq.get_unchecked_mut(i) = 0.5f32 * *freq.get_unchecked(i) + 0.5f32 * *freq2.get_unchecked(i); }
+            unsafe {
+                *freq.get_unchecked_mut(i) =
+                    0.5f32 * *freq.get_unchecked(i) + 0.5f32 * *freq2.get_unchecked(i);
+            }
             i += 1;
         }
         b = 0;
@@ -958,7 +993,9 @@ fn tf_decode(
             tell = ec_tell(dec) as u32;
             tf_changed |= curr;
         }
-        unsafe { *tf_res.get_unchecked_mut(i as usize) = curr; }
+        unsafe {
+            *tf_res.get_unchecked_mut(i as usize) = curr;
+        }
         logp = if isTransient != 0 { 4 } else { 5 };
         i += 1;
     }
@@ -974,9 +1011,11 @@ fn tf_decode(
     }
     i = start;
     while i < end {
-        unsafe { *tf_res.get_unchecked_mut(i as usize) = tf_select_table[lm_idx]
-            [(4 * isTransient + 2 * tf_select + *tf_res.get_unchecked(i as usize)) as usize & 7]
-            as i32; }
+        unsafe {
+            *tf_res.get_unchecked_mut(i as usize) = tf_select_table[lm_idx]
+                [(4 * isTransient + 2 * tf_select + *tf_res.get_unchecked(i as usize)) as usize & 7]
+                as i32;
+        }
         i += 1;
     }
 }
@@ -1055,8 +1094,10 @@ fn prefilter_and_fold(st: &mut OpusCustomDecoder, N: i32) {
         // MDCT of the next frame.
         for i in 0..overlap_u / 2 {
             unsafe {
-                *st.decode_mem.get_unchecked_mut(ch_off + decode_buffer_size - n + i) =
-                    *mode.window.get_unchecked(i) * *etmp.get_unchecked(overlap_u - 1 - i) + *mode.window.get_unchecked(overlap_u - i - 1) * *etmp.get_unchecked(i);
+                *st.decode_mem
+                    .get_unchecked_mut(ch_off + decode_buffer_size - n + i) =
+                    *mode.window.get_unchecked(i) * *etmp.get_unchecked(overlap_u - 1 - i)
+                        + *mode.window.get_unchecked(overlap_u - i - 1) * *etmp.get_unchecked(i);
             }
         }
 
@@ -1153,7 +1194,9 @@ fn celt_decode_lost(
             while i < end {
                 let idx = (c * nbEBands + i) as usize;
                 unsafe {
-                    *st.oldEBands.get_unchecked_mut(idx) = if *st.backgroundLogE.get_unchecked(idx) > *st.oldEBands.get_unchecked(idx) - decay {
+                    *st.oldEBands.get_unchecked_mut(idx) = if *st.backgroundLogE.get_unchecked(idx)
+                        > *st.oldEBands.get_unchecked(idx) - decay
+                    {
                         *st.backgroundLogE.get_unchecked(idx)
                     } else {
                         *st.oldEBands.get_unchecked(idx) - decay
@@ -1171,13 +1214,17 @@ fn celt_decode_lost(
         while c < C {
             let mut i = start;
             while i < effEnd {
-                let boffs = (N * c + ((unsafe { *eBands.get_unchecked(i as usize) } as i32) << LM)) as usize;
-                let blen =
-                    ((unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32 - unsafe { *eBands.get_unchecked(i as usize) } as i32) << LM) as usize;
+                let boffs = (N * c + ((unsafe { *eBands.get_unchecked(i as usize) } as i32) << LM))
+                    as usize;
+                let blen = ((unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32
+                    - unsafe { *eBands.get_unchecked(i as usize) } as i32)
+                    << LM) as usize;
                 let mut j = 0;
                 while j < blen {
                     seed = celt_lcg_rand(seed);
-                    unsafe { *X.get_unchecked_mut(boffs + j) = (seed as i32 >> 20) as celt_norm; }
+                    unsafe {
+                        *X.get_unchecked_mut(boffs + j) = (seed as i32 >> 20) as celt_norm;
+                    }
                     j += 1;
                 }
                 renormalise_vector(&mut X[boffs..boffs + blen], blen as i32, Q15ONE, st.arch);
@@ -1324,8 +1371,9 @@ fn celt_decode_lost(
                 let mut i = 0;
                 while i < max_period as usize + LPC_ORDER {
                     unsafe {
-                        *_exc.get_unchecked_mut(i) = *st.decode_mem
-                            .get_unchecked(ch_off + decode_buffer_size - max_period as usize - LPC_ORDER + i);
+                        *_exc.get_unchecked_mut(i) = *st.decode_mem.get_unchecked(
+                            ch_off + decode_buffer_size - max_period as usize - LPC_ORDER + i,
+                        );
                     }
                     i += 1;
                 }
@@ -1345,7 +1393,8 @@ fn celt_decode_lost(
                 while i <= LPC_ORDER as i32 {
                     unsafe {
                         let v = *ac.get_unchecked(i as usize);
-                        *ac.get_unchecked_mut(i as usize) -= v * (0.008f32 * 0.008f32) * i as f32 * i as f32;
+                        *ac.get_unchecked_mut(i as usize) -=
+                            v * (0.008f32 * 0.008f32) * i as f32 * i as f32;
                     }
                     i += 1;
                 }
@@ -1377,9 +1426,13 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < decay_length {
-                    let e = unsafe { *_exc.get_unchecked(exc_off + (max_period - decay_length + i) as usize) };
+                    let e = unsafe {
+                        *_exc.get_unchecked(exc_off + (max_period - decay_length + i) as usize)
+                    };
                     E1 += e * e;
-                    let e = unsafe { *_exc.get_unchecked(exc_off + (max_period - 2 * decay_length + i) as usize) };
+                    let e = unsafe {
+                        *_exc.get_unchecked(exc_off + (max_period - 2 * decay_length + i) as usize)
+                    };
                     E2 += e * e;
                     i += 1;
                 }
@@ -1400,10 +1453,14 @@ fn celt_decode_lost(
                     attenuation *= decay_0;
                 }
                 unsafe {
-                    *st.decode_mem.get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) =
-                        attenuation * *_exc.get_unchecked(exc_off + (extrapolation_offset + j_0) as usize);
-                    let tmp = *st.decode_mem.get_unchecked(ch_off + decode_buffer_size - max_period as usize - n
-                        + (extrapolation_offset + j_0) as usize);
+                    *st.decode_mem
+                        .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) =
+                        attenuation
+                            * *_exc.get_unchecked(exc_off + (extrapolation_offset + j_0) as usize);
+                    let tmp = *st.decode_mem.get_unchecked(
+                        ch_off + decode_buffer_size - max_period as usize - n
+                            + (extrapolation_offset + j_0) as usize,
+                    );
                     S1 += tmp * tmp;
                 }
                 i += 1;
@@ -1413,7 +1470,11 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < LPC_ORDER {
-                    unsafe { *lpc_mem.get_unchecked_mut(i) = *st.decode_mem.get_unchecked(ch_off + decode_buffer_size - n - 1 - i); }
+                    unsafe {
+                        *lpc_mem.get_unchecked_mut(i) = *st
+                            .decode_mem
+                            .get_unchecked(ch_off + decode_buffer_size - n - 1 - i);
+                    }
                     i += 1;
                 }
             }
@@ -1434,8 +1495,10 @@ fn celt_decode_lost(
             {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    let tmp_0: opus_val16 =
-                        unsafe { *st.decode_mem.get_unchecked(ch_off + decode_buffer_size - n + i as usize) };
+                    let tmp_0: opus_val16 = unsafe {
+                        *st.decode_mem
+                            .get_unchecked(ch_off + decode_buffer_size - n + i as usize)
+                    };
                     S2 += tmp_0 * tmp_0;
                     i += 1;
                 }
@@ -1444,20 +1507,32 @@ fn celt_decode_lost(
             if !(S1 > 0.2f32 * S2) {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    unsafe { *st.decode_mem.get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) = 0.0; }
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) = 0.0;
+                    }
                     i += 1;
                 }
             } else if S1 < S2 {
                 let ratio: opus_val16 = celt_sqrt((0.5 * S1 + 1.0) / (S2 + 1.0));
                 let mut i = 0;
                 while i < overlap {
-                    let tmp_g: opus_val16 = Q15ONE - unsafe { *window.get_unchecked(i as usize) } * (1.0f32 - ratio);
-                    unsafe { *st.decode_mem.get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *= tmp_g; }
+                    let tmp_g: opus_val16 =
+                        Q15ONE - unsafe { *window.get_unchecked(i as usize) } * (1.0f32 - ratio);
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *=
+                            tmp_g;
+                    }
                     i += 1;
                 }
                 i = overlap;
                 while i < extrapolation_len {
-                    unsafe { *st.decode_mem.get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *= ratio; }
+                    unsafe {
+                        *st.decode_mem
+                            .get_unchecked_mut(ch_off + decode_buffer_size - n + i as usize) *=
+                            ratio;
+                    }
                     i += 1;
                 }
             }
@@ -1744,11 +1819,14 @@ fn celt_decode_body(
         let nb = nbEBands as usize;
         while i < nbEBands {
             unsafe {
-                *st.oldEBands.get_unchecked_mut(i as usize) = if *st.oldEBands.get_unchecked(i as usize) > *st.oldEBands.get_unchecked(nb + i as usize) {
-                    *st.oldEBands.get_unchecked(i as usize)
-                } else {
-                    *st.oldEBands.get_unchecked(nb + i as usize)
-                };
+                *st.oldEBands.get_unchecked_mut(i as usize) =
+                    if *st.oldEBands.get_unchecked(i as usize)
+                        > *st.oldEBands.get_unchecked(nb + i as usize)
+                    {
+                        *st.oldEBands.get_unchecked(i as usize)
+                    } else {
+                        *st.oldEBands.get_unchecked(nb + i as usize)
+                    };
             }
             i += 1;
         }
@@ -1840,11 +1918,13 @@ fn celt_decode_body(
                             } else {
                                 (1 + missing) as f32 * slope
                             });
-                        *st.oldEBands.get_unchecked_mut(idx) = if -20.0f32 > new_e { -20.0f32 } else { new_e };
+                        *st.oldEBands.get_unchecked_mut(idx) =
+                            if -20.0f32 > new_e { -20.0f32 } else { new_e };
                     } else {
                         // Otherwise take the min of the last frames.
-                        *st.oldEBands.get_unchecked_mut(idx) =
-                            (*st.oldEBands.get_unchecked(idx)).min(*st.oldLogE.get_unchecked(idx)).min(*st.oldLogE2.get_unchecked(idx));
+                        *st.oldEBands.get_unchecked_mut(idx) = (*st.oldEBands.get_unchecked(idx))
+                            .min(*st.oldLogE.get_unchecked(idx))
+                            .min(*st.oldLogE2.get_unchecked(idx));
                     }
                     // Shorter frames have more natural fluctuations -- play it safe.
                     *st.oldEBands.get_unchecked_mut(idx) -= safety;
@@ -1981,7 +2061,10 @@ fn celt_decode_body(
         let mut quanta: i32 = 0;
         let mut dynalloc_loop_logp: i32 = 0;
         let mut boost: i32 = 0;
-        width = (C * (unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32 - unsafe { *eBands.get_unchecked(i as usize) } as i32)) << LM;
+        width = (C
+            * (unsafe { *eBands.get_unchecked((i + 1) as usize) } as i32
+                - unsafe { *eBands.get_unchecked(i as usize) } as i32))
+            << LM;
         quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
@@ -1991,7 +2074,9 @@ fn celt_decode_body(
         };
         dynalloc_loop_logp = dynalloc_logp;
         boost = 0;
-        while tell + (dynalloc_loop_logp << BITRES) < total_bits && boost < unsafe { *cap.get_unchecked(i as usize) } {
+        while tell + (dynalloc_loop_logp << BITRES) < total_bits
+            && boost < unsafe { *cap.get_unchecked(i as usize) }
+        {
             let mut flag: i32 = 0;
             flag = ec_dec_bit_logp(dec, dynalloc_loop_logp as u32);
             tell = ec_tell_frac(dec) as i32;
@@ -2002,7 +2087,9 @@ fn celt_decode_body(
             total_bits -= quanta;
             dynalloc_loop_logp = 1;
         }
-        unsafe { *offsets.get_unchecked_mut(i as usize) = boost; }
+        unsafe {
+            *offsets.get_unchecked_mut(i as usize) = boost;
+        }
         if boost > 0 {
             dynalloc_logp = if 2 > dynalloc_logp - 1 {
                 2
@@ -2229,7 +2316,8 @@ fn celt_decode_body(
                 let mut bal = qext_bytes * (8 << BITRES) - ec_tell_frac(&ext_dec) as i32;
                 for j in 0..qext_end {
                     bal -= unsafe { *extra_pulses.get_unchecked(nbEBands as usize + j as usize) }
-                        + C * (unsafe { *extra_quant.get_unchecked(nbEBands as usize + 1) } << BITRES);
+                        + C * (unsafe { *extra_quant.get_unchecked(nbEBands as usize + 1) }
+                            << BITRES);
                 }
                 bal
             };
@@ -2400,7 +2488,9 @@ fn celt_decode_body(
     if silence != 0 {
         i = 0;
         while i < C * nbEBands {
-            unsafe { *st.oldEBands.get_unchecked_mut(i as usize) = -28.0f32; }
+            unsafe {
+                *st.oldEBands.get_unchecked_mut(i as usize) = -28.0f32;
+            }
             i += 1;
         }
     }
@@ -2574,7 +2664,9 @@ fn celt_decode_body(
         i = 0;
         while i < 2 * nbEBands {
             unsafe {
-                *st.oldLogE.get_unchecked_mut(i as usize) = if *st.oldLogE.get_unchecked(i as usize) < *st.oldEBands.get_unchecked(i as usize) {
+                *st.oldLogE.get_unchecked_mut(i as usize) = if *st.oldLogE.get_unchecked(i as usize)
+                    < *st.oldEBands.get_unchecked(i as usize)
+                {
                     *st.oldLogE.get_unchecked(i as usize)
                 } else {
                     *st.oldEBands.get_unchecked(i as usize)
@@ -2588,7 +2680,9 @@ fn celt_decode_body(
     while i < 2 * nbEBands {
         unsafe {
             *st.backgroundLogE.get_unchecked_mut(i as usize) =
-                if *st.backgroundLogE.get_unchecked(i as usize) + max_background_increase < *st.oldEBands.get_unchecked(i as usize) {
+                if *st.backgroundLogE.get_unchecked(i as usize) + max_background_increase
+                    < *st.oldEBands.get_unchecked(i as usize)
+                {
                     *st.backgroundLogE.get_unchecked(i as usize) + max_background_increase
                 } else {
                     *st.oldEBands.get_unchecked(i as usize)

@@ -92,8 +92,7 @@ pub fn silk_encode_indices(
     debug_assert!(psEncC.psNLSF_CB.order as i32 == psEncC.predictLPCOrder);
     i = 0;
     while i < psEncC.psNLSF_CB.order as i32 {
-        let nlsf_idx =
-            unsafe { *psIndices.NLSFIndices.get_unchecked((i + 1) as usize) } as i32;
+        let nlsf_idx = unsafe { *psIndices.NLSFIndices.get_unchecked((i + 1) as usize) } as i32;
         let ec_ix_i = unsafe { *ec_ix.get_unchecked(i as usize) } as usize;
         if nlsf_idx >= NLSF_QUANT_MAX_AMPLITUDE {
             ec_enc_icdf(
@@ -109,12 +108,7 @@ pub fn silk_encode_indices(
                 8,
             );
         } else if nlsf_idx <= -NLSF_QUANT_MAX_AMPLITUDE {
-            ec_enc_icdf(
-                psRangeEnc,
-                0,
-                &psEncC.psNLSF_CB.ec_iCDF[ec_ix_i..],
-                8,
-            );
+            ec_enc_icdf(psRangeEnc, 0, &psEncC.psNLSF_CB.ec_iCDF[ec_ix_i..], 8);
             ec_enc_icdf(
                 psRangeEnc,
                 -nlsf_idx - NLSF_QUANT_MAX_AMPLITUDE,

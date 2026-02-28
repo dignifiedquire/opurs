@@ -84,7 +84,7 @@ fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
         }
     }
     // Backward pass
-    if len >= 2 * stride + 1 {
+    if len > 2 * stride {
         for i in (0..=len - 2 * stride - 1).rev() {
             let x1 = X[i];
             let x2 = X[i + stride];
@@ -155,7 +155,9 @@ fn extract_collapse_mask(iy: &[i32], N: i32, B: i32) -> u32 {
     for i in 0..B {
         let mut tmp: u32 = 0;
         for j in 0..N0 {
-            unsafe { tmp |= *iy.get_unchecked((i * N0 + j) as usize) as u32; }
+            unsafe {
+                tmp |= *iy.get_unchecked((i * N0 + j) as usize) as u32;
+            }
         }
         collapse_mask |= ((tmp != 0) as u32) << i;
     }
@@ -321,18 +323,22 @@ fn op_pvq_refine(
         unsafe {
             let tmp = (K as f32 * 256.0) * *Xn.get_unchecked(i); // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
             *iy.get_unchecked_mut(i) = (0.5 + tmp).floor() as i32;
-            *rounding.get_unchecked_mut(i) = tmp - (*iy.get_unchecked(i) as f32 * 128.0); // tmp - SHL32(iy[i], 7)
+            *rounding.get_unchecked_mut(i) = tmp - (*iy.get_unchecked(i) as f32 * 128.0);
+            // tmp - SHL32(iy[i], 7)
         }
     }
     if !same {
         for i in 0..N as usize {
             unsafe {
-                *iy.get_unchecked_mut(i) = (up * *iy0.get_unchecked(i) + up - 1).min((up * *iy0.get_unchecked(i) - up + 1).max(*iy.get_unchecked(i)));
+                *iy.get_unchecked_mut(i) = (up * *iy0.get_unchecked(i) + up - 1)
+                    .min((up * *iy0.get_unchecked(i) - up + 1).max(*iy.get_unchecked(i)));
             }
         }
     }
     for i in 0..N as usize {
-        unsafe { iysum += *iy.get_unchecked(i); }
+        unsafe {
+            iysum += *iy.get_unchecked(i);
+        }
     }
     if (iysum - K).abs() > 32 {
         return true; // failed
@@ -380,7 +386,9 @@ fn op_pvq_search_extra(
     let n = N as usize;
 
     for i in 0..n {
-        unsafe { sum += X.get_unchecked(i).abs(); }
+        unsafe {
+            sum += X.get_unchecked(i).abs();
+        }
     }
     let mut Xn = vec![0.0f32; n];
     if sum < EPSILON {
@@ -388,7 +396,9 @@ fn op_pvq_search_extra(
     } else {
         let rcp_sum = 1.0f32 / sum;
         for i in 0..n {
-            unsafe { *Xn.get_unchecked_mut(i) = X.get_unchecked(i).abs() * rcp_sum; }
+            unsafe {
+                *Xn.get_unchecked_mut(i) = X.get_unchecked(i).abs() * rcp_sum;
+            }
         }
     }
     // First pass: refine base quantization
@@ -400,11 +410,15 @@ fn op_pvq_search_extra(
     if failed {
         iy[0] = K;
         for i in 1..n {
-            unsafe { *iy.get_unchecked_mut(i) = 0; }
+            unsafe {
+                *iy.get_unchecked_mut(i) = 0;
+            }
         }
         up_iy[0] = up * K;
         for i in 1..n {
-            unsafe { *up_iy.get_unchecked_mut(i) = 0; }
+            unsafe {
+                *up_iy.get_unchecked_mut(i) = 0;
+            }
         }
     }
     let mut yy: f64 = 0.0;
@@ -469,11 +483,15 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
     #[cfg(feature = "qext")]
     let trace = qext_trace_enabled_vq();
     for i in 0..n {
-        unsafe { *X.get_unchecked_mut(i) = (1 + 2 * *iy.get_unchecked(i)) as f32 - K as f32; }
+        unsafe {
+            *X.get_unchecked_mut(i) = (1 + 2 * *iy.get_unchecked(i)) as f32 - K as f32;
+        }
     }
     X[face] = if sign { -(K as f32) } else { K as f32 };
     for i in 0..n {
-        unsafe { sum += *X.get_unchecked(i) * *X.get_unchecked(i); }
+        unsafe {
+            sum += *X.get_unchecked(i) * *X.get_unchecked(i);
+        }
     }
     // Match upstream float path semantics: C computes `1.f/sqrt(sum)` with `sqrt`
     // operating in double precision before rounding back to float.
@@ -492,7 +510,9 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
         );
     }
     for i in 0..n {
-        unsafe { *X.get_unchecked_mut(i) *= mag * gain; }
+        unsafe {
+            *X.get_unchecked_mut(i) *= mag * gain;
+        }
     }
     #[cfg(feature = "qext")]
     if trace {
@@ -551,11 +571,16 @@ pub fn cubic_quant(
     let norm = 0.5 * K as f32 / (faceval + EPSILON);
     let mut iy = vec![0i32; n];
     for i in 0..n {
-        unsafe { *iy.get_unchecked_mut(i) = (K - 1).min(((*X.get_unchecked(i) + faceval) * norm).floor() as i32); }
+        unsafe {
+            *iy.get_unchecked_mut(i) =
+                (K - 1).min(((*X.get_unchecked(i) + faceval) * norm).floor() as i32);
+        }
     }
     for i in 0..n {
         if i != face {
-            unsafe { ec_enc_bits(enc, *iy.get_unchecked(i) as u32, res as u32); }
+            unsafe {
+                ec_enc_bits(enc, *iy.get_unchecked(i) as u32, res as u32);
+            }
         }
     }
     if resynth != 0 {
@@ -586,7 +611,9 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
     let mut iy = vec![0i32; n];
     for i in 0..n {
         if i != face {
-            unsafe { *iy.get_unchecked_mut(i) = ec_dec_bits(dec, res as u32) as i32; }
+            unsafe {
+                *iy.get_unchecked_mut(i) = ec_dec_bits(dec, res as u32) as i32;
+            }
         }
     }
     iy[face] = 0;
@@ -672,7 +699,15 @@ pub fn alg_quant(
             let use_entropy =
                 (ext_enc.storage as i32 * 8 - ec_tell(ext_enc)) > (N - 1) * (extra_bits + 3) + 1;
             for i in 0..(N - 1) as usize {
-                unsafe { ec_enc_refine(ext_enc, *refine.get_unchecked(i), up, extra_bits, use_entropy); }
+                unsafe {
+                    ec_enc_refine(
+                        ext_enc,
+                        *refine.get_unchecked(i),
+                        up,
+                        extra_bits,
+                        use_entropy,
+                    );
+                }
             }
             if iy[(N - 1) as usize] == 0 {
                 ec_enc_bits(ext_enc, (up_iy[(N - 1) as usize] < 0) as u32, 1);
@@ -760,7 +795,10 @@ pub fn alg_unquant(
                 (ext_dec.storage as i32 * 8 - ec_tell(ext_dec)) > (N - 1) * (extra_bits + 3) + 1;
             let mut refine = vec![0i32; n];
             for i in 0..(N - 1) as usize {
-                unsafe { *refine.get_unchecked_mut(i) = ec_dec_refine(ext_dec, up, extra_bits, use_entropy); }
+                unsafe {
+                    *refine.get_unchecked_mut(i) =
+                        ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
+                }
             }
             let sign = if iy[(N - 1) as usize] == 0 {
                 ec_dec_bits(ext_dec, 1) != 0
@@ -768,18 +806,24 @@ pub fn alg_unquant(
                 iy[(N - 1) as usize] < 0
             };
             for i in 0..(N - 1) as usize {
-                unsafe { *iy.get_unchecked_mut(i) = *iy.get_unchecked(i) * up + *refine.get_unchecked(i); }
+                unsafe {
+                    *iy.get_unchecked_mut(i) = *iy.get_unchecked(i) * up + *refine.get_unchecked(i);
+                }
             }
             iy[(N - 1) as usize] = up * K;
             for i in 0..(N - 1) as usize {
-                unsafe { *iy.get_unchecked_mut((N - 1) as usize) -= iy.get_unchecked(i).abs(); }
+                unsafe {
+                    *iy.get_unchecked_mut((N - 1) as usize) -= iy.get_unchecked(i).abs();
+                }
             }
             if sign {
                 iy[(N - 1) as usize] = -iy[(N - 1) as usize];
             }
             let mut yy64: f32 = 0.0;
             for i in 0..n {
-                unsafe { yy64 += *iy.get_unchecked(i) as f32 * *iy.get_unchecked(i) as f32; }
+                unsafe {
+                    yy64 += *iy.get_unchecked(i) as f32 * *iy.get_unchecked(i) as f32;
+                }
             }
             Ryy = yy64;
         }

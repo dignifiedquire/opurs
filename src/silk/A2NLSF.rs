@@ -184,8 +184,8 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
                     while k < d {
                         unsafe {
                             *NLSF.get_unchecked_mut(k as usize) =
-                                (*NLSF.get_unchecked((k - 1) as usize) as i32
-                                    + NLSF[0] as i32) as i16;
+                                (*NLSF.get_unchecked((k - 1) as usize) as i32 + NLSF[0] as i32)
+                                    as i16;
                         }
                         k += 1;
                     }

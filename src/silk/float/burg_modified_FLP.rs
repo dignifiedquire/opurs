@@ -73,26 +73,25 @@ pub fn silk_burg_modified_FLP(
                 tmp2 = *x.get_unchecked(x_off + (subfr_length - n - 1) as usize) as f64;
                 k = 0;
                 while k < n {
-                    *C_first_row.get_unchecked_mut(k as usize) -=
-                        (*x.get_unchecked(x_off + n as usize)
-                            * *x.get_unchecked(x_off + (n - k - 1) as usize))
-                            as f64;
-                    *C_last_row.get_unchecked_mut(k as usize) -=
-                        (*x.get_unchecked(x_off + (subfr_length - n - 1) as usize)
-                            * *x.get_unchecked(x_off + (subfr_length - n + k) as usize))
-                            as f64;
+                    *C_first_row.get_unchecked_mut(k as usize) -= (*x
+                        .get_unchecked(x_off + n as usize)
+                        * *x.get_unchecked(x_off + (n - k - 1) as usize))
+                        as f64;
+                    *C_last_row.get_unchecked_mut(k as usize) -= (*x
+                        .get_unchecked(x_off + (subfr_length - n - 1) as usize)
+                        * *x.get_unchecked(x_off + (subfr_length - n + k) as usize))
+                        as f64;
                     Atmp = *Af.get_unchecked(k as usize);
                     tmp1 += *x.get_unchecked(x_off + (n - k - 1) as usize) as f64 * Atmp;
-                    tmp2 += *x.get_unchecked(x_off + (subfr_length - n + k) as usize) as f64
-                        * Atmp;
+                    tmp2 += *x.get_unchecked(x_off + (subfr_length - n + k) as usize) as f64 * Atmp;
                     k += 1;
                 }
                 k = 0;
                 while k <= n {
                     *CAf.get_unchecked_mut(k as usize) -=
                         tmp1 * *x.get_unchecked(x_off + (n - k) as usize) as f64;
-                    *CAb.get_unchecked_mut(k as usize) -= tmp2
-                        * *x.get_unchecked(x_off + (subfr_length - n + k - 1) as usize) as f64;
+                    *CAb.get_unchecked_mut(k as usize) -=
+                        tmp2 * *x.get_unchecked(x_off + (subfr_length - n + k - 1) as usize) as f64;
                     k += 1;
                 }
             }

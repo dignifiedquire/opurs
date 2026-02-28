@@ -195,13 +195,17 @@ pub fn silk_pitch_analysis_core_FLP(
             );
         }
         // Safety: (max_lag_4kHz - min_lag_4kHz) < xcorr.len() == 65
-        cross_corr = (unsafe { *xcorr.get_unchecked((max_lag_4kHz - min_lag_4kHz) as usize) }) as f64;
+        cross_corr =
+            (unsafe { *xcorr.get_unchecked((max_lag_4kHz - min_lag_4kHz) as usize) }) as f64;
         normalizer = silk_energy_FLP(&frame_4kHz[target_off..target_off + sf_length_8kHz as usize])
             + silk_energy_FLP(&frame_4kHz[basis_off..basis_off + sf_length_8kHz as usize])
             + (sf_length_8kHz as f32 * 4000.0f32) as f64;
         // Safety: min_lag_4kHz < 149 (C dimension)
         let tmp = unsafe { *C[0].get_unchecked(min_lag_4kHz as usize) };
-        unsafe { *C[0].get_unchecked_mut(min_lag_4kHz as usize) = tmp + (2_f64 * cross_corr / normalizer) as f32; }
+        unsafe {
+            *C[0].get_unchecked_mut(min_lag_4kHz as usize) =
+                tmp + (2_f64 * cross_corr / normalizer) as f32;
+        }
         // basis_off_d starts at basis_off and decrements
         let mut basis_off_d = basis_off;
         d = min_lag_4kHz + 1;
@@ -211,11 +215,15 @@ pub fn silk_pitch_analysis_core_FLP(
             cross_corr = (unsafe { *xcorr.get_unchecked((max_lag_4kHz - d) as usize) }) as f64;
             // Safety: basis_off_d and basis_off_d + sf_length_8kHz are within frame_4kHz bounds
             let lo = unsafe { *frame_4kHz.get_unchecked(basis_off_d) } as f64;
-            let hi = unsafe { *frame_4kHz.get_unchecked(basis_off_d + sf_length_8kHz as usize) } as f64;
+            let hi =
+                unsafe { *frame_4kHz.get_unchecked(basis_off_d + sf_length_8kHz as usize) } as f64;
             normalizer += lo * lo - hi * hi;
             // Safety: d in [min_lag_4kHz+1, max_lag_4kHz], d < 149
             let tmp = unsafe { *C[0].get_unchecked(d as usize) };
-            unsafe { *C[0].get_unchecked_mut(d as usize) = tmp + (2_f64 * cross_corr / normalizer) as f32; }
+            unsafe {
+                *C[0].get_unchecked_mut(d as usize) =
+                    tmp + (2_f64 * cross_corr / normalizer) as f32;
+            }
             d += 1;
         }
         target_off += sf_length_8kHz as usize;
@@ -226,7 +234,9 @@ pub fn silk_pitch_analysis_core_FLP(
     while i >= min_lag_4kHz {
         // Safety: i in [min_lag_4kHz, max_lag_4kHz], both < 149
         let val = unsafe { *C[0].get_unchecked(i as usize) };
-        unsafe { *C[0].get_unchecked_mut(i as usize) = val - val * i as f32 / 4096.0f32; }
+        unsafe {
+            *C[0].get_unchecked_mut(i as usize) = val - val * i as f32 / 4096.0f32;
+        }
         i -= 1;
     }
     length_d_srch = 4 + 2 * complexity;
@@ -252,7 +262,8 @@ pub fn silk_pitch_analysis_core_FLP(
         if (unsafe { *C[0_usize].get_unchecked((min_lag_4kHz + i) as usize) }) > threshold {
             unsafe {
                 let prev = *d_srch.get_unchecked(i as usize);
-                *d_srch.get_unchecked_mut(i as usize) = (((prev + min_lag_4kHz) as u32) << 1) as i32;
+                *d_srch.get_unchecked_mut(i as usize) =
+                    (((prev + min_lag_4kHz) as u32) << 1) as i32;
             }
             i += 1;
         } else {
@@ -264,7 +275,9 @@ pub fn silk_pitch_analysis_core_FLP(
     i = min_lag_8kHz - 5;
     while i < max_lag_8kHz + 5 {
         // Safety: i in [min_lag_8kHz-5, max_lag_8kHz+4], all < 149
-        unsafe { *d_comp.get_unchecked_mut(i as usize) = 0; }
+        unsafe {
+            *d_comp.get_unchecked_mut(i as usize) = 0;
+        }
         i += 1;
     }
     i = 0;
@@ -292,7 +305,9 @@ pub fn silk_pitch_analysis_core_FLP(
     while i < max_lag_8kHz + 1 {
         // Safety: (i+1) <= max_lag_8kHz+1 < 149, length_d_srch < 24
         if (unsafe { *d_comp.get_unchecked((i + 1) as usize) }) as i32 > 0 {
-            unsafe { *d_srch.get_unchecked_mut(length_d_srch as usize) = i; }
+            unsafe {
+                *d_srch.get_unchecked_mut(length_d_srch as usize) = i;
+            }
             length_d_srch += 1;
         }
         i += 1;
@@ -304,7 +319,8 @@ pub fn silk_pitch_analysis_core_FLP(
             *d_comp.get_unchecked_mut(i as usize) = (*d_comp.get_unchecked(i as usize) as i32
                 + (*d_comp.get_unchecked((i - 1) as usize) as i32
                     + *d_comp.get_unchecked((i - 2) as usize) as i32
-                    + *d_comp.get_unchecked((i - 3) as usize) as i32)) as i16;
+                    + *d_comp.get_unchecked((i - 3) as usize) as i32))
+                as i16;
         }
         i -= 1;
     }
@@ -313,7 +329,9 @@ pub fn silk_pitch_analysis_core_FLP(
     while i < max_lag_8kHz + 4 {
         // Safety: i < max_lag_8kHz+4 < 149, length_d_comp bounded
         if (unsafe { *d_comp.get_unchecked(i as usize) }) as i32 > 0 {
-            unsafe { *d_comp.get_unchecked_mut(length_d_comp as usize) = (i - 2) as i16; }
+            unsafe {
+                *d_comp.get_unchecked_mut(length_d_comp as usize) = (i - 2) as i16;
+            }
             length_d_comp += 1;
         }
         i += 1;
@@ -338,9 +356,16 @@ pub fn silk_pitch_analysis_core_FLP(
             );
             if cross_corr > 0.0f32 as f64 {
                 energy = silk_energy_FLP(&frame_8[basis_off..basis_off + sf_length_8kHz as usize]);
-                unsafe { *C.get_unchecked_mut(k as usize).get_unchecked_mut(d as usize) = (2_f64 * cross_corr / (energy + energy_tmp)) as f32; }
+                unsafe {
+                    *C.get_unchecked_mut(k as usize)
+                        .get_unchecked_mut(d as usize) =
+                        (2_f64 * cross_corr / (energy + energy_tmp)) as f32;
+                }
             } else {
-                unsafe { *C.get_unchecked_mut(k as usize).get_unchecked_mut(d as usize) = 0.0f32; }
+                unsafe {
+                    *C.get_unchecked_mut(k as usize)
+                        .get_unchecked_mut(d as usize) = 0.0f32;
+                }
             }
             j += 1;
         }
@@ -381,14 +406,17 @@ pub fn silk_pitch_analysis_core_FLP(
         j = 0;
         while j < nb_cbk_search {
             // Safety: j < nb_cbk_search <= 11
-            unsafe { *CC.get_unchecked_mut(j as usize) = 0.0f32; }
+            unsafe {
+                *CC.get_unchecked_mut(j as usize) = 0.0f32;
+            }
             i = 0;
             while i < nb_subfr {
                 // Safety: i < nb_subfr <= 4, j < cbk_size, d + lag_cb_val < 149
                 unsafe {
                     let lag_cb_val = *Lag_CB.get_unchecked((i * cbk_size + j) as usize) as i32;
-                    *CC.get_unchecked_mut(j as usize) +=
-                        *C.get_unchecked(i as usize).get_unchecked((d + lag_cb_val) as usize);
+                    *CC.get_unchecked_mut(j as usize) += *C
+                        .get_unchecked(i as usize)
+                        .get_unchecked((d + lag_cb_val) as usize);
                 }
                 i += 1;
             }
@@ -499,14 +527,16 @@ pub fn silk_pitch_analysis_core_FLP(
                 while k < nb_subfr {
                     // Safety: k < nb_subfr <= 4, j < 34, lag_counter < 5
                     unsafe {
-                        cross_corr +=
-                            *cross_corr_st3.get_unchecked(k as usize)
-                                .get_unchecked(j as usize)
-                                .get_unchecked(lag_counter as usize) as f64;
-                        energy +=
-                            *energies_st3.get_unchecked(k as usize)
-                                .get_unchecked(j as usize)
-                                .get_unchecked(lag_counter as usize) as f64;
+                        cross_corr += *cross_corr_st3
+                            .get_unchecked(k as usize)
+                            .get_unchecked(j as usize)
+                            .get_unchecked(lag_counter as usize)
+                            as f64;
+                        energy += *energies_st3
+                            .get_unchecked(k as usize)
+                            .get_unchecked(j as usize)
+                            .get_unchecked(lag_counter as usize)
+                            as f64;
                     }
                     k += 1;
                 }
@@ -516,7 +546,10 @@ pub fn silk_pitch_analysis_core_FLP(
                 } else {
                     CCmax_new = 0.0f32;
                 }
-                if CCmax_new > CCmax && d + (unsafe { *silk_CB_lags_stage3.get_unchecked(j as usize) }) as i32 <= max_lag {
+                if CCmax_new > CCmax
+                    && d + (unsafe { *silk_CB_lags_stage3.get_unchecked(j as usize) }) as i32
+                        <= max_lag
+                {
                     CCmax = CCmax_new;
                     lag_new = d;
                     CBimax = j;
@@ -660,7 +693,8 @@ fn silk_P_Ana_calc_corr_st3(
             while j < PE_NB_STAGE3_LAGS {
                 // Safety: k < 4, i < 34, j < 5, (idx + j) < 22
                 unsafe {
-                    *cross_corr_st3.get_unchecked_mut(k as usize)
+                    *cross_corr_st3
+                        .get_unchecked_mut(k as usize)
                         .get_unchecked_mut(i as usize)
                         .get_unchecked_mut(j as usize) =
                         *scratch_mem.get_unchecked((idx + j) as usize);
@@ -715,11 +749,16 @@ fn silk_P_Ana_calc_energy_st3(
         lag_counter = 0;
         // Safety: k < nb_subfr <= 4, Lag_range has nb_subfr entries
         let lag_range_k = unsafe { Lag_range.get_unchecked(k as usize) };
-        let basis_off = target_off - (start_lag + unsafe { *lag_range_k.get_unchecked(0) } as i32) as usize;
+        let basis_off =
+            target_off - (start_lag + unsafe { *lag_range_k.get_unchecked(0) } as i32) as usize;
         energy = silk_energy_FLP(&frame[basis_off..basis_off + sf_length as usize]) + 1e-3f64;
-        unsafe { *scratch_mem.get_unchecked_mut(lag_counter as usize) = energy as f32; }
+        unsafe {
+            *scratch_mem.get_unchecked_mut(lag_counter as usize) = energy as f32;
+        }
         lag_counter += 1;
-        lag_diff = unsafe { *lag_range_k.get_unchecked(1) } as i32 - unsafe { *lag_range_k.get_unchecked(0) } as i32 + 1;
+        lag_diff = unsafe { *lag_range_k.get_unchecked(1) } as i32
+            - unsafe { *lag_range_k.get_unchecked(0) } as i32
+            + 1;
         i = 1;
         while i < lag_diff {
             // Safety: basis_off +/- offsets within frame bounds, lag_counter < 22
@@ -742,7 +781,8 @@ fn silk_P_Ana_calc_energy_st3(
             while j < PE_NB_STAGE3_LAGS {
                 // Safety: k < 4, i < 34, j < 5, (idx + j) < 22
                 unsafe {
-                    *energies_st3.get_unchecked_mut(k as usize)
+                    *energies_st3
+                        .get_unchecked_mut(k as usize)
                         .get_unchecked_mut(i as usize)
                         .get_unchecked_mut(j as usize) =
                         *scratch_mem.get_unchecked((idx + j) as usize);

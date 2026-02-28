@@ -207,13 +207,17 @@ pub fn silk_Encode(
         }
         n = 0;
         while n < encControl.nChannelsInternal {
-            let arch = unsafe { &*psEnc.state_Fxx.get_unchecked(n as usize) }.sCmn.arch;
+            let arch = unsafe { psEnc.state_Fxx.get_unchecked(n as usize) }
+                .sCmn
+                .arch;
             ret = silk_init_encoder(
                 unsafe { &mut *psEnc.state_Fxx.get_unchecked_mut(n as usize) },
                 arch,
             );
             if prefillFlag == 2 {
-                unsafe { &mut *psEnc.state_Fxx.get_unchecked_mut(n as usize) }.sCmn.sLP = save_LP;
+                unsafe { &mut *psEnc.state_Fxx.get_unchecked_mut(n as usize) }
+                    .sCmn
+                    .sLP = save_LP;
             }
             debug_assert_eq!(ret, 0);
             n += 1;
@@ -257,7 +261,7 @@ pub fn silk_Encode(
         if ret != 0 {
             return ret;
         }
-        if unsafe { &*psEnc.state_Fxx.get_unchecked(n as usize) }
+        if unsafe { psEnc.state_Fxx.get_unchecked(n as usize) }
             .sCmn
             .first_frame_after_reset
             != 0
@@ -451,7 +455,7 @@ pub fn silk_Encode(
                 psEnc.state_Fxx[n as usize].sCmn.LBRR_flag =
                     (if LBRR_symbol > 0 { 1 } else { 0 }) as i8;
                 if LBRR_symbol != 0
-                    && unsafe { &*psEnc.state_Fxx.get_unchecked(n as usize) }
+                    && unsafe { psEnc.state_Fxx.get_unchecked(n as usize) }
                         .sCmn
                         .nFramesPerPacket
                         > 1
@@ -460,8 +464,12 @@ pub fn silk_Encode(
                         psRangeEnc,
                         LBRR_symbol - 1,
                         unsafe {
-                            *silk_LBRR_flags_iCDF_ptr.get_unchecked(
-                                (psEnc.state_Fxx.get_unchecked(n as usize).sCmn.nFramesPerPacket
+                            silk_LBRR_flags_iCDF_ptr.get_unchecked(
+                                (psEnc
+                                    .state_Fxx
+                                    .get_unchecked(n as usize)
+                                    .sCmn
+                                    .nFramesPerPacket
                                     - 2) as usize,
                             )
                         },
@@ -482,15 +490,9 @@ pub fn silk_Encode(
                     } != 0
                     {
                         if encControl.nChannelsInternal == 2 && n == 0 {
-                            silk_stereo_encode_pred(
-                                psRangeEnc,
-                                &psEnc.sStereo.predIx[i as usize],
-                            );
+                            silk_stereo_encode_pred(psRangeEnc, &psEnc.sStereo.predIx[i as usize]);
                             if unsafe {
-                                *psEnc.state_Fxx[1]
-                                    .sCmn
-                                    .LBRR_flags
-                                    .get_unchecked(i as usize)
+                                *psEnc.state_Fxx[1].sCmn.LBRR_flags.get_unchecked(i as usize)
                             } == 0
                             {
                                 silk_stereo_encode_mid_only(
@@ -714,7 +716,7 @@ pub fn silk_Encode(
             n = 0;
             while n < encControl.nChannelsInternal {
                 i = 0;
-                while i < unsafe { &*psEnc.state_Fxx.get_unchecked(n as usize) }
+                while i < unsafe { psEnc.state_Fxx.get_unchecked(n as usize) }
                     .sCmn
                     .nFramesPerPacket
                 {
@@ -730,7 +732,7 @@ pub fn silk_Encode(
                     i += 1;
                 }
                 flags = ((flags as u32) << 1) as i32;
-                flags |= unsafe { &*psEnc.state_Fxx.get_unchecked(n as usize) }
+                flags |= unsafe { psEnc.state_Fxx.get_unchecked(n as usize) }
                     .sCmn
                     .LBRR_flag as i32;
                 n += 1;

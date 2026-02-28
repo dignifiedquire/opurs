@@ -287,7 +287,8 @@ pub fn silk_stereo_LR_to_MS(
         unsafe {
             sum = (((*x1.get_unchecked(n as usize) as i32
                 + *x1.get_unchecked((n + 2) as usize) as i32
-                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32) as u32)
+                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32)
+                as u32)
                 << 9) as i32;
             sum = (((w_Q24 as i64 * *side.get_unchecked((n + 1) as usize) as i64) >> 16) as i32
                 as i64
@@ -311,7 +312,8 @@ pub fn silk_stereo_LR_to_MS(
         unsafe {
             sum = (((*x1.get_unchecked(n as usize) as i32
                 + *x1.get_unchecked((n + 2) as usize) as i32
-                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32) as u32)
+                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32)
+                as u32)
                 << 9) as i32;
             sum = (((w_Q24 as i64 * *side.get_unchecked((n + 1) as usize) as i64) >> 16) as i32
                 as i64

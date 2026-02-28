@@ -216,7 +216,9 @@ pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     let x = &x[..N];
     let y = &y[..N];
     for i in 0..N {
-        unsafe { xy += *x.get_unchecked(i) * *y.get_unchecked(i); }
+        unsafe {
+            xy += *x.get_unchecked(i) * *y.get_unchecked(i);
+        }
     }
     xy
 }
@@ -401,10 +403,16 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
     let mut y_lp4: Vec<f32> = vec![0.0; (lag >> 2) as usize];
     let mut xcorr: Vec<f32> = vec![0.0; (max_pitch >> 1) as usize];
 
-    for (dst, src) in x_lp4[..(len >> 2) as usize].iter_mut().zip(x_lp.chunks_exact(2)) {
+    for (dst, src) in x_lp4[..(len >> 2) as usize]
+        .iter_mut()
+        .zip(x_lp.chunks_exact(2))
+    {
         *dst = src[0];
     }
-    for (dst, src) in y_lp4[..(lag >> 2) as usize].iter_mut().zip(y.chunks_exact(2)) {
+    for (dst, src) in y_lp4[..(lag >> 2) as usize]
+        .iter_mut()
+        .zip(y.chunks_exact(2))
+    {
         *dst = src[0];
     }
 
@@ -528,7 +536,12 @@ pub fn remove_doubling(
         let x_left = &x[x_off - mp..x_off];
         let x_right = &x[x_off + n - mp..x_off + n];
         let yy_out = &mut yy_lookup[1..=mp];
-        for ((xl, xr), yy_dest) in x_left.iter().rev().zip(x_right.iter().rev()).zip(yy_out.iter_mut()) {
+        for ((xl, xr), yy_dest) in x_left
+            .iter()
+            .rev()
+            .zip(x_right.iter().rev())
+            .zip(yy_out.iter_mut())
+        {
             // Match C: yy = yy + x[-i]*x[-i] - x[N-i]*x[N-i]  (left-associative)
             yy = yy + xl * xl - xr * xr;
             *yy_dest = celt_max32(0.0f32, yy);
@@ -565,7 +578,10 @@ pub fn remove_doubling(
             arch,
         );
         xy = 0.5f32 * (xy_new + xy2_new);
-        yy = 0.5f32 * unsafe { *yy_lookup.get_unchecked(T1 as usize) + *yy_lookup.get_unchecked(T1b as usize) };
+        yy = 0.5f32
+            * unsafe {
+                *yy_lookup.get_unchecked(T1 as usize) + *yy_lookup.get_unchecked(T1b as usize)
+            };
         let g1 = compute_pitch_gain(xy, xx, yy);
         let mut cont: f32 = 0.0;
         if (T1 - prev_period).abs() <= 1 {
@@ -593,12 +609,14 @@ pub fn remove_doubling(
         pg = best_xy / (best_yy + 1.0);
     }
     for k in 0..3i32 {
-        unsafe { *xcorr.get_unchecked_mut(k as usize) = celt_inner_prod(
-            &x[x_off..],
-            &x[x_off - (T + k - 1) as usize..],
-            N as usize,
-            arch,
-        ); }
+        unsafe {
+            *xcorr.get_unchecked_mut(k as usize) = celt_inner_prod(
+                &x[x_off..],
+                &x[x_off - (T + k - 1) as usize..],
+                N as usize,
+                arch,
+            );
+        }
     }
     if xcorr[2] - xcorr[0] > 0.7f32 * (xcorr[1] - xcorr[0]) {
         offset = 1;

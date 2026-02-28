@@ -57,8 +57,7 @@ fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i3
     unsafe {
         i = order - 1;
         while i > 0 {
-            *coefs.get_unchecked_mut((i - 1) as usize) -=
-                lambda * *coefs.get_unchecked(i as usize);
+            *coefs.get_unchecked_mut((i - 1) as usize) -= lambda * *coefs.get_unchecked(i as usize);
             i -= 1;
         }
         gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * *coefs.get_unchecked(0));
@@ -378,8 +377,7 @@ pub fn silk_noise_shape_analysis_FLP(
             SUBFR_SMTH_COEF * (HarmShapeGain - psShapeSt.HarmShapeGain_smth);
         // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
         unsafe {
-            *psEncCtrl.HarmShapeGain.get_unchecked_mut(k as usize) =
-                psShapeSt.HarmShapeGain_smth;
+            *psEncCtrl.HarmShapeGain.get_unchecked_mut(k as usize) = psShapeSt.HarmShapeGain_smth;
         }
         psShapeSt.Tilt_smth += SUBFR_SMTH_COEF * (Tilt - psShapeSt.Tilt_smth);
         unsafe {

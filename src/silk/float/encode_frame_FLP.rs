@@ -282,7 +282,11 @@ pub fn silk_encode_frame_FLP(
                     i = 0;
                     while i < psEnc.sCmn.nb_subfr as i32 {
                         unsafe {
-                            *psEnc.sCmn.indices.GainsIndices.get_unchecked_mut(i as usize) = 4;
+                            *psEnc
+                                .sCmn
+                                .indices
+                                .GainsIndices
+                                .get_unchecked_mut(i as usize) = 4;
                         }
                         i += 1;
                     }

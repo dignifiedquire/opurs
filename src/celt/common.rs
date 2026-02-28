@@ -57,13 +57,17 @@ fn comb_filter_qext_inplace(
     for s in 0..2usize {
         let mut new_window = vec![0.0f32; overlap2];
         for i in 0..overlap2 {
-            unsafe { *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s); }
+            unsafe {
+                *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s);
+            }
         }
         let mem_len = COMBFILTER_MAXPERIOD as usize + n2;
         let mut mem_buf = vec![0.0f32; mem_len];
         for (i, mem) in mem_buf.iter_mut().enumerate() {
             let src_idx = start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
-            unsafe { *mem = *buf.get_unchecked(src_idx as usize); }
+            unsafe {
+                *mem = *buf.get_unchecked(src_idx as usize);
+            }
         }
         let cf_start = COMBFILTER_MAXPERIOD as usize;
         comb_filter_inplace(
@@ -81,7 +85,9 @@ fn comb_filter_qext_inplace(
             arch,
         );
         for i in 0..n2 {
-            unsafe { *buf.get_unchecked_mut(start + 2 * i + s) = *mem_buf.get_unchecked(cf_start + i); }
+            unsafe {
+                *buf.get_unchecked_mut(start + 2 * i + s) = *mem_buf.get_unchecked(cf_start + i);
+            }
         }
     }
 }
@@ -123,8 +129,9 @@ pub fn comb_filter_const_c(
     for i in 0..N as usize {
         unsafe {
             let x0 = *x.get_unchecked(x_start + i - t + 2);
-            *y.get_unchecked_mut(y_start + i) =
-                saturate_sig(*x.get_unchecked(x_start + i) + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4));
+            *y.get_unchecked_mut(y_start + i) = saturate_sig(
+                *x.get_unchecked(x_start + i) + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4),
+            );
             x4 = x3;
             x3 = x2;
             x2 = x1;
@@ -193,10 +200,12 @@ pub fn comb_filter(
                     + (1.0f32 - f) * g00 * *x.get_unchecked(x_start + iu - T0 as usize)
                     + (1.0f32 - f)
                         * g01
-                        * (*x.get_unchecked(x_start + iu - T0 as usize + 1) + *x.get_unchecked(x_start + iu - T0 as usize - 1))
+                        * (*x.get_unchecked(x_start + iu - T0 as usize + 1)
+                            + *x.get_unchecked(x_start + iu - T0 as usize - 1))
                     + (1.0f32 - f)
                         * g02
-                        * (*x.get_unchecked(x_start + iu - T0 as usize + 2) + *x.get_unchecked(x_start + iu - T0 as usize - 2))
+                        * (*x.get_unchecked(x_start + iu - T0 as usize + 2)
+                            + *x.get_unchecked(x_start + iu - T0 as usize - 2))
                     + f * g10 * x2
                     + f * g11 * (x1 + x3)
                     + f * g12 * (x0 + x4),
@@ -306,10 +315,12 @@ pub fn comb_filter_inplace(
                     + (1.0f32 - f) * g00 * *buf.get_unchecked(start + i - T0 as usize)
                     + (1.0f32 - f)
                         * g01
-                        * (*buf.get_unchecked(start + i - T0 as usize + 1) + *buf.get_unchecked(start + i - T0 as usize - 1))
+                        * (*buf.get_unchecked(start + i - T0 as usize + 1)
+                            + *buf.get_unchecked(start + i - T0 as usize - 1))
                     + (1.0f32 - f)
                         * g02
-                        * (*buf.get_unchecked(start + i - T0 as usize + 2) + *buf.get_unchecked(start + i - T0 as usize - 2))
+                        * (*buf.get_unchecked(start + i - T0 as usize + 2)
+                            + *buf.get_unchecked(start + i - T0 as usize - 2))
                     + f * g10 * x2
                     + f * g11 * (x1 + x3)
                     + f * g12 * (x0 + x4),
@@ -345,7 +356,8 @@ pub fn comb_filter_inplace(
         for j in 0..remain {
             unsafe {
                 let xv0 = *buf.get_unchecked(pos + j - t + 2);
-                *buf.get_unchecked_mut(pos + j) = *buf.get_unchecked(pos + j) + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
+                *buf.get_unchecked_mut(pos + j) =
+                    *buf.get_unchecked(pos + j) + g10 * xv2 + g11 * (xv1 + xv3) + g12 * (xv0 + xv4);
                 xv4 = xv3;
                 xv3 = xv2;
                 xv2 = xv1;
@@ -390,7 +402,9 @@ pub fn comb_filter_qext(
     for s in 0..2usize {
         let mut new_window = vec![0.0f32; overlap2];
         for i in 0..overlap2 {
-            unsafe { *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s); }
+            unsafe {
+                *new_window.get_unchecked_mut(i) = *window.get_unchecked(2 * i + s);
+            }
         }
 
         // Build deinterleaved memory buffer: mem_buf[0..COMBFILTER_MAXPERIOD + N2]
@@ -400,7 +414,9 @@ pub fn comb_filter_qext(
             // x[x_start + 2*i + s - 2*COMBFILTER_MAXPERIOD]
             let src_idx =
                 x_start as isize + (2 * i + s) as isize - 2 * COMBFILTER_MAXPERIOD as isize;
-            unsafe { *mem = *x.get_unchecked(src_idx as usize); }
+            unsafe {
+                *mem = *x.get_unchecked(src_idx as usize);
+            }
         }
 
         let in_place = std::ptr::eq(
@@ -427,13 +443,18 @@ pub fn comb_filter_qext(
             );
             // Write back interleaved
             for i in 0..N2 {
-                unsafe { *y.get_unchecked_mut(y_start + 2 * i + s) = *mem_buf.get_unchecked(cf_start + i); }
+                unsafe {
+                    *y.get_unchecked_mut(y_start + 2 * i + s) =
+                        *mem_buf.get_unchecked(cf_start + i);
+                }
             }
         } else {
             // Separate output: deinterleave y into buf, apply filter, reinterleave
             let mut buf = vec![0.0f32; N2];
             for i in 0..N2 {
-                unsafe { *buf.get_unchecked_mut(i) = *y.get_unchecked(y_start + 2 * i + s); }
+                unsafe {
+                    *buf.get_unchecked_mut(i) = *y.get_unchecked(y_start + 2 * i + s);
+                }
             }
             let cf_start = COMBFILTER_MAXPERIOD as usize;
             comb_filter(
@@ -453,7 +474,9 @@ pub fn comb_filter_qext(
                 arch,
             );
             for i in 0..N2 {
-                unsafe { *y.get_unchecked_mut(y_start + 2 * i + s) = *buf.get_unchecked(i); }
+                unsafe {
+                    *y.get_unchecked_mut(y_start + 2 * i + s) = *buf.get_unchecked(i);
+                }
             }
         }
     }

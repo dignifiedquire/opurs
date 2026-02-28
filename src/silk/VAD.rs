@@ -40,21 +40,27 @@ pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
     *psSilk_VAD = Default::default();
     b = 0;
     while b < VAD_N_BANDS {
-        unsafe { *psSilk_VAD.NoiseLevelBias.get_unchecked_mut(b as usize) = silk_max_32(50 / (b + 1), 1); }
+        unsafe {
+            *psSilk_VAD.NoiseLevelBias.get_unchecked_mut(b as usize) = silk_max_32(50 / (b + 1), 1);
+        }
         b += 1;
     }
     b = 0;
     while b < VAD_N_BANDS {
         unsafe {
-        *psSilk_VAD.NL.get_unchecked_mut(b as usize) = 100 * *psSilk_VAD.NoiseLevelBias.get_unchecked(b as usize);
-        *psSilk_VAD.inv_NL.get_unchecked_mut(b as usize) = 0x7fffffff / *psSilk_VAD.NL.get_unchecked(b as usize);
+            *psSilk_VAD.NL.get_unchecked_mut(b as usize) =
+                100 * *psSilk_VAD.NoiseLevelBias.get_unchecked(b as usize);
+            *psSilk_VAD.inv_NL.get_unchecked_mut(b as usize) =
+                0x7fffffff / *psSilk_VAD.NL.get_unchecked(b as usize);
         }
         b += 1;
     }
     psSilk_VAD.counter = 15;
     b = 0;
     while b < VAD_N_BANDS {
-        unsafe { *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked_mut(b as usize) = 100 * 256; }
+        unsafe {
+            *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked_mut(b as usize) = 100 * 256;
+        }
         b += 1;
     }
     ret
@@ -141,59 +147,71 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         );
     }
     unsafe {
-    *X.get_unchecked_mut((decimated_framelength - 1) as usize) =
-        (*X.get_unchecked((decimated_framelength - 1) as usize) as i32 >> 1) as i16;
-    HPstateTmp = *X.get_unchecked((decimated_framelength - 1) as usize);
+        *X.get_unchecked_mut((decimated_framelength - 1) as usize) =
+            (*X.get_unchecked((decimated_framelength - 1) as usize) as i32 >> 1) as i16;
+        HPstateTmp = *X.get_unchecked((decimated_framelength - 1) as usize);
     }
     i = decimated_framelength - 1;
     while i > 0 {
         unsafe {
-        *X.get_unchecked_mut((i - 1) as usize) = (*X.get_unchecked((i - 1) as usize) as i32 >> 1) as i16;
-        *X.get_unchecked_mut(i as usize) = (*X.get_unchecked(i as usize) as i32 - *X.get_unchecked((i - 1) as usize) as i32) as i16;
+            *X.get_unchecked_mut((i - 1) as usize) =
+                (*X.get_unchecked((i - 1) as usize) as i32 >> 1) as i16;
+            *X.get_unchecked_mut(i as usize) = (*X.get_unchecked(i as usize) as i32
+                - *X.get_unchecked((i - 1) as usize) as i32)
+                as i16;
         }
         i -= 1;
     }
-    unsafe { *X.get_unchecked_mut(0) = (*X.get_unchecked(0) as i32 - psSilk_VAD.HPstate as i32) as i16; }
+    unsafe {
+        *X.get_unchecked_mut(0) = (*X.get_unchecked(0) as i32 - psSilk_VAD.HPstate as i32) as i16;
+    }
     psSilk_VAD.HPstate = HPstateTmp;
     b = 0;
     while b < VAD_N_BANDS {
         decimated_framelength = psEncC.frame_length as i32 >> silk_min_int(4 - b, 4 - 1);
         dec_subframe_length = decimated_framelength >> 2;
         dec_subframe_offset = 0;
-        unsafe { *Xnrg.get_unchecked_mut(b as usize) = *psSilk_VAD.XnrgSubfr.get_unchecked(b as usize); }
+        unsafe {
+            *Xnrg.get_unchecked_mut(b as usize) = *psSilk_VAD.XnrgSubfr.get_unchecked(b as usize);
+        }
         s = 0;
         while s < VAD_INTERNAL_SUBFRAMES {
             {
-                let start = (unsafe { *X_offset.get_unchecked(b as usize) } + dec_subframe_offset) as usize;
+                let start =
+                    (unsafe { *X_offset.get_unchecked(b as usize) } + dec_subframe_offset) as usize;
                 let end = start + dec_subframe_length as usize;
                 sumSquared = silk_vad_energy(&X[start..end], psEncC.arch);
             }
             unsafe {
-            if s < VAD_INTERNAL_SUBFRAMES - 1 {
-                *Xnrg.get_unchecked_mut(b as usize) = if (*Xnrg.get_unchecked(b as usize) as u32).wrapping_add(sumSquared as u32)
-                    & 0x80000000_u32
-                    != 0
-                {
-                    silk_int32_MAX
+                if s < VAD_INTERNAL_SUBFRAMES - 1 {
+                    *Xnrg.get_unchecked_mut(b as usize) =
+                        if (*Xnrg.get_unchecked(b as usize) as u32).wrapping_add(sumSquared as u32)
+                            & 0x80000000_u32
+                            != 0
+                        {
+                            silk_int32_MAX
+                        } else {
+                            *Xnrg.get_unchecked(b as usize) + sumSquared
+                        };
                 } else {
-                    *Xnrg.get_unchecked(b as usize) + sumSquared
-                };
-            } else {
-                *Xnrg.get_unchecked_mut(b as usize) = if (*Xnrg.get_unchecked(b as usize) as u32)
-                    .wrapping_add((sumSquared >> 1) as u32)
-                    & 0x80000000_u32
-                    != 0
-                {
-                    silk_int32_MAX
-                } else {
-                    *Xnrg.get_unchecked(b as usize) + (sumSquared >> 1)
-                };
-            }
+                    *Xnrg.get_unchecked_mut(b as usize) = if (*Xnrg.get_unchecked(b as usize)
+                        as u32)
+                        .wrapping_add((sumSquared >> 1) as u32)
+                        & 0x80000000_u32
+                        != 0
+                    {
+                        silk_int32_MAX
+                    } else {
+                        *Xnrg.get_unchecked(b as usize) + (sumSquared >> 1)
+                    };
+                }
             }
             dec_subframe_offset += dec_subframe_length;
             s += 1;
         }
-        unsafe { *psSilk_VAD.XnrgSubfr.get_unchecked_mut(b as usize) = sumSquared; }
+        unsafe {
+            *psSilk_VAD.XnrgSubfr.get_unchecked_mut(b as usize) = sumSquared;
+        }
         b += 1;
     }
     silk_VAD_GetNoiseLevels(&Xnrg, psSilk_VAD);
@@ -202,28 +220,30 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     b = 0;
     while b < VAD_N_BANDS {
         unsafe {
-        speech_nrg = *Xnrg.get_unchecked(b as usize) - *psSilk_VAD.NL.get_unchecked(b as usize);
-        if speech_nrg > 0 {
-            if *Xnrg.get_unchecked(b as usize) as u32 & 0xff800000_u32 == 0 {
-                *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) =
-                    ((*Xnrg.get_unchecked(b as usize) as u32) << 8) as i32 / (*psSilk_VAD.NL.get_unchecked(b as usize) + 1);
+            speech_nrg = *Xnrg.get_unchecked(b as usize) - *psSilk_VAD.NL.get_unchecked(b as usize);
+            if speech_nrg > 0 {
+                if *Xnrg.get_unchecked(b as usize) as u32 & 0xff800000_u32 == 0 {
+                    *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) =
+                        ((*Xnrg.get_unchecked(b as usize) as u32) << 8) as i32
+                            / (*psSilk_VAD.NL.get_unchecked(b as usize) + 1);
+                } else {
+                    *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) = *Xnrg
+                        .get_unchecked(b as usize)
+                        / ((*psSilk_VAD.NL.get_unchecked(b as usize) >> 8) + 1);
+                }
+                SNR_Q7 = silk_lin2log(*NrgToNoiseRatio_Q8.get_unchecked(b as usize)) - 8 * 128;
+                sumSquared += SNR_Q7 as i16 as i32 * SNR_Q7 as i16 as i32;
+                if speech_nrg < (1) << 20 {
+                    SNR_Q7 = ((((silk_SQRT_APPROX(speech_nrg) as u32) << 6) as i32 as i64
+                        * SNR_Q7 as i16 as i64)
+                        >> 16) as i32;
+                }
+                input_tilt = (input_tilt as i64
+                    + ((*TILT_WEIGHTS.get_unchecked(b as usize) as i64 * SNR_Q7 as i16 as i64)
+                        >> 16)) as i32;
             } else {
-                *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) =
-                    *Xnrg.get_unchecked(b as usize) / ((*psSilk_VAD.NL.get_unchecked(b as usize) >> 8) + 1);
+                *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) = 256;
             }
-            SNR_Q7 = silk_lin2log(*NrgToNoiseRatio_Q8.get_unchecked(b as usize)) - 8 * 128;
-            sumSquared += SNR_Q7 as i16 as i32 * SNR_Q7 as i16 as i32;
-            if speech_nrg < (1) << 20 {
-                SNR_Q7 = ((((silk_SQRT_APPROX(speech_nrg) as u32) << 6) as i32 as i64
-                    * SNR_Q7 as i16 as i64)
-                    >> 16) as i32;
-            }
-            input_tilt = (input_tilt as i64
-                + ((*TILT_WEIGHTS.get_unchecked(b as usize) as i64 * SNR_Q7 as i16 as i64) >> 16))
-                as i32;
-        } else {
-            *NrgToNoiseRatio_Q8.get_unchecked_mut(b as usize) = 256;
-        }
         }
         b += 1;
     }
@@ -235,7 +255,10 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     speech_nrg = 0;
     b = 0;
     while b < VAD_N_BANDS {
-        speech_nrg += (b + 1) * ((unsafe { *Xnrg.get_unchecked(b as usize) } - unsafe { *psSilk_VAD.NL.get_unchecked(b as usize) }) >> 4);
+        speech_nrg += (b + 1)
+            * ((unsafe { *Xnrg.get_unchecked(b as usize) }
+                - unsafe { *psSilk_VAD.NL.get_unchecked(b as usize) })
+                >> 4);
         b += 1;
     }
     if psEncC.frame_length as i32 == 20 * psEncC.fs_kHz {
@@ -257,12 +280,17 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     b = 0;
     while b < VAD_N_BANDS {
         unsafe {
-        *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked_mut(b as usize) = (*psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize) as i64
-            + (((*NrgToNoiseRatio_Q8.get_unchecked(b as usize) - *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize)) as i64
-                * smooth_coef_Q16 as i16 as i64)
-                >> 16)) as i32;
-        SNR_Q7 = 3 * (silk_lin2log(*psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize)) - 8 * 128);
-        *psEncC.input_quality_bands_Q15.get_unchecked_mut(b as usize) = silk_sigm_Q15((SNR_Q7 - 16 * 128) >> 4);
+            *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked_mut(b as usize) =
+                (*psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize) as i64
+                    + (((*NrgToNoiseRatio_Q8.get_unchecked(b as usize)
+                        - *psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize))
+                        as i64
+                        * smooth_coef_Q16 as i16 as i64)
+                        >> 16)) as i32;
+            SNR_Q7 =
+                3 * (silk_lin2log(*psSilk_VAD.NrgRatioSmth_Q8.get_unchecked(b as usize)) - 8 * 128);
+            *psEncC.input_quality_bands_Q15.get_unchecked_mut(b as usize) =
+                silk_sigm_Q15((SNR_Q7 - 16 * 128) >> 4);
         }
         b += 1;
     }
@@ -301,32 +329,35 @@ fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
     k = 0;
     while k < VAD_N_BANDS {
         unsafe {
-        nl = *psSilk_VAD.NL.get_unchecked(k as usize);
-        nrg = if (*pX.get_unchecked(k as usize) as u32).wrapping_add(*psSilk_VAD.NoiseLevelBias.get_unchecked(k as usize) as u32)
-            & 0x80000000_u32
-            != 0
-        {
-            silk_int32_MAX
-        } else {
-            *pX.get_unchecked(k as usize) + *psSilk_VAD.NoiseLevelBias.get_unchecked(k as usize)
-        };
-        inv_nrg = 0x7fffffff / nrg;
-        if nrg > ((nl as u32) << 3) as i32 {
-            coef = VAD_NOISE_LEVEL_SMOOTH_COEF_Q16 >> 3;
-        } else if nrg < nl {
-            coef = VAD_NOISE_LEVEL_SMOOTH_COEF_Q16;
-        } else {
-            coef = ((((inv_nrg as i64 * nl as i64) >> 16) as i32 as i64
-                * ((1024) << 1) as i16 as i64)
-                >> 16) as i32;
-        }
-        coef = silk_max_int(coef, min_coef);
-        *psSilk_VAD.inv_NL.get_unchecked_mut(k as usize) = (*psSilk_VAD.inv_NL.get_unchecked(k as usize) as i64
-            + (((inv_nrg - *psSilk_VAD.inv_NL.get_unchecked(k as usize)) as i64 * coef as i16 as i64) >> 16))
-            as i32;
-        nl = 0x7fffffff / *psSilk_VAD.inv_NL.get_unchecked(k as usize);
-        nl = if nl < 0xffffff { nl } else { 0xffffff };
-        *psSilk_VAD.NL.get_unchecked_mut(k as usize) = nl;
+            nl = *psSilk_VAD.NL.get_unchecked(k as usize);
+            nrg = if (*pX.get_unchecked(k as usize) as u32)
+                .wrapping_add(*psSilk_VAD.NoiseLevelBias.get_unchecked(k as usize) as u32)
+                & 0x80000000_u32
+                != 0
+            {
+                silk_int32_MAX
+            } else {
+                *pX.get_unchecked(k as usize) + *psSilk_VAD.NoiseLevelBias.get_unchecked(k as usize)
+            };
+            inv_nrg = 0x7fffffff / nrg;
+            if nrg > ((nl as u32) << 3) as i32 {
+                coef = VAD_NOISE_LEVEL_SMOOTH_COEF_Q16 >> 3;
+            } else if nrg < nl {
+                coef = VAD_NOISE_LEVEL_SMOOTH_COEF_Q16;
+            } else {
+                coef = ((((inv_nrg as i64 * nl as i64) >> 16) as i32 as i64
+                    * ((1024) << 1) as i16 as i64)
+                    >> 16) as i32;
+            }
+            coef = silk_max_int(coef, min_coef);
+            *psSilk_VAD.inv_NL.get_unchecked_mut(k as usize) =
+                (*psSilk_VAD.inv_NL.get_unchecked(k as usize) as i64
+                    + (((inv_nrg - *psSilk_VAD.inv_NL.get_unchecked(k as usize)) as i64
+                        * coef as i16 as i64)
+                        >> 16)) as i32;
+            nl = 0x7fffffff / *psSilk_VAD.inv_NL.get_unchecked(k as usize);
+            nl = if nl < 0xffffff { nl } else { 0xffffff };
+            *psSilk_VAD.NL.get_unchecked_mut(k as usize) = nl;
         }
         k += 1;
     }

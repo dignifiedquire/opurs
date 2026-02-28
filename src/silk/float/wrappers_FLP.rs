@@ -102,11 +102,13 @@ pub fn silk_NSQ_wrapper_FLP(
         j = 0;
         while j < psEncC.shapingLPCOrder {
             unsafe {
-                *AR_Q13.get_unchecked_mut((i * MAX_SHAPE_LPC_ORDER + j) as usize) =
-                    silk_float2int(
-                        *psEncCtrl.AR.get_unchecked((i * MAX_SHAPE_LPC_ORDER + j) as usize)
-                            * 8192.0f32,
-                    ) as i16;
+                *AR_Q13.get_unchecked_mut((i * MAX_SHAPE_LPC_ORDER + j) as usize) = silk_float2int(
+                    *psEncCtrl
+                        .AR
+                        .get_unchecked((i * MAX_SHAPE_LPC_ORDER + j) as usize)
+                        * 8192.0f32,
+                )
+                    as i16;
             }
             j += 1;
         }
@@ -119,9 +121,8 @@ pub fn silk_NSQ_wrapper_FLP(
                 ((silk_float2int(*psEncCtrl.LF_AR_shp.get_unchecked(i as usize) * 16384.0f32)
                     as u32)
                     << 16) as i32
-                    | silk_float2int(
-                        *psEncCtrl.LF_MA_shp.get_unchecked(i as usize) * 16384.0f32,
-                    ) as u16 as i32;
+                    | silk_float2int(*psEncCtrl.LF_MA_shp.get_unchecked(i as usize) * 16384.0f32)
+                        as u16 as i32;
             *Tilt_Q14.get_unchecked_mut(i as usize) =
                 silk_float2int(*psEncCtrl.Tilt.get_unchecked(i as usize) * 16384.0f32);
             *HarmShapeGain_Q14.get_unchecked_mut(i as usize) =
@@ -145,8 +146,7 @@ pub fn silk_NSQ_wrapper_FLP(
             unsafe {
                 *(*PredCoef_Q12.get_unchecked_mut(j as usize)).get_unchecked_mut(i as usize) =
                     silk_float2int(
-                        *(*psEncCtrl.PredCoef.get_unchecked(j as usize))
-                            .get_unchecked(i as usize)
+                        *(*psEncCtrl.PredCoef.get_unchecked(j as usize)).get_unchecked(i as usize)
                             * 4096.0f32,
                     ) as i16;
             }

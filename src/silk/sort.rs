@@ -12,7 +12,9 @@ pub fn silk_insertion_sort_increasing(a: &mut [i32], idx: &mut [i32], L: i32, K:
     debug_assert!(L >= K);
     i = 0;
     while i < K {
-        unsafe { *idx.get_unchecked_mut(i as usize) = i; }
+        unsafe {
+            *idx.get_unchecked_mut(i as usize) = i;
+        }
         i += 1;
     }
     i = 1;

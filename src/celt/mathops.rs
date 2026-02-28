@@ -18,10 +18,7 @@ use std::f32::consts::PI;
 #[inline(always)]
 pub fn float2int_nonneg(x: f32) -> i32 {
     debug_assert!(x >= 0.0, "float2int_nonneg: x={x} is negative");
-    debug_assert!(
-        x < i32::MAX as f32,
-        "float2int_nonneg: x={x} overflows i32"
-    );
+    debug_assert!(x < i32::MAX as f32, "float2int_nonneg: x={x} overflows i32");
     x as i32
 }
 

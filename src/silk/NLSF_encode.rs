@@ -74,12 +74,12 @@ pub fn silk_NLSF_encode(
                 *NLSF_tmp_Q15.get_unchecked_mut(i as usize) =
                     ((*pCB_element.get_unchecked(i as usize) as i16 as u16 as i32) << 7) as i16;
                 W_tmp_Q9 = *pCB_Wght_Q9.get_unchecked(i as usize) as i32;
-                *res_Q10.get_unchecked_mut(i as usize) =
-                    (((*pNLSF_Q15.get_unchecked(i as usize) as i32
-                        - *NLSF_tmp_Q15.get_unchecked(i as usize) as i32)
-                        as i16 as i32
-                        * W_tmp_Q9 as i16 as i32)
-                        >> 14) as i16;
+                *res_Q10.get_unchecked_mut(i as usize) = (((*pNLSF_Q15.get_unchecked(i as usize)
+                    as i32
+                    - *NLSF_tmp_Q15.get_unchecked(i as usize) as i32)
+                    as i16 as i32
+                    * W_tmp_Q9 as i16 as i32)
+                    >> 14) as i16;
                 *W_adj_Q5.get_unchecked_mut(i as usize) = silk_DIV32_varQ(
                     *pW_Q2.get_unchecked(i as usize) as i32,
                     W_tmp_Q9 as i16 as i32 * W_tmp_Q9 as i16 as i32,
