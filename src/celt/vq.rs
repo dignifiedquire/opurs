@@ -861,16 +861,19 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> 
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
     let n = N as usize;
+    // SAFETY: X and Y are >= N elements (function precondition from caller).
     if stereo != 0 {
-        for (&x, &y) in X[..n].iter().zip(&Y[..n]) {
+        for (&x, &y) in unsafe { X.get_unchecked(..n) }.iter().zip(unsafe { Y.get_unchecked(..n) }) {
             let m = x + y;
             let s = x - y;
             Emid += m * m;
             Eside += s * s;
         }
     } else {
-        Emid += celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
-        Eside += celt_inner_prod(&Y[..N as usize], &Y[..N as usize], N as usize, _arch);
+        let x_n = unsafe { X.get_unchecked(..n) };
+        let y_n = unsafe { Y.get_unchecked(..n) };
+        Emid += celt_inner_prod(x_n, x_n, n, _arch);
+        Eside += celt_inner_prod(y_n, y_n, n, _arch);
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);

@@ -1003,12 +1003,13 @@ fn quant_band_n1(
 ) -> u32 {
     let encode = ctx.encode;
     let _stereo = if Y.is_some() { 1 } else { 0 };
+    // SAFETY: N==1, X (and Y if present) have >= 1 element. lbo has >= 1 element.
     // c=0: process X
     {
         let mut sign: i32 = 0;
         if ctx.remaining_bits >= (1) << BITRES {
             if encode != 0 {
-                sign = (X[0] < 0.0f32) as i32;
+                sign = (unsafe { *X.get_unchecked(0) } < 0.0f32) as i32;
                 ec_enc_bits(ec, sign as u32, 1);
             } else {
                 sign = ec_dec_bits(ec, 1) as i32;
@@ -1017,11 +1018,13 @@ fn quant_band_n1(
             _b -= (1) << BITRES;
         }
         if ctx.resynth != 0 {
-            X[0] = if sign != 0 {
-                -NORM_SCALING
-            } else {
-                NORM_SCALING
-            };
+            unsafe {
+                *X.get_unchecked_mut(0) = if sign != 0 {
+                    -NORM_SCALING
+                } else {
+                    NORM_SCALING
+                };
+            }
         }
     }
     // c=1: process Y (if stereo)
@@ -1029,7 +1032,7 @@ fn quant_band_n1(
         let mut sign: i32 = 0;
         if ctx.remaining_bits >= (1) << BITRES {
             if encode != 0 {
-                sign = (y[0] < 0.0f32) as i32;
+                sign = (unsafe { *y.get_unchecked(0) } < 0.0f32) as i32;
                 ec_enc_bits(ec, sign as u32, 1);
             } else {
                 sign = ec_dec_bits(ec, 1) as i32;
@@ -1038,15 +1041,19 @@ fn quant_band_n1(
             _b -= (1) << BITRES;
         }
         if ctx.resynth != 0 {
-            y[0] = if sign != 0 {
-                -NORM_SCALING
-            } else {
-                NORM_SCALING
-            };
+            unsafe {
+                *y.get_unchecked_mut(0) = if sign != 0 {
+                    -NORM_SCALING
+                } else {
+                    NORM_SCALING
+                };
+            }
         }
     }
     if let Some(lbo) = lowband_out {
-        lbo[0] = X[0];
+        unsafe {
+            *lbo.get_unchecked_mut(0) = *X.get_unchecked(0);
+        }
     }
     1
 }
@@ -1772,12 +1779,15 @@ fn quant_band_stereo(
         ctx.remaining_bits -= qalloc + sbits;
         // When c != 0, x2=Y,y2=X; otherwise x2=X,y2=Y.
         // We work with (X,Y) directly and swap logic as needed.
+        // SAFETY: N==2, X and Y are >= 2 elements (function precondition).
         if sbits != 0 {
             if encode != 0 {
-                sign = if c != 0 {
-                    (Y[0] * X[1] - Y[1] * X[0] < 0.0f32) as i32
-                } else {
-                    (X[0] * Y[1] - X[1] * Y[0] < 0.0f32) as i32
+                sign = unsafe {
+                    if c != 0 {
+                        (*Y.get_unchecked(0) * *X.get_unchecked(1) - *Y.get_unchecked(1) * *X.get_unchecked(0) < 0.0f32) as i32
+                    } else {
+                        (*X.get_unchecked(0) * *Y.get_unchecked(1) - *X.get_unchecked(1) * *Y.get_unchecked(0) < 0.0f32) as i32
+                    }
                 };
                 ec_enc_bits(ec, sign as u32, 1);
             } else {
@@ -1802,8 +1812,10 @@ fn quant_band_stereo(
                 ec,
             );
             // y2=X: X[0] = -sign * Y[1], X[1] = sign * Y[0]
-            X[0] = -sign as f32 * Y[1];
-            X[1] = sign as f32 * Y[0];
+            unsafe {
+                *X.get_unchecked_mut(0) = -sign as f32 * *Y.get_unchecked(1);
+                *X.get_unchecked_mut(1) = sign as f32 * *Y.get_unchecked(0);
+            }
         } else {
             cm = quant_band(
                 ctx,
@@ -1820,20 +1832,24 @@ fn quant_band_stereo(
                 ec,
             );
             // y2=Y: Y[0] = -sign * X[1], Y[1] = sign * X[0]
-            Y[0] = -sign as f32 * X[1];
-            Y[1] = sign as f32 * X[0];
+            unsafe {
+                *Y.get_unchecked_mut(0) = -sign as f32 * *X.get_unchecked(1);
+                *Y.get_unchecked_mut(1) = sign as f32 * *X.get_unchecked(0);
+            }
         }
         if ctx.resynth != 0 {
-            X[0] *= mid;
-            X[1] *= mid;
-            Y[0] *= side;
-            Y[1] *= side;
-            let tmp0 = X[0];
-            X[0] = tmp0 - Y[0];
-            Y[0] += tmp0;
-            let tmp1 = X[1];
-            X[1] = tmp1 - Y[1];
-            Y[1] += tmp1;
+            unsafe {
+                *X.get_unchecked_mut(0) *= mid;
+                *X.get_unchecked_mut(1) *= mid;
+                *Y.get_unchecked_mut(0) *= side;
+                *Y.get_unchecked_mut(1) *= side;
+                let tmp0 = *X.get_unchecked(0);
+                *X.get_unchecked_mut(0) = tmp0 - *Y.get_unchecked(0);
+                *Y.get_unchecked_mut(0) += tmp0;
+                let tmp1 = *X.get_unchecked(1);
+                *X.get_unchecked_mut(1) = tmp1 - *Y.get_unchecked(1);
+                *Y.get_unchecked_mut(1) += tmp1;
+            }
         }
     } else {
         mbits = if 0
