@@ -604,12 +604,13 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
     let mut tmp = [0.0f32; 176];
     debug_assert!(stride > 0);
-    let tmp = &mut tmp[..N];
-    let x = &X[..N];
+    // SAFETY: N <= 176 (max CELT band size), X.len() >= N.
+    let tmp = unsafe { tmp.get_unchecked_mut(..N) };
+    let x = unsafe { X.get_unchecked(..N) };
     if hadamard != 0 {
-        let ordery = &ordery_table[(stride - 2) as usize..];
+        let ordery = unsafe { ordery_table.get_unchecked((stride - 2) as usize..) };
         for i in 0..stride as usize {
-            let dst_base = (ordery[i] * N0) as usize;
+            let dst_base = (unsafe { *ordery.get_unchecked(i) } * N0) as usize;
             for j in 0..N0 as usize {
                 unsafe { *tmp.get_unchecked_mut(dst_base + j) = *x.get_unchecked(j * stride as usize + i); }
             }
@@ -622,7 +623,7 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
             }
         }
     }
-    X[..N].copy_from_slice(tmp);
+    unsafe { X.get_unchecked_mut(..N) }.copy_from_slice(tmp);
 }
 
 /// Upstream C: celt/bands.c:interleave_hadamard
@@ -630,12 +631,13 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
 fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let N = (N0 * stride) as usize;
     let mut tmp = [0.0f32; 176];
-    let tmp = &mut tmp[..N];
-    let x = &X[..N];
+    // SAFETY: N <= 176 (max CELT band size), X.len() >= N.
+    let tmp = unsafe { tmp.get_unchecked_mut(..N) };
+    let x = unsafe { X.get_unchecked(..N) };
     if hadamard != 0 {
-        let ordery = &ordery_table[(stride - 2) as usize..];
+        let ordery = unsafe { ordery_table.get_unchecked((stride - 2) as usize..) };
         for i in 0..stride as usize {
-            let src_base = (ordery[i] * N0) as usize;
+            let src_base = (unsafe { *ordery.get_unchecked(i) } * N0) as usize;
             for j in 0..N0 as usize {
                 unsafe { *tmp.get_unchecked_mut(j * stride as usize + i) = *x.get_unchecked(src_base + j); }
             }
@@ -648,7 +650,7 @@ fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
             }
         }
     }
-    X[..N].copy_from_slice(tmp);
+    unsafe { X.get_unchecked_mut(..N) }.copy_from_slice(tmp);
 }
 
 /// Upstream C: celt/bands.c:haar1
@@ -1574,8 +1576,9 @@ fn quant_band(
         if let Some(ref mut lb) = lb_work {
             haar1(unsafe { lb.get_unchecked_mut(..N as usize) }, N >> k, (1) << k);
         }
-        fill = BIT_INTERLEAVE_TABLE[(fill & 0xf) as usize] as i32
-            | (BIT_INTERLEAVE_TABLE[(fill >> 4) as usize] as i32) << 2;
+        // SAFETY: fill & 0xf is always 0-15, fill >> 4 bounded by fill being small.
+        fill = (unsafe { *BIT_INTERLEAVE_TABLE.get_unchecked((fill & 0xf) as usize) }) as i32
+            | ((unsafe { *BIT_INTERLEAVE_TABLE.get_unchecked((fill >> 4) as usize) }) as i32) << 2;
         k += 1;
     }
     B >>= recombine;
@@ -1656,7 +1659,8 @@ fn quant_band(
 
         k = 0;
         while k < recombine {
-            cm = BIT_DEINTERLEAVE_TABLE[cm as usize] as u32;
+            // SAFETY: cm < 16 at this point (bounded by B after masking).
+            cm = (unsafe { *BIT_DEINTERLEAVE_TABLE.get_unchecked(cm as usize) }) as u32;
             haar1(unsafe { X.get_unchecked_mut(..N as usize) }, N0 >> k, (1) << k);
             k += 1;
         }

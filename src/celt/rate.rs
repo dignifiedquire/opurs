@@ -43,10 +43,12 @@ pub fn get_pulses(i: i32) -> i32 {
 #[inline]
 pub fn bits2pulses(m: &OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) -> i32 {
     LM += 1;
-    let cache_off = m.cache.index[(LM * m.nbEBands as i32 + band) as usize] as usize;
-    let cache = &m.cache.bits[cache_off..];
+    // SAFETY: Mode table indices are bounded by mode constants.
+    let cache_off =
+        (unsafe { *m.cache.index.get_unchecked((LM * m.nbEBands as i32 + band) as usize) }) as usize;
+    let cache = unsafe { m.cache.bits.get_unchecked(cache_off..) };
     let mut lo: i32 = 0;
-    let mut hi: i32 = cache[0] as i32;
+    let mut hi: i32 = (unsafe { *cache.get_unchecked(0) }) as i32;
     bits -= 1;
     for _ in 0..LOG_MAX_PSEUDO {
         let mid: i32 = (lo + hi + 1) >> 1;
@@ -60,9 +62,9 @@ pub fn bits2pulses(m: &OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) ->
         - (if lo == 0 {
             -1
         } else {
-            cache[lo as usize] as i32
+            (unsafe { *cache.get_unchecked(lo as usize) }) as i32
         })
-        <= cache[hi as usize] as i32 - bits
+        <= (unsafe { *cache.get_unchecked(hi as usize) }) as i32 - bits
     {
         lo
     } else {
@@ -74,12 +76,15 @@ pub fn bits2pulses(m: &OpusCustomMode, band: i32, mut LM: i32, mut bits: i32) ->
 #[inline]
 pub fn pulses2bits(m: &OpusCustomMode, band: i32, mut LM: i32, pulses: i32) -> i32 {
     LM += 1;
-    let cache_off = m.cache.index[(LM * m.nbEBands as i32 + band) as usize] as usize;
-    let cache = &m.cache.bits[cache_off..];
+    // SAFETY: Mode table indices are bounded by mode constants.
+    let cache_off =
+        (unsafe { *m.cache.index.get_unchecked((LM * m.nbEBands as i32 + band) as usize) }) as usize;
+    let cache = unsafe { m.cache.bits.get_unchecked(cache_off..) };
     if pulses == 0 {
         0
     } else {
-        cache[pulses as usize] as i32 + 1
+        // SAFETY: pulses is bounded by cache[0] (the max pulse count for this band).
+        (unsafe { *cache.get_unchecked(pulses as usize) }) as i32 + 1
     }
 }
 
