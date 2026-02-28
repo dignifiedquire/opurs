@@ -43,12 +43,8 @@ pub const SPREAD_AGGRESSIVE: i32 = 3;
 
 /// Band encoding/decoding context.
 ///
-/// `ec` is passed separately so the struct can remain `Copy + Clone`
-/// for theta-rdo save/restore.
-///
 /// Upstream C: celt/bands.c:struct band_ctx
-#[derive(Copy, Clone)]
-struct band_ctx<'a> {
+struct band_ctx<'a, 'b> {
     encode: i32,
     resynth: i32,
     m: &'a OpusCustomMode,
@@ -64,7 +60,7 @@ struct band_ctx<'a> {
     disable_inv: i32,
     avoid_split_noise: i32,
     #[cfg(feature = "qext")]
-    ext_ec: *mut ec_ctx<'a>,
+    ext_ec: &'b mut ec_ctx<'a>,
     #[cfg(feature = "qext")]
     extra_bits: i32,
     #[cfg(feature = "qext")]
@@ -74,10 +70,82 @@ struct band_ctx<'a> {
     #[cfg(feature = "qext")]
     ext_b: i32,
     #[cfg(feature = "qext")]
-    cap: *const i32,
+    cap: &'b [i32],
+}
+
+#[derive(Copy, Clone)]
+struct band_ctx_snapshot {
+    encode: i32,
+    resynth: i32,
+    i: i32,
+    intensity: i32,
+    spread: i32,
+    tf_change: i32,
+    remaining_bits: i32,
+    seed: u32,
+    arch: Arch,
+    theta_round: i32,
+    disable_inv: i32,
+    avoid_split_noise: i32,
     #[cfg(feature = "qext")]
-    #[allow(dead_code)]
-    cap_len: i32,
+    extra_bits: i32,
+    #[cfg(feature = "qext")]
+    ext_total_bits: i32,
+    #[cfg(feature = "qext")]
+    extra_bands: bool,
+    #[cfg(feature = "qext")]
+    ext_b: i32,
+}
+
+impl band_ctx<'_, '_> {
+    #[inline]
+    fn snapshot(&self) -> band_ctx_snapshot {
+        band_ctx_snapshot {
+            encode: self.encode,
+            resynth: self.resynth,
+            i: self.i,
+            intensity: self.intensity,
+            spread: self.spread,
+            tf_change: self.tf_change,
+            remaining_bits: self.remaining_bits,
+            seed: self.seed,
+            arch: self.arch,
+            theta_round: self.theta_round,
+            disable_inv: self.disable_inv,
+            avoid_split_noise: self.avoid_split_noise,
+            #[cfg(feature = "qext")]
+            extra_bits: self.extra_bits,
+            #[cfg(feature = "qext")]
+            ext_total_bits: self.ext_total_bits,
+            #[cfg(feature = "qext")]
+            extra_bands: self.extra_bands,
+            #[cfg(feature = "qext")]
+            ext_b: self.ext_b,
+        }
+    }
+
+    #[inline]
+    fn restore(&mut self, snapshot: band_ctx_snapshot) {
+        self.encode = snapshot.encode;
+        self.resynth = snapshot.resynth;
+        self.i = snapshot.i;
+        self.intensity = snapshot.intensity;
+        self.spread = snapshot.spread;
+        self.tf_change = snapshot.tf_change;
+        self.remaining_bits = snapshot.remaining_bits;
+        self.seed = snapshot.seed;
+        self.arch = snapshot.arch;
+        self.theta_round = snapshot.theta_round;
+        self.disable_inv = snapshot.disable_inv;
+        self.avoid_split_noise = snapshot.avoid_split_noise;
+        #[cfg(feature = "qext")]
+        {
+            self.extra_bits = snapshot.extra_bits;
+            self.ext_total_bits = snapshot.ext_total_bits;
+            self.extra_bands = snapshot.extra_bands;
+            self.ext_b = snapshot.ext_b;
+        }
+    }
 }
 
 /// Upstream C: celt/bands.c:struct split_ctx
@@ -628,7 +696,7 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
 /// Upstream C: celt/bands.c:compute_theta
 #[inline(never)]
 fn compute_theta(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     sctx: &mut split_ctx,
     X: &mut [f32],
     Y: &mut [f32],
@@ -800,13 +868,12 @@ fn compute_theta(
         {
             ctx.ext_b = ctx
                 .ext_b
-                .min(ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32);
+                .min(ctx.ext_total_bits - ec_tell_frac(&*ctx.ext_ec) as i32);
             if ctx.ext_b >= (2 * N) << BITRES
-                && ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32 - 1
-                    > 2 << BITRES
+                && ctx.ext_total_bits - ec_tell_frac(&*ctx.ext_ec) as i32 - 1 > 2 << BITRES
             {
                 let extra_bits = 12.min(2.max(celt_sudiv(ctx.ext_b, (2 * N - 1) << BITRES)));
-                let ext_tell = ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+                let ext_tell = ec_tell_frac(&*ctx.ext_ec) as i32;
                 if encode != 0 {
                     itheta_q30 -= itheta << 16;
                     itheta_q30 = ((itheta_q30 as i64 * qn as i64 * ((1 << extra_bits) - 1) as i64
@@ -815,14 +882,13 @@ fn compute_theta(
                     itheta_q30 += (1 << (extra_bits - 1)) - 1;
                     itheta_q30 = 0.max(((1 << extra_bits) - 2).min(itheta_q30));
                     ec_enc_uint(
-                        unsafe { &mut *ctx.ext_ec },
+                        &mut *ctx.ext_ec,
                         itheta_q30 as u32,
                         ((1 << extra_bits) - 1) as u32,
                     );
                 } else {
                     itheta_q30 =
-                        ec_dec_uint(unsafe { &mut *ctx.ext_ec }, ((1 << extra_bits) - 1) as u32)
-                            as i32;
+                        ec_dec_uint(&mut *ctx.ext_ec, ((1 << extra_bits) - 1) as u32) as i32;
                 }
                 itheta_q30 -= (1 << (extra_bits - 1)) - 1;
                 itheta_q30 = (itheta << 16)
@@ -831,7 +897,7 @@ fn compute_theta(
                         as i32;
                 // Hard bounds on itheta (can only trigger on corrupted bitstreams).
                 itheta_q30 = 0.max(1073741824i32.min(itheta_q30));
-                ctx.ext_b -= ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32 - ext_tell;
+                ctx.ext_b -= ec_tell_frac(&*ctx.ext_ec) as i32 - ext_tell;
             } else {
                 itheta_q30 = itheta << 16;
             }
@@ -910,7 +976,7 @@ fn compute_theta(
                 iside,
                 ctx.ext_b,
                 ec_tell_frac(ec),
-                ec_tell_frac(unsafe { &*ctx.ext_ec }),
+                ec_tell_frac(&*ctx.ext_ec),
             );
         }
         sctx.itheta_q30 = itheta_q30;
@@ -920,7 +986,7 @@ fn compute_theta(
 /// Upstream C: celt/bands.c:quant_band_n1
 #[inline]
 fn quant_band_n1(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
     Y: Option<&mut [f32]>,
     mut _b: i32,
@@ -980,7 +1046,7 @@ fn quant_band_n1(
 /// Upstream C: celt/bands.c:quant_partition
 #[inline]
 fn quant_partition(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
     mut N: i32,
     mut b: i32,
@@ -1162,8 +1228,7 @@ fn quant_partition(
         #[cfg(feature = "qext")]
         {
             let mut eb = (ctx.ext_b / (N - 1)) >> BITRES;
-            let ext_remaining_bits =
-                ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+            let ext_remaining_bits = ctx.ext_total_bits - ec_tell_frac(&*ctx.ext_ec) as i32;
             if ext_remaining_bits < ((eb + 1) * (N - 1) + N) << BITRES {
                 eb = ((ext_remaining_bits - (N << BITRES)) / (N - 1)) >> BITRES;
                 eb = 0.max(eb - 1);
@@ -1196,9 +1261,7 @@ fn quant_partition(
                     ctx.resynth,
                     ctx.arch,
                     #[cfg(feature = "qext")]
-                    unsafe {
-                        &mut *ctx.ext_ec
-                    },
+                    &mut *ctx.ext_ec,
                     #[cfg(feature = "qext")]
                     extra_bits,
                 );
@@ -1212,9 +1275,7 @@ fn quant_partition(
                     ec,
                     gain,
                     #[cfg(feature = "qext")]
-                    unsafe {
-                        &mut *ctx.ext_ec
-                    },
+                    &mut *ctx.ext_ec,
                     #[cfg(feature = "qext")]
                     extra_bits,
                 );
@@ -1224,8 +1285,7 @@ fn quant_partition(
             if ctx.ext_b > (2 * N) << BITRES {
                 // No pulses but have extension bits: use cubic quantization.
                 let mut eb = (ctx.ext_b / (N - 1)) >> BITRES;
-                let ext_remaining_bits =
-                    ctx.ext_total_bits - ec_tell_frac(unsafe { &*ctx.ext_ec }) as i32;
+                let ext_remaining_bits = ctx.ext_total_bits - ec_tell_frac(&*ctx.ext_ec) as i32;
                 if ext_remaining_bits < ((eb + 1) * (N - 1) + N) << BITRES {
                     eb = ((ext_remaining_bits - (N << BITRES)) / (N - 1)) >> BITRES;
                     eb = 0.max(eb - 1);
@@ -1237,7 +1297,7 @@ fn quant_partition(
                         N,
                         cubic_bits,
                         B,
-                        unsafe { &mut *ctx.ext_ec },
+                        &mut *ctx.ext_ec,
                         gain,
                         ctx.resynth,
                     );
@@ -1247,7 +1307,7 @@ fn quant_partition(
                         N,
                         cubic_bits,
                         B,
-                        unsafe { &mut *ctx.ext_ec },
+                        &mut *ctx.ext_ec,
                         gain,
                     );
                 }
@@ -1332,7 +1392,7 @@ fn quant_partition(
 /// Upstream C: celt/bands.c:cubic_quant_partition
 #[cfg(feature = "qext")]
 fn cubic_quant_partition(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
     mut N: i32,
     mut b: i32,
@@ -1415,7 +1475,7 @@ fn cubic_quant_partition(
 /// Upstream C: celt/bands.c:quant_band
 #[inline]
 fn quant_band(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
     N: i32,
     b: i32,
@@ -1571,7 +1631,7 @@ fn quant_band(
 
 /// Upstream C: celt/bands.c:quant_band_stereo
 fn quant_band_stereo(
-    ctx: &mut band_ctx,
+    ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
     Y: &mut [f32],
     N: i32,
@@ -1753,8 +1813,10 @@ fn quant_band_stereo(
             #[cfg(feature = "qext")]
             let qext_extra = {
                 let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && saved_ext_b != 0 {
-                    let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
+                if saved_ext_b != 0 {
+                    debug_assert!(ctx.i >= 0);
+                    debug_assert!((ctx.i as usize) < ctx.cap.len());
+                    let cap_val = ctx.cap[ctx.i as usize];
                     qext_extra = 0.max((saved_ext_b / 2).min(mbits - cap_val / 2));
                 }
                 qext_extra
@@ -1837,8 +1899,10 @@ fn quant_band_stereo(
             #[cfg(feature = "qext")]
             let qext_extra = {
                 let mut qext_extra = 0i32;
-                if !ctx.cap.is_null() && saved_ext_b != 0 {
-                    let cap_val = unsafe { *ctx.cap.add(ctx.i as usize) };
+                if saved_ext_b != 0 {
+                    debug_assert!(ctx.i >= 0);
+                    debug_assert!((ctx.i as usize) < ctx.cap.len());
+                    let cap_val = ctx.cap[ctx.i as usize];
                     qext_extra = 0.max((saved_ext_b / 2).min(sbits - cap_val / 2));
                 }
                 qext_extra
@@ -2050,7 +2114,7 @@ pub fn quant_all_bands<'a>(
         theta_round: 0,
         avoid_split_noise: (B > 1) as i32,
         #[cfg(feature = "qext")]
-        ext_ec: ext_ec as *mut ec_ctx,
+        ext_ec,
         #[cfg(feature = "qext")]
         extra_bits: 0,
         #[cfg(feature = "qext")]
@@ -2060,13 +2124,7 @@ pub fn quant_all_bands<'a>(
         #[cfg(feature = "qext")]
         ext_b: 0,
         #[cfg(feature = "qext")]
-        cap: if cap.is_empty() {
-            std::ptr::null()
-        } else {
-            cap.as_ptr()
-        },
-        #[cfg(feature = "qext")]
-        cap_len: cap.len() as i32,
+        cap,
     };
     #[cfg(feature = "qext")]
     let qext_band_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some();
@@ -2135,7 +2193,7 @@ pub fn quant_all_bands<'a>(
             if i != start {
                 ext_balance += extra_pulses[i as usize - 1] + ext_tell;
             }
-            ext_tell = ec_tell_frac(ext_ec) as i32;
+            ext_tell = ec_tell_frac(&*ctx.ext_ec) as i32;
             ctx.extra_bits = extra_pulses[i as usize];
             if i != start {
                 ext_balance -= ext_tell;
@@ -2156,7 +2214,7 @@ pub fn quant_all_bands<'a>(
                     b,
                     ext_b,
                     ec_tell_frac(ec),
-                    ec_tell_frac(ext_ec),
+                    ec_tell_frac(&*ctx.ext_ec),
                     ctx.remaining_bits,
                     tf_res[i as usize]
                 );
@@ -2403,7 +2461,7 @@ pub fn quant_all_bands<'a>(
                     );
                     let cm: u32 = x_cm | y_cm;
                     let ec_save = ec.save();
-                    let ctx_save: band_ctx = ctx;
+                    let ctx_save = ctx.snapshot();
                     _X_save[..n].copy_from_slice(&x_band[..n]);
                     _Y_save[..n].copy_from_slice(&y_band[..n]);
                     // Try theta_round = -1
@@ -2453,7 +2511,7 @@ pub fn quant_all_bands<'a>(
                         + w[1] * celt_inner_prod(&_Y_save[..n], &y_band[..n], n, arch);
                     let cm2: u32 = x_cm;
                     let ec_save2 = ec.save();
-                    let ctx_save2: band_ctx = ctx;
+                    let ctx_save2 = ctx.snapshot();
                     _X_save2[..n].copy_from_slice(&x_band[..n]);
                     _Y_save2[..n].copy_from_slice(&y_band[..n]);
                     if last == 0 {
@@ -2470,7 +2528,7 @@ pub fn quant_all_bands<'a>(
                     bytes_save[..save_bytes].copy_from_slice(&ec.buf[nstart_bytes..nend_bytes]);
                     // Restore state for round +1
                     ec.restore(ec_save);
-                    ctx = ctx_save;
+                    ctx.restore(ctx_save);
                     x_band[..n].copy_from_slice(&_X_save[..n]);
                     y_band[..n].copy_from_slice(&_Y_save[..n]);
                     if i == start + 1 {
@@ -2535,7 +2593,7 @@ pub fn quant_all_bands<'a>(
                     if dist0 >= dist1 {
                         x_cm = cm2;
                         ec.restore(ec_save2);
-                        ctx = ctx_save2;
+                        ctx.restore(ctx_save2);
                         x_band[..n].copy_from_slice(&_X_save2[..n]);
                         y_band[..n].copy_from_slice(&_Y_save2[..n]);
                         if last == 0 {
@@ -2612,7 +2670,7 @@ pub fn quant_all_bands<'a>(
                 "[rust qext bands] post i={} ec_tell={} ext_tell={} x_cm={} y_cm={} seed={} xh={:016x} yh={:016x}",
                 i,
                 ec_tell_frac(ec),
-                ec_tell_frac(ext_ec),
+                ec_tell_frac(&*ctx.ext_ec),
                 x_cm,
                 y_cm,
                 ctx.seed,
