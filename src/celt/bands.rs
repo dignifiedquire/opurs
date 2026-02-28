@@ -71,6 +71,8 @@ struct band_ctx<'a, 'b> {
     ext_b: i32,
     #[cfg(feature = "qext")]
     cap: &'b [i32],
+    #[cfg(not(feature = "qext"))]
+    _lifetime: core::marker::PhantomData<&'b mut ()>,
 }
 
 #[derive(Copy, Clone)]
@@ -2125,6 +2127,8 @@ pub fn quant_all_bands<'a>(
         ext_b: 0,
         #[cfg(feature = "qext")]
         cap,
+        #[cfg(not(feature = "qext"))]
+        _lifetime: core::marker::PhantomData,
     };
     #[cfg(feature = "qext")]
     let qext_band_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some();

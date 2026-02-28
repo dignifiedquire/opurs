@@ -202,34 +202,11 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
 pub fn opus_select_arch() -> Arch {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        // Mirror upstream x86cpu.c:opus_select_arch_impl() bit checks exactly:
-        // - SSE   : CPUID.1:EDX bit 25
-        // - SSE2  : CPUID.1:EDX bit 26
-        // - SSE4.1: CPUID.1:ECX bit 19
-        // - AVX2  : CPUID.1:ECX bits 28 (AVX) + 12 (FMA), then CPUID.7:EBX bit 5
-        #[cfg(target_arch = "x86")]
-        use core::arch::x86::{__cpuid, __cpuid_count};
-        #[cfg(target_arch = "x86_64")]
-        use core::arch::x86_64::{__cpuid, __cpuid_count};
-
-        let leaf0 = unsafe { __cpuid(0) };
-        let max_leaf = leaf0.eax;
-        if max_leaf < 1 {
-            return Arch::Scalar;
-        }
-
-        let leaf1 = unsafe { __cpuid(1) };
-        let hw_sse = (leaf1.edx & (1 << 25)) != 0;
-        let hw_sse2 = (leaf1.edx & (1 << 26)) != 0;
-        let hw_sse4_1 = (leaf1.ecx & (1 << 19)) != 0;
-        let mut hw_avx2 = (leaf1.ecx & (1 << 28)) != 0 && (leaf1.ecx & (1 << 12)) != 0;
-
-        if hw_avx2 && max_leaf >= 7 {
-            let leaf7 = unsafe { __cpuid_count(7, 0) };
-            hw_avx2 &= (leaf7.ebx & (1 << 5)) != 0;
-        } else {
-            hw_avx2 = false;
-        }
+        // Use Rust's safe x86 runtime feature detection.
+        let hw_sse = std::is_x86_feature_detected!("sse");
+        let hw_sse2 = std::is_x86_feature_detected!("sse2");
+        let hw_sse4_1 = std::is_x86_feature_detected!("sse4.1");
+        let hw_avx2 = std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma");
 
         let mut arch = Arch::Scalar;
         if hw_sse {
