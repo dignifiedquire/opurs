@@ -515,6 +515,26 @@ pub unsafe fn comb_filter_const_sse(
     // Tail handling exists in C only under CUSTOM_MODES.
 }
 
+/// SSE implementation of in-place `comb_filter_const`.
+///
+/// # Safety
+/// Requires SSE support (checked by caller via cpufeatures).
+#[target_feature(enable = "sse")]
+pub unsafe fn comb_filter_const_inplace_sse(
+    buf: &mut [f32],
+    start: usize,
+    T: i32,
+    N: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+) {
+    let ptr = buf.as_mut_ptr();
+    let len = buf.len();
+    let x = core::slice::from_raw_parts(ptr as *const f32, len);
+    comb_filter_const_sse(buf, start, x, start, T, N, g10, g11, g12);
+}
+
 /// SSE implementation of `celt_pitch_xcorr`.
 /// Processes 4 correlations at a time using `xcorr_kernel_sse`.
 ///

@@ -320,32 +320,12 @@ pub fn comb_filter_inplace(
         return;
     }
     // Constant-coefficient section: T >= 15 guarantees reads are always behind writes.
-    // For the SSE path we need a separate output slice, but since T >= 15 the read
-    // positions are always 13+ samples behind the write positions, so we can safely
-    // use a pointer-based SSE implementation on the same buffer.
+    // SIMD dispatch handles in-place aliasing internally.
     #[cfg(feature = "simd")]
     {
         let pos = start + i;
         let remain = (N as usize) - i;
-        // SAFETY: T >= 15 guarantees no read/write aliasing within the SIMD window.
-        // The SSE function reads from buf[pos - T - 2..] and writes to buf[pos..pos+remain].
-        // Since pos - T - 2 + 4 < pos (because T >= 15), the 4-wide read window
-        // never overlaps the 4-wide write window.
-        let buf_ptr = buf.as_mut_ptr();
-        let x_slice = unsafe { core::slice::from_raw_parts(buf_ptr, pos + remain) };
-        let y_slice = unsafe { core::slice::from_raw_parts_mut(buf_ptr, pos + remain) };
-        super::simd::comb_filter_const(
-            y_slice,
-            pos,
-            x_slice,
-            pos,
-            T1,
-            remain as i32,
-            g10,
-            g11,
-            g12,
-            _arch,
-        );
+        super::simd::comb_filter_const_inplace(buf, pos, T1, remain as i32, g10, g11, g12, _arch);
     }
     #[cfg(not(feature = "simd"))]
     {

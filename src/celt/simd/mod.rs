@@ -119,6 +119,41 @@ pub fn comb_filter_const(
     super::common::comb_filter_const_c(y, y_start, x, x_start, T, N, g10, g11, g12);
 }
 
+/// SIMD-accelerated constant-coefficient in-place comb filter.
+/// Dispatches to SSE on x86, with scalar fallback.
+#[inline(always)]
+pub fn comb_filter_const_inplace(
+    buf: &mut [f32],
+    start: usize,
+    T: i32,
+    N: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+    arch: Arch,
+) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if arch.has_sse() {
+        return unsafe { x86::comb_filter_const_inplace_sse(buf, start, T, N, g10, g11, g12) };
+    }
+
+    let _ = arch;
+    let t = T as usize;
+    let n = N as usize;
+    let mut x4 = buf[start - t - 2];
+    let mut x3 = buf[start - t - 1];
+    let mut x2 = buf[start - t];
+    let mut x1 = buf[start - t + 1];
+    for i in 0..n {
+        let x0 = buf[start + i - t + 2];
+        buf[start + i] = buf[start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4);
+        x4 = x3;
+        x3 = x2;
+        x2 = x1;
+        x1 = x0;
+    }
+}
+
 /// SIMD-accelerated PVQ search.
 /// Dispatches to SSE2 on x86, with scalar fallback.
 /// The SSE2 version handles any N by zero-padding arrays to N+3 elements,
