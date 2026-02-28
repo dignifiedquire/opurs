@@ -343,28 +343,26 @@ pub fn silk_NSQ_c(
         #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
         {
             if use_simd_quantizer {
-                unsafe {
-                    super::simd::silk_noise_shape_quantizer_10_16_sse4_1(
-                        NSQ,
-                        psIndices.signalType as i32,
-                        &x_sc_Q10,
-                        &mut pulses[pulses_off..pulses_off + subfr_len],
-                        pxq_off,
-                        &mut sLTP_Q15,
-                        a_Q12,
-                        b_Q14,
-                        ar_shp_Q13,
-                        lag,
-                        HarmShapeFIRPacked_Q14,
-                        Tilt_Q14[k as usize],
-                        LF_shp_Q14[k as usize],
-                        Gains_Q16[k as usize],
-                        Lambda_Q10,
-                        offset_Q10,
-                        subfr_len as i32,
-                        &table,
-                    );
-                }
+                super::simd::silk_noise_shape_quantizer_10_16_sse4_1(
+                    NSQ,
+                    psIndices.signalType as i32,
+                    &x_sc_Q10,
+                    &mut pulses[pulses_off..pulses_off + subfr_len],
+                    pxq_off,
+                    &mut sLTP_Q15,
+                    a_Q12,
+                    b_Q14,
+                    ar_shp_Q13,
+                    lag,
+                    HarmShapeFIRPacked_Q14,
+                    Tilt_Q14[k as usize],
+                    LF_shp_Q14[k as usize],
+                    Gains_Q16[k as usize],
+                    Lambda_Q10,
+                    offset_Q10,
+                    subfr_len as i32,
+                    &table,
+                );
             } else {
                 silk_noise_shape_quantizer(
                     NSQ,

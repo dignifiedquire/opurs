@@ -392,12 +392,9 @@ pub fn silk_NSQ_del_dec(
 }
 
 /// Run the SSE4.1 NSQ inner quantizer (specialized for order 10/16).
-///
-/// # Safety
-/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
-pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
+pub fn silk_noise_shape_quantizer_10_16_sse4_1(
     NSQ: &mut super::structs::silk_nsq_state,
     signalType: i32,
     x_sc_Q10: &[i32],
@@ -417,36 +414,36 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
     length: i32,
     table: &[[i32; 4]; 64],
 ) {
-    x86::silk_noise_shape_quantizer_10_16_sse4_1(
-        NSQ,
-        signalType,
-        x_sc_Q10,
-        pulses,
-        xq_off,
-        sLTP_Q15,
-        a_Q12,
-        b_Q14,
-        AR_shp_Q13,
-        lag,
-        HarmShapeFIRPacked_Q14,
-        Tilt_Q14,
-        LF_shp_Q14,
-        Gain_Q16,
-        Lambda_Q10,
-        offset_Q10,
-        length,
-        table,
-    );
+    // SAFETY: call sites gate this wrapper with `use_nsq_sse4_1`.
+    unsafe {
+        x86::silk_noise_shape_quantizer_10_16_sse4_1(
+            NSQ,
+            signalType,
+            x_sc_Q10,
+            pulses,
+            xq_off,
+            sLTP_Q15,
+            a_Q12,
+            b_Q14,
+            AR_shp_Q13,
+            lag,
+            HarmShapeFIRPacked_Q14,
+            Tilt_Q14,
+            LF_shp_Q14,
+            Gain_Q16,
+            Lambda_Q10,
+            offset_Q10,
+            length,
+            table,
+        );
+    }
 }
 
 /// Run the SSE4.1 NSQ del_dec scale_states.
-///
-/// # Safety
-/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
+pub fn silk_nsq_del_dec_scale_states_sse4_1(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
@@ -462,22 +459,25 @@ pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
     signal_type: i32,
     decisionDelay: i32,
 ) {
-    x86::silk_nsq_del_dec_scale_states_sse4_1(
-        psEncC,
-        NSQ,
-        psDelDec,
-        x16,
-        x_sc_Q10,
-        sLTP,
-        sLTP_Q15,
-        subfr,
-        nStatesDelayedDecision,
-        LTP_scale_Q14,
-        Gains_Q16,
-        pitchL,
-        signal_type,
-        decisionDelay,
-    );
+    // SAFETY: call sites gate this wrapper with `use_nsq_sse4_1`.
+    unsafe {
+        x86::silk_nsq_del_dec_scale_states_sse4_1(
+            psEncC,
+            NSQ,
+            psDelDec,
+            x16,
+            x_sc_Q10,
+            sLTP,
+            sLTP_Q15,
+            subfr,
+            nStatesDelayedDecision,
+            LTP_scale_Q14,
+            Gains_Q16,
+            pitchL,
+            signal_type,
+            decisionDelay,
+        );
+    }
 }
 
 /// Returns true if the AVX2 NSQ del_dec path should be used.
@@ -496,13 +496,10 @@ pub fn use_nsq_del_dec_avx2(arch: Arch, n_states: i32) -> bool {
 }
 
 /// Run the AVX2 NSQ del_dec complete outer function.
-///
-/// # Safety
-/// Caller must verify AVX2 is available and nStatesDelayedDecision is 3 or 4.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_del_dec_avx2(
+pub fn silk_NSQ_del_dec_avx2(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -519,33 +516,33 @@ pub unsafe fn silk_NSQ_del_dec_avx2(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    x86::silk_NSQ_del_dec_avx2(
-        psEncC,
-        NSQ,
-        psIndices,
-        x16,
-        pulses,
-        PredCoef_Q12,
-        LTPCoef_Q14,
-        AR_Q13,
-        HarmShapeGain_Q14,
-        Tilt_Q14,
-        LF_shp_Q14,
-        Gains_Q16,
-        pitchL,
-        Lambda_Q10,
-        LTP_scale_Q14,
-    );
+    // SAFETY: call sites gate this wrapper with `use_nsq_del_dec_avx2`.
+    unsafe {
+        x86::silk_NSQ_del_dec_avx2(
+            psEncC,
+            NSQ,
+            psIndices,
+            x16,
+            pulses,
+            PredCoef_Q12,
+            LTPCoef_Q14,
+            AR_Q13,
+            HarmShapeGain_Q14,
+            Tilt_Q14,
+            LF_shp_Q14,
+            Gains_Q16,
+            pitchL,
+            Lambda_Q10,
+            LTP_scale_Q14,
+        );
+    }
 }
 
 /// Run the SSE4.1 NSQ del_dec inner quantizer.
-///
-/// # Safety
-/// Caller must verify SSE4.1 is available via `use_nsq_sse4_1()`.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
+pub fn silk_noise_shape_quantizer_del_dec_sse4_1(
     NSQ: &mut super::structs::silk_nsq_state,
     psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
     signalType: i32,
@@ -574,35 +571,38 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
     smpl_buf_idx: &mut i32,
     decisionDelay: i32,
 ) {
-    x86::silk_noise_shape_quantizer_del_dec_sse4_1(
-        NSQ,
-        psDelDec,
-        signalType,
-        x_Q10,
-        pulses,
-        pulses_off,
-        xq_off,
-        sLTP_Q15,
-        delayedGain_Q10,
-        a_Q12,
-        b_Q14,
-        AR_shp_Q13,
-        lag,
-        HarmShapeFIRPacked_Q14,
-        Tilt_Q14,
-        LF_shp_Q14,
-        Gain_Q16,
-        Lambda_Q10,
-        offset_Q10,
-        length,
-        subfr,
-        shapingLPCOrder,
-        predictLPCOrder,
-        warping_Q16,
-        nStatesDelayedDecision,
-        smpl_buf_idx,
-        decisionDelay,
-    );
+    // SAFETY: call sites gate this wrapper with `use_nsq_sse4_1`.
+    unsafe {
+        x86::silk_noise_shape_quantizer_del_dec_sse4_1(
+            NSQ,
+            psDelDec,
+            signalType,
+            x_Q10,
+            pulses,
+            pulses_off,
+            xq_off,
+            sLTP_Q15,
+            delayedGain_Q10,
+            a_Q12,
+            b_Q14,
+            AR_shp_Q13,
+            lag,
+            HarmShapeFIRPacked_Q14,
+            Tilt_Q14,
+            LF_shp_Q14,
+            Gain_Q16,
+            Lambda_Q10,
+            offset_Q10,
+            length,
+            subfr,
+            shapingLPCOrder,
+            predictLPCOrder,
+            warping_Q16,
+            nStatesDelayedDecision,
+            smpl_buf_idx,
+            decisionDelay,
+        );
+    }
 }
 
 /// Returns true if the aarch64 NEON NSQ del_dec path should be used.
@@ -621,13 +621,10 @@ pub fn use_neon_nsq_del_dec(arch: Arch, n_states: i32) -> bool {
 }
 
 /// Run the aarch64 NEON NSQ del_dec complete outer function.
-///
-/// # Safety
-/// Caller must verify nStatesDelayedDecision is 3 or 4 (via `use_neon_nsq_del_dec`).
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_del_dec_neon(
+pub fn silk_NSQ_del_dec_neon(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -644,23 +641,26 @@ pub unsafe fn silk_NSQ_del_dec_neon(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    aarch64::silk_NSQ_del_dec_neon(
-        psEncC,
-        NSQ,
-        psIndices,
-        x16,
-        pulses,
-        PredCoef_Q12,
-        LTPCoef_Q14,
-        AR_Q13,
-        HarmShapeGain_Q14,
-        Tilt_Q14,
-        LF_shp_Q14,
-        Gains_Q16,
-        pitchL,
-        Lambda_Q10,
-        LTP_scale_Q14,
-    );
+    // SAFETY: call sites gate this wrapper with `use_neon_nsq_del_dec`.
+    unsafe {
+        aarch64::silk_NSQ_del_dec_neon(
+            psEncC,
+            NSQ,
+            psIndices,
+            x16,
+            pulses,
+            PredCoef_Q12,
+            LTPCoef_Q14,
+            AR_Q13,
+            HarmShapeGain_Q14,
+            Tilt_Q14,
+            LF_shp_Q14,
+            Gains_Q16,
+            pitchL,
+            Lambda_Q10,
+            LTP_scale_Q14,
+        );
+    }
 }
 
 #[cfg(test)]
