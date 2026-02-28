@@ -281,7 +281,9 @@ pub fn silk_encode_frame_FLP(
                     psEnc.sShape.LastGainIndex = sEncCtrl.lastGainIndexPrev;
                     i = 0;
                     while i < psEnc.sCmn.nb_subfr as i32 {
-                        psEnc.sCmn.indices.GainsIndices[i as usize] = 4;
+                        unsafe {
+                            *psEnc.sCmn.indices.GainsIndices.get_unchecked_mut(i as usize) = 4;
+                        }
                         i += 1;
                     }
                     if condCoding != CODE_CONDITIONALLY {
@@ -291,7 +293,9 @@ pub fn silk_encode_frame_FLP(
                     psEnc.sCmn.ec_prevSignalType = ec_prevSignalType_copy;
                     i = 0;
                     while i < psEnc.sCmn.frame_length as i32 {
-                        psEnc.sCmn.pulses[i as usize] = 0;
+                        unsafe {
+                            *psEnc.sCmn.pulses.get_unchecked_mut(i as usize) = 0;
+                        }
                         i += 1;
                     }
                     {
@@ -368,14 +372,22 @@ pub fn silk_encode_frame_FLP(
                         let mut sum: i32 = 0;
                         j = i * psEnc.sCmn.subfr_length as i32;
                         while j < (i + 1) * psEnc.sCmn.subfr_length as i32 {
-                            sum += (psEnc.sCmn.pulses[j as usize] as i32).abs();
+                            sum += (unsafe { *psEnc.sCmn.pulses.get_unchecked(j as usize) } as i32)
+                                .abs();
                             j += 1;
                         }
-                        if iter == 0 || sum < best_sum[i as usize] && gain_lock[i as usize] == 0 {
-                            best_sum[i as usize] = sum;
-                            best_gain_mult[i as usize] = gainMult_Q8;
+                        if iter == 0
+                            || sum < unsafe { *best_sum.get_unchecked(i as usize) }
+                                && unsafe { *gain_lock.get_unchecked(i as usize) } == 0
+                        {
+                            unsafe {
+                                *best_sum.get_unchecked_mut(i as usize) = sum;
+                                *best_gain_mult.get_unchecked_mut(i as usize) = gainMult_Q8;
+                            }
                         } else {
-                            gain_lock[i as usize] = 1;
+                            unsafe {
+                                *gain_lock.get_unchecked_mut(i as usize) = 1;
+                            }
                         }
                         i += 1;
                     }
@@ -405,37 +417,39 @@ pub fn silk_encode_frame_FLP(
                 i = 0;
                 while i < psEnc.sCmn.nb_subfr as i32 {
                     let mut tmp: i16 = 0;
-                    if gain_lock[i as usize] != 0 {
-                        tmp = best_gain_mult[i as usize];
+                    if unsafe { *gain_lock.get_unchecked(i as usize) } != 0 {
+                        tmp = unsafe { *best_gain_mult.get_unchecked(i as usize) };
                     } else {
                         tmp = gainMult_Q8;
                     }
-                    pGains_Q16[i as usize] = (((if 0x80000000_u32 as i32 >> 8 > 0x7fffffff >> 8 {
-                        if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
-                            > 0x80000000_u32 as i32 >> 8
-                        {
-                            0x80000000_u32 as i32 >> 8
-                        } else if (((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16)
-                            as i32)
-                            < 0x7fffffff >> 8
-                        {
-                            0x7fffffff >> 8
-                        } else {
-                            ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
-                        }
-                    } else if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
-                        > 0x7fffffff >> 8
-                    {
-                        0x7fffffff >> 8
-                    } else if (((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16)
-                        as i32)
-                        < 0x80000000_u32 as i32 >> 8
-                    {
-                        0x80000000_u32 as i32 >> 8
-                    } else {
-                        ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
-                    }) as u32)
-                        << 8) as i32;
+                    let gains_unq = unsafe { *sEncCtrl.GainsUnq_Q16.get_unchecked(i as usize) };
+                    unsafe {
+                        *pGains_Q16.get_unchecked_mut(i as usize) =
+                            (((if 0x80000000_u32 as i32 >> 8 > 0x7fffffff >> 8 {
+                                if ((gains_unq as i64 * tmp as i64) >> 16) as i32
+                                    > 0x80000000_u32 as i32 >> 8
+                                {
+                                    0x80000000_u32 as i32 >> 8
+                                } else if (((gains_unq as i64 * tmp as i64) >> 16) as i32)
+                                    < 0x7fffffff >> 8
+                                {
+                                    0x7fffffff >> 8
+                                } else {
+                                    ((gains_unq as i64 * tmp as i64) >> 16) as i32
+                                }
+                            } else if ((gains_unq as i64 * tmp as i64) >> 16) as i32
+                                > 0x7fffffff >> 8
+                            {
+                                0x7fffffff >> 8
+                            } else if (((gains_unq as i64 * tmp as i64) >> 16) as i32)
+                                < 0x80000000_u32 as i32 >> 8
+                            {
+                                0x80000000_u32 as i32 >> 8
+                            } else {
+                                ((gains_unq as i64 * tmp as i64) >> 16) as i32
+                            }) as u32)
+                                << 8) as i32;
+                    }
                     i += 1;
                 }
                 psEnc.sShape.LastGainIndex = sEncCtrl.lastGainIndexPrev;
@@ -448,7 +462,10 @@ pub fn silk_encode_frame_FLP(
                 gainsID = silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
                 i = 0;
                 while i < psEnc.sCmn.nb_subfr as i32 {
-                    sEncCtrl.Gains[i as usize] = pGains_Q16[i as usize] as f32 / 65536.0f32;
+                    unsafe {
+                        *sEncCtrl.Gains.get_unchecked_mut(i as usize) =
+                            *pGains_Q16.get_unchecked(i as usize) as f32 / 65536.0f32;
+                    }
                     i += 1;
                 }
                 iter += 1;
@@ -510,7 +527,10 @@ fn silk_LBRR_encode_FLP(
         );
         k = 0;
         while k < nb_subfr as i32 {
-            psEncCtrl.Gains[k as usize] = Gains_Q16[k as usize] as f32 * (1.0f32 / 65536.0f32);
+            unsafe {
+                *psEncCtrl.Gains.get_unchecked_mut(k as usize) =
+                    *Gains_Q16.get_unchecked(k as usize) as f32 * (1.0f32 / 65536.0f32);
+            }
             k += 1;
         }
         {

@@ -70,7 +70,7 @@ pub fn silk_encode_indices(
     while i < psEncC.nb_subfr as i32 {
         ec_enc_icdf(
             psRangeEnc,
-            psIndices.GainsIndices[i as usize] as i32,
+            unsafe { *psIndices.GainsIndices.get_unchecked(i as usize) } as i32,
             &silk_delta_gain_iCDF,
             8,
         );
@@ -92,37 +92,40 @@ pub fn silk_encode_indices(
     debug_assert!(psEncC.psNLSF_CB.order as i32 == psEncC.predictLPCOrder);
     i = 0;
     while i < psEncC.psNLSF_CB.order as i32 {
-        if psIndices.NLSFIndices[(i + 1) as usize] as i32 >= NLSF_QUANT_MAX_AMPLITUDE {
+        let nlsf_idx =
+            unsafe { *psIndices.NLSFIndices.get_unchecked((i + 1) as usize) } as i32;
+        let ec_ix_i = unsafe { *ec_ix.get_unchecked(i as usize) } as usize;
+        if nlsf_idx >= NLSF_QUANT_MAX_AMPLITUDE {
             ec_enc_icdf(
                 psRangeEnc,
                 2 * NLSF_QUANT_MAX_AMPLITUDE,
-                &psEncC.psNLSF_CB.ec_iCDF[ec_ix[i as usize] as usize..],
+                &psEncC.psNLSF_CB.ec_iCDF[ec_ix_i..],
                 8,
             );
             ec_enc_icdf(
                 psRangeEnc,
-                psIndices.NLSFIndices[(i + 1) as usize] as i32 - NLSF_QUANT_MAX_AMPLITUDE,
+                nlsf_idx - NLSF_QUANT_MAX_AMPLITUDE,
                 &silk_NLSF_EXT_iCDF,
                 8,
             );
-        } else if psIndices.NLSFIndices[(i + 1) as usize] as i32 <= -NLSF_QUANT_MAX_AMPLITUDE {
+        } else if nlsf_idx <= -NLSF_QUANT_MAX_AMPLITUDE {
             ec_enc_icdf(
                 psRangeEnc,
                 0,
-                &psEncC.psNLSF_CB.ec_iCDF[ec_ix[i as usize] as usize..],
+                &psEncC.psNLSF_CB.ec_iCDF[ec_ix_i..],
                 8,
             );
             ec_enc_icdf(
                 psRangeEnc,
-                -(psIndices.NLSFIndices[(i + 1) as usize] as i32) - NLSF_QUANT_MAX_AMPLITUDE,
+                -nlsf_idx - NLSF_QUANT_MAX_AMPLITUDE,
                 &silk_NLSF_EXT_iCDF,
                 8,
             );
         } else {
             ec_enc_icdf(
                 psRangeEnc,
-                psIndices.NLSFIndices[(i + 1) as usize] as i32 + NLSF_QUANT_MAX_AMPLITUDE,
-                &psEncC.psNLSF_CB.ec_iCDF[ec_ix[i as usize] as usize..],
+                nlsf_idx + NLSF_QUANT_MAX_AMPLITUDE,
+                &psEncC.psNLSF_CB.ec_iCDF[ec_ix_i..],
                 8,
             );
         }
@@ -179,7 +182,7 @@ pub fn silk_encode_indices(
         while k < psEncC.nb_subfr as i32 {
             ec_enc_icdf(
                 psRangeEnc,
-                psIndices.LTPIndex[k as usize] as i32,
+                unsafe { *psIndices.LTPIndex.get_unchecked(k as usize) } as i32,
                 silk_LTP_gain_iCDF_ptrs[psIndices.PERIndex as usize],
                 8,
             );

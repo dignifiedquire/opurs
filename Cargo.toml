@@ -16,12 +16,12 @@ members = [
 ]
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 debug = true
 
 [profile.bench]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 debug = true
 

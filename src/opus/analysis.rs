@@ -1085,11 +1085,11 @@ fn tonality_analysis(
     let mut noisiness: [f32; 240] = [0.; 240];
     i = 0;
     while i < N2 {
-        let w: f32 = analysis_window[i as usize];
-        in_0[i as usize].re = w * tonal.inmem[i as usize];
-        in_0[i as usize].im = w * tonal.inmem[(N2 + i) as usize];
-        in_0[(N - i - 1) as usize].re = w * tonal.inmem[(N - i - 1) as usize];
-        in_0[(N - i - 1) as usize].im = w * tonal.inmem[(N + N2 - i - 1) as usize];
+        let w: f32 = unsafe { *analysis_window.get_unchecked(i as usize) };
+        unsafe { (*in_0.get_unchecked_mut(i as usize)).re = w * *tonal.inmem.get_unchecked(i as usize) };
+        unsafe { (*in_0.get_unchecked_mut(i as usize)).im = w * *tonal.inmem.get_unchecked((N2 + i) as usize) };
+        unsafe { (*in_0.get_unchecked_mut((N - i - 1) as usize)).re = w * *tonal.inmem.get_unchecked((N - i - 1) as usize) };
+        unsafe { (*in_0.get_unchecked_mut((N - i - 1) as usize)).im = w * *tonal.inmem.get_unchecked((N + N2 - i - 1) as usize) };
         i += 1;
     }
     // memmove: copy last 240 samples (inmem[480..720]) to start (inmem[0..240])
@@ -1139,52 +1139,52 @@ fn tonality_analysis(
         let mut mod1: f32 = 0.;
         let mut mod2: f32 = 0.;
         let mut avg_mod: f32 = 0.;
-        X1r = out[i as usize].re + out[(N - i) as usize].re;
-        X1i = out[i as usize].im - out[(N - i) as usize].im;
-        X2r = out[i as usize].im + out[(N - i) as usize].im;
-        X2i = out[(N - i) as usize].re - out[i as usize].re;
+        X1r = unsafe { (*out.get_unchecked(i as usize)).re + (*out.get_unchecked((N - i) as usize)).re };
+        X1i = unsafe { (*out.get_unchecked(i as usize)).im - (*out.get_unchecked((N - i) as usize)).im };
+        X2r = unsafe { (*out.get_unchecked(i as usize)).im + (*out.get_unchecked((N - i) as usize)).im };
+        X2i = unsafe { (*out.get_unchecked((N - i) as usize)).re - (*out.get_unchecked(i as usize)).re };
         angle = (0.5f32 as f64 / M_PI) as f32 * fast_atan2f(X1i, X1r);
-        d_angle = angle - tonal.angle[i as usize];
-        d2_angle = d_angle - tonal.d_angle[i as usize];
+        d_angle = angle - unsafe { *tonal.angle.get_unchecked(i as usize) };
+        d2_angle = d_angle - unsafe { *tonal.d_angle.get_unchecked(i as usize) };
         angle2 = (0.5f32 as f64 / M_PI) as f32 * fast_atan2f(X2i, X2r);
         d_angle2 = angle2 - angle;
         d2_angle2 = d_angle2 - d_angle;
         mod1 = d2_angle - float2int(d2_angle) as f32;
-        noisiness[i as usize] = (mod1).abs();
+        unsafe { *noisiness.get_unchecked_mut(i as usize) = (mod1).abs() };
         mod1 *= mod1;
         mod1 *= mod1;
         mod2 = d2_angle2 - float2int(d2_angle2) as f32;
-        noisiness[i as usize] += (mod2).abs();
+        unsafe { *noisiness.get_unchecked_mut(i as usize) += (mod2).abs() };
         mod2 *= mod2;
         mod2 *= mod2;
-        avg_mod = 0.25f32 * (tonal.d2_angle[i as usize] + mod1 + 2_f32 * mod2);
-        tonality[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * avg_mod) - 0.015f32;
-        tonality2[i as usize] = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * mod2) - 0.015f32;
-        tonal.angle[i as usize] = angle2;
-        tonal.d_angle[i as usize] = d_angle2;
-        tonal.d2_angle[i as usize] = mod2;
+        avg_mod = 0.25f32 * (unsafe { *tonal.d2_angle.get_unchecked(i as usize) } + mod1 + 2_f32 * mod2);
+        unsafe { *tonality.get_unchecked_mut(i as usize) = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * avg_mod) - 0.015f32 };
+        unsafe { *tonality2.get_unchecked_mut(i as usize) = 1.0f32 / (1.0f32 + 40.0f32 * 16.0f32 * pi4 * mod2) - 0.015f32 };
+        unsafe { *tonal.angle.get_unchecked_mut(i as usize) = angle2 };
+        unsafe { *tonal.d_angle.get_unchecked_mut(i as usize) = d_angle2 };
+        unsafe { *tonal.d2_angle.get_unchecked_mut(i as usize) = mod2 };
         i += 1;
     }
     i = 2;
     while i < N2 - 1 {
-        let tt: f32 = if tonality2[i as usize]
-            < (if tonality2[(i - 1) as usize] > tonality2[(i + 1) as usize] {
-                tonality2[(i - 1) as usize]
+        let tt: f32 = if unsafe { *tonality2.get_unchecked(i as usize) }
+            < (if unsafe { *tonality2.get_unchecked((i - 1) as usize) } > unsafe { *tonality2.get_unchecked((i + 1) as usize) } {
+                unsafe { *tonality2.get_unchecked((i - 1) as usize) }
             } else {
-                tonality2[(i + 1) as usize]
+                unsafe { *tonality2.get_unchecked((i + 1) as usize) }
             }) {
-            tonality2[i as usize]
-        } else if tonality2[(i - 1) as usize] > tonality2[(i + 1) as usize] {
-            tonality2[(i - 1) as usize]
+            unsafe { *tonality2.get_unchecked(i as usize) }
+        } else if unsafe { *tonality2.get_unchecked((i - 1) as usize) } > unsafe { *tonality2.get_unchecked((i + 1) as usize) } {
+            unsafe { *tonality2.get_unchecked((i - 1) as usize) }
         } else {
-            tonality2[(i + 1) as usize]
+            unsafe { *tonality2.get_unchecked((i + 1) as usize) }
         };
-        tonality[i as usize] = 0.9f32
-            * (if tonality[i as usize] > tt - 0.1f32 {
-                tonality[i as usize]
+        unsafe { *tonality.get_unchecked_mut(i as usize) = 0.9f32
+            * (if *tonality.get_unchecked(i as usize) > tt - 0.1f32 {
+                *tonality.get_unchecked(i as usize)
             } else {
                 tt - 0.1f32
-            });
+            }) };
         i += 1;
     }
     frame_tonality = 0 as f32;
@@ -1195,8 +1195,8 @@ fn tonality_analysis(
     if tonal.count == 0 {
         b = 0;
         while b < NB_TBANDS {
-            tonal.lowE[b as usize] = 1e10f64 as f32;
-            tonal.highE[b as usize] = -1e10f64 as f32;
+            unsafe { *tonal.lowE.get_unchecked_mut(b as usize) = 1e10f64 as f32 };
+            unsafe { *tonal.highE.get_unchecked_mut(b as usize) = -1e10f64 as f32 };
             b += 1;
         }
     }
@@ -1210,10 +1210,10 @@ fn tonality_analysis(
     E = X1r_0 * X1r_0 + X2r_0 * X2r_0;
     i = 1;
     while i < 4 {
-        let binE: f32 = out[i as usize].re * out[i as usize].re
-            + out[(N - i) as usize].re * out[(N - i) as usize].re
-            + out[i as usize].im * out[i as usize].im
-            + out[(N - i) as usize].im * out[(N - i) as usize].im;
+        let binE: f32 = unsafe { (*out.get_unchecked(i as usize)).re * (*out.get_unchecked(i as usize)).re
+            + (*out.get_unchecked((N - i) as usize)).re * (*out.get_unchecked((N - i) as usize)).re
+            + (*out.get_unchecked(i as usize)).im * (*out.get_unchecked(i as usize)).im
+            + (*out.get_unchecked((N - i) as usize)).im * (*out.get_unchecked((N - i) as usize)).im };
         E += binE;
         i += 1;
     }
@@ -1228,21 +1228,21 @@ fn tonality_analysis(
         let mut L1: f32 = 0.;
         let mut L2: f32 = 0.;
         let mut stationarity: f32 = 0.;
-        i = tbands[b as usize];
-        while i < tbands[(b + 1) as usize] {
-            let binE_0: f32 = out[i as usize].re * out[i as usize].re
-                + out[(N - i) as usize].re * out[(N - i) as usize].re
-                + out[i as usize].im * out[i as usize].im
-                + out[(N - i) as usize].im * out[(N - i) as usize].im;
+        i = unsafe { *tbands.get_unchecked(b as usize) };
+        while i < unsafe { *tbands.get_unchecked((b + 1) as usize) } {
+            let binE_0: f32 = unsafe { (*out.get_unchecked(i as usize)).re * (*out.get_unchecked(i as usize)).re
+                + (*out.get_unchecked((N - i) as usize)).re * (*out.get_unchecked((N - i) as usize)).re
+                + (*out.get_unchecked(i as usize)).im * (*out.get_unchecked(i as usize)).im
+                + (*out.get_unchecked((N - i) as usize)).im * (*out.get_unchecked((N - i) as usize)).im };
             let binE_0 = binE_0 * (1.0f32 / 32768.0 / 32768.0);
             E_0 += binE_0;
             tE += binE_0
-                * (if 0 as f32 > tonality[i as usize] {
+                * (if 0 as f32 > unsafe { *tonality.get_unchecked(i as usize) } {
                     0 as f32
                 } else {
-                    tonality[i as usize]
+                    unsafe { *tonality.get_unchecked(i as usize) }
                 });
-            nE += binE_0 * 2.0f32 * (0.5f32 - noisiness[i as usize]);
+            nE += binE_0 * 2.0f32 * (0.5f32 - unsafe { *noisiness.get_unchecked(i as usize) });
             i += 1;
         }
         #[allow(clippy::neg_cmp_op_on_partial_ord)]
@@ -1250,50 +1250,50 @@ fn tonality_analysis(
             tonal.info[info_idx].valid = 0;
             return;
         }
-        tonal.E[tonal.E_count as usize][b as usize] = E_0;
+        unsafe { *tonal.E.get_unchecked_mut(tonal.E_count as usize).get_unchecked_mut(b as usize) = E_0 };
         frame_noisiness += nE / (1e-15f32 + E_0);
         frame_loudness += celt_sqrt(E_0 + 1e-10f32);
         loge0 = ((E_0 + 1e-10f32) as f64).ln() as f32;
-        logE[b as usize] = loge0;
-        band_log2[(b + 1) as usize] = 0.5f32 * LOG2_E_UPSTREAM * loge0;
-        tonal.logE[tonal.E_count as usize][b as usize] = logE[b as usize];
+        unsafe { *logE.get_unchecked_mut(b as usize) = loge0 };
+        unsafe { *band_log2.get_unchecked_mut((b + 1) as usize) = 0.5f32 * LOG2_E_UPSTREAM * loge0 };
+        unsafe { *tonal.logE.get_unchecked_mut(tonal.E_count as usize).get_unchecked_mut(b as usize) = *logE.get_unchecked(b as usize) };
         if tonal.count == 0 {
-            tonal.lowE[b as usize] = logE[b as usize];
-            tonal.highE[b as usize] = tonal.lowE[b as usize];
+            unsafe { *tonal.lowE.get_unchecked_mut(b as usize) = *logE.get_unchecked(b as usize) };
+            unsafe { *tonal.highE.get_unchecked_mut(b as usize) = *tonal.lowE.get_unchecked(b as usize) };
         }
-        if tonal.highE[b as usize] as f64 > tonal.lowE[b as usize] as f64 + 7.5f64 {
-            if tonal.highE[b as usize] - logE[b as usize]
-                > logE[b as usize] - tonal.lowE[b as usize]
+        if unsafe { *tonal.highE.get_unchecked(b as usize) } as f64 > unsafe { *tonal.lowE.get_unchecked(b as usize) } as f64 + 7.5f64 {
+            if unsafe { *tonal.highE.get_unchecked(b as usize) } - unsafe { *logE.get_unchecked(b as usize) }
+                > unsafe { *logE.get_unchecked(b as usize) } - unsafe { *tonal.lowE.get_unchecked(b as usize) }
             {
-                tonal.highE[b as usize] -= 0.01f32;
+                unsafe { *tonal.highE.get_unchecked_mut(b as usize) -= 0.01f32 };
             } else {
-                tonal.lowE[b as usize] += 0.01f32;
+                unsafe { *tonal.lowE.get_unchecked_mut(b as usize) += 0.01f32 };
             }
         }
-        if logE[b as usize] > tonal.highE[b as usize] {
-            tonal.highE[b as usize] = logE[b as usize];
-            tonal.lowE[b as usize] = if tonal.highE[b as usize] - 15_f32 > tonal.lowE[b as usize] {
-                tonal.highE[b as usize] - 15_f32
+        if unsafe { *logE.get_unchecked(b as usize) } > unsafe { *tonal.highE.get_unchecked(b as usize) } {
+            unsafe { *tonal.highE.get_unchecked_mut(b as usize) = *logE.get_unchecked(b as usize) };
+            unsafe { *tonal.lowE.get_unchecked_mut(b as usize) = if *tonal.highE.get_unchecked(b as usize) - 15_f32 > *tonal.lowE.get_unchecked(b as usize) {
+                *tonal.highE.get_unchecked(b as usize) - 15_f32
             } else {
-                tonal.lowE[b as usize]
-            };
-        } else if logE[b as usize] < tonal.lowE[b as usize] {
-            tonal.lowE[b as usize] = logE[b as usize];
-            tonal.highE[b as usize] = if (tonal.lowE[b as usize] + 15_f32) < tonal.highE[b as usize]
+                *tonal.lowE.get_unchecked(b as usize)
+            } };
+        } else if unsafe { *logE.get_unchecked(b as usize) } < unsafe { *tonal.lowE.get_unchecked(b as usize) } {
+            unsafe { *tonal.lowE.get_unchecked_mut(b as usize) = *logE.get_unchecked(b as usize) };
+            unsafe { *tonal.highE.get_unchecked_mut(b as usize) = if (*tonal.lowE.get_unchecked(b as usize) + 15_f32) < *tonal.highE.get_unchecked(b as usize)
             {
-                tonal.lowE[b as usize] + 15_f32
+                *tonal.lowE.get_unchecked(b as usize) + 15_f32
             } else {
-                tonal.highE[b as usize]
-            };
+                *tonal.highE.get_unchecked(b as usize)
+            } };
         }
-        relativeE += (logE[b as usize] - tonal.lowE[b as usize])
-            / (1e-5f32 + (tonal.highE[b as usize] - tonal.lowE[b as usize]));
+        relativeE += (unsafe { *logE.get_unchecked(b as usize) } - unsafe { *tonal.lowE.get_unchecked(b as usize) })
+            / (1e-5f32 + (unsafe { *tonal.highE.get_unchecked(b as usize) } - unsafe { *tonal.lowE.get_unchecked(b as usize) }));
         L2 = 0 as f32;
         L1 = L2;
         i = 0;
         while i < NB_FRAMES {
-            L1 += celt_sqrt(tonal.E[i as usize][b as usize]);
-            L2 += tonal.E[i as usize][b as usize];
+            L1 += celt_sqrt(unsafe { *tonal.E.get_unchecked(i as usize).get_unchecked(b as usize) });
+            L2 += unsafe { *tonal.E.get_unchecked(i as usize).get_unchecked(b as usize) };
             i += 1;
         }
         // NB:
@@ -1303,15 +1303,15 @@ fn tonality_analysis(
         stationarity *= stationarity;
         stationarity *= stationarity;
         frame_stationarity += stationarity;
-        band_tonality[b as usize] =
-            if tE / (1e-15f32 + E_0) > stationarity * tonal.prev_band_tonality[b as usize] {
+        unsafe { *band_tonality.get_unchecked_mut(b as usize) =
+            if tE / (1e-15f32 + E_0) > stationarity * *tonal.prev_band_tonality.get_unchecked(b as usize) {
                 tE / (1e-15f32 + E_0)
             } else {
-                stationarity * tonal.prev_band_tonality[b as usize]
-            };
-        frame_tonality += band_tonality[b as usize];
+                stationarity * *tonal.prev_band_tonality.get_unchecked(b as usize)
+            } };
+        frame_tonality += unsafe { *band_tonality.get_unchecked(b as usize) };
         if b >= NB_TBANDS - NB_TONAL_SKIP_BANDS {
-            frame_tonality -= band_tonality[(b - NB_TBANDS + NB_TONAL_SKIP_BANDS) as usize];
+            frame_tonality -= unsafe { *band_tonality.get_unchecked((b - NB_TBANDS + NB_TONAL_SKIP_BANDS) as usize) };
         }
         max_frame_tonality =
             if max_frame_tonality > (1.0f32 + 0.03f32 * (b - 18) as f32) * frame_tonality {
@@ -1319,8 +1319,8 @@ fn tonality_analysis(
             } else {
                 (1.0f32 + 0.03f32 * (b - 18) as f32) * frame_tonality
             };
-        slope += band_tonality[b as usize] * (b - 8) as f32;
-        tonal.prev_band_tonality[b as usize] = band_tonality[b as usize];
+        slope += unsafe { *band_tonality.get_unchecked(b as usize) } * (b - 8) as f32;
+        unsafe { *tonal.prev_band_tonality.get_unchecked_mut(b as usize) = *band_tonality.get_unchecked(b as usize) };
         b += 1;
     }
     leakage_from[0_usize] = band_log2[0_usize];
@@ -1328,61 +1328,64 @@ fn tonality_analysis(
     b = 1;
     while b < NB_TBANDS + 1 {
         let leak_slope: f32 =
-            LEAKAGE_SLOPE * (tbands[b as usize] - tbands[(b - 1) as usize]) as f32 / 4_f32;
-        leakage_from[b as usize] =
-            if leakage_from[(b - 1) as usize] + leak_slope < band_log2[b as usize] {
-                leakage_from[(b - 1) as usize] + leak_slope
+            LEAKAGE_SLOPE * (unsafe { *tbands.get_unchecked(b as usize) } - unsafe { *tbands.get_unchecked((b - 1) as usize) }) as f32 / 4_f32;
+        unsafe { *leakage_from.get_unchecked_mut(b as usize) =
+            if *leakage_from.get_unchecked((b - 1) as usize) + leak_slope < *band_log2.get_unchecked(b as usize) {
+                *leakage_from.get_unchecked((b - 1) as usize) + leak_slope
             } else {
-                band_log2[b as usize]
-            };
-        leakage_to[b as usize] =
-            if leakage_to[(b - 1) as usize] - leak_slope > band_log2[b as usize] - 2.5f32 {
-                leakage_to[(b - 1) as usize] - leak_slope
+                *band_log2.get_unchecked(b as usize)
+            } };
+        unsafe { *leakage_to.get_unchecked_mut(b as usize) =
+            if *leakage_to.get_unchecked((b - 1) as usize) - leak_slope > *band_log2.get_unchecked(b as usize) - 2.5f32 {
+                *leakage_to.get_unchecked((b - 1) as usize) - leak_slope
             } else {
-                band_log2[b as usize] - 2.5f32
-            };
+                *band_log2.get_unchecked(b as usize) - 2.5f32
+            } };
         b += 1;
     }
     b = NB_TBANDS - 2;
     while b >= 0 {
         let leak_slope_0: f32 =
-            LEAKAGE_SLOPE * (tbands[(b + 1) as usize] - tbands[b as usize]) as f32 / 4_f32;
-        leakage_from[b as usize] =
-            if leakage_from[(b + 1) as usize] + leak_slope_0 < leakage_from[b as usize] {
-                leakage_from[(b + 1) as usize] + leak_slope_0
+            LEAKAGE_SLOPE * (unsafe { *tbands.get_unchecked((b + 1) as usize) } - unsafe { *tbands.get_unchecked(b as usize) }) as f32 / 4_f32;
+        unsafe { *leakage_from.get_unchecked_mut(b as usize) =
+            if *leakage_from.get_unchecked((b + 1) as usize) + leak_slope_0 < *leakage_from.get_unchecked(b as usize) {
+                *leakage_from.get_unchecked((b + 1) as usize) + leak_slope_0
             } else {
-                leakage_from[b as usize]
-            };
-        leakage_to[b as usize] =
-            if leakage_to[(b + 1) as usize] - leak_slope_0 > leakage_to[b as usize] {
-                leakage_to[(b + 1) as usize] - leak_slope_0
+                *leakage_from.get_unchecked(b as usize)
+            } };
+        unsafe { *leakage_to.get_unchecked_mut(b as usize) =
+            if *leakage_to.get_unchecked((b + 1) as usize) - leak_slope_0 > *leakage_to.get_unchecked(b as usize) {
+                *leakage_to.get_unchecked((b + 1) as usize) - leak_slope_0
             } else {
-                leakage_to[b as usize]
-            };
+                *leakage_to.get_unchecked(b as usize)
+            } };
         b -= 1;
     }
     b = 0;
     while b < NB_TBANDS + 1 {
+        let leak_to_b = unsafe { *leakage_to.get_unchecked(b as usize) };
+        let band_b = unsafe { *band_log2.get_unchecked(b as usize) };
+        let leak_from_b = unsafe { *leakage_from.get_unchecked(b as usize) };
         let boost: f32 =
-            (if 0 as f32 > leakage_to[b as usize] - band_log2[b as usize] {
+            (if 0 as f32 > leak_to_b - band_b {
                 0 as f32
             } else {
-                leakage_to[b as usize] - band_log2[b as usize]
-            }) + (if 0 as f32 > band_log2[b as usize] - (leakage_from[b as usize] + 2.5f32) {
+                leak_to_b - band_b
+            }) + (if 0 as f32 > band_b - (leak_from_b + 2.5f32) {
                 0 as f32
             } else {
-                band_log2[b as usize] - (leakage_from[b as usize] + 2.5f32)
+                band_b - (leak_from_b + 2.5f32)
             });
-        tonal.info[info_idx].leak_boost[b as usize] =
+        unsafe { *tonal.info.get_unchecked_mut(info_idx).leak_boost.get_unchecked_mut(b as usize) =
             (if (255) < (0.5f64 + (64.0f32 * boost) as f64).floor() as i32 {
                 255
             } else {
                 (0.5f64 + (64.0f32 * boost) as f64).floor() as i32
-            }) as u8;
+            }) as u8 };
         b += 1;
     }
     while b < LEAK_BANDS {
-        tonal.info[info_idx].leak_boost[b as usize] = 0;
+        unsafe { *tonal.info.get_unchecked_mut(info_idx).leak_boost.get_unchecked_mut(b as usize) = 0 };
         b += 1;
     }
     i = 0;
@@ -1396,7 +1399,7 @@ fn tonality_analysis(
             k = 0;
             while k < NB_TBANDS {
                 let mut tmp: f32 = 0.;
-                tmp = tonal.logE[i as usize][k as usize] - tonal.logE[j as usize][k as usize];
+                tmp = unsafe { *tonal.logE.get_unchecked(i as usize).get_unchecked(k as usize) } - unsafe { *tonal.logE.get_unchecked(j as usize).get_unchecked(k as usize) };
                 dist += tmp * tmp;
                 k += 1;
             }
@@ -1422,14 +1425,14 @@ fn tonality_analysis(
         let mut Em: f32 = 0.;
         let mut band_start: i32 = 0;
         let mut band_end: i32 = 0;
-        band_start = tbands[b as usize];
-        band_end = tbands[(b + 1) as usize];
+        band_start = unsafe { *tbands.get_unchecked(b as usize) };
+        band_end = unsafe { *tbands.get_unchecked((b + 1) as usize) };
         i = band_start;
         while i < band_end {
-            let binE_1: f32 = out[i as usize].re * out[i as usize].re
-                + out[(N - i) as usize].re * out[(N - i) as usize].re
-                + out[i as usize].im * out[i as usize].im
-                + out[(N - i) as usize].im * out[(N - i) as usize].im;
+            let binE_1: f32 = unsafe { (*out.get_unchecked(i as usize)).re * (*out.get_unchecked(i as usize)).re
+                + (*out.get_unchecked((N - i) as usize)).re * (*out.get_unchecked((N - i) as usize)).re
+                + (*out.get_unchecked(i as usize)).im * (*out.get_unchecked(i as usize)).im
+                + (*out.get_unchecked((N - i) as usize)).im * (*out.get_unchecked((N - i) as usize)).im };
             E_1 += binE_1;
             i += 1;
         }
@@ -1440,15 +1443,15 @@ fn tonality_analysis(
         } else {
             above_max_pitch += E_1;
         }
-        tonal.meanE[b as usize] = if (1_f32 - alphaE2) * tonal.meanE[b as usize] > E_1 {
-            (1_f32 - alphaE2) * tonal.meanE[b as usize]
+        unsafe { *tonal.meanE.get_unchecked_mut(b as usize) = if (1_f32 - alphaE2) * *tonal.meanE.get_unchecked(b as usize) > E_1 {
+            (1_f32 - alphaE2) * *tonal.meanE.get_unchecked(b as usize)
         } else {
             E_1
-        };
-        Em = if E_1 > tonal.meanE[b as usize] {
+        } };
+        Em = if E_1 > unsafe { *tonal.meanE.get_unchecked(b as usize) } {
             E_1
         } else {
-            tonal.meanE[b as usize]
+            unsafe { *tonal.meanE.get_unchecked(b as usize) }
         };
         if E_1 * 1e9f32 > maxE
             && (Em > 3_f32 * noise_floor * (band_end - band_start) as f32
@@ -1456,12 +1459,12 @@ fn tonality_analysis(
         {
             bandwidth = b + 1;
         }
-        is_masked[b as usize] = (E_1
+        unsafe { *is_masked.get_unchecked_mut(b as usize) = (E_1
             < (if tonal.prev_bandwidth > b {
                 0.01f32
             } else {
                 0.05f32
-            }) * bandwidth_mask) as i32;
+            }) * bandwidth_mask) as i32 };
         bandwidth_mask = if 0.05f32 * bandwidth_mask > E_1 {
             0.05f32 * bandwidth_mask
         } else {
@@ -1529,10 +1532,10 @@ fn tonality_analysis(
         let mut sum: f32 = 0 as f32;
         b = 0;
         while b < 16 {
-            sum += dct_table[(i * 16 + b) as usize] * logE[b as usize];
+            sum += unsafe { *dct_table.get_unchecked((i * 16 + b) as usize) } * unsafe { *logE.get_unchecked(b as usize) };
             b += 1;
         }
-        BFCC[i as usize] = sum;
+        unsafe { *BFCC.get_unchecked_mut(i as usize) = sum };
         i += 1;
     }
     i = 0;
@@ -1540,12 +1543,12 @@ fn tonality_analysis(
         let mut sum_0: f32 = 0 as f32;
         b = 0;
         while b < 16 {
-            sum_0 += dct_table[(i * 16 + b) as usize]
+            sum_0 += unsafe { *dct_table.get_unchecked((i * 16 + b) as usize) }
                 * 0.5f32
-                * (tonal.highE[b as usize] + tonal.lowE[b as usize]);
+                * (unsafe { *tonal.highE.get_unchecked(b as usize) } + unsafe { *tonal.lowE.get_unchecked(b as usize) });
             b += 1;
         }
-        midE[i as usize] = sum_0;
+        unsafe { *midE.get_unchecked_mut(i as usize) = sum_0 };
         i += 1;
     }
     frame_stationarity /= NB_TBANDS as f32;
@@ -1573,56 +1576,56 @@ fn tonality_analysis(
     tonal.info[info_idx].tonality = frame_tonality;
     i = 0;
     while i < 4 {
-        features[i as usize] = -0.12299f32 * (BFCC[i as usize] + tonal.mem[(i + 24) as usize])
-            + 0.49195f32 * (tonal.mem[i as usize] + tonal.mem[(i + 16) as usize])
-            + 0.69693f32 * tonal.mem[(i + 8) as usize]
-            - 1.4349f32 * tonal.cmean[i as usize];
+        unsafe { *features.get_unchecked_mut(i as usize) = -0.12299f32 * (*BFCC.get_unchecked(i as usize) + *tonal.mem.get_unchecked((i + 24) as usize))
+            + 0.49195f32 * (*tonal.mem.get_unchecked(i as usize) + *tonal.mem.get_unchecked((i + 16) as usize))
+            + 0.69693f32 * *tonal.mem.get_unchecked((i + 8) as usize)
+            - 1.4349f32 * *tonal.cmean.get_unchecked(i as usize) };
         i += 1;
     }
     i = 0;
     while i < 4 {
-        tonal.cmean[i as usize] =
-            (1_f32 - alpha) * tonal.cmean[i as usize] + alpha * BFCC[i as usize];
+        unsafe { *tonal.cmean.get_unchecked_mut(i as usize) =
+            (1_f32 - alpha) * *tonal.cmean.get_unchecked(i as usize) + alpha * *BFCC.get_unchecked(i as usize) };
         i += 1;
     }
     i = 0;
     while i < 4 {
-        features[(4 + i) as usize] = 0.63246f32 * (BFCC[i as usize] - tonal.mem[(i + 24) as usize])
-            + 0.31623f32 * (tonal.mem[i as usize] - tonal.mem[(i + 16) as usize]);
+        unsafe { *features.get_unchecked_mut((4 + i) as usize) = 0.63246f32 * (*BFCC.get_unchecked(i as usize) - *tonal.mem.get_unchecked((i + 24) as usize))
+            + 0.31623f32 * (*tonal.mem.get_unchecked(i as usize) - *tonal.mem.get_unchecked((i + 16) as usize)) };
         i += 1;
     }
     i = 0;
     while i < 3 {
-        features[(8 + i) as usize] = 0.53452f32 * (BFCC[i as usize] + tonal.mem[(i + 24) as usize])
-            - 0.26726f32 * (tonal.mem[i as usize] + tonal.mem[(i + 16) as usize])
-            - 0.53452f32 * tonal.mem[(i + 8) as usize];
+        unsafe { *features.get_unchecked_mut((8 + i) as usize) = 0.53452f32 * (*BFCC.get_unchecked(i as usize) + *tonal.mem.get_unchecked((i + 24) as usize))
+            - 0.26726f32 * (*tonal.mem.get_unchecked(i as usize) + *tonal.mem.get_unchecked((i + 16) as usize))
+            - 0.53452f32 * *tonal.mem.get_unchecked((i + 8) as usize) };
         i += 1;
     }
     if tonal.count > 5 {
         i = 0;
         while i < 9 {
-            tonal.std[i as usize] = (1_f32 - alpha) * tonal.std[i as usize]
-                + alpha * features[i as usize] * features[i as usize];
+            unsafe { *tonal.std.get_unchecked_mut(i as usize) = (1_f32 - alpha) * *tonal.std.get_unchecked(i as usize)
+                + alpha * *features.get_unchecked(i as usize) * *features.get_unchecked(i as usize) };
             i += 1;
         }
     }
     i = 0;
     while i < 4 {
-        features[i as usize] = BFCC[i as usize] - midE[i as usize];
+        unsafe { *features.get_unchecked_mut(i as usize) = *BFCC.get_unchecked(i as usize) - *midE.get_unchecked(i as usize) };
         i += 1;
     }
     i = 0;
     while i < 8 {
-        tonal.mem[(i + 24) as usize] = tonal.mem[(i + 16) as usize];
-        tonal.mem[(i + 16) as usize] = tonal.mem[(i + 8) as usize];
-        tonal.mem[(i + 8) as usize] = tonal.mem[i as usize];
-        tonal.mem[i as usize] = BFCC[i as usize];
+        unsafe { *tonal.mem.get_unchecked_mut((i + 24) as usize) = *tonal.mem.get_unchecked((i + 16) as usize) };
+        unsafe { *tonal.mem.get_unchecked_mut((i + 16) as usize) = *tonal.mem.get_unchecked((i + 8) as usize) };
+        unsafe { *tonal.mem.get_unchecked_mut((i + 8) as usize) = *tonal.mem.get_unchecked(i as usize) };
+        unsafe { *tonal.mem.get_unchecked_mut(i as usize) = *BFCC.get_unchecked(i as usize) };
         i += 1;
     }
     i = 0;
     while i < 9 {
-        features[(11 + i) as usize] =
-            celt_sqrt(tonal.std[i as usize]) - std_feature_bias[i as usize];
+        unsafe { *features.get_unchecked_mut((11 + i) as usize) =
+            celt_sqrt(*tonal.std.get_unchecked(i as usize)) - *std_feature_bias.get_unchecked(i as usize) };
         i += 1;
     }
     features[18] = spec_variability - 0.78f32;

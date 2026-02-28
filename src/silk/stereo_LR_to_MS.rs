@@ -56,10 +56,14 @@ pub fn silk_stereo_LR_to_MS(
     // side[n] = sat16(round((x1[n] - x2[n]) / 2))
     n = 0;
     while n < frame_length + 2 {
-        sum = x1[n as usize] as i32 + x2[n as usize] as i32;
-        diff = x1[n as usize] as i32 - x2[n as usize] as i32;
-        x1[n as usize] = ((sum >> 1) + (sum & 1)) as i16;
-        side[n as usize] = ((diff >> 1) + (diff & 1)).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        // SAFETY: n ranges over 0..frame_length+2, which is the length of x1, x2, and side.
+        unsafe {
+            sum = *x1.get_unchecked(n as usize) as i32 + *x2.get_unchecked(n as usize) as i32;
+            diff = *x1.get_unchecked(n as usize) as i32 - *x2.get_unchecked(n as usize) as i32;
+            *x1.get_unchecked_mut(n as usize) = ((sum >> 1) + (sum & 1)) as i16;
+            *side.get_unchecked_mut(n as usize) =
+                ((diff >> 1) + (diff & 1)).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        }
         n += 1;
     }
 
@@ -82,15 +86,20 @@ pub fn silk_stereo_LR_to_MS(
     let mut HP_mid: Vec<i16> = ::std::vec::from_elem(0, vla_1);
     n = 0;
     while n < frame_length {
-        // mid = x1
-        sum = (((x1[n as usize] as i32
-            + x1[(n + 2) as usize] as i32
-            + ((x1[(n + 1) as usize] as u32) << 1) as i32)
-            >> (2 - 1))
-            + 1)
-            >> 1;
-        LP_mid[n as usize] = sum as i16;
-        HP_mid[n as usize] = (x1[(n + 1) as usize] as i32 - sum) as i16;
+        // SAFETY: n ranges over 0..frame_length; x1 has length frame_length+2,
+        // LP_mid and HP_mid have length frame_length.
+        unsafe {
+            // mid = x1
+            sum = (((*x1.get_unchecked(n as usize) as i32
+                + *x1.get_unchecked((n + 2) as usize) as i32
+                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32)
+                >> (2 - 1))
+                + 1)
+                >> 1;
+            *LP_mid.get_unchecked_mut(n as usize) = sum as i16;
+            *HP_mid.get_unchecked_mut(n as usize) =
+                (*x1.get_unchecked((n + 1) as usize) as i32 - sum) as i16;
+        }
         n += 1;
     }
     let vla_2 = frame_length as usize;
@@ -99,14 +108,19 @@ pub fn silk_stereo_LR_to_MS(
     let mut HP_side: Vec<i16> = ::std::vec::from_elem(0, vla_3);
     n = 0;
     while n < frame_length {
-        sum = (((side[n as usize] as i32
-            + side[(n + 2) as usize] as i32
-            + ((side[(n + 1) as usize] as u32) << 1) as i32)
-            >> (2 - 1))
-            + 1)
-            >> 1;
-        LP_side[n as usize] = sum as i16;
-        HP_side[n as usize] = (side[(n + 1) as usize] as i32 - sum) as i16;
+        // SAFETY: n ranges over 0..frame_length; side has length frame_length+2,
+        // LP_side and HP_side have length frame_length.
+        unsafe {
+            sum = (((*side.get_unchecked(n as usize) as i32
+                + *side.get_unchecked((n + 2) as usize) as i32
+                + ((*side.get_unchecked((n + 1) as usize) as u32) << 1) as i32)
+                >> (2 - 1))
+                + 1)
+                >> 1;
+            *LP_side.get_unchecked_mut(n as usize) = sum as i16;
+            *HP_side.get_unchecked_mut(n as usize) =
+                (*side.get_unchecked((n + 1) as usize) as i32 - sum) as i16;
+        }
         n += 1;
     }
     let is10msFrame: i32 = (frame_length == 10 * fs_kHz) as i32;
@@ -268,43 +282,23 @@ pub fn silk_stereo_LR_to_MS(
         pred0_Q13 += delta0_Q13;
         pred1_Q13 += delta1_Q13;
         w_Q24 += deltaw_Q24;
-        sum = (((x1[n as usize] as i32
-            + x1[(n + 2) as usize] as i32
-            + ((x1[(n + 1) as usize] as u32) << 1) as i32) as u32)
-            << 9) as i32;
-        sum = (((w_Q24 as i64 * side[(n + 1) as usize] as i64) >> 16) as i32 as i64
-            + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
-        sum = (sum as i64
-            + ((((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
-                * pred1_Q13 as i16 as i64)
-                >> 16)) as i32;
-        // x2 output is at offset n-1 relative to mid; but since our slices start 2 before frame,
-        // x2[n-1] in the original code with mid=x1-2 corresponds to x2[n-1] here
-        // Original: *x2.offset((n-1) as isize) where x2 starts at frame data
-        // But our x2 slice also starts 2 before frame data, same as x1.
-        // In the C code, x2 was pointing at frame start (offset 2 in inputBuf).
-        // mid was x1-2 = pointing 2 before frame start.
-        // The output was *x2.offset((n-1) as isize) = x2[n-1] relative to frame start.
-        // But in our caller, x2 also starts 2 before frame start (same offset as x1).
-        // So we need x2[n-1+2] = x2[n+1] to match.
-        // Wait, let me re-examine...
-        // In the C caller (enc_API.rs): x1 = &inputBuf[2], x2 = &inputBuf[2]
-        // In C original: mid = x1 - 2 = &inputBuf[0]
-        // Output: x2[n-1] where n goes from 0..interp_len
-        // But our x1 starts at inputBuf[0] (caller passes &inputBuf[0..frame_length+2])
-        // so mid = x1 directly (no offset needed)
-        // x2 also starts at inputBuf[0], so output x2[n-1]... but n starts at 0, giving x2[-1]?
-        //
-        // Actually in the original, the caller passes &inputBuf[2] for both x1 and x2.
-        // mid = x1 - 2 = &inputBuf[0], and mid[n] for n=0..frame_length+2 covers inputBuf[0..frame_length+2]
-        // x2[n-1] for n=0 gives x2[-1] = inputBuf[1], which is the last history sample.
-        //
-        // For our safe version, we'll change the caller to pass &inputBuf[0..frame_length+2]
-        // for both x1 and x2, and adjust the x2 write index accordingly.
-        // x2 output index: in C, x2.offset(n-1) = inputBuf[2 + n - 1] = inputBuf[n+1]
-        // In our version with x2 starting at inputBuf[0]: x2[n+1]
-        x2[(n + 1) as usize] =
-            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        // SAFETY: n ranges over 0..interp_len (< frame_length); x1/side have length
+        // frame_length+2, x2 has length frame_length+2. Indices n, n+1, n+2 are in bounds.
+        unsafe {
+            sum = (((*x1.get_unchecked(n as usize) as i32
+                + *x1.get_unchecked((n + 2) as usize) as i32
+                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32) as u32)
+                << 9) as i32;
+            sum = (((w_Q24 as i64 * *side.get_unchecked((n + 1) as usize) as i64) >> 16) as i32
+                as i64
+                + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
+            sum = (sum as i64
+                + ((((*x1.get_unchecked((n + 1) as usize) as i32 as u32) << 11) as i32 as i64
+                    * pred1_Q13 as i16 as i64)
+                    >> 16)) as i32;
+            *x2.get_unchecked_mut((n + 1) as usize) =
+                (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        }
         n += 1;
     }
     pred0_Q13 = -pred_Q13[0_usize];
@@ -312,18 +306,23 @@ pub fn silk_stereo_LR_to_MS(
     w_Q24 = ((width_Q14 as u32) << 10) as i32;
     n = STEREO_INTERP_LEN_MS as i32 * fs_kHz;
     while n < frame_length {
-        sum = (((x1[n as usize] as i32
-            + x1[(n + 2) as usize] as i32
-            + ((x1[(n + 1) as usize] as u32) << 1) as i32) as u32)
-            << 9) as i32;
-        sum = (((w_Q24 as i64 * side[(n + 1) as usize] as i64) >> 16) as i32 as i64
-            + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
-        sum = (sum as i64
-            + ((((x1[(n + 1) as usize] as i32 as u32) << 11) as i32 as i64
-                * pred1_Q13 as i16 as i64)
-                >> 16)) as i32;
-        x2[(n + 1) as usize] =
-            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        // SAFETY: n ranges over interp_len..frame_length; x1/side have length
+        // frame_length+2, x2 has length frame_length+2. Indices n, n+1, n+2 are in bounds.
+        unsafe {
+            sum = (((*x1.get_unchecked(n as usize) as i32
+                + *x1.get_unchecked((n + 2) as usize) as i32
+                + ((*x1.get_unchecked((n + 1) as usize) as u32) << 1) as i32) as u32)
+                << 9) as i32;
+            sum = (((w_Q24 as i64 * *side.get_unchecked((n + 1) as usize) as i64) >> 16) as i32
+                as i64
+                + ((sum as i64 * pred0_Q13 as i16 as i64) >> 16)) as i32;
+            sum = (sum as i64
+                + ((((*x1.get_unchecked((n + 1) as usize) as i32 as u32) << 11) as i32 as i64
+                    * pred1_Q13 as i16 as i64)
+                    >> 16)) as i32;
+            *x2.get_unchecked_mut((n + 1) as usize) =
+                (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        }
         n += 1;
     }
     state.pred_prev_Q13[0_usize] = pred_Q13[0_usize] as i16;

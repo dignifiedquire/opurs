@@ -357,13 +357,13 @@ pub fn pvq_v(n: u32, k: u32) -> u32 {
 pub fn icwrs(n: usize, y: &[i32]) -> u32 {
     debug_assert!(n >= 2);
     let mut j = n - 1;
-    let mut i = (y[j] < 0) as u32;
-    let mut k = y[j].unsigned_abs();
+    let mut i = (unsafe { *y.get_unchecked(j) } < 0) as u32;
+    let mut k = unsafe { *y.get_unchecked(j) }.unsigned_abs();
     loop {
         j -= 1;
         i = i.wrapping_add(pvq_u(n as u32 - j as u32, k));
-        k += y[j].unsigned_abs();
-        if y[j] < 0 {
+        k += unsafe { *y.get_unchecked(j) }.unsigned_abs();
+        if unsafe { *y.get_unchecked(j) } < 0 {
             i = i.wrapping_add(pvq_u(n as u32 - j as u32, k + 1));
         }
         if j == 0 {
@@ -424,7 +424,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
             q = pvq_u((k + 1) as u32, n as u32);
             if p <= i && i < q {
                 i = i.wrapping_sub(p);
-                y[yi] = 0;
+                unsafe { *y.get_unchecked_mut(yi) = 0; }
                 yi += 1;
             } else {
                 s = -((i >= q) as i32);
@@ -439,7 +439,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
                 }
                 i = i.wrapping_sub(p);
                 val = ((k0 - k + s) ^ s) as i16;
-                y[yi] = val as i32;
+                unsafe { *y.get_unchecked_mut(yi) = val as i32; }
                 yi += 1;
                 yy += val as f32 * val as f32;
             }
@@ -455,12 +455,12 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
         i = i.wrapping_sub((2 * k - 1) as u32);
     }
     val = ((k0 - k + s) ^ s) as i16;
-    y[yi] = val as i32;
+    unsafe { *y.get_unchecked_mut(yi) = val as i32; }
     yi += 1;
     yy += val as f32 * val as f32;
     s = -(i as i32);
     val = ((k + s) ^ s) as i16;
-    y[yi] = val as i32;
+    unsafe { *y.get_unchecked_mut(yi) = val as i32; }
     yy += val as f32 * val as f32;
     yy
 }

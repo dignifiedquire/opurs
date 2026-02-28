@@ -65,38 +65,45 @@ pub fn silk_NLSF_encode(
     let mut tempIndices2 = [0i8; MAX_SURVIVORS * MAX_LPC_ORDER];
     s = 0;
     while s < nSurvivors {
-        ind1 = tempIndices1[s as usize];
+        ind1 = unsafe { *tempIndices1.get_unchecked(s as usize) };
         let pCB_element = &psNLSF_CB.CB1_NLSF_Q8[(ind1 * psNLSF_CB.order as i32) as usize..];
         let pCB_Wght_Q9 = &psNLSF_CB.CB1_Wght_Q9[(ind1 * psNLSF_CB.order as i32) as usize..];
         i = 0;
         while i < psNLSF_CB.order as i32 {
-            NLSF_tmp_Q15[i as usize] = ((pCB_element[i as usize] as i16 as u16 as i32) << 7) as i16;
-            W_tmp_Q9 = pCB_Wght_Q9[i as usize] as i32;
-            res_Q10[i as usize] = (((pNLSF_Q15[i as usize] as i32 - NLSF_tmp_Q15[i as usize] as i32)
-                as i16 as i32
-                * W_tmp_Q9 as i16 as i32)
-                >> 14) as i16;
-            W_adj_Q5[i as usize] = silk_DIV32_varQ(
-                pW_Q2[i as usize] as i32,
-                W_tmp_Q9 as i16 as i32 * W_tmp_Q9 as i16 as i32,
-                21,
-            ) as i16;
+            unsafe {
+                *NLSF_tmp_Q15.get_unchecked_mut(i as usize) =
+                    ((*pCB_element.get_unchecked(i as usize) as i16 as u16 as i32) << 7) as i16;
+                W_tmp_Q9 = *pCB_Wght_Q9.get_unchecked(i as usize) as i32;
+                *res_Q10.get_unchecked_mut(i as usize) =
+                    (((*pNLSF_Q15.get_unchecked(i as usize) as i32
+                        - *NLSF_tmp_Q15.get_unchecked(i as usize) as i32)
+                        as i16 as i32
+                        * W_tmp_Q9 as i16 as i32)
+                        >> 14) as i16;
+                *W_adj_Q5.get_unchecked_mut(i as usize) = silk_DIV32_varQ(
+                    *pW_Q2.get_unchecked(i as usize) as i32,
+                    W_tmp_Q9 as i16 as i32 * W_tmp_Q9 as i16 as i32,
+                    21,
+                ) as i16;
+            }
             i += 1;
         }
         silk_NLSF_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, ind1);
         let idx_start = (s * MAX_LPC_ORDER as i32) as usize;
-        RD_Q25[s as usize] = silk_NLSF_del_dec_quant(
-            &mut tempIndices2[idx_start..idx_start + MAX_LPC_ORDER],
-            &res_Q10,
-            &W_adj_Q5,
-            &pred_Q8,
-            &ec_ix,
-            psNLSF_CB.ec_Rates_Q5,
-            psNLSF_CB.quantStepSize_Q16 as i32,
-            psNLSF_CB.invQuantStepSize_Q6,
-            NLSF_mu_Q20,
-            psNLSF_CB.order,
-        );
+        unsafe {
+            *RD_Q25.get_unchecked_mut(s as usize) = silk_NLSF_del_dec_quant(
+                &mut tempIndices2[idx_start..idx_start + MAX_LPC_ORDER],
+                &res_Q10,
+                &W_adj_Q5,
+                &pred_Q8,
+                &ec_ix,
+                psNLSF_CB.ec_Rates_Q5,
+                psNLSF_CB.quantStepSize_Q16 as i32,
+                psNLSF_CB.invQuantStepSize_Q6,
+                NLSF_mu_Q20,
+                psNLSF_CB.order,
+            );
+        }
         let iCDF_ptr =
             &(psNLSF_CB.CB1_iCDF)[((signalType >> 1) * psNLSF_CB.nVectors as i32) as usize..];
         if ind1 == 0 {
@@ -105,7 +112,10 @@ pub fn silk_NLSF_encode(
             prob_Q8 = iCDF_ptr[(ind1 - 1) as usize] as i32 - iCDF_ptr[ind1 as usize] as i32;
         }
         bits_q7 = ((8) << 7) - silk_lin2log(prob_Q8);
-        RD_Q25[s as usize] += bits_q7 as i16 as i32 * (NLSF_mu_Q20 >> 2) as i16 as i32;
+        unsafe {
+            *RD_Q25.get_unchecked_mut(s as usize) +=
+                bits_q7 as i16 as i32 * (NLSF_mu_Q20 >> 2) as i16 as i32;
+        }
         s += 1;
     }
     silk_insertion_sort_increasing(
@@ -114,7 +124,7 @@ pub fn silk_NLSF_encode(
         nSurvivors,
         1,
     );
-    NLSFIndices[0] = tempIndices1[bestIndex as usize] as i8;
+    NLSFIndices[0] = unsafe { *tempIndices1.get_unchecked(bestIndex as usize) } as i8;
     let best_start = (bestIndex * 16) as usize;
     NLSFIndices[1..1 + order].copy_from_slice(&tempIndices2[best_start..best_start + order]);
     silk_NLSF_decode(

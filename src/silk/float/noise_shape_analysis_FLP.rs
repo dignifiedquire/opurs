@@ -30,11 +30,15 @@ fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
     let mut i: i32;
     let mut gain: f32;
     lambda = -lambda;
-    gain = coefs[(order - 1) as usize];
-    i = order - 2;
-    while i >= 0 {
-        gain = lambda * gain + coefs[i as usize];
-        i -= 1;
+    // SAFETY: order-1 and i range over 0..order where order <= MAX_SHAPE_LPC_ORDER (24).
+    // Caller guarantees coefs has at least `order` elements.
+    unsafe {
+        gain = *coefs.get_unchecked((order - 1) as usize);
+        i = order - 2;
+        while i >= 0 {
+            gain = lambda * gain + *coefs.get_unchecked(i as usize);
+            i -= 1;
+        }
     }
     1.0f32 / (1.0f32 - lambda * gain)
 }
@@ -48,56 +52,69 @@ fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i3
     let mut maxabs: f32;
     let mut chirp: f32;
     let mut gain: f32;
-    i = order - 1;
-    while i > 0 {
-        coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
-        i -= 1;
-    }
-    gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * coefs[0]);
-    i = 0;
-    while i < order {
-        coefs[i as usize] *= gain;
-        i += 1;
+    // SAFETY: All indices i range over 0..order where order <= MAX_SHAPE_LPC_ORDER (24).
+    // Caller guarantees coefs has at least `order` elements.
+    unsafe {
+        i = order - 1;
+        while i > 0 {
+            *coefs.get_unchecked_mut((i - 1) as usize) -=
+                lambda * *coefs.get_unchecked(i as usize);
+            i -= 1;
+        }
+        gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * *coefs.get_unchecked(0));
+        i = 0;
+        while i < order {
+            *coefs.get_unchecked_mut(i as usize) *= gain;
+            i += 1;
+        }
     }
     iter = 0;
     while iter < 10 {
-        maxabs = -1.0f32;
-        i = 0;
-        while i < order {
-            tmp = coefs[i as usize].abs();
-            if tmp > maxabs {
-                maxabs = tmp;
-                ind = i;
+        // SAFETY: i ranges over 0..order where order <= 24.
+        unsafe {
+            maxabs = -1.0f32;
+            i = 0;
+            while i < order {
+                tmp = coefs.get_unchecked(i as usize).abs();
+                if tmp > maxabs {
+                    maxabs = tmp;
+                    ind = i;
+                }
+                i += 1;
             }
-            i += 1;
-        }
-        if maxabs <= limit {
-            return;
-        }
-        i = 1;
-        while i < order {
-            coefs[(i - 1) as usize] += lambda * coefs[i as usize];
-            i += 1;
-        }
-        gain = 1.0f32 / gain;
-        i = 0;
-        while i < order {
-            coefs[i as usize] *= gain;
-            i += 1;
+            if maxabs <= limit {
+                return;
+            }
+            i = 1;
+            while i < order {
+                *coefs.get_unchecked_mut((i - 1) as usize) +=
+                    lambda * *coefs.get_unchecked(i as usize);
+                i += 1;
+            }
+            gain = 1.0f32 / gain;
+            i = 0;
+            while i < order {
+                *coefs.get_unchecked_mut(i as usize) *= gain;
+                i += 1;
+            }
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
         silk_bwexpander_FLP(coefs, order, chirp);
-        i = order - 1;
-        while i > 0 {
-            coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
-            i -= 1;
-        }
-        gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * coefs[0]);
-        i = 0;
-        while i < order {
-            coefs[i as usize] *= gain;
-            i += 1;
+        // SAFETY: i ranges over 0..order where order <= 24.
+        unsafe {
+            i = order - 1;
+            while i > 0 {
+                *coefs.get_unchecked_mut((i - 1) as usize) -=
+                    lambda * *coefs.get_unchecked(i as usize);
+                i -= 1;
+            }
+            gain = (1.0f32 - lambda * lambda) / (1.0f32 + lambda * *coefs.get_unchecked(0));
+            i = 0;
+            while i < order {
+                *coefs.get_unchecked_mut(i as usize) *= gain;
+                i += 1;
+            }
         }
         iter += 1;
     }
@@ -114,14 +131,17 @@ fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
     iter = 0;
     while iter < 10 {
         maxabs = -1.0f32;
-        i = 0;
-        while i < order {
-            tmp = coefs[i as usize].abs();
-            if tmp > maxabs {
-                maxabs = tmp;
-                ind = i;
+        // SAFETY: i ranges over 0..order where order <= MAX_SHAPE_LPC_ORDER (24).
+        unsafe {
+            i = 0;
+            while i < order {
+                tmp = coefs.get_unchecked(i as usize).abs();
+                if tmp > maxabs {
+                    maxabs = tmp;
+                    ind = i;
+                }
+                i += 1;
             }
-            i += 1;
         }
         if maxabs <= limit {
             return;
@@ -258,13 +278,19 @@ pub fn silk_noise_shape_analysis_FLP(
             &rc,
             psEnc.sCmn.shapingLPCOrder,
         );
-        psEncCtrl.Gains[k as usize] = celt_sqrt(nrg);
+        // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
+        unsafe {
+            *psEncCtrl.Gains.get_unchecked_mut(k as usize) = celt_sqrt(nrg);
+        }
         if psEnc.sCmn.warping_Q16 > 0 {
-            psEncCtrl.Gains[k as usize] *= warped_gain(
-                &(&psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
-                warping,
-                psEnc.sCmn.shapingLPCOrder,
-            );
+            // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
+            unsafe {
+                *psEncCtrl.Gains.get_unchecked_mut(k as usize) *= warped_gain(
+                    &(&psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
+                    warping,
+                    psEnc.sCmn.shapingLPCOrder,
+                );
+            }
         }
         silk_bwexpander_FLP(
             &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
@@ -291,8 +317,11 @@ pub fn silk_noise_shape_analysis_FLP(
     let gain_add: f32 = silk_exp2(0.16f32 * MIN_QGAIN_DB as f32);
     k = 0;
     while k < psEnc.sCmn.nb_subfr as i32 {
-        psEncCtrl.Gains[k as usize] *= gain_mult;
-        psEncCtrl.Gains[k as usize] += gain_add;
+        // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
+        unsafe {
+            *psEncCtrl.Gains.get_unchecked_mut(k as usize) *= gain_mult;
+            *psEncCtrl.Gains.get_unchecked_mut(k as usize) += gain_add;
+        }
         k += 1;
     }
     strength = LOW_FREQ_SHAPING
@@ -304,9 +333,13 @@ pub fn silk_noise_shape_analysis_FLP(
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         k = 0;
         while k < psEnc.sCmn.nb_subfr as i32 {
-            b = 0.2f32 / psEnc.sCmn.fs_kHz as f32 + 3.0f32 / psEncCtrl.pitchL[k as usize] as f32;
-            psEncCtrl.LF_MA_shp[k as usize] = -1.0f32 + b;
-            psEncCtrl.LF_AR_shp[k as usize] = 1.0f32 - b - b * strength;
+            // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
+            unsafe {
+                b = 0.2f32 / psEnc.sCmn.fs_kHz as f32
+                    + 3.0f32 / *psEncCtrl.pitchL.get_unchecked(k as usize) as f32;
+                *psEncCtrl.LF_MA_shp.get_unchecked_mut(k as usize) = -1.0f32 + b;
+                *psEncCtrl.LF_AR_shp.get_unchecked_mut(k as usize) = 1.0f32 - b - b * strength;
+            }
             k += 1;
         }
         Tilt = -HP_NOISE_COEF
@@ -320,8 +353,13 @@ pub fn silk_noise_shape_analysis_FLP(
         psEncCtrl.LF_AR_shp[0_usize] = 1.0f32 - b - b * strength * 0.6f32;
         k = 1;
         while k < psEnc.sCmn.nb_subfr as i32 {
-            psEncCtrl.LF_MA_shp[k as usize] = psEncCtrl.LF_MA_shp[0_usize];
-            psEncCtrl.LF_AR_shp[k as usize] = psEncCtrl.LF_AR_shp[0_usize];
+            // SAFETY: k ranges over 1..nb_subfr where nb_subfr <= 4.
+            unsafe {
+                *psEncCtrl.LF_MA_shp.get_unchecked_mut(k as usize) =
+                    *psEncCtrl.LF_MA_shp.get_unchecked(0);
+                *psEncCtrl.LF_AR_shp.get_unchecked_mut(k as usize) =
+                    *psEncCtrl.LF_AR_shp.get_unchecked(0);
+            }
             k += 1;
         }
         Tilt = -HP_NOISE_COEF;
@@ -338,9 +376,15 @@ pub fn silk_noise_shape_analysis_FLP(
     while k < psEnc.sCmn.nb_subfr as i32 {
         psShapeSt.HarmShapeGain_smth +=
             SUBFR_SMTH_COEF * (HarmShapeGain - psShapeSt.HarmShapeGain_smth);
-        psEncCtrl.HarmShapeGain[k as usize] = psShapeSt.HarmShapeGain_smth;
+        // SAFETY: k ranges over 0..nb_subfr where nb_subfr <= 4.
+        unsafe {
+            *psEncCtrl.HarmShapeGain.get_unchecked_mut(k as usize) =
+                psShapeSt.HarmShapeGain_smth;
+        }
         psShapeSt.Tilt_smth += SUBFR_SMTH_COEF * (Tilt - psShapeSt.Tilt_smth);
-        psEncCtrl.Tilt[k as usize] = psShapeSt.Tilt_smth;
+        unsafe {
+            *psEncCtrl.Tilt.get_unchecked_mut(k as usize) = psShapeSt.Tilt_smth;
+        }
         k += 1;
     }
 }
