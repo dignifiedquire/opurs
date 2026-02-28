@@ -479,8 +479,8 @@ pub fn unquant_coarse_energy(
     C: i32,
     LM: i32,
 ) {
-    // Safety: LM in [0,3], intra in {0,1}; tables are [4], [4][2][42].
-    let prob_model = unsafe { E_PROB_MODEL.get_unchecked(LM as usize).get_unchecked(intra as usize) };
+    // LM in [0,3], intra in {0,1}. & 3 / & 1 let LLVM prove in-bounds.
+    let prob_model = &E_PROB_MODEL[LM as usize & 3][intra as usize & 1];
     let mut prev: [f32; 2] = [0.0, 0.0];
     let coef: f32;
     let beta: f32;
@@ -489,8 +489,8 @@ pub fn unquant_coarse_energy(
         coef = 0.0;
         beta = BETA_INTRA;
     } else {
-        beta = unsafe { *BETA_COEF.get_unchecked(LM as usize) };
-        coef = unsafe { *PRED_COEF.get_unchecked(LM as usize) };
+        beta = BETA_COEF[LM as usize & 3];
+        coef = PRED_COEF[LM as usize & 3];
     }
     let budget = dec.storage.wrapping_mul(8) as i32;
     for i in start..end {

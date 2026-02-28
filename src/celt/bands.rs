@@ -170,17 +170,20 @@ pub fn hysteresis_decision(
     prev: i32,
 ) -> i32 {
     let mut i: i32 = 0;
+    // Pre-slice to N so LLVM knows loop bound matches slice length.
+    let thresholds = &thresholds[..N as usize];
+    let hysteresis = &hysteresis[..N as usize];
     while i < N {
-        if val < unsafe { *thresholds.get_unchecked(i as usize) } {
+        if val < thresholds[i as usize] {
             break;
         }
         i += 1;
     }
-    // Safety: prev is in [0, N), thresholds/hysteresis have N elements.
-    if i > prev && val < unsafe { *thresholds.get_unchecked(prev as usize) } + unsafe { *hysteresis.get_unchecked(prev as usize) } {
+    // prev is in [0, N): i > prev implies prev < N; i < prev implies prev >= 1.
+    if i > prev && val < thresholds[prev as usize] + hysteresis[prev as usize] {
         i = prev;
     }
-    if i < prev && val > unsafe { *thresholds.get_unchecked((prev - 1) as usize) } - unsafe { *hysteresis.get_unchecked((prev - 1) as usize) } {
+    if i < prev && val > thresholds[(prev - 1) as usize] - hysteresis[(prev - 1) as usize] {
         i = prev;
     }
     i
@@ -458,8 +461,8 @@ fn intensity_stereo(
     let norm = EPSILON + celt_sqrt(1e-15f32 + left * left + right * right);
     let a1 = left / norm;
     let a2 = right / norm;
-    // SAFETY: X and Y are >= N (function precondition from caller).
-    for (x, &r) in unsafe { X.get_unchecked_mut(..N as usize) }.iter_mut().zip(unsafe { Y.get_unchecked(..N as usize) }) {
+    // Pre-slice + .zip() — LLVM elides bounds checks in the iterator.
+    for (x, &r) in X[..N as usize].iter_mut().zip(&Y[..N as usize]) {
         let l = *x;
         *x = a1 * l + a2 * r;
     }
@@ -468,8 +471,8 @@ fn intensity_stereo(
 /// Upstream C: celt/bands.c:stereo_split
 #[inline]
 fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
-    // SAFETY: X and Y are >= N (function precondition from caller).
-    for (x, y) in unsafe { X.get_unchecked_mut(..N as usize) }.iter_mut().zip(unsafe { Y.get_unchecked_mut(..N as usize) }.iter_mut()) {
+    // Pre-slice + .zip() — LLVM elides bounds checks in the iterator.
+    for (x, y) in X[..N as usize].iter_mut().zip(Y[..N as usize].iter_mut()) {
         let l = std::f32::consts::FRAC_1_SQRT_2 * *x;
         let r = std::f32::consts::FRAC_1_SQRT_2 * *y;
         *x = l + r;
@@ -481,19 +484,19 @@ fn stereo_split(X: &mut [f32], Y: &mut [f32], N: i32) {
 #[inline]
 fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: Arch) {
     let n = N as usize;
-    // SAFETY: X and Y are >= N (function precondition from caller).
-    let (xp, side) = dual_inner_prod(unsafe { Y.get_unchecked(..n) }, unsafe { X.get_unchecked(..n) }, unsafe { Y.get_unchecked(..n) }, n, _arch);
+    // Pre-slice + .zip() — LLVM elides bounds checks.
+    let (xp, side) = dual_inner_prod(&Y[..n], &X[..n], &Y[..n], n, _arch);
     let xp = mid * xp;
     let mid2 = mid;
     let El = mid2 * mid2 + side - 2.0f32 * xp;
     let Er = mid2 * mid2 + side + 2.0f32 * xp;
     if Er < 6e-4f32 || El < 6e-4f32 {
-        unsafe { Y.get_unchecked_mut(..n) }.copy_from_slice(unsafe { X.get_unchecked(..n) });
+        Y[..n].copy_from_slice(&X[..n]);
         return;
     }
     let lgain = celt_rsqrt_norm(El);
     let rgain = celt_rsqrt_norm(Er);
-    for (x, y) in unsafe { X.get_unchecked_mut(..N as usize) }.iter_mut().zip(unsafe { Y.get_unchecked_mut(..N as usize) }.iter_mut()) {
+    for (x, y) in X[..N as usize].iter_mut().zip(Y[..N as usize].iter_mut()) {
         let l = mid * *x;
         let r = *y;
         *x = lgain * (l - r);
@@ -695,8 +698,8 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
     let qn = if qb < (1) << BITRES >> 1 {
         1
     } else {
-        // Safety: qb & 0x7 is always in [0, 7], table has 8 entries.
-        let raw = (unsafe { *EXP2_TABLE8.get_unchecked((qb & 0x7) as usize) }) as i32 >> (14 - (qb >> BITRES));
+        // qb & 0x7 is always in [0, 7]; table has 8 entries. LLVM elides bounds check.
+        let raw = EXP2_TABLE8[(qb & 0x7) as usize] as i32 >> (14 - (qb >> BITRES));
         ((raw + 1) >> 1) << 1
     };
     debug_assert!(qn <= 256);
@@ -1583,9 +1586,9 @@ fn quant_band(
         if let Some(ref mut lb) = lb_work {
             haar1(unsafe { lb.get_unchecked_mut(..N as usize) }, N >> k, (1) << k);
         }
-        // SAFETY: fill & 0xf is always 0-15, fill >> 4 bounded by fill being small.
-        fill = (unsafe { *BIT_INTERLEAVE_TABLE.get_unchecked((fill & 0xf) as usize) }) as i32
-            | ((unsafe { *BIT_INTERLEAVE_TABLE.get_unchecked((fill >> 4) as usize) }) as i32) << 2;
+        // fill & 0xf is always 0-15; table has 16 entries. LLVM elides bounds check.
+        fill = BIT_INTERLEAVE_TABLE[(fill & 0xf) as usize] as i32
+            | (BIT_INTERLEAVE_TABLE[(fill >> 4 & 0xf) as usize] as i32) << 2;
         k += 1;
     }
     B >>= recombine;
@@ -1666,8 +1669,8 @@ fn quant_band(
 
         k = 0;
         while k < recombine {
-            // SAFETY: cm < 16 at this point (bounded by B after masking).
-            cm = (unsafe { *BIT_DEINTERLEAVE_TABLE.get_unchecked(cm as usize) }) as u32;
+            // cm < 16 (bounded by B after masking). & 0xf lets LLVM prove in-bounds.
+            cm = BIT_DEINTERLEAVE_TABLE[cm as usize & 0xf] as u32;
             haar1(unsafe { X.get_unchecked_mut(..N as usize) }, N0 >> k, (1) << k);
             k += 1;
         }

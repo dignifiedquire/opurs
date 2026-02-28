@@ -72,28 +72,24 @@ fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
     let len = len as usize;
     let stride = stride as usize;
-    // SAFETY: X.len() >= len (caller passes exact sub-slice from exp_rotation).
-    let X = unsafe { X.get_unchecked_mut(..len) };
-    // Forward pass
+    // Pre-slice so LLVM knows X.len() == len and can elide bounds checks.
+    let X = &mut X[..len];
+    // Forward pass: i < len - stride, so i + stride < len = X.len().
     if stride < len {
         for i in 0..len - stride {
-            unsafe {
-                let x1 = *X.get_unchecked(i);
-                let x2 = *X.get_unchecked(i + stride);
-                *X.get_unchecked_mut(i + stride) = c * x2 + s * x1;
-                *X.get_unchecked_mut(i) = c * x1 + ms * x2;
-            }
+            let x1 = X[i];
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
+            X[i] = c * x1 + ms * x2;
         }
     }
     // Backward pass
     if len >= 2 * stride + 1 {
         for i in (0..=len - 2 * stride - 1).rev() {
-            unsafe {
-                let x1 = *X.get_unchecked(i);
-                let x2 = *X.get_unchecked(i + stride);
-                *X.get_unchecked_mut(i + stride) = c * x2 + s * x1;
-                *X.get_unchecked_mut(i) = c * x1 + ms * x2;
-            }
+            let x1 = X[i];
+            let x2 = X[i + stride];
+            X[i + stride] = c * x2 + s * x1;
+            X[i] = c * x1 + ms * x2;
         }
     }
 }
@@ -118,10 +114,12 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
         }
     }
     len = celt_udiv(len as u32, stride as u32) as i32;
+    let total = (stride * len) as usize;
+    debug_assert!(total <= X.len());
+    let X = &mut X[..total]; // pre-slice so LLVM can prove sub-slice bounds
     for i in 0..stride {
         let off = (i * len) as usize;
-        // SAFETY: stride * len <= original len (celt_udiv ensures this).
-        let sub = unsafe { X.get_unchecked_mut(off..off + len as usize) };
+        let sub = &mut X[off..off + len as usize];
         if dir < 0 {
             if stride2 != 0 {
                 exp_rotation1(sub, len, stride2, s, c);
@@ -141,8 +139,8 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
 fn normalise_residual(iy: &[i32], X: &mut [f32], N: i32, Ryy: f32, gain: f32) {
     let g = celt_rsqrt_norm(Ryy) * gain;
     let n = N as usize;
-    // SAFETY: X and iy are >= N (function precondition from caller).
-    for (x, &y) in unsafe { X.get_unchecked_mut(..n) }.iter_mut().zip(unsafe { iy.get_unchecked(..n) }) {
+    // Pre-slice both to n, then .zip() avoids all bounds checks.
+    for (x, &y) in X[..n].iter_mut().zip(&iy[..n]) {
         *x = g * y as f32;
     }
 }
@@ -726,8 +724,8 @@ pub fn alg_unquant(
     debug_assert!(N > 1);
     let mut iy = [0i32; 176];
     #[allow(unused_mut)]
-    // SAFETY: N <= 176 (max CELT band size, iy is [i32; 176]).
-    let mut Ryy = decode_pulses(unsafe { iy.get_unchecked_mut(..N as usize) }, K, dec);
+    // N <= 176 (max CELT band size, iy is [i32; 176]).
+    let mut Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
     #[allow(unused_assignments, unused_mut)]
     let mut yy_shift: i32 = 0;
 
@@ -849,11 +847,11 @@ pub fn alg_unquant(
 /// Upstream C: celt/vq.c:renormalise_vector
 #[inline]
 pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
-    // SAFETY: X.len() >= N (function precondition from caller).
-    let x_n = unsafe { X.get_unchecked(..N as usize) };
+    // Pre-slice to N; iterator avoids bounds checks in the loop.
+    let x_n = &X[..N as usize];
     let E = EPSILON + celt_inner_prod(x_n, x_n, N as usize, _arch);
     let g = celt_rsqrt_norm(E) * gain;
-    for xi in unsafe { X.get_unchecked_mut(..N as usize) }.iter_mut() {
+    for xi in X[..N as usize].iter_mut() {
         *xi *= g;
     }
 }
@@ -866,17 +864,17 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> 
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
     let n = N as usize;
-    // SAFETY: X and Y are >= N elements (function precondition from caller).
+    // Pre-slice both to n; .zip() and celt_inner_prod avoid bounds checks.
     if stereo != 0 {
-        for (&x, &y) in unsafe { X.get_unchecked(..n) }.iter().zip(unsafe { Y.get_unchecked(..n) }) {
+        for (&x, &y) in X[..n].iter().zip(&Y[..n]) {
             let m = x + y;
             let s = x - y;
             Emid += m * m;
             Eside += s * s;
         }
     } else {
-        let x_n = unsafe { X.get_unchecked(..n) };
-        let y_n = unsafe { Y.get_unchecked(..n) };
+        let x_n = &X[..n];
+        let y_n = &Y[..n];
         Emid += celt_inner_prod(x_n, x_n, n, _arch);
         Eside += celt_inner_prod(y_n, y_n, n, _arch);
     }

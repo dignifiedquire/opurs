@@ -963,18 +963,19 @@ fn tf_decode(
         i += 1;
     }
     tf_select = 0;
-    // Safety: LM in [0,3], isTransient in {0,1}, tf_changed in {0,1},
-    // so table indices are in [0,7] for tf_select_table[4][8].
+    // LM in [0,3], isTransient/tf_changed/tf_select in {0,1}.
+    // & 3 / & 7 masks let LLVM prove table indices in-bounds for [4][8].
+    let lm_idx = LM as usize & 3;
     if tf_select_rsv != 0
-        && unsafe { *tf_select_table.get_unchecked(LM as usize).get_unchecked(((4 * isTransient) + tf_changed) as usize) } as i32
-            != unsafe { *tf_select_table.get_unchecked(LM as usize).get_unchecked((4 * isTransient + 2 + tf_changed) as usize) } as i32
+        && tf_select_table[lm_idx][((4 * isTransient) + tf_changed) as usize & 7] as i32
+            != tf_select_table[lm_idx][(4 * isTransient + 2 + tf_changed) as usize & 7] as i32
     {
         tf_select = ec_dec_bit_logp(dec, 1);
     }
     i = start;
     while i < end {
-        unsafe { *tf_res.get_unchecked_mut(i as usize) = *tf_select_table.get_unchecked(LM as usize)
-            .get_unchecked((4 * isTransient + 2 * tf_select + *tf_res.get_unchecked(i as usize)) as usize)
+        unsafe { *tf_res.get_unchecked_mut(i as usize) = tf_select_table[lm_idx]
+            [(4 * isTransient + 2 * tf_select + *tf_res.get_unchecked(i as usize)) as usize & 7]
             as i32; }
         i += 1;
     }

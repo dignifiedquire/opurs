@@ -134,10 +134,10 @@ pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
     l = EC_CLZ0 - (this.rng).leading_zeros() as i32;
     r = this.rng >> (l - 16);
     b = (r >> 12).wrapping_sub(8);
-    // b is always in [0,7]: r is 16-bit (rng >> (l-16)), so r>>12 is in [0,15],
-    // minus 8 wraps to [0,7] for valid range values.
+    // b is always in [0,7]: r is 16-bit (rng >> (l-16)), so r>>12 is in [8,15],
+    // minus 8 gives [0,7]. The & 7 mask is a no-op but lets LLVM prove in-bounds.
     b = b.wrapping_add(
-        (r > unsafe { *correction.get_unchecked(b as usize) }) as i32 as u32,
+        (r > correction[b as usize & 7]) as i32 as u32,
     );
     l = ((l << 3) as u32).wrapping_add(b) as i32;
     nbits.wrapping_sub(l as u32)
