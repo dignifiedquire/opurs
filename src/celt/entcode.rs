@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `celt/entcode.c`, `celt/entcode.h`
 
-#![forbid(unsafe_code)]
+#![allow(unsafe_code)]
 
 use crate::silk::macros::EC_CLZ0;
 
@@ -134,7 +134,11 @@ pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
     l = EC_CLZ0 - (this.rng).leading_zeros() as i32;
     r = this.rng >> (l - 16);
     b = (r >> 12).wrapping_sub(8);
-    b = b.wrapping_add((r > correction[b as usize]) as i32 as u32);
+    // b is always in [0,7]: r is 16-bit (rng >> (l-16)), so r>>12 is in [0,15],
+    // minus 8 wraps to [0,7] for valid range values.
+    b = b.wrapping_add(
+        (r > unsafe { *correction.get_unchecked(b as usize) }) as i32 as u32,
+    );
     l = ((l << 3) as u32).wrapping_add(b) as i32;
     nbits.wrapping_sub(l as u32)
 }
