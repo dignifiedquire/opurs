@@ -33,7 +33,7 @@ use crate::celt::entenc::{
     ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
     ec_enc_uint,
 };
-use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
+use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt, float2int_nonneg};
 use crate::celt::mdct::mdct_forward;
 #[cfg(feature = "qext")]
 use crate::celt::modes::compute_qext_mode;
@@ -2136,7 +2136,7 @@ fn run_prefilter(
         if ((gain1 - st.prefilter_gain).abs()) < 0.1f32 {
             gain1 = st.prefilter_gain;
         }
-        qg = (0.5f32 + gain1 * 32_f32 / 3_f32).floor() as i32 - 1;
+        qg = float2int_nonneg(0.5f32 + gain1 * 32_f32 / 3_f32) - 1;
         qg = if 0 > (if (7) < qg { 7 } else { qg }) {
             0
         } else if (7) < qg {

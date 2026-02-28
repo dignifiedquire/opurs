@@ -123,6 +123,7 @@ pub fn celt_sudiv(n: i32, d: i32) -> i32 {
 }
 
 /// Upstream C: celt/entcode.c:ec_tell_frac
+#[inline]
 pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
     static correction: [u32; 8] = [35733, 38967, 42495, 46340, 50535, 55109, 60097, 65535];
     let mut nbits: u32 = 0;

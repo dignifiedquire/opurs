@@ -306,7 +306,8 @@ fn unext(u: &mut [u32], mut ui0: u32) {
 }
 
 /// Upstream C (SMALL_FOOTPRINT): celt/cwrs.c:ncwrs_urow
-#[inline]
+#[cold]
+#[inline(never)]
 fn pvq_u_fallback(n: u32, k: u32) -> u32 {
     if n == 0 {
         return (k == 0) as u32;
@@ -374,6 +375,7 @@ pub fn icwrs(n: usize, y: &[i32]) -> u32 {
 }
 
 /// Upstream C: celt/cwrs.c:encode_pulses
+#[inline]
 pub fn encode_pulses(y: &[i32], k: i32, enc: &mut ec_enc) {
     let n = y.len();
     debug_assert!(k > 0);
@@ -466,6 +468,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
 }
 
 /// Upstream C: celt/cwrs.c:decode_pulses
+#[inline]
 pub fn decode_pulses(y: &mut [i32], k: i32, dec: &mut ec_dec) -> f32 {
     let n = y.len();
     cwrsi(n, k, ec_dec_uint(dec, pvq_v(n as u32, k as u32)), y)

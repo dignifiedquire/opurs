@@ -7,6 +7,24 @@ use crate::silk::macros::EC_CLZ0;
 
 use std::f32::consts::PI;
 
+/// Fast `floor(x) as i32` for values known to be non-negative.
+///
+/// Rust's `f32::floor()` compiles to a libc `floorf` PLT call, which is
+/// expensive in hot loops. For non-negative values, `floor(x) == x as i32`
+/// (truncation towards zero), so we can skip the call entirely.
+///
+/// # Safety contract (enforced via debug_assert)
+/// The caller guarantees `x >= 0.0` and `x` fits in `i32`.
+#[inline(always)]
+pub fn float2int_nonneg(x: f32) -> i32 {
+    debug_assert!(x >= 0.0, "float2int_nonneg: x={x} is negative");
+    debug_assert!(
+        x < i32::MAX as f32,
+        "float2int_nonneg: x={x} overflows i32"
+    );
+    x as i32
+}
+
 pub const cA: f32 = 0.43157974f32;
 pub const cB: f32 = 0.678_484_f32;
 pub const cC: f32 = 0.08595542f32;

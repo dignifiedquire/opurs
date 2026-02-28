@@ -210,6 +210,7 @@ pub fn bitexact_cos(x: i16) -> i16 {
 }
 
 /// Upstream C: celt/bands.c:bitexact_log2tan
+#[inline]
 pub fn bitexact_log2tan(mut isin: i32, mut icos: i32) -> i32 {
     let lc = EC_CLZ0 - (icos as u32).leading_zeros() as i32;
     let ls = EC_CLZ0 - (isin as u32).leading_zeros() as i32;
@@ -694,7 +695,6 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
 /// needs to split X at varying offsets and pass sub-slices. The pointer
 /// arithmetic is confined to this function.
 /// Upstream C: celt/bands.c:compute_theta
-#[inline(never)]
 fn compute_theta(
     ctx: &mut band_ctx<'_, '_>,
     sctx: &mut split_ctx,

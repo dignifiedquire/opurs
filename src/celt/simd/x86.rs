@@ -299,9 +299,11 @@ pub unsafe fn dual_inner_prod_sse(x: &[f32], y01: &[f32], y02: &[f32], n: usize)
 pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32) -> f32 {
     let n = N as usize;
     // Pad to N+3 for safe SIMD overread + sentinel values.
-    let mut X = vec![0.0f32; n + 3];
-    let mut y = vec![0.0f32; n + 3];
-    let mut signy = vec![0.0f32; n + 3];
+    // Max CELT band size is 176, N+3 <= 179; use stack buffers to avoid heap allocs per band.
+    debug_assert!(n + 3 <= 180);
+    let mut X = [0.0f32; 180];
+    let mut y = [0.0f32; 180];
+    let mut signy = [0.0f32; 180];
 
     X[..n].copy_from_slice(&_X[..n]);
     X[n] = 0.0;

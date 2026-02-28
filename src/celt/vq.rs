@@ -8,7 +8,9 @@ use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;
 use crate::celt::entdec::ec_dec;
 use crate::celt::entenc::ec_enc;
-use crate::celt::mathops::{celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt};
+use crate::celt::mathops::{
+    celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt, float2int_nonneg,
+};
 use crate::celt::pitch::celt_inner_prod;
 
 #[cfg(feature = "qext")]
@@ -855,7 +857,6 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
 /// Returns Q30 value in range [0, 1073741824] (= 2^30).
 /// Callers that need Q14 should right-shift by 16.
 /// Upstream C: celt/vq.c:stereo_itheta
-#[inline(never)]
 pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
     let mut Emid: f32 = 0.0;
     let mut Eside: f32 = 0.0;
@@ -873,5 +874,5 @@ pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> 
     }
     let mid = celt_sqrt(Emid);
     let side = celt_sqrt(Eside);
-    (0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid)).floor() as i32
+    float2int_nonneg(0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid))
 }
