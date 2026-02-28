@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `celt/vq.c`
 
+use smallvec::{smallvec, SmallVec};
+
 use crate::arch::Arch;
 use crate::celt::bands::SPREAD_NONE;
 use crate::celt::cwrs::{decode_pulses, encode_pulses};
@@ -170,10 +172,9 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
     let mut xy: f32;
     let mut yy: f32;
     let N = N as usize;
-    // Max CELT band size is 176; use stack buffers.
-    debug_assert!(N <= 176);
-    let mut y = [0.0f32; 176];
-    let mut signx = [0i32; 176];
+    // Stack-allocate for typical CELT band sizes (≤176), heap-fallback for larger N.
+    let mut y: SmallVec<[f32; 176]> = smallvec![0.0f32; N];
+    let mut signx: SmallVec<[i32; 176]> = smallvec![0i32; N];
     // Pre-slice to hoist bounds checks out of the hot loops.
     let X = &mut X[..N];
     let iy = &mut iy[..N];

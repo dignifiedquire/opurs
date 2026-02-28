@@ -59,6 +59,8 @@ struct band_ctx<'a, 'b> {
     theta_round: i32,
     disable_inv: i32,
     avoid_split_noise: i32,
+    #[cfg(not(feature = "qext"))]
+    _phantom: std::marker::PhantomData<&'b ()>,
     #[cfg(feature = "qext")]
     ext_ec: &'b mut ec_ctx<'a>,
     #[cfg(feature = "qext")]
@@ -1393,24 +1395,9 @@ fn quant_partition(
                 // SAFETY: X.len() >= N (function precondition).
                 let x_n = unsafe { X.get_unchecked_mut(..N as usize) };
                 if encode != 0 {
-                    cm = cubic_quant(
-                        x_n,
-                        N,
-                        cubic_bits,
-                        B,
-                        &mut *ctx.ext_ec,
-                        gain,
-                        ctx.resynth,
-                    );
+                    cm = cubic_quant(x_n, N, cubic_bits, B, &mut *ctx.ext_ec, gain, ctx.resynth);
                 } else {
-                    cm = cubic_unquant(
-                        x_n,
-                        N,
-                        cubic_bits,
-                        B,
-                        &mut *ctx.ext_ec,
-                        gain,
-                    );
+                    cm = cubic_unquant(x_n, N, cubic_bits, B, &mut *ctx.ext_ec, gain);
                 }
             } else {
                 cm = 0;
@@ -2297,6 +2284,8 @@ pub fn quant_all_bands<'a>(
         disable_inv,
         theta_round: 0,
         avoid_split_noise: (B > 1) as i32,
+        #[cfg(not(feature = "qext"))]
+        _phantom: std::marker::PhantomData,
         #[cfg(feature = "qext")]
         ext_ec,
         #[cfg(feature = "qext")]
@@ -2379,7 +2368,7 @@ pub fn quant_all_bands<'a>(
             if i != start {
                 ext_balance += unsafe { *extra_pulses.get_unchecked(i as usize - 1) } + ext_tell;
             }
-            ext_tell = ec_tell_frac(ext_ec) as i32;
+            ext_tell = ec_tell_frac(&*ctx.ext_ec) as i32;
             ctx.extra_bits = unsafe { *extra_pulses.get_unchecked(i as usize) };
             if i != start {
                 ext_balance -= ext_tell;

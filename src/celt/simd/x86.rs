@@ -11,6 +11,8 @@ use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
+use smallvec::{smallvec, SmallVec};
+
 /// SSE implementation of `xcorr_kernel`.
 /// Port of `celt/x86/pitch_sse.c:xcorr_kernel_sse`.
 ///
@@ -298,12 +300,11 @@ pub unsafe fn dual_inner_prod_sse(x: &[f32], y01: &[f32], y02: &[f32], n: usize)
 #[target_feature(enable = "sse2")]
 pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32) -> f32 {
     let n = N as usize;
-    // Pad to N+3 for safe SIMD overread + sentinel values.
-    // Max CELT band size is 176, N+3 <= 179; use stack buffers to avoid heap allocs per band.
-    debug_assert!(n + 3 <= 180);
-    let mut X = [0.0f32; 180];
-    let mut y = [0.0f32; 180];
-    let mut signy = [0.0f32; 180];
+    let padded = n + 3; // SIMD overread + sentinel values
+                        // Stack-allocate for typical CELT band sizes (≤176, padded ≤179), heap-fallback for larger N.
+    let mut X: SmallVec<[f32; 180]> = smallvec![0.0f32; padded];
+    let mut y: SmallVec<[f32; 180]> = smallvec![0.0f32; padded];
+    let mut signy: SmallVec<[f32; 180]> = smallvec![0.0f32; padded];
 
     X[..n].copy_from_slice(&_X[..n]);
     X[n] = 0.0;
