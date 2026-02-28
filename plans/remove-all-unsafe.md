@@ -1,203 +1,202 @@
-# Plan: Remove All Remaining Unsafe Code
+# Plan: Remove Unnecessary Unsafe (Main Audit)
 
-> Reference plan. Active execution and priority decisions are tracked in
-> `remaining-plan.md`.
+Last updated: 2026-02-28  
+Branch: `main`  
+Commit: `5312c9f9`
 
-**Goal**: Eliminate all remaining `unsafe` occurrences, reaching `#![forbid(unsafe_code)]`.
+## Goal
 
-> Execution priority for this plan is tracked in `remaining-plan.md`.
+Eliminate unnecessary `unsafe` usage and confine required `unsafe` to explicit, justified boundaries:
 
-**Current state (2026-02-13)**: Non-SIMD: 2 `unsafe` blocks across 1 file.
-SIMD: 4 `unsafe fn` + 73 `unsafe` blocks across 2 files (expected for intrinsics).
-Down from 47/9 at plan creation.
+- SIMD intrinsic implementations
+- FFI boundaries (tooling/tests only where unavoidable)
 
----
+Target policy after cleanup:
 
-## Inventory (updated 2026-02-13)
+- No `unsafe` in non-SIMD production paths.
+- No call-site `unsafe` in dispatch layers.
+- All remaining `unsafe` blocks have explicit `// SAFETY:` justification.
+- CI guard prevents unsafe drift.
 
-### Non-SIMD code
+## Current inventory (full)
 
-| File | unsafe fn | unsafe {} | Total | Category | Status |
-|------|-----------|-----------|-------|----------|--------|
-| `src/celt/mdct.rs` | 0 | 2 | 2 | ndarray view casting | Open (no safe alternative) |
-| ~~`src/celt/bands.rs`~~ | ~~0~~ | ~~16~~ | ~~0~~ | ~~Band processing sub-slicing~~ | **Done** ✓ |
-| ~~`src/celt/celt_encoder.rs`~~ | ~~0~~ | ~~1~~ | ~~0~~ | ~~energy_mask raw pointer~~ | **Done** ✓ |
-| ~~`src/celt/celt_decoder.rs`~~ | ~~0~~ | ~~1~~ | ~~0~~ | ~~Channel view splitting~~ | **Done** ✓ |
-| ~~`src/src/opus_encoder.rs`~~ | ~~6~~ | ~~4~~ | ~~0~~ | ~~Encode path + downmix~~ | **Done** ✓ |
-| ~~`src/src/opus_decoder.rs`~~ | ~~2~~ | ~~3~~ | ~~0~~ | ~~Decode path~~ | **Done** ✓ |
-| ~~`src/silk/enc_API.rs`~~ | ~~0~~ | ~~2~~ | ~~0~~ | ~~addr_of_mut~~ | **Done** ✓ |
-| ~~`src/util/nalgebra.rs`~~ | ~~0~~ | ~~2~~ | ~~0~~ | ~~nalgebra ViewStorage~~ | **Done** ✓ |
-| ~~`src/src/opus.rs`~~ | ~~0~~ | ~~1~~ | ~~0~~ | ~~pointer offset_from~~ | **Done** ✓ |
+Counts come from `rg -n "\\bunsafe\\b" src` at `5312c9f9`.
 
-### SIMD code (expected unsafe — intrinsics require it)
+| File | unsafe total | unsafe fn | unsafe blocks | unsafe extern | Category | Priority |
+|---|---:|---:|---:|---:|---|---|
+| `src/arch.rs` | 3 | 0 | 3 | 0 | Core non-SIMD | P0 |
+| `src/celt/common.rs` | 2 | 0 | 2 | 0 | Core non-SIMD | P0 |
+| `src/celt/float_cast.rs` | 3 | 0 | 3 | 0 | Core non-SIMD (arch intrinsics) | P1 |
+| `src/silk/NSQ.rs` | 1 | 0 | 1 | 0 | Core non-SIMD (SIMD dispatch callsite) | P0 |
+| `src/silk/NSQ_del_dec.rs` | 4 | 0 | 4 | 0 | Core non-SIMD (SIMD dispatch callsite) | P0 |
+| `src/celt/simd/mod.rs` | 9 | 0 | 9 | 0 | SIMD dispatch | P1 |
+| `src/dnn/simd/mod.rs` | 30 | 0 | 30 | 0 | SIMD dispatch | P1 |
+| `src/silk/simd/mod.rs` | 17 | 5 | 12 | 0 | SIMD dispatch | P1 |
+| `src/celt/simd/aarch64.rs` | 4 | 4 | 0 | 0 | SIMD intrinsics | P2 |
+| `src/celt/simd/x86.rs` | 35 | 8 | 20 | 7 | SIMD intrinsics + test interop | P2 |
+| `src/dnn/simd/aarch64.rs` | 21 | 19 | 2 | 0 | SIMD intrinsics | P2 |
+| `src/dnn/simd/x86.rs` | 31 | 29 | 2 | 0 | SIMD intrinsics | P2 |
+| `src/silk/simd/aarch64.rs` | 21 | 20 | 1 | 0 | SIMD intrinsics | P2 |
+| `src/silk/simd/x86.rs` | 39 | 38 | 1 | 0 | SIMD intrinsics | P2 |
+| `src/opus/analysis.rs` | 2 | 0 | 1 | 1 | Test interop FFI (`cfg(test, tools)`) | P3 |
+| `src/silk/float/residual_energy_FLP.rs` | 3 | 0 | 2 | 1 | Test interop FFI (`cfg(test, tools)`) | P3 |
+| `src/tools/demo/backend.rs` | 54 | 0 | 53 | 0 | Tooling FFI backend | P3 |
 
-| File | unsafe fn | unsafe {} | Total | Category |
-|------|-----------|-----------|-------|----------|
-| `src/celt/simd/x86.rs` | 2 | 26 | 28 | x86 CELT SIMD intrinsics |
-| `src/silk/simd/x86.rs` | 2 | 47 | 49 | x86 SILK SIMD intrinsics |
+Totals:
 
----
+- 17 files
+- 279 `unsafe` matches
+- 123 `unsafe fn`
+- 146 `unsafe {}` blocks
+- 9 `unsafe extern` declarations
 
-## Stages (ordered by dependency — bottom-up)
+Category rollup:
 
-### Stage 1: bands.rs — ✅ DONE
+- Core non-SIMD: 13
+- SIMD dispatch: 56
+- SIMD intrinsics: 151
+- Test interop FFI: 5
+- Tooling FFI backend: 54
 
-All 16 unsafe blocks eliminated during later refactoring.
+## Hotspots and concrete fix directions
 
----
+### P0 — Core non-SIMD unsafe (must go first)
 
-### Stage 2: celt_decoder.rs — ✅ DONE
+Completed:
 
-Both unsafe blocks eliminated.
+- `src/celt/bands.rs`: 0 `unsafe` (raw-pointer qext context removed; snapshot/restore added for theta-rdo rollback).
 
----
+1. `src/celt/common.rs`
+- Current issue: in-place comb filter uses `from_raw_parts` + `from_raw_parts_mut` alias construction.
+- Fix direction:
+  - Introduce safe in-place SIMD entrypoint (single `&mut [f32]` + indices) in `src/celt/simd/mod.rs`.
+  - Keep any required pointer aliasing internal to SIMD backend only.
+- Exit criteria: 0 `unsafe` in `src/celt/common.rs`.
 
-### Stage 3: celt_encoder.rs — ✅ DONE
+2. `src/silk/NSQ.rs`, `src/silk/NSQ_del_dec.rs`
+- Current issue: call-site `unsafe` to invoke SIMD routines.
+- Fix direction:
+  - Make SIMD dispatch wrappers safe, moving unsafe to backend internals.
+- Exit criteria: 0 `unsafe` in both files.
 
-energy_mask raw pointer replaced with safe alternative.
+3. `src/arch.rs`
+- Current issue: direct `unsafe` CPUID intrinsics.
+- Fix direction:
+  - Replace with safe feature-detection strategy where possible (`is_x86_feature_detected!` + equivalent logic).
+  - If direct CPUID remains necessary for strict upstream parity, confine to one helper with full `// SAFETY:` and no duplicated call-site unsafe.
+- Exit criteria: either 0 unsafe, or one tightly-scoped justified helper.
 
----
+### P1 — SIMD dispatch layer cleanup
 
-### Stage 4: mdct.rs — Safe ndarray view splitting (2 unsafe blocks)
+Files:
 
-**Problem**: `split_interleaving_opposite` and `_mut` create strided ndarray
-views via `raw_view()` → `deref_into_view()`. The unsafe is needed because
-ndarray doesn't provide a safe API for creating two strided views that are
-provably disjoint.
+- `src/celt/simd/mod.rs`
+- `src/dnn/simd/mod.rs`
+- `src/silk/simd/mod.rs`
+- `src/celt/float_cast.rs` (depends on chosen boundary)
 
-**Strategy options**:
-- (a) Use `ndarray::Zip` or manual iteration to avoid needing simultaneous
-  views — process elements in-place with index arithmetic.
-- (b) Keep the unsafe but wrap it in a well-documented `# Safety` comment
-  and move it into a dedicated helper module with unit tests proving
-  disjointness. Mark the containing functions as safe (the unsafe is
-  internal implementation detail).
-- (c) Use `split_at` on the underlying slice, then construct two separate
-  ArrayViews from the halves with appropriate strides.
+Fix direction:
 
-**Recommended**: Option (c) if feasible, otherwise (b) with thorough safety
-documentation and test coverage. The interleaving pattern (even indices
-forward, odd indices backward) guarantees disjointness.
+- Remove call-site `unsafe` from dispatch functions.
+- Make public dispatch APIs safe.
+- Push all intrinsic-unsafe code behind private/internal backend boundaries.
+- For `float_cast`, choose one of:
+  - Keep intrinsic impl and isolate unsafe in one private helper.
+  - Move to safe fallback only if bit-exactness parity is preserved (must be proven by vectors).
 
-**Risk**: Low — well-contained, clear disjointness invariant.
+Exit criteria:
 
----
+- `simd/mod.rs` layers have no `unsafe` usage.
+- Any remaining `unsafe` in `float_cast` is isolated and documented.
 
-### Stage 5: silk/enc_API.rs — ✅ DONE
+### P2 — SIMD intrinsic modules (retain only necessary unsafe)
 
-Resolved. Zero unsafe blocks remain in enc_API.rs.
+Files:
 
----
+- `src/celt/simd/{x86,aarch64}.rs`
+- `src/dnn/simd/{x86,aarch64}.rs`
+- `src/silk/simd/{x86,aarch64}.rs`
 
-### Stage 6: util/nalgebra.rs — ✅ DONE
+Fix direction:
 
-Resolved. Zero unsafe blocks remain in util/nalgebra.rs.
+- Minimize `pub unsafe fn` surface:
+  - Prefer safe public wrappers with feature-gated dispatch.
+  - Keep unsafe in private kernels when target-feature/ptr invariants require it.
+- Add/standardize `// SAFETY:` comments for each remaining `unsafe` block.
+- Ensure no unchecked memory invariants are silently assumed.
 
----
+Exit criteria:
 
-### Stage 7: opus.rs — ✅ DONE
+- No unnecessary public `unsafe fn` exports in SIMD modules.
+- Remaining unsafe sites are intentional, documented, and tested.
 
-Resolved. Zero unsafe blocks remain in opus.rs.
+### P3 — Tool/test FFI consolidation
 
----
+Files:
 
-### Stage 8: opus_decoder.rs — ✅ DONE
+- `src/tools/demo/backend.rs`
+- `src/opus/analysis.rs` (`cfg(test, feature = "tools")`)
+- `src/silk/float/residual_energy_FLP.rs` (`cfg(test, feature = "tools")`)
+- Test interop in `src/celt/simd/x86.rs`
 
-All unsafe fn and unsafe blocks eliminated. Safe typed API with methods.
+Fix direction:
 
----
+- Consolidate repeated FFI call-site unsafe into small wrapper helpers.
+- Keep `unsafe extern` declarations in one place per module/test helper.
+- Explicitly mark these as tooling/test-only in policy.
 
-### Stage 9: opus_encoder.rs — ✅ DONE
+Exit criteria:
 
-All unsafe fn and unsafe blocks eliminated. Safe typed API with methods.
-CTL dispatch deleted, C-style API deleted, downmix made safe, encode path
-converted to use slices.
+- Tooling/test FFI unsafe is centralized and minimal.
 
----
+## Execution plan (commit order)
 
-### Stage 10: Implement safe public API wrappers
+1. `plan: refresh unsafe inventory and remediation phases`
+- Update this file and add `scripts/unsafe_inventory.sh` for deterministic counts.
 
-Implement the `Encoder`, `Decoder`, `Repacketizer`, `SoftClip` wrapper
-structs defined in `phase4-integration-safety.md` stages 4.4-4.7.
+2. `refactor(celt): remove aliasing unsafe from common`
+- `src/celt/common.rs`
 
-These wrap the now-safe internal functions with typed parameters and
-`Result` returns. This stage has no new unsafe code to eliminate — it's
-about providing the final public API.
+3. `refactor(silk): remove NSQ call-site unsafe via safe SIMD wrappers`
+- `src/silk/NSQ.rs`
+- `src/silk/NSQ_del_dec.rs`
+- `src/silk/simd/mod.rs`
 
-**Risk**: Low — wrapper code only.
+4. `refactor(simd): eliminate dispatch-layer unsafe`
+- `src/celt/simd/mod.rs`
+- `src/dnn/simd/mod.rs`
+- `src/silk/simd/mod.rs`
+- `src/celt/float_cast.rs` (if in scope)
 
----
+5. `refactor(tools/tests): centralize FFI unsafe`
+- `src/tools/demo/backend.rs`
+- tool/test interop modules
 
-### Stage 11: Final cleanup
+6. `ci(safety): enforce unsafe policy`
+- Add CI check script/step for unsafe drift.
+- Add lint gates (`unsafe_op_in_unsafe_fn`, `undocumented_unsafe_blocks`).
 
-1. ~~Remove deprecated `unsafe fn` C-API functions~~ — **Done** ✓ (all deleted)
-2. ~~Remove `varargs.rs`~~ — **Done** ✓ (deleted in dig-safe: fe517bb)
-3. Add `#![deny(unsafe_code)]` to `lib.rs` with `#[allow(unsafe_code)]` on
-   SIMD modules (`src/celt/simd/`, `src/silk/simd/`) and `src/celt/mdct.rs`
-   (Note: `#![forbid(unsafe_code)]` is not possible because SIMD intrinsics
-   inherently require unsafe. Use `deny` + targeted `allow` instead.)
-4. Verify: `cargo build`, `cargo test --all`, `cargo clippy`, vector tests
+## Verification requirements after each phase
 
-**Risk**: Low — attribute annotations and verification only.
+Always run:
 
----
+- `cargo fmt --all`
+- `cargo clippy --all-targets --all-features -- -D warnings`
+- `cargo nextest run --all-features`
 
-## Execution Order & Dependencies
+Plus parity checks:
 
-```
-Stage 1 (bands.rs)          ── ✅ DONE
-Stage 2 (celt_decoder.rs)   ── ✅ DONE
-Stage 3 (celt_encoder.rs)   ── ✅ DONE
-Stage 4 (mdct.rs)            ── Open (2 unsafe blocks, may be irreducible)
-Stage 5 (enc_API.rs)         ── ✅ DONE
-Stage 6 (nalgebra.rs)        ── ✅ DONE
-Stage 7 (opus.rs)            ── ✅ DONE
-Stage 8 (opus_decoder.rs)   ── ✅ DONE
-Stage 9 (opus_encoder.rs)   ── ✅ DONE
-                               │
-Stage 10 (public API)        ──┤── Depends on Stages 8, 9
-                               │
-Stage 11 (forbid unsafe)    ───┘── Depends on all above
-```
+- Required vector jobs (all major platforms).
+- Bit-exact comparison suites against upstream C where already wired.
 
----
+Unsafe policy checks:
 
-## Estimated Remaining Commit Count
+- `rg -n "\\bunsafe\\b" src` count must not increase.
+- `rg -n "\\bunsafe\\b" src/celt src/silk src/opus` should trend down in P0/P1.
 
-| Stage | Commits | Description |
-|-------|---------|-------------|
-| ~~1~~ | ~~0~~ | ~~bands.rs — done~~ |
-| ~~2~~ | ~~0~~ | ~~celt_decoder — done~~ |
-| ~~3~~ | ~~0~~ | ~~celt_encoder — done~~ |
-| 4 | 0-1 | mdct view splitting (may be irreducible) |
-| ~~5~~ | ~~0~~ | ~~enc_API — done~~ |
-| ~~6~~ | ~~0~~ | ~~nalgebra — done~~ |
-| ~~7~~ | ~~0~~ | ~~opus.rs — done~~ |
-| ~~8~~ | ~~0~~ | ~~decoder — done~~ |
-| ~~9~~ | ~~0~~ | ~~encoder — done~~ |
-| 10 | 2-3 | public API wrappers |
-| 11 | 1 | deny(unsafe_code) with allow on SIMD modules |
-| **Total** | **~3-5** | |
+## Definition of done
 
----
-
-## Testing Strategy
-
-After every stage:
-1. `cargo build` — must compile
-2. `cargo test --all` — all unit + integration tests pass
-3. `cargo clippy` — no warnings
-4. Vector tests (for stages touching encoder/decoder/codec internals):
-   `cargo run --release --features tools --example run_vectors2 -- opus_newvectors`
-
----
-
-## What We Start With
-
-I recommend starting with **Stages 1-7 in parallel** (the independent
-bottom-up work on CELT/SILK/util), then moving to **Stage 8** (decoder),
-then **Stage 9** (encoder — the hardest), then **Stages 10-11** (API + cleanup).
-
-The single hardest piece is **Stage 9b** (making `opus_encode_native` safe) —
-a 1300-line function with pervasive raw pointer usage. This will likely need
-to be broken into multiple sub-commits.
+- Non-SIMD production code is free of `unsafe`.
+- SIMD dispatch layers are safe.
+- Remaining `unsafe` is only in justified SIMD kernels and unavoidable FFI boundaries.
+- CI blocks new unsafe drift.
