@@ -418,7 +418,8 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
             }
             i = i.wrapping_sub(p);
             val = ((k0 - k + s) ^ s) as i16;
-            y[yi] = val as i32;
+            // SAFETY: yi < n, y.len() >= n (loop decrements n from initial value).
+            unsafe { *y.get_unchecked_mut(yi) = val as i32; }
             yi += 1;
             yy += val as f32 * val as f32;
         } else {
