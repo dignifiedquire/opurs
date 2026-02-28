@@ -233,3 +233,21 @@ pub unsafe fn celt_pitch_xcorr_neon(x: &[f32], y: &[f32], xcorr: &mut [f32], len
         i += 1;
     }
 }
+
+#[inline(always)]
+pub fn celt_inner_prod_neon_dispatch(x: &[f32], y: &[f32], n: usize) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { celt_inner_prod_neon(x, y, n) }
+}
+
+#[inline(always)]
+pub fn dual_inner_prod_neon_dispatch(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { dual_inner_prod_neon(x, y01, y02, n) }
+}
+
+#[inline(always)]
+pub fn celt_pitch_xcorr_neon_dispatch(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+    // SAFETY: Dispatch layer gates this on `arch.has_neon()`.
+    unsafe { celt_pitch_xcorr_neon(x, y, xcorr, len) }
+}

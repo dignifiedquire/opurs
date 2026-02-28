@@ -28,7 +28,7 @@ pub mod aarch64;
 pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, arch: Arch) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return unsafe { x86::xcorr_kernel_sse(x, y, sum, len) };
+        return x86::xcorr_kernel_sse_dispatch(x, y, sum, len);
     }
 
     let _ = arch;
@@ -41,12 +41,12 @@ pub fn xcorr_kernel(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize, arch: 
 pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
-        return unsafe { aarch64::celt_inner_prod_neon(x, y, n) };
+        return aarch64::celt_inner_prod_neon_dispatch(x, y, n);
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return unsafe { x86::celt_inner_prod_sse(x, y, n) };
+        return x86::celt_inner_prod_sse_dispatch(x, y, n);
     }
 
     let _ = arch;
@@ -59,12 +59,12 @@ pub fn celt_inner_prod(x: &[f32], y: &[f32], n: usize, arch: Arch) -> f32 {
 pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, arch: Arch) -> (f32, f32) {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
-        return unsafe { aarch64::dual_inner_prod_neon(x, y01, y02, n) };
+        return aarch64::dual_inner_prod_neon_dispatch(x, y01, y02, n);
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return unsafe { x86::dual_inner_prod_sse(x, y01, y02, n) };
+        return x86::dual_inner_prod_sse_dispatch(x, y01, y02, n);
     }
 
     let _ = arch;
@@ -80,15 +80,13 @@ pub fn dual_inner_prod(x: &[f32], y01: &[f32], y02: &[f32], n: usize, arch: Arch
 pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
-        unsafe {
-            aarch64::celt_pitch_xcorr_neon(x, y, xcorr, len);
-        }
+        aarch64::celt_pitch_xcorr_neon_dispatch(x, y, xcorr, len);
         return;
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_avx2() {
-        return unsafe { x86::celt_pitch_xcorr_avx2(x, y, xcorr, len) };
+        return x86::celt_pitch_xcorr_avx2_dispatch(x, y, xcorr, len);
     }
 
     let _ = arch;
@@ -112,7 +110,7 @@ pub fn comb_filter_const(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return unsafe { x86::comb_filter_const_sse(y, y_start, x, x_start, T, N, g10, g11, g12) };
+        return x86::comb_filter_const_sse_dispatch(y, y_start, x, x_start, T, N, g10, g11, g12);
     }
 
     let _ = arch;
@@ -134,7 +132,7 @@ pub fn comb_filter_const_inplace(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return unsafe { x86::comb_filter_const_inplace_sse(buf, start, T, N, g10, g11, g12) };
+        return x86::comb_filter_const_inplace_sse_dispatch(buf, start, T, N, g10, g11, g12);
     }
 
     let _ = arch;
@@ -162,7 +160,7 @@ pub fn comb_filter_const_inplace(
 pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse2() {
-        return unsafe { x86::op_pvq_search_sse2(X, iy, K, N) };
+        return x86::op_pvq_search_sse2_dispatch(X, iy, K, N);
     }
 
     let _ = arch;

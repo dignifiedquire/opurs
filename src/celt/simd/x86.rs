@@ -593,6 +593,67 @@ pub unsafe fn celt_pitch_xcorr_sse(x: &[f32], y: &[f32], xcorr: &mut [f32], len:
     }
 }
 
+#[inline(always)]
+pub fn xcorr_kernel_sse_dispatch(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse()`.
+    unsafe { xcorr_kernel_sse(x, y, sum, len) }
+}
+
+#[inline(always)]
+pub fn celt_inner_prod_sse_dispatch(x: &[f32], y: &[f32], n: usize) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse()`.
+    unsafe { celt_inner_prod_sse(x, y, n) }
+}
+
+#[inline(always)]
+pub fn dual_inner_prod_sse_dispatch(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> (f32, f32) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse()`.
+    unsafe { dual_inner_prod_sse(x, y01, y02, n) }
+}
+
+#[inline(always)]
+pub fn celt_pitch_xcorr_avx2_dispatch(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
+    // SAFETY: Dispatch layer gates this on `arch.has_avx2()`.
+    unsafe { celt_pitch_xcorr_avx2(x, y, xcorr, len) }
+}
+
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+pub fn comb_filter_const_sse_dispatch(
+    y: &mut [f32],
+    y_start: usize,
+    x: &[f32],
+    x_start: usize,
+    t: i32,
+    n: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse()`.
+    unsafe { comb_filter_const_sse(y, y_start, x, x_start, t, n, g10, g11, g12) }
+}
+
+#[inline(always)]
+pub fn comb_filter_const_inplace_sse_dispatch(
+    buf: &mut [f32],
+    start: usize,
+    t: i32,
+    n: i32,
+    g10: f32,
+    g11: f32,
+    g12: f32,
+) {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse()`.
+    unsafe { comb_filter_const_inplace_sse(buf, start, t, n, g10, g11, g12) }
+}
+
+#[inline(always)]
+pub fn op_pvq_search_sse2_dispatch(x: &mut [f32], iy: &mut [i32], k: i32, n: i32) -> f32 {
+    // SAFETY: Dispatch layer gates this on `arch.has_sse2()`.
+    unsafe { op_pvq_search_sse2(x, iy, k, n) }
+}
+
 #[cfg(all(test, feature = "tools"))]
 mod tests {
     use super::{
