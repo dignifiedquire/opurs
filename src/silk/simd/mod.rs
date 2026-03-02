@@ -206,7 +206,7 @@ pub fn use_nsq_sse4_1(arch: Arch) -> bool {
     {
         return arch.has_sse4_1();
     }
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
         let _ = arch;
         false
@@ -488,7 +488,7 @@ pub fn use_nsq_del_dec_avx2(arch: Arch, n_states: i32) -> bool {
     {
         return arch.has_avx2() && n_states > 2 && n_states <= 4;
     }
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
         let _ = (arch, n_states);
         false
@@ -611,9 +611,9 @@ pub fn silk_noise_shape_quantizer_del_dec_sse4_1(
 pub fn use_neon_nsq_del_dec(arch: Arch, n_states: i32) -> bool {
     #[cfg(target_arch = "aarch64")]
     {
-        return arch.has_neon() && n_states > 2 && n_states <= 4;
+        arch.has_neon() && n_states > 2 && n_states <= 4
     }
-    #[allow(unreachable_code)]
+    #[cfg(not(target_arch = "aarch64"))]
     {
         let _ = (arch, n_states);
         false

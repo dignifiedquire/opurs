@@ -34,22 +34,21 @@ pub fn sgemv(
     #[cfg(target_arch = "aarch64")]
     {
         aarch64::sgemv_neon_dispatch(out, weights, rows, cols, col_stride, x);
-        return;
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::sgemv_avx2_dispatch(out, weights, rows, cols, col_stride, x);
-            return;
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::sgemv_avx2_dispatch(out, weights, rows, cols, col_stride, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                x86::sgemv_sse2_dispatch(out, weights, rows, cols, col_stride, x);
+                return;
+            }
         }
-        if _arch.has_sse2() {
-            x86::sgemv_sse2_dispatch(out, weights, rows, cols, col_stride, x);
-            return;
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::sgemv_scalar(out, weights, rows, cols, col_stride, x);
     }
 }
@@ -67,22 +66,21 @@ pub fn sparse_sgemv8x4(
     #[cfg(target_arch = "aarch64")]
     {
         aarch64::sparse_sgemv8x4_neon_dispatch(out, w, idx, rows, x);
-        return;
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::sparse_sgemv8x4_avx2_dispatch(out, w, idx, rows, x);
-            return;
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::sparse_sgemv8x4_avx2_dispatch(out, w, idx, rows, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                x86::sparse_sgemv8x4_sse2_dispatch(out, w, idx, rows, x);
+                return;
+            }
         }
-        if _arch.has_sse2() {
-            x86::sparse_sgemv8x4_sse2_dispatch(out, w, idx, rows, x);
-            return;
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::sparse_sgemv8x4_scalar(out, w, idx, rows, x);
     }
 }
@@ -105,34 +103,33 @@ pub fn cgemv8x4(
         } else {
             aarch64::cgemv8x4_neon_dispatch(out, w, scale, rows, cols, x);
         }
-        return;
     }
 
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::cgemv8x4_avx2_dispatch(out, w, scale, rows, cols, x);
-            return;
-        }
-        // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
-        if _arch.has_sse4_1() {
-            super::vec::cgemv8x4_scalar_su_ssse3(out, w, scale, rows, cols, x);
-            return;
-        }
-        if _arch.has_sse2() {
-            // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::cgemv8x4_avx2_dispatch(out, w, scale, rows, cols, x);
+                return;
+            }
+            // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
+            if _arch.has_sse4_1() {
+                super::vec::cgemv8x4_scalar_su_ssse3(out, w, scale, rows, cols, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+                super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
+                return;
+            }
+            // Upstream x86 compiles vec_avx.h for all runtime arch tiers, including
+            // arch=0/1 entries that still dispatch to compute_linear_c.
+            // Keep USE_SU_BIAS quantization in this fallback too.
             super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
             return;
         }
-        // Upstream x86 compiles vec_avx.h for all runtime arch tiers, including
-        // arch=0/1 entries that still dispatch to compute_linear_c.
-        // Keep USE_SU_BIAS quantization in this fallback too.
-        super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
-        return;
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::cgemv8x4_scalar(out, w, scale, rows, cols, x);
     }
 }
@@ -156,32 +153,31 @@ pub fn sparse_cgemv8x4(
         } else {
             aarch64::sparse_cgemv8x4_neon_dispatch(out, w, idx, scale, rows, cols, x);
         }
-        return;
     }
 
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::sparse_cgemv8x4_avx2_dispatch(out, w, idx, scale, rows, cols, x);
-            return;
-        }
-        // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
-        if _arch.has_sse4_1() {
-            super::vec::sparse_cgemv8x4_scalar_su_ssse3(out, w, idx, scale, rows, cols, x);
-            return;
-        }
-        if _arch.has_sse2() {
-            // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::sparse_cgemv8x4_avx2_dispatch(out, w, idx, scale, rows, cols, x);
+                return;
+            }
+            // Upstream x86 SSE4.1 path emulates dpbusds with maddubs i16 saturation.
+            if _arch.has_sse4_1() {
+                super::vec::sparse_cgemv8x4_scalar_su_ssse3(out, w, idx, scale, rows, cols, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                // SSE2 fallback path (no maddubs saturation) still uses USE_SU_BIAS quantization.
+                super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
+                return;
+            }
+            // Upstream x86 compute_linear_c also uses USE_SU_BIAS at low arch tiers.
             super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
             return;
         }
-        // Upstream x86 compute_linear_c also uses USE_SU_BIAS at low arch tiers.
-        super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
-        return;
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x);
     }
 }
@@ -203,20 +199,20 @@ pub fn sparse_cgemv8x4(
 pub fn tanh_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return aarch64::tanh_approx_neon_dispatch(x);
+        aarch64::tanh_approx_neon_dispatch(x)
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            return x86::tanh_approx_avx2_dispatch(x);
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                return x86::tanh_approx_avx2_dispatch(x);
+            }
+            if _arch.has_sse2() {
+                return x86::tanh_approx_sse2_dispatch(x);
+            }
         }
-        if _arch.has_sse2() {
-            return x86::tanh_approx_sse2_dispatch(x);
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::tanh_approx(x)
     }
 }
@@ -229,20 +225,20 @@ pub fn tanh_approx(x: f32, _arch: Arch) -> f32 {
 pub fn sigmoid_approx(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return aarch64::sigmoid_approx_neon_dispatch(x);
+        aarch64::sigmoid_approx_neon_dispatch(x)
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            return x86::sigmoid_approx_avx2_dispatch(x);
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                return x86::sigmoid_approx_avx2_dispatch(x);
+            }
+            if _arch.has_sse2() {
+                return x86::sigmoid_approx_sse2_dispatch(x);
+            }
         }
-        if _arch.has_sse2() {
-            return x86::sigmoid_approx_sse2_dispatch(x);
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::sigmoid_approx(x)
     }
 }
@@ -255,23 +251,23 @@ pub fn sigmoid_approx(x: f32, _arch: Arch) -> f32 {
 pub fn lpcnet_exp(x: f32, _arch: Arch) -> f32 {
     #[cfg(target_arch = "aarch64")]
     {
-        return aarch64::lpcnet_exp_neon_dispatch(x);
+        aarch64::lpcnet_exp_neon_dispatch(x)
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            return x86::lpcnet_exp_avx2_dispatch(x);
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                return x86::lpcnet_exp_avx2_dispatch(x);
+            }
+            if _arch.has_sse4_1() {
+                return x86::lpcnet_exp_sse4_1_dispatch(x);
+            }
+            if _arch.has_sse2() {
+                return x86::lpcnet_exp_sse2_dispatch(x);
+            }
         }
-        if _arch.has_sse4_1() {
-            return x86::lpcnet_exp_sse4_1_dispatch(x);
-        }
-        if _arch.has_sse2() {
-            return x86::lpcnet_exp_sse2_dispatch(x);
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::lpcnet_exp(x)
     }
 }
@@ -282,22 +278,21 @@ pub fn vec_tanh(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
         aarch64::vec_tanh_neon_dispatch(y, x);
-        return;
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::vec_tanh_avx2_dispatch(y, x);
-            return;
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::vec_tanh_avx2_dispatch(y, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                x86::vec_tanh_sse2_dispatch(y, x);
+                return;
+            }
         }
-        if _arch.has_sse2() {
-            x86::vec_tanh_sse2_dispatch(y, x);
-            return;
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::vec_tanh_scalar(y, x);
     }
 }
@@ -308,22 +303,21 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
         aarch64::vec_sigmoid_neon_dispatch(y, x);
-        return;
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::vec_sigmoid_avx2_dispatch(y, x);
-            return;
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::vec_sigmoid_avx2_dispatch(y, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                x86::vec_sigmoid_sse2_dispatch(y, x);
+                return;
+            }
         }
-        if _arch.has_sse2() {
-            x86::vec_sigmoid_sse2_dispatch(y, x);
-            return;
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::vec_sigmoid_scalar(y, x);
     }
 }
@@ -340,21 +334,21 @@ pub fn vec_sigmoid(y: &mut [f32], x: &[f32], _arch: Arch) {
 /// Upstream C: dnn/vec_avx.h:USE_SU_BIAS
 #[inline]
 pub fn use_su_bias(arch: Arch) -> bool {
-    let _ = arch;
-
     #[cfg(target_arch = "aarch64")]
     {
-        return false; // NEON uses signed i8 quantization
+        let _ = arch;
+        false // NEON uses signed i8 quantization
     }
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         let _ = arch;
-        return true; // x86 build uses vec_avx.h (USE_SU_BIAS) for all arch tiers
+        true // x86 build uses vec_avx.h (USE_SU_BIAS) for all arch tiers
     }
 
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
     {
+        let _ = arch;
         false // scalar fallback uses signed i8
     }
 }
@@ -365,26 +359,25 @@ pub fn softmax(y: &mut [f32], x: &[f32], _arch: Arch) {
     #[cfg(target_arch = "aarch64")]
     {
         aarch64::softmax_neon_dispatch(y, x);
-        return;
     }
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(not(target_arch = "aarch64"))]
     {
-        if _arch.has_avx2() {
-            x86::softmax_avx2_dispatch(y, x);
-            return;
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if _arch.has_avx2() {
+                x86::softmax_avx2_dispatch(y, x);
+                return;
+            }
+            if _arch.has_sse4_1() {
+                x86::softmax_sse4_1_dispatch(y, x);
+                return;
+            }
+            if _arch.has_sse2() {
+                x86::softmax_sse2_dispatch(y, x);
+                return;
+            }
         }
-        if _arch.has_sse4_1() {
-            x86::softmax_sse4_1_dispatch(y, x);
-            return;
-        }
-        if _arch.has_sse2() {
-            x86::softmax_sse2_dispatch(y, x);
-            return;
-        }
-    }
 
-    #[allow(unreachable_code)]
-    {
         super::vec::softmax_scalar(y, x);
     }
 }

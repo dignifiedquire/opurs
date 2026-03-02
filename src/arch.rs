@@ -235,7 +235,7 @@ pub fn opus_select_arch() -> Arch {
         {
             arch = fuzz_downgrade_arch(arch);
         }
-        return arch;
+        arch
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -255,7 +255,7 @@ pub fn opus_select_arch() -> Arch {
         };
         #[cfg(feature = "fuzzing")]
         let arch = fuzz_downgrade_arch(arch);
-        return arch;
+        arch
     }
 
     #[cfg(target_arch = "arm")]
@@ -319,8 +319,15 @@ pub fn opus_select_arch() -> Arch {
         return arch;
     }
 
-    #[allow(unreachable_code)]
-    Arch::Scalar
+    #[cfg(not(any(
+        target_arch = "x86",
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "arm"
+    )))]
+    {
+        Arch::Scalar
+    }
 }
 
 /// When `simd` feature is disabled, always returns [`Arch::Scalar`].
