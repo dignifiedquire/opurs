@@ -2,11 +2,6 @@
 //!
 //! Upstream C: `silk/VAD.c`
 
-pub mod typedef_h {
-    pub const silk_uint8_MAX: i32 = 0xff;
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
-pub use self::typedef_h::{silk_int32_MAX, silk_uint8_MAX};
 #[cfg(not(feature = "simd"))]
 use crate::arch::Arch;
 use crate::silk::ana_filt_bank_1::silk_ana_filt_bank_1;
@@ -16,6 +11,7 @@ use crate::silk::define::{
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sigm_Q15::silk_sigm_Q15;
 use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
+use crate::silk::typedefs::{silk_int32_MAX, silk_uint8_MAX};
 use crate::silk::Inlines::silk_SQRT_APPROX;
 use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 

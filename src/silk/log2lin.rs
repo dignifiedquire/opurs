@@ -2,11 +2,7 @@
 //!
 //! Upstream C: `silk/log2lin.c`
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
-
-pub use self::typedef_h::silk_int32_MAX;
+use crate::silk::typedefs::silk_int32_MAX;
 
 ///
 /// Approximation of 2^() (very close inverse of silk_lin2log()) */

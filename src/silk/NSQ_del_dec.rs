@@ -2,12 +2,6 @@
 //!
 //! Upstream C: `silk/NSQ_del_dec.c`
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-}
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX};
 use crate::arch::Arch;
 use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
@@ -15,6 +9,7 @@ use crate::silk::define::{
 };
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX};
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::{silk_RAND, silk_min_int};

@@ -2,18 +2,6 @@
 //!
 //! Upstream C: `silk/float/find_LPC_FLP.c`
 
-pub mod float_h {
-    pub const FLT_MAX: f32 = __FLT_MAX__;
-    use super::internal::__FLT_MAX__;
-}
-pub mod typedef_h {
-    pub const silk_float_MAX: f32 = FLT_MAX;
-    use super::float_h::FLT_MAX;
-}
-pub mod internal {
-    pub const __FLT_MAX__: f32 = 3.402_823_5e38_f32;
-}
-pub use self::typedef_h::silk_float_MAX;
 use crate::silk::define::MAX_NB_SUBFR;
 use crate::silk::float::burg_modified_FLP::silk_burg_modified_FLP;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
@@ -21,6 +9,7 @@ use crate::silk::float::wrappers_FLP::{silk_A2NLSF_FLP, silk_NLSF2A_FLP};
 use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
+use crate::silk::typedefs::silk_float_MAX;
 
 /// Upstream C: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
 pub fn silk_find_LPC_FLP(

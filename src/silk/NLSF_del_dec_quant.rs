@@ -2,14 +2,10 @@
 //!
 //! Upstream C: `silk/NLSF_del_dec_quant.c`
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
 use crate::silk::define::{
     NLSF_QUANT_DEL_DEC_STATES, NLSF_QUANT_MAX_AMPLITUDE, NLSF_QUANT_MAX_AMPLITUDE_EXT,
 };
-
-pub use self::typedef_h::silk_int32_MAX;
+use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/NLSF_del_dec_quant.c:silk_NLSF_del_dec_quant
 pub fn silk_NLSF_del_dec_quant(

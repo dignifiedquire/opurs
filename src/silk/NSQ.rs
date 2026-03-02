@@ -2,10 +2,8 @@
 //!
 //! Upstream C: `silk/NSQ.c`
 
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-}
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+
 pub mod NSQ_h {
     ///
     /// Short-term prediction using LPC coefficients. `buf32` is indexed as
@@ -85,7 +83,6 @@ pub mod NSQ_h {
     }
 }
 
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 pub use self::NSQ_h::{
     silk_NSQ_noise_shape_feedback_loop_c, silk_noise_shape_quantizer_short_prediction_c,
 };

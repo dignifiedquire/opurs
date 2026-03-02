@@ -2,12 +2,7 @@
 //!
 //! Upstream C: `silk/ana_filt_bank_1.c`
 
-pub mod typedef_h {
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-}
-
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
 const A_FB1_20: i16 = ((5394) << 1) as i16;
 const A_FB1_21: i16 = -24290_i16;

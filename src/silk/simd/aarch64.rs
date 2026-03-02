@@ -13,9 +13,9 @@ use crate::silk::macros::silk_CLZ32;
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::typedefs::silk_int32_MAX;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::NSQ_del_dec::silk_int32_MAX;
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND64;
 use crate::silk::SigProc_FIX::{
     silk_SMMUL, silk_min_int, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,

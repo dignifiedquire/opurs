@@ -3,13 +3,7 @@
 //! Upstream C: `silk/resampler_private_up2_HQ.c`
 
 use super::rom::{silk_resampler_up2_hq_0, silk_resampler_up2_hq_1};
-
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-}
-
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
 #[derive(Default, Copy, Clone)]
 pub struct ResamplerUp2HqState {

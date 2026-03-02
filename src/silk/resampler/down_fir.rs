@@ -2,16 +2,12 @@
 //!
 //! Upstream C: `silk/resampler_private_down_FIR.c`
 
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-}
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use super::ar2::silk_resampler_private_AR2;
 use super::rom::{RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2};
 use crate::silk::resampler::{
     ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN, SILK_RESAMPLER_MAX_FIR_ORDER,
 };
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
 #[derive(Copy, Clone)]
 pub struct ResamplerDownFirParams {

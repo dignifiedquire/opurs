@@ -2,10 +2,7 @@
 //!
 //! Upstream C: `silk/NLSF_VQ_weights_laroia.c`
 
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-}
-pub use self::typedef_h::silk_int16_MAX;
+use crate::silk::typedefs::silk_int16_MAX;
 use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 const NLSF_W_Q: i32 = 2;

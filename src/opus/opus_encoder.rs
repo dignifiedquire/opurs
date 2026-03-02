@@ -1199,8 +1199,7 @@ pub fn compute_stereo_width(
     let qrrt_xx: f32;
     let qrrt_yy: f32;
     let frame_rate: i32 = Fs / frame_size;
-    let short_alpha: f32 =
-        25_f32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
+    let short_alpha: f32 = 25_f32 * 1.0f32 / (if 50 > frame_rate { 50 } else { frame_rate }) as f32;
     yy = 0 as f32;
     xy = yy;
     xx = xy;

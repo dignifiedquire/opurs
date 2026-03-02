@@ -2,12 +2,9 @@
 //!
 //! Upstream C: `silk/stereo_quant_pred.c`
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
-pub use self::typedef_h::silk_int32_MAX;
 use crate::silk::define::{STEREO_QUANT_SUB_STEPS, STEREO_QUANT_TAB_SIZE};
 use crate::silk::tables_other::silk_stereo_pred_quant_Q13;
+use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/stereo_quant_pred.c:silk_stereo_quant_pred
 pub fn silk_stereo_quant_pred(pred_Q13: &mut [i32], ix: &mut [[i8; 3]]) {

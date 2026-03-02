@@ -2,15 +2,11 @@
 //!
 //! Upstream C: `silk/stereo_LR_to_MS.c`
 
-pub mod typedef_h {
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-}
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::define::{LA_SHAPE_MS, STEREO_INTERP_LEN_MS};
 use crate::silk::stereo_find_predictor::silk_stereo_find_predictor;
 use crate::silk::stereo_quant_pred::silk_stereo_quant_pred;
 use crate::silk::structs::stereo_enc_state;
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::Inlines::silk_DIV32_varQ;
 use crate::silk::SigProc_FIX::silk_max_int;
 

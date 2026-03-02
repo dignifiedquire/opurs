@@ -4,13 +4,8 @@
 
 #![forbid(unsafe_code)]
 
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-}
 use crate::silk::resampler::{ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN};
-
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
 use super::rom::{silk_resampler_frac_FIR_12, RESAMPLER_ORDER_FIR_12};
 use super::up2_hq::{silk_resampler_private_up2_HQ, ResamplerUp2HqState};

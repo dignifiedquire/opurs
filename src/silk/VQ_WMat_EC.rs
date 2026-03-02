@@ -4,11 +4,8 @@
 
 use crate::silk::lin2log::silk_lin2log;
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
-pub use self::typedef_h::silk_int32_MAX;
 use crate::silk::define::LTP_ORDER;
+use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/VQ_WMat_EC.c:silk_VQ_WMat_EC_c
 pub fn silk_VQ_WMat_EC_c(

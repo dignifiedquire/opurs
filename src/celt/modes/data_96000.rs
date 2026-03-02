@@ -11,7 +11,7 @@
     dead_code
 )]
 
-use super::static_modes_float_h::{
+use super::static_modes_float::{
     cache_bits50, cache_caps50, cache_index50, fft_bitrev120, fft_bitrev240, fft_bitrev480, logN400,
 };
 use super::{band_allocation, eband5ms};

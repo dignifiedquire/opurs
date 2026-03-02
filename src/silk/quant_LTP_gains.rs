@@ -4,10 +4,6 @@
 
 use crate::arch::Arch;
 
-pub mod typedef_h {
-    pub const silk_int32_MAX: i32 = i32::MAX;
-}
-pub use self::typedef_h::silk_int32_MAX;
 use crate::silk::define::LTP_ORDER;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
@@ -17,6 +13,7 @@ use crate::silk::tables_LTP::{
     silk_LTP_gain_BITS_Q5_ptrs, silk_LTP_vq_gain_ptrs_Q7, silk_LTP_vq_ptrs_Q7, silk_LTP_vq_sizes,
 };
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
+use crate::silk::typedefs::silk_int32_MAX;
 #[cfg(not(feature = "simd"))]
 use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
 

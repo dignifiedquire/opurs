@@ -4,6 +4,7 @@
 
 use crate::arch::Arch;
 
+use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 // const BWE_COEF: f64 = 0.99;
 
 /// 0.7 in Q14
@@ -13,11 +14,6 @@ const V_PITCH_GAIN_START_MAX_Q14: i32 = 15565;
 
 pub const RAND_BUF_MASK: i32 = RAND_BUF_SIZE - 1;
 pub const RAND_BUF_SIZE: i32 = 128;
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-    pub const silk_int16_MIN: i32 = i16::MIN as i32;
-}
-pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::define::{
     LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_SUB_FRAME_LENGTH, TYPE_VOICED,

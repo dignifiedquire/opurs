@@ -3,12 +3,9 @@
 //! Upstream C: `silk/A2NLSF.c`
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
+use crate::silk::typedefs::silk_int16_MAX;
 use crate::silk::SigProc_FIX::silk_min_32;
 
-pub mod typedef_h {
-    pub const silk_int16_MAX: i32 = i16::MAX as i32;
-}
-pub use self::typedef_h::silk_int16_MAX;
 use crate::silk::define::LSF_COS_TAB_SZ_FIX;
 use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;
 

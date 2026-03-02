@@ -90,5 +90,6 @@ pub mod define;
 pub mod macros;
 pub mod structs;
 pub mod tuning_parameters;
+pub mod typedefs;
 
 pub mod mathops;

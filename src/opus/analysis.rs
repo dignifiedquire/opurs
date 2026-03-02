@@ -201,10 +201,7 @@ pub const ANALYSIS_BUF_SIZE: i32 = 720;
 pub const DETECT_SIZE: i32 = 100;
 pub const NB_FRAMES: i32 = 8;
 pub const NB_TBANDS: i32 = 18;
-pub mod math_h {
-    pub const M_PI: f64 = std::f64::consts::PI;
-}
-pub use self::math_h::M_PI;
+const M_PI: f64 = std::f64::consts::PI;
 use crate::arch::{opus_select_arch, Arch};
 use crate::celt::float_cast::{float2int, CELT_SIG_SCALE};
 use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
