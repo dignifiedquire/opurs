@@ -53,6 +53,11 @@ use crate::{
 
 #[derive(Clone)]
 #[repr(C)]
+/// Opus decoder state.
+///
+/// This contains the complete decoder state and can be reused across calls.
+///
+/// Upstream C: include/opus.h:OpusDecoder
 pub struct OpusDecoder {
     pub(crate) celt_dec: OpusCustomDecoder,
     pub(crate) silk_dec: silk_decoder,

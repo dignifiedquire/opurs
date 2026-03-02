@@ -127,6 +127,12 @@ pub(crate) fn opus_pcm_soft_clip_impl(
     }
 }
 
+/// Applies soft clipping to interleaved float PCM in-place.
+///
+/// This is the public wrapper over the core soft-clipping routine and carries
+/// softclip state across calls in `softclip_mem`.
+///
+/// Upstream C: include/opus.h:opus_pcm_soft_clip
 pub fn opus_pcm_soft_clip(
     pcm: &mut [f32],
     frame_size: usize,
@@ -180,6 +186,8 @@ fn parse_size(data: &[u8], len: i32, size: &mut i16) -> i32 {
 ///   This must be a multiple of 400, or inaccurate results will be returned.
 ///
 /// Returns the number of samples per frame.
+///
+/// Upstream C: include/opus.h:opus_packet_get_samples_per_frame
 pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
     if data & 0x80 != 0 {
         let audiosize = data as i32 >> 3 & 0x3;
@@ -435,6 +443,8 @@ pub fn opus_packet_parse_impl(
 /// - `payload_offset`: returns the position of the payload within the packet (in bytes)
 ///
 /// Returns number of frames
+///
+/// Upstream C: include/opus.h:opus_packet_parse
 pub fn opus_packet_parse(
     data: &[u8],
     out_toc: Option<&mut u8>,

@@ -51,6 +51,11 @@ use crate::{opus_packet_pad, OpusRepacketizer};
 
 #[derive(Clone)]
 #[repr(C)]
+/// Opus encoder state.
+///
+/// This contains the complete encoder state and can be reused across calls.
+///
+/// Upstream C: include/opus.h:OpusEncoder
 pub struct OpusEncoder {
     pub(crate) silk_enc: silk_encoder,
     pub(crate) celt_enc: OpusCustomEncoder,
@@ -134,6 +139,9 @@ pub struct OpusEncoder {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
+/// Helper state for stereo width tracking during analysis.
+///
+/// Upstream C: src/opus_encoder.c:StereoWidthState
 pub struct StereoWidthState {
     pub XX: opus_val32,
     pub XY: opus_val32,
@@ -457,6 +465,9 @@ impl OpusEncoder {
         self.sync_celt_controls();
     }
 
+    /// Return whether LFE encoding mode is enabled.
+    ///
+    /// Upstream C: src/opus_encoder.c:OPUS_GET_LFE_REQUEST
     pub fn lfe(&self) -> bool {
         self.lfe != 0
     }

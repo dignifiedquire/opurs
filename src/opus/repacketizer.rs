@@ -34,6 +34,8 @@ use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
 /// obtained with [`OpusRepacketizer::out`] and the input packet for which
 /// [`OpusRepacketizer::cat`] needs to be re-added to a newly reinitialized
 /// repacketizer state.
+///
+/// Upstream C: include/opus.h:@ref opus_repacketizer
 #[derive(Debug, Clone)]
 pub struct OpusRepacketizer {
     toc: u8,

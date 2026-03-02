@@ -5,11 +5,16 @@
 use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::analysis::DownmixInput;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
-use crate::opus::opus_encoder::{OpusEncoder, frame_size_select, opus_encode_native};
+use crate::opus::opus_encoder::{frame_size_select, opus_encode_native, OpusEncoder};
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
 
-/// Pure-Rust multistream encoder.
+/// Multistream Opus encoder state.
+///
+/// This wraps the Opus multistream encoder API and stores one internal
+/// encoder per coded stream.
+///
+/// Upstream C: include/opus_multistream.h:OpusMSEncoder
 #[derive(Clone)]
 pub struct OpusMSEncoder {
     config: OpusMultistreamConfig,
@@ -72,6 +77,8 @@ impl OpusMSEncoder {
     /// Upstream-style sizing helper.
     ///
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_get_size
     pub fn get_size(streams: i32, coupled_streams: i32) -> i32 {
         if streams < 1 || coupled_streams < 0 || coupled_streams > streams {
             0
@@ -82,6 +89,8 @@ impl OpusMSEncoder {
     }
 
     /// Create and initialize a multistream encoder.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_create
     pub fn new(
         sample_rate: i32,
         channels: i32,
@@ -110,6 +119,8 @@ impl OpusMSEncoder {
     }
 
     /// Reinitialize an existing multistream encoder instance.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_init
     pub fn init(
         &mut self,
         sample_rate: i32,
@@ -135,6 +146,12 @@ impl OpusMSEncoder {
         }
     }
 
+    /// Initialize an existing encoder with a surround mapping family layout.
+    ///
+    /// Fills `streams`, `coupled_streams`, and `mapping` as part of layout
+    /// selection, then initializes this encoder instance.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_init
     pub fn init_surround(
         &mut self,
         sample_rate: i32,
@@ -160,6 +177,9 @@ impl OpusMSEncoder {
         )
     }
 
+    /// Create a new surround multistream encoder and output the computed layout.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_create
     pub fn create_surround(
         sample_rate: i32,
         channels: i32,
@@ -180,28 +200,42 @@ impl OpusMSEncoder {
         )
     }
 
+    /// Return the channel-to-stream mapping layout.
+    ///
+    /// Upstream C: include/opus_multistream.h:@ref opus_multistream
     #[inline]
     pub fn layout(&self) -> &OpusMultistreamLayout {
         self.config.layout()
     }
 
+    /// Return encoder sample rate in Hz.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_init
     #[inline]
     pub fn sample_rate(&self) -> i32 {
         self.config.sample_rate()
     }
 
+    /// Return encoder application mode.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     #[inline]
     pub fn application(&self) -> i32 {
         self.config.application()
     }
 
     /// Reset all child encoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn reset(&mut self) {
         for encoder in &mut self.encoders {
             encoder.reset();
         }
     }
 
+    /// Borrow a specific child stream encoder by stream index.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, i32> {
         if stream_id < 0 || stream_id >= self.layout().streams() {
             return Err(OPUS_BAD_ARG);
@@ -209,6 +243,9 @@ impl OpusMSEncoder {
         self.encoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
     }
 
+    /// Mutably borrow a specific child stream encoder by stream index.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, i32> {
         if stream_id < 0 || stream_id >= self.layout().streams() {
             return Err(OPUS_BAD_ARG);
@@ -221,6 +258,8 @@ impl OpusMSEncoder {
     /// Apply bitrate to all stream encoders.
     ///
     /// Explicit bitrates are split approximately evenly across streams.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_bitrate(&mut self, bitrate: Bitrate) {
         self.requested_bitrate = bitrate;
         let stream_count = self.encoders.len() as i32;
@@ -235,6 +274,9 @@ impl OpusMSEncoder {
         }
     }
 
+    /// Set encoder application mode for all child encoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
         let app = Application::try_from(application).map_err(|_| OPUS_BAD_ARG)?;
         for encoder in &mut self.encoders {
@@ -244,6 +286,9 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Set encoder complexity for all child encoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_complexity(complexity)?;
@@ -251,36 +296,54 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Enable or disable variable bitrate mode.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_vbr(&mut self, enabled: bool) {
         for encoder in &mut self.encoders {
             encoder.set_vbr(enabled);
         }
     }
 
+    /// Enable or disable VBR constraint.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_vbr_constraint(&mut self, enabled: bool) {
         for encoder in &mut self.encoders {
             encoder.set_vbr_constraint(enabled);
         }
     }
 
+    /// Set requested target bandwidth.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_bandwidth(&mut self, bandwidth: Option<Bandwidth>) {
         for encoder in &mut self.encoders {
             encoder.set_bandwidth(bandwidth);
         }
     }
 
+    /// Set maximum allowed encoder bandwidth.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_max_bandwidth(&mut self, bandwidth: Bandwidth) {
         for encoder in &mut self.encoders {
             encoder.set_max_bandwidth(bandwidth);
         }
     }
 
+    /// Hint signal type (voice/music/auto) for all child encoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_signal(&mut self, signal: Option<Signal>) {
         for encoder in &mut self.encoders {
             encoder.set_signal(signal);
         }
     }
 
+    /// Enable or disable in-band FEC.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_inband_fec(value)?;
@@ -288,6 +351,9 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Set expected packet loss percentage.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_packet_loss_perc(pct)?;
@@ -295,12 +361,18 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Enable or disable discontinuous transmission (DTX).
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_dtx(&mut self, enabled: bool) {
         for encoder in &mut self.encoders {
             encoder.set_dtx(enabled);
         }
     }
 
+    /// Set forced mono/stereo behavior.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_force_channels(channels)?;
@@ -308,6 +380,9 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Set input PCM bit depth hint.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
         for encoder in &mut self.encoders {
             encoder.set_lsb_depth(depth)?;
@@ -315,24 +390,36 @@ impl OpusMSEncoder {
         Ok(())
     }
 
+    /// Set expert frame duration request.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_expert_frame_duration(&mut self, fs: FrameSize) {
         for encoder in &mut self.encoders {
             encoder.set_expert_frame_duration(fs);
         }
     }
 
+    /// Enable or disable inter-frame prediction.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_prediction_disabled(&mut self, disabled: bool) {
         for encoder in &mut self.encoders {
             encoder.set_prediction_disabled(disabled);
         }
     }
 
+    /// Enable or disable phase inversion in intensity stereo.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
         for encoder in &mut self.encoders {
             encoder.set_phase_inversion_disabled(disabled);
         }
     }
 
+    /// Enable or disable QEXT encoding.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     #[cfg(feature = "qext")]
     pub fn set_qext(&mut self, enabled: bool) {
         for encoder in &mut self.encoders {
@@ -341,6 +428,8 @@ impl OpusMSEncoder {
     }
 
     /// Return the XOR of child encoder final ranges.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn final_range(&self) -> u32 {
         self.encoders
             .iter()
@@ -348,6 +437,9 @@ impl OpusMSEncoder {
     }
 
     /// Return the maximum lookahead across child encoders.
+    /// Return total encoder lookahead in samples per channel.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn lookahead(&self) -> i32 {
         self.encoders
             .iter()
@@ -356,6 +448,9 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return current complexity setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn complexity(&self) -> i32 {
         self.encoders
             .first()
@@ -363,10 +458,16 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return whether VBR is enabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn vbr(&self) -> bool {
         self.encoders.first().map(OpusEncoder::vbr).unwrap_or(false)
     }
 
+    /// Return whether constrained VBR is enabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn vbr_constraint(&self) -> bool {
         self.encoders
             .first()
@@ -374,6 +475,9 @@ impl OpusMSEncoder {
             .unwrap_or(false)
     }
 
+    /// Return currently selected output bandwidth.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn bandwidth(&self) -> i32 {
         self.encoders
             .first()
@@ -381,6 +485,9 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return configured maximum bandwidth.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn max_bandwidth(&self) -> Bandwidth {
         self.encoders
             .first()
@@ -388,10 +495,16 @@ impl OpusMSEncoder {
             .unwrap_or(Bandwidth::Fullband)
     }
 
+    /// Return configured signal hint.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn signal(&self) -> Option<Signal> {
         self.encoders.first().and_then(OpusEncoder::signal)
     }
 
+    /// Return in-band FEC setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn inband_fec(&self) -> i32 {
         self.encoders
             .first()
@@ -399,6 +512,9 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return expected packet loss percentage setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn packet_loss_perc(&self) -> i32 {
         self.encoders
             .first()
@@ -406,14 +522,23 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return whether DTX is enabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn dtx(&self) -> bool {
         self.encoders.first().map(OpusEncoder::dtx).unwrap_or(false)
     }
 
+    /// Return forced channel setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn force_channels(&self) -> Option<Channels> {
         self.encoders.first().and_then(OpusEncoder::force_channels)
     }
 
+    /// Return input bit depth hint.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn lsb_depth(&self) -> i32 {
         self.encoders
             .first()
@@ -421,6 +546,9 @@ impl OpusMSEncoder {
             .unwrap_or(0)
     }
 
+    /// Return expert frame duration setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn expert_frame_duration(&self) -> FrameSize {
         self.encoders
             .first()
@@ -428,6 +556,9 @@ impl OpusMSEncoder {
             .unwrap_or(FrameSize::Arg)
     }
 
+    /// Return whether inter-frame prediction is disabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn prediction_disabled(&self) -> bool {
         self.encoders
             .first()
@@ -435,6 +566,9 @@ impl OpusMSEncoder {
             .unwrap_or(false)
     }
 
+    /// Return whether phase inversion is disabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn phase_inversion_disabled(&self) -> bool {
         self.encoders
             .first()
@@ -442,6 +576,9 @@ impl OpusMSEncoder {
             .unwrap_or(false)
     }
 
+    /// Return whether QEXT is enabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     #[cfg(feature = "qext")]
     pub fn qext(&self) -> bool {
         self.encoders
@@ -450,11 +587,18 @@ impl OpusMSEncoder {
             .unwrap_or(false)
     }
 
+    /// Return effective target bitrate for the stream set.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
     pub fn bitrate(&self) -> i32 {
         self.encoders.iter().map(OpusEncoder::bitrate).sum()
     }
 
-    /// Encode interleaved i16 PCM into a multistream Opus packet.
+    /// Encode one interleaved `i16` frame across all streams.
+    ///
+    /// `pcm` must contain `frame_size * channels` samples.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encode
     pub fn encode(&mut self, pcm: &[i16], frame_size: i32, output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
@@ -463,7 +607,11 @@ impl OpusMSEncoder {
         self.encode_impl_i16(pcm, output)
     }
 
-    /// Encode interleaved f32 PCM into a multistream Opus packet.
+    /// Encode one interleaved `f32` frame across all streams.
+    ///
+    /// `pcm` must contain `frame_size * channels` samples.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encode_float
     pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
@@ -472,7 +620,11 @@ impl OpusMSEncoder {
         self.encode_impl_f32(pcm, output)
     }
 
-    /// Encode interleaved 24-bit PCM (stored in i32) into a multistream Opus packet.
+    /// Encode one interleaved 24-bit frame (`i32`) across all streams.
+    ///
+    /// `pcm` must contain `frame_size * channels` samples.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_encode24
     pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, output: &mut [u8]) -> i32 {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {

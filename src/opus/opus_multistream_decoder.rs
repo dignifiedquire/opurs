@@ -10,7 +10,12 @@ use crate::opus::opus_defines::{
 use crate::opus::opus_multistream::OpusMultistreamLayout;
 use crate::opus::packet::opus_packet_parse_impl;
 
-/// Pure-Rust multistream decoder.
+/// Multistream Opus decoder state.
+///
+/// This wraps the Opus multistream decoder API and stores one child decoder
+/// per coded stream.
+///
+/// Upstream C: include/opus_multistream.h:OpusMSDecoder
 #[derive(Clone)]
 pub struct OpusMSDecoder {
     sample_rate: i32,
@@ -27,6 +32,8 @@ impl OpusMSDecoder {
     /// Upstream-style sizing helper.
     ///
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_get_size
     pub fn get_size(streams: i32, coupled_streams: i32) -> i32 {
         if streams < 1 || coupled_streams < 0 || coupled_streams > streams {
             0
@@ -36,6 +43,8 @@ impl OpusMSDecoder {
     }
 
     /// Create and initialize a multistream decoder.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_create
     pub fn new(
         sample_rate: i32,
         channels: i32,
@@ -61,6 +70,8 @@ impl OpusMSDecoder {
     }
 
     /// Reinitialize an existing multistream decoder instance.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_init
     pub fn init(
         &mut self,
         sample_rate: i32,
@@ -78,17 +89,25 @@ impl OpusMSDecoder {
         }
     }
 
+    /// Return decoder sample rate in Hz.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_init
     #[inline]
     pub fn sample_rate(&self) -> i32 {
         self.sample_rate
     }
 
+    /// Return the channel mapping layout.
+    ///
+    /// Upstream C: include/opus_multistream.h:@ref opus_multistream
     #[inline]
     pub fn layout(&self) -> &OpusMultistreamLayout {
         &self.layout
     }
 
     /// Reset all child decoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn reset(&mut self) {
         for decoder in &mut self.decoders {
             decoder.reset();
@@ -96,6 +115,8 @@ impl OpusMSDecoder {
     }
 
     /// Return the XOR of child decoder final ranges.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn final_range(&self) -> u32 {
         self.decoders
             .iter()
@@ -103,6 +124,11 @@ impl OpusMSDecoder {
     }
 
     /// Decode multistream packet into interleaved i16 PCM.
+    ///
+    /// `frame_size` is output capacity per channel; for PLC/FEC paths it should
+    /// match the missing duration.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decode
     pub fn decode(
         &mut self,
         data: &[u8],
@@ -130,6 +156,11 @@ impl OpusMSDecoder {
     }
 
     /// Decode multistream packet into interleaved f32 PCM.
+    ///
+    /// `frame_size` is output capacity per channel; for PLC/FEC paths it should
+    /// match the missing duration.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decode_float
     pub fn decode_float(
         &mut self,
         data: &[u8],
@@ -157,6 +188,11 @@ impl OpusMSDecoder {
     }
 
     /// Decode multistream packet into 24-bit PCM (stored in i32).
+    ///
+    /// `frame_size` is output capacity per channel; for PLC/FEC paths it should
+    /// match the missing duration.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decode24
     pub fn decode24(
         &mut self,
         data: &[u8],
@@ -267,6 +303,9 @@ impl OpusMSDecoder {
         Ok((stream_pcm, frame_size as usize))
     }
 
+    /// Set decode gain for all child decoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
         for decoder in &mut self.decoders {
             decoder.set_gain(gain)?;
@@ -274,6 +313,9 @@ impl OpusMSDecoder {
         Ok(())
     }
 
+    /// Set complexity for all child decoders.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
         for decoder in &mut self.decoders {
             decoder.set_complexity(complexity)?;
@@ -281,12 +323,18 @@ impl OpusMSDecoder {
         Ok(())
     }
 
+    /// Enable or disable packet extension parsing.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn set_ignore_extensions(&mut self, ignore: bool) {
         for decoder in &mut self.decoders {
             decoder.set_ignore_extensions(ignore);
         }
     }
 
+    /// Enable or disable OSCE bandwidth extension.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     #[cfg(feature = "osce")]
     pub fn set_osce_bwe(&mut self, enabled: bool) {
         for decoder in &mut self.decoders {
@@ -294,12 +342,18 @@ impl OpusMSDecoder {
         }
     }
 
+    /// Enable or disable phase inversion in intensity stereo.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn set_phase_inversion_disabled(&mut self, disabled: bool) {
         for decoder in &mut self.decoders {
             decoder.set_phase_inversion_disabled(disabled);
         }
     }
 
+    /// Borrow a child decoder by stream index.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, i32> {
         if stream_id < 0 || stream_id >= self.layout.streams() {
             return Err(OPUS_BAD_ARG);
@@ -307,6 +361,9 @@ impl OpusMSDecoder {
         self.decoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
     }
 
+    /// Mutably borrow a child decoder by stream index.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, i32> {
         if stream_id < 0 || stream_id >= self.layout.streams() {
             return Err(OPUS_BAD_ARG);
@@ -316,10 +373,16 @@ impl OpusMSDecoder {
             .ok_or(OPUS_BAD_ARG)
     }
 
+    /// Return current decode gain.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn gain(&self) -> i32 {
         self.decoders.first().map(OpusDecoder::gain).unwrap_or(0)
     }
 
+    /// Return current packet bandwidth.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn bandwidth(&self) -> i32 {
         self.decoders
             .first()
@@ -327,6 +390,9 @@ impl OpusMSDecoder {
             .unwrap_or(0)
     }
 
+    /// Return current complexity setting.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn complexity(&self) -> i32 {
         self.decoders
             .first()
@@ -334,6 +400,9 @@ impl OpusMSDecoder {
             .unwrap_or(0)
     }
 
+    /// Return whether phase inversion is disabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn phase_inversion_disabled(&self) -> bool {
         self.decoders
             .first()
@@ -341,6 +410,9 @@ impl OpusMSDecoder {
             .unwrap_or(false)
     }
 
+    /// Return duration of last decoded packet in samples per channel.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn last_packet_duration(&self) -> i32 {
         self.decoders
             .first()
@@ -348,6 +420,9 @@ impl OpusMSDecoder {
             .unwrap_or(0)
     }
 
+    /// Return whether packet extensions are ignored.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     pub fn ignore_extensions(&self) -> bool {
         self.decoders
             .first()
@@ -355,6 +430,9 @@ impl OpusMSDecoder {
             .unwrap_or(false)
     }
 
+    /// Return whether OSCE BWE is enabled.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
     #[cfg(feature = "osce")]
     pub fn osce_bwe(&self) -> bool {
         self.decoders
