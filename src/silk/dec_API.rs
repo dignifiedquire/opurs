@@ -31,14 +31,6 @@ pub struct silk_DecControlStruct {
 pub const FLAG_DECODE_NORMAL: i32 = 0;
 pub const FLAG_DECODE_LBRR: i32 = 2;
 pub const FLAG_PACKET_LOST: i32 = 1;
-pub mod errors_h {
-    pub const SILK_DEC_INVALID_SAMPLING_FREQUENCY: i32 = -(200);
-    pub const SILK_NO_ERROR: i32 = 0;
-    pub const SILK_DEC_INVALID_FRAME_SIZE: i32 = -(203);
-}
-use self::errors_h::{
-    SILK_DEC_INVALID_FRAME_SIZE, SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR,
-};
 use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_icdf};
 use crate::silk::decode_frame::silk_decode_frame;
 use crate::silk::decode_indices::silk_decode_indices;
@@ -47,6 +39,9 @@ use crate::silk::decoder_set_fs::silk_decoder_set_fs;
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, CODE_INDEPENDENTLY_NO_LTP_SCALING, MAX_API_FS_KHZ,
     MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH, TYPE_NO_VOICE_ACTIVITY, TYPE_VOICED,
+};
+use crate::silk::errors::{
+    SILK_DEC_INVALID_FRAME_SIZE, SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR,
 };
 use crate::silk::init_decoder::{silk_decoder_state_new, silk_init_decoder, silk_reset_decoder};
 use crate::silk::resampler::silk_resampler;

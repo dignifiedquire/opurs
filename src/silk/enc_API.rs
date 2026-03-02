@@ -32,15 +32,11 @@ pub struct silk_EncControlStruct {
     pub signalType: i32,
     pub offset: i32,
 }
-pub mod errors_h {
-    pub const SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES: i32 = -(101);
-    pub const SILK_NO_ERROR: i32 = 0;
-}
-use self::errors_h::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 use crate::arch::Arch;
 use crate::celt::entcode::ec_tell;
 use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
 use crate::celt::float_cast::FLOAT2INT16;
+use crate::silk::errors::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 
 use crate::silk::check_control_input::check_control_input;
 use crate::silk::control_SNR::silk_control_SNR;

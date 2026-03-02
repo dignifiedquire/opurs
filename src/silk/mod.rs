@@ -52,6 +52,7 @@ pub mod decoder_set_fs;
 pub mod enc_API;
 pub mod encode_indices;
 pub mod encode_pulses;
+pub mod errors;
 pub mod float;
 pub mod gain_quant;
 pub mod init_decoder;

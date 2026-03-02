@@ -2,25 +2,13 @@
 //!
 //! Upstream C: `silk/check_control_input.c`
 
-pub mod errors_h {
-    pub const SILK_NO_ERROR: i32 = 0;
-    pub const SILK_ENC_INVALID_COMPLEXITY_SETTING: i32 = -(106);
-    pub const SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR: i32 = -(111);
-    pub const SILK_ENC_INVALID_INBAND_FEC_SETTING: i32 = -(107);
-    pub const SILK_ENC_INVALID_CBR_SETTING: i32 = -(109);
-    pub const SILK_ENC_INVALID_DTX_SETTING: i32 = -(108);
-    pub const SILK_ENC_INVALID_LOSS_RATE: i32 = -(105);
-    pub const SILK_ENC_PACKET_SIZE_NOT_SUPPORTED: i32 = -(103);
-    pub const SILK_ENC_FS_NOT_SUPPORTED: i32 = -(102);
-}
-
-pub use self::errors_h::{
+use crate::silk::define::ENCODER_NUM_CHANNELS;
+use crate::silk::enc_API::silk_EncControlStruct;
+pub use crate::silk::errors::{
     SILK_ENC_FS_NOT_SUPPORTED, SILK_ENC_INVALID_CBR_SETTING, SILK_ENC_INVALID_COMPLEXITY_SETTING,
     SILK_ENC_INVALID_DTX_SETTING, SILK_ENC_INVALID_INBAND_FEC_SETTING, SILK_ENC_INVALID_LOSS_RATE,
     SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR, SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR,
 };
-use crate::silk::define::ENCODER_NUM_CHANNELS;
-use crate::silk::enc_API::silk_EncControlStruct;
 
 /// Upstream C: silk/check_control_input.c:check_control_input
 #[inline]

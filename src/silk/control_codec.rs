@@ -2,18 +2,13 @@
 //!
 //! Upstream C: `silk/control_codec.c`
 
-pub mod errors_h {
-    pub const SILK_ENC_PACKET_SIZE_NOT_SUPPORTED: i32 = -(103);
-    pub const SILK_NO_ERROR: i32 = 0;
-}
-
-use self::errors_h::{SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR};
 use crate::silk::control_audio_bandwidth::silk_control_audio_bandwidth;
 use crate::silk::define::{
     LA_SHAPE_MS, MAX_DEL_DEC_STATES, MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER,
     SUB_FRAME_LENGTH_MS, TYPE_NO_VOICE_ACTIVITY,
 };
 use crate::silk::enc_API::silk_EncControlStruct;
+use crate::silk::errors::{SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR};
 use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
 use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_short2float_array};
 use crate::silk::pitch_est_tables::{
