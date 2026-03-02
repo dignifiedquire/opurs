@@ -2,70 +2,43 @@
 
 extern crate core;
 
-pub mod arch;
-
 mod enums;
 mod error;
-pub mod util;
 
-#[cfg(feature = "tools")]
-pub mod tools;
-
-#[cfg(not(feature = "tools"))]
 mod celt;
-#[cfg(feature = "tools")]
-pub mod celt;
-
-mod silk;
-
 mod opus;
+mod silk;
 
 #[cfg(feature = "deep-plc")]
 pub mod dnn;
 
-// TODO: copy over the docs
-// =====
-// opus.h
-// =====
+#[cfg(feature = "tools")]
+pub mod tools;
 
-// opus_encoder
+pub mod arch;
+pub mod util;
+
 pub use crate::opus::opus_encoder::OpusEncoder;
-// opus_multistream (layout/config scaffolding + packet helpers)
 pub use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
-pub use crate::opus::opus_multistream_decoder::{
-    opus_multistream_decode, opus_multistream_decode24, opus_multistream_decode_float,
-    opus_multistream_decoder_create, opus_multistream_decoder_destroy,
-    opus_multistream_decoder_get_decoder_state, opus_multistream_decoder_get_size,
-    opus_multistream_decoder_init, OpusMSDecoder,
+pub use crate::opus::opus_multistream_decoder::OpusMSDecoder;
+pub use crate::opus::opus_multistream_encoder::OpusMSEncoder;
+pub use crate::opus::opus_projection_decoder::OpusProjectionDecoder;
+pub use crate::opus::opus_projection_encoder::OpusProjectionEncoder;
+
+pub use crate::opus::opus_decoder::{
+    opus_packet_get_bandwidth, opus_packet_get_nb_channels, opus_packet_get_nb_frames,
+    opus_packet_get_nb_samples, OpusDecoder,
 };
-pub use crate::opus::opus_multistream_encoder::{
-    opus_multistream_encode, opus_multistream_encode24, opus_multistream_encode_float,
-    opus_multistream_encoder_create, opus_multistream_encoder_destroy,
-    opus_multistream_encoder_get_encoder_state, opus_multistream_encoder_get_size,
-    opus_multistream_encoder_init, opus_multistream_surround_encoder_create,
-    opus_multistream_surround_encoder_get_size, opus_multistream_surround_encoder_init,
-    OpusMSEncoder,
+pub use crate::opus::packet::{
+    opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip,
 };
-pub use crate::opus::opus_projection_decoder::{
-    opus_projection_decode, opus_projection_decode24, opus_projection_decode_float,
-    opus_projection_decoder_create, opus_projection_decoder_destroy,
-    opus_projection_decoder_get_decoder_state, opus_projection_decoder_get_size,
-    opus_projection_decoder_init, OpusProjectionDecoder,
+pub use crate::opus::repacketizer::{
+    opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad,
+    OpusRepacketizer,
 };
-pub use crate::opus::opus_projection_encoder::{
-    opus_projection_ambisonics_encoder_create, opus_projection_ambisonics_encoder_get_size,
-    opus_projection_ambisonics_encoder_init, opus_projection_encode, opus_projection_encode24,
-    opus_projection_encode_float, opus_projection_encoder_destroy,
-    opus_projection_encoder_get_encoder_state, OpusProjectionEncoder,
-};
-// opus_decoder
+
 #[cfg(feature = "dred")]
 pub use crate::dnn::dred::decoder::{OpusDRED, OpusDREDDecoder};
-pub use crate::opus::opus_decoder::{
-    opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
-    opus_packet_get_nb_channels, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
-    OpusDecoder,
-};
 #[cfg(feature = "dred")]
 pub use crate::opus::opus_decoder::{
     opus_decoder_dred_decode, opus_decoder_dred_decode24, opus_decoder_dred_decode_float,
@@ -74,19 +47,6 @@ pub use crate::opus::opus_decoder::{
     opus_dred_parse, opus_dred_process,
 };
 
-pub use crate::opus::packet::{
-    opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip,
-};
-// opus_repacketizer
-pub use crate::opus::repacketizer::{
-    opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad,
-    OpusRepacketizer,
-};
-
-// =====
-// opus_defines.h
-// =====
-// opus_errorcodes
 pub use crate::opus::opus_defines::{
     OPUS_ALLOC_FAIL, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
     OPUS_INVALID_STATE, OPUS_OK, OPUS_UNIMPLEMENTED,
@@ -198,7 +158,7 @@ pub mod internals {
     pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
 
     // -- CELT comb filter (for benchmarks) --
-    pub use crate::celt::common::comb_filter_const_c;
+    pub use crate::celt::common::{comb_filter, comb_filter_const_c};
     #[cfg(feature = "simd")]
     pub use crate::celt::simd::comb_filter_const;
 
@@ -207,6 +167,7 @@ pub mod internals {
     pub use crate::celt::pitch::{
         celt_inner_prod, celt_pitch_xcorr, dual_inner_prod, xcorr_kernel,
     };
+    pub use crate::celt::pitch::{pitch_downsample, pitch_search, remove_doubling};
     // Scalar implementations (for A/B comparison):
     pub use crate::celt::pitch::{
         celt_inner_prod_scalar, celt_pitch_xcorr_scalar, dual_inner_prod_scalar,

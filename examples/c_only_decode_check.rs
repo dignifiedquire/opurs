@@ -100,10 +100,8 @@ fn main() {
         let mut pcm1 = vec![0.0f32; MAX_FRAME_SIZE * 2];
         let mut pcm2 = vec![0.0f32; MAX_FRAME_SIZE * 2];
 
-        let ret1 =
-            opurs::opus_decode_float(&mut rust_dec1, pkt, &mut pcm1, MAX_FRAME_SIZE as i32, 0);
-        let ret2 =
-            opurs::opus_decode_float(&mut rust_dec2, pkt, &mut pcm2, MAX_FRAME_SIZE as i32, 0);
+        let ret1 = rust_dec1.decode_float(pkt, &mut pcm1, MAX_FRAME_SIZE as i32, false);
+        let ret2 = rust_dec2.decode_float(pkt, &mut pcm2, MAX_FRAME_SIZE as i32, false);
         assert_eq!(ret1, ret2);
 
         let n = ret1 as usize * 2;

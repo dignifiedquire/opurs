@@ -5,9 +5,7 @@
 mod test_common;
 
 use opurs::{
-    opus_projection_ambisonics_encoder_create, opus_projection_decode,
-    opus_projection_decoder_create, opus_projection_encode, Bitrate, MappingMatrix,
-    OPUS_APPLICATION_AUDIO,
+    Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
 };
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use test_common::TestRng;
@@ -184,7 +182,7 @@ fn projection_upstream_creation_arguments() {
         let mut streams = -1i32;
         let mut coupled_streams = -1i32;
 
-        let is_projection_valid = match opus_projection_ambisonics_encoder_create(
+        let is_projection_valid = match OpusProjectionEncoder::new(
             48000,
             channels,
             3,
@@ -198,7 +196,7 @@ fn projection_upstream_creation_arguments() {
                 let mut matrix = vec![0u8; matrix_size as usize];
                 enc.copy_demixing_matrix(&mut matrix)
                     .expect("copy demixing matrix");
-                opus_projection_decoder_create(48000, channels, streams, coupled_streams, &matrix)
+                OpusProjectionDecoder::new(48000, channels, streams, coupled_streams, &matrix)
                     .is_ok()
             }
             Err(_) => false,
@@ -259,7 +257,7 @@ fn projection_upstream_encode_decode_pipeline() {
     let channels = 18i32;
     let mut streams = -1i32;
     let mut coupled = -1i32;
-    let mut enc = opus_projection_ambisonics_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         48000,
         channels,
         3,
@@ -278,7 +276,7 @@ fn projection_upstream_encode_decode_pipeline() {
     enc.copy_demixing_matrix(&mut matrix)
         .expect("copy demixing matrix");
 
-    let mut dec = opus_projection_decoder_create(48000, channels, streams, coupled, &matrix)
+    let mut dec = OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix)
         .expect("projection decoder create");
 
     let mut rng = TestRng::new(0);
@@ -286,15 +284,14 @@ fn projection_upstream_encode_decode_pipeline() {
     projection_generate_music(&mut buffer_in, BUFFER_SIZE, channels as usize, &mut rng);
 
     let mut packet = vec![0u8; MAX_DATA_BYTES];
-    let len = opus_projection_encode(&mut enc, &buffer_in, BUFFER_SIZE as i32, &mut packet);
+    let len = enc.encode(&buffer_in, BUFFER_SIZE as i32, &mut packet);
     assert!(
         len > 0 && (len as usize) <= MAX_DATA_BYTES,
         "opus_projection_encode returned {len}"
     );
 
     let mut buffer_out = vec![0i16; MAX_FRAME_SAMPLES * channels as usize];
-    let out_samples = opus_projection_decode(
-        &mut dec,
+    let out_samples = dec.decode(
         &packet[..len as usize],
         &mut buffer_out,
         MAX_FRAME_SAMPLES as i32,

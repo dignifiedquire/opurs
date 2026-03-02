@@ -4,10 +4,7 @@
 
 use std::ptr;
 
-use opurs::{
-    opus_decode_float, opus_decoder_dred_decode_float, OpusDecoder, OpusEncoder,
-    OPUS_APPLICATION_AUDIO,
-};
+use opurs::{opus_decoder_dred_decode_float, OpusDecoder, OpusEncoder, OPUS_APPLICATION_AUDIO};
 
 fn max_abs_diff(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
@@ -35,8 +32,7 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
 
     let mut rust_ref = vec![0.0f32; 960];
     let mut c_ref = vec![0.0f32; 960];
-    let rust_ref_ret =
-        opus_decode_float(&mut rust_dec, &packet[..packet_len], &mut rust_ref, 960, 0);
+    let rust_ref_ret = rust_dec.decode_float(&packet[..packet_len], &mut rust_ref, 960, false);
     let c_ref_ret = unsafe {
         libopus_sys::opus_decode_float(
             c_dec,

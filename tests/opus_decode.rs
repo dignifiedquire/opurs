@@ -8,9 +8,7 @@
 
 mod test_common;
 
-use opurs::{
-    opus_decoder_get_nb_samples, opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder,
-};
+use opurs::{opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder};
 use test_common::{debruijn2, TestRng};
 
 /// Sample rates used by the decoder tests (matching upstream fsv[]).
@@ -145,13 +143,7 @@ fn test_decoder_initial_plc() {
                 "dec[{t}] output buffer was modified when it shouldn't have been"
             );
 
-            // Invalid FEC value
-            let invalid_fec = if fec != 0 { -1 } else { 2 };
-            let out_samples = opurs::opus_decode(dec, &packet[..1], outbuf, MAX_FRAME, invalid_fec);
-            assert!(
-                out_samples < 0,
-                "dec[{t}] invalid fec={invalid_fec} should fail, got {out_samples}"
-            );
+            // Safe API uses bool for FEC, so invalid integer FEC values are unrepresentable.
 
             dec.reset();
         }
@@ -186,7 +178,7 @@ fn test_decoder_all_2byte_prefixes() {
 
         // Get expected sample counts
         for t in 0..NUM_DECODERS {
-            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..1]);
+            expected[t] = decoders[t].get_nb_samples(&packet[..1]);
             assert!(
                 expected[t] <= 2880,
                 "dec[{t}] mode {i}: nb_samples {} > 2880",
@@ -362,7 +354,7 @@ fn test_decoder_fuzz() {
         packet[0] = (i << 2) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..1]);
+            expected[t] = decoders[t].get_nb_samples(&packet[..1]);
         }
 
         let mut j = 2 + skip;
@@ -409,7 +401,7 @@ fn test_decoder_fuzz() {
         packet[0] = (modes[i] as i32 * 4) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..plen as usize]);
+            expected[t] = decoders[t].get_nb_samples(&packet[..plen as usize]);
         }
 
         for j in 0..plen {
@@ -466,7 +458,7 @@ fn test_decoder_fuzz() {
 
     for i in 0..4096 {
         packet[0] = (modes[i] as i32 * 4) as u8;
-        let expected = opus_decoder_get_nb_samples(&mut decoders[t], &packet[..plen as usize]);
+        let expected = decoders[t].get_nb_samples(&packet[..plen as usize]);
 
         for _ in 0..10 {
             for j in 0..plen {

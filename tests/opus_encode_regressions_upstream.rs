@@ -5,10 +5,8 @@
 #[cfg(not(feature = "qext"))]
 use opurs::OPUS_BAD_ARG;
 use opurs::{
-    opus_multistream_encode, opus_multistream_encoder_create,
-    opus_multistream_surround_encoder_create, opus_projection_ambisonics_encoder_create, Bandwidth,
-    Bitrate, Channels, OpusEncoder, Signal, OPUS_APPLICATION_AUDIO,
-    OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,
+    Bandwidth, Bitrate, Channels, OpusEncoder, OpusMSEncoder, OpusProjectionEncoder, Signal,
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,
 };
 
 fn identity_mapping(channels: usize) -> Vec<u8> {
@@ -38,7 +36,7 @@ fn mostly_constant_pcm_i16(samples: usize, base: i16, seed: u32) -> Vec<i16> {
 #[test]
 fn regression_mscbr_encode_fail10() {
     let mapping = identity_mapping(255);
-    let mut enc = opus_multistream_encoder_create(
+    let mut enc = OpusMSEncoder::new(
         8_000,
         255,
         254,
@@ -65,7 +63,7 @@ fn regression_mscbr_encode_fail10() {
 
     let pcm = vec![0i16; 20 * 255];
     let mut data = vec![0u8; 627_300];
-    let data_len = opus_multistream_encode(&mut enc, &pcm, 20, &mut data);
+    let data_len = enc.encode(&pcm, 20, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "expected positive packet length in range, got {data_len}"
@@ -76,7 +74,7 @@ fn regression_mscbr_encode_fail10() {
 #[test]
 fn regression_mscbr_encode_fail() {
     let mapping = identity_mapping(192);
-    let mut enc = opus_multistream_encoder_create(
+    let mut enc = OpusMSEncoder::new(
         8_000,
         192,
         189,
@@ -103,7 +101,7 @@ fn regression_mscbr_encode_fail() {
 
     let pcm = vec![0i16; 20 * 192];
     let mut data = vec![0u8; 472_320];
-    let data_len = opus_multistream_encode(&mut enc, &pcm, 20, &mut data);
+    let data_len = enc.encode(&pcm, 20, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "expected positive packet length in range, got {data_len}"
@@ -131,7 +129,7 @@ fn regression_analysis_overflow() {
 fn regression_projection_overflow2() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
-    let mut enc = opus_projection_ambisonics_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         12_000,
         9,
         3,
@@ -158,7 +156,7 @@ fn regression_projection_overflow2() {
 fn regression_projection_overflow3() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
-    let mut enc = opus_projection_ambisonics_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         24_000,
         4,
         3,
@@ -233,7 +231,7 @@ fn regression_celt_ec_internal_error() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 1];
-    let mut enc = opus_multistream_surround_encoder_create(
+    let mut enc = OpusMSEncoder::create_surround(
         16_000,
         1,
         1,
@@ -260,7 +258,7 @@ fn regression_celt_ec_internal_error() {
 
     let mut data = vec![0u8; 2460];
     let pcm0 = patterned_pcm_i16(320, 0x1234_5678);
-    let data_len = opus_multistream_encode(&mut enc, &pcm0, 320, &mut data);
+    let data_len = enc.encode(&pcm0, 320, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "first encode expected packet length in range, got {data_len}"
@@ -286,7 +284,7 @@ fn regression_celt_ec_internal_error() {
             let mid = pcm.len() / 2;
             pcm[mid] = 25_600;
         }
-        let data_len = opus_multistream_encode(&mut enc, &pcm, 160, &mut data);
+        let data_len = enc.encode(&pcm, 160, &mut data);
         assert!(
             data_len > 0 && data_len <= data.len() as i32,
             "iteration {idx} encode expected packet length in range, got {data_len}"
@@ -307,7 +305,7 @@ fn regression_celt_ec_internal_error() {
     let _ = enc.set_packet_loss_perc(41);
     enc.set_bitrate(Bitrate::Bits(21_425));
     let pcm_last = patterned_pcm_i16(40, 0xCAFE_BABE);
-    let data_len = opus_multistream_encode(&mut enc, &pcm_last, 40, &mut data);
+    let data_len = enc.encode(&pcm_last, 40, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "final encode expected packet length in range, got {data_len}"
@@ -320,7 +318,7 @@ fn regression_surround_analysis_uninit() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 3];
-    let mut enc = opus_multistream_surround_encoder_create(
+    let mut enc = OpusMSEncoder::create_surround(
         24_000,
         3,
         1,
@@ -347,7 +345,7 @@ fn regression_surround_analysis_uninit() {
 
     let mut data = vec![0u8; 7380];
     let pcm0 = patterned_pcm_i16(960 * 3, 0x00C0_FFEE);
-    let data_len = opus_multistream_encode(&mut enc, &pcm0, 960, &mut data);
+    let data_len = enc.encode(&pcm0, 960, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "first encode expected packet length in range, got {data_len}"
@@ -369,7 +367,7 @@ fn regression_surround_analysis_uninit() {
     enc.set_bitrate(Bitrate::Bits(775_410));
 
     let pcm1 = mostly_constant_pcm_i16(1440 * 3, -13365, 0x0BAD_F00D);
-    let data_len = opus_multistream_encode(&mut enc, &pcm1, 1440, &mut data);
+    let data_len = enc.encode(&pcm1, 1440, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "second encode expected packet length in range, got {data_len}"
@@ -382,7 +380,7 @@ fn regression_surround_analysis_uninit() {
 fn regression_projection_overflow() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
-    let create = opus_projection_ambisonics_encoder_create(
+    let create = OpusProjectionEncoder::new(
         96_000,
         36,
         3,
@@ -403,7 +401,7 @@ fn regression_projection_overflow() {
 fn regression_projection_overflow() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
-    let mut enc = opus_projection_ambisonics_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         96_000,
         36,
         3,
@@ -429,7 +427,7 @@ fn regression_projection_overflow() {
 fn regression_projection_overflow4() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
-    let mut enc = opus_projection_ambisonics_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         96_000,
         36,
         3,
@@ -457,7 +455,7 @@ fn regression_qext_dred_combination() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 5];
-    let mut enc = opus_multistream_surround_encoder_create(
+    let mut enc = OpusMSEncoder::create_surround(
         16_000,
         5,
         1,
@@ -486,7 +484,7 @@ fn regression_qext_dred_combination() {
         pcm[24] = -2057;
     }
     let mut data = vec![0u8; 2560];
-    let data_len = opus_multistream_encode(&mut enc, &pcm, 320, &mut data);
+    let data_len = enc.encode(&pcm, 320, &mut data);
     assert!(
         data_len > 0 && data_len <= data.len() as i32,
         "expected packet length in range, got {data_len}"

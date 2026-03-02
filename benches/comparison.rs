@@ -86,7 +86,7 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
                     unsafe {
-                        PITCH_XCORR_IMPL[(arch as usize) & 7](
+                        (PITCH_XCORR_IMPL[(arch as usize) & 7].expect("missing pitch impl"))(
                             x.as_ptr(),
                             y.as_ptr(),
                             xcorr.as_mut_ptr(),
@@ -110,7 +110,8 @@ fn bench_pitch_xcorr_comparison(c: &mut Criterion) {
                 let mut xcorr = vec![0.0f32; max_pitch];
                 b.iter(|| {
                     unsafe {
-                        CELT_PITCH_XCORR_IMPL[(arch as usize) & 7](
+                        (CELT_PITCH_XCORR_IMPL[(arch as usize) & 7]
+                            .expect("missing aarch64 pitch impl"))(
                             x.as_ptr(),
                             y.as_ptr(),
                             xcorr.as_mut_ptr(),
@@ -153,7 +154,8 @@ fn bench_silk_inner_product_flp_comparison(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("c_simd", n), &n, |b, &n| {
             let arch = unsafe { libopus_sys::opus_select_arch() };
             b.iter(|| unsafe {
-                black_box(SILK_INNER_PRODUCT_FLP_IMPL[(arch as usize) & 7](
+                black_box((SILK_INNER_PRODUCT_FLP_IMPL[(arch as usize) & 7]
+                    .expect("missing silk inner-prod impl"))(
                     d1.as_ptr(),
                     d2.as_ptr(),
                     n as i32,

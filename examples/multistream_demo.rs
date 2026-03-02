@@ -1,9 +1,6 @@
 //! Minimal multistream encode/decode demo.
 
-use opurs::{
-    opus_multistream_decode, opus_multistream_encode, OpusMSDecoder, OpusMSEncoder,
-    OPUS_APPLICATION_AUDIO,
-};
+use opurs::{OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO};
 
 fn main() {
     let sample_rate = 48_000;
@@ -34,12 +31,11 @@ fn main() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = opus_multistream_encode(&mut enc, &pcm, frame_size, &mut packet);
+    let packet_len = enc.encode(&pcm, frame_size, &mut packet);
     assert!(packet_len > 0, "encode failed: {packet_len}");
 
     let mut decoded = vec![0i16; frame_size as usize * channels as usize];
-    let decoded_samples = opus_multistream_decode(
-        &mut dec,
+    let decoded_samples = dec.decode(
         &packet[..packet_len as usize],
         &mut decoded,
         frame_size,

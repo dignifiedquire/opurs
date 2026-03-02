@@ -17,12 +17,9 @@ use opurs::tools::demo::{
 };
 use opurs::tools::{opus_compare, CompareParams};
 use opurs::{
-    opus_projection_ambisonics_encoder_create as rust_projection_encoder_create,
-    opus_projection_decode as rust_projection_decode,
-    opus_projection_decoder_create as rust_projection_decoder_create,
-    opus_projection_encode as rust_projection_encode, Bitrate as OpusBitrate,
-    OPUS_APPLICATION_AUDIO, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
-    OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_SET_BITRATE_REQUEST,
+    Bitrate as OpusBitrate, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
+    OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
+    OPUS_SET_BITRATE_REQUEST,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::c_void;
@@ -2522,7 +2519,7 @@ fn run_test(
 
                 let mut rust_streams = -1i32;
                 let mut rust_coupled = -1i32;
-                let mut rust_enc = match rust_projection_encoder_create(
+                let mut rust_enc = match OpusProjectionEncoder::new(
                     usize::from(projection_case.sample_rate) as i32,
                     projection_case.channels,
                     3,
@@ -2582,7 +2579,7 @@ fn run_test(
                     return TestResult::fail(format!("C projection get matrix failed: {c_ret}"));
                 }
 
-                let mut rust_dec_upstream = match rust_projection_decoder_create(
+                let mut rust_dec_upstream = match OpusProjectionDecoder::new(
                     usize::from(projection_case.sample_rate) as i32,
                     projection_case.channels,
                     c_streams,
@@ -2596,7 +2593,7 @@ fn run_test(
                         ))
                     }
                 };
-                let mut rust_dec_rust = match rust_projection_decoder_create(
+                let mut rust_dec_rust = match OpusProjectionDecoder::new(
                     usize::from(projection_case.sample_rate) as i32,
                     projection_case.channels,
                     c_streams,
@@ -2686,12 +2683,7 @@ fn run_test(
                     upstream_total_bytes += upstream_packet.len();
 
                     let mut rust_packet = vec![0u8; 4000];
-                    let rust_len = rust_projection_encode(
-                        &mut rust_enc,
-                        frame,
-                        frame_size as i32,
-                        &mut rust_packet,
-                    );
+                    let rust_len = rust_enc.encode(frame, frame_size as i32, &mut rust_packet);
                     if rust_len <= 0 {
                         return TestResult::fail(format!(
                             "Rust projection encode failed at packet {packet_idx}: {rust_len}"
@@ -2731,8 +2723,7 @@ fn run_test(
                         )
                     };
                     let mut rust_out_upstream = vec![0i16; samples_per_packet];
-                    let rust_ret = rust_projection_decode(
-                        &mut rust_dec_upstream,
+                    let rust_ret = rust_dec_upstream.decode(
                         &upstream_packet,
                         &mut rust_out_upstream,
                         frame_size as i32,
@@ -2771,8 +2762,7 @@ fn run_test(
                         )
                     };
                     let mut rust_out_rust = vec![0i16; samples_per_packet];
-                    let rust_ret = rust_projection_decode(
-                        &mut rust_dec_rust,
+                    let rust_ret = rust_dec_rust.decode(
                         &rust_packet,
                         &mut rust_out_rust,
                         frame_size as i32,

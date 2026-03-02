@@ -1,45 +1,9 @@
 #![cfg(feature = "tools")]
 
-use opurs::celt::pitch::{
+use opurs::internals::{
     pitch_downsample as rust_pitch_downsample, pitch_search as rust_pitch_search,
     remove_doubling as rust_remove_doubling,
 };
-
-unsafe extern "C" {
-    fn pitch_downsample(x: *mut *mut f32, x_lp: *mut f32, len: i32, c: i32, factor: i32, arch: i32);
-    fn pitch_search(
-        x_lp: *const f32,
-        y: *mut f32,
-        len: i32,
-        max_pitch: i32,
-        pitch: *mut i32,
-        arch: i32,
-    );
-    fn remove_doubling(
-        x: *mut f32,
-        maxperiod: i32,
-        minperiod: i32,
-        n: i32,
-        t0: *mut i32,
-        prev_period: i32,
-        prev_gain: f32,
-        arch: i32,
-    ) -> f32;
-    fn comb_filter(
-        y: *mut f32,
-        x: *mut f32,
-        t0: i32,
-        t1: i32,
-        n: i32,
-        g0: f32,
-        g1: f32,
-        tapset0: i32,
-        tapset1: i32,
-        window: *const f32,
-        overlap: i32,
-        arch: i32,
-    );
-}
 
 struct Rng(u64);
 impl Rng {
@@ -98,7 +62,7 @@ fn pitch_primitives_match_c_scalar() {
         let mut x_lp_c = vec![0.0f32; half];
         unsafe {
             let mut ptrs = [ch0.as_mut_ptr(), ch1.as_mut_ptr()];
-            pitch_downsample(
+            libopus_sys::pitch_downsample(
                 ptrs.as_mut_ptr(),
                 x_lp_c.as_mut_ptr(),
                 (len >> 1) as i32,
@@ -130,7 +94,7 @@ fn pitch_primitives_match_c_scalar() {
             arch,
         );
         unsafe {
-            pitch_search(
+            libopus_sys::pitch_search(
                 x_lp_c[(maxperiod as usize / 2)..].as_ptr(),
                 y_c.as_mut_ptr(),
                 n,
@@ -160,7 +124,7 @@ fn pitch_primitives_match_c_scalar() {
             arch,
         );
         let g_c = unsafe {
-            remove_doubling(
+            libopus_sys::remove_doubling(
                 y_c.as_mut_ptr(),
                 maxperiod,
                 minperiod,
@@ -191,7 +155,7 @@ fn pitch_primitives_match_c_scalar() {
 #[test]
 fn comb_filter_matches_c_scalar() {
     use opurs::arch::Arch;
-    use opurs::celt::common::comb_filter as rust_comb_filter;
+    use opurs::internals::comb_filter as rust_comb_filter;
 
     let mut rng = Rng::new(0x1234_5678_9abc_def0);
     let c_arch = 0;
@@ -240,7 +204,7 @@ fn comb_filter_matches_c_scalar() {
         );
 
         unsafe {
-            comb_filter(
+            libopus_sys::comb_filter(
                 y_c.as_mut_ptr().add(y_start),
                 x.as_mut_ptr().add(x_start),
                 t0,

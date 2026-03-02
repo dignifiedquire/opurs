@@ -4,6 +4,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+
 pub const __WORDSIZE: u32 = 64;
 pub const __has_safe_buffers: u32 = 1;
 pub const __DARWIN_ONLY_64_BIT_INO_T: u32 = 1;
@@ -198,7 +199,6 @@ pub union __mbstate_t {
     pub _mbstateL: ::std::os::raw::c_longlong,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __mbstate_t"][::std::mem::size_of::<__mbstate_t>() - 128usize];
     ["Alignment of __mbstate_t"][::std::mem::align_of::<__mbstate_t>() - 8usize];
@@ -246,7 +246,6 @@ pub struct __darwin_pthread_handler_rec {
     pub __next: *mut __darwin_pthread_handler_rec,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __darwin_pthread_handler_rec"]
         [::std::mem::size_of::<__darwin_pthread_handler_rec>() - 24usize];
@@ -266,7 +265,6 @@ pub struct _opaque_pthread_attr_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_attr_t"][::std::mem::size_of::<_opaque_pthread_attr_t>() - 64usize];
     ["Alignment of _opaque_pthread_attr_t"]
@@ -283,7 +281,6 @@ pub struct _opaque_pthread_cond_t {
     pub __opaque: [::std::os::raw::c_char; 40usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_cond_t"][::std::mem::size_of::<_opaque_pthread_cond_t>() - 48usize];
     ["Alignment of _opaque_pthread_cond_t"]
@@ -300,7 +297,6 @@ pub struct _opaque_pthread_condattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_condattr_t"]
         [::std::mem::size_of::<_opaque_pthread_condattr_t>() - 16usize];
@@ -318,7 +314,6 @@ pub struct _opaque_pthread_mutex_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutex_t"][::std::mem::size_of::<_opaque_pthread_mutex_t>() - 64usize];
     ["Alignment of _opaque_pthread_mutex_t"]
@@ -335,7 +330,6 @@ pub struct _opaque_pthread_mutexattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutexattr_t"]
         [::std::mem::size_of::<_opaque_pthread_mutexattr_t>() - 16usize];
@@ -353,7 +347,6 @@ pub struct _opaque_pthread_once_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_once_t"][::std::mem::size_of::<_opaque_pthread_once_t>() - 16usize];
     ["Alignment of _opaque_pthread_once_t"]
@@ -370,7 +363,6 @@ pub struct _opaque_pthread_rwlock_t {
     pub __opaque: [::std::os::raw::c_char; 192usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlock_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlock_t>() - 200usize];
@@ -388,7 +380,6 @@ pub struct _opaque_pthread_rwlockattr_t {
     pub __opaque: [::std::os::raw::c_char; 16usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlockattr_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlockattr_t>() - 24usize];
@@ -407,7 +398,6 @@ pub struct _opaque_pthread_t {
     pub __opaque: [::std::os::raw::c_char; 8176usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
-#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_t"][::std::mem::size_of::<_opaque_pthread_t>() - 8192usize];
     ["Alignment of _opaque_pthread_t"][::std::mem::align_of::<_opaque_pthread_t>() - 8usize];
@@ -450,83 +440,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct OpusEncoder {
     _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct OpusCustomMode {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct OpusCustomEncoder {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct OpusCustomDecoder {
-    _unused: [u8; 0],
-}
-unsafe extern "C" {
-    pub fn opus_custom_mode_create(
-        Fs: opus_int32,
-        frame_size: ::std::os::raw::c_int,
-        error: *mut ::std::os::raw::c_int,
-    ) -> *mut OpusCustomMode;
-}
-unsafe extern "C" {
-    pub fn opus_custom_mode_destroy(mode: *mut OpusCustomMode);
-}
-unsafe extern "C" {
-    pub fn opus_custom_encoder_create(
-        mode: *const OpusCustomMode,
-        channels: ::std::os::raw::c_int,
-        error: *mut ::std::os::raw::c_int,
-    ) -> *mut OpusCustomEncoder;
-}
-unsafe extern "C" {
-    pub fn opus_custom_encoder_destroy(st: *mut OpusCustomEncoder);
-}
-unsafe extern "C" {
-    pub fn opus_custom_encoder_ctl(
-        st: *mut OpusCustomEncoder,
-        request: ::std::os::raw::c_int,
-        ...
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn opus_custom_encode24(
-        st: *mut OpusCustomEncoder,
-        pcm: *const opus_int32,
-        frame_size: ::std::os::raw::c_int,
-        compressed: *mut ::std::os::raw::c_uchar,
-        nbCompressedBytes: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn opus_custom_decoder_create(
-        mode: *const OpusCustomMode,
-        channels: ::std::os::raw::c_int,
-        error: *mut ::std::os::raw::c_int,
-    ) -> *mut OpusCustomDecoder;
-}
-unsafe extern "C" {
-    pub fn opus_custom_decoder_destroy(st: *mut OpusCustomDecoder);
-}
-unsafe extern "C" {
-    pub fn opus_custom_decoder_ctl(
-        st: *mut OpusCustomDecoder,
-        request: ::std::os::raw::c_int,
-        ...
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn opus_custom_decode24(
-        st: *mut OpusCustomDecoder,
-        data: *const ::std::os::raw::c_uchar,
-        len: ::std::os::raw::c_int,
-        pcm: *mut opus_int32,
-        frame_size: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     #[doc = " Gets the size of an <code>OpusEncoder</code> structure.\n @param[in] channels <tt>int</tt>: Number of channels.\n                                   This must be 1 or 2.\n @returns The size in bytes.\n @note Since this function does not take the application as input, it will overestimate\n the size required for OPUS_APPLICATION_RESTRICTED_SILK and OPUS_APPLICATION_RESTRICTED_CELT.\n That is generally not a problem, except when trying to know the size to use for a copy."]
@@ -773,7 +686,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[doc = " Gets the bandwidth of an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet\n @retval OPUS_BANDWIDTH_NARROWBAND Narrowband (4kHz bandpass)\n @retval OPUS_BANDWIDTH_MEDIUMBAND Mediumband (6kHz bandpass)\n @retval OPUS_BANDWIDTH_WIDEBAND Wideband (8kHz bandpass)\n @retval OPUS_BANDWIDTH_SUPERWIDEBAND Superwideband (12kHz bandpass)\n @retval OPUS_BANDWIDTH_FULLBAND Fullband (20kHz bandpass)\n @retval OPUS_INVALID_PACKET The compressed data passed is corrupted or of an unsupported type"]
     pub fn opus_packet_get_bandwidth(data: *const ::std::os::raw::c_uchar)
-        -> ::std::os::raw::c_int;
+    -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     #[doc = " Gets the number of samples per frame from an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet.\n                                  This must contain at least one byte of\n                                  data.\n @param [in] Fs <tt>opus_int32</tt>: Sampling rate in Hz.\n                                     This must be a multiple of 400, or\n                                     inaccurate results will be returned.\n @returns Number of samples per frame."]
@@ -1094,241 +1007,153 @@ unsafe extern "C" {
     #[doc = " Frees an <code>OpusMSDecoder</code> allocated by\n opus_multistream_decoder_create().\n @param st <tt>OpusMSDecoder</tt>: Multistream decoder state to be freed."]
     pub fn opus_multistream_decoder_destroy(st: *mut OpusMSDecoder);
 }
-
-#[cfg(feature = "deep-plc")]
-unsafe extern "C" {
-    pub fn opus_dnn_weights_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_write_weights_blob(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_pitchdnn_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_pitchdnn_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_fargan_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_fargan_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_plcmodel_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_plcmodel_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomEncoder {
+    _unused: [u8; 0],
 }
-
-#[cfg(feature = "dred")]
-unsafe extern "C" {
-    pub fn opus_dnn_rdovaeenc_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_rdovaeenc_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_rdovaedec_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_rdovaedec_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomDecoder {
+    _unused: [u8; 0],
 }
-
-#[cfg(feature = "osce")]
-unsafe extern "C" {
-    pub fn opus_dnn_lace_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_lace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_nolace_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-    pub fn opus_dnn_bbwenet_blob_size() -> ::std::os::raw::c_int;
-    pub fn opus_dnn_bbwenet_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
-
-    pub fn osce_test_libm_values(out: *mut f32);
-    pub fn osce_test_adaconv(
-        out: *mut f32,
-        use_nolace: ::std::os::raw::c_int,
-        num_frames: ::std::os::raw::c_int,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_adacomb(
-        out: *mut f32,
-        use_nolace: ::std::os::raw::c_int,
-        num_frames: ::std::os::raw::c_int,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_adashape(
-        out: *mut f32,
-        num_frames: ::std::os::raw::c_int,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_compute_linear(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_dense_tanh(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_compute_linear_gain(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_tanh_approx(out: *mut f32, value: f32) -> ::std::os::raw::c_int;
-    pub fn osce_test_adashape_intermediates(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_compute_linear_nolace_tdshape(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_compute_linear_nolace_af2(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_celt_pitch_xcorr(
-        out: *mut f32,
-        max_pitch: ::std::os::raw::c_int,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_compute_linear_int8(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_gru_lace_fnet(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_dense_tanh_lace_tconv(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
-    pub fn osce_test_adacomb_intermediates(
-        out: *mut f32,
-        seed: ::std::os::raw::c_uint,
-    ) -> ::std::os::raw::c_int;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OpusCustomMode {
+    _unused: [u8; 0],
 }
-
-#[cfg(feature = "simd")]
 unsafe extern "C" {
-    pub fn opus_select_arch() -> ::std::os::raw::c_int;
-    pub fn celt_inner_prod_sse(x: *const f32, y: *const f32, N: ::std::os::raw::c_int) -> f32;
-    pub fn dual_inner_prod_sse(
-        x: *const f32,
-        y01: *const f32,
-        y02: *const f32,
-        N: ::std::os::raw::c_int,
-        xy1: *mut f32,
-        xy2: *mut f32,
-    );
-    pub fn xcorr_kernel_sse(
-        x: *const f32,
-        y: *const f32,
-        sum: *mut f32,
-        len: ::std::os::raw::c_int,
-    );
-    pub fn comb_filter_const_sse(
-        y: *mut f32,
-        x: *mut f32,
-        T: ::std::os::raw::c_int,
-        N: ::std::os::raw::c_int,
-        g10: f32,
-        g11: f32,
-        g12: f32,
-    );
-    pub fn op_pvq_search_sse2(
-        X: *mut f32,
-        iy: *mut ::std::os::raw::c_int,
-        K: ::std::os::raw::c_int,
-        N: ::std::os::raw::c_int,
-        arch: ::std::os::raw::c_int,
-    ) -> f32;
-    pub fn celt_pitch_xcorr_avx2(
-        _x: *const f32,
-        _y: *const f32,
-        xcorr: *mut f32,
-        len: ::std::os::raw::c_int,
-        max_pitch: ::std::os::raw::c_int,
-        arch: ::std::os::raw::c_int,
-    );
-}
-
-unsafe extern "C" {
-    pub fn celt_pitch_xcorr_c(
-        x: *const f32,
-        y: *const f32,
-        xcorr: *mut f32,
-        len: ::std::os::raw::c_int,
-        max_pitch: ::std::os::raw::c_int,
-        arch: ::std::os::raw::c_int,
-    );
-    pub fn silk_inner_product_FLP_c(
-        data1: *const f32,
-        data2: *const f32,
-        data_size: ::std::os::raw::c_int,
-    ) -> f64;
-}
-
-#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-pub type pitch_xcorr_impl_fn = unsafe extern "C" fn(
-    x: *const f32,
-    y: *const f32,
-    xcorr: *mut f32,
-    len: ::std::os::raw::c_int,
-    max_pitch: ::std::os::raw::c_int,
-    arch: ::std::os::raw::c_int,
-);
-
-#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-pub type silk_inner_product_flp_impl_fn = unsafe extern "C" fn(
-    data1: *const f32,
-    data2: *const f32,
-    data_size: ::std::os::raw::c_int,
-) -> f64;
-
-#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
-unsafe extern "C" {
-    pub static PITCH_XCORR_IMPL: [pitch_xcorr_impl_fn; 8usize];
-    pub static SILK_INNER_PRODUCT_FLP_IMPL: [silk_inner_product_flp_impl_fn; 8usize];
-}
-
-#[cfg(all(feature = "simd", target_arch = "aarch64"))]
-pub type celt_pitch_xcorr_impl_fn = unsafe extern "C" fn(
-    x: *const f32,
-    y: *const f32,
-    xcorr: *mut f32,
-    len: ::std::os::raw::c_int,
-    max_pitch: ::std::os::raw::c_int,
-    arch: ::std::os::raw::c_int,
-);
-
-#[cfg(all(feature = "simd", target_arch = "aarch64"))]
-unsafe extern "C" {
-    pub static CELT_PITCH_XCORR_IMPL: [celt_pitch_xcorr_impl_fn; 8usize];
-}
-
-unsafe extern "C" {
-    pub fn opus_projection_ambisonics_encoder_create(
-        Fs: ::std::os::raw::c_int,
-        channels: ::std::os::raw::c_int,
-        mapping_family: ::std::os::raw::c_int,
-        streams: *mut ::std::os::raw::c_int,
-        coupled_streams: *mut ::std::os::raw::c_int,
-        application: ::std::os::raw::c_int,
+    #[doc = " Creates a new mode struct. This will be passed to an encoder or\n decoder. The mode MUST NOT BE DESTROYED until the encoders and\n decoders that use it are destroyed as well.\n @param [in] Fs <tt>int</tt>: Sampling rate (8000 to 96000 Hz)\n @param [in] frame_size <tt>int</tt>: Number of samples (per channel) to encode in each\n        packet (64 - 1024, prime factorization must contain zero or more 2s, 3s, or 5s and no other primes)\n @param [out] error <tt>int*</tt>: Returned error code (if NULL, no error will be returned)\n @return A newly created mode"]
+    pub fn opus_custom_mode_create(
+        Fs: opus_int32,
+        frame_size: ::std::os::raw::c_int,
         error: *mut ::std::os::raw::c_int,
-    ) -> *mut ::std::os::raw::c_void;
-    pub fn opus_projection_encoder_destroy(st: *mut ::std::os::raw::c_void);
-    pub fn opus_projection_encoder_ctl(
-        st: *mut ::std::os::raw::c_void,
+    ) -> *mut OpusCustomMode;
+}
+unsafe extern "C" {
+    #[doc = " Destroys a mode struct. Only call this after all encoders and\n decoders using this mode are destroyed as well.\n @param [in] mode <tt>OpusCustomMode*</tt>: Mode to be freed."]
+    pub fn opus_custom_mode_destroy(mode: *mut OpusCustomMode);
+}
+unsafe extern "C" {
+    #[doc = " Gets the size of an OpusCustomEncoder structure.\n @param [in] mode <tt>OpusCustomMode *</tt>: Mode configuration\n @param [in] channels <tt>int</tt>: Number of channels\n @returns size"]
+    pub fn opus_custom_encoder_get_size(
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Creates a new encoder state. Each stream needs its own encoder\n state (can't be shared across simultaneous streams).\n @param [in] mode <tt>OpusCustomMode*</tt>: Contains all the information about the characteristics of\n  the stream (must be the same characteristics as used for the\n  decoder)\n @param [in] channels <tt>int</tt>: Number of channels\n @param [out] error <tt>int*</tt>: Returns an error code\n @return Newly created encoder state."]
+    pub fn opus_custom_encoder_create(
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut OpusCustomEncoder;
+}
+unsafe extern "C" {
+    #[doc = " Destroys an encoder state.\n @param[in] st <tt>OpusCustomEncoder*</tt>: State to be freed."]
+    pub fn opus_custom_encoder_destroy(st: *mut OpusCustomEncoder);
+}
+unsafe extern "C" {
+    #[doc = " Encodes a frame of audio.\n @param [in] st <tt>OpusCustomEncoder*</tt>: Encoder state\n @param [in] pcm <tt>float*</tt>: PCM audio in float format, with a normal range of +/-1.0.\n          Samples with a range beyond +/-1.0 are supported but will\n          be clipped by decoders using the integer API and should\n          only be used if it is known that the far end supports\n          extended dynamic range. There must be exactly\n          frame_size samples per channel.\n @param [in] frame_size <tt>int</tt>: Number of samples per frame of input signal\n @param [out] compressed <tt>char *</tt>: The compressed data is written here. This may not alias pcm and must be at least maxCompressedBytes long.\n @param [in] maxCompressedBytes <tt>int</tt>: Maximum number of bytes to use for compressing the frame\n          (can change from one frame to another)\n @return Number of bytes written to \"compressed\".\n       If negative, an error has occurred (see error codes). It is IMPORTANT that\n       the length returned be somehow transmitted to the decoder. Otherwise, no\n       decoding is possible."]
+    pub fn opus_custom_encode_float(
+        st: *mut OpusCustomEncoder,
+        pcm: *const f32,
+        frame_size: ::std::os::raw::c_int,
+        compressed: *mut ::std::os::raw::c_uchar,
+        maxCompressedBytes: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Encodes a frame of audio.\n @param [in] st <tt>OpusCustomEncoder*</tt>: Encoder state\n @param [in] pcm <tt>opus_int16*</tt>: PCM audio in signed 16-bit format (native endian).\n          There must be exactly frame_size samples per channel.\n @param [in] frame_size <tt>int</tt>: Number of samples per frame of input signal\n @param [out] compressed <tt>char *</tt>: The compressed data is written here. This may not alias pcm and must be at least maxCompressedBytes long.\n @param [in] maxCompressedBytes <tt>int</tt>: Maximum number of bytes to use for compressing the frame\n          (can change from one frame to another)\n @return Number of bytes written to \"compressed\".\n       If negative, an error has occurred (see error codes). It is IMPORTANT that\n       the length returned be somehow transmitted to the decoder. Otherwise, no\n       decoding is possible."]
+    pub fn opus_custom_encode(
+        st: *mut OpusCustomEncoder,
+        pcm: *const opus_int16,
+        frame_size: ::std::os::raw::c_int,
+        compressed: *mut ::std::os::raw::c_uchar,
+        maxCompressedBytes: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Encodes a frame of audio.\n @param [in] st <tt>OpusCustomEncoder*</tt>: Encoder state\n @param [in] pcm <tt>opus_int32*</tt>: PCM audio in signed 32-bit format (native endian) representing (or slightly exceeding) 24-bit values.\n          There must be exactly frame_size samples per channel.\n @param [in] frame_size <tt>int</tt>: Number of samples per frame of input signal\n @param [out] compressed <tt>char *</tt>: The compressed data is written here. This may not alias pcm and must be at least maxCompressedBytes long.\n @param [in] maxCompressedBytes <tt>int</tt>: Maximum number of bytes to use for compressing the frame\n          (can change from one frame to another)\n @return Number of bytes written to \"compressed\".\n       If negative, an error has occurred (see error codes). It is IMPORTANT that\n       the length returned be somehow transmitted to the decoder. Otherwise, no\n       decoding is possible."]
+    pub fn opus_custom_encode24(
+        st: *mut OpusCustomEncoder,
+        pcm: *const opus_int32,
+        frame_size: ::std::os::raw::c_int,
+        compressed: *mut ::std::os::raw::c_uchar,
+        maxCompressedBytes: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Perform a CTL function on an Opus custom encoder.\n\n Generally the request and subsequent arguments are generated\n by a convenience macro.\n @see opus_encoderctls"]
+    pub fn opus_custom_encoder_ctl(
+        st: *mut OpusCustomEncoder,
         request: ::std::os::raw::c_int,
         ...
     ) -> ::std::os::raw::c_int;
-    pub fn opus_projection_encode(
-        st: *mut ::std::os::raw::c_void,
-        pcm: *const i16,
-        frame_size: ::std::os::raw::c_int,
-        data: *mut u8,
-        max_data_bytes: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
-    pub fn opus_projection_decoder_create(
-        Fs: ::std::os::raw::c_int,
+}
+unsafe extern "C" {
+    #[doc = " Gets the size of an OpusCustomDecoder structure.\n @param [in] mode <tt>OpusCustomMode *</tt>: Mode configuration\n @param [in] channels <tt>int</tt>: Number of channels\n @returns size"]
+    pub fn opus_custom_decoder_get_size(
+        mode: *const OpusCustomMode,
         channels: ::std::os::raw::c_int,
-        streams: ::std::os::raw::c_int,
-        coupled_streams: ::std::os::raw::c_int,
-        demixing_matrix: *mut u8,
-        demixing_matrix_size: ::std::os::raw::c_int,
-        error: *mut ::std::os::raw::c_int,
-    ) -> *mut ::std::os::raw::c_void;
-    pub fn opus_projection_decoder_destroy(st: *mut ::std::os::raw::c_void);
-    pub fn opus_projection_decode(
-        st: *mut ::std::os::raw::c_void,
-        data: *const u8,
-        len: ::std::os::raw::c_int,
-        pcm: *mut i16,
-        frame_size: ::std::os::raw::c_int,
-        decode_fec: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
 }
-
+unsafe extern "C" {
+    #[doc = " Initializes a previously allocated decoder state\n The memory pointed to by st must be the size returned by opus_custom_decoder_get_size.\n This is intended for applications which use their own allocator instead of malloc.\n @see opus_custom_decoder_create(),opus_custom_decoder_get_size()\n To reset a previously initialized state use the OPUS_RESET_STATE CTL.\n @param [in] st <tt>OpusCustomDecoder*</tt>: Decoder state\n @param [in] mode <tt>OpusCustomMode *</tt>: Contains all the information about the characteristics of\n  the stream (must be the same characteristics as used for the\n  encoder)\n @param [in] channels <tt>int</tt>: Number of channels\n @return OPUS_OK Success or @ref opus_errorcodes"]
+    pub fn opus_custom_decoder_init(
+        st: *mut OpusCustomDecoder,
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Creates a new decoder state. Each stream needs its own decoder state (can't\n be shared across simultaneous streams).\n @param [in] mode <tt>OpusCustomMode</tt>: Contains all the information about the characteristics of the\n          stream (must be the same characteristics as used for the encoder)\n @param [in] channels <tt>int</tt>: Number of channels\n @param [out] error <tt>int*</tt>: Returns an error code\n @return Newly created decoder state."]
+    pub fn opus_custom_decoder_create(
+        mode: *const OpusCustomMode,
+        channels: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut OpusCustomDecoder;
+}
+unsafe extern "C" {
+    #[doc = " Destroys a decoder state.\n @param[in] st <tt>OpusCustomDecoder*</tt>: State to be freed."]
+    pub fn opus_custom_decoder_destroy(st: *mut OpusCustomDecoder);
+}
+unsafe extern "C" {
+    #[doc = " Decode an opus custom frame with floating point output\n @param [in] st <tt>OpusCustomDecoder*</tt>: Decoder state\n @param [in] data <tt>char*</tt>: Input payload. Use a NULL pointer to indicate packet loss\n @param [in] len <tt>int</tt>: Number of bytes in payload\n @param [out] pcm <tt>float*</tt>: Output signal (interleaved if 2 channels). length\n  is frame_size*channels*sizeof(float)\n @param [in] frame_size Number of samples per channel of available space in *pcm.\n @returns Number of decoded samples or @ref opus_errorcodes"]
+    pub fn opus_custom_decode_float(
+        st: *mut OpusCustomDecoder,
+        data: *const ::std::os::raw::c_uchar,
+        len: ::std::os::raw::c_int,
+        pcm: *mut f32,
+        frame_size: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Decode an opus custom frame\n @param [in] st <tt>OpusCustomDecoder*</tt>: Decoder state\n @param [in] data <tt>char*</tt>: Input payload. Use a NULL pointer to indicate packet loss\n @param [in] len <tt>int</tt>: Number of bytes in payload\n @param [out] pcm <tt>opus_int16*</tt>: Output signal (interleaved if 2 channels). length\n  is frame_size*channels*sizeof(opus_int16)\n @param [in] frame_size Number of samples per channel of available space in *pcm.\n @returns Number of decoded samples or @ref opus_errorcodes"]
+    pub fn opus_custom_decode(
+        st: *mut OpusCustomDecoder,
+        data: *const ::std::os::raw::c_uchar,
+        len: ::std::os::raw::c_int,
+        pcm: *mut opus_int16,
+        frame_size: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Decode an opus custom frame\n @param [in] st <tt>OpusCustomDecoder*</tt>: Decoder state\n @param [in] data <tt>char*</tt>: Input payload. Use a NULL pointer to indicate packet loss\n @param [in] len <tt>int</tt>: Number of bytes in payload\n @param [out] pcm <tt>opus_int32*</tt>: Output signal (interleaved if 2 channels) representing (or slightly exceeding) 24-bit values. length\n  is frame_size*channels*sizeof(opus_int32)\n @param [in] frame_size Number of samples per channel of available space in *pcm.\n @returns Number of decoded samples or @ref opus_errorcodes"]
+    pub fn opus_custom_decode24(
+        st: *mut OpusCustomDecoder,
+        data: *const ::std::os::raw::c_uchar,
+        len: ::std::os::raw::c_int,
+        pcm: *mut opus_int32,
+        frame_size: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Perform a CTL function on an Opus custom decoder.\n\n Generally the request and subsequent arguments are generated\n by a convenience macro.\n @see opus_genericctls"]
+    pub fn opus_custom_decoder_ctl(
+        st: *mut OpusCustomDecoder,
+        request: ::std::os::raw::c_int,
+        ...
+    ) -> ::std::os::raw::c_int;
+}
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;

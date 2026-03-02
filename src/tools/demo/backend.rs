@@ -467,7 +467,7 @@ mod rust_backend {
             data: &mut [u8],
         ) -> i32 {
             let frame_samples = frame_size as usize * st.layout().channels() as usize;
-            crate::opus_multistream_encode(st, &pcm[..frame_samples], frame_size, data)
+            st.encode(&pcm[..frame_samples], frame_size, data)
         }
 
         fn opus_multistream_encoder_destroy(_st: Self::MSEncoder) {}
@@ -489,7 +489,7 @@ mod rust_backend {
             frame_size: i32,
             decode_fec: i32,
         ) -> i32 {
-            crate::opus_multistream_decode(st, data, pcm, frame_size, decode_fec != 0)
+            st.decode(data, pcm, frame_size, decode_fec != 0)
         }
 
         fn ms_dec_set_complexity(st: &mut Self::MSDecoder, val: i32) {

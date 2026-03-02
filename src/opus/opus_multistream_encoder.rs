@@ -5,7 +5,7 @@
 use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::analysis::DownmixInput;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
-use crate::opus::opus_encoder::{frame_size_select, opus_encode_native, OpusEncoder};
+use crate::opus::opus_encoder::{OpusEncoder, frame_size_select, opus_encode_native};
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
 
@@ -133,6 +133,51 @@ impl OpusMSEncoder {
             }
             Err(err) => err,
         }
+    }
+
+    pub fn init_surround(
+        &mut self,
+        sample_rate: i32,
+        channels: i32,
+        mapping_family: i32,
+        streams: &mut i32,
+        coupled_streams: &mut i32,
+        mapping: &mut [u8],
+        application: i32,
+    ) -> i32 {
+        if let Err(err) =
+            surround_layout(channels, mapping_family, streams, coupled_streams, mapping)
+        {
+            return err;
+        };
+        self.init(
+            sample_rate,
+            channels,
+            *streams,
+            *coupled_streams,
+            &mapping[..channels as usize],
+            application,
+        )
+    }
+
+    pub fn create_surround(
+        sample_rate: i32,
+        channels: i32,
+        mapping_family: i32,
+        streams: &mut i32,
+        coupled_streams: &mut i32,
+        mapping: &mut [u8],
+        application: i32,
+    ) -> Result<Self, i32> {
+        surround_layout(channels, mapping_family, streams, coupled_streams, mapping)?;
+        OpusMSEncoder::new(
+            sample_rate,
+            channels,
+            *streams,
+            *coupled_streams,
+            &mapping[..channels as usize],
+            application,
+        )
     }
 
     #[inline]
@@ -410,17 +455,29 @@ impl OpusMSEncoder {
     }
 
     /// Encode interleaved i16 PCM into a multistream Opus packet.
-    pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
+    pub fn encode(&mut self, pcm: &[i16], frame_size: i32, output: &mut [u8]) -> i32 {
+        let channels = self.layout().channels() as usize;
+        if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+            return OPUS_BAD_ARG;
+        }
         self.encode_impl_i16(pcm, output)
     }
 
     /// Encode interleaved f32 PCM into a multistream Opus packet.
-    pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> i32 {
+    pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, output: &mut [u8]) -> i32 {
+        let channels = self.layout().channels() as usize;
+        if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+            return OPUS_BAD_ARG;
+        }
         self.encode_impl_f32(pcm, output)
     }
 
     /// Encode interleaved 24-bit PCM (stored in i32) into a multistream Opus packet.
-    pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
+    pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, output: &mut [u8]) -> i32 {
+        let channels = self.layout().channels() as usize;
+        if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
+            return OPUS_BAD_ARG;
+        }
         self.encode_impl_i24(pcm, output)
     }
 
@@ -856,168 +913,6 @@ impl OpusMSEncoder {
         }
         write_offset as i32
     }
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encoder_get_size(streams: i32, coupled_streams: i32) -> i32 {
-    OpusMSEncoder::get_size(streams, coupled_streams)
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_surround_encoder_get_size(channels: i32, mapping_family: i32) -> i32 {
-    let mut streams = 0i32;
-    let mut coupled_streams = 0i32;
-    let mut mapping = vec![0u8; channels.max(0) as usize];
-    if surround_layout(
-        channels,
-        mapping_family,
-        &mut streams,
-        &mut coupled_streams,
-        &mut mapping,
-    )
-    .is_ok()
-    {
-        OpusMSEncoder::get_size(streams, coupled_streams)
-    } else {
-        0
-    }
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encoder_create(
-    sample_rate: i32,
-    channels: i32,
-    streams: i32,
-    coupled_streams: i32,
-    mapping: &[u8],
-    application: i32,
-) -> Result<OpusMSEncoder, i32> {
-    OpusMSEncoder::new(
-        sample_rate,
-        channels,
-        streams,
-        coupled_streams,
-        mapping,
-        application,
-    )
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_surround_encoder_create(
-    sample_rate: i32,
-    channels: i32,
-    mapping_family: i32,
-    streams: &mut i32,
-    coupled_streams: &mut i32,
-    mapping: &mut [u8],
-    application: i32,
-) -> Result<OpusMSEncoder, i32> {
-    surround_layout(channels, mapping_family, streams, coupled_streams, mapping)?;
-    OpusMSEncoder::new(
-        sample_rate,
-        channels,
-        *streams,
-        *coupled_streams,
-        &mapping[..channels as usize],
-        application,
-    )
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encoder_init(
-    st: &mut OpusMSEncoder,
-    sample_rate: i32,
-    channels: i32,
-    streams: i32,
-    coupled_streams: i32,
-    mapping: &[u8],
-    application: i32,
-) -> i32 {
-    st.init(
-        sample_rate,
-        channels,
-        streams,
-        coupled_streams,
-        mapping,
-        application,
-    )
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_surround_encoder_init(
-    st: &mut OpusMSEncoder,
-    sample_rate: i32,
-    channels: i32,
-    mapping_family: i32,
-    streams: &mut i32,
-    coupled_streams: &mut i32,
-    mapping: &mut [u8],
-    application: i32,
-) -> i32 {
-    match surround_layout(channels, mapping_family, streams, coupled_streams, mapping) {
-        Ok(()) => st.init(
-            sample_rate,
-            channels,
-            *streams,
-            *coupled_streams,
-            &mapping[..channels as usize],
-            application,
-        ),
-        Err(err) => err,
-    }
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encoder_destroy(_st: OpusMSEncoder) {}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encode(
-    st: &mut OpusMSEncoder,
-    pcm: &[i16],
-    frame_size: i32,
-    data: &mut [u8],
-) -> i32 {
-    let channels = st.layout().channels() as usize;
-    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-        return OPUS_BAD_ARG;
-    }
-    st.encode(pcm, data)
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encode_float(
-    st: &mut OpusMSEncoder,
-    pcm: &[f32],
-    frame_size: i32,
-    data: &mut [u8],
-) -> i32 {
-    let channels = st.layout().channels() as usize;
-    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-        return OPUS_BAD_ARG;
-    }
-    st.encode_float(pcm, data)
-}
-
-/// Upstream-style free function wrapper.
-pub fn opus_multistream_encode24(
-    st: &mut OpusMSEncoder,
-    pcm: &[i32],
-    frame_size: i32,
-    data: &mut [u8],
-) -> i32 {
-    let channels = st.layout().channels() as usize;
-    if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-        return OPUS_BAD_ARG;
-    }
-    st.encode24(pcm, data)
-}
-
-/// Upstream-style helper for `OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST`.
-pub fn opus_multistream_encoder_get_encoder_state(
-    st: &mut OpusMSEncoder,
-    stream_id: i32,
-) -> Result<&mut OpusEncoder, i32> {
-    st.encoder_state_mut(stream_id)
 }
 
 fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {

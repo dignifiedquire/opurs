@@ -911,7 +911,7 @@ fn ms_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() 
 
         let pcm = stereo_pcm(seed.wrapping_add(1000));
         let mut packet = vec![0u8; 4000];
-        let len = enc.encode(&pcm, &mut packet);
+        let len = enc.encode(&pcm, FRAME_SIZE_20MS_96K, &mut packet);
         assert!(len > 0, "multistream encode failed");
         packet.truncate(len as usize);
 
@@ -1036,7 +1036,7 @@ fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
 
         let pcm = stereo_pcm(seed.wrapping_add(5000));
         let mut packet = vec![0u8; 4000];
-        let len = enc.encode(&pcm, &mut packet);
+        let len = enc.encode(&pcm, FRAME_SIZE_20MS_96K, &mut packet);
         assert!(len > 0, "encode failed");
         packet.truncate(len as usize);
 
@@ -1521,7 +1521,7 @@ fn osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets() {
         ms_enc.set_bitrate(Bitrate::Bits(8_000));
         ms_enc.set_complexity(10).expect("set complexity");
         let mut ms_packet = vec![0u8; 2000];
-        let ms_len = ms_enc.encode(&pcm, &mut ms_packet);
+        let ms_len = ms_enc.encode(&pcm, 960, &mut ms_packet);
         assert!(ms_len > 0, "multistream encode failed");
         ms_packet.truncate(ms_len as usize);
 

@@ -1,11 +1,10 @@
 #![allow(unused_assignments)]
 
 use opurs::{
-    opus_decode, opus_decode_float, opus_decoder_get_nb_samples, opus_packet_get_bandwidth,
-    opus_packet_get_nb_frames, opus_packet_get_nb_samples, opus_packet_get_samples_per_frame,
-    opus_packet_pad, opus_packet_parse, opus_packet_unpad, Application, Bandwidth, Bitrate,
-    Channels, FrameSize, OpusDecoder, OpusEncoder, OpusRepacketizer, Signal, OPUS_BAD_ARG,
-    OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
+    opus_packet_get_bandwidth, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
+    opus_packet_get_samples_per_frame, opus_packet_pad, opus_packet_parse, opus_packet_unpad,
+    Application, Bandwidth, Bitrate, Channels, FrameSize, OpusDecoder, OpusEncoder,
+    OpusRepacketizer, Signal, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
 };
 
 static OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
@@ -145,7 +144,7 @@ fn test_dec_api() {
     cfgs += 1;
 
     packet[0] = 0;
-    assert_eq!(opus_decoder_get_nb_samples(&mut dec, &packet[..1]), 480);
+    assert_eq!(dec.get_nb_samples(&packet[..1]), 480);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 48000), 480);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 96000), 960);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 32000), 320);
@@ -162,10 +161,7 @@ fn test_dec_api() {
         opus_packet_get_nb_samples(&packet[..2], 48000),
         OPUS_INVALID_PACKET
     );
-    assert_eq!(
-        opus_decoder_get_nb_samples(&mut dec, &packet[..2]),
-        OPUS_INVALID_PACKET
-    );
+    assert_eq!(dec.get_nb_samples(&packet[..2]), OPUS_INVALID_PACKET);
     println!("    opus_{{packet,decoder}}_get_nb_samples() ....... OK.");
     cfgs += 9;
     assert_eq!(opus_packet_get_nb_frames(&[]), OPUS_BAD_ARG);
@@ -236,7 +232,7 @@ fn test_dec_api() {
     }
 
     assert_eq!(
-        opus_decode(&mut dec, &packet[..51], &mut sbuf, 960, 0),
+        dec.decode(&packet[..51], &mut sbuf, 960, false),
         OPUS_INVALID_PACKET
     );
     cfgs += 1;
@@ -245,22 +241,19 @@ fn test_dec_api() {
     packet[1] = packet[2];
 
     assert_eq!(
-        opus_decode(&mut dec, &packet[..3], &mut sbuf, 60, 0),
+        dec.decode(&packet[..3], &mut sbuf, 60, false),
         OPUS_BUFFER_TOO_SMALL
     );
     cfgs += 1;
     assert_eq!(
-        opus_decode(&mut dec, &packet[..3], &mut sbuf, 480, 0),
+        dec.decode(&packet[..3], &mut sbuf, 480, false),
         OPUS_BUFFER_TOO_SMALL
     );
     cfgs += 1;
-    assert_eq!(opus_decode(&mut dec, &packet[..3], &mut sbuf, 960, 0), 960);
+    assert_eq!(dec.decode(&packet[..3], &mut sbuf, 960, false), 960);
     cfgs += 1;
     println!("    opus_decode() ................................ OK.");
-    assert_eq!(
-        opus_decode_float(&mut dec, &packet[..3], &mut fbuf, 960, 0),
-        960
-    );
+    assert_eq!(dec.decode_float(&packet[..3], &mut fbuf, 960, false), 960);
     cfgs += 1;
     println!("    opus_decode_float() .......................... OK.");
 

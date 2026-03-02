@@ -272,6 +272,13 @@ impl OpusDecoder {
         opus_decoder_dred_decode_float(self, dred, dred_offset, pcm, frame_size)
     }
 
+    /// Return decoded sample count for a packet using the decoder sample rate.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
+    pub fn get_nb_samples(&self, packet: &[u8]) -> i32 {
+        opus_packet_get_nb_samples(packet, self.Fs)
+    }
+
     // -- Type-safe CTL getters and setters --
 
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
@@ -1402,7 +1409,7 @@ pub fn opus_decode(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_decoder_get_nb_samples(st, data);
+        let nb_samples = st.get_nb_samples(data);
         if nb_samples > 0 {
             frame_size = if frame_size < nb_samples {
                 frame_size
@@ -1452,7 +1459,7 @@ pub fn opus_decode24(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_decoder_get_nb_samples(st, data);
+        let nb_samples = st.get_nb_samples(data);
         if nb_samples > 0 {
             frame_size = frame_size.min(nb_samples);
         } else {
@@ -1846,12 +1853,6 @@ pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
     } else {
         samples
     }
-}
-/// Return decoded sample count for a packet using the decoder sample rate.
-///
-/// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
-pub fn opus_decoder_get_nb_samples(dec: &mut OpusDecoder, packet: &[u8]) -> i32 {
-    opus_packet_get_nb_samples(packet, dec.Fs)
 }
 
 #[cfg(all(test, feature = "dred"))]

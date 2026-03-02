@@ -17,12 +17,6 @@ use opurs::dnn::nndsp::*;
 use opurs::dnn::osce::*;
 use opurs::dnn::weights::compiled_weights;
 
-unsafe extern "C" {
-    fn osce_test_compute_conv2d_3x3(out: *mut f32, seed: u32) -> i32;
-    fn osce_test_compute_linear_int8_arch(out: *mut f32, seed: u32, arch: i32) -> i32;
-    fn osce_test_compute_activation_exp_arch(out: *mut f32, seed: u32, arch: i32) -> i32;
-}
-
 /// Same xorshift32 PRNG as the C test harness.
 struct Prng(u32);
 
@@ -444,7 +438,7 @@ fn test_dense_tanh_lace_af1_gain() {
 /// Uses same PRNG-generated kernel and signal data, len=16 (ADACONV_MAX_KERNEL_SIZE).
 #[test]
 fn test_celt_pitch_xcorr_neon() {
-    use opurs::celt::pitch::celt_pitch_xcorr;
+    use opurs::internals::celt_pitch_xcorr;
 
     let max_pitch = 40; // typical overlap_size
     let len = ADACONV_MAX_KERNEL_SIZE;
@@ -630,9 +624,9 @@ fn test_compute_linear_int8_arch_tiers_match_c() {
 
     for (arch, c_arch, name) in tiers {
         let mut c_out = vec![0.0f32; nb_outputs];
-        let c_nb_inputs =
-            unsafe { osce_test_compute_linear_int8_arch(c_out.as_mut_ptr(), SEED, c_arch) }
-                as usize;
+        let c_nb_inputs = unsafe {
+            libopus_sys::osce_test_compute_linear_int8_arch(c_out.as_mut_ptr(), SEED, c_arch)
+        } as usize;
         assert_eq!(c_nb_inputs, nb_inputs);
 
         let mut rust_out = vec![0.0f32; nb_outputs];
@@ -680,8 +674,9 @@ fn test_compute_activation_exp_arch_tiers_match_c() {
 
     for (arch, c_arch, name) in tiers {
         let mut c_out = vec![0.0f32; n];
-        let c_n = unsafe { osce_test_compute_activation_exp_arch(c_out.as_mut_ptr(), SEED, c_arch) }
-            as usize;
+        let c_n = unsafe {
+            libopus_sys::osce_test_compute_activation_exp_arch(c_out.as_mut_ptr(), SEED, c_arch)
+        } as usize;
         assert_eq!(c_n, n);
 
         let mut rust_out = vec![0.0f32; n];
@@ -811,7 +806,8 @@ fn test_compute_conv2d_3x3() {
     );
 
     let mut c_out = vec![0.0f32; OUT_CHANNELS * HSTRIDE];
-    let c_len = unsafe { osce_test_compute_conv2d_3x3(c_out.as_mut_ptr(), SEED) } as usize;
+    let c_len =
+        unsafe { libopus_sys::osce_test_compute_conv2d_3x3(c_out.as_mut_ptr(), SEED) } as usize;
     c_out.truncate(c_len);
 
     compare_outputs("compute_conv2d_3x3", &rust_out, &c_out);
@@ -820,11 +816,11 @@ fn test_compute_conv2d_3x3() {
 /// Step-by-step bit-exact comparison of adacomb intermediates between Rust and C.
 #[test]
 fn test_adacomb_intermediates() {
-    use opurs::celt::pitch::celt_pitch_xcorr;
     use opurs::dnn::nndsp::*;
     use opurs::dnn::nnet::{
         compute_generic_dense, ACTIVATION_LINEAR, ACTIVATION_RELU, ACTIVATION_TANH,
     };
+    use opurs::internals::celt_pitch_xcorr;
 
     let arch = opurs::arch::opus_select_arch();
     let arrays = compiled_weights();

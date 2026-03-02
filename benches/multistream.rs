@@ -147,7 +147,7 @@ fn pre_encode_rust(
     let mut packets = Vec::new();
     for frame in pcm.chunks_exact(frame_size * channels) {
         let mut out = vec![0u8; MAX_PACKET];
-        let len = enc.encode(frame, &mut out);
+        let len = enc.encode(frame, frame_size as i32, &mut out);
         assert!(len > 0, "rust ms encode failed: {len}");
         out.truncate(len as usize);
         packets.push(out);
@@ -195,7 +195,7 @@ fn bench_multistream_encode_cmp(c: &mut Criterion) {
                         let mut out = vec![0u8; MAX_PACKET];
                         let mut total = 0i32;
                         for frame in pcm.chunks_exact(frame_size * channels) {
-                            total += enc.encode(frame, &mut out);
+                            total += enc.encode(frame, frame_size as i32, &mut out);
                         }
                         black_box(total);
                     });
