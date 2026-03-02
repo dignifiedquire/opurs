@@ -12,6 +12,8 @@ cc = "1.2"
 
 [features]
 default = []
+# Enable upstream-style C assertions (defines ENABLE_ASSERTIONS in generated config.h).
+assertions = []
 # SIMD intrinsics (SSE/SSE2/SSE4.1/AVX2 on x86, NEON on aarch64)
 simd = []
 # QEXT support (96 kHz Opus HD path)

@@ -59,7 +59,8 @@ pub fn silk_residual_energy_covar_FLP(
     }
 
     if k == MAX_ITERATIONS_RESIDUAL_NRG {
-        debug_assert!(nrg == 0.0);
+        #[cfg(feature = "assertions")]
+        assert!(nrg == 0.0);
         nrg = 1.0;
     }
 

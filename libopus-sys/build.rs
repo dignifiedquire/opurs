@@ -96,6 +96,7 @@ fn build_opus() {
     let osce = env::var("CARGO_FEATURE_OSCE").is_ok();
     let qext = env::var("CARGO_FEATURE_QEXT").is_ok();
     let fuzzing = env::var("CARGO_FEATURE_FUZZING").is_ok();
+    let assertions = env::var("CARGO_FEATURE_ASSERTIONS").is_ok();
 
     // Parse upstream .mk files for source and header lists
     let opus_sources_mk = parse_mk_file(&opus_source_path.join("opus_sources.mk"));
@@ -336,6 +337,9 @@ fn build_opus() {
     }
     if fuzzing {
         config.push_str("#define FUZZING 1\n");
+    }
+    if assertions {
+        config.push_str("#define ENABLE_ASSERTIONS 1\n");
     }
 
     if simd {
