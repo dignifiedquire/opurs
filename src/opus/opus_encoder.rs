@@ -1513,17 +1513,26 @@ fn encode_multiframe_packet(
     // Worst cases:
     // 2 frames: Code 2 with different compressed sizes
     // >2 frames: Code 3 VBR
-    #[allow(unused_mut)]
-    let mut max_header_bytes = if nb_frames == 2 {
+    let base_header_bytes = if nb_frames == 2 {
         3
     } else {
         2 + (nb_frames - 1) * 2
     };
-    // Cover the use of separators for extension signaling during repacketization.
-    #[cfg(feature = "qext")]
-    if st.enable_qext != 0 {
-        max_header_bytes += (nb_frames - 1) + 1;
-    }
+    let max_header_bytes = {
+        #[cfg(feature = "qext")]
+        {
+            // Cover the use of separators for extension signaling during repacketization.
+            if st.enable_qext != 0 {
+                base_header_bytes + (nb_frames - 1) + 1
+            } else {
+                base_header_bytes
+            }
+        }
+        #[cfg(not(feature = "qext"))]
+        {
+            base_header_bytes
+        }
+    };
     let repacketize_len = if st.use_vbr != 0 || st.user_bitrate_bps == OPUS_BITRATE_MAX {
         out_data_bytes
     } else if max_data_bytes < out_data_bytes {
