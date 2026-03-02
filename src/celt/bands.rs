@@ -1817,9 +1817,9 @@ fn quant_band_stereo(
                 let mut qext_extra = 0i32;
                 if saved_ext_b != 0 {
                     debug_assert!(ctx.i >= 0);
-                    debug_assert!((ctx.i as usize) < ctx.cap.len());
-                    let cap_val = ctx.cap[ctx.i as usize];
-                    qext_extra = 0.max((saved_ext_b / 2).min(mbits - cap_val / 2));
+                    if let Some(&cap_val) = ctx.cap.get(ctx.i as usize) {
+                        qext_extra = 0.max((saved_ext_b / 2).min(mbits - cap_val / 2));
+                    }
                 }
                 qext_extra
             };
@@ -1903,9 +1903,9 @@ fn quant_band_stereo(
                 let mut qext_extra = 0i32;
                 if saved_ext_b != 0 {
                     debug_assert!(ctx.i >= 0);
-                    debug_assert!((ctx.i as usize) < ctx.cap.len());
-                    let cap_val = ctx.cap[ctx.i as usize];
-                    qext_extra = 0.max((saved_ext_b / 2).min(sbits - cap_val / 2));
+                    if let Some(&cap_val) = ctx.cap.get(ctx.i as usize) {
+                        qext_extra = 0.max((saved_ext_b / 2).min(sbits - cap_val / 2));
+                    }
                 }
                 qext_extra
             };
