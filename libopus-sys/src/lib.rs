@@ -4,7 +4,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-
 pub const __WORDSIZE: u32 = 64;
 pub const __has_safe_buffers: u32 = 1;
 pub const __DARWIN_ONLY_64_BIT_INO_T: u32 = 1;
@@ -686,7 +685,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[doc = " Gets the bandwidth of an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet\n @retval OPUS_BANDWIDTH_NARROWBAND Narrowband (4kHz bandpass)\n @retval OPUS_BANDWIDTH_MEDIUMBAND Mediumband (6kHz bandpass)\n @retval OPUS_BANDWIDTH_WIDEBAND Wideband (8kHz bandpass)\n @retval OPUS_BANDWIDTH_SUPERWIDEBAND Superwideband (12kHz bandpass)\n @retval OPUS_BANDWIDTH_FULLBAND Fullband (20kHz bandpass)\n @retval OPUS_INVALID_PACKET The compressed data passed is corrupted or of an unsupported type"]
     pub fn opus_packet_get_bandwidth(data: *const ::std::os::raw::c_uchar)
-    -> ::std::os::raw::c_int;
+        -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     #[doc = " Gets the number of samples per frame from an Opus packet.\n @param [in] data <tt>char*</tt>: Opus packet.\n                                  This must contain at least one byte of\n                                  data.\n @param [in] Fs <tt>opus_int32</tt>: Sampling rate in Hz.\n                                     This must be a multiple of 400, or\n                                     inaccurate results will be returned.\n @returns Number of samples per frame."]
@@ -1157,3 +1156,252 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
+
+/* Extra wrapper exports used by benches/examples/tests.
+ * These are declared explicitly because checked-in bindings intentionally
+ * include only the stable wrapper surface, while parity tests also call
+ * internal C symbols. */
+
+#[cfg(feature = "deep-plc")]
+unsafe extern "C" {
+    pub fn opus_dnn_weights_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_write_weights_blob(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_pitchdnn_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_fargan_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_plcmodel_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "dred")]
+unsafe extern "C" {
+    pub fn opus_dnn_rdovaeenc_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaeenc_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_rdovaedec_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "osce")]
+unsafe extern "C" {
+    pub fn opus_dnn_lace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_lace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_nolace_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_blob_size() -> ::std::os::raw::c_int;
+    pub fn opus_dnn_bbwenet_write(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int;
+
+    pub fn osce_test_libm_values(out: *mut f32);
+    pub fn osce_test_adaconv(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adacomb(
+        out: *mut f32,
+        use_nolace: ::std::os::raw::c_int,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adashape(
+        out: *mut f32,
+        num_frames: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_dense_tanh(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_gain(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_tanh_approx(out: *mut f32, value: f32) -> ::std::os::raw::c_int;
+    pub fn osce_test_adashape_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_nolace_tdshape(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_nolace_af2(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_celt_pitch_xcorr(
+        out: *mut f32,
+        max_pitch: ::std::os::raw::c_int,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_int8(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_linear_int8_arch(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+        arch: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_activation_exp_arch(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+        arch: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_gru_lace_fnet(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_dense_tanh_lace_tconv(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_compute_conv2d_3x3(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+    pub fn osce_test_adacomb_intermediates(
+        out: *mut f32,
+        seed: ::std::os::raw::c_uint,
+    ) -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "simd")]
+unsafe extern "C" {
+    pub fn opus_select_arch() -> ::std::os::raw::c_int;
+}
+
+#[cfg(feature = "simd")]
+unsafe extern "C" {
+    pub static PITCH_XCORR_IMPL: [::std::option::Option<
+        unsafe extern "C" fn(
+            _x: *const f32,
+            _y: *const f32,
+            xcorr: *mut f32,
+            len: ::std::os::raw::c_int,
+            max_pitch: ::std::os::raw::c_int,
+            arch: ::std::os::raw::c_int,
+        ),
+    >; 8];
+    pub static SILK_INNER_PRODUCT_FLP_IMPL: [::std::option::Option<
+        unsafe extern "C" fn(
+            data1: *const f32,
+            data2: *const f32,
+            dataSize: ::std::os::raw::c_int,
+        ) -> f64,
+    >; 8];
+    pub static CELT_PITCH_XCORR_IMPL: [::std::option::Option<
+        unsafe extern "C" fn(
+            _x: *const f32,
+            _y: *const f32,
+            xcorr: *mut f32,
+            len: ::std::os::raw::c_int,
+            max_pitch: ::std::os::raw::c_int,
+            arch: ::std::os::raw::c_int,
+        ),
+    >; 8];
+}
+
+unsafe extern "C" {
+    pub fn pitch_downsample(
+        x: *mut *mut f32,
+        x_lp: *mut f32,
+        len: ::std::os::raw::c_int,
+        C: ::std::os::raw::c_int,
+        factor: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+    pub fn pitch_search(
+        x_lp: *const f32,
+        y: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        pitch: *mut ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+    pub fn remove_doubling(
+        x: *mut f32,
+        maxperiod: ::std::os::raw::c_int,
+        minperiod: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        T0: *mut ::std::os::raw::c_int,
+        prev_period: ::std::os::raw::c_int,
+        prev_gain: f32,
+        arch: ::std::os::raw::c_int,
+    ) -> f32;
+    pub fn comb_filter(
+        y: *mut f32,
+        x: *mut f32,
+        T0: ::std::os::raw::c_int,
+        T1: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        g0: f32,
+        g1: f32,
+        tapset0: ::std::os::raw::c_int,
+        tapset1: ::std::os::raw::c_int,
+        window: *const f32,
+        overlap: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+    pub fn celt_pitch_xcorr_c(
+        _x: *const f32,
+        _y: *const f32,
+        xcorr: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
+    pub fn silk_inner_product_FLP_c(
+        data1: *const f32,
+        data2: *const f32,
+        dataSize: ::std::os::raw::c_int,
+    ) -> f64;
+}
+
+unsafe extern "C" {
+    pub fn opus_projection_ambisonics_encoder_create(
+        Fs: opus_int32,
+        channels: ::std::os::raw::c_int,
+        mapping_family: ::std::os::raw::c_int,
+        streams: *mut ::std::os::raw::c_int,
+        coupled_streams: *mut ::std::os::raw::c_int,
+        application: ::std::os::raw::c_int,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut ::std::os::raw::c_void;
+    pub fn opus_projection_encoder_destroy(st: *mut ::std::os::raw::c_void);
+    pub fn opus_projection_encoder_ctl(
+        st: *mut ::std::os::raw::c_void,
+        request: ::std::os::raw::c_int,
+        ...
+    ) -> ::std::os::raw::c_int;
+    pub fn opus_projection_encode(
+        st: *mut ::std::os::raw::c_void,
+        pcm: *const opus_int16,
+        frame_size: ::std::os::raw::c_int,
+        data: *mut ::std::os::raw::c_uchar,
+        max_data_bytes: opus_int32,
+    ) -> opus_int32;
+    pub fn opus_projection_decoder_create(
+        Fs: opus_int32,
+        channels: ::std::os::raw::c_int,
+        streams: ::std::os::raw::c_int,
+        coupled_streams: ::std::os::raw::c_int,
+        demixing_matrix: *mut ::std::os::raw::c_uchar,
+        demixing_matrix_size: opus_int32,
+        error: *mut ::std::os::raw::c_int,
+    ) -> *mut ::std::os::raw::c_void;
+    pub fn opus_projection_decoder_destroy(st: *mut ::std::os::raw::c_void);
+    pub fn opus_projection_decode(
+        st: *mut ::std::os::raw::c_void,
+        data: *const ::std::os::raw::c_uchar,
+        len: opus_int32,
+        pcm: *mut opus_int16,
+        frame_size: ::std::os::raw::c_int,
+        decode_fec: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}

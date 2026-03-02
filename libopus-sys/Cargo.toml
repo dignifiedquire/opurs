@@ -9,11 +9,9 @@ publish = false
 
 [build-dependencies]
 cc = "1.2"
-bindgen = { version = "0.72", optional = true }
 
 [features]
 default = []
-generate_binding = ["bindgen"]
 # SIMD intrinsics (SSE/SSE2/SSE4.1/AVX2 on x86, NEON on aarch64)
 simd = []
 # QEXT support (96 kHz Opus HD path)

@@ -1,18 +1,13 @@
 #![cfg(feature = "tools")]
 
 use opurs::{
-    opus_projection_ambisonics_encoder_create as rust_opus_projection_encoder_create,
-    opus_projection_ambisonics_encoder_init as rust_opus_projection_encoder_init,
-    opus_projection_encode as rust_opus_projection_encode,
-    opus_projection_encode24 as rust_opus_projection_encode24,
-    opus_projection_encode_float as rust_opus_projection_encode_float,
-    opus_projection_encoder_get_encoder_state as rust_opus_projection_encoder_get_encoder_state,
-    Channels, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
-    OPUS_BUFFER_TOO_SMALL, OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST,
-    OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
-    OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
-    OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST,
-    OPUS_GET_VBR_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
+    Channels, OpusProjectionEncoder, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
+    OPUS_AUTO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_GET_APPLICATION_REQUEST,
+    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST,
+    OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PREDICTION_DISABLED_REQUEST,
+    OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
+    OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
     OPUS_SET_APPLICATION_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
     OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
@@ -81,7 +76,7 @@ fn projection_encoder_get_size_zero_nonzero_parity() {
     let _guard = test_guard();
     let cases = [(4, 3), (9, 3), (36, 3), (49, 3), (4, 1)];
     for (channels, mapping_family) in cases {
-        let rust = opurs::opus_projection_ambisonics_encoder_get_size(channels, mapping_family);
+        let rust = OpusProjectionEncoder::get_size(channels, mapping_family);
         let c = unsafe { opus_projection_ambisonics_encoder_get_size(channels, mapping_family) };
         assert_eq!(
             rust == 0,
@@ -98,7 +93,7 @@ fn projection_encoder_create_and_matrix_parity_with_c() {
     for channels in [4, 9, 16, 25, 36] {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
-        let rust_enc = rust_opus_projection_encoder_create(
+        let rust_enc = OpusProjectionEncoder::new(
             48000,
             channels,
             3,
@@ -169,7 +164,7 @@ fn projection_encoder_foa_encode_smoke_against_c() {
 
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
-    let mut rust_enc = rust_opus_projection_encoder_create(
+    let mut rust_enc = OpusProjectionEncoder::new(
         48000,
         4,
         3,
@@ -207,8 +202,7 @@ fn projection_encoder_foa_encode_smoke_against_c() {
     }
 
     let mut rust_packet = vec![0u8; 4000];
-    let rust_len =
-        rust_opus_projection_encode(&mut rust_enc, &pcm, frame_size as i32, &mut rust_packet);
+    let rust_len = rust_enc.encode(&pcm, frame_size as i32, &mut rust_packet);
     assert!(rust_len > 0, "rust projection encode failed: {rust_len}");
 
     let mut c_packet = vec![0u8; 4000];
@@ -232,7 +226,7 @@ fn projection_encoder_init_reinit_parity_with_c() {
 
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
-    let mut rust_enc = rust_opus_projection_encoder_create(
+    let mut rust_enc = OpusProjectionEncoder::new(
         48000,
         4,
         3,
@@ -273,8 +267,7 @@ fn projection_encoder_init_reinit_parity_with_c() {
 
     let mut rust_streams_re = -1i32;
     let mut rust_coupled_re = -1i32;
-    let rust_ret = rust_opus_projection_encoder_init(
-        &mut rust_enc,
+    let rust_ret = rust_enc.init(
         48000,
         9,
         3,
@@ -356,7 +349,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
         {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
-            let mut rust_enc = rust_opus_projection_encoder_create(
+            let mut rust_enc = OpusProjectionEncoder::new(
                 48000,
                 channels,
                 3,
@@ -385,12 +378,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_opus_projection_encode(
-                &mut rust_enc,
-                &pcm_i16,
-                frame_size as i32,
-                &mut rust_packet,
-            );
+            let rust_len = rust_enc.encode(&pcm_i16, frame_size as i32, &mut rust_packet);
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode(
@@ -410,7 +398,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
         {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
-            let mut rust_enc = rust_opus_projection_encoder_create(
+            let mut rust_enc = OpusProjectionEncoder::new(
                 48000,
                 channels,
                 3,
@@ -439,12 +427,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_opus_projection_encode_float(
-                &mut rust_enc,
-                &pcm_f32,
-                frame_size as i32,
-                &mut rust_packet,
-            );
+            let rust_len = rust_enc.encode_float(&pcm_f32, frame_size as i32, &mut rust_packet);
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode_float(
@@ -467,7 +450,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
         {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
-            let mut rust_enc = rust_opus_projection_encoder_create(
+            let mut rust_enc = OpusProjectionEncoder::new(
                 48000,
                 channels,
                 3,
@@ -496,12 +479,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_opus_projection_encode24(
-                &mut rust_enc,
-                &pcm_i24,
-                frame_size as i32,
-                &mut rust_packet,
-            );
+            let rust_len = rust_enc.encode24(&pcm_i24, frame_size as i32, &mut rust_packet);
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode24(
@@ -532,7 +510,7 @@ fn projection_encoder_error_code_parity_with_c() {
 
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
-    let mut rust_enc = rust_opus_projection_encoder_create(
+    let mut rust_enc = OpusProjectionEncoder::new(
         48000,
         channels,
         3,
@@ -572,8 +550,7 @@ fn projection_encoder_error_code_parity_with_c() {
 
     for bad_frame in [-1i32, 0i32] {
         let mut rust_packet = vec![0u8; 4000];
-        let rust_ret =
-            rust_opus_projection_encode(&mut rust_enc, &pcm_i16, bad_frame, &mut rust_packet);
+        let rust_ret = rust_enc.encode(&pcm_i16, bad_frame, &mut rust_packet);
         let mut c_packet = vec![0u8; 4000];
         let c_ret = unsafe {
             opus_projection_encode(
@@ -592,8 +569,7 @@ fn projection_encoder_error_code_parity_with_c() {
     }
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret =
-        rust_opus_projection_encode(&mut rust_enc, &pcm_i16, frame_size as i32, &mut tiny);
+    let rust_ret = rust_enc.encode(&pcm_i16, frame_size as i32, &mut tiny);
     let c_ret = unsafe {
         opus_projection_encode(
             c_enc,
@@ -607,8 +583,7 @@ fn projection_encoder_error_code_parity_with_c() {
     assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret =
-        rust_opus_projection_encode_float(&mut rust_enc, &pcm_f32, frame_size as i32, &mut tiny);
+    let rust_ret = rust_enc.encode_float(&pcm_f32, frame_size as i32, &mut tiny);
     let c_ret = unsafe {
         opus_projection_encode_float(
             c_enc,
@@ -622,8 +597,7 @@ fn projection_encoder_error_code_parity_with_c() {
     assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret =
-        rust_opus_projection_encode24(&mut rust_enc, &pcm_i24, frame_size as i32, &mut tiny);
+    let rust_ret = rust_enc.encode24(&pcm_i24, frame_size as i32, &mut tiny);
     let c_ret = unsafe {
         opus_projection_encode24(
             c_enc,
@@ -645,7 +619,7 @@ fn projection_encoder_ctl_value_parity_with_c() {
 
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
-    let mut rust = rust_opus_projection_encoder_create(
+    let mut rust = OpusProjectionEncoder::new(
         48000,
         4,
         3,
@@ -774,7 +748,7 @@ fn projection_encoder_state_access_parity_with_c() {
 
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
-    let mut rust = rust_opus_projection_encoder_create(
+    let mut rust = OpusProjectionEncoder::new(
         48000,
         4,
         3,
@@ -800,14 +774,8 @@ fn projection_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(
-        rust_opus_projection_encoder_get_encoder_state(&mut rust, -1).err(),
-        Some(OPUS_BAD_ARG)
-    );
-    assert_eq!(
-        rust_opus_projection_encoder_get_encoder_state(&mut rust, 2).err(),
-        Some(OPUS_BAD_ARG)
-    );
+    assert_eq!(rust.encoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.encoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -852,7 +820,7 @@ fn projection_encoder_state_access_parity_with_c() {
     assert!(!c_state0.is_null());
     assert!(!c_state1.is_null());
 
-    rust_opus_projection_encoder_get_encoder_state(&mut rust, 1)
+    rust.encoder_state_mut(1)
         .expect("rust stream1")
         .set_complexity(3)
         .expect("set complexity");
@@ -860,10 +828,12 @@ fn projection_encoder_state_access_parity_with_c() {
         libopus_sys::opus_encoder_ctl(c_state1, OPUS_SET_COMPLEXITY_REQUEST, 3i32);
     }
 
-    let rust_c0 = rust_opus_projection_encoder_get_encoder_state(&mut rust, 0)
+    let rust_c0 = rust
+        .encoder_state_mut(0)
         .expect("rust stream0")
         .complexity();
-    let rust_c1 = rust_opus_projection_encoder_get_encoder_state(&mut rust, 1)
+    let rust_c1 = rust
+        .encoder_state_mut(1)
         .expect("rust stream1")
         .complexity();
     let mut c_c0 = 0i32;

@@ -56,13 +56,7 @@ fn main() {
 
         // Rust float decode
         let mut rust_float = vec![0.0f32; MAX_FRAME_SIZE * 2];
-        let rust_ret = opurs::opus_decode_float(
-            &mut rust_dec,
-            pkt,
-            &mut rust_float,
-            MAX_FRAME_SIZE as i32,
-            0,
-        );
+        let rust_ret = rust_dec.decode_float(pkt, &mut rust_float, MAX_FRAME_SIZE as i32, false);
         assert_eq!(c_ret, rust_ret);
 
         // C int16 decode (create fresh decoder for int16 if needed, or use separate decoders)
@@ -205,8 +199,7 @@ fn main() {
 
         // Rust int16 decode
         let mut rust_i16 = vec![0i16; MAX_FRAME_SIZE * 2];
-        let rust_ret =
-            opurs::opus_decode(&mut rust_dec2, pkt, &mut rust_i16, MAX_FRAME_SIZE as i32, 0);
+        let rust_ret = rust_dec2.decode(pkt, &mut rust_i16, MAX_FRAME_SIZE as i32, false);
         assert_eq!(c_ret, rust_ret);
 
         let n = c_ret as usize * 2;

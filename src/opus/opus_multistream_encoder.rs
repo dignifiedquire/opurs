@@ -88,6 +88,29 @@ impl OpusMSEncoder {
         }
     }
 
+    /// Upstream-style surround sizing helper.
+    ///
+    /// Returns zero for invalid `(channels, mapping_family)` combinations.
+    ///
+    /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_get_size
+    pub fn surround_get_size(channels: i32, mapping_family: i32) -> i32 {
+        let mut streams = 0i32;
+        let mut coupled_streams = 0i32;
+        let mut mapping = vec![0u8; channels.max(0) as usize];
+        if surround_layout(
+            channels,
+            mapping_family,
+            &mut streams,
+            &mut coupled_streams,
+            &mut mapping,
+        )
+        .is_err()
+        {
+            return 0;
+        }
+        Self::get_size(streams, coupled_streams)
+    }
+
     /// Create and initialize a multistream encoder.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_create

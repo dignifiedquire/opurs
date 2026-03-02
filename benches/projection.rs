@@ -13,11 +13,8 @@ use libopus_sys::{
     opus_projection_encoder_destroy as c_opus_projection_encoder_destroy,
 };
 use opurs::{
-    opus_projection_ambisonics_encoder_create as rust_projection_encoder_create,
-    opus_projection_decode as rust_projection_decode,
-    opus_projection_decoder_create as rust_projection_decoder_create,
-    opus_projection_encode as rust_projection_encode, Bitrate, MappingMatrix,
-    OPUS_APPLICATION_AUDIO, OPUS_OK, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
+    Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
+    OPUS_OK, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_SET_BITRATE_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST,
 };
@@ -60,7 +57,7 @@ fn gen_pcm(channels: i32, frame_size: usize, frames: usize) -> Vec<i16> {
 fn create_rust_encoder(channels: i32, bitrate: i32) -> (opurs::OpusProjectionEncoder, i32, i32) {
     let mut streams = -1i32;
     let mut coupled_streams = -1i32;
-    let mut enc = rust_projection_encoder_create(
+    let mut enc = OpusProjectionEncoder::new(
         SAMPLE_RATE,
         channels,
         MAPPING_FAMILY_AMBISONICS,
@@ -128,7 +125,7 @@ fn fetch_c_demixing_matrix(enc: *mut c_void) -> Vec<u8> {
 }
 
 fn create_rust_decoder(prepared: &PreparedProjection) -> opurs::OpusProjectionDecoder {
-    rust_projection_decoder_create(
+    OpusProjectionDecoder::new(
         SAMPLE_RATE,
         prepared.channels,
         prepared.streams,
@@ -170,7 +167,7 @@ fn pre_encode_rust(
     let mut packets = Vec::new();
     for frame in pcm.chunks_exact(frame_size * channels as usize) {
         let mut packet = vec![0u8; MAX_PACKET];
-        let len = rust_projection_encode(&mut enc, frame, frame_size as i32, &mut packet);
+        let len = enc.encode(frame, frame_size as i32, &mut packet);
         assert!(len > 0, "rust projection encode failed: {len}");
         packet.truncate(len as usize);
         packets.push(packet);
@@ -231,12 +228,7 @@ fn bench_projection_encode_cmp(c: &mut Criterion) {
                         let mut packet = vec![0u8; MAX_PACKET];
                         let mut total = 0i32;
                         for frame in pcm.chunks_exact(frame_size * channels as usize) {
-                            let len = rust_projection_encode(
-                                &mut enc,
-                                frame,
-                                frame_size as i32,
-                                &mut packet,
-                            );
+                            let len = enc.encode(frame, frame_size as i32, &mut packet);
                             total += len;
                         }
                         black_box(total);
@@ -288,13 +280,7 @@ fn bench_projection_decode_cmp(c: &mut Criterion) {
                         let mut out = vec![0i16; frame_size * channels as usize];
                         let mut total = 0i32;
                         for packet in &prepared_rust.packets {
-                            total += rust_projection_decode(
-                                &mut dec,
-                                packet,
-                                &mut out,
-                                frame_size as i32,
-                                false,
-                            );
+                            total += dec.decode(packet, &mut out, frame_size as i32, false);
                         }
                         black_box(total);
                     });

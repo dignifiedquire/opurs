@@ -1036,7 +1036,7 @@ fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
 
         let pcm = stereo_pcm(seed.wrapping_add(5000));
         let mut packet = vec![0u8; 4000];
-        let len = enc.encode(&pcm, FRAME_SIZE_20MS_96K, &mut packet);
+        let len = enc.encode(&pcm, &mut packet);
         assert!(len > 0, "encode failed");
         packet.truncate(len as usize);
 
@@ -1164,7 +1164,7 @@ fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
 
         let pcm = stereo_pcm(seed.wrapping_add(6000));
         let mut packet = vec![0u8; 4000];
-        let len = enc.encode(&pcm, &mut packet);
+        let len = enc.encode(&pcm, FRAME_SIZE_20MS_96K, &mut packet);
         assert!(len > 0, "multistream encode failed");
         packet.truncate(len as usize);
 

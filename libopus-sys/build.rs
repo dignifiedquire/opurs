@@ -85,26 +85,6 @@ const CONFIG_H: &str = r##"
 #endif
 "##;
 
-/// Generates a new binding at `src/lib.rs` using `src/wrapper.h`.
-#[cfg(feature = "generate_binding")]
-fn generate_binding() {
-    const ALLOW_UNCONVENTIONALS: &str = "#![allow(non_upper_case_globals)]\n\
-                                         #![allow(non_camel_case_types)]\n\
-                                         #![allow(non_snake_case)]\n";
-
-    let bindings = bindgen::Builder::default()
-        .header("src/wrapper.h")
-        .raw_line(ALLOW_UNCONVENTIONALS)
-        .generate()
-        .expect("Unable to generate binding");
-
-    let binding_target_path = PathBuf::new().join("src").join("lib.rs");
-
-    bindings
-        .write_to_file(binding_target_path)
-        .expect("Could not write binding to the file at `src/lib.rs`");
-}
-
 fn build_opus() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
     let opus_build_dir = out_dir.join("opus_build");
@@ -528,8 +508,5 @@ fn build_opus() {
 }
 
 fn main() {
-    #[cfg(feature = "generate_binding")]
-    generate_binding();
-
     build_opus();
 }

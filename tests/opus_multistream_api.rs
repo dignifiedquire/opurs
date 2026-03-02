@@ -13,35 +13,21 @@ use libopus_sys::{
     opus_multistream_surround_encoder_init,
 };
 use opurs::{
-    opus_multistream_decode as rust_opus_multistream_decode,
-    opus_multistream_decode24 as rust_opus_multistream_decode24,
-    opus_multistream_decode_float as rust_opus_multistream_decode_float,
-    opus_multistream_decoder_create as rust_opus_multistream_decoder_create,
-    opus_multistream_decoder_get_decoder_state as rust_opus_multistream_decoder_get_decoder_state,
-    opus_multistream_decoder_init as rust_opus_multistream_decoder_init,
-    opus_multistream_encode as rust_opus_multistream_encode,
-    opus_multistream_encode24 as rust_opus_multistream_encode24,
-    opus_multistream_encode_float as rust_opus_multistream_encode_float,
-    opus_multistream_encoder_create as rust_opus_multistream_encoder_create,
-    opus_multistream_encoder_get_encoder_state as rust_opus_multistream_encoder_get_encoder_state,
-    opus_multistream_encoder_init as rust_opus_multistream_encoder_init,
-    opus_multistream_surround_encoder_create as rust_opus_multistream_surround_encoder_create,
-    opus_multistream_surround_encoder_get_size as rust_opus_multistream_surround_encoder_get_size,
-    opus_multistream_surround_encoder_init as rust_opus_multistream_surround_encoder_init, Bitrate,
-    Channels, OpusMSDecoder, OpusMSEncoder, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
-    OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_APPLICATION_REQUEST, OPUS_GET_BANDWIDTH_REQUEST,
-    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST,
-    OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_LAST_PACKET_DURATION_REQUEST,
-    OPUS_GET_LSB_DEPTH_REQUEST, OPUS_GET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PREDICTION_DISABLED_REQUEST,
-    OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST,
-    OPUS_GET_VBR_REQUEST, OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST,
-    OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK, OPUS_SET_APPLICATION_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST, OPUS_SET_FORCE_CHANNELS_REQUEST,
-    OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST, OPUS_SET_LSB_DEPTH_REQUEST,
-    OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
-    OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
-    OPUS_SET_VBR_REQUEST, OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
+    Bitrate, Channels, OpusMSDecoder, OpusMSEncoder, Signal, OPUS_APPLICATION_AUDIO,
+    OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_GET_APPLICATION_REQUEST,
+    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
+    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
+    OPUS_GET_LAST_PACKET_DURATION_REQUEST, OPUS_GET_LSB_DEPTH_REQUEST,
+    OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_GET_SIGNAL_REQUEST,
+    OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
+    OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST,
+    OPUS_OK, OPUS_SET_APPLICATION_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
+    OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
+    OPUS_SET_LSB_DEPTH_REQUEST, OPUS_SET_PACKET_LOSS_PERC_REQUEST,
+    OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
+    OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
+    OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
 };
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -245,7 +231,7 @@ fn multistream_roundtrip_two_mono_streams() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = ms_enc.encode(&pcm, &mut packet);
+    let packet_len = ms_enc.encode(&pcm, frame_size as i32, &mut packet);
     assert!(packet_len > 0, "encode failed: {packet_len}");
 
     let mut out = vec![0i16; frame_size * 2];
@@ -277,7 +263,7 @@ fn multistream_float_roundtrip_two_mono_streams() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = ms_enc.encode_float(&pcm, &mut packet);
+    let packet_len = ms_enc.encode_float(&pcm, frame_size as i32, &mut packet);
     assert!(packet_len > 0, "encode_float failed: {packet_len}");
 
     let mut out = vec![0f32; frame_size * 2];
@@ -343,7 +329,7 @@ fn multistream_surround_get_size_zero_nonzero_parity() {
         (5, 2),
     ];
     for (channels, mapping_family) in cases {
-        let rust = rust_opus_multistream_surround_encoder_get_size(channels, mapping_family);
+        let rust = OpusMSEncoder::surround_get_size(channels, mapping_family);
         let c = unsafe { opus_multistream_surround_encoder_get_size(channels, mapping_family) };
         assert_eq!(
             rust == 0,
@@ -372,7 +358,7 @@ fn multistream_surround_create_parity_with_c() {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
         let mut rust_mapping = vec![0u8; channels.max(0) as usize];
-        let rust = rust_opus_multistream_surround_encoder_create(
+        let rust = OpusMSEncoder::create_surround(
             48000,
             channels,
             mapping_family,
@@ -445,8 +431,7 @@ fn multistream_surround_init_parity_with_c() {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
         let mut rust_mapping = vec![0u8; channels.max(0) as usize];
-        let rust_ret = rust_opus_multistream_surround_encoder_init(
-            &mut rust,
+        let rust_ret = rust.init_surround(
             48000,
             channels,
             mapping_family,
@@ -508,7 +493,7 @@ fn multistream_surround_unimplemented_paths_match_upstream_c() {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
         let mut rust_mapping = vec![0u8; channels as usize];
-        let rust_create = rust_opus_multistream_surround_encoder_create(
+        let rust_create = OpusMSEncoder::create_surround(
             48_000,
             channels,
             mapping_family,
@@ -552,8 +537,7 @@ fn multistream_surround_unimplemented_paths_match_upstream_c() {
 
         let mut rust_enc =
             OpusMSEncoder::new(48_000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
-        let rust_init = rust_opus_multistream_surround_encoder_init(
-            &mut rust_enc,
+        let rust_init = rust_enc.init_surround(
             48_000,
             channels,
             mapping_family,
@@ -622,11 +606,9 @@ fn multistream_decode_invalid_packet_parity_with_c() {
 #[test]
 fn multistream_wrapper_entrypoints_smoke() {
     let _guard = test_guard();
-    let mut enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .expect("encoder create");
-    let mut dec =
-        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("decoder create");
+    let mut enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+        .expect("encoder create");
+    let mut dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).expect("decoder create");
 
     let frame_size = 960usize;
     let mut pcm_i16 = vec![0i16; frame_size * 2];
@@ -639,12 +621,11 @@ fn multistream_wrapper_entrypoints_smoke() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let len_i16 = rust_opus_multistream_encode(&mut enc, &pcm_i16, frame_size as i32, &mut packet);
+    let len_i16 = enc.encode(&pcm_i16, frame_size as i32, &mut packet);
     assert!(len_i16 > 0);
 
     let mut out_i16 = vec![0i16; frame_size * 2];
-    let dec_i16 = rust_opus_multistream_decode(
-        &mut dec,
+    let dec_i16 = dec.decode(
         &packet[..len_i16 as usize],
         &mut out_i16,
         frame_size as i32,
@@ -652,13 +633,11 @@ fn multistream_wrapper_entrypoints_smoke() {
     );
     assert_eq!(dec_i16, frame_size as i32);
 
-    let len_f32 =
-        rust_opus_multistream_encode_float(&mut enc, &pcm_f32, frame_size as i32, &mut packet);
+    let len_f32 = enc.encode_float(&pcm_f32, frame_size as i32, &mut packet);
     assert!(len_f32 > 0);
 
     let mut out_f32 = vec![0f32; frame_size * 2];
-    let dec_f32 = rust_opus_multistream_decode_float(
-        &mut dec,
+    let dec_f32 = dec.decode_float(
         &packet[..len_f32 as usize],
         &mut out_f32,
         frame_size as i32,
@@ -670,11 +649,9 @@ fn multistream_wrapper_entrypoints_smoke() {
 #[test]
 fn multistream_24bit_wrapper_entrypoints_smoke() {
     let _guard = test_guard();
-    let mut enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .expect("encoder create");
-    let mut dec =
-        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("decoder create");
+    let mut enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+        .expect("encoder create");
+    let mut dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).expect("decoder create");
 
     let frame_size = 960usize;
     let mut pcm_i24 = vec![0i32; frame_size * 2];
@@ -684,17 +661,11 @@ fn multistream_24bit_wrapper_entrypoints_smoke() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let len = rust_opus_multistream_encode24(&mut enc, &pcm_i24, frame_size as i32, &mut packet);
+    let len = enc.encode24(&pcm_i24, frame_size as i32, &mut packet);
     assert!(len > 0);
 
     let mut out = vec![0i32; frame_size * 2];
-    let decoded = rust_opus_multistream_decode24(
-        &mut dec,
-        &packet[..len as usize],
-        &mut out,
-        frame_size as i32,
-        false,
-    );
+    let decoded = dec.decode24(&packet[..len as usize], &mut out, frame_size as i32, false);
     assert_eq!(decoded, frame_size as i32);
     assert!(out.iter().any(|&x| x != 0));
 }
@@ -703,11 +674,9 @@ fn multistream_24bit_wrapper_entrypoints_smoke() {
 fn multistream_24bit_encode_decode_parity_with_c() {
     let _guard = test_guard();
 
-    let mut rust_enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .expect("rust encoder create");
-    let mut rust_dec =
-        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
+    let mut rust_enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+        .expect("rust encoder create");
+    let mut rust_dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
 
     let mut c_error = 0i32;
     let c_enc = unsafe {
@@ -735,8 +704,7 @@ fn multistream_24bit_encode_decode_parity_with_c() {
     }
 
     let mut rust_packet = vec![0u8; 4000];
-    let rust_len =
-        rust_opus_multistream_encode24(&mut rust_enc, &pcm, frame_size as i32, &mut rust_packet);
+    let rust_len = rust_enc.encode24(&pcm, frame_size as i32, &mut rust_packet);
     assert!(rust_len > 0, "rust encode24 failed: {rust_len}");
 
     let mut c_packet = vec![0u8; 4000];
@@ -752,8 +720,7 @@ fn multistream_24bit_encode_decode_parity_with_c() {
     assert!(c_len > 0, "c encode24 failed: {c_len}");
 
     let mut rust_out_from_c = vec![0i32; frame_size * 2];
-    let rust_decoded_from_c = rust_opus_multistream_decode24(
-        &mut rust_dec,
+    let rust_decoded_from_c = rust_dec.decode24(
         &c_packet[..c_len as usize],
         &mut rust_out_from_c,
         frame_size as i32,
@@ -787,11 +754,9 @@ fn multistream_24bit_encode_decode_parity_with_c() {
 #[test]
 fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
     let _guard = test_guard();
-    let mut rust_enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .expect("rust encoder create");
-    let mut rust_dec =
-        rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
+    let mut rust_enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+        .expect("rust encoder create");
+    let mut rust_dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).expect("rust decoder create");
 
     let mut c_error = 0i32;
     let c_enc = unsafe {
@@ -814,7 +779,7 @@ fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
 
     let pcm = vec![0i32; 100];
     let mut packet = vec![0u8; 1000];
-    let rust_bad_arg = rust_opus_multistream_encode24(&mut rust_enc, &pcm, 60, &mut packet);
+    let rust_bad_arg = rust_enc.encode24(&pcm, 60, &mut packet);
     let c_bad_arg = unsafe {
         opus_multistream_encode24(
             c_enc,
@@ -828,8 +793,7 @@ fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
 
     let bad_packet = [0xffu8];
     let mut rust_out = vec![0i32; 960 * 2];
-    let rust_invalid =
-        rust_opus_multistream_decode24(&mut rust_dec, &bad_packet, &mut rust_out, 960, false);
+    let rust_invalid = rust_dec.decode24(&bad_packet, &mut rust_out, 960, false);
 
     let mut c_out = vec![0i32; 960 * 2];
     let c_invalid = unsafe {
@@ -863,7 +827,7 @@ fn multistream_decoder_mapping_255_outputs_silence() {
         *s = (i as i16).wrapping_mul(13);
     }
     let mut packet = vec![0u8; 2000];
-    let len = enc.encode(&pcm, &mut packet);
+    let len = enc.encode(&pcm, frame_size as i32, &mut packet);
     assert!(len > 0);
 
     let mut out = vec![1i16; frame_size * 2];
@@ -1027,12 +991,10 @@ fn multistream_encoder_constructor_matrix_parity_sampled() {
 #[test]
 fn multistream_wrapper_encode_rejects_frame_size_mismatch() {
     let _guard = test_guard();
-    let mut enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .unwrap();
+    let mut enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
     let pcm = vec![0i16; 100];
     let mut packet = vec![0u8; 1000];
-    let ret = rust_opus_multistream_encode(&mut enc, &pcm, 60, &mut packet);
+    let ret = enc.encode(&pcm, 60, &mut packet);
     assert_eq!(ret, OPUS_BAD_ARG);
 }
 
@@ -1040,9 +1002,8 @@ fn multistream_wrapper_encode_rejects_frame_size_mismatch() {
 fn multistream_frame_size_validation_parity_with_c() {
     let _guard = test_guard();
 
-    let mut rust_enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .expect("rust encoder create");
+    let mut rust_enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
+        .expect("rust encoder create");
     let mut c_error = 0i32;
     let c_enc = unsafe {
         opus_multistream_encoder_create(
@@ -1062,8 +1023,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_i16 = vec![0i16; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_i16 =
-            rust_opus_multistream_encode(&mut rust_enc, &pcm_i16, frame_size, &mut rust_packet);
+        let rust_i16 = rust_enc.encode(&pcm_i16, frame_size, &mut rust_packet);
         let mut c_packet = vec![0u8; 4000];
         let c_i16 = unsafe {
             opus_multistream_encode(
@@ -1081,12 +1041,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_f32 = vec![0f32; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_f32 = rust_opus_multistream_encode_float(
-            &mut rust_enc,
-            &pcm_f32,
-            frame_size,
-            &mut rust_packet,
-        );
+        let rust_f32 = rust_enc.encode_float(&pcm_f32, frame_size, &mut rust_packet);
         let mut c_packet = vec![0u8; 4000];
         let c_f32 = unsafe {
             opus_multistream_encode_float(
@@ -1104,8 +1059,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_i24 = vec![0i32; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_i24 =
-            rust_opus_multistream_encode24(&mut rust_enc, &pcm_i24, frame_size, &mut rust_packet);
+        let rust_i24 = rust_enc.encode24(&pcm_i24, frame_size, &mut rust_packet);
         let mut c_packet = vec![0u8; 4000];
         let c_i24 = unsafe {
             opus_multistream_encode24(
@@ -1142,8 +1096,7 @@ fn multistream_frame_size_validation_parity_with_c() {
     unsafe { opus_multistream_encoder_destroy(c_enc) };
 
     for frame_size in [-1i32, 0] {
-        let mut rust_dec =
-            rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).expect("rust decoder");
+        let mut rust_dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).expect("rust decoder");
         let mut c_error = 0i32;
         let c_dec = unsafe {
             opus_multistream_decoder_create(48000, 2, 2, 0, [0u8, 1u8].as_ptr(), &mut c_error)
@@ -1151,8 +1104,7 @@ fn multistream_frame_size_validation_parity_with_c() {
         assert!(!c_dec.is_null(), "c decoder create failed: {c_error}");
 
         let mut out_i16 = vec![0i16; 960 * 2];
-        let rust_i16 = rust_opus_multistream_decode(
-            &mut rust_dec,
+        let rust_i16 = rust_dec.decode(
             &packet[..packet_len as usize],
             &mut out_i16,
             frame_size,
@@ -1175,8 +1127,7 @@ fn multistream_frame_size_validation_parity_with_c() {
         );
 
         let mut out_f32 = vec![0f32; 960 * 2];
-        let rust_f32 = rust_opus_multistream_decode_float(
-            &mut rust_dec,
+        let rust_f32 = rust_dec.decode_float(
             &packet[..packet_len as usize],
             &mut out_f32,
             frame_size,
@@ -1199,8 +1150,7 @@ fn multistream_frame_size_validation_parity_with_c() {
         );
 
         let mut out_i24 = vec![0i32; 960 * 2];
-        let rust_i24 = rust_opus_multistream_decode24(
-            &mut rust_dec,
+        let rust_i24 = rust_dec.decode24(
             &packet[..packet_len as usize],
             &mut out_i24,
             frame_size,
@@ -1229,35 +1179,17 @@ fn multistream_frame_size_validation_parity_with_c() {
 #[test]
 fn multistream_wrapper_init_reinitializes_state() {
     let _guard = test_guard();
-    let mut enc =
-        rust_opus_multistream_encoder_create(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO)
-            .unwrap();
-    let mut dec = rust_opus_multistream_decoder_create(48000, 2, 2, 0, &[0, 1]).unwrap();
+    let mut enc = OpusMSEncoder::new(48000, 2, 2, 0, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
+    let mut dec = OpusMSDecoder::new(48000, 2, 2, 0, &[0, 1]).unwrap();
 
-    let enc_ret = rust_opus_multistream_encoder_init(
-        &mut enc,
-        48000,
-        3,
-        2,
-        1,
-        &[0, 1, 2],
-        OPUS_APPLICATION_AUDIO,
-    );
+    let enc_ret = enc.init(48000, 3, 2, 1, &[0, 1, 2], OPUS_APPLICATION_AUDIO);
     assert_eq!(enc_ret, 0);
 
-    let dec_ret = rust_opus_multistream_decoder_init(&mut dec, 48000, 3, 2, 1, &[0, 1, 2]);
+    let dec_ret = dec.init(48000, 3, 2, 1, &[0, 1, 2]);
     assert_eq!(dec_ret, 0);
 
     // Re-init with invalid layout should fail with BAD_ARG.
-    let bad = rust_opus_multistream_encoder_init(
-        &mut enc,
-        48000,
-        2,
-        1,
-        1,
-        &[0, 2],
-        OPUS_APPLICATION_AUDIO,
-    );
+    let bad = enc.init(48000, 2, 1, 1, &[0, 2], OPUS_APPLICATION_AUDIO);
     assert_eq!(bad, OPUS_BAD_ARG);
 }
 
@@ -1479,7 +1411,7 @@ fn multistream_decoder_ctl_value_parity_with_c() {
         .map(|i| ((i as i32 * 257) % 32768 - 16384) as i16)
         .collect();
     let mut packet = vec![0u8; 4000];
-    let packet_len = enc.encode(&pcm, &mut packet);
+    let packet_len = enc.encode(&pcm, frame_size as i32, &mut packet);
     assert!(packet_len > 0, "encode failed: {packet_len}");
 
     let mut rust_out = vec![0i16; frame_size * 2];
@@ -1572,14 +1504,8 @@ fn multistream_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(
-        rust_opus_multistream_encoder_get_encoder_state(&mut rust, -1).err(),
-        Some(OPUS_BAD_ARG)
-    );
-    assert_eq!(
-        rust_opus_multistream_encoder_get_encoder_state(&mut rust, 2).err(),
-        Some(OPUS_BAD_ARG)
-    );
+    assert_eq!(rust.encoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.encoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1624,7 +1550,7 @@ fn multistream_encoder_state_access_parity_with_c() {
     assert!(!c_state0.is_null());
     assert!(!c_state1.is_null());
 
-    rust_opus_multistream_encoder_get_encoder_state(&mut rust, 1)
+    rust.encoder_state_mut(1)
         .expect("rust stream1")
         .set_complexity(3)
         .expect("set complexity");
@@ -1632,10 +1558,12 @@ fn multistream_encoder_state_access_parity_with_c() {
         libopus_sys::opus_encoder_ctl(c_state1, OPUS_SET_COMPLEXITY_REQUEST, 3i32);
     }
 
-    let rust_c0 = rust_opus_multistream_encoder_get_encoder_state(&mut rust, 0)
+    let rust_c0 = rust
+        .encoder_state_mut(0)
         .expect("rust stream0")
         .complexity();
-    let rust_c1 = rust_opus_multistream_encoder_get_encoder_state(&mut rust, 1)
+    let rust_c1 = rust
+        .encoder_state_mut(1)
         .expect("rust stream1")
         .complexity();
     let mut c_c0 = 0i32;
@@ -1662,14 +1590,8 @@ fn multistream_decoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(
-        rust_opus_multistream_decoder_get_decoder_state(&mut rust, -1).err(),
-        Some(OPUS_BAD_ARG)
-    );
-    assert_eq!(
-        rust_opus_multistream_decoder_get_decoder_state(&mut rust, 2).err(),
-        Some(OPUS_BAD_ARG)
-    );
+    assert_eq!(rust.decoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.decoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1714,11 +1636,11 @@ fn multistream_decoder_state_access_parity_with_c() {
     assert!(!c_state0.is_null());
     assert!(!c_state1.is_null());
 
-    rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
+    rust.decoder_state_mut(1)
         .expect("rust stream1")
         .set_gain(123)
         .expect("set gain");
-    rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
+    rust.decoder_state_mut(1)
         .expect("rust stream1")
         .set_phase_inversion_disabled(true);
     unsafe {
@@ -1726,16 +1648,14 @@ fn multistream_decoder_state_access_parity_with_c() {
         libopus_sys::opus_decoder_ctl(c_state1, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, 1i32);
     }
 
-    let rust_gain0 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 0)
-        .expect("rust stream0")
-        .gain();
-    let rust_gain1 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
-        .expect("rust stream1")
-        .gain();
-    let rust_phase0 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 0)
+    let rust_gain0 = rust.decoder_state_mut(0).expect("rust stream0").gain();
+    let rust_gain1 = rust.decoder_state_mut(1).expect("rust stream1").gain();
+    let rust_phase0 = rust
+        .decoder_state_mut(0)
         .expect("rust stream0")
         .phase_inversion_disabled();
-    let rust_phase1 = rust_opus_multistream_decoder_get_decoder_state(&mut rust, 1)
+    let rust_phase1 = rust
+        .decoder_state_mut(1)
         .expect("rust stream1")
         .phase_inversion_disabled();
     let mut c_gain0 = 0i32;
