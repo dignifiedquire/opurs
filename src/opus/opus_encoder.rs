@@ -227,8 +227,7 @@ impl OpusEncoder {
         tonality_analysis_init(&mut analysis, Fs);
         analysis.application = application;
 
-        #[allow(unused_mut)]
-        let mut st = OpusEncoder {
+        let st = OpusEncoder {
             silk_enc,
             celt_enc,
             silk_mode,
@@ -316,7 +315,11 @@ impl OpusEncoder {
             enable_qext: 0,
         };
         #[cfg(feature = "dred")]
-        st.dred_encoder.init(Fs, channels);
+        let st = {
+            let mut st = st;
+            st.dred_encoder.init(Fs, channels);
+            st
+        };
         Ok(st)
     }
 
@@ -3426,8 +3429,9 @@ pub fn opus_encode_native(
     // Save enc state and drop it so we can write to data[] directly.
     let enc_rng = enc.rng;
     let enc_tell = ec_tell(&enc);
-    #[allow(clippy::drop_non_drop)] // intentional: ends mutable borrow on data[1..]
-    drop(enc);
+    // Move `enc` to a throwaway binding so it is dropped now, releasing
+    // the mutable borrow of `data[1..]` before direct writes below.
+    let _ = enc;
     // Write redundancy data into the output buffer now that enc's borrow is released.
     if redundancy_copy_off > 0 {
         let rb = redundancy_bytes as usize;
@@ -3483,8 +3487,10 @@ pub fn opus_encode_native(
         }
     }
     ret += 1 + redundancy_bytes;
-    #[allow(unused_mut)]
+    #[cfg(any(feature = "dred", feature = "qext"))]
     let mut apply_padding = st.use_vbr == 0;
+    #[cfg(not(any(feature = "dred", feature = "qext")))]
+    let apply_padding = st.use_vbr == 0;
     #[cfg(any(feature = "dred", feature = "qext"))]
     let mut extensions: Vec<crate::opus::extensions::OpusExtensionData> = Vec::new();
     #[cfg(feature = "qext")]
