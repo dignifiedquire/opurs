@@ -2,10 +2,12 @@
 //!
 //! Upstream C: `celt/laplace.c`
 
-#[allow(unused_imports)]
-use crate::celt::entdec::{ec_dec, ec_dec_icdf16, ec_dec_update, ec_decode_bin};
-#[allow(unused_imports)]
-use crate::celt::entenc::{ec_enc, ec_enc_icdf16, ec_encode_bin};
+#[cfg(feature = "dred")]
+use crate::celt::entdec::ec_dec_icdf16;
+use crate::celt::entdec::{ec_dec, ec_dec_update, ec_decode_bin};
+#[cfg(feature = "dred")]
+use crate::celt::entenc::ec_enc_icdf16;
+use crate::celt::entenc::{ec_enc, ec_encode_bin};
 
 /// Upstream C: celt/laplace.c
 pub const LAPLACE_LOG_MINP: i32 = 0;
@@ -121,7 +123,7 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
 }
 
 /// Upstream C: celt/laplace.c:ec_laplace_encode_p0
-#[allow(dead_code)]
+#[cfg(feature = "dred")]
 pub fn ec_laplace_encode_p0(enc: &mut ec_enc, value: i32, p0: u16, decay: u16) {
     let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
     let s = if value == 0 {
@@ -152,7 +154,7 @@ pub fn ec_laplace_encode_p0(enc: &mut ec_enc, value: i32, p0: u16, decay: u16) {
 }
 
 /// Upstream C: celt/laplace.c:ec_laplace_decode_p0
-#[allow(dead_code)]
+#[cfg(feature = "dred")]
 pub fn ec_laplace_decode_p0(dec: &mut ec_dec, p0: u16, decay: u16) -> i32 {
     let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
     let mut s = ec_dec_icdf16(dec, &sign_icdf, 15);

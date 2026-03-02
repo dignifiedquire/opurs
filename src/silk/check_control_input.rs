@@ -2,7 +2,6 @@
 //!
 //! Upstream C: `silk/check_control_input.c`
 
-#[allow(unused)]
 pub mod errors_h {
     pub const SILK_NO_ERROR: i32 = 0;
     pub const SILK_ENC_INVALID_COMPLEXITY_SETTING: i32 = -(106);
@@ -15,7 +14,6 @@ pub mod errors_h {
     pub const SILK_ENC_FS_NOT_SUPPORTED: i32 = -(102);
 }
 
-#[allow(unused)]
 pub use self::errors_h::{
     SILK_ENC_FS_NOT_SUPPORTED, SILK_ENC_INVALID_CBR_SETTING, SILK_ENC_INVALID_COMPLEXITY_SETTING,
     SILK_ENC_INVALID_DTX_SETTING, SILK_ENC_INVALID_INBAND_FEC_SETTING, SILK_ENC_INVALID_LOSS_RATE,

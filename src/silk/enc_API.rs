@@ -33,7 +33,6 @@ pub struct silk_EncControlStruct {
     pub offset: i32,
 }
 pub mod errors_h {
-    #[allow(unused)]
     pub const SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES: i32 = -(101);
     pub const SILK_NO_ERROR: i32 = 0;
 }

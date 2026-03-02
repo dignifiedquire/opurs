@@ -171,8 +171,8 @@ pub fn ec_dec_icdf(mut _this: &mut ec_dec, icdf: &[u8], mut _ftb: u32) -> i32 {
 }
 
 /// Upstream C: celt/entdec.c:ec_dec_icdf16
-#[allow(dead_code)]
 #[inline]
+#[cfg(feature = "dred")]
 pub fn ec_dec_icdf16(this: &mut ec_dec, icdf: &[u16], ftb: u32) -> i32 {
     let s_init = this.rng;
     let d = this.val;

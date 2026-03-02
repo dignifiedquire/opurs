@@ -119,7 +119,7 @@ fn opus_demo_encode_impl<B: OpusBackendTrait>(
 
     let mut buffer = vec![0u8; options.max_payload];
     for frame in samples.chunks_exact(frame_size * channels) {
-        #[allow(unused)]
+        #[cfg(feature = "ent-dump")]
         let fpos = output.len();
         #[cfg(feature = "ent-dump")]
         eprintln!("START encoding packet @ 0x{:x}", fpos);

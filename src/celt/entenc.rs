@@ -186,8 +186,8 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
 }
 
 /// Upstream C: celt/entenc.c:ec_enc_icdf16
-#[allow(dead_code)]
 #[inline]
+#[cfg(feature = "dred")]
 pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
     let r: u32 = this.rng >> ftb;
     if s > 0 {
