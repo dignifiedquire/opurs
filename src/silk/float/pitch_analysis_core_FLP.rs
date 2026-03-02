@@ -4,15 +4,11 @@
 
 use crate::arch::Arch;
 
-pub mod arch_h {
-    pub type opus_val32 = f32;
-}
 pub mod typedef_h {
     pub const silk_int16_MAX: i32 = i16::MAX as i32;
     pub const silk_int16_MIN: i32 = i16::MIN as i32;
 }
 
-use self::arch_h::opus_val32;
 pub use self::typedef_h::{silk_int16_MAX, silk_int16_MIN};
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
@@ -58,7 +54,7 @@ pub fn silk_pitch_analysis_core_FLP(
 
     let contour_bias: f32;
     let mut C: [[f32; 149]; 4] = [[0.; 149]; 4];
-    let mut xcorr: [opus_val32; 65] = [0.; 65];
+    let mut xcorr: [f32; 65] = [0.; 65];
     let mut CC: [f32; 11] = [0.; 11];
     let mut cross_corr: f64;
     let mut normalizer: f64;
@@ -549,7 +545,7 @@ fn silk_P_Ana_calc_corr_st3(
     let mut idx: i32;
     let cbk_size: i32;
     let mut scratch_mem: [f32; 22] = [0.; 22];
-    let mut xcorr: [opus_val32; 22] = [0.; 22];
+    let mut xcorr: [f32; 22] = [0.; 22];
     let Lag_range: &[[i8; 2]];
     let Lag_CB: &[i8];
     debug_assert!(complexity >= 0);

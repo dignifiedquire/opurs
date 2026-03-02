@@ -4,11 +4,6 @@
 
 use num_traits::Zero;
 
-pub mod arch_h {
-    pub type opus_val32 = f32;
-    pub type opus_val64 = f32;
-}
-
 #[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct AnalysisInfo {
@@ -43,15 +38,7 @@ impl<'a> DownmixInput<'a> {
     /// - `c1`: first channel index
     /// - `c2`: second channel index (-1 = none, -2 = all channels)
     /// - `C`: total number of channels
-    pub fn downmix(
-        &self,
-        y: &mut [opus_val32],
-        subframe: i32,
-        offset: i32,
-        c1: i32,
-        c2: i32,
-        C: i32,
-    ) {
+    pub fn downmix(&self, y: &mut [f32], subframe: i32, offset: i32, c1: i32, c2: i32, C: i32) {
         match self {
             DownmixInput::Float(x) => {
                 let mut j = 0;
@@ -87,7 +74,7 @@ impl<'a> DownmixInput<'a> {
             DownmixInput::Int(x) => {
                 let mut j = 0;
                 while j < subframe {
-                    y[j as usize] = x[((j + offset) * C + c1) as usize] as opus_val32;
+                    y[j as usize] = x[((j + offset) * C + c1) as usize] as f32;
                     j += 1;
                 }
                 if c2 > -1 {
@@ -111,13 +98,13 @@ impl<'a> DownmixInput<'a> {
             DownmixInput::Int24(x) => {
                 let mut j = 0;
                 while j < subframe {
-                    y[j as usize] = x[((j + offset) * C + c1) as usize] as opus_val32 / 256.0;
+                    y[j as usize] = x[((j + offset) * C + c1) as usize] as f32 / 256.0;
                     j += 1;
                 }
                 if c2 > -1 {
                     j = 0;
                     while j < subframe {
-                        y[j as usize] += x[((j + offset) * C + c2) as usize] as opus_val32 / 256.0;
+                        y[j as usize] += x[((j + offset) * C + c2) as usize] as f32 / 256.0;
                         j += 1;
                     }
                 } else if c2 == -2 {
@@ -125,8 +112,7 @@ impl<'a> DownmixInput<'a> {
                     while c < C {
                         j = 0;
                         while j < subframe {
-                            y[j as usize] +=
-                                x[((j + offset) * C + c) as usize] as opus_val32 / 256.0;
+                            y[j as usize] += x[((j + offset) * C + c) as usize] as f32 / 256.0;
                             j += 1;
                         }
                         c += 1;
@@ -146,7 +132,7 @@ pub struct TonalityAnalysisState {
     pub angle: [f32; 240],
     pub d_angle: [f32; 240],
     pub d2_angle: [f32; 240],
-    pub inmem: [opus_val32; 720],
+    pub inmem: [f32; 720],
     pub mem_fill: i32,
     pub prev_band_tonality: [f32; 18],
     pub prev_tonality: f32,
@@ -170,7 +156,7 @@ pub struct TonalityAnalysisState {
     pub hp_ener_accum: f32,
     pub initialized: i32,
     pub rnn_state: [f32; 24],
-    pub downmix_state: [opus_val32; 3],
+    pub downmix_state: [f32; 3],
     pub info: [AnalysisInfo; 100],
 }
 impl Default for TonalityAnalysisState {
@@ -218,7 +204,6 @@ pub const NB_TBANDS: i32 = 18;
 pub mod math_h {
     pub const M_PI: f64 = std::f64::consts::PI;
 }
-pub use self::arch_h::{opus_val32, opus_val64};
 pub use self::math_h::M_PI;
 use crate::arch::{opus_select_arch, Arch};
 use crate::celt::float_cast::{float2int, CELT_SIG_SCALE};
@@ -608,19 +593,14 @@ static tbands: [i32; 19] = [
     4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160, 192, 240,
 ];
 pub const NB_TONAL_SKIP_BANDS: i32 = 9;
-fn silk_resampler_down2_hp(
-    S: &mut [opus_val32; 3],
-    out: &mut [opus_val32],
-    in_0: &[opus_val32],
-    inLen: i32,
-) -> opus_val32 {
+fn silk_resampler_down2_hp(S: &mut [f32; 3], out: &mut [f32], in_0: &[f32], inLen: i32) -> f32 {
     let len2: i32 = inLen / 2;
-    let mut in32: opus_val32;
-    let mut out32: opus_val32;
-    let mut out32_hp: opus_val32;
-    let mut Y: opus_val32;
-    let mut X: opus_val32;
-    let mut hp_ener: opus_val64 = 0 as opus_val64;
+    let mut in32: f32;
+    let mut out32: f32;
+    let mut out32_hp: f32;
+    let mut Y: f32;
+    let mut X: f32;
+    let mut hp_ener: f32 = 0 as f32;
     let mut k = 0;
     while k < len2 {
         in32 = in_0[(2 * k) as usize];
@@ -648,19 +628,19 @@ fn silk_resampler_down2_hp(
 }
 fn downmix_and_resample(
     input: &DownmixInput,
-    y: &mut [opus_val32],
-    S: &mut [opus_val32; 3],
+    y: &mut [f32],
+    S: &mut [f32; 3],
     mut subframe: i32,
     mut offset: i32,
     c1: i32,
     c2: i32,
     C: i32,
     Fs: i32,
-) -> opus_val32 {
+) -> f32 {
     let mut j: i32;
-    let mut ret: opus_val32 = 0 as opus_val32;
+    let mut ret: f32 = 0 as f32;
     if subframe == 0 {
-        return 0 as opus_val32;
+        return 0 as f32;
     }
     debug_assert!(
         matches!(Fs, 16000 | 24000 | 48000),
@@ -673,7 +653,7 @@ fn downmix_and_resample(
         subframe = subframe * 2 / 3;
         offset = offset * 2 / 3;
     }
-    let mut tmp: Vec<opus_val32> = vec![0.0; subframe as usize];
+    let mut tmp: Vec<f32> = vec![0.0; subframe as usize];
     input.downmix(&mut tmp, subframe, offset, c1, c2, C);
     if (c2 == -2 && C == 2) || c2 > -1 {
         j = 0;
@@ -687,7 +667,7 @@ fn downmix_and_resample(
     } else if Fs == 24000 {
         y[..subframe as usize].copy_from_slice(&tmp[..subframe as usize]);
     } else if Fs == 16000 {
-        let mut tmp3x: Vec<opus_val32> = vec![0.0; (3 * subframe) as usize];
+        let mut tmp3x: Vec<f32> = vec![0.0; (3 * subframe) as usize];
         j = 0;
         while j < subframe {
             tmp3x[(3 * j) as usize] = tmp[j as usize];
@@ -1697,7 +1677,7 @@ mod tests {
     unsafe extern "C" {
         fn downmix_float(
             x: *const c_void,
-            y: *mut opus_val32,
+            y: *mut f32,
             subframe: i32,
             offset: i32,
             c1: i32,

@@ -30,19 +30,9 @@ use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
 
-pub use self::arch_h::{
-    celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, Q15ONE, VERY_SMALL,
-};
-
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-    pub type celt_sig = f32;
-    pub type celt_norm = f32;
-    pub const Q15ONE: f32 = 1.0f32;
-    pub const VERY_SMALL: f32 = 1e-30f32;
-    pub const CELT_SIG_SCALE: f32 = 32768.0f32;
-}
+const Q15ONE: f32 = 1.0;
+const VERY_SMALL: f32 = 1e-30;
+const CELT_SIG_SCALE: f32 = 32768.0;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -74,7 +64,7 @@ pub struct OpusCustomDecoder {
     pub postfilter_tapset: i32,
     pub postfilter_tapset_old: i32,
     pub prefilter_and_fold: i32,
-    pub preemph_memD: [celt_sig; 2],
+    pub preemph_memD: [f32; 2],
 
     pub decode_mem: [f32; 2 * (2 * DECODE_BUFFER_SIZE + 240)], /* Size = channels*(QEXT_SCALE(DECODE_BUFFER_SIZE)+mode->overlap), max qext_scale=2, overlap=240 */
     pub lpc: [f32; 2 * LPC_ORDER],                             /* Size = channels*LPC_ORDER */
@@ -459,23 +449,23 @@ pub fn opus_custom_decode24(
 /// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
 #[inline]
 fn deemphasis_stereo_simple(
-    ch0: &[celt_sig],
-    ch1: &[celt_sig],
-    pcm: &mut [opus_val16],
+    ch0: &[f32],
+    ch1: &[f32],
+    pcm: &mut [f32],
     N: i32,
-    coef0: opus_val16,
-    mem: &mut [celt_sig; 2],
+    coef0: f32,
+    mem: &mut [f32; 2],
 ) {
-    let mut m0: celt_sig = mem[0];
-    let mut m1: celt_sig = mem[1];
+    let mut m0: f32 = mem[0];
+    let mut m1: f32 = mem[1];
     let n = N as usize;
     for ((&c0, &c1), out) in ch0[..n]
         .iter()
         .zip(&ch1[..n])
         .zip(pcm[..2 * n].chunks_exact_mut(2))
     {
-        let tmp0: celt_sig = saturate_sig(c0 + VERY_SMALL + m0);
-        let tmp1: celt_sig = saturate_sig(c1 + VERY_SMALL + m1);
+        let tmp0: f32 = saturate_sig(c0 + VERY_SMALL + m0);
+        let tmp1: f32 = saturate_sig(c1 + VERY_SMALL + m1);
         m0 = coef0 * tmp0;
         m1 = coef0 * tmp1;
         out[0] = tmp0 * (1_f32 / CELT_SIG_SCALE);
@@ -487,13 +477,13 @@ fn deemphasis_stereo_simple(
 /// Upstream C: celt/celt_decoder.c:deemphasis
 #[inline]
 fn deemphasis(
-    in_channels: &[&[celt_sig]],
-    pcm: &mut [opus_val16],
+    in_channels: &[&[f32]],
+    pcm: &mut [f32],
     N: i32,
     C: i32,
     downsample: i32,
-    coef: &[opus_val16],
-    mem: &mut [celt_sig],
+    coef: &[f32],
+    mem: &mut [f32],
     accum: i32,
 ) {
     let mut apply_downsampling: i32 = 0;
@@ -517,20 +507,20 @@ fn deemphasis(
     const MAX_SCRATCH: usize = 1920;
     debug_assert!((N as usize) <= MAX_SCRATCH);
     let mut scratch = [0.0f32; MAX_SCRATCH];
-    let coef0: opus_val16 = coef[0];
+    let coef0: f32 = coef[0];
     let Nd: i32 = N / downsample;
     let mut c = 0;
     loop {
         let mut j: i32;
-        let mut m: celt_sig = mem[c as usize];
+        let mut m: f32 = mem[c as usize];
         let x = in_channels[c as usize];
         #[cfg(feature = "qext")]
         if use_custom_iir {
-            let coef1: opus_val16 = coef[1];
-            let coef3: opus_val16 = coef.get(3).copied().unwrap_or(0.0);
+            let coef1: f32 = coef[1];
+            let coef3: f32 = coef.get(3).copied().unwrap_or(0.0);
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
+                let tmp: f32 = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp - coef1 * x[j as usize];
                 scratch[j as usize] = coef3 * tmp;
                 j += 1;
@@ -539,7 +529,7 @@ fn deemphasis(
         } else if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp: f32 = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp;
                 scratch[j as usize] = tmp;
                 j += 1;
@@ -548,7 +538,7 @@ fn deemphasis(
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
+                let tmp: f32 = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp;
                 pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -556,7 +546,7 @@ fn deemphasis(
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp_0: f32 = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp_0;
                 pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -566,7 +556,7 @@ fn deemphasis(
         if downsample > 1 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp: f32 = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp;
                 scratch[j as usize] = tmp;
                 j += 1;
@@ -575,7 +565,7 @@ fn deemphasis(
         } else if accum != 0 {
             j = 0;
             while j < N {
-                let tmp: celt_sig = saturate_sig(x[j as usize] + m + VERY_SMALL);
+                let tmp: f32 = saturate_sig(x[j as usize] + m + VERY_SMALL);
                 m = coef0 * tmp;
                 pcm[(c + j * C) as usize] += tmp * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -583,7 +573,7 @@ fn deemphasis(
         } else {
             j = 0;
             while j < N {
-                let tmp_0: celt_sig = saturate_sig(x[j as usize] + VERY_SMALL + m);
+                let tmp_0: f32 = saturate_sig(x[j as usize] + VERY_SMALL + m);
                 m = coef0 * tmp_0;
                 pcm[(c + j * C) as usize] = tmp_0 * (1_f32 / CELT_SIG_SCALE);
                 j += 1;
@@ -616,10 +606,10 @@ fn deemphasis(
 /// Upstream C: celt/celt_decoder.c:celt_synthesis
 fn celt_synthesis(
     mode: &OpusCustomMode,
-    X: &[celt_norm],
-    out_syn_ch0: &mut [celt_sig],
-    out_syn_ch1: &mut [celt_sig],
-    oldBandE: &[opus_val16],
+    X: &[f32],
+    out_syn_ch0: &mut [f32],
+    out_syn_ch1: &mut [f32],
+    oldBandE: &[f32],
     start: i32,
     effEnd: i32,
     C: i32,
@@ -630,7 +620,7 @@ fn celt_synthesis(
     silence: i32,
     _arch: Arch,
     #[cfg(feature = "qext")] qext_mode: Option<&OpusCustomMode>,
-    #[cfg(feature = "qext")] qext_bandLogE: &[opus_val16],
+    #[cfg(feature = "qext")] qext_bandLogE: &[f32],
     #[cfg(feature = "qext")] mut qext_end: i32,
 ) {
     let mut b: i32;
@@ -978,13 +968,8 @@ fn tf_decode(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_plc_pitch_search
-fn celt_plc_pitch_search(
-    ch0: &[celt_sig],
-    ch1: Option<&[celt_sig]>,
-    qext_scale: i32,
-    _arch: Arch,
-) -> i32 {
-    let mut lp_pitch_buf: [opus_val16; DECODE_BUFFER_SIZE >> 1] = [0.; DECODE_BUFFER_SIZE >> 1];
+fn celt_plc_pitch_search(ch0: &[f32], ch1: Option<&[f32]>, qext_scale: i32, _arch: Arch) -> i32 {
+    let mut lp_pitch_buf: [f32; DECODE_BUFFER_SIZE >> 1] = [0.; DECODE_BUFFER_SIZE >> 1];
     let ds_len = DECODE_BUFFER_SIZE >> 1;
     let factor = (2 * qext_scale) as usize;
     if let Some(ch1) = ch1 {
@@ -1141,7 +1126,7 @@ fn celt_decode_lost(
             prefilter_and_fold(st, N);
         }
 
-        let decay: opus_val16 = if loss_duration == 0 { 1.5f32 } else { 0.5f32 };
+        let decay: f32 = if loss_duration == 0 { 1.5f32 } else { 0.5f32 };
         c = 0;
         loop {
             let mut i = start;
@@ -1170,7 +1155,7 @@ fn celt_decode_lost(
                 let mut j = 0;
                 while j < blen {
                     seed = celt_lcg_rand(seed);
-                    X[boffs + j] = (seed as i32 >> 20) as celt_norm;
+                    X[boffs + j] = (seed as i32 >> 20) as f32;
                     j += 1;
                 }
                 renormalise_vector(&mut X[boffs..boffs + blen], blen as i32, Q15ONE, st.arch);
@@ -1261,7 +1246,7 @@ fn celt_decode_lost(
         // Skip regular PLC until we get two consecutive packets.
         st.skip_plc = 1;
     } else {
-        let mut fade: opus_val16 = Q15ONE;
+        let mut fade: f32 = Q15ONE;
         let pitch_index: i32;
         #[cfg(feature = "deep-plc")]
         let curr_neural = curr_frame_type == FRAME_PLC_NEURAL || curr_frame_type == FRAME_DRED;
@@ -1322,7 +1307,7 @@ fn celt_decode_lost(
                 }
             }
             if need_pitch_search {
-                let mut ac: [opus_val32; 25] = [0.; 25];
+                let mut ac: [f32; 25] = [0.; 25];
                 _celt_autocorr(
                     &_exc[exc_off..exc_off + max_period as usize],
                     &mut ac,
@@ -1359,8 +1344,8 @@ fn celt_decode_lost(
                 _exc[dst_start..dst_start + exc_length as usize]
                     .copy_from_slice(&fir_tmp[..exc_length as usize]);
             }
-            let mut E1: opus_val32 = 1.0;
-            let mut E2: opus_val32 = 1.0;
+            let mut E1: f32 = 1.0;
+            let mut E2: f32 = 1.0;
             let decay_length = exc_length >> 1;
             {
                 let mut i = 0;
@@ -1373,15 +1358,15 @@ fn celt_decode_lost(
                 }
             }
             E1 = if E1 < E2 { E1 } else { E2 };
-            let decay_0: opus_val16 = celt_sqrt(E1 / E2);
+            let decay_0: f32 = celt_sqrt(E1 / E2);
             st.decode_mem
                 .copy_within(ch_off + n..ch_off + decode_buffer_size, ch_off);
             let extrapolation_offset = max_period - pitch_index;
             let extrapolation_len = N + overlap;
-            let mut attenuation: opus_val16 = fade * decay_0;
+            let mut attenuation: f32 = fade * decay_0;
             let mut j_0 = 0i32;
             let mut i = j_0;
-            let mut S1: opus_val32 = 0.0;
+            let mut S1: f32 = 0.0;
             while i < extrapolation_len {
                 if j_0 >= pitch_index {
                     j_0 -= pitch_index;
@@ -1395,7 +1380,7 @@ fn celt_decode_lost(
                 i += 1;
                 j_0 += 1;
             }
-            let mut lpc_mem: [opus_val16; 24] = [0.; 24];
+            let mut lpc_mem: [f32; 24] = [0.; 24];
             {
                 let mut i = 0;
                 while i < LPC_ORDER {
@@ -1416,12 +1401,11 @@ fn celt_decode_lost(
                     st.arch,
                 );
             }
-            let mut S2: opus_val32 = 0.0;
+            let mut S2: f32 = 0.0;
             {
                 let mut i = 0;
                 while i < extrapolation_len {
-                    let tmp_0: opus_val16 =
-                        st.decode_mem[ch_off + decode_buffer_size - n + i as usize];
+                    let tmp_0: f32 = st.decode_mem[ch_off + decode_buffer_size - n + i as usize];
                     S2 += tmp_0 * tmp_0;
                     i += 1;
                 }
@@ -1434,10 +1418,10 @@ fn celt_decode_lost(
                     i += 1;
                 }
             } else if S1 < S2 {
-                let ratio: opus_val16 = celt_sqrt((0.5 * S1 + 1.0) / (S2 + 1.0));
+                let ratio: f32 = celt_sqrt((0.5 * S1 + 1.0) / (S2 + 1.0));
                 let mut i = 0;
                 while i < overlap {
-                    let tmp_g: opus_val16 = Q15ONE - window[i as usize] * (1.0f32 - ratio);
+                    let tmp_g: f32 = Q15ONE - window[i as usize] * (1.0f32 - ratio);
                     st.decode_mem[ch_off + decode_buffer_size - n + i as usize] *= tmp_g;
                     i += 1;
                 }
@@ -1467,7 +1451,7 @@ fn celt_decode_lost(
 pub fn celt_decode_with_ec(
     st: &mut OpusCustomDecoder,
     data: Option<&[u8]>,
-    pcm: &mut [opus_val16],
+    pcm: &mut [f32],
     mut frame_size: i32,
     dec: Option<&mut ec_dec>,
     accum: i32,
@@ -1591,7 +1575,7 @@ pub fn celt_decode_with_ec(
             lpcnet,
         );
         {
-            let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
+            let in_ch: Vec<&[f32]> = (0..CC as usize)
                 .map(|c| {
                     &st.decode_mem[c * chan_stride + out_syn_off..c * chan_stride + out_syn_off + n]
                 })
@@ -1687,7 +1671,7 @@ pub fn celt_decode_with_ec(
 #[inline]
 fn celt_decode_body(
     st: &mut OpusCustomDecoder,
-    pcm: &mut [opus_val16],
+    pcm: &mut [f32],
     frame_size: i32,
     dec: &mut ec_dec,
     accum: i32,
@@ -1716,7 +1700,7 @@ fn celt_decode_body(
     let mut bits: i32;
 
     let mut postfilter_pitch: i32;
-    let mut postfilter_gain: opus_val16;
+    let mut postfilter_gain: f32;
     let mut intensity: i32 = 0;
     let mut dual_stereo: i32 = 0;
     let mut total_bits: i32;
@@ -1751,7 +1735,7 @@ fn celt_decode_body(
         tell = len * 8;
         dec.nbits_total += tell - ec_tell(dec);
     }
-    postfilter_gain = 0 as opus_val16;
+    postfilter_gain = 0 as f32;
     postfilter_pitch = 0;
     postfilter_tapset = 0;
     if start == 0 && tell + 16 <= total_bits {
@@ -1789,7 +1773,7 @@ fn celt_decode_body(
     if intra_ener == 0 && st.loss_duration != 0 {
         c = 0;
         loop {
-            let safety: opus_val16 = if LM == 0 {
+            let safety: f32 = if LM == 0 {
                 1.5f32
             } else if LM == 1 {
                 0.5f32
@@ -2563,7 +2547,7 @@ fn celt_decode_body(
             i += 1;
         }
     }
-    let max_background_increase: opus_val16 = (160_i32.min(st.loss_duration + M) as f32) * 0.001f32;
+    let max_background_increase: f32 = (160_i32.min(st.loss_duration + M) as f32) * 0.001f32;
     i = 0;
     while i < 2 * nbEBands {
         st.backgroundLogE[i as usize] =
@@ -2578,14 +2562,14 @@ fn celt_decode_body(
     loop {
         i = 0;
         while i < start {
-            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
+            st.oldEBands[(c * nbEBands + i) as usize] = 0 as f32;
             st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
             st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
             i += 1;
         }
         i = end;
         while i < nbEBands {
-            st.oldEBands[(c * nbEBands + i) as usize] = 0 as opus_val16;
+            st.oldEBands[(c * nbEBands + i) as usize] = 0 as f32;
             st.oldLogE2[(c * nbEBands + i) as usize] = -28.0f32;
             st.oldLogE[(c * nbEBands + i) as usize] = -28.0f32;
             i += 1;
@@ -2607,7 +2591,7 @@ fn celt_decode_body(
         st.rng ^= ext_dec.rng;
     }
     {
-        let in_ch: Vec<&[celt_sig]> = (0..CC as usize)
+        let in_ch: Vec<&[f32]> = (0..CC as usize)
             .map(|c| {
                 &st.decode_mem[c * chan_stride + out_syn_off..c * chan_stride + out_syn_off + n]
             })

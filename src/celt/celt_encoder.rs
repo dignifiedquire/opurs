@@ -8,14 +8,8 @@ use crate::celt::bands::{
     spreading_decision, SPREAD_AGGRESSIVE, SPREAD_NONE, SPREAD_NORMAL,
 };
 
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-    pub type celt_sig = f32;
-    pub type celt_norm = f32;
-    pub const CELT_SIG_SCALE: f32 = 32768.0f32;
-    pub const EPSILON: f32 = 1e-15f32;
-}
+const CELT_SIG_SCALE: f32 = 32768.0;
+const EPSILON: f32 = 1e-15;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SILKInfo {
@@ -23,7 +17,6 @@ pub struct SILKInfo {
     pub offset: i32,
 }
 
-pub use self::arch_h::{celt_norm, celt_sig, opus_val16, opus_val32, CELT_SIG_SCALE, EPSILON};
 use crate::celt::common::{
     comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
 };
@@ -80,43 +73,43 @@ pub struct OpusCustomEncoder {
     pub arch: Arch,
     pub rng: u32,
     pub spread_decision: i32,
-    pub delayedIntra: opus_val32,
+    pub delayedIntra: f32,
     pub tonal_average: i32,
     pub lastCodedBands: i32,
     pub hf_average: i32,
     pub tapset_decision: i32,
     pub prefilter_period: i32,
-    pub prefilter_gain: opus_val16,
+    pub prefilter_gain: f32,
     pub prefilter_tapset: i32,
     pub consec_transient: i32,
     pub analysis: AnalysisInfo,
     pub silk_info: SILKInfo,
-    pub preemph_memE: [opus_val32; 2],
-    pub preemph_memD: [opus_val32; 2],
+    pub preemph_memE: [f32; 2],
+    pub preemph_memD: [f32; 2],
     pub vbr_reservoir: i32,
     pub vbr_drift: i32,
     pub vbr_offset: i32,
     pub vbr_count: i32,
-    pub overlap_max: opus_val32,
-    pub stereo_saving: opus_val16,
+    pub overlap_max: f32,
+    pub stereo_saving: f32,
     pub intensity: i32,
     /// Energy mask for surround encoding (set by multistream encoder).
     /// `energy_mask_len == 0` means no mask is active.
-    pub energy_mask: [opus_val16; 2 * 21],
+    pub energy_mask: [f32; 2 * 21],
     pub energy_mask_len: usize,
-    pub spec_avg: opus_val16,
+    pub spec_avg: f32,
     /// Overlap memory, size = channels * overlap (max 2*240 = 480)
-    pub in_mem: [celt_sig; 2 * 240],
+    pub in_mem: [f32; 2 * 240],
     /// Prefilter memory, size = channels * QEXT_SCALE(COMBFILTER_MAXPERIOD) (max 2*2048 = 4096)
-    pub prefilter_mem: [celt_sig; 2 * PREFILTER_MEM_CHAN_CAP],
+    pub prefilter_mem: [f32; 2 * PREFILTER_MEM_CHAN_CAP],
     /// Old band energies, size = channels * nbEBands (max 2*21 = 42)
-    pub oldBandE: [opus_val16; 2 * 21],
+    pub oldBandE: [f32; 2 * 21],
     /// Old log energies, size = channels * nbEBands (max 2*21 = 42)
-    pub oldLogE: [opus_val16; 2 * 21],
+    pub oldLogE: [f32; 2 * 21],
     /// Old log energies (2 frames ago), size = channels * nbEBands (max 2*21 = 42)
-    pub oldLogE2: [opus_val16; 2 * 21],
+    pub oldLogE2: [f32; 2 * 21],
     /// Energy quantization error, size = channels * nbEBands (max 2*21 = 42)
-    pub energyError: [opus_val16; 2 * 21],
+    pub energyError: [f32; 2 * 21],
     /// QEXT: enable quality extension encoding
     #[cfg(feature = "qext")]
     pub enable_qext: i32,
@@ -125,7 +118,7 @@ pub struct OpusCustomEncoder {
     pub qext_scale: i32,
     /// QEXT: old band energies for extension bands
     #[cfg(feature = "qext")]
-    pub qext_oldBandE: [opus_val16; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
+    pub qext_oldBandE: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
 #[cfg(feature = "qext")]
@@ -290,7 +283,7 @@ impl OpusCustomEncoder {
         let overlap = self.mode.overlap;
         self.rng = 0;
         self.spread_decision = SPREAD_NORMAL;
-        self.delayedIntra = 1 as opus_val32;
+        self.delayedIntra = 1_f32;
         self.tonal_average = 256;
         self.lastCodedBands = 0;
         self.hf_average = 0;
@@ -527,26 +520,26 @@ mod tests {
 
 /// Upstream C: celt/celt_encoder.c:transient_analysis
 fn transient_analysis(
-    in_0: &[opus_val32],
+    in_0: &[f32],
     len: i32,
     C: i32,
-    tf_estimate: &mut opus_val16,
+    tf_estimate: &mut f32,
     tf_chan: &mut i32,
     allow_weak_transients: i32,
     weak_transient: &mut i32,
-    tone_freq: opus_val16,
-    toneishness: opus_val32,
+    tone_freq: f32,
+    toneishness: f32,
 ) -> i32 {
     let mut i: i32 = 0;
-    let mut mem0: opus_val32 = 0.;
-    let mut mem1: opus_val32 = 0.;
+    let mut mem0: f32 = 0.;
+    let mut mem1: f32 = 0.;
     let mut is_transient: i32 = 0;
     let mut mask_metric: i32 = 0;
     let mut c: i32 = 0;
-    let mut tf_max: opus_val16 = 0.;
+    let mut tf_max: f32 = 0.;
     let mut len2: i32 = 0;
     // Forward masking: 6.7 dB/ms.
-    let mut forward_decay: opus_val16 = 0.0625f32;
+    let mut forward_decay: f32 = 0.0625f32;
     // Table of 6*64/x, trained on real data to minimize average error.
     static inv_table: [u8; 128] = [
         255, 255, 156, 110, 86, 70, 59, 51, 45, 40, 37, 33, 31, 28, 26, 25, 23, 22, 21, 20, 19, 18,
@@ -569,17 +562,17 @@ fn transient_analysis(
     len2 = len / 2;
     c = 0;
     while c < C {
-        let mut mean: opus_val32 = 0.;
+        let mut mean: f32 = 0.;
         let mut unmask: i32 = 0;
-        let mut norm: opus_val32 = 0.;
-        let mut maxE: opus_val16 = 0.;
-        mem0 = 0 as opus_val32;
-        mem1 = 0 as opus_val32;
+        let mut norm: f32 = 0.;
+        let mut maxE: f32 = 0.;
+        mem0 = 0 as f32;
+        mem1 = 0 as f32;
         // High-pass filter: (1 - 2*z^-1 + z^-2) / (1 - z^-1 + .5*z^-2).
         i = 0;
         while i < len {
-            let mut x: opus_val32 = 0.;
-            let mut y: opus_val32 = 0.;
+            let mut x: f32 = 0.;
+            let mut y: f32 = 0.;
             x = in_0[(i + c * len) as usize];
             y = mem0 + x;
             /* Modified code to shorten dependency chains: */
@@ -591,21 +584,21 @@ fn transient_analysis(
         }
         // First few samples are unreliable because filter memory isn't propagated.
         tmp[..12].fill(0.0);
-        mean = 0 as opus_val32;
-        mem0 = 0 as opus_val32;
+        mean = 0 as f32;
+        mem0 = 0 as f32;
         // Group by two to reduce complexity.
         // Forward pass to compute the post-echo threshold.
         i = 0;
         while i < len2 {
-            let x2: opus_val16 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
+            let x2: f32 = tmp[(2 * i) as usize] * tmp[(2 * i) as usize]
                 + tmp[(2 * i + 1) as usize] * tmp[(2 * i + 1) as usize];
             mean += x2;
             mem0 = x2 + (1.0f32 - forward_decay) * mem0;
             tmp[i as usize] = forward_decay * mem0;
             i += 1;
         }
-        mem0 = 0 as opus_val32;
-        maxE = 0 as opus_val16;
+        mem0 = 0 as f32;
+        maxE = 0 as f32;
         // Backward pass to compute the pre-echo threshold.
         i = len2 - 1;
         while i >= 0 {
@@ -682,13 +675,11 @@ fn transient_analysis(
         celt_sqrt((27 * mask_metric) as f32) - 42_f32
     };
     *tf_estimate = (if 0 as f64
-        > (0.0069f64 as opus_val32 * (if 163_f32 < tf_max { 163_f32 } else { tf_max })) as f64
-            - 0.139f64
+        > (0.0069f64 as f32 * (if 163_f32 < tf_max { 163_f32 } else { tf_max })) as f64 - 0.139f64
     {
         0 as f64
     } else {
-        (0.0069f64 as opus_val32 * (if 163_f32 < tf_max { 163_f32 } else { tf_max })) as f64
-            - 0.139f64
+        (0.0069f64 as f32 * (if 163_f32 < tf_max { 163_f32 } else { tf_max })) as f64 - 0.139f64
     })
     // here, a 64-bit sqrt __should__ be used
     .sqrt() as f32;
@@ -699,8 +690,8 @@ fn transient_analysis(
 /// the transient decision.
 /// Upstream C: celt/celt_encoder.c:patch_transient_decision
 fn patch_transient_decision(
-    newE: &[opus_val16],
-    oldE: &[opus_val16],
+    newE: &[f32],
+    oldE: &[f32],
     nbEBands: i32,
     start: i32,
     end: i32,
@@ -708,8 +699,8 @@ fn patch_transient_decision(
 ) -> i32 {
     let mut i: i32 = 0;
     let mut c: i32 = 0;
-    let mut mean_diff: opus_val32 = 0 as opus_val32;
-    let mut spread_old: [opus_val16; 26] = [0.; 26];
+    let mut mean_diff: f32 = 0 as f32;
+    let mut spread_old: [f32; 26] = [0.; 26];
     // Apply an aggressive (-6 dB/Bark) spreading to old-frame energies to
     // avoid false positives caused by irrelevant narrowband peaks.
     if C == 1 {
@@ -760,8 +751,8 @@ fn patch_transient_decision(
     loop {
         i = if 2 > start { 2 } else { start };
         while i < end - 1 {
-            let mut x1: opus_val16 = 0.;
-            let mut x2: opus_val16 = 0.;
+            let mut x1: f32 = 0.;
+            let mut x2: f32 = 0.;
             x1 = if 0 as f32 > newE[(i + c * nbEBands) as usize] {
                 0 as f32
             } else {
@@ -784,15 +775,15 @@ fn patch_transient_decision(
             break;
         }
     }
-    mean_diff /= (C * (end - 1 - (if 2 > start { 2 } else { start }))) as opus_val32;
+    mean_diff /= (C * (end - 1 - (if 2 > start { 2 } else { start }))) as f32;
     (mean_diff > 1.0f32) as i32
 }
 /// Upstream C: celt/celt_encoder.c:compute_mdcts
 fn compute_mdcts(
     mode: &OpusCustomMode,
     shortBlocks: i32,
-    in_0: &mut [celt_sig],
-    out: &mut [celt_sig],
+    in_0: &mut [f32],
+    out: &mut [f32],
     C: i32,
     CC: i32,
     LM: i32,
@@ -868,25 +859,25 @@ fn compute_mdcts(
 }
 /// Upstream C: celt/celt_encoder.c:celt_preemphasis
 fn celt_preemphasis(
-    pcmp: &[opus_val16],
-    inp: &mut [celt_sig],
+    pcmp: &[f32],
+    inp: &mut [f32],
     N: i32,
     CC: i32,
     upsample: i32,
-    coef: &[opus_val16],
-    mem: &mut celt_sig,
+    coef: &[f32],
+    mem: &mut f32,
     clip: i32,
 ) {
     let mut i: i32 = 0;
-    let mut coef0: opus_val16 = 0.;
-    let mut m: celt_sig = 0.;
+    let mut coef0: f32 = 0.;
+    let mut m: f32 = 0.;
     let mut Nu: i32 = 0;
     coef0 = coef[0];
     m = *mem;
     if coef[1] == 0 as f32 && upsample == 1 && clip == 0 {
         i = 0;
         while i < N {
-            let mut x: opus_val16 = 0.;
+            let mut x: f32 = 0.;
             x = pcmp[(CC * i) as usize] * CELT_SIG_SCALE;
             inp[i as usize] = x - m;
             m = coef0 * x;
@@ -924,7 +915,7 @@ fn celt_preemphasis(
     }
     i = 0;
     while i < N {
-        let mut x_0: opus_val16 = 0.;
+        let mut x_0: f32 = 0.;
         x_0 = inp[i as usize];
         inp[i as usize] = x_0 - m;
         m = coef0 * x_0;
@@ -933,8 +924,8 @@ fn celt_preemphasis(
     *mem = m;
 }
 /// Upstream C: celt/celt_encoder.c:l1_metric
-fn l1_metric(tmp: &[celt_norm], N: i32, LM: i32, bias: opus_val16) -> opus_val32 {
-    let mut L1: opus_val32 = 0 as opus_val32;
+fn l1_metric(tmp: &[f32], N: i32, LM: i32, bias: f32) -> f32 {
+    let mut L1: f32 = 0 as f32;
     let mut i: i32 = 0;
     while i < N {
         L1 += tmp[i as usize].abs();
@@ -950,10 +941,10 @@ fn tf_analysis(
     isTransient: i32,
     tf_res: &mut [i32],
     lambda: i32,
-    X: &[celt_norm],
+    X: &[f32],
     N0: i32,
     LM: i32,
-    tf_estimate: opus_val16,
+    tf_estimate: f32,
     tf_chan: i32,
     importance: &[i32],
 ) -> i32 {
@@ -963,7 +954,7 @@ fn tf_analysis(
     let mut sel: i32 = 0;
     let mut selcost: [i32; 2] = [0; 2];
     let mut tf_select: i32 = 0;
-    let mut bias: opus_val16 = 0.;
+    let mut bias: f32 = 0.;
     bias = 0.04f32
         * (if -0.25f32 > 0.5f32 - tf_estimate {
             -0.25f32
@@ -988,8 +979,8 @@ fn tf_analysis(
         let mut k: i32 = 0;
         let mut N: i32 = 0;
         let mut narrow: i32 = 0;
-        let mut L1: opus_val32 = 0.;
-        let mut best_L1: opus_val32 = 0.;
+        let mut L1: f32 = 0.;
+        let mut best_L1: f32 = 0.;
         let mut best_level: i32 = 0;
         N = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32) << LM;
         narrow = (m.eBands[(i + 1) as usize] as i32 - m.eBands[i as usize] as i32 == 1) as i32;
@@ -1197,27 +1188,27 @@ fn tf_encode(
 /// Upstream C: celt/celt_encoder.c:alloc_trim_analysis
 fn alloc_trim_analysis(
     m: &OpusCustomMode,
-    X: &[celt_norm],
-    bandLogE: &[opus_val16],
+    X: &[f32],
+    bandLogE: &[f32],
     end: i32,
     LM: i32,
     C: i32,
     N0: i32,
     analysis: &AnalysisInfo,
-    stereo_saving: &mut opus_val16,
-    tf_estimate: opus_val16,
+    stereo_saving: &mut f32,
+    tf_estimate: f32,
     intensity: i32,
-    surround_trim: opus_val16,
+    surround_trim: f32,
     equiv_rate: i32,
     _arch: Arch,
 ) -> i32 {
     let mut i: i32 = 0;
-    let mut diff: opus_val32 = 0 as opus_val32;
+    let mut diff: f32 = 0 as f32;
     let mut c: i32 = 0;
     let mut trim_index: i32 = 0;
-    let mut trim: opus_val16 = 5.0f32;
-    let mut logXC: opus_val16 = 0.;
-    let mut logXC2: opus_val16 = 0.;
+    let mut trim: f32 = 5.0f32;
+    let mut logXC: f32 = 0.;
+    let mut logXC2: f32 = 0.;
     if equiv_rate < 64000 {
         trim = 4.0f32;
     } else if equiv_rate < 80000 {
@@ -1225,11 +1216,11 @@ fn alloc_trim_analysis(
         trim = 4.0f32 + 1.0f32 / 16.0f32 * frac as f32;
     }
     if C == 2 {
-        let mut sum: opus_val16 = 0 as opus_val16;
-        let mut minXC: opus_val16 = 0.;
+        let mut sum: f32 = 0 as f32;
+        let mut minXC: f32 = 0.;
         i = 0;
         while i < 8 {
-            let mut partial: opus_val32 = 0.;
+            let mut partial: f32 = 0.;
             let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
             let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
             let band_len =
@@ -1252,7 +1243,7 @@ fn alloc_trim_analysis(
         minXC = sum;
         i = 8;
         while i < intensity {
-            let mut partial_0: opus_val32 = 0.;
+            let mut partial_0: f32 = 0.;
             let band_off = ((m.eBands[i as usize] as i32) << LM) as usize;
             let band_off2 = (N0 + ((m.eBands[i as usize] as i32) << LM)) as usize;
             let band_len =
@@ -1344,20 +1335,20 @@ fn alloc_trim_analysis(
     trim_index
 }
 /// Upstream C: celt/celt_encoder.c:stereo_analysis
-fn stereo_analysis(m: &OpusCustomMode, X: &[celt_norm], LM: i32, N0: i32) -> i32 {
+fn stereo_analysis(m: &OpusCustomMode, X: &[f32], LM: i32, N0: i32) -> i32 {
     let mut i: i32 = 0;
     let mut thetas: i32 = 0;
-    let mut sumLR: opus_val32 = EPSILON;
-    let mut sumMS: opus_val32 = EPSILON;
+    let mut sumLR: f32 = EPSILON;
+    let mut sumMS: f32 = EPSILON;
     i = 0;
     while i < 13 {
         let mut j: i32 = 0;
         j = (m.eBands[i as usize] as i32) << LM;
         while j < (m.eBands[(i + 1) as usize] as i32) << LM {
-            let mut L: opus_val32 = 0.;
-            let mut R: opus_val32 = 0.;
-            let mut M: opus_val32 = 0.;
-            let mut S: opus_val32 = 0.;
+            let mut L: f32 = 0.;
+            let mut R: f32 = 0.;
+            let mut M: f32 = 0.;
+            let mut S: f32 = 0.;
             L = X[j as usize];
             R = X[(N0 + j) as usize];
             M = L + R;
@@ -1380,13 +1371,13 @@ fn stereo_analysis(m: &OpusCustomMode, X: &[celt_norm], LM: i32, N0: i32) -> i32
         > ((m.eBands[13] as i32) << (LM + 1)) as f32 * sumLR) as i32
 }
 /// Upstream C: celt/celt_encoder.c:median_of_5
-fn median_of_5(x: &[opus_val16]) -> opus_val16 {
-    let mut t0: opus_val16;
-    let mut t1: opus_val16;
+fn median_of_5(x: &[f32]) -> f32 {
+    let mut t0: f32;
+    let mut t1: f32;
 
-    let mut t3: opus_val16;
-    let mut t4: opus_val16;
-    let t2: opus_val16 = x[2];
+    let mut t3: f32;
+    let mut t4: f32;
+    let t2: f32 = x[2];
     if x[0] > x[1] {
         t0 = x[1];
         t1 = x[0];
@@ -1430,9 +1421,9 @@ fn median_of_5(x: &[opus_val16]) -> opus_val16 {
     }
 }
 /// Upstream C: celt/celt_encoder.c:median_of_3
-fn median_of_3(x: &[opus_val16]) -> opus_val16 {
-    let t0: opus_val16;
-    let t1: opus_val16;
+fn median_of_3(x: &[f32]) -> f32 {
+    let t0: f32;
+    let t1: f32;
 
     if x[0] > x[1] {
         t0 = x[1];
@@ -1441,7 +1432,7 @@ fn median_of_3(x: &[opus_val16]) -> opus_val16 {
         t0 = x[0];
         t1 = x[1];
     }
-    let t2: opus_val16 = x[2];
+    let t2: f32 = x[2];
     if t1 < t2 {
         t1
     } else if t0 < t2 {
@@ -1452,9 +1443,9 @@ fn median_of_3(x: &[opus_val16]) -> opus_val16 {
 }
 /// Upstream C: celt/celt_encoder.c:dynalloc_analysis
 fn dynalloc_analysis(
-    bandLogE: &[opus_val16],
-    bandLogE2: &[opus_val16],
-    oldBandE: &[opus_val16],
+    bandLogE: &[f32],
+    bandLogE2: &[f32],
+    oldBandE: &[f32],
     nbEBands: i32,
     start: i32,
     end: i32,
@@ -1470,17 +1461,17 @@ fn dynalloc_analysis(
     effectiveBytes: i32,
     tot_boost_: &mut i32,
     lfe: i32,
-    surround_dynalloc: &[opus_val16],
+    surround_dynalloc: &[f32],
     analysis: &AnalysisInfo,
     importance: &mut [i32],
     spread_weight: &mut [i32],
-    tone_freq: opus_val16,
-    toneishness: opus_val32,
-) -> opus_val16 {
+    tone_freq: f32,
+    toneishness: f32,
+) -> f32 {
     let mut i: i32 = 0;
     let mut c: i32 = 0;
     let mut tot_boost: i32 = 0;
-    let mut maxDepth: opus_val16 = 0.;
+    let mut maxDepth: f32 = 0.;
     // C * nbEBands max: 2 * 35 = 70.
     const MAX_C_BANDS: usize = 80;
     debug_assert!(((C * nbEBands) as usize) <= MAX_C_BANDS);
@@ -1491,9 +1482,9 @@ fn dynalloc_analysis(
     i = 0;
     while i < end {
         noise_floor[i as usize] =
-            0.0625f32 * logN[i as usize] as opus_val32 + 0.5f32 + (9 - lsb_depth) as f32
+            0.0625f32 * logN[i as usize] as f32 + 0.5f32 + (9 - lsb_depth) as f32
                 - eMeans[i as usize]
-                + 0.0062f64 as opus_val32 * ((i + 5) * (i + 5)) as opus_val32;
+                + 0.0062f64 as f32 * ((i + 5) * (i + 5)) as f32;
         i += 1;
     }
     c = 0;
@@ -1555,7 +1546,7 @@ fn dynalloc_analysis(
     }
     i = 0;
     while i < end {
-        let smr: opus_val16 = sig[i as usize]
+        let smr: f32 = sig[i as usize]
             - (if (if 0 as f32 > maxDepth - 12.0f32 {
                 0 as f32
             } else {
@@ -1586,13 +1577,13 @@ fn dynalloc_analysis(
         i += 1;
     }
     // nbEBands max is 21; use stack buffer.
-    let mut bandLogE3 = [0.0 as opus_val16; 24];
+    let mut bandLogE3 = [0.0_f32; 24];
     if effectiveBytes >= (30 + 5 * LM) && lfe == 0 {
         let mut last: i32 = 0;
         c = 0;
         loop {
-            let mut offset: opus_val16 = 0.;
-            let mut tmp: opus_val16 = 0.;
+            let mut offset: f32 = 0.;
+            let mut tmp: f32 = 0.;
             let fb = (c * nbEBands) as usize;
             bandLogE3[..end as usize].copy_from_slice(&bandLogE2[fb..fb + end as usize]);
             if LM == 0 {
@@ -1851,18 +1842,18 @@ fn dynalloc_analysis(
 /// Returns `true` on failure (ill-conditioned).
 ///
 /// Upstream C: celt/celt_encoder.c:tone_lpc
-fn tone_lpc(x: &[opus_val16], len: usize, delay: usize, lpc: &mut [opus_val32; 2]) -> bool {
+fn tone_lpc(x: &[f32], len: usize, delay: usize, lpc: &mut [f32; 2]) -> bool {
     debug_assert!(len > 2 * delay);
     // Compute forward correlations.
-    let mut r00: opus_val32 = 0.0;
-    let mut r01: opus_val32 = 0.0;
-    let mut r02: opus_val32 = 0.0;
+    let mut r00: f32 = 0.0;
+    let mut r01: f32 = 0.0;
+    let mut r02: f32 = 0.0;
     for i in 0..len - 2 * delay {
         r00 += x[i] * x[i];
         r01 += x[i] * x[i + delay];
         r02 += x[i] * x[i + 2 * delay];
     }
-    let mut edges: opus_val32 = 0.0;
+    let mut edges: f32 = 0.0;
     for i in 0..delay {
         edges += x[len + i - 2 * delay] * x[len + i - 2 * delay] - x[i] * x[i];
     }
@@ -1916,20 +1907,14 @@ fn tone_lpc(x: &[opus_val16], len: usize, delay: usize, lpc: &mut [opus_val32; 2
 /// problems with the encoder.
 ///
 /// Upstream C: celt/celt_encoder.c:tone_detect
-fn tone_detect(
-    input: &[celt_sig],
-    CC: i32,
-    N: i32,
-    toneishness: &mut opus_val32,
-    Fs: i32,
-) -> opus_val16 {
+fn tone_detect(input: &[f32], CC: i32, N: i32, toneishness: &mut f32, Fs: i32) -> f32 {
     let n = N as usize;
     let mut delay: usize = 1;
     let mut lpc = [0.0f32; 2];
     // N + overlap max: 1920 + 240 = 2160 (QEXT 96kHz); use stack buffer.
     const MAX_TONE: usize = 2400;
     debug_assert!(n <= MAX_TONE);
-    let mut x = [0.0 as opus_val16; MAX_TONE];
+    let mut x = [0.0_f32; MAX_TONE];
     // Shift by SIG_SHIFT+2 (+3 for stereo) to account for HF gain from the
     // preemphasis filter. In float build this reduces to averaging channels.
     if CC == 2 {
@@ -1960,27 +1945,27 @@ fn tone_detect(
 #[allow(clippy::approx_constant)]
 fn run_prefilter(
     st: &mut OpusCustomEncoder,
-    in_0: &mut [celt_sig],
+    in_0: &mut [f32],
     CC: i32,
     N: i32,
     prefilter_tapset: i32,
     pitch: &mut i32,
-    gain: &mut opus_val16,
+    gain: &mut f32,
     qgain: &mut i32,
     enabled: i32,
-    tf_estimate: opus_val16,
+    tf_estimate: f32,
     nbAvailableBytes: i32,
     analysis: &AnalysisInfo,
-    tone_freq: opus_val16,
-    toneishness: opus_val32,
+    tone_freq: f32,
+    toneishness: f32,
 ) -> i32 {
     #[cfg(feature = "qext")]
     let qext_scale = st.qext_scale;
     #[cfg(not(feature = "qext"))]
     let qext_scale = 1;
     let mut pitch_index: i32 = 0;
-    let mut gain1: opus_val16 = 0.;
-    let mut pf_threshold: opus_val16;
+    let mut gain1: f32 = 0.;
+    let mut pf_threshold: f32;
     let mut pf_on: i32;
     let mut qg: i32 = 0;
     let mode = st.mode;
@@ -2086,10 +2071,10 @@ fn run_prefilter(
             gain1 *= 0.5f32;
         }
         if st.loss_rate > 8 {
-            gain1 = 0 as opus_val16;
+            gain1 = 0 as f32;
         }
     } else {
-        gain1 = 0 as opus_val16;
+        gain1 = 0 as f32;
         pitch_index = COMBFILTER_MINPERIOD;
     }
     if analysis.valid != 0 {
@@ -2121,7 +2106,7 @@ fn run_prefilter(
         0.2f32
     };
     if gain1 < pf_threshold {
-        gain1 = 0 as opus_val16;
+        gain1 = 0 as f32;
         pf_on = 0;
         qg = 0;
     } else {
@@ -2299,21 +2284,21 @@ fn compute_vbr(
     C: i32,
     intensity: i32,
     constrained_vbr: i32,
-    mut stereo_saving: opus_val16,
+    mut stereo_saving: f32,
     tot_boost: i32,
-    tf_estimate: opus_val16,
+    tf_estimate: f32,
     pitch_change: i32,
-    maxDepth: opus_val16,
+    maxDepth: f32,
     lfe: i32,
     has_surround_mask: i32,
-    surround_masking: opus_val16,
-    temporal_vbr: opus_val16,
+    surround_masking: f32,
+    temporal_vbr: f32,
 ) -> i32 {
     // The target rate in 8th bits per frame.
     let mut target: i32 = 0;
     let mut coded_bins: i32 = 0;
     let mut coded_bands: i32 = 0;
-    let mut tf_calibration: opus_val16 = 0.;
+    let mut tf_calibration: f32 = 0.;
     let mut nbEBands: i32 = 0;
     let eBands = &mode.eBands;
     nbEBands = mode.nbEBands as i32;
@@ -2339,7 +2324,7 @@ fn compute_vbr(
     if C == 2 {
         let mut coded_stereo_bands: i32 = 0;
         let mut coded_stereo_dof: i32 = 0;
-        let mut max_frac: opus_val16 = 0.;
+        let mut max_frac: f32 = 0.;
         coded_stereo_bands = if intensity < coded_bands {
             intensity
         } else {
@@ -2348,18 +2333,18 @@ fn compute_vbr(
         coded_stereo_dof =
             ((eBands[coded_stereo_bands as usize] as i32) << LM) - coded_stereo_bands;
         // Maximum fraction of bits we can save if the signal is effectively mono.
-        max_frac = 0.8f32 * coded_stereo_dof as opus_val32 / coded_bins as opus_val16;
+        max_frac = 0.8f32 * coded_stereo_dof as f32 / coded_bins as f32;
         stereo_saving = if stereo_saving < 1.0f32 {
             stereo_saving
         } else {
             1.0f32
         };
         target -= (if (max_frac * target as f32)
-            < (stereo_saving - 0.1f32) * (coded_stereo_dof << 3) as opus_val32
+            < (stereo_saving - 0.1f32) * (coded_stereo_dof << 3) as f32
         {
             max_frac * target as f32
         } else {
-            (stereo_saving - 0.1f32) * (coded_stereo_dof << 3) as opus_val32
+            (stereo_saving - 0.1f32) * (coded_stereo_dof << 3) as f32
         }) as i32;
     }
     // Boost according to dynalloc (minus average calibration term).
@@ -2383,8 +2368,7 @@ fn compute_vbr(
         target = tonal_target;
     }
     if has_surround_mask != 0 && lfe == 0 {
-        let surround_target: i32 =
-            target + (surround_masking * (coded_bins << 3) as opus_val32) as i32;
+        let surround_target: i32 = target + (surround_masking * (coded_bins << 3) as f32) as i32;
         target = if target / 4 > surround_target {
             target / 4
         } else {
@@ -2394,7 +2378,7 @@ fn compute_vbr(
     let mut floor_depth: i32 = 0;
     let mut bins: i32 = 0;
     bins = (eBands[(nbEBands - 2) as usize] as i32) << LM;
-    floor_depth = (((C * bins) << 3) as opus_val32 * maxDepth) as i32;
+    floor_depth = (((C * bins) << 3) as f32 * maxDepth) as i32;
     floor_depth = if floor_depth > target >> 2 {
         floor_depth
     } else {
@@ -2411,8 +2395,8 @@ fn compute_vbr(
         target = base_target + (0.67f32 * (target - base_target) as f32) as i32;
     }
     if has_surround_mask == 0 && tf_estimate < 0.2f32 {
-        let mut amount: opus_val16 = 0.;
-        let mut tvbr_factor: opus_val16 = 0.;
+        let mut amount: f32 = 0.;
+        let mut tvbr_factor: f32 = 0.;
         amount = 0.0000031f32
             * (if 0
                 > (if (32000) < 96000 - bitrate {
@@ -2440,7 +2424,7 @@ fn compute_vbr(
 }
 pub fn celt_encode_with_ec<'b>(
     st: &mut OpusCustomEncoder,
-    pcm: &[opus_val16],
+    pcm: &[f32],
     mut frame_size: i32,
     compressed: &'b mut [u8],
     mut nbCompressedBytes: i32,
@@ -2482,7 +2466,7 @@ pub fn celt_encode_with_ec<'b>(
     let mut codedBands: i32 = 0;
     let mut alloc_trim: i32 = 0;
     let mut pitch_index: i32 = COMBFILTER_MINPERIOD;
-    let mut gain1: opus_val16 = 0 as opus_val16;
+    let mut gain1: f32 = 0 as f32;
     let mut dual_stereo: i32 = 0;
     let mut effectiveBytes: i32 = 0;
     let mut dynalloc_logp: i32 = 0;
@@ -2498,13 +2482,13 @@ pub fn celt_encode_with_ec<'b>(
     let mut anti_collapse_on: i32 = 0;
     let mut silence: i32 = 0;
     let mut tf_chan: i32 = 0;
-    let mut tf_estimate: opus_val16 = 0.;
-    let mut tone_freq: opus_val16 = -1.0;
-    let mut toneishness: opus_val32 = 0.0;
+    let mut tf_estimate: f32 = 0.;
+    let mut tone_freq: f32 = -1.0;
+    let mut toneishness: f32 = 0.0;
     let mut pitch_change: i32 = 0;
     let mut tot_boost: i32 = 0;
-    let mut sample_max: opus_val32 = 0.;
-    let mut maxDepth: opus_val16 = 0.;
+    let mut sample_max: f32 = 0.;
+    let mut maxDepth: f32 = 0.;
     let mut wrote_custom_header = false;
     let mut compressed_offset = 0usize;
 
@@ -2514,9 +2498,9 @@ pub fn celt_encode_with_ec<'b>(
     let mut secondMdct: i32 = 0;
     let mut signalBandwidth: i32 = 0;
     let mut transient_got_disabled: i32 = 0;
-    let mut surround_masking: opus_val16 = 0 as opus_val16;
-    let mut temporal_vbr: opus_val16 = 0 as opus_val16;
-    let mut surround_trim: opus_val16 = 0 as opus_val16;
+    let mut surround_masking: f32 = 0 as f32;
+    let mut temporal_vbr: f32 = 0 as f32;
+    let mut surround_trim: f32 = 0 as f32;
     let mut equiv_rate: i32 = 0;
     let mut hybrid: i32 = 0;
     let mut weak_transient: i32 = 0;
@@ -2558,7 +2542,7 @@ pub fn celt_encode_with_ec<'b>(
     start = st.start;
     end = st.end;
     hybrid = (start != 0) as i32;
-    tf_estimate = 0 as opus_val16;
+    tf_estimate = 0 as f32;
     if nbCompressedBytes < 2 || pcm.is_empty() {
         return OPUS_BAD_ARG;
     }
@@ -2718,7 +2702,7 @@ pub fn celt_encode_with_ec<'b>(
     } else {
         st.overlap_max
     };
-    silence = (sample_max <= 1 as opus_val16 / ((1) << st.lsb_depth) as f32) as i32;
+    silence = (sample_max <= 1_f32 / ((1) << st.lsb_depth) as f32) as i32;
     if tell == 1 {
         ec_enc_bit_logp(enc, silence, 15);
     } else {
@@ -2903,7 +2887,7 @@ pub fn celt_encode_with_ec<'b>(
     amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
     let mut surround_dynalloc = [0.0f32; MAX_C_BANDS];
     surround_dynalloc[..end as usize].fill(0.0);
-    let energy_mask: Option<&[opus_val16]> = if st.energy_mask_len == 0 {
+    let energy_mask: Option<&[f32]> = if st.energy_mask_len == 0 {
         None
     } else {
         Some(&st.energy_mask[..(CC * nbEBands) as usize])
@@ -2913,8 +2897,8 @@ pub fn celt_encode_with_ec<'b>(
             let mut mask_end: i32 = 0;
             let mut midband: i32 = 0;
             let mut count_dynalloc: i32 = 0;
-            let mut mask_avg: opus_val32 = 0 as opus_val32;
-            let mut diff: opus_val32 = 0 as opus_val32;
+            let mut mask_avg: f32 = 0 as f32;
+            let mut diff: f32 = 0 as f32;
             let mut count: i32 = 0;
             mask_end = if 2 > st.lastCodedBands {
                 2
@@ -2925,7 +2909,7 @@ pub fn celt_encode_with_ec<'b>(
             while c < C {
                 i = 0;
                 while i < mask_end {
-                    let mut mask: opus_val16 = 0.;
+                    let mut mask: f32 = 0.;
                     mask = if (if energy_mask[(nbEBands * c + i) as usize] < 0.25f32 {
                         energy_mask[(nbEBands * c + i) as usize]
                     } else {
@@ -2943,17 +2927,16 @@ pub fn celt_encode_with_ec<'b>(
                     if mask > 0 as f32 {
                         mask *= 0.5f32;
                     }
-                    mask_avg += mask
-                        * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)
-                            as opus_val32;
+                    mask_avg +=
+                        mask * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32) as f32;
                     count += eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32;
-                    diff += mask * (1 + 2 * i - mask_end) as opus_val32;
+                    diff += mask * (1 + 2 * i - mask_end) as f32;
                     i += 1;
                 }
                 c += 1;
             }
             assert!(count > 0);
-            mask_avg /= count as opus_val16;
+            mask_avg /= count as f32;
             mask_avg += 0.2f32;
             diff = diff * 6_f32 / (C * (mask_end - 1) * (mask_end + 1) * mask_end) as f32;
             diff *= 0.5f32;
@@ -2973,8 +2956,8 @@ pub fn celt_encode_with_ec<'b>(
             count_dynalloc = 0;
             i = 0;
             while i < mask_end {
-                let mut lin: opus_val32 = 0.;
-                let mut unmask: opus_val16 = 0.;
+                let mut lin: f32 = 0.;
+                let mut unmask: f32 = 0.;
                 lin = mask_avg + diff * (i - midband) as f32;
                 if C == 2 {
                     unmask = if energy_mask[i as usize] > energy_mask[(nbEBands + i) as usize] {
@@ -2996,8 +2979,8 @@ pub fn celt_encode_with_ec<'b>(
             if count_dynalloc >= 3 {
                 mask_avg += 0.25f32;
                 if mask_avg > 0 as f32 {
-                    mask_avg = 0 as opus_val32;
-                    diff = 0 as opus_val32;
+                    mask_avg = 0 as f32;
+                    diff = 0 as f32;
                     surround_dynalloc[..mask_end as usize].fill(0.0);
                 } else {
                     i = 0;
@@ -3018,9 +3001,9 @@ pub fn celt_encode_with_ec<'b>(
         }
     }
     if st.lfe == 0 {
-        let mut follow: opus_val16 = -10.0f32;
-        let mut frame_avg: opus_val32 = 0 as opus_val32;
-        let offset: opus_val16 = if shortBlocks != 0 {
+        let mut follow: f32 = -10.0f32;
+        let mut frame_avg: f32 = 0 as f32;
+        let offset: f32 = if shortBlocks != 0 {
             0.5f32 * LM as f32
         } else {
             0 as f32
@@ -3324,57 +3307,21 @@ pub fn celt_encode_with_ec<'b>(
         i += 1;
     }
     if C == 2 {
-        static intensity_thresholds: [opus_val16; 21] = [
-            1 as opus_val16,
-            2 as opus_val16,
-            3 as opus_val16,
-            4 as opus_val16,
-            5 as opus_val16,
-            6 as opus_val16,
-            7 as opus_val16,
-            8 as opus_val16,
-            16 as opus_val16,
-            24 as opus_val16,
-            36 as opus_val16,
-            44 as opus_val16,
-            50 as opus_val16,
-            56 as opus_val16,
-            62 as opus_val16,
-            67 as opus_val16,
-            72 as opus_val16,
-            79 as opus_val16,
-            88 as opus_val16,
-            106 as opus_val16,
-            134 as opus_val16,
+        static intensity_thresholds: [f32; 21] = [
+            1_f32, 2_f32, 3_f32, 4_f32, 5_f32, 6_f32, 7_f32, 8_f32,
+            16_f32, 24_f32, 36_f32, 44_f32, 50_f32, 56_f32, 62_f32, 67_f32,
+            72_f32, 79_f32, 88_f32, 106_f32, 134_f32,
         ];
-        static intensity_histeresis: [opus_val16; 21] = [
-            1 as opus_val16,
-            1 as opus_val16,
-            1 as opus_val16,
-            1 as opus_val16,
-            1 as opus_val16,
-            1 as opus_val16,
-            1 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            2 as opus_val16,
-            3 as opus_val16,
-            3 as opus_val16,
-            4 as opus_val16,
-            5 as opus_val16,
-            6 as opus_val16,
-            8 as opus_val16,
-            8 as opus_val16,
+        static intensity_histeresis: [f32; 21] = [
+            1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 2_f32,
+            2_f32, 2_f32, 2_f32, 2_f32, 2_f32, 2_f32, 3_f32, 3_f32,
+            4_f32, 5_f32, 6_f32, 8_f32, 8_f32,
         ];
         if LM != 0 {
             dual_stereo = stereo_analysis(mode, &X, LM, N);
         }
         st.intensity = hysteresis_decision(
-            (equiv_rate / 1000) as opus_val16,
+            (equiv_rate / 1000) as f32,
             &intensity_thresholds,
             &intensity_histeresis,
             21,
@@ -3396,7 +3343,7 @@ pub fn celt_encode_with_ec<'b>(
     alloc_trim = 5;
     if tell + ((6) << BITRES) <= total_bits - total_boost {
         if start > 0 || st.lfe != 0 {
-            st.stereo_saving = 0 as opus_val16;
+            st.stereo_saving = 0 as f32;
             alloc_trim = 5;
         } else {
             alloc_trim = alloc_trim_analysis(
@@ -3420,7 +3367,7 @@ pub fn celt_encode_with_ec<'b>(
         tell = ec_tell_frac(enc) as i32;
     }
     if vbr_rate > 0 {
-        let mut alpha: opus_val16 = 0.;
+        let mut alpha: f32 = 0.;
         let mut delta: i32 = 0;
         let mut target: i32 = 0;
         let mut base_target: i32 = 0;
@@ -3655,7 +3602,7 @@ pub fn celt_encode_with_ec<'b>(
             }
 
             // Coarse quantization of QEXT band energies
-            let mut qext_delayedIntra: opus_val32 = 0.0;
+            let mut qext_delayedIntra: f32 = 0.0;
             quant_coarse_energy(
                 qm,
                 0,
@@ -4027,7 +3974,7 @@ pub fn celt_encode_with_ec<'b>(
         i = 0;
         while i < start {
             let idx = (c * nbEBands + i) as usize;
-            st.oldBandE[idx] = 0 as opus_val16;
+            st.oldBandE[idx] = 0 as f32;
             st.oldLogE2[idx] = -28.0f32;
             st.oldLogE[idx] = -28.0f32;
             i += 1;
@@ -4035,7 +3982,7 @@ pub fn celt_encode_with_ec<'b>(
         i = end;
         while i < nbEBands {
             let idx = (c * nbEBands + i) as usize;
-            st.oldBandE[idx] = 0 as opus_val16;
+            st.oldBandE[idx] = 0 as f32;
             st.oldLogE2[idx] = -28.0f32;
             st.oldLogE[idx] = -28.0f32;
             i += 1;

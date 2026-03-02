@@ -5,12 +5,6 @@
 use crate::arch::Arch;
 use crate::celt::modes::OpusCustomMode;
 
-pub mod arch_h {
-    pub type opus_val16 = f32;
-}
-
-pub use self::arch_h::opus_val16;
-
 pub static trim_icdf: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
 pub static spread_icdf: [u8; 4] = [25, 23, 2, 0];
 pub static tapset_icdf: [u8; 3] = [2, 1, 0];
@@ -25,7 +19,7 @@ pub const COMBFILTER_MAXPERIOD: i32 = 1024;
 pub const COMBFILTER_MINPERIOD: i32 = 15;
 const SIG_SAT: f32 = 536_870_911.0;
 
-const GAINS: [[opus_val16; 3]; 3] = [
+const GAINS: [[f32; 3]; 3] = [
     [0.306_640_63_f32, 0.217_041_02_f32, 0.129_638_67_f32],
     [0.463_867_2_f32, 0.268_066_4_f32, 0.0f32],
     [0.799_804_7_f32, 0.100_097_656_f32, 0.0f32],
@@ -44,8 +38,8 @@ fn comb_filter_qext_inplace(
     T0: i32,
     T1: i32,
     N: i32,
-    g0: opus_val16,
-    g1: opus_val16,
+    g0: f32,
+    g1: f32,
     tapset0: i32,
     tapset1: i32,
     window: &[f32],
@@ -111,9 +105,9 @@ pub fn comb_filter_const_c(
     x_start: usize,
     T: i32,
     N: i32,
-    g10: opus_val16,
-    g11: opus_val16,
-    g12: opus_val16,
+    g10: f32,
+    g11: f32,
+    g12: f32,
 ) {
     let t = T as usize;
     let mut x4 = x[x_start - t - 2];
@@ -146,8 +140,8 @@ pub fn comb_filter(
     mut T0: i32,
     mut T1: i32,
     N: i32,
-    g0: opus_val16,
-    g1: opus_val16,
+    g0: f32,
+    g1: f32,
     tapset0: i32,
     tapset1: i32,
     window: &[f32],
@@ -257,8 +251,8 @@ pub fn comb_filter_inplace(
     mut T0: i32,
     mut T1: i32,
     N: i32,
-    g0: opus_val16,
-    g1: opus_val16,
+    g0: f32,
+    g1: f32,
     tapset0: i32,
     tapset1: i32,
     window: &[f32],
@@ -367,8 +361,8 @@ pub fn comb_filter_qext(
     T0: i32,
     T1: i32,
     N: i32,
-    g0: opus_val16,
-    g1: opus_val16,
+    g0: f32,
+    g1: f32,
     tapset0: i32,
     tapset1: i32,
     window: &[f32],

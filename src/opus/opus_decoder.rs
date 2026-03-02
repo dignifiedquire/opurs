@@ -2,22 +2,6 @@
 //!
 //! Upstream C: `src/opus_decoder.c`
 
-pub mod arch_h {
-    pub type opus_val16 = f32;
-    pub type opus_val32 = f32;
-}
-pub mod stddef_h {}
-pub mod stack_alloc_h {
-    pub const ALLOC_NONE: i32 = 1;
-    #[inline]
-    /// Upstream C: celt/stack_alloc.h:_opus_false
-    pub fn _opus_false() -> i32 {
-        0
-    }
-}
-pub use self::arch_h::{opus_val16, opus_val32};
-pub use self::stack_alloc_h::{_opus_false, ALLOC_NONE};
-
 use crate::arch::opus_select_arch;
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
 use crate::celt::entcode::ec_tell;
@@ -75,7 +59,7 @@ pub struct OpusDecoder {
     pub(crate) frame_size: i32,
     pub(crate) prev_redundancy: i32,
     pub(crate) last_packet_duration: i32,
-    pub(crate) softclip_mem: [opus_val16; 2],
+    pub(crate) softclip_mem: [f32; 2],
     pub(crate) rangeFinal: u32,
     pub(crate) ignore_extensions: bool,
 }
@@ -488,12 +472,12 @@ fn validate_opus_decoder(st: &OpusDecoder) {
 ///
 /// Upstream C: src/opus_decoder.c:smooth_fade
 fn smooth_fade(
-    in1: &[opus_val16],
-    in2: &[opus_val16],
-    out: &mut [opus_val16],
+    in1: &[f32],
+    in2: &[f32],
+    out: &mut [f32],
     overlap: i32,
     channels: i32,
-    window: &[opus_val16],
+    window: &[f32],
     Fs: i32,
 ) {
     let inc: i32 = 48000 / Fs;
@@ -501,7 +485,7 @@ fn smooth_fade(
     while c < channels {
         let mut i: i32 = 0;
         while i < overlap {
-            let w: opus_val16 = window[(i * inc) as usize] * window[(i * inc) as usize];
+            let w: f32 = window[(i * inc) as usize] * window[(i * inc) as usize];
             out[(i * channels + c) as usize] = w * in2[(i * channels + c) as usize]
                 + (1.0f32 - w) * in1[(i * channels + c) as usize];
             i += 1;
@@ -525,7 +509,7 @@ fn opus_packet_get_mode(data: &[u8]) -> i32 {
 fn opus_decode_frame(
     st: &mut OpusDecoder,
     data: Option<&[u8]>,
-    pcm: &mut [opus_val16],
+    pcm: &mut [f32],
     mut frame_size: i32,
     decode_fec: i32,
     #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
@@ -619,7 +603,7 @@ fn opus_decode_frame(
         bandwidth = 0;
         if mode == 0 {
             for sample in pcm[..(audiosize * st.channels) as usize].iter_mut() {
-                *sample = 0 as opus_val16;
+                *sample = 0 as f32;
             }
             return audiosize;
         }
@@ -654,8 +638,8 @@ fn opus_decode_frame(
         }
     }
     let celt_accum: i32 = (mode != MODE_CELT_ONLY) as i32;
-    pcm_transition_silk_size = ALLOC_NONE;
-    pcm_transition_celt_size = ALLOC_NONE;
+    pcm_transition_silk_size = 1;
+    pcm_transition_celt_size = 1;
     if data.is_some()
         && st.prev_mode > 0
         && (mode == MODE_CELT_ONLY && st.prev_mode != MODE_CELT_ONLY && st.prev_redundancy == 0
@@ -695,7 +679,7 @@ fn opus_decode_frame(
     let pcm_silk_size: i32 = if mode != MODE_CELT_ONLY && pcm_too_small {
         F10 * st.channels
     } else {
-        ALLOC_NONE
+        1
     };
     // F10 * channels max: 960 * 2 = 1920 (QEXT 96kHz stereo).
     const MAX_F10_CH: usize = 1920;
@@ -849,7 +833,7 @@ fn opus_decode_frame(
     }
     if redundancy != 0 {
         transition = 0;
-        pcm_transition_silk_size = ALLOC_NONE;
+        pcm_transition_silk_size = 1;
     }
     let vla_1 = pcm_transition_silk_size as usize;
     debug_assert!(vla_1 <= MAX_F5_CH);
@@ -890,11 +874,7 @@ fn opus_decode_frame(
         celt_dec.end = endband;
     }
     celt_dec.stream_channels = st.stream_channels as usize;
-    let redundant_audio_size: i32 = if redundancy != 0 {
-        F5 * st.channels
-    } else {
-        ALLOC_NONE
-    };
+    let redundant_audio_size: i32 = if redundancy != 0 { F5 * st.channels } else { 1 };
     let vla_2 = redundant_audio_size as usize;
     debug_assert!(vla_2 <= MAX_F5_CH);
     let mut redundant_audio = [0.0f32; MAX_F5_CH];
@@ -946,7 +926,7 @@ fn opus_decode_frame(
         let silence: [u8; 2] = [0xff, 0xff];
         if celt_accum == 0 {
             for sample in pcm[..(frame_size * st.channels) as usize].iter_mut() {
-                *sample = 0 as opus_val16;
+                *sample = 0 as f32;
             }
         }
         if st.prev_mode == MODE_HYBRID
@@ -1037,7 +1017,7 @@ fn opus_decode_frame(
         );
     }
     if transition != 0 {
-        let pcm_transition: &[opus_val16] = if mode == MODE_CELT_ONLY {
+        let pcm_transition: &[f32] = if mode == MODE_CELT_ONLY {
             &pcm_transition_celt
         } else {
             &pcm_transition_silk
@@ -1076,7 +1056,7 @@ fn opus_decode_frame(
         }
     }
     if st.decode_gain != 0 {
-        let gain: opus_val32 = celt_exp2(6.488_141e-4_f32 * st.decode_gain as f32);
+        let gain: f32 = celt_exp2(6.488_141e-4_f32 * st.decode_gain as f32);
         i = 0;
         while i < frame_size * st.channels {
             pcm[i as usize] *= gain;
@@ -1090,9 +1070,6 @@ fn opus_decode_frame(
     }
     st.prev_mode = mode;
     st.prev_redundancy = (redundancy != 0 && celt_to_silk == 0) as i32;
-    if celt_ret >= 0 {
-        let _ = _opus_false() != 0;
-    }
     if celt_ret < 0 {
         celt_ret
     } else {
@@ -1151,7 +1128,7 @@ fn stage_dred_features_for_decode(
 pub fn opus_decode_native(
     st: &mut OpusDecoder,
     data: &[u8],
-    pcm: &mut [opus_val16],
+    pcm: &mut [f32],
     frame_size: i32,
     decode_fec: i32,
     self_delimited: bool,
@@ -1201,7 +1178,6 @@ pub fn opus_decode_native(
             }
         }
         debug_assert_eq!(pcm_count, frame_size);
-        let _ = _opus_false() != 0;
         st.last_packet_duration = pcm_count;
         return pcm_count;
     }
@@ -1301,7 +1277,6 @@ pub fn opus_decode_native(
         if ret_0 < 0 {
             return ret_0;
         } else {
-            let _ = _opus_false() != 0;
             st.last_packet_duration = frame_size;
             return frame_size;
         }
@@ -1379,7 +1354,6 @@ pub fn opus_decode_native(
         i += 1;
     }
     st.last_packet_duration = nb_samples as i32;
-    let _ = _opus_false() != 0;
     if soft_clip != 0 {
         opus_pcm_soft_clip_impl(
             pcm,
@@ -1389,7 +1363,7 @@ pub fn opus_decode_native(
             st.celt_dec.arch,
         );
     } else {
-        st.softclip_mem[1_usize] = 0 as opus_val16;
+        st.softclip_mem[1_usize] = 0 as f32;
         st.softclip_mem[0_usize] = st.softclip_mem[1_usize];
     }
     nb_samples as i32
@@ -1433,7 +1407,7 @@ pub fn opus_decode(
 pub fn opus_decode_float(
     st: &mut OpusDecoder,
     data: &[u8],
-    pcm: &mut [opus_val16],
+    pcm: &mut [f32],
     frame_size: i32,
     decode_fec: i32,
 ) -> i32 {
