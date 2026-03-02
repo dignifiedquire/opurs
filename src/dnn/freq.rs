@@ -46,14 +46,14 @@ pub const NB_FEATURES: usize = 20;
 /// Band edges in 5ms-unit frequency bins.
 ///
 /// Upstream C: dnn/freq.c:eband5ms
-static EBAND5MS: [usize; NB_BANDS] = [
+const EBAND5MS: [usize; NB_BANDS] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40,
 ];
 
 /// Compensation factors per band.
 ///
 /// Upstream C: dnn/freq.c:compensation
-static COMPENSATION: [f32; NB_BANDS] = [
+const COMPENSATION: [f32; NB_BANDS] = [
     0.8, 1., 1., 1., 1., 1., 1., 1., 0.666667, 0.5, 0.5, 0.5, 0.333333, 0.25, 0.25, 0.2, 0.166667,
     0.173913,
 ];

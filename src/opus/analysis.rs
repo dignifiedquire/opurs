@@ -214,7 +214,7 @@ use crate::opus::mlp::analysis_mlp::run_analysis_mlp;
 const LOG2_E_UPSTREAM: f32 = 1.442695f32;
 use crate::opus::opus_encoder::is_digital_silence;
 
-static dct_table: [f32; 128] = [
+const dct_table: [f32; 128] = [
     0.250000f32,
     0.250000f32,
     0.250000f32,
@@ -344,7 +344,7 @@ static dct_table: [f32; 128] = [
     0.166664f32,
     -0.273300f32,
 ];
-static analysis_window: [f32; 240] = [
+const analysis_window: [f32; 240] = [
     0.000043f32,
     0.000171f32,
     0.000385f32,
@@ -586,7 +586,7 @@ static analysis_window: [f32; 240] = [
     0.999957f32,
     1.000000f32,
 ];
-static tbands: [i32; 19] = [
+const tbands: [i32; 19] = [
     4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160, 192, 240,
 ];
 pub const NB_TONAL_SKIP_BANDS: i32 = 9;
@@ -928,7 +928,7 @@ pub fn tonality_get_info(tonal: &mut TonalityAnalysisState, info_out: &mut Analy
     info_out.music_prob_min = prob_min;
     info_out.music_prob_max = prob_max;
 }
-static std_feature_bias: [f32; 9] = [
+const std_feature_bias: [f32; 9] = [
     5.684947f32,
     3.475288f32,
     1.770634f32,

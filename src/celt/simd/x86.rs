@@ -123,7 +123,7 @@ unsafe fn xcorr_kernel_avx2(x: &[f32], y: &[f32], sum: &mut [f32; 8], len: usize
     // Handle remaining 1-7 elements with masked loads.
     // This matches upstream `celt/x86/pitch_avx.c` exactly.
     if i < len {
-        static MASK_TABLE: [i32; 15] = [-1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0];
+        const MASK_TABLE: [i32; 15] = [-1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0];
         let remaining = len - i;
         let m = _mm256_loadu_si256(MASK_TABLE.as_ptr().add(7 - remaining) as *const __m256i);
         let x0 = _mm256_maskload_ps(x.as_ptr().add(i), m);

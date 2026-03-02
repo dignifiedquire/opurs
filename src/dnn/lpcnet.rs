@@ -776,7 +776,7 @@ pub fn lpcnet_plc_update(st: &mut LPCNetPLCState, pcm: &[i16]) {
 }
 
 /// Attenuation table for increasing loss count.
-static ATT_TABLE: [f32; 10] = [0.0, 0.0, -0.2, -0.2, -0.4, -0.4, -0.8, -0.8, -1.6, -1.6];
+const ATT_TABLE: [f32; 10] = [0.0, 0.0, -0.2, -0.2, -0.4, -0.4, -0.8, -0.8, -1.6, -1.6];
 
 /// Conceal a lost frame using neural PLC.
 ///

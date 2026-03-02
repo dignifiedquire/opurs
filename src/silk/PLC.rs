@@ -33,9 +33,9 @@ use crate::silk::SigProc_FIX::{
 };
 
 pub const NB_ATT: i32 = 2;
-static HARM_ATT_Q15: [i16; 2] = [32440, 31130];
-static PLC_RAND_ATTENUATE_V_Q15: [i16; 2] = [31130, 26214];
-static PLC_RAND_ATTENUATE_UV_Q15: [i16; 2] = [32440, 29491];
+const HARM_ATT_Q15: [i16; 2] = [32440, 31130];
+const PLC_RAND_ATTENUATE_V_Q15: [i16; 2] = [31130, 26214];
+const PLC_RAND_ATTENUATE_UV_Q15: [i16; 2] = [32440, 29491];
 
 pub fn silk_PLC_Reset(psDec: &mut silk_decoder_state) {
     psDec.sPLC.pitchL_Q8 = (psDec.frame_length as i32) << (8 - 1);

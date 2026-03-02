@@ -10,7 +10,7 @@ use crate::celt::mathops::celt_log2;
 use crate::celt::modes::OpusCustomMode;
 use crate::celt::rate::MAX_FINE_BITS;
 
-pub static eMeans: [f32; 25] = [
+pub const eMeans: [f32; 25] = [
     6.437_5_f32,
     6.25_f32,
     5.75_f32,
@@ -105,7 +105,7 @@ const E_PROB_MODEL: [[[u8; 42]; 2]; 4] = [
     ],
 ];
 
-static SMALL_ENERGY_ICDF: [u8; 3] = [2, 1, 0];
+const SMALL_ENERGY_ICDF: [u8; 3] = [2, 1, 0];
 
 /// Upstream C: celt/quant_bands.c:loss_distortion
 fn loss_distortion(

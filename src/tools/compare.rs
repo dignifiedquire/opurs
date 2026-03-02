@@ -101,7 +101,7 @@ const NBANDS: usize = 21;
 const NFREQS: usize = 240;
 
 /// Bands on which we compute the pseudo-NMR (Bark-derived CELT bands).
-static BANDS: [usize; NBANDS + 1] = [
+const BANDS: [usize; NBANDS + 1] = [
     0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 68, 80, 96, 120, 156, 200,
 ];
 

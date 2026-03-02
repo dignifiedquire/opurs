@@ -591,7 +591,7 @@ pub fn spreading_decision(
     }
 }
 
-static ordery_table: [i32; 30] = [
+const ordery_table: [i32; 30] = [
     1, 0, 3, 0, 2, 1, 7, 0, 4, 3, 6, 1, 5, 2, 15, 0, 8, 7, 12, 3, 11, 4, 14, 1, 9, 6, 13, 2, 10, 5,
 ];
 

@@ -518,13 +518,13 @@ pub fn clt_compute_allocation(
 
 #[cfg(feature = "qext")]
 #[allow(dead_code)]
-static LAST_ZERO: [u8; 3] = [64, 50, 0];
+const LAST_ZERO: [u8; 3] = [64, 50, 0];
 #[cfg(feature = "qext")]
 #[allow(dead_code)]
-static LAST_CAP: [u8; 3] = [110, 60, 0];
+const LAST_CAP: [u8; 3] = [110, 60, 0];
 #[cfg(feature = "qext")]
 #[allow(dead_code)]
-static LAST_OTHER: [u8; 4] = [120, 112, 70, 0];
+const LAST_OTHER: [u8; 4] = [120, 112, 70, 0];
 
 /// Context-adaptive entropy encoding of a depth value.
 ///

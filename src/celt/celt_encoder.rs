@@ -541,7 +541,7 @@ fn transient_analysis(
     // Forward masking: 6.7 dB/ms.
     let mut forward_decay: f32 = 0.0625f32;
     // Table of 6*64/x, trained on real data to minimize average error.
-    static inv_table: [u8; 128] = [
+    const inv_table: [u8; 128] = [
         255, 255, 156, 110, 86, 70, 59, 51, 45, 40, 37, 33, 31, 28, 26, 25, 23, 22, 21, 20, 19, 18,
         17, 16, 16, 15, 15, 14, 13, 13, 12, 12, 12, 12, 11, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9,
         8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5,
@@ -3307,11 +3307,11 @@ pub fn celt_encode_with_ec<'b>(
         i += 1;
     }
     if C == 2 {
-        static intensity_thresholds: [f32; 21] = [
+        const intensity_thresholds: [f32; 21] = [
             1_f32, 2_f32, 3_f32, 4_f32, 5_f32, 6_f32, 7_f32, 8_f32, 16_f32, 24_f32, 36_f32, 44_f32,
             50_f32, 56_f32, 62_f32, 67_f32, 72_f32, 79_f32, 88_f32, 106_f32, 134_f32,
         ];
-        static intensity_histeresis: [f32; 21] = [
+        const intensity_histeresis: [f32; 21] = [
             1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 2_f32, 2_f32, 2_f32, 2_f32, 2_f32,
             2_f32, 2_f32, 3_f32, 3_f32, 4_f32, 5_f32, 6_f32, 8_f32, 8_f32,
         ];

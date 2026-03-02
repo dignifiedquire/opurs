@@ -5,10 +5,10 @@
 use crate::arch::Arch;
 use crate::celt::modes::OpusCustomMode;
 
-pub static trim_icdf: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
-pub static spread_icdf: [u8; 4] = [25, 23, 2, 0];
-pub static tapset_icdf: [u8; 3] = [2, 1, 0];
-pub static tf_select_table: [[i8; 8]; 4] = [
+pub const trim_icdf: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
+pub const spread_icdf: [u8; 4] = [25, 23, 2, 0];
+pub const tapset_icdf: [u8; 3] = [2, 1, 0];
+pub const tf_select_table: [[i8; 8]; 4] = [
     [0, -1, 0, -1, 0, -1, 0, -1],
     [0, -1, 0, -2, 1, 0, 1, -1],
     [0, -2, 0, -3, 2, 0, 1, -1],
@@ -458,7 +458,7 @@ pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
 }
 
 pub fn opus_strerror(error: i32) -> &'static str {
-    static error_strings: [&str; 8] = [
+    const error_strings: [&str; 8] = [
         "success",
         "invalid argument",
         "buffer too small",

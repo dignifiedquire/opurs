@@ -144,16 +144,16 @@ pub struct StereoWidthState {
     pub max_follower: f32,
 }
 pub const PSEUDO_SNR_THRESHOLD: f32 = 316.23f32;
-static mono_voice_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-static mono_music_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
-static stereo_voice_bandwidth_thresholds: [i32; 8] =
+const mono_voice_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
+const mono_music_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
+const stereo_voice_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-static stereo_music_bandwidth_thresholds: [i32; 8] =
+const stereo_music_bandwidth_thresholds: [i32; 8] =
     [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
 const STEREO_VOICE_THRESHOLD: i32 = 19000;
 const STEREO_MUSIC_THRESHOLD: i32 = 17000;
 const MODE_THRESHOLDS: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
-static fec_thresholds: [i32; 10] = [
+const fec_thresholds: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
 
@@ -1328,7 +1328,7 @@ fn compute_silk_rate_for_hybrid(
     let mut i: i32;
 
     let mut silk_rate: i32;
-    static rate_table: [[i32; 5]; 7] = [
+    const rate_table: [[i32; 5]; 7] = [
         [0, 0, 0, 0, 0],
         [12000, 10000, 10000, 11000, 11000],
         [16000, 13500, 13500, 15000, 15000],
@@ -1694,7 +1694,7 @@ fn encode_multiframe_packet(
 
 /// Upstream C: src/opus_encoder.c:dred_bits_table
 #[cfg(feature = "dred")]
-static DRED_BITS_TABLE: [f32; 16] = [
+const DRED_BITS_TABLE: [f32; 16] = [
     73.2, 68.1, 62.5, 57.0, 51.5, 45.7, 39.9, 32.4, 26.4, 20.4, 16.3, 13.0, 9.3, 8.2, 7.2, 6.4,
 ];
 

@@ -3,7 +3,7 @@
 //! Upstream C: `dnn/dred_rdovae_stats_data.c`, `dnn/dred_rdovae_stats_data.h`
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_latent_quant_scales_q8`
-pub static DRED_LATENT_QUANT_SCALES_Q8: [u8; 400] = [
+pub const DRED_LATENT_QUANT_SCALES_Q8: [u8; 400] = [
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 219, 213, 200, 217, 216, 210, 215, 208, 208, 208, 208, 213, 213,
     207, 210, 218, 214, 210, 217, 212, 213, 211, 214, 199, 218, 191, 182, 156, 187, 185, 175, 183,
@@ -25,7 +25,7 @@ pub static DRED_LATENT_QUANT_SCALES_Q8: [u8; 400] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_latent_dead_zone_q8`
-pub static DRED_LATENT_DEAD_ZONE_Q8: [u8; 400] = [
+pub const DRED_LATENT_DEAD_ZONE_Q8: [u8; 400] = [
     37, 72, 2, 25, 24, 14, 25, 0, 10, 0, 0, 29, 7, 0, 11, 29, 29, 2, 22, 17, 4, 15, 23, 15, 30, 50,
     98, 2, 36, 33, 17, 32, 0, 16, 1, 1, 33, 15, 0, 14, 40, 36, 6, 32, 22, 19, 17, 30, 16, 40, 63,
     126, 2, 49, 42, 19, 40, 0, 23, 1, 3, 38, 23, 1, 17, 51, 46, 9, 43, 26, 37, 20, 38, 20, 53, 79,
@@ -48,7 +48,7 @@ pub static DRED_LATENT_DEAD_ZONE_Q8: [u8; 400] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_latent_r_q8`
-pub static DRED_LATENT_R_Q8: [u8; 400] = [
+pub const DRED_LATENT_R_Q8: [u8; 400] = [
     51, 5, 248, 50, 67, 110, 61, 193, 73, 228, 168, 87, 92, 197, 125, 51, 35, 131, 67, 95, 79, 118,
     55, 156, 43, 38, 3, 246, 36, 51, 93, 44, 183, 52, 222, 153, 70, 77, 187, 105, 37, 23, 114, 52,
     76, 65, 100, 39, 138, 31, 28, 2, 243, 25, 37, 76, 30, 171, 33, 216, 136, 54, 64, 175, 86, 25,
@@ -68,7 +68,7 @@ pub static DRED_LATENT_R_Q8: [u8; 400] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_latent_p0_q8`
-pub static DRED_LATENT_P0_Q8: [u8; 400] = [
+pub const DRED_LATENT_P0_Q8: [u8; 400] = [
     171, 251, 4, 158, 146, 115, 140, 63, 120, 14, 66, 141, 142, 51, 84, 158, 174, 100, 152, 117,
     172, 110, 138, 93, 169, 190, 253, 5, 178, 165, 130, 159, 73, 141, 17, 75, 157, 160, 59, 98,
     177, 194, 113, 170, 132, 191, 123, 158, 109, 189, 207, 254, 6, 198, 183, 145, 178, 83, 164, 21,
@@ -93,7 +93,7 @@ pub static DRED_LATENT_P0_Q8: [u8; 400] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_state_quant_scales_q8`
-pub static DRED_STATE_QUANT_SCALES_Q8: [u8; 800] = [
+pub const DRED_STATE_QUANT_SCALES_Q8: [u8; 800] = [
     255, 99, 255, 255, 108, 255, 255, 255, 255, 255, 255, 255, 209, 255, 136, 255, 255, 255, 44,
     255, 147, 169, 255, 255, 255, 241, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 72, 255, 255, 255, 255, 61, 255, 255, 255, 255, 208, 88, 210, 208, 96, 206, 206, 209,
@@ -135,7 +135,7 @@ pub static DRED_STATE_QUANT_SCALES_Q8: [u8; 800] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_state_dead_zone_q8`
-pub static DRED_STATE_DEAD_ZONE_Q8: [u8; 800] = [
+pub const DRED_STATE_DEAD_ZONE_Q8: [u8; 800] = [
     32, 255, 11, 18, 255, 21, 14, 0, 6, 0, 0, 5, 255, 3, 255, 10, 3, 33, 255, 26, 255, 255, 15, 4,
     6, 255, 8, 7, 20, 0, 18, 0, 9, 18, 32, 8, 8, 37, 72, 0, 255, 9, 0, 33, 5, 255, 0, 12, 15, 12,
     28, 255, 13, 17, 255, 17, 10, 2, 12, 0, 0, 8, 255, 6, 255, 12, 7, 34, 255, 21, 255, 255, 13, 7,
@@ -174,7 +174,7 @@ pub static DRED_STATE_DEAD_ZONE_Q8: [u8; 800] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_state_r_q8`
-pub static DRED_STATE_R_Q8: [u8; 800] = [
+pub const DRED_STATE_R_Q8: [u8; 800] = [
     207, 0, 141, 141, 2, 226, 226, 98, 103, 78, 79, 160, 1, 138, 0, 251, 114, 120, 4, 203, 0, 1,
     232, 134, 192, 1, 111, 175, 223, 104, 136, 102, 201, 119, 88, 247, 114, 144, 94, 130, 0, 181,
     103, 239, 246, 0, 73, 187, 232, 254, 197, 0, 124, 123, 1, 219, 220, 79, 83, 68, 61, 146, 0,
@@ -212,7 +212,7 @@ pub static DRED_STATE_R_Q8: [u8; 800] = [
 ];
 
 /// Upstream C: `dnn/dred_rdovae_stats_data.c:dred_state_p0_q8`
-pub static DRED_STATE_P0_Q8: [u8; 800] = [
+pub const DRED_STATE_P0_Q8: [u8; 800] = [
     27, 255, 68, 67, 253, 19, 29, 100, 94, 152, 115, 82, 255, 79, 255, 2, 98, 81, 251, 53, 255,
     255, 16, 99, 64, 255, 88, 47, 17, 106, 70, 122, 29, 81, 107, 5, 85, 64, 106, 74, 255, 58, 99,
     8, 5, 255, 120, 37, 13, 1, 32, 255, 81, 79, 255, 23, 35, 116, 110, 169, 131, 96, 255, 94, 255,

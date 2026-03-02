@@ -54,7 +54,7 @@ pub(crate) const RESAMPLER_MAX_BATCH_SIZE_IN: usize =
 
 #[rustfmt::skip]
 #[cfg(feature = "qext")]
-static delay_matrix_enc: [[i8; 3]; 6] = [
+const delay_matrix_enc: [[i8; 3]; 6] = [
     /* in  \ out  8  12  16 */
     /*  8 */   [  6,  0,  3 ],
     /* 12 */   [  0,  7,  3 ],
@@ -65,7 +65,7 @@ static delay_matrix_enc: [[i8; 3]; 6] = [
 ];
 #[rustfmt::skip]
 #[cfg(not(feature = "qext"))]
-static delay_matrix_enc: [[i8; 3]; 5] = [
+const delay_matrix_enc: [[i8; 3]; 5] = [
     /* in  \ out  8  12  16 */
     /*  8 */   [  6,  0,  3 ],
     /* 12 */   [  0,  7,  3 ],
@@ -75,7 +75,7 @@ static delay_matrix_enc: [[i8; 3]; 5] = [
 ];
 #[rustfmt::skip]
 #[cfg(feature = "qext")]
-static delay_matrix_dec: [[i8; 6]; 3] = [
+const delay_matrix_dec: [[i8; 6]; 3] = [
     /* in  \ out  8  12  16  24  48  96 */
     /*  8 */   [  4,  0,  2,  0,  0,  0 ],
     /* 12 */   [  0,  9,  4,  7,  4,  4 ],
@@ -83,7 +83,7 @@ static delay_matrix_dec: [[i8; 6]; 3] = [
 ];
 #[rustfmt::skip]
 #[cfg(not(feature = "qext"))]
-static delay_matrix_dec: [[i8; 5]; 3] = [
+const delay_matrix_dec: [[i8; 5]; 3] = [
     /* in  \ out  8  12  16  24  48 */
     /*  8 */   [  4,  0,  2,  0,  0 ],
     /* 12 */   [  0,  9,  4,  7,  4 ],

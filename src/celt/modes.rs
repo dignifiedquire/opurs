@@ -40,7 +40,7 @@ pub mod static_modes_float;
 #[cfg(not(feature = "qext"))]
 pub use self::static_modes_float::static_mode_list;
 #[cfg(feature = "qext")]
-pub static static_mode_list: [&OpusCustomMode; 2] = [
+pub const static_mode_list: [&OpusCustomMode; 2] = [
     &static_modes_float::mode48000_960_120,
     &data_96000::mode96000_1920_240,
 ];
@@ -52,10 +52,10 @@ use self::data_96000::{
     NB_QEXT_BANDS, QEXT_EBANDS_180, QEXT_EBANDS_240, QEXT_LOGN_180, QEXT_LOGN_240,
 };
 
-static eband5ms: [i16; 22] = [
+const eband5ms: [i16; 22] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100,
 ];
-static band_allocation: [u8; 231] = [
+const band_allocation: [u8; 231] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 80, 75, 69, 63, 56, 49, 40,
     34, 29, 20, 18, 10, 0, 0, 0, 0, 0, 0, 0, 0, 110, 100, 90, 84, 78, 71, 65, 58, 51, 45, 39, 32,
     26, 20, 12, 0, 0, 0, 0, 0, 0, 118, 110, 103, 93, 86, 80, 75, 70, 65, 59, 53, 47, 40, 31, 23,

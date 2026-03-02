@@ -256,17 +256,17 @@ pub const NOLACE_TDSHAPE3_AVG_POOL_K: usize = 4;
 
 // ========== Feature Tables (osce_features.c) ==========
 
-static CENTER_BINS_CLEAN: [usize; 64] = [
+const CENTER_BINS_CLEAN: [usize; 64] = [
     0, 2, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 30, 33, 35, 38, 40, 42, 45, 48, 50, 52, 55, 58, 60,
     62, 65, 68, 70, 73, 75, 78, 80, 82, 85, 88, 90, 92, 95, 98, 100, 102, 105, 108, 110, 112, 115,
     118, 120, 122, 125, 128, 130, 132, 135, 138, 140, 142, 145, 148, 150, 152, 155, 160,
 ];
 
-static CENTER_BINS_NOISY: [usize; 18] = [
+const CENTER_BINS_NOISY: [usize; 18] = [
     0, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160,
 ];
 
-static BAND_WEIGHTS_CLEAN: [f32; 64] = [
+const BAND_WEIGHTS_CLEAN: [f32; 64] = [
     0.666666666667,
     0.400000000000,
     0.333333333333,
@@ -333,7 +333,7 @@ static BAND_WEIGHTS_CLEAN: [f32; 64] = [
     0.333333333333,
 ];
 
-static BAND_WEIGHTS_NOISY: [f32; 18] = [
+const BAND_WEIGHTS_NOISY: [f32; 18] = [
     0.400000000000,
     0.250000000000,
     0.250000000000,
@@ -2765,12 +2765,12 @@ pub fn osce_enhance_frame(
 
 // BWE filterbank tables (from osce_features.c)
 
-static CENTER_BINS_BWE: [usize; 32] = [
+const CENTER_BINS_BWE: [usize; 32] = [
     0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110,
     115, 120, 125, 130, 135, 140, 145, 150, 160,
 ];
 
-static BAND_WEIGHTS_BWE: [f32; 32] = [
+const BAND_WEIGHTS_BWE: [f32; 32] = [
     0.333333333,
     0.200000000,
     0.200000000,
@@ -2807,10 +2807,10 @@ static BAND_WEIGHTS_BWE: [f32; 32] = [
 
 // Resampling filter coefficients (from osce.c)
 
-static HQ_2X_EVEN: [f32; 3] = [0.026641845703125, 0.228668212890625, -0.4036407470703125];
-static HQ_2X_ODD: [f32; 3] = [0.104583740234375, 0.3932037353515625, -0.152496337890625];
+const HQ_2X_EVEN: [f32; 3] = [0.026641845703125, 0.228668212890625, -0.4036407470703125];
+const HQ_2X_ODD: [f32; 3] = [0.104583740234375, 0.3932037353515625, -0.152496337890625];
 
-static FRAC_01_24: [f32; 8] = [
+const FRAC_01_24: [f32; 8] = [
     0.00576782,
     -0.01831055,
     0.01882935,
@@ -2820,7 +2820,7 @@ static FRAC_01_24: [f32; 8] = [
     0.01296997,
     -0.00140381,
 ];
-static FRAC_17_24: [f32; 8] = [
+const FRAC_17_24: [f32; 8] = [
     -3.14331055e-03,
     2.73437500e-02,
     -1.06414795e-01,
@@ -2830,7 +2830,7 @@ static FRAC_17_24: [f32; 8] = [
     1.61437988e-02,
     -1.22070312e-04,
 ];
-static FRAC_09_24: [f32; 8] = [
+const FRAC_09_24: [f32; 8] = [
     -0.00146484,
     0.02313232,
     -0.12072754,

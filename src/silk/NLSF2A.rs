@@ -61,8 +61,8 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
 
     /* This ordering was found to maximize quality. It improves the numerical accuracy of
     silk_NLSF2A_find_poly() compared to "standard" ordering. */
-    static ordering16: [u8; 16] = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
-    static ordering10: [u8; 10] = [0, 9, 6, 3, 4, 5, 8, 1, 2, 7];
+    const ordering16: [u8; 16] = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
+    const ordering10: [u8; 10] = [0, 9, 6, 3, 4, 5, 8, 1, 2, 7];
 
     debug_assert!(d == 10 || d == 16);
 

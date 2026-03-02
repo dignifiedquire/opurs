@@ -196,7 +196,7 @@ fn dred_convert_to_16k(
         output[..out_len].copy_from_slice(&downmix[..out_len]);
     } else if fs == 48000 || fs == 24000 {
         // ellip(7, .2, 70, 7750/24000)
-        static FILTER_B: [f32; 8] = [
+        const FILTER_B: [f32; 8] = [
             0.005873358047,
             0.012980854831,
             0.014531340042,
@@ -206,7 +206,7 @@ fn dred_convert_to_16k(
             0.004523418224,
             0.0,
         ];
-        static FILTER_A: [f32; 8] = [
+        const FILTER_A: [f32; 8] = [
             -3.878718597768,
             7.748834257468,
             -9.653651699533,
@@ -231,7 +231,7 @@ fn dred_convert_to_16k(
             output[i] = downmix[3 * i];
         }
     } else if fs == 12000 {
-        static FILTER_B: [f32; 8] = [
+        const FILTER_B: [f32; 8] = [
             -0.001017101081,
             0.003673127243,
             0.001009165267,
@@ -241,7 +241,7 @@ fn dred_convert_to_16k(
             0.002033596776,
             0.0,
         ];
-        static FILTER_A: [f32; 8] = [
+        const FILTER_A: [f32; 8] = [
             -4.930414411612,
             11.291643096504,
             -15.322037343815,
@@ -266,7 +266,7 @@ fn dred_convert_to_16k(
             output[i] = downmix[3 * i];
         }
     } else if fs == 8000 {
-        static FILTER_B: [f32; 8] = [
+        const FILTER_B: [f32; 8] = [
             0.081670120929,
             0.180401598565,
             0.259391051971,
@@ -276,7 +276,7 @@ fn dred_convert_to_16k(
             0.020109185709,
             0.0,
         ];
-        static FILTER_A: [f32; 8] = [
+        const FILTER_A: [f32; 8] = [
             -1.393651933659,
             2.609789872676,
             -2.403541968806,
@@ -298,7 +298,7 @@ fn dred_convert_to_16k(
             resample_mem,
         );
     } else if fs == 96000 {
-        static FILTER_B: [f32; 8] = [
+        const FILTER_B: [f32; 8] = [
             -0.002160290245,
             0.002887088080,
             -0.001214921271,
@@ -308,7 +308,7 @@ fn dred_convert_to_16k(
             0.000880286074,
             0.0,
         ];
-        static FILTER_A: [f32; 8] = [
+        const FILTER_A: [f32; 8] = [
             -5.813483928050,
             14.932091805554,
             -21.900933283269,

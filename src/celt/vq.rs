@@ -93,7 +93,7 @@ fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
 /// Upstream C: celt/vq.c:exp_rotation
 #[inline]
 pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, spread: i32) {
-    static SPREAD_FACTOR: [i32; 3] = [15, 10, 5];
+    const SPREAD_FACTOR: [i32; 3] = [15, 10, 5];
     let mut stride2: i32 = 0;
     if 2 * K >= len || spread == SPREAD_NONE {
         return;

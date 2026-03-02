@@ -9,7 +9,7 @@ use num_complex::Complex32;
 /// Bit-reversal table for the 320-point FFT.
 ///
 /// Upstream C: dnn/lpcnet_tables.c:fft_bitrev
-static FFT_BITREV: [i16; 320] = [
+const FFT_BITREV: [i16; 320] = [
     0, 64, 128, 192, 256, 16, 80, 144, 208, 272, 32, 96, 160, 224, 288, 48, 112, 176, 240, 304, 4,
     68, 132, 196, 260, 20, 84, 148, 212, 276, 36, 100, 164, 228, 292, 52, 116, 180, 244, 308, 8,
     72, 136, 200, 264, 24, 88, 152, 216, 280, 40, 104, 168, 232, 296, 56, 120, 184, 248, 312, 12,
@@ -33,7 +33,7 @@ static FFT_BITREV: [i16; 320] = [
 /// Only the first 320 entries are used.
 ///
 /// Upstream C: dnn/lpcnet_tables.c:fft_twiddles
-static FFT_TWIDDLES: [kiss_twiddle_cpx; 480] = {
+const FFT_TWIDDLES: [kiss_twiddle_cpx; 480] = {
     let mut t = [Complex32 { re: 0.0, im: 0.0 }; 480];
     let src: [(f32, f32); 320] = [
         (1.00000000, -0.00000000),
@@ -398,7 +398,7 @@ pub fn kfft() -> kiss_fft_state<'static> {
 /// Length: OVERLAP_SIZE (160 samples).
 ///
 /// Upstream C: dnn/lpcnet_tables.c:half_window
-pub static HALF_WINDOW: [f32; 160] = [
+pub const HALF_WINDOW: [f32; 160] = [
     3.78491532e-05,
     0.000340620492,
     0.000946046319,
@@ -565,7 +565,7 @@ pub static HALF_WINDOW: [f32; 160] = [
 /// Stored row-major: `dct_table[j * NB_BANDS + i]` = basis function.
 ///
 /// Upstream C: dnn/lpcnet_tables.c:dct_table
-pub static DCT_TABLE: [f32; 18 * 18] = [
+pub const DCT_TABLE: [f32; 18 * 18] = [
     0.707106769,
     0.996194720,
     0.984807730,

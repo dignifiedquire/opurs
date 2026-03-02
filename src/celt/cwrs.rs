@@ -124,7 +124,7 @@ This allows us to derive O(N) encoding and O(N*log(K)) decoding routines for
   year=1986
 }*/
 
-static PVQ_U_DATA2: [&[u32]; 15] = [
+const PVQ_U_DATA2: [&[u32]; 15] = [
     /*N=0, K=0...176:*/
     &[
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

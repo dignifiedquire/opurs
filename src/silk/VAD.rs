@@ -53,7 +53,7 @@ pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
     }
     ret
 }
-static TILT_WEIGHTS: [i32; 4] = [30000, 6000, -(12000), -(12000)];
+const TILT_WEIGHTS: [i32; 4] = [30000, 6000, -(12000), -(12000)];
 /// Upstream C: silk/VAD.c:silk_VAD_GetSA_Q8_c
 pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
     let mut SA_Q15: i32 = 0;

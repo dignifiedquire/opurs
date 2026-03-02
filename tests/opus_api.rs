@@ -7,7 +7,7 @@ use opurs::{
     OpusRepacketizer, Signal, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
 };
 
-static OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
+const OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
 
 #[test]
 fn test_opus_decoder_create_init() {
