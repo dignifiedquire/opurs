@@ -3,7 +3,7 @@
 //!
 //! Run with: cargo test --release --features tools --test simd_comparison
 
-#![cfg(all(feature = "tools", target_arch = "x86_64"))]
+#![cfg(all(feature = "tools", feature = "simd", target_arch = "x86_64"))]
 #![allow(non_snake_case)]
 
 extern crate opurs;
@@ -11,6 +11,10 @@ extern crate opurs;
 use libopus_sys::{
     celt_inner_prod_sse, celt_pitch_xcorr_avx2, comb_filter_const_sse, dual_inner_prod_sse,
     op_pvq_search_sse2, opus_select_arch, xcorr_kernel_sse,
+};
+use opurs::internals::{
+    celt_inner_prod, celt_pitch_xcorr, comb_filter_const, dual_inner_prod, op_pvq_search,
+    xcorr_kernel, Arch,
 };
 
 /// Simple deterministic pseudo-random number generator
@@ -64,7 +68,7 @@ fn compare_celt_inner_prod_sse() {
             let x: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
             let y: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
 
-            let rust_result = unsafe { opurs::celt::simd::x86::celt_inner_prod_sse(&x, &y, n) };
+            let rust_result = celt_inner_prod(&x, &y, n, Arch::Sse);
             let c_result = unsafe { celt_inner_prod_sse(x.as_ptr(), y.as_ptr(), n as i32) };
 
             if rust_result.to_bits() != c_result.to_bits() {
@@ -97,8 +101,7 @@ fn compare_dual_inner_prod_sse() {
             let y01: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
             let y02: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
 
-            let (rust_xy1, rust_xy2) =
-                unsafe { opurs::celt::simd::x86::dual_inner_prod_sse(&x, &y01, &y02, n) };
+            let (rust_xy1, rust_xy2) = dual_inner_prod(&x, &y01, &y02, n, Arch::Sse);
             let (mut c_xy1, mut c_xy2) = (0.0f32, 0.0f32);
             unsafe {
                 dual_inner_prod_sse(
@@ -146,9 +149,7 @@ fn compare_xcorr_kernel_sse() {
             ];
 
             let mut rust_sum = init_sum;
-            unsafe {
-                opurs::celt::simd::x86::xcorr_kernel_sse(&x, &y, &mut rust_sum, len);
-            }
+            xcorr_kernel(&x, &y, &mut rust_sum, len, Arch::Sse);
             let mut c_sum = init_sum;
             unsafe {
                 xcorr_kernel_sse(x.as_ptr(), y.as_ptr(), c_sum.as_mut_ptr(), len as i32);
@@ -190,19 +191,18 @@ fn compare_comb_filter_const_sse() {
 
             // Rust version
             let mut rust_y = vec![0.0f32; total];
-            unsafe {
-                opurs::celt::simd::x86::comb_filter_const_sse(
-                    &mut rust_y,
-                    x_start,
-                    &x,
-                    x_start,
-                    T as i32,
-                    N as i32,
-                    g10,
-                    g11,
-                    g12,
-                );
-            }
+            comb_filter_const(
+                &mut rust_y,
+                x_start,
+                &x,
+                x_start,
+                T as i32,
+                N as i32,
+                g10,
+                g11,
+                g12,
+                Arch::Sse,
+            );
 
             // C version: x pointer is at x_start, uses negative indexing for x[-T-2..]
             let mut c_y = vec![0.0f32; total];
@@ -256,14 +256,7 @@ fn compare_op_pvq_search_sse2() {
                 let mut rust_iy = vec![0i32; N];
                 let mut c_iy = vec![0i32; N];
 
-                let rust_yy = unsafe {
-                    opurs::celt::simd::x86::op_pvq_search_sse2(
-                        &mut rust_X,
-                        &mut rust_iy,
-                        K,
-                        N as i32,
-                    )
-                };
+                let rust_yy = op_pvq_search(&mut rust_X, &mut rust_iy, K, N as i32, Arch::Sse2);
                 let c_yy = unsafe {
                     op_pvq_search_sse2(c_X.as_mut_ptr(), c_iy.as_mut_ptr(), K, N as i32, 4)
                 };
@@ -300,9 +293,7 @@ fn compare_celt_pitch_xcorr_avx2() {
             let y: Vec<f32> = (0..len + max_pitch).map(|_| rng.next_f32()).collect();
 
             let mut rust_xcorr = vec![0.0f32; max_pitch];
-            unsafe {
-                opurs::celt::simd::x86::celt_pitch_xcorr_avx2(&x, &y, &mut rust_xcorr, len);
-            }
+            celt_pitch_xcorr(&x, &y, &mut rust_xcorr, len, Arch::Avx2);
 
             let mut c_xcorr = vec![0.0f32; max_pitch];
             unsafe {

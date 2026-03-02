@@ -470,7 +470,7 @@ impl OpusEncoder {
 
     /// Return whether LFE encoding mode is enabled.
     ///
-    /// Upstream C: src/opus_encoder.c:OPUS_GET_LFE_REQUEST
+    /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn lfe(&self) -> bool {
         self.lfe != 0
     }

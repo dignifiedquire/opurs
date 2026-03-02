@@ -4,11 +4,8 @@
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 
-use opurs::celt::simd::x86::op_pvq_search_sse2 as rust_op_pvq_search_sse2;
-
-unsafe extern "C" {
-    fn op_pvq_search_sse2(X: *mut f32, iy: *mut i32, K: i32, N: i32, arch: i32) -> f32;
-}
+use libopus_sys::op_pvq_search_sse2;
+use opurs::internals::{op_pvq_search, Arch};
 
 struct Rng(u64);
 impl Rng {
@@ -45,7 +42,7 @@ fn pvq_sse2_matches_c() {
 
             let yy_c =
                 unsafe { op_pvq_search_sse2(x_c.as_mut_ptr(), iy_c.as_mut_ptr(), k, n as i32, 2) };
-            let yy_r = unsafe { rust_op_pvq_search_sse2(&mut x_r, &mut iy_r, k, n as i32) };
+            let yy_r = op_pvq_search(&mut x_r, &mut iy_r, k, n as i32, Arch::Sse2);
 
             if yy_c.to_bits() != yy_r.to_bits() || iy_c[..n] != iy_r[..n] {
                 panic!(

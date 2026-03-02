@@ -198,6 +198,7 @@ pub union __mbstate_t {
     pub _mbstateL: ::std::os::raw::c_longlong,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __mbstate_t"][::std::mem::size_of::<__mbstate_t>() - 128usize];
     ["Alignment of __mbstate_t"][::std::mem::align_of::<__mbstate_t>() - 8usize];
@@ -245,6 +246,7 @@ pub struct __darwin_pthread_handler_rec {
     pub __next: *mut __darwin_pthread_handler_rec,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of __darwin_pthread_handler_rec"]
         [::std::mem::size_of::<__darwin_pthread_handler_rec>() - 24usize];
@@ -264,6 +266,7 @@ pub struct _opaque_pthread_attr_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_attr_t"][::std::mem::size_of::<_opaque_pthread_attr_t>() - 64usize];
     ["Alignment of _opaque_pthread_attr_t"]
@@ -280,6 +283,7 @@ pub struct _opaque_pthread_cond_t {
     pub __opaque: [::std::os::raw::c_char; 40usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_cond_t"][::std::mem::size_of::<_opaque_pthread_cond_t>() - 48usize];
     ["Alignment of _opaque_pthread_cond_t"]
@@ -296,6 +300,7 @@ pub struct _opaque_pthread_condattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_condattr_t"]
         [::std::mem::size_of::<_opaque_pthread_condattr_t>() - 16usize];
@@ -313,6 +318,7 @@ pub struct _opaque_pthread_mutex_t {
     pub __opaque: [::std::os::raw::c_char; 56usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutex_t"][::std::mem::size_of::<_opaque_pthread_mutex_t>() - 64usize];
     ["Alignment of _opaque_pthread_mutex_t"]
@@ -329,6 +335,7 @@ pub struct _opaque_pthread_mutexattr_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_mutexattr_t"]
         [::std::mem::size_of::<_opaque_pthread_mutexattr_t>() - 16usize];
@@ -346,6 +353,7 @@ pub struct _opaque_pthread_once_t {
     pub __opaque: [::std::os::raw::c_char; 8usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_once_t"][::std::mem::size_of::<_opaque_pthread_once_t>() - 16usize];
     ["Alignment of _opaque_pthread_once_t"]
@@ -362,6 +370,7 @@ pub struct _opaque_pthread_rwlock_t {
     pub __opaque: [::std::os::raw::c_char; 192usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlock_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlock_t>() - 200usize];
@@ -379,6 +388,7 @@ pub struct _opaque_pthread_rwlockattr_t {
     pub __opaque: [::std::os::raw::c_char; 16usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_rwlockattr_t"]
         [::std::mem::size_of::<_opaque_pthread_rwlockattr_t>() - 24usize];
@@ -397,6 +407,7 @@ pub struct _opaque_pthread_t {
     pub __opaque: [::std::os::raw::c_char; 8176usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[cfg(target_vendor = "apple")]
 const _: () = {
     ["Size of _opaque_pthread_t"][::std::mem::size_of::<_opaque_pthread_t>() - 8192usize];
     ["Alignment of _opaque_pthread_t"][::std::mem::align_of::<_opaque_pthread_t>() - 8usize];
@@ -1274,6 +1285,49 @@ unsafe extern "C" {
 #[cfg(feature = "simd")]
 unsafe extern "C" {
     pub fn opus_select_arch() -> ::std::os::raw::c_int;
+}
+
+#[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
+unsafe extern "C" {
+    pub fn celt_inner_prod_sse(x: *const f32, y: *const f32, N: ::std::os::raw::c_int) -> f32;
+    pub fn dual_inner_prod_sse(
+        x: *const f32,
+        y01: *const f32,
+        y02: *const f32,
+        N: ::std::os::raw::c_int,
+        xy1: *mut f32,
+        xy2: *mut f32,
+    );
+    pub fn xcorr_kernel_sse(
+        x: *const f32,
+        y: *const f32,
+        sum: *mut f32,
+        len: ::std::os::raw::c_int,
+    );
+    pub fn comb_filter_const_sse(
+        y: *mut f32,
+        x: *mut f32,
+        T: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        g10: f32,
+        g11: f32,
+        g12: f32,
+    );
+    pub fn op_pvq_search_sse2(
+        X: *mut f32,
+        iy: *mut ::std::os::raw::c_int,
+        K: ::std::os::raw::c_int,
+        N: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    ) -> f32;
+    pub fn celt_pitch_xcorr_avx2(
+        _x: *const f32,
+        _y: *const f32,
+        xcorr: *mut f32,
+        len: ::std::os::raw::c_int,
+        max_pitch: ::std::os::raw::c_int,
+        arch: ::std::os::raw::c_int,
+    );
 }
 
 #[cfg(feature = "simd")]
