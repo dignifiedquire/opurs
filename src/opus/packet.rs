@@ -108,9 +108,8 @@ pub(crate) fn opus_pcm_soft_clip_impl(
             if special != 0 && peak_pos >= 2 {
                 // Add a linear ramp from the first sample to the signal peak.
                 // This avoids a discontinuity at the beginning of the frame.
-                let mut delta = 0.;
                 let mut offset = x0 - x[0];
-                delta = offset / peak_pos as f32;
+                let delta = offset / peak_pos as f32;
 
                 for i in curr..peak_pos {
                     offset -= delta;
@@ -252,7 +251,7 @@ pub fn opus_packet_parse_impl(
     }
 
     // the number of encoded frames
-    let mut count: i32 = 0;
+    let count: i32;
     let mut is_cbr = false;
     // the number of padding bytes
     let mut pad: i32 = 0;

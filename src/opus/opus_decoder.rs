@@ -1161,15 +1161,10 @@ pub fn opus_decode_native(
     #[cfg(not(feature = "dred"))] _dred: Option<&()>,
     dred_offset: i32,
 ) -> i32 {
-    let mut i: i32 = 0;
+    let mut i: i32;
     let mut nb_samples: usize = 0;
-    let mut count: i32 = 0;
     let mut offset: i32 = 0;
     let mut toc: u8 = 0;
-    let mut packet_frame_size: i32 = 0;
-    let mut packet_bandwidth: i32 = 0;
-    let mut packet_mode: i32 = 0;
-    let mut packet_stream_channels: i32 = 0;
     let mut size: [i16; 48] = [0; 48];
     validate_opus_decoder(&*st);
     if !(0..=1).contains(&decode_fec) {
@@ -1211,13 +1206,13 @@ pub fn opus_decode_native(
         return pcm_count;
     }
 
-    packet_mode = opus_packet_get_mode(data);
-    packet_bandwidth = opus_packet_get_bandwidth(data[0]);
-    packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.Fs);
-    packet_stream_channels = opus_packet_get_nb_channels(data[0]);
+    let packet_mode = opus_packet_get_mode(data);
+    let packet_bandwidth = opus_packet_get_bandwidth(data[0]);
+    let packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.Fs);
+    let packet_stream_channels = opus_packet_get_nb_channels(data[0]);
     let mut padding_len: i32 = 0;
     let mut parsed_packet_offset: i32 = 0;
-    count = opus_packet_parse_impl(
+    let count = opus_packet_parse_impl(
         data,
         self_delimited,
         Some(&mut toc),
@@ -1252,8 +1247,8 @@ pub fn opus_decode_native(
     };
     let mut data = &data[offset as usize..];
     if decode_fec != 0 {
-        let mut duration_copy: i32 = 0;
-        let mut ret_0: i32 = 0;
+        let duration_copy: i32 = st.last_packet_duration;
+        let mut ret_0: i32;
         if frame_size < packet_frame_size
             || packet_mode == MODE_CELT_ONLY
             || st.mode == MODE_CELT_ONLY
@@ -1271,7 +1266,6 @@ pub fn opus_decode_native(
                 0,
             );
         }
-        duration_copy = st.last_packet_duration;
         if frame_size - packet_frame_size != 0 {
             ret_0 = opus_decode_native(
                 st,
@@ -1319,7 +1313,6 @@ pub fn opus_decode_native(
     st.bandwidth = packet_bandwidth;
     st.frame_size = packet_frame_size;
     st.stream_channels = packet_stream_channels;
-    nb_samples = 0;
     #[cfg(feature = "qext")]
     let mut iter = if !padding_data.is_empty() && !st.ignore_extensions {
         Some(crate::opus::extensions::OpusExtensionIterator::new(
@@ -1847,12 +1840,11 @@ pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
 ///
 /// Upstream C: src/opus_decoder.c:opus_packet_get_nb_samples
 pub fn opus_packet_get_nb_samples(packet: &[u8], Fs: i32) -> i32 {
-    let mut samples: i32 = 0;
     let count: i32 = opus_packet_get_nb_frames(packet);
     if count < 0 {
         return count;
     }
-    samples = count * opus_packet_get_samples_per_frame(packet[0], Fs);
+    let samples = count * opus_packet_get_samples_per_frame(packet[0], Fs);
     if samples * 25 > Fs * 3 {
         OPUS_INVALID_PACKET
     } else {

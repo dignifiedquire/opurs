@@ -377,7 +377,6 @@ impl OpusRepacketizer {
             } else {
                 tot_size = 0;
             }
-            vbr = 0;
             for i in 1..count {
                 if len[i as usize] != len[0] {
                     vbr = 1;
