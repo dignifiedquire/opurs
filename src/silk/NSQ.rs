@@ -20,32 +20,71 @@ pub mod NSQ_h {
         order: i32,
     ) -> i32 {
         // buf32 is indexed backwards from the end: buf32[len-1] = pos, buf32[len-2] = pos-1, etc.
-        // Pre-slice to the last 10 elements to hoist bounds checks.
-        let b = buf32.len();
-        let buf = &buf32[b - 10..];
-        let coef = &coef16[..10];
-        let mut out: i32 = order >> 1;
-        out = (out as i64 + ((buf[9] as i64 * coef[0] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[8] as i64 * coef[1] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[7] as i64 * coef[2] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[6] as i64 * coef[3] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[5] as i64 * coef[4] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[4] as i64 * coef[5] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[3] as i64 * coef[6] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[2] as i64 * coef[7] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[1] as i64 * coef[8] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[0] as i64 * coef[9] as i64) >> 16)) as i32;
-        if order == 16 {
-            let buf16 = &buf32[b - 16..];
-            let coef16 = &coef16[10..16];
-            out = (out as i64 + ((buf16[5] as i64 * coef16[0] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[4] as i64 * coef16[1] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[3] as i64 * coef16[2] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[2] as i64 * coef16[3] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[1] as i64 * coef16[4] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[0] as i64 * coef16[5] as i64) >> 16)) as i32;
+        // SAFETY: buf32 has at least `order` elements (10 or 16) and coef16 has at least `order`
+        // elements. All indices below are constant and within those bounds.
+        unsafe {
+            let b = buf32.len();
+            debug_assert!(b >= 10);
+            debug_assert!(coef16.len() >= 10);
+            let buf = &buf32[b - 10..];
+            let coef = &coef16[..10];
+            let mut out: i32 = order >> 1;
+            out = (out as i64
+                + ((*buf.get_unchecked(9) as i64 * *coef.get_unchecked(0) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(8) as i64 * *coef.get_unchecked(1) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(7) as i64 * *coef.get_unchecked(2) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(6) as i64 * *coef.get_unchecked(3) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(5) as i64 * *coef.get_unchecked(4) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(4) as i64 * *coef.get_unchecked(5) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(3) as i64 * *coef.get_unchecked(6) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(2) as i64 * *coef.get_unchecked(7) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(1) as i64 * *coef.get_unchecked(8) as i64) >> 16))
+                as i32;
+            out = (out as i64
+                + ((*buf.get_unchecked(0) as i64 * *coef.get_unchecked(9) as i64) >> 16))
+                as i32;
+            if order == 16 {
+                debug_assert!(b >= 16);
+                debug_assert!(coef16.len() >= 16);
+                let buf16 = &buf32[b - 16..];
+                let coef16 = &coef16[10..16];
+                out = (out as i64
+                    + ((*buf16.get_unchecked(5) as i64 * *coef16.get_unchecked(0) as i64) >> 16))
+                    as i32;
+                out = (out as i64
+                    + ((*buf16.get_unchecked(4) as i64 * *coef16.get_unchecked(1) as i64) >> 16))
+                    as i32;
+                out = (out as i64
+                    + ((*buf16.get_unchecked(3) as i64 * *coef16.get_unchecked(2) as i64) >> 16))
+                    as i32;
+                out = (out as i64
+                    + ((*buf16.get_unchecked(2) as i64 * *coef16.get_unchecked(3) as i64) >> 16))
+                    as i32;
+                out = (out as i64
+                    + ((*buf16.get_unchecked(1) as i64 * *coef16.get_unchecked(4) as i64) >> 16))
+                    as i32;
+                out = (out as i64
+                    + ((*buf16.get_unchecked(0) as i64 * *coef16.get_unchecked(5) as i64) >> 16))
+                    as i32;
+            }
+            out
         }
-        out
     }
 
     ///
@@ -60,26 +99,39 @@ pub mod NSQ_h {
         coef: &[i16],
         order: i32,
     ) -> i32 {
+        // SAFETY: data1 and coef both have at least `order` elements (order is even, >= 2).
+        // All indices j, j-1, n-1 are within [0, n) throughout the loop.
         let n = order as usize;
+        debug_assert!(n >= 2 && n & 1 == 0);
+        debug_assert!(data1.len() >= n);
+        debug_assert!(coef.len() >= n);
         let data1 = &mut data1[..n];
         let coef = &coef[..n];
         let mut tmp2 = data0;
-        let mut tmp1 = data1[0];
-        data1[0] = tmp2;
+        let mut tmp1 = unsafe { *data1.get_unchecked(0) };
+        unsafe {
+            *data1.get_unchecked_mut(0) = tmp2;
+        }
         let mut out: i32 = order >> 1;
-        out = (out as i64 + ((tmp2 as i64 * coef[0] as i64) >> 16)) as i32;
+        out =
+            (out as i64 + ((tmp2 as i64 * unsafe { *coef.get_unchecked(0) } as i64) >> 16)) as i32;
         let mut j = 2usize;
         while j < n {
-            tmp2 = data1[j - 1];
-            data1[j - 1] = tmp1;
-            out = (out as i64 + ((tmp1 as i64 * coef[j - 1] as i64) >> 16)) as i32;
-            tmp1 = data1[j];
-            data1[j] = tmp2;
-            out = (out as i64 + ((tmp2 as i64 * coef[j] as i64) >> 16)) as i32;
+            unsafe {
+                tmp2 = *data1.get_unchecked(j - 1);
+                *data1.get_unchecked_mut(j - 1) = tmp1;
+                out =
+                    (out as i64 + ((tmp1 as i64 * *coef.get_unchecked(j - 1) as i64) >> 16)) as i32;
+                tmp1 = *data1.get_unchecked(j);
+                *data1.get_unchecked_mut(j) = tmp2;
+                out = (out as i64 + ((tmp2 as i64 * *coef.get_unchecked(j) as i64) >> 16)) as i32;
+            }
             j += 2;
         }
-        data1[n - 1] = tmp1;
-        out = (out as i64 + ((tmp1 as i64 * coef[n - 1] as i64) >> 16)) as i32;
+        unsafe {
+            *data1.get_unchecked_mut(n - 1) = tmp1;
+            out = (out as i64 + ((tmp1 as i64 * *coef.get_unchecked(n - 1) as i64) >> 16)) as i32;
+        }
         out = ((out as u32) << 1) as i32;
         out
     }
@@ -500,23 +552,34 @@ fn silk_noise_shape_quantizer(
         );
 
         // LTP prediction
+        // SAFETY: pred_lag_idx >= 4 (starts at sLTP_buf_idx - lag + LTP_ORDER/2, lag >= 1,
+        // LTP_ORDER/2 == 2, so pred_lag_idx >= sLTP_buf_idx - lag + 2 >= 4 given buffer layout).
+        // pred_lag_idx < sLTP_Q15.len() because we advance at most `length` times from a valid start.
+        // b_Q14 has exactly LTP_ORDER (5) elements.
         if signalType == TYPE_VOICED {
             LTP_pred_Q13 = 2;
-            LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + ((sLTP_Q15[pred_lag_idx] as i64 * b_Q14[0] as i64) >> 16))
-                as i32;
-            LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + ((sLTP_Q15[pred_lag_idx - 1] as i64 * b_Q14[1] as i64) >> 16))
-                as i32;
-            LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + ((sLTP_Q15[pred_lag_idx - 2] as i64 * b_Q14[2] as i64) >> 16))
-                as i32;
-            LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + ((sLTP_Q15[pred_lag_idx - 3] as i64 * b_Q14[3] as i64) >> 16))
-                as i32;
-            LTP_pred_Q13 = (LTP_pred_Q13 as i64
-                + ((sLTP_Q15[pred_lag_idx - 4] as i64 * b_Q14[4] as i64) >> 16))
-                as i32;
+            unsafe {
+                LTP_pred_Q13 = (LTP_pred_Q13 as i64
+                    + ((*sLTP_Q15.get_unchecked(pred_lag_idx) as i64
+                        * *b_Q14.get_unchecked(0) as i64)
+                        >> 16)) as i32;
+                LTP_pred_Q13 = (LTP_pred_Q13 as i64
+                    + ((*sLTP_Q15.get_unchecked(pred_lag_idx - 1) as i64
+                        * *b_Q14.get_unchecked(1) as i64)
+                        >> 16)) as i32;
+                LTP_pred_Q13 = (LTP_pred_Q13 as i64
+                    + ((*sLTP_Q15.get_unchecked(pred_lag_idx - 2) as i64
+                        * *b_Q14.get_unchecked(2) as i64)
+                        >> 16)) as i32;
+                LTP_pred_Q13 = (LTP_pred_Q13 as i64
+                    + ((*sLTP_Q15.get_unchecked(pred_lag_idx - 3) as i64
+                        * *b_Q14.get_unchecked(3) as i64)
+                        >> 16)) as i32;
+                LTP_pred_Q13 = (LTP_pred_Q13 as i64
+                    + ((*sLTP_Q15.get_unchecked(pred_lag_idx - 4) as i64
+                        * *b_Q14.get_unchecked(4) as i64)
+                        >> 16)) as i32;
+            }
             pred_lag_idx += 1;
         } else {
             LTP_pred_Q13 = 0;
@@ -535,7 +598,11 @@ fn silk_noise_shape_quantizer(
         n_AR_Q12 =
             (n_AR_Q12 as i64 + ((NSQ.sLF_AR_shp_Q14 as i64 * Tilt_Q14 as i16 as i64) >> 16)) as i32;
 
-        n_LF_Q12 = ((NSQ.sLTP_shp_Q14[(NSQ.sLTP_shp_buf_idx - 1) as usize] as i64
+        // SAFETY: sLTP_shp_buf_idx >= 1 (initialized to ltp_mem_len >= LTP_ORDER).
+        n_LF_Q12 = ((unsafe {
+            *NSQ.sLTP_shp_Q14
+                .get_unchecked((NSQ.sLTP_shp_buf_idx - 1) as usize)
+        } as i64
             * LF_shp_Q14 as i16 as i64)
             >> 16) as i32;
         n_LF_Q12 = (n_LF_Q12 as i64
@@ -546,16 +613,22 @@ fn silk_noise_shape_quantizer(
 
         tmp1 = (((LPC_pred_Q10 as u32) << 2) as i32).wrapping_sub(n_AR_Q12);
         tmp1 = tmp1.wrapping_sub(n_LF_Q12);
+        // SAFETY: shp_lag_idx >= 2 and shp_lag_idx < NSQ.sLTP_shp_Q14.len() — same buffer
+        // layout reasoning as pred_lag_idx above.
         if lag > 0 {
-            n_LTP_Q13 = (((NSQ.sLTP_shp_Q14[shp_lag_idx]
-                .saturating_add(NSQ.sLTP_shp_Q14[shp_lag_idx - 2]))
-                as i64
-                * HarmShapeFIRPacked_Q14 as i16 as i64)
-                >> 16) as i32;
+            n_LTP_Q13 = unsafe {
+                ((((*NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx))
+                    .saturating_add(*NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx - 2)))
+                    as i64
+                    * HarmShapeFIRPacked_Q14 as i16 as i64)
+                    >> 16) as i32
+            };
             n_LTP_Q13 = (n_LTP_Q13 as i64
-                + ((NSQ.sLTP_shp_Q14[shp_lag_idx - 1] as i64
-                    * (HarmShapeFIRPacked_Q14 as i64 >> 16))
-                    >> 16)) as i32;
+                + unsafe {
+                    (*NSQ.sLTP_shp_Q14.get_unchecked(shp_lag_idx - 1) as i64
+                        * (HarmShapeFIRPacked_Q14 as i64 >> 16))
+                        >> 16
+                }) as i32;
             n_LTP_Q13 = ((n_LTP_Q13 as u32) << 1) as i32;
             shp_lag_idx += 1;
             tmp2 = LTP_pred_Q13 - n_LTP_Q13;
@@ -573,7 +646,8 @@ fn silk_noise_shape_quantizer(
             };
         }
 
-        r_Q10 = x_sc_Q10[i] - tmp1;
+        // SAFETY: i < length, x_sc_Q10 pre-sliced to length.
+        r_Q10 = unsafe { *x_sc_Q10.get_unchecked(i) } - tmp1;
         if NSQ.rand_seed < 0 {
             r_Q10 = -r_Q10;
         }
@@ -641,11 +715,14 @@ fn silk_noise_shape_quantizer(
             q1_Q10 = q2_Q10;
         }
 
-        pulses[i] = (if 10 == 1 {
-            (q1_Q10 >> 1) + (q1_Q10 & 1)
-        } else {
-            ((q1_Q10 >> (10 - 1)) + 1) >> 1
-        }) as i8;
+        // SAFETY: i < length, pulses pre-sliced to length.
+        unsafe {
+            *pulses.get_unchecked_mut(i) = (if 10 == 1 {
+                (q1_Q10 >> 1) + (q1_Q10 & 1)
+            } else {
+                ((q1_Q10 >> (10 - 1)) + 1) >> 1
+            }) as i8;
+        }
 
         // Excitation
         exc_Q14 = ((q1_Q10 as u32) << 4) as i32;
@@ -655,46 +732,62 @@ fn silk_noise_shape_quantizer(
         LPC_exc_Q14 = exc_Q14 + ((LTP_pred_Q13 as u32) << 1) as i32;
         xq_Q14 = LPC_exc_Q14.wrapping_add(((LPC_pred_Q10 as u32) << 4) as i32);
 
-        NSQ.xq[xq_off + i] = (if (if 8 == 1 {
-            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
-                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
-        } else {
-            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
-        }) > silk_int16_MAX
-        {
-            silk_int16_MAX
-        } else if (if 8 == 1 {
-            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
-                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
-        } else {
-            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
-        }) < silk_int16_MIN
-        {
-            silk_int16_MIN
-        } else if 8 == 1 {
-            (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
-                + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
-        } else {
-            ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
-        }) as i16;
+        // SAFETY: xq_off + i < NSQ.xq.len() — xq_off starts at ltp_mem_len and we write
+        // at most subfr_len * nb_subfr samples total, which fits within the xq buffer.
+        unsafe {
+            *NSQ.xq.get_unchecked_mut(xq_off + i) = (if (if 8 == 1 {
+                (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                    + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
+            } else {
+                ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
+            }) > silk_int16_MAX
+            {
+                silk_int16_MAX
+            } else if (if 8 == 1 {
+                (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                    + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
+            } else {
+                ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
+            }) < silk_int16_MIN
+            {
+                silk_int16_MIN
+            } else if 8 == 1 {
+                (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
+                    + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
+            } else {
+                ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
+            }) as i16;
+        }
 
         // Update state
+        // SAFETY: lpc_idx starts at NSQ_LPC_BUF_LENGTH - 1 and advances by 1 per iteration
+        // for at most `length` iterations (max 80). sLPC_Q14 has NSQ_LPC_BUF_LENGTH + MAX_SUBFR
+        // elements, so lpc_idx + 1 is always in bounds.
         lpc_idx += 1;
-        NSQ.sLPC_Q14[lpc_idx] = xq_Q14;
+        unsafe {
+            *NSQ.sLPC_Q14.get_unchecked_mut(lpc_idx) = xq_Q14;
+        }
 
-        NSQ.sDiff_shp_Q14 = xq_Q14 - ((x_sc_Q10[i] as u32) << 4) as i32;
+        NSQ.sDiff_shp_Q14 = xq_Q14 - (unsafe { (*x_sc_Q10.get_unchecked(i) as u32) << 4 }) as i32;
         sLF_AR_shp_Q14 = NSQ
             .sDiff_shp_Q14
             .wrapping_sub(((n_AR_Q12 as u32) << 2) as i32);
         NSQ.sLF_AR_shp_Q14 = sLF_AR_shp_Q14;
 
-        NSQ.sLTP_shp_Q14[NSQ.sLTP_shp_buf_idx as usize] =
-            sLF_AR_shp_Q14.wrapping_sub(((n_LF_Q12 as u32) << 2) as i32);
-        sLTP_Q15[NSQ.sLTP_buf_idx as usize] = ((LPC_exc_Q14 as u32) << 1) as i32;
+        // SAFETY: sLTP_shp_buf_idx is incremented from ltp_mem_len and stays within
+        // the sLTP_shp_Q14 buffer (which has ltp_mem_len + frame_len capacity).
+        unsafe {
+            *NSQ.sLTP_shp_Q14
+                .get_unchecked_mut(NSQ.sLTP_shp_buf_idx as usize) =
+                sLF_AR_shp_Q14.wrapping_sub(((n_LF_Q12 as u32) << 2) as i32);
+            *sLTP_Q15.get_unchecked_mut(NSQ.sLTP_buf_idx as usize) =
+                ((LPC_exc_Q14 as u32) << 1) as i32;
+        }
         NSQ.sLTP_shp_buf_idx += 1;
         NSQ.sLTP_buf_idx += 1;
 
-        NSQ.rand_seed = (NSQ.rand_seed as u32).wrapping_add(pulses[i] as u32) as i32;
+        NSQ.rand_seed =
+            (NSQ.rand_seed as u32).wrapping_add(unsafe { *pulses.get_unchecked(i) } as u32) as i32;
     }
 
     // Copy last NSQ_LPC_BUF_LENGTH values to the beginning
@@ -732,8 +825,12 @@ fn silk_nsq_scale_states(
         ((inv_gain_Q31 >> (5 - 1)) + 1) >> 1
     };
 
+    // SAFETY: subfr_length <= x16.len() and x_sc_Q10.len() (caller pre-slices).
     for i in 0..psEncC.subfr_length {
-        x_sc_Q10[i] = ((x16[i] as i64 * inv_gain_Q26 as i64) >> 16) as i32;
+        unsafe {
+            *x_sc_Q10.get_unchecked_mut(i) =
+                ((*x16.get_unchecked(i) as i64 * inv_gain_Q26 as i64) >> 16) as i32;
+        }
     }
 
     if NSQ.rewhite_flag != 0 {
@@ -744,8 +841,12 @@ fn silk_nsq_scale_states(
         }
         let start = (NSQ.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let end = NSQ.sLTP_buf_idx as usize;
+        // SAFETY: start..end is within sLTP_Q15 and sLTP bounds (both sized ltp_mem_len + frame_len).
         for i in start..end {
-            sLTP_Q15[i] = ((inv_gain_Q31 as i64 * sLTP[i] as i64) >> 16) as i32;
+            unsafe {
+                *sLTP_Q15.get_unchecked_mut(i) =
+                    ((inv_gain_Q31 as i64 * *sLTP.get_unchecked(i) as i64) >> 16) as i32;
+            }
         }
     }
 
@@ -754,8 +855,12 @@ fn silk_nsq_scale_states(
 
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;
+        // SAFETY: shp_start..shp_end is within sLTP_shp_Q14 bounds.
         for i in shp_start..shp_end {
-            NSQ.sLTP_shp_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLTP_shp_Q14[i] as i64) >> 16) as i32;
+            unsafe {
+                let v = (gain_adj_Q16 as i64 * *NSQ.sLTP_shp_Q14.get_unchecked(i) as i64) >> 16;
+                *NSQ.sLTP_shp_Q14.get_unchecked_mut(i) = v as i32;
+            }
         }
 
         if signal_type == TYPE_VOICED && NSQ.rewhite_flag == 0 {
@@ -769,11 +874,19 @@ fn silk_nsq_scale_states(
         NSQ.sLF_AR_shp_Q14 = ((gain_adj_Q16 as i64 * NSQ.sLF_AR_shp_Q14 as i64) >> 16) as i32;
         NSQ.sDiff_shp_Q14 = ((gain_adj_Q16 as i64 * NSQ.sDiff_shp_Q14 as i64) >> 16) as i32;
 
+        // SAFETY: NSQ_LPC_BUF_LENGTH == sLPC_Q14.len() (or less), indices in bounds.
         for i in 0..NSQ_LPC_BUF_LENGTH {
-            NSQ.sLPC_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sLPC_Q14[i] as i64) >> 16) as i32;
+            unsafe {
+                let v = (gain_adj_Q16 as i64 * *NSQ.sLPC_Q14.get_unchecked(i) as i64) >> 16;
+                *NSQ.sLPC_Q14.get_unchecked_mut(i) = v as i32;
+            }
         }
+        // SAFETY: MAX_SHAPE_LPC_ORDER <= sAR2_Q14.len().
         for i in 0..MAX_SHAPE_LPC_ORDER as usize {
-            NSQ.sAR2_Q14[i] = ((gain_adj_Q16 as i64 * NSQ.sAR2_Q14[i] as i64) >> 16) as i32;
+            unsafe {
+                let v = (gain_adj_Q16 as i64 * *NSQ.sAR2_Q14.get_unchecked(i) as i64) >> 16;
+                *NSQ.sAR2_Q14.get_unchecked_mut(i) = v as i32;
+            }
         }
 
         NSQ.prev_gain_Q16 = Gains_Q16[subfr as usize];

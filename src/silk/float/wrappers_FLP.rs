@@ -22,7 +22,10 @@ pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
     let mut a_fix_Q16: [i32; 16] = [0; 16];
     i = 0;
     while i < LPC_order {
-        a_fix_Q16[i as usize] = silk_float2int(pAR[i as usize] * 65536.0f32);
+        unsafe {
+            *a_fix_Q16.get_unchecked_mut(i as usize) =
+                silk_float2int(*pAR.get_unchecked(i as usize) * 65536.0f32);
+        }
         i += 1;
     }
     silk_A2NLSF(
@@ -42,7 +45,10 @@ pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: 
     );
     i = 0;
     while i < LPC_order {
-        pAR[i as usize] = a_fix_Q12[i as usize] as f32 * (1.0f32 / 4096.0f32);
+        unsafe {
+            *pAR.get_unchecked_mut(i as usize) =
+                *a_fix_Q12.get_unchecked(i as usize) as f32 * (1.0f32 / 4096.0f32);
+        }
         i += 1;
     }
 }
@@ -61,8 +67,11 @@ pub fn silk_process_NLSFs_FLP(
     while j < 2 {
         i = 0;
         while i < psEncC.predictLPCOrder {
-            PredCoef[j as usize][i as usize] =
-                PredCoef_Q12[j as usize][i as usize] as f32 * (1.0f32 / 4096.0f32);
+            unsafe {
+                *(*PredCoef.get_unchecked_mut(j as usize)).get_unchecked_mut(i as usize) =
+                    *(*PredCoef_Q12.get_unchecked(j as usize)).get_unchecked(i as usize) as f32
+                        * (1.0f32 / 4096.0f32);
+            }
             i += 1;
         }
         j += 1;
@@ -92,42 +101,65 @@ pub fn silk_NSQ_wrapper_FLP(
     while i < psEncC.nb_subfr as i32 {
         j = 0;
         while j < psEncC.shapingLPCOrder {
-            AR_Q13[(i * MAX_SHAPE_LPC_ORDER + j) as usize] =
-                silk_float2int(psEncCtrl.AR[(i * MAX_SHAPE_LPC_ORDER + j) as usize] * 8192.0f32)
+            unsafe {
+                *AR_Q13.get_unchecked_mut((i * MAX_SHAPE_LPC_ORDER + j) as usize) = silk_float2int(
+                    *psEncCtrl
+                        .AR
+                        .get_unchecked((i * MAX_SHAPE_LPC_ORDER + j) as usize)
+                        * 8192.0f32,
+                )
                     as i16;
+            }
             j += 1;
         }
         i += 1;
     }
     i = 0;
     while i < psEncC.nb_subfr as i32 {
-        LF_shp_Q14[i as usize] =
-            ((silk_float2int(psEncCtrl.LF_AR_shp[i as usize] * 16384.0f32) as u32) << 16) as i32
-                | silk_float2int(psEncCtrl.LF_MA_shp[i as usize] * 16384.0f32) as u16 as i32;
-        Tilt_Q14[i as usize] = silk_float2int(psEncCtrl.Tilt[i as usize] * 16384.0f32);
-        HarmShapeGain_Q14[i as usize] =
-            silk_float2int(psEncCtrl.HarmShapeGain[i as usize] * 16384.0f32);
+        unsafe {
+            *LF_shp_Q14.get_unchecked_mut(i as usize) =
+                ((silk_float2int(*psEncCtrl.LF_AR_shp.get_unchecked(i as usize) * 16384.0f32)
+                    as u32)
+                    << 16) as i32
+                    | silk_float2int(*psEncCtrl.LF_MA_shp.get_unchecked(i as usize) * 16384.0f32)
+                        as u16 as i32;
+            *Tilt_Q14.get_unchecked_mut(i as usize) =
+                silk_float2int(*psEncCtrl.Tilt.get_unchecked(i as usize) * 16384.0f32);
+            *HarmShapeGain_Q14.get_unchecked_mut(i as usize) =
+                silk_float2int(*psEncCtrl.HarmShapeGain.get_unchecked(i as usize) * 16384.0f32);
+        }
         i += 1;
     }
     let Lambda_Q10: i32 = silk_float2int(psEncCtrl.Lambda * 1024.0f32);
     i = 0;
     while i < psEncC.nb_subfr as i32 * LTP_ORDER as i32 {
-        LTPCoef_Q14[i as usize] = silk_float2int(psEncCtrl.LTPCoef[i as usize] * 16384.0f32) as i16;
+        unsafe {
+            *LTPCoef_Q14.get_unchecked_mut(i as usize) =
+                silk_float2int(*psEncCtrl.LTPCoef.get_unchecked(i as usize) * 16384.0f32) as i16;
+        }
         i += 1;
     }
     j = 0;
     while j < 2 {
         i = 0;
         while i < psEncC.predictLPCOrder {
-            PredCoef_Q12[j as usize][i as usize] =
-                silk_float2int(psEncCtrl.PredCoef[j as usize][i as usize] * 4096.0f32) as i16;
+            unsafe {
+                *(*PredCoef_Q12.get_unchecked_mut(j as usize)).get_unchecked_mut(i as usize) =
+                    silk_float2int(
+                        *(*psEncCtrl.PredCoef.get_unchecked(j as usize)).get_unchecked(i as usize)
+                            * 4096.0f32,
+                    ) as i16;
+            }
             i += 1;
         }
         j += 1;
     }
     i = 0;
     while i < psEncC.nb_subfr as i32 {
-        Gains_Q16[i as usize] = silk_float2int(psEncCtrl.Gains[i as usize] * 65536.0f32);
+        unsafe {
+            *Gains_Q16.get_unchecked_mut(i as usize) =
+                silk_float2int(*psEncCtrl.Gains.get_unchecked(i as usize) * 65536.0f32);
+        }
         i += 1;
     }
     let LTP_scale_Q14: i32 = if psIndices.signalType as i32 == TYPE_VOICED {
@@ -138,7 +170,10 @@ pub fn silk_NSQ_wrapper_FLP(
     let frame_length = psEncC.frame_length;
     i = 0;
     while i < frame_length as i32 {
-        x16[i as usize] = silk_float2int(x[i as usize]) as i16;
+        unsafe {
+            *x16.get_unchecked_mut(i as usize) =
+                silk_float2int(*x.get_unchecked(i as usize)) as i16;
+        }
         i += 1;
     }
     if psEncC.nStatesDelayedDecision > 1 || psEncC.warping_Q16 > 0 {
@@ -199,12 +234,18 @@ pub fn silk_quant_LTP_gains_FLP(
     let mut xX_Q17: [i32; 20] = [0; 20];
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 * LTP_ORDER as i32 {
-        XX_Q17[i as usize] = silk_float2int(XX[i as usize] * 131072.0f32);
+        unsafe {
+            *XX_Q17.get_unchecked_mut(i as usize) =
+                silk_float2int(*XX.get_unchecked(i as usize) * 131072.0f32);
+        }
         i += 1;
     }
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 {
-        xX_Q17[i as usize] = silk_float2int(xX[i as usize] * 131072.0f32);
+        unsafe {
+            *xX_Q17.get_unchecked_mut(i as usize) =
+                silk_float2int(*xX.get_unchecked(i as usize) * 131072.0f32);
+        }
         i += 1;
     }
     silk_quant_LTP_gains(
@@ -221,7 +262,10 @@ pub fn silk_quant_LTP_gains_FLP(
     );
     i = 0;
     while i < nb_subfr * LTP_ORDER as i32 {
-        B[i as usize] = B_Q14[i as usize] as f32 * (1.0f32 / 16384.0f32);
+        unsafe {
+            *B.get_unchecked_mut(i as usize) =
+                *B_Q14.get_unchecked(i as usize) as f32 * (1.0f32 / 16384.0f32);
+        }
         i += 1;
     }
     *pred_gain_dB = pred_gain_dB_Q7 as f32 * (1.0f32 / 128.0f32);

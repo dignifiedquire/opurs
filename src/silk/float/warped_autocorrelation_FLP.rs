@@ -25,27 +25,35 @@ pub fn silk_warped_autocorrelation_FLP(
     debug_assert!(order & 1 == 0);
     n = 0;
     while n < length {
-        tmp1 = input[n as usize] as f64;
+        tmp1 = unsafe { *input.get_unchecked(n as usize) } as f64;
         i = 0;
         while i < order {
-            // Use two multiplies instead of factoring to reduce dependency chain
-            tmp2 = state[i as usize] + warping as f64 * state[(i + 1) as usize]
-                - warping as f64 * tmp1;
-            state[i as usize] = tmp1;
-            C[i as usize] += state[0_usize] * tmp1;
-            tmp1 = state[(i + 1) as usize] + warping as f64 * state[(i + 2) as usize]
-                - warping as f64 * tmp2;
-            state[(i + 1) as usize] = tmp2;
-            C[(i + 1) as usize] += state[0_usize] * tmp2;
+            unsafe {
+                // Use two multiplies instead of factoring to reduce dependency chain
+                tmp2 = *state.get_unchecked(i as usize)
+                    + warping as f64 * *state.get_unchecked((i + 1) as usize)
+                    - warping as f64 * tmp1;
+                *state.get_unchecked_mut(i as usize) = tmp1;
+                *C.get_unchecked_mut(i as usize) += *state.get_unchecked(0) * tmp1;
+                tmp1 = *state.get_unchecked((i + 1) as usize)
+                    + warping as f64 * *state.get_unchecked((i + 2) as usize)
+                    - warping as f64 * tmp2;
+                *state.get_unchecked_mut((i + 1) as usize) = tmp2;
+                *C.get_unchecked_mut((i + 1) as usize) += *state.get_unchecked(0) * tmp2;
+            }
             i += 2;
         }
-        state[order as usize] = tmp1;
-        C[order as usize] += state[0_usize] * tmp1;
+        unsafe {
+            *state.get_unchecked_mut(order as usize) = tmp1;
+            *C.get_unchecked_mut(order as usize) += *state.get_unchecked(0) * tmp1;
+        }
         n += 1;
     }
     i = 0;
     while i < order + 1 {
-        corr[i as usize] = C[i as usize] as f32;
+        unsafe {
+            *corr.get_unchecked_mut(i as usize) = *C.get_unchecked(i as usize) as f32;
+        }
         i += 1;
     }
 }

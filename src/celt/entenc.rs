@@ -2,8 +2,6 @@
 //!
 //! Upstream C: `celt/entenc.c`
 
-#![forbid(unsafe_code)]
-
 use crate::celt::entcode::{celt_udiv, ec_ctx, ec_window, EC_UINT_BITS, EC_WINDOW_SIZE};
 
 /// Upstream C: celt/entenc.h:ec_enc
@@ -24,7 +22,9 @@ fn ec_write_byte(this: &mut ec_enc, value: u32) -> i32 {
         return -1;
     }
 
-    this.buf[this.offs as usize] = value as u8;
+    unsafe {
+        *this.buf.get_unchecked_mut(this.offs as usize) = value as u8;
+    }
     this.offs += 1;
 
     0
@@ -43,7 +43,11 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
     }
 
     this.end_offs += 1;
-    this.buf[(this.storage - this.end_offs) as usize] = value as u8;
+    unsafe {
+        *this
+            .buf
+            .get_unchecked_mut((this.storage - this.end_offs) as usize) = value as u8;
+    }
 
     0
 }
@@ -172,15 +176,18 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     let mut r: u32 = 0;
     r = this.rng >> ftb;
     if s > 0 {
-        this.val = this.val.wrapping_add(
-            this.rng
-                .wrapping_sub(r.wrapping_mul(icdf[s as usize - 1] as u32)),
+        this.val =
+            this.val.wrapping_add(this.rng.wrapping_sub(
+                r.wrapping_mul(unsafe { *icdf.get_unchecked(s as usize - 1) } as u32),
+            ));
+        this.rng = r.wrapping_mul(
+            (unsafe { *icdf.get_unchecked(s as usize - 1) } as i32
+                - unsafe { *icdf.get_unchecked(s as usize) } as i32) as u32,
         );
-        this.rng = r.wrapping_mul((icdf[s as usize - 1] as i32 - icdf[s as usize] as i32) as u32);
     } else {
         this.rng = this
             .rng
-            .wrapping_sub(r.wrapping_mul(icdf[s as usize] as u32));
+            .wrapping_sub(r.wrapping_mul(unsafe { *icdf.get_unchecked(s as usize) } as u32));
     }
     ec_enc_normalize(this);
 }
@@ -191,15 +198,18 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
 pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
     let r: u32 = this.rng >> ftb;
     if s > 0 {
-        this.val = this.val.wrapping_add(
-            this.rng
-                .wrapping_sub(r.wrapping_mul(icdf[s as usize - 1] as u32)),
+        this.val =
+            this.val.wrapping_add(this.rng.wrapping_sub(
+                r.wrapping_mul(unsafe { *icdf.get_unchecked(s as usize - 1) } as u32),
+            ));
+        this.rng = r.wrapping_mul(
+            (unsafe { *icdf.get_unchecked(s as usize - 1) } as i32
+                - unsafe { *icdf.get_unchecked(s as usize) } as i32) as u32,
         );
-        this.rng = r.wrapping_mul((icdf[s as usize - 1] as i32 - icdf[s as usize] as i32) as u32);
     } else {
         this.rng = this
             .rng
-            .wrapping_sub(r.wrapping_mul(icdf[s as usize] as u32));
+            .wrapping_sub(r.wrapping_mul(unsafe { *icdf.get_unchecked(s as usize) } as u32));
     }
     ec_enc_normalize(this);
 }

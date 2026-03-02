@@ -16,12 +16,12 @@ members = [
 ]
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 debug = true
 
 [profile.bench]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 debug = true
 
@@ -57,6 +57,7 @@ byteorder = { version = "1.4", optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
 rayon = { version = "1.7", optional = true }
 indicatif = { version = "0.17", features = ["rayon"], optional = true }
+smallvec = { version = "1.15.1", features = ["const_generics"] }
 
 [dev-dependencies]
 getrandom = "0.2.15"

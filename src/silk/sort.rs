@@ -12,34 +12,44 @@ pub fn silk_insertion_sort_increasing(a: &mut [i32], idx: &mut [i32], L: i32, K:
     debug_assert!(L >= K);
     i = 0;
     while i < K {
-        idx[i as usize] = i;
+        unsafe {
+            *idx.get_unchecked_mut(i as usize) = i;
+        }
         i += 1;
     }
     i = 1;
     while i < K {
-        value = a[i as usize];
+        value = unsafe { *a.get_unchecked(i as usize) };
         j = i - 1;
-        while j >= 0 && value < a[j as usize] {
-            a[(j + 1) as usize] = a[j as usize];
-            idx[(j + 1) as usize] = idx[j as usize];
+        while j >= 0 && value < unsafe { *a.get_unchecked(j as usize) } {
+            unsafe {
+                *a.get_unchecked_mut((j + 1) as usize) = *a.get_unchecked(j as usize);
+                *idx.get_unchecked_mut((j + 1) as usize) = *idx.get_unchecked(j as usize);
+            }
             j -= 1;
         }
-        a[(j + 1) as usize] = value;
-        idx[(j + 1) as usize] = i;
+        unsafe {
+            *a.get_unchecked_mut((j + 1) as usize) = value;
+            *idx.get_unchecked_mut((j + 1) as usize) = i;
+        }
         i += 1;
     }
     i = K;
     while i < L {
-        value = a[i as usize];
-        if value < a[(K - 1) as usize] {
+        value = unsafe { *a.get_unchecked(i as usize) };
+        if value < unsafe { *a.get_unchecked((K - 1) as usize) } {
             j = K - 2;
-            while j >= 0 && value < a[j as usize] {
-                a[(j + 1) as usize] = a[j as usize];
-                idx[(j + 1) as usize] = idx[j as usize];
+            while j >= 0 && value < unsafe { *a.get_unchecked(j as usize) } {
+                unsafe {
+                    *a.get_unchecked_mut((j + 1) as usize) = *a.get_unchecked(j as usize);
+                    *idx.get_unchecked_mut((j + 1) as usize) = *idx.get_unchecked(j as usize);
+                }
                 j -= 1;
             }
-            a[(j + 1) as usize] = value;
-            idx[(j + 1) as usize] = i;
+            unsafe {
+                *a.get_unchecked_mut((j + 1) as usize) = value;
+                *idx.get_unchecked_mut((j + 1) as usize) = i;
+            }
         }
         i += 1;
     }

@@ -88,8 +88,10 @@ pub fn dual_inner_prod_scalar(x: &[f32], y01: &[f32], y02: &[f32], n: usize) -> 
     let mut xy01: f32 = 0.0;
     let mut xy02: f32 = 0.0;
     for i in 0..n {
-        xy01 += x[i] * y01[i];
-        xy02 += x[i] * y02[i];
+        unsafe {
+            xy01 += *x.get_unchecked(i) * *y01.get_unchecked(i);
+            xy02 += *x.get_unchecked(i) * *y02.get_unchecked(i);
+        }
     }
     (xy01, xy02)
 }
@@ -123,73 +125,81 @@ pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize)
     yi += 1;
     let mut j = 0usize;
     while j < len - 3 {
-        let tmp = x[xi];
-        xi += 1;
-        y_3 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_0;
-        sum[1] += tmp * y_1;
-        sum[2] += tmp * y_2;
-        sum[3] += tmp * y_3;
+        unsafe {
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_3 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_0;
+            sum[1] += tmp * y_1;
+            sum[2] += tmp * y_2;
+            sum[3] += tmp * y_3;
 
-        let tmp = x[xi];
-        xi += 1;
-        y_0 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_1;
-        sum[1] += tmp * y_2;
-        sum[2] += tmp * y_3;
-        sum[3] += tmp * y_0;
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_0 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_1;
+            sum[1] += tmp * y_2;
+            sum[2] += tmp * y_3;
+            sum[3] += tmp * y_0;
 
-        let tmp = x[xi];
-        xi += 1;
-        y_1 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_2;
-        sum[1] += tmp * y_3;
-        sum[2] += tmp * y_0;
-        sum[3] += tmp * y_1;
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_1 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_2;
+            sum[1] += tmp * y_3;
+            sum[2] += tmp * y_0;
+            sum[3] += tmp * y_1;
 
-        let tmp = x[xi];
-        xi += 1;
-        y_2 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_3;
-        sum[1] += tmp * y_0;
-        sum[2] += tmp * y_1;
-        sum[3] += tmp * y_2;
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_2 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_3;
+            sum[1] += tmp * y_0;
+            sum[2] += tmp * y_1;
+            sum[3] += tmp * y_2;
+        }
 
         j += 4;
     }
     if j < len {
-        let tmp = x[xi];
-        xi += 1;
-        y_3 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_0;
-        sum[1] += tmp * y_1;
-        sum[2] += tmp * y_2;
-        sum[3] += tmp * y_3;
+        unsafe {
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_3 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_0;
+            sum[1] += tmp * y_1;
+            sum[2] += tmp * y_2;
+            sum[3] += tmp * y_3;
+        }
         j += 1;
     }
     if j < len {
-        let tmp = x[xi];
-        xi += 1;
-        y_0 = y[yi];
-        yi += 1;
-        sum[0] += tmp * y_1;
-        sum[1] += tmp * y_2;
-        sum[2] += tmp * y_3;
-        sum[3] += tmp * y_0;
+        unsafe {
+            let tmp = *x.get_unchecked(xi);
+            xi += 1;
+            y_0 = *y.get_unchecked(yi);
+            yi += 1;
+            sum[0] += tmp * y_1;
+            sum[1] += tmp * y_2;
+            sum[2] += tmp * y_3;
+            sum[3] += tmp * y_0;
+        }
         j += 1;
     }
     if j < len {
-        let tmp = x[xi];
-        y_1 = y[yi];
-        sum[0] += tmp * y_2;
-        sum[1] += tmp * y_3;
-        sum[2] += tmp * y_0;
-        sum[3] += tmp * y_1;
+        unsafe {
+            let tmp = *x.get_unchecked(xi);
+            y_1 = *y.get_unchecked(yi);
+            sum[0] += tmp * y_2;
+            sum[1] += tmp * y_3;
+            sum[2] += tmp * y_0;
+            sum[3] += tmp * y_1;
+        }
     }
 }
 
@@ -206,7 +216,9 @@ pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
     let x = &x[..N];
     let y = &y[..N];
     for i in 0..N {
-        xy += x[i] * y[i];
+        unsafe {
+            xy += *x.get_unchecked(i) * *y.get_unchecked(i);
+        }
     }
     xy
 }
@@ -224,8 +236,8 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
         Syy += yj * yj;
     }
     for i in 0..max_pitch {
-        if xcorr[i] > 0.0 {
-            let xcorr16 = xcorr[i] * 1e-12f32;
+        if unsafe { *xcorr.get_unchecked(i) } > 0.0 {
+            let xcorr16 = unsafe { *xcorr.get_unchecked(i) } * 1e-12f32;
             let num = xcorr16 * xcorr16;
             if num * best_den[1] > best_num[1] * Syy {
                 if num * best_den[0] > best_num[0] * Syy {
@@ -243,7 +255,10 @@ fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i
             }
         }
         // C: Syy += A - B, i.e. Syy + (A - B), not (Syy + A) - B.
-        Syy += y[i + len] * y[i + len] - y[i] * y[i];
+        unsafe {
+            Syy += *y.get_unchecked(i + len) * *y.get_unchecked(i + len)
+                - *y.get_unchecked(i) * *y.get_unchecked(i);
+        }
         Syy = celt_max32(1.0f32, Syy);
     }
     best_pitch
@@ -299,17 +314,21 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
     let c1: f32 = 0.8f32;
 
     for i in 1..len {
-        x_lp[i] = 0.25f32 * x[0][factor * i - offset]
-            + 0.25f32 * x[0][factor * i + offset]
-            + 0.5f32 * x[0][factor * i];
+        unsafe {
+            *x_lp.get_unchecked_mut(i) = 0.25f32 * *x[0].get_unchecked(factor * i - offset)
+                + 0.25f32 * *x[0].get_unchecked(factor * i + offset)
+                + 0.5f32 * *x[0].get_unchecked(factor * i);
+        }
     }
     x_lp[0] = 0.25f32 * x[0][offset] + 0.5f32 * x[0][0];
 
     if C == 2 {
         for i in 1..len {
-            x_lp[i] += 0.25f32 * x[1][factor * i - offset]
-                + 0.25f32 * x[1][factor * i + offset]
-                + 0.5f32 * x[1][factor * i];
+            unsafe {
+                *x_lp.get_unchecked_mut(i) += 0.25f32 * *x[1].get_unchecked(factor * i - offset)
+                    + 0.25f32 * *x[1].get_unchecked(factor * i + offset)
+                    + 0.5f32 * *x[1].get_unchecked(factor * i);
+            }
         }
         x_lp[0] += 0.25f32 * x[1][offset] + 0.5f32 * x[1][0];
     }
@@ -354,15 +373,19 @@ pub fn celt_pitch_xcorr_scalar(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usi
     while i < max_pitch as i32 - 3 {
         let mut sum: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
         xcorr_kernel_scalar(&x[..len], &y[i as usize..], &mut sum, len);
-        xcorr[i as usize] = sum[0];
-        xcorr[i as usize + 1] = sum[1];
-        xcorr[i as usize + 2] = sum[2];
-        xcorr[i as usize + 3] = sum[3];
+        unsafe {
+            *xcorr.get_unchecked_mut(i as usize) = sum[0];
+            *xcorr.get_unchecked_mut(i as usize + 1) = sum[1];
+            *xcorr.get_unchecked_mut(i as usize + 2) = sum[2];
+            *xcorr.get_unchecked_mut(i as usize + 3) = sum[3];
+        }
         i += 4;
     }
     // In case max_pitch isn't a multiple of 4, do the non-unrolled tail.
     while (i as usize) < max_pitch {
-        xcorr[i as usize] = celt_inner_prod_scalar(x, &y[i as usize..], len);
+        unsafe {
+            *xcorr.get_unchecked_mut(i as usize) = celt_inner_prod_scalar(x, &y[i as usize..], len);
+        }
         i += 1;
     }
 }
@@ -380,11 +403,17 @@ pub fn pitch_search(x_lp: &[f32], y: &[f32], len: i32, max_pitch: i32, arch: Arc
     let mut y_lp4: Vec<f32> = vec![0.0; (lag >> 2) as usize];
     let mut xcorr: Vec<f32> = vec![0.0; (max_pitch >> 1) as usize];
 
-    for j in 0..(len >> 2) as usize {
-        x_lp4[j] = x_lp[2 * j];
+    for (dst, src) in x_lp4[..(len >> 2) as usize]
+        .iter_mut()
+        .zip(x_lp.chunks_exact(2))
+    {
+        *dst = src[0];
     }
-    for j in 0..(lag >> 2) as usize {
-        y_lp4[j] = y[2 * j];
+    for (dst, src) in y_lp4[..(lag >> 2) as usize]
+        .iter_mut()
+        .zip(y.chunks_exact(2))
+    {
+        *dst = src[0];
     }
 
     // Coarse search with 4x decimation.
@@ -499,11 +528,24 @@ pub fn remove_doubling(
     xy = xy_val;
     yy_lookup[0] = xx;
     yy = xx;
-    for i in 1..=maxperiod as usize {
-        // Match C left-associative evaluation: (yy + add) - sub.
-        yy += x[x_off - i] * x[x_off - i];
-        yy -= x[x_off + N as usize - i] * x[x_off + N as usize - i];
-        yy_lookup[i] = celt_max32(0.0f32, yy);
+    {
+        // Pre-slice to eliminate per-iteration bounds checks.
+        // x_left[k] == x[x_off - 1 - k], x_right[k] == x[x_off + N - 1 - k]
+        let mp = maxperiod as usize;
+        let n = N as usize;
+        let x_left = &x[x_off - mp..x_off];
+        let x_right = &x[x_off + n - mp..x_off + n];
+        let yy_out = &mut yy_lookup[1..=mp];
+        for ((xl, xr), yy_dest) in x_left
+            .iter()
+            .rev()
+            .zip(x_right.iter().rev())
+            .zip(yy_out.iter_mut())
+        {
+            // Match C: yy = yy + x[-i]*x[-i] - x[N-i]*x[N-i]  (left-associative)
+            yy = yy + xl * xl - xr * xr;
+            *yy_dest = celt_max32(0.0f32, yy);
+        }
     }
     yy = yy_lookup[T0 as usize];
     best_xy = xy;
@@ -536,7 +578,10 @@ pub fn remove_doubling(
             arch,
         );
         xy = 0.5f32 * (xy_new + xy2_new);
-        yy = 0.5f32 * (yy_lookup[T1 as usize] + yy_lookup[T1b as usize]);
+        yy = 0.5f32
+            * unsafe {
+                *yy_lookup.get_unchecked(T1 as usize) + *yy_lookup.get_unchecked(T1b as usize)
+            };
         let g1 = compute_pitch_gain(xy, xx, yy);
         let mut cont: f32 = 0.0;
         if (T1 - prev_period).abs() <= 1 {
@@ -564,12 +609,14 @@ pub fn remove_doubling(
         pg = best_xy / (best_yy + 1.0);
     }
     for k in 0..3i32 {
-        xcorr[k as usize] = celt_inner_prod(
-            &x[x_off..],
-            &x[x_off - (T + k - 1) as usize..],
-            N as usize,
-            arch,
-        );
+        unsafe {
+            *xcorr.get_unchecked_mut(k as usize) = celt_inner_prod(
+                &x[x_off..],
+                &x[x_off - (T + k - 1) as usize..],
+                N as usize,
+                arch,
+            );
+        }
     }
     if xcorr[2] - xcorr[0] > 0.7f32 * (xcorr[1] - xcorr[0]) {
         offset = 1;

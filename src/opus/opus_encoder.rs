@@ -871,11 +871,13 @@ fn silk_biquad_float(
     B[2_usize] = B_Q28[2] as f32 * (1.0f32 / ((1) << 28) as f32);
     k = 0;
     while k < len {
-        inval = in_0[(k * stride) as usize];
-        vout = S[0] + B[0_usize] * inval;
-        S[0] = S[1] - vout * A[0_usize] + B[1_usize] * inval;
-        S[1] = -vout * A[1_usize] + B[2_usize] * inval + VERY_SMALL;
-        out[(k * stride) as usize] = vout;
+        unsafe {
+            inval = *in_0.get_unchecked((k * stride) as usize);
+            vout = S[0] + B[0_usize] * inval;
+            S[0] = S[1] - vout * A[0_usize] + B[1_usize] * inval;
+            S[1] = -vout * A[1_usize] + B[2_usize] * inval + VERY_SMALL;
+            *out.get_unchecked_mut((k * stride) as usize) = vout;
+        }
         k += 1;
     }
 }
@@ -951,14 +953,16 @@ fn dc_reject(
             let mut x1: opus_val32 = 0.;
             let mut out0: opus_val32 = 0.;
             let mut out1: opus_val32 = 0.;
-            x0 = in_0[(2 * i) as usize];
-            x1 = in_0[(2 * i + 1) as usize];
-            out0 = x0 - m0;
-            out1 = x1 - m2;
-            m0 = coef * x0 + VERY_SMALL + coef2 * m0;
-            m2 = coef * x1 + VERY_SMALL + coef2 * m2;
-            out[(2 * i) as usize] = out0;
-            out[(2 * i + 1) as usize] = out1;
+            unsafe {
+                x0 = *in_0.get_unchecked((2 * i) as usize);
+                x1 = *in_0.get_unchecked((2 * i + 1) as usize);
+                out0 = x0 - m0;
+                out1 = x1 - m2;
+                m0 = coef * x0 + VERY_SMALL + coef2 * m0;
+                m2 = coef * x1 + VERY_SMALL + coef2 * m2;
+                *out.get_unchecked_mut((2 * i) as usize) = out0;
+                *out.get_unchecked_mut((2 * i + 1) as usize) = out1;
+            }
             i += 1;
         }
         hp_mem[0] = m0;
@@ -970,10 +974,12 @@ fn dc_reject(
         while i < len {
             let mut x: opus_val32 = 0.;
             let mut y: opus_val32 = 0.;
-            x = in_0[i as usize];
-            y = x - m0_0;
-            m0_0 = coef * x + VERY_SMALL + coef2 * m0_0;
-            out[i as usize] = y;
+            unsafe {
+                x = *in_0.get_unchecked(i as usize);
+                y = x - m0_0;
+                m0_0 = coef * x + VERY_SMALL + coef2 * m0_0;
+                *out.get_unchecked_mut(i as usize) = y;
+            }
             i += 1;
         }
         hp_mem[0] = m0_0;
@@ -1003,20 +1009,29 @@ fn stereo_fade(
         let mut diff: opus_val32 = 0.;
         let mut g: opus_val16 = 0.;
         let mut w: opus_val16 = 0.;
-        w = window[(i * inc) as usize] * window[(i * inc) as usize];
-        g = w * g2 + (1.0f32 - w) * g1;
-        diff = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
-        diff *= g;
-        out[(i * channels) as usize] -= diff;
-        out[(i * channels + 1) as usize] += diff;
+        unsafe {
+            w = *window.get_unchecked((i * inc) as usize)
+                * *window.get_unchecked((i * inc) as usize);
+            g = w * g2 + (1.0f32 - w) * g1;
+            diff = 0.5f32
+                * (*in_0.get_unchecked((i * channels) as usize)
+                    - *in_0.get_unchecked((i * channels + 1) as usize));
+            diff *= g;
+            *out.get_unchecked_mut((i * channels) as usize) -= diff;
+            *out.get_unchecked_mut((i * channels + 1) as usize) += diff;
+        }
         i += 1;
     }
     while i < frame_size {
         let mut diff_0: opus_val32 = 0.;
-        diff_0 = 0.5f32 * (in_0[(i * channels) as usize] - in_0[(i * channels + 1) as usize]);
-        diff_0 *= g2;
-        out[(i * channels) as usize] -= diff_0;
-        out[(i * channels + 1) as usize] += diff_0;
+        unsafe {
+            diff_0 = 0.5f32
+                * (*in_0.get_unchecked((i * channels) as usize)
+                    - *in_0.get_unchecked((i * channels + 1) as usize));
+            diff_0 *= g2;
+            *out.get_unchecked_mut((i * channels) as usize) -= diff_0;
+            *out.get_unchecked_mut((i * channels + 1) as usize) += diff_0;
+        }
         i += 1;
     }
 }
@@ -1043,9 +1058,12 @@ fn gain_fade(
         while i < overlap {
             let mut g: opus_val16 = 0.;
             let mut w: opus_val16 = 0.;
-            w = window[(i * inc) as usize] * window[(i * inc) as usize];
-            g = w * g2 + (1.0f32 - w) * g1;
-            out[i as usize] = g * in_0[i as usize];
+            unsafe {
+                w = *window.get_unchecked((i * inc) as usize)
+                    * *window.get_unchecked((i * inc) as usize);
+                g = w * g2 + (1.0f32 - w) * g1;
+                *out.get_unchecked_mut(i as usize) = g * *in_0.get_unchecked(i as usize);
+            }
             i += 1;
         }
     } else {
@@ -1053,10 +1071,15 @@ fn gain_fade(
         while i < overlap {
             let mut g_0: opus_val16 = 0.;
             let mut w_0: opus_val16 = 0.;
-            w_0 = window[(i * inc) as usize] * window[(i * inc) as usize];
-            g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
-            out[(i * 2) as usize] = g_0 * in_0[(i * 2) as usize];
-            out[(i * 2 + 1) as usize] = g_0 * in_0[(i * 2 + 1) as usize];
+            unsafe {
+                w_0 = *window.get_unchecked((i * inc) as usize)
+                    * *window.get_unchecked((i * inc) as usize);
+                g_0 = w_0 * g2 + (1.0f32 - w_0) * g1;
+                *out.get_unchecked_mut((i * 2) as usize) =
+                    g_0 * *in_0.get_unchecked((i * 2) as usize);
+                *out.get_unchecked_mut((i * 2 + 1) as usize) =
+                    g_0 * *in_0.get_unchecked((i * 2 + 1) as usize);
+            }
             i += 1;
         }
     }
@@ -1064,7 +1087,10 @@ fn gain_fade(
     loop {
         i = overlap;
         while i < frame_size {
-            out[(i * channels + c) as usize] = g2 * in_0[(i * channels + c) as usize];
+            unsafe {
+                *out.get_unchecked_mut((i * channels + c) as usize) =
+                    g2 * *in_0.get_unchecked((i * channels + c) as usize);
+            }
             i += 1;
         }
         c += 1;
@@ -1227,26 +1253,28 @@ pub fn compute_stereo_width(
         let mut pyy: opus_val32 = 0 as opus_val32;
         let mut x: opus_val16 = 0.;
         let mut y: opus_val16 = 0.;
-        x = pcm[(2 * i) as usize];
-        y = pcm[(2 * i + 1) as usize];
-        pxx = x * x;
-        pxy = x * y;
-        pyy = y * y;
-        x = pcm[(2 * i + 2) as usize];
-        y = pcm[(2 * i + 3) as usize];
-        pxx += x * x;
-        pxy += x * y;
-        pyy += y * y;
-        x = pcm[(2 * i + 4) as usize];
-        y = pcm[(2 * i + 5) as usize];
-        pxx += x * x;
-        pxy += x * y;
-        pyy += y * y;
-        x = pcm[(2 * i + 6) as usize];
-        y = pcm[(2 * i + 7) as usize];
-        pxx += x * x;
-        pxy += x * y;
-        pyy += y * y;
+        unsafe {
+            x = *pcm.get_unchecked((2 * i) as usize);
+            y = *pcm.get_unchecked((2 * i + 1) as usize);
+            pxx = x * x;
+            pxy = x * y;
+            pyy = y * y;
+            x = *pcm.get_unchecked((2 * i + 2) as usize);
+            y = *pcm.get_unchecked((2 * i + 3) as usize);
+            pxx += x * x;
+            pxy += x * y;
+            pyy += y * y;
+            x = *pcm.get_unchecked((2 * i + 4) as usize);
+            y = *pcm.get_unchecked((2 * i + 5) as usize);
+            pxx += x * x;
+            pxy += x * y;
+            pyy += y * y;
+            x = *pcm.get_unchecked((2 * i + 6) as usize);
+            y = *pcm.get_unchecked((2 * i + 7) as usize);
+            pxx += x * x;
+            pxy += x * y;
+            pyy += y * y;
+        }
         xx += pxx;
         xy += pxy;
         yy += pyy;
@@ -1312,9 +1340,13 @@ fn decide_fec(
     loop {
         let mut hysteresis: i32 = 0;
         let mut LBRR_rate_thres_bps: i32 = 0;
-        LBRR_rate_thres_bps =
-            fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND)) as usize];
-        hysteresis = fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize];
+        LBRR_rate_thres_bps = unsafe {
+            *fec_thresholds.get_unchecked((2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND)) as usize)
+        };
+        hysteresis = unsafe {
+            *fec_thresholds
+                .get_unchecked((2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize)
+        };
         if last_fec == 1 {
             LBRR_rate_thres_bps -= hysteresis;
         }
@@ -1372,23 +1404,33 @@ fn compute_silk_rate_for_hybrid(
         .wrapping_div(::core::mem::size_of::<[i32; 5]>() as u64) as i32;
     i = 1;
     while i < N {
-        if rate_table[i as usize][0_usize] > rate {
+        if unsafe { *rate_table.get_unchecked(i as usize).get_unchecked(0) } > rate {
             break;
         }
         i += 1;
     }
     if i == N {
-        silk_rate = rate_table[(i - 1) as usize][entry as usize];
-        silk_rate += (rate - rate_table[(i - 1) as usize][0_usize]) / 2;
+        unsafe {
+            silk_rate = *rate_table
+                .get_unchecked((i - 1) as usize)
+                .get_unchecked(entry as usize);
+            silk_rate += (rate - *rate_table.get_unchecked((i - 1) as usize).get_unchecked(0)) / 2;
+        }
     } else {
         let mut lo: i32 = 0;
         let mut hi: i32 = 0;
         let mut x0: i32 = 0;
         let mut x1: i32 = 0;
-        lo = rate_table[(i - 1) as usize][entry as usize];
-        hi = rate_table[i as usize][entry as usize];
-        x0 = rate_table[(i - 1) as usize][0_usize];
-        x1 = rate_table[i as usize][0_usize];
+        unsafe {
+            lo = *rate_table
+                .get_unchecked((i - 1) as usize)
+                .get_unchecked(entry as usize);
+            hi = *rate_table
+                .get_unchecked(i as usize)
+                .get_unchecked(entry as usize);
+            x0 = *rate_table.get_unchecked((i - 1) as usize).get_unchecked(0);
+            x1 = *rate_table.get_unchecked(i as usize).get_unchecked(0);
+        }
         silk_rate = (lo * (x1 - rate) + hi * (rate - x0)) / (x1 - x0);
     }
     if vbr == 0 {
@@ -1749,12 +1791,12 @@ fn estimate_dred_bitrate(
     // Signaling DRED costs 3 bytes.
     let mut bits: f32 = 8.0 * (3 + DRED_EXPERIMENTAL_BYTES) as f32;
     // Approximation for the size of the IS.
-    bits += 50.0 + DRED_BITS_TABLE[q0 as usize];
+    bits += 50.0 + unsafe { *DRED_BITS_TABLE.get_unchecked(q0 as usize) };
     let dred_chunks = ((duration + 5) / 4).min(DRED_NUM_REDUNDANCY_FRAMES as i32 / 2);
     *target_chunks = 0;
     for i in 0..dred_chunks {
         let q = compute_quantizer(q0, dq, qmax, i);
-        bits += DRED_BITS_TABLE[q as usize];
+        bits += unsafe { *DRED_BITS_TABLE.get_unchecked(q as usize) };
         if (bits as i32) < target_bits {
             *target_chunks = i + 1;
         }
@@ -2506,21 +2548,26 @@ pub fn opus_encode_native(
         }
         i = 0;
         while i < 8 {
-            bandwidth_thresholds[i as usize] = music_bandwidth_thresholds[i as usize]
-                + ((voice_est
-                    * voice_est
-                    * (voice_bandwidth_thresholds[i as usize]
-                        - music_bandwidth_thresholds[i as usize]))
-                    >> 14);
+            unsafe {
+                *bandwidth_thresholds.get_unchecked_mut(i as usize) = *music_bandwidth_thresholds
+                    .get_unchecked(i as usize)
+                    + ((voice_est
+                        * voice_est
+                        * (*voice_bandwidth_thresholds.get_unchecked(i as usize)
+                            - *music_bandwidth_thresholds.get_unchecked(i as usize)))
+                        >> 14);
+            }
             i += 1;
         }
         loop {
             let mut threshold_0: i32 = 0;
             let mut hysteresis: i32 = 0;
-            threshold_0 =
-                bandwidth_thresholds[(2 * (bandwidth - OPUS_BANDWIDTH_MEDIUMBAND)) as usize];
-            hysteresis =
-                bandwidth_thresholds[(2 * (bandwidth - OPUS_BANDWIDTH_MEDIUMBAND) + 1) as usize];
+            unsafe {
+                threshold_0 = *bandwidth_thresholds
+                    .get_unchecked((2 * (bandwidth - OPUS_BANDWIDTH_MEDIUMBAND)) as usize);
+                hysteresis = *bandwidth_thresholds
+                    .get_unchecked((2 * (bandwidth - OPUS_BANDWIDTH_MEDIUMBAND) + 1) as usize);
+            }
             if st.first == 0 {
                 if st.auto_bandwidth >= bandwidth {
                     threshold_0 -= hysteresis;
@@ -2877,7 +2924,7 @@ pub fn opus_encode_native(
                 i = 0;
                 while i < end {
                     let mut mask: opus_val16 = 0.;
-                    let em_val = st.energy_masking[(21 * c + i) as usize];
+                    let em_val = unsafe { *st.energy_masking.get_unchecked((21 * c + i) as usize) };
                     mask = if (if em_val < 0.5f32 { em_val } else { 0.5f32 }) > -2.0f32 {
                         if em_val < 0.5f32 {
                             em_val
@@ -3013,7 +3060,10 @@ pub fn opus_encode_native(
             st.delay_buffer[..prefill_offset as usize].fill(0.0);
             i = 0;
             while i < st.encoder_buffer * st.channels {
-                pcm_silk[i as usize] = st.delay_buffer[i as usize];
+                unsafe {
+                    *pcm_silk.get_unchecked_mut(i as usize) =
+                        *st.delay_buffer.get_unchecked(i as usize);
+                }
                 i += 1;
             }
             silk_Encode(
@@ -3030,7 +3080,10 @@ pub fn opus_encode_native(
         }
         i = 0;
         while i < frame_size * st.channels {
-            pcm_silk[i as usize] = pcm_buf[(total_buffer * st.channels + i) as usize];
+            unsafe {
+                *pcm_silk.get_unchecked_mut(i as usize) =
+                    *pcm_buf.get_unchecked((total_buffer * st.channels + i) as usize);
+            }
             i += 1;
         }
         ret = silk_Encode(
