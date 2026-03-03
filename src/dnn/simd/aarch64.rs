@@ -4,6 +4,8 @@
 //! (no runtime detection needed).
 //!
 //! Port of `dnn/vec_neon.h` from libopus 1.6.1.
+// Keep float literals aligned with upstream C constants.
+#![allow(clippy::approx_constant)]
 
 use core::arch::aarch64::*;
 use core::arch::asm;

@@ -4,6 +4,8 @@
 //! The PLC uses a small neural network + FARGAN to conceal lost frames.
 //!
 //! Upstream C: `dnn/lpcnet_enc.c`, `dnn/lpcnet_plc.c`, `dnn/lpcnet_private.h`
+// Keep float literals aligned with upstream C constants.
+#![allow(clippy::approx_constant)]
 
 use super::fargan::*;
 use super::freq::*;

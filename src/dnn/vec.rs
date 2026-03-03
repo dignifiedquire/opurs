@@ -4,6 +4,8 @@
 //! functions from `dnn/vec.h` — sgemv, cgemv, tanh approximation, etc.
 //!
 //! Upstream C: `dnn/vec.h` (generic/no-optimization path)
+// Keep float literals aligned with upstream C constants.
+#![allow(clippy::approx_constant)]
 
 use crate::arch::Arch;
 
