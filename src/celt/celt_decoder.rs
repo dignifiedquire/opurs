@@ -1743,13 +1743,13 @@ fn celt_decode_body(
     postfilter_tapset = 0;
     if start == 0 && tell + 16 <= total_bits {
         if ec_dec_bit_logp(dec, 1) != 0 {
-            let mut qg: i32 = 0;
-            let mut octave: i32 = 0;
-            octave = ec_dec_uint(dec, 6) as i32;
+            
+            
+            let octave: i32 = ec_dec_uint(dec, 6) as i32;
             postfilter_pitch = (((16) << octave) as u32)
                 .wrapping_add(ec_dec_bits(dec, (4 + octave) as u32))
                 .wrapping_sub(1) as i32;
-            qg = ec_dec_bits(dec, 3) as i32;
+            let qg: i32 = ec_dec_bits(dec, 3) as i32;
             if ec_tell(dec) + 2 <= total_bits {
                 postfilter_tapset = ec_dec_icdf(dec, &tapset_icdf, 2);
             }
@@ -1842,7 +1842,7 @@ fn celt_decode_body(
 
     // QEXT: Set up extension decoder and decode QEXT band energies
     #[cfg(feature = "qext")]
-    let mut qext_bytes: i32 = 0;
+    let qext_bytes: i32 ;
     #[cfg(feature = "qext")]
     let mut qext_end: i32 = 0;
     #[cfg(feature = "qext")]
@@ -1946,12 +1946,12 @@ fn celt_decode_body(
     tell = ec_tell_frac(dec) as i32;
     i = start;
     while i < end {
-        let mut width: i32 = 0;
-        let mut quanta: i32 = 0;
-        let mut dynalloc_loop_logp: i32 = 0;
-        let mut boost: i32 = 0;
-        width = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
-        quanta = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
+        
+        
+        let mut dynalloc_loop_logp: i32 ;
+        let mut boost: i32 ;
+        let width: i32 = (C * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) << LM;
+        let quanta: i32 = if (width << 3) < (if (6) << 3 > width { (6) << 3 } else { width }) {
             width << 3
         } else if (6) << 3 > width {
             (6) << 3
@@ -1961,8 +1961,8 @@ fn celt_decode_body(
         dynalloc_loop_logp = dynalloc_logp;
         boost = 0;
         while tell + (dynalloc_loop_logp << BITRES) < total_bits && boost < cap[i as usize] {
-            let mut flag: i32 = 0;
-            flag = ec_dec_bit_logp(dec, dynalloc_loop_logp as u32);
+            
+            let flag: i32 = ec_dec_bit_logp(dec, dynalloc_loop_logp as u32);
             tell = ec_tell_frac(dec) as i32;
             if flag == 0 {
                 break;

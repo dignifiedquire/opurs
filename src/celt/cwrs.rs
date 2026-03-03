@@ -322,13 +322,15 @@ fn pvq_u_fallback(n: u32, k: u32) -> u32 {
     // Use a stack buffer for common sizes, falling back to heap for very large K.
     const STACK_MAX: usize = 256;
     let mut stack_buf = [0u32; STACK_MAX];
-    let mut heap_buf;
-    let u: &mut [u32] = if len <= STACK_MAX {
-        heap_buf = Vec::new();
-        &mut stack_buf[..len.max(2)]
+    let mut heap_buf = if len <= STACK_MAX {
+        None
     } else {
-        heap_buf = vec![0u32; len.max(2)];
-        &mut heap_buf
+        Some(vec![0u32; len.max(2)])
+    };
+    let u: &mut [u32] = if let Some(buf) = heap_buf.as_mut() {
+        buf
+    } else {
+        &mut stack_buf[..len.max(2)]
     };
     u[0] = 0;
     u[1] = 1;

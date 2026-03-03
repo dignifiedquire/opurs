@@ -125,13 +125,13 @@ pub fn celt_sudiv(n: i32, d: i32) -> i32 {
 /// Upstream C: celt/entcode.c:ec_tell_frac
 pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
     const correction: [u32; 8] = [35733, 38967, 42495, 46340, 50535, 55109, 60097, 65535];
-    let mut nbits: u32 = 0;
-    let mut r: u32 = 0;
-    let mut l: i32 = 0;
-    let mut b: u32 = 0;
-    nbits = (this.nbits_total << BITRES) as u32;
+    
+    
+    let mut l: i32 ;
+    let mut b: u32 ;
+    let nbits: u32 = (this.nbits_total << BITRES) as u32;
     l = EC_CLZ0 - (this.rng).leading_zeros() as i32;
-    r = this.rng >> (l - 16);
+    let r: u32 = this.rng >> (l - 16);
     b = (r >> 12).wrapping_sub(8);
     b = b.wrapping_add((r > correction[b as usize]) as i32 as u32);
     l = ((l << 3) as u32).wrapping_add(b) as i32;

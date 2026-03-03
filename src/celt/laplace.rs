@@ -24,13 +24,13 @@ fn ec_laplace_get_freq1(fs0: u32, decay: i32) -> u32 {
 
 /// Upstream C: celt/laplace.c:ec_laplace_encode
 pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: i32) {
-    let mut fl: u32 = 0;
+    let mut fl: u32 ;
     let mut val: i32 = *value;
     fl = 0;
     if val != 0 {
-        let mut s: i32 = 0;
-        let mut i: i32 = 0;
-        s = -((val < 0) as i32);
+        
+        let mut i: i32 ;
+        let s: i32 = -((val < 0) as i32);
         val = (val + s) ^ s;
         fl = fs;
         fs = ec_laplace_get_freq1(fs, decay);
@@ -42,15 +42,15 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
             i += 1;
         }
         if fs == 0 {
-            let mut di: i32 = 0;
-            let mut ndi_max: i32 = 0;
+            
+            let mut ndi_max: i32 ;
             ndi_max = (32768_u32
                 .wrapping_sub(fl)
                 .wrapping_add(LAPLACE_MINP as u32)
                 .wrapping_sub(1)
                 >> LAPLACE_LOG_MINP) as i32;
             ndi_max = (ndi_max - s) >> 1;
-            di = if val - i < ndi_max - 1 {
+            let di: i32 = if val - i < ndi_max - 1 {
                 val - i
             } else {
                 ndi_max - 1
@@ -75,9 +75,9 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
 /// Upstream C: celt/laplace.c:ec_laplace_decode
 pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
     let mut val: i32 = 0;
-    let mut fl: u32 = 0;
-    let mut fm: u32 = 0;
-    fm = ec_decode_bin(dec, 15);
+    let mut fl: u32 ;
+    
+    let fm: u32 = ec_decode_bin(dec, 15);
     fl = 0;
     if fm >= fs {
         val += 1;
@@ -94,8 +94,8 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
             val += 1;
         }
         if fs <= LAPLACE_MINP as u32 {
-            let mut di: i32 = 0;
-            di = (fm.wrapping_sub(fl) >> (LAPLACE_LOG_MINP + 1)) as i32;
+            
+            let di: i32 = (fm.wrapping_sub(fl) >> (LAPLACE_LOG_MINP + 1)) as i32;
             val += di;
             fl = fl.wrapping_add((2 * di * LAPLACE_MINP) as u32);
         }

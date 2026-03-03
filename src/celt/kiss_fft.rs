@@ -242,8 +242,8 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
 /// Upstream C: celt/kiss_fft.c:opus_fft_c
 #[inline]
 pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
-    let mut scale: f32 = 0.;
-    scale = st.scale;
+    
+    let scale: f32 = st.scale;
     debug_assert_eq!(fin.len(), st.nfft);
     debug_assert_eq!(fout.len(), st.nfft);
     for (&x, &i) in fin.iter().zip(st.bitrev) {
