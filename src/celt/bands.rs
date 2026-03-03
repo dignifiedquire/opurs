@@ -712,8 +712,7 @@ fn compute_theta(
     ec: &mut ec_ctx,
 ) {
     let mut itheta: i32 = 0;
-    #[allow(unused_assignments)]
-    let mut itheta_q30: i32 = 0;
+    let mut itheta_q30: i32;
     let mut imid: i32;
     let mut iside: i32;
     let mut inv: i32 = 0;
@@ -736,6 +735,8 @@ fn compute_theta(
     if encode != 0 {
         itheta_q30 = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch);
         itheta = itheta_q30 >> 16;
+    } else {
+        itheta_q30 = itheta << 16;
     }
     let tell = ec_tell_frac(ec) as i32;
     if qn != 1 {
@@ -2058,15 +2059,14 @@ pub fn quant_all_bands<'a>(
     let mut update_lowband: i32 = 1;
     let C: i32 = if Y_.is_some() { 2 } else { 1 };
     let norm_offset: i32 = M * eBands[start as usize] as i32;
-    #[allow(unused_mut)]
-    let mut theta_rdo: i32 =
+    let theta_rdo_base: i32 =
         (encode != 0 && Y_.is_some() && dual_stereo == 0 && complexity >= 8) as i32;
     #[cfg(feature = "qext")]
     let extra_bands = end == crate::celt::modes::data_96000::NB_QEXT_BANDS as i32 || end == 2;
     #[cfg(feature = "qext")]
-    if extra_bands {
-        theta_rdo = 0;
-    }
+    let theta_rdo = if extra_bands { 0 } else { theta_rdo_base };
+    #[cfg(not(feature = "qext"))]
+    let theta_rdo = theta_rdo_base;
     let resynth: i32 = (encode == 0 || theta_rdo != 0) as i32;
     let B: i32 = if shortBlocks != 0 { M } else { 1 };
     let norm_size = (M * eBands[m.nbEBands - 1] as i32 - norm_offset) as usize;

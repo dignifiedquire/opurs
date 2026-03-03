@@ -689,9 +689,11 @@ pub fn alg_unquant(
     debug_assert!(K > 0);
     debug_assert!(N > 1);
     let mut iy = [0i32; 176];
-    #[allow(unused_mut)]
+    #[cfg(feature = "qext")]
     let mut Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
-    #[allow(unused_assignments, unused_mut)]
+    #[cfg(not(feature = "qext"))]
+    let Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
+    #[cfg(feature = "qext")]
     let mut yy_shift: i32 = 0;
 
     #[cfg(feature = "qext")]
@@ -771,6 +773,7 @@ pub fn alg_unquant(
         );
     }
 
+    #[cfg(feature = "qext")]
     let _ = yy_shift; // used by fixed-point only
     normalise_residual(&iy, X, N, Ryy, gain);
     #[cfg(feature = "qext")]
