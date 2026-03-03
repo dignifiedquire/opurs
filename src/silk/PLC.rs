@@ -360,8 +360,7 @@ fn silk_PLC_conceal(
         .copy_from_slice(&psDec.sLPC_Q14_buf[..MAX_LPC_ORDER]);
 
     debug_assert!(psDec.LPC_order >= 10); /* check that unrolling works */
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..psDec.frame_length {
+    for (i, frame_i) in frame.iter_mut().take(psDec.frame_length).enumerate() {
         /* Partly unrolled LPC prediction */
         let s = sLPC_off + MAX_LPC_ORDER + i;
         let mut LPC_pred_Q10 = (psDec.LPC_order as i32) >> 1;
@@ -383,7 +382,7 @@ fn silk_PLC_conceal(
         sLTP_Q14[s] = sLTP_Q14[s].saturating_add(silk_LSHIFT_SAT32(LPC_pred_Q10, 4));
 
         /* Scale with Gain */
-        frame[i] = silk_SAT16(silk_SAT16(silk_RSHIFT_ROUND(
+        *frame_i = silk_SAT16(silk_SAT16(silk_RSHIFT_ROUND(
             silk_SMULWW(sLTP_Q14[s], prevGain_Q10[1]),
             8,
         ))) as i16;

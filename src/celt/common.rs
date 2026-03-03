@@ -452,10 +452,9 @@ pub fn comb_filter_qext(
 
 /// Upstream C: celt/celt.c:init_caps
 pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..m.nbEBands {
+    for (i, cap_i) in cap.iter_mut().enumerate().take(m.nbEBands) {
         let N = (m.eBands[i + 1] as i32 - m.eBands[i] as i32) << LM;
-        cap[i] = ((m.cache.caps[m.nbEBands * (2 * LM as usize + C as usize - 1) + i] as i32 + 64)
+        *cap_i = ((m.cache.caps[m.nbEBands * (2 * LM as usize + C as usize - 1) + i] as i32 + 64)
             * C
             * N)
             >> 2;

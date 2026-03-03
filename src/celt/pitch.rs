@@ -319,9 +319,8 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
     // Noise floor -40 dB.
     ac[0] *= 1.0001f32;
     // Lag windowing.
-    #[allow(clippy::needless_range_loop)]
-    for i in 1..=4 {
-        ac[i] -= ac[i] * (0.008f32 * i as f32) * (0.008f32 * i as f32);
+    for (i, ac_i) in ac.iter_mut().enumerate().take(5).skip(1) {
+        *ac_i -= *ac_i * (0.008f32 * i as f32) * (0.008f32 * i as f32);
     }
     _celt_lpc(&mut lpc, &ac);
     for lpc_val in lpc.iter_mut() {

@@ -39,19 +39,16 @@ fn band_energy(
 
     let ps_sz = window_size / 2;
 
-    #[allow(clippy::needless_range_loop)]
-    for xj in 0..window_size {
-        window[xj] = 0.5 - 0.5 * ((2.0 * PI / (window_size - 1) as f32) * xj as f32).cos();
+    for (xj, win) in window.iter_mut().enumerate() {
+        *win = 0.5 - 0.5 * ((2.0 * PI / (window_size - 1) as f32) * xj as f32).cos();
     }
 
-    #[allow(clippy::needless_range_loop)]
-    for xj in 0..window_size {
-        c[xj] = (2.0 * PI / window_size as f32 * xj as f32).cos();
+    for (xj, c_val) in c.iter_mut().enumerate() {
+        *c_val = (2.0 * PI / window_size as f32 * xj as f32).cos();
     }
 
-    #[allow(clippy::needless_range_loop)]
-    for xj in 0..window_size {
-        s[xj] = (2.0 * PI / window_size as f32 * xj as f32).sin();
+    for (xj, s_val) in s.iter_mut().enumerate() {
+        *s_val = (2.0 * PI / window_size as f32 * xj as f32).sin();
     }
 
     for xi in 0..frames {
