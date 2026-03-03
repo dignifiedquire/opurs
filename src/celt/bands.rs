@@ -716,6 +716,7 @@ fn compute_theta(
     ec: &mut ec_ctx,
 ) {
     let mut itheta: i32 = 0;
+    #[cfg(feature = "qext")]
     let mut itheta_q30: i32;
     let mut imid: i32;
     let mut iside: i32;
@@ -737,10 +738,20 @@ fn compute_theta(
         qn = 1;
     }
     if encode != 0 {
-        itheta_q30 = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch);
-        itheta = itheta_q30 >> 16;
+        #[cfg(feature = "qext")]
+        {
+            itheta_q30 = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch);
+            itheta = itheta_q30 >> 16;
+        }
+        #[cfg(not(feature = "qext"))]
+        {
+            itheta = stereo_itheta(&X[..N as usize], &Y[..N as usize], stereo, N, ctx.arch) >> 16;
+        }
     } else {
-        itheta_q30 = itheta << 16;
+        #[cfg(feature = "qext")]
+        {
+            itheta_q30 = itheta << 16;
+        }
     }
     let tell = ec_tell_frac(ec) as i32;
     if qn != 1 {
@@ -939,7 +950,10 @@ fn compute_theta(
             inv = 0;
         }
         itheta = 0;
-        itheta_q30 = 0;
+        #[cfg(feature = "qext")]
+        {
+            itheta_q30 = 0;
+        }
     }
     let qalloc = (ec_tell_frac(ec)).wrapping_sub(tell as u32) as i32;
     *b -= qalloc;
