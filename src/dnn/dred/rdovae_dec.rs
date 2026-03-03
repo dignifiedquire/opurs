@@ -10,11 +10,6 @@ use super::config::*;
 // --- Layer size constants from dred_rdovae_dec_data.h ---
 
 const DEC_DENSE1_OUT_SIZE: usize = 96;
-const DEC_GLU1_OUT_SIZE: usize = 64;
-const DEC_GLU2_OUT_SIZE: usize = 64;
-const DEC_GLU3_OUT_SIZE: usize = 64;
-const DEC_GLU4_OUT_SIZE: usize = 64;
-const DEC_GLU5_OUT_SIZE: usize = 64;
 const DEC_OUTPUT_OUT_SIZE: usize = 80;
 const DEC_HIDDEN_INIT_OUT_SIZE: usize = 128;
 const DEC_CONV_DENSE1_OUT_SIZE: usize = 32;

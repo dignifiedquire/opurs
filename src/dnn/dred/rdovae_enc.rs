@@ -10,7 +10,6 @@ use super::config::*;
 // --- Layer size constants from dred_rdovae_enc_data.h ---
 
 const ENC_DENSE1_OUT_SIZE: usize = 64;
-const ENC_ZDENSE_OUT_SIZE: usize = 32;
 const GDENSE2_OUT_SIZE: usize = 56;
 const GDENSE1_OUT_SIZE: usize = 128;
 const ENC_CONV_DENSE1_OUT_SIZE: usize = 64;

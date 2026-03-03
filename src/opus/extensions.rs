@@ -7,10 +7,6 @@
 //!
 //! Upstream C: `src/extensions.c`
 
-// These APIs are externally consumed (tools/tests) and not all are referenced
-// from the library's internal call graph.
-#![allow(dead_code)]
-
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
 
 /// Extension ID 2: "Repeat These Extensions" indicator.
@@ -29,72 +25,14 @@ pub struct OpusExtensionData {
     pub data: Vec<u8>,
 }
 
-/// Given an extension payload, advance past the current extension and return
-/// the length of the remaining data. Returns `(remaining_len, header_size)` or
-/// negative on error.
-///
-/// `ID=2` (RTE) only advances past the indicator itself; skipping repeated
-/// payloads is handled by higher-level iterator logic.
-///
-/// Upstream C: src/extensions.c:skip_extension
-fn skip_extension(data: &[u8], mut pos: usize, len: usize) -> Result<(usize, usize), i32> {
-    if pos >= len {
-        return Ok((0, 0));
-    }
-    let id = data[pos] >> 1;
-    let l = data[pos] & 1;
-    if id == 0 && l == 1 {
-        // Padding byte
-        let header_size = 1;
-        pos += 1;
-        if pos > len {
-            return Err(-1);
-        }
-        Ok((len - pos, header_size))
-    } else if id > 0 && id < 32 {
-        // Short extension: 1-byte header + optional 1-byte payload
-        if pos + 1 + l as usize > len {
-            return Err(-1);
-        }
-        pos += 1 + l as usize;
-        Ok((len - pos, 1))
-    } else {
-        // Long extension (id >= 32)
-        if l == 0 {
-            // Last extension: consumes rest of data
-            Ok((0, 1))
-        } else {
-            // Not last: length encoded as sum of bytes until non-255
-            let mut bytes: usize = 0;
-            let mut header_size = 1;
-            loop {
-                pos += 1;
-                if pos >= len {
-                    return Err(-1);
-                }
-                bytes += data[pos] as usize;
-                header_size += 1;
-                if data[pos] != 255 {
-                    break;
-                }
-            }
-            pos += 1;
-            if bytes <= len - pos {
-                pos += bytes;
-                Ok((len - pos, header_size))
-            } else {
-                Err(-1)
-            }
-        }
-    }
-}
-
 /// Count the number of extensions (excluding real padding, separators, and
 /// repeat indicators, but including repeated extensions).
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_count
 pub fn opus_packet_extensions_count(data: &[u8], nb_frames: i32) -> Result<i32, i32> {
     let mut iter = OpusExtensionIterator::new(data, nb_frames);
+    iter.set_frame_max(nb_frames);
+    iter.reset();
     let mut count = 0;
     loop {
         match iter.next()? {
@@ -485,32 +423,6 @@ fn generate_extensions_internal(
     Ok(writer.pos())
 }
 
-/// Find the first extension with the given ID for a frame in `[0, frame_max)`.
-///
-/// Returns `Some(OpusExtensionData)` if found, `None` otherwise.
-/// Upstream C: src/extensions.c:opus_extension_iterator_find
-pub fn opus_packet_extension_find(
-    data: &[u8],
-    target_id: i32,
-    frame_max: i32,
-    nb_frames: i32,
-) -> Option<OpusExtensionData> {
-    let mut iter = OpusExtensionIterator::new(data, nb_frames);
-    iter.set_frame_max(frame_max);
-    match iter.find(target_id) {
-        Ok(Some(ext)) => {
-            let start = ext.data_offset;
-            let end = start + ext.len;
-            Some(OpusExtensionData {
-                id: ext.id,
-                frame: ext.frame,
-                data: data[start..end].to_vec(),
-            })
-        }
-        _ => None,
-    }
-}
-
 /// Extension data referencing a slice of the original padding buffer.
 ///
 /// Like `OpusExtensionData` but borrows the payload instead of copying it.
@@ -544,7 +456,7 @@ fn skip_extension_payload(
     let l = id_byte & 1;
     let mut header_size: i32 = 0;
 
-    if (id == 0 && l == 1) || id == 2 {
+    if (id == 0 && l == 1) || id == EXTENSION_ID_REPEAT as u8 {
         // Padding byte or RTE indicator — nothing to skip
     } else if id > 0 && id < 32 {
         if len < l as i32 {
@@ -620,8 +532,6 @@ pub struct OpusExtensionIterator<'a> {
     curr_pos: usize,
     /// Remaining bytes from curr_pos.
     curr_len: i32,
-    /// Total length of `data`.
-    len: i32,
     /// Start of the region that will be repeated by RTE.
     repeat_pos: usize,
     /// Position of the last long extension seen (for L=0 fixup during repeat).
@@ -657,7 +567,6 @@ impl<'a> OpusExtensionIterator<'a> {
             data,
             curr_pos: 0,
             curr_len: len,
-            len,
             repeat_pos: 0,
             last_long_pos: None,
             src_pos: 0,
@@ -679,7 +588,7 @@ impl<'a> OpusExtensionIterator<'a> {
         self.repeat_pos = 0;
         self.curr_pos = 0;
         self.last_long_pos = None;
-        self.curr_len = self.len;
+        self.curr_len = self.data.len() as i32;
         self.repeat_frame = 0;
         self.curr_frame = 0;
         self.trailing_short_len = 0;
@@ -826,7 +735,7 @@ impl<'a> OpusExtensionIterator<'a> {
                 self.repeat_pos = self.curr_pos;
                 self.last_long_pos = None;
                 self.trailing_short_len = 0;
-            } else if id == 2 {
+            } else if id == EXTENSION_ID_REPEAT as u8 {
                 // Repeat These Extensions
                 self.repeat_l = l;
                 self.repeat_frame = self.curr_frame + 1;
@@ -837,7 +746,7 @@ impl<'a> OpusExtensionIterator<'a> {
                 if ret.is_some() {
                     return Ok(ret);
                 }
-            } else if id > 2 {
+            } else if id > EXTENSION_ID_REPEAT as u8 {
                 // Track last long extension position
                 if id >= 32 {
                     self.last_long_pos = Some(self.curr_pos);

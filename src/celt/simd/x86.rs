@@ -564,34 +564,6 @@ pub unsafe fn comb_filter_const_inplace_sse(
     // Intentionally no scalar tail: upstream SSE path only processes i < N-3.
 }
 
-/// SSE implementation of `celt_pitch_xcorr`.
-/// Processes 4 correlations at a time using `xcorr_kernel_sse`.
-///
-/// # Safety
-/// Requires SSE support (checked by caller via cpufeatures).
-#[allow(dead_code)]
-#[target_feature(enable = "sse")]
-pub unsafe fn celt_pitch_xcorr_sse(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize) {
-    let max_pitch = xcorr.len();
-    debug_assert!(max_pitch > 0);
-    debug_assert!(x.len() >= len);
-
-    let mut i = 0i32;
-    while i < max_pitch as i32 - 3 {
-        let mut sum = [0.0f32; 4];
-        xcorr_kernel_sse(&x[..len], &y[i as usize..], &mut sum, len);
-        xcorr[i as usize] = sum[0];
-        xcorr[i as usize + 1] = sum[1];
-        xcorr[i as usize + 2] = sum[2];
-        xcorr[i as usize + 3] = sum[3];
-        i += 4;
-    }
-    while (i as usize) < max_pitch {
-        xcorr[i as usize] = celt_inner_prod_sse(x, &y[i as usize..], len);
-        i += 1;
-    }
-}
-
 #[inline(always)]
 pub fn xcorr_kernel_sse_dispatch(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize) {
     // SAFETY: Dispatch layer gates this on `arch.has_sse()`.

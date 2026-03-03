@@ -2645,14 +2645,6 @@ pub fn osce_enhance_frame(
             std::sync::LazyLock::new(|| {
                 Mutex::new(std::fs::File::create("/tmp/osce_rs_features.bin").unwrap())
             });
-        static IN_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
-            std::sync::LazyLock::new(|| {
-                Mutex::new(std::fs::File::create("/tmp/osce_rs_in_buffer.bin").unwrap())
-            });
-        static OUT_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
-            std::sync::LazyLock::new(|| {
-                Mutex::new(std::fs::File::create("/tmp/osce_rs_out_buffer.bin").unwrap())
-            });
         static NB_FILE: std::sync::LazyLock<Mutex<std::fs::File>> =
             std::sync::LazyLock::new(|| {
                 Mutex::new(std::fs::File::create("/tmp/osce_rs_numbits.bin").unwrap())

@@ -25,7 +25,6 @@ const PITCH_BUF_SIZE: usize = PITCH_MAX_PERIOD + PITCH_FRAME_SIZE;
 
 pub const PLC_MAX_FEC: usize = 102;
 const CONT_VECTORS: usize = 5;
-const FEATURES_DELAY: usize = 1;
 
 const PITCH_IF_MAX_FREQ: usize = 30;
 const PITCH_IF_FEATURES: usize = 3 * PITCH_IF_MAX_FREQ - 2;
@@ -173,7 +172,6 @@ pub struct LPCNetEncState {
     lp_mem: [f32; 2],
     pub lpc: Vec<f32>,
     pub features: Vec<f32>,
-    sig_mem: Vec<f32>,
     pub burg_cepstrum: Vec<f32>,
 }
 
@@ -200,7 +198,6 @@ impl LPCNetEncState {
             lp_mem: [0.0; 2],
             lpc: vec![0.0; LPC_ORDER],
             features: vec![0.0; NB_TOTAL_FEATURES],
-            sig_mem: vec![0.0; LPC_ORDER],
             burg_cepstrum: vec![0.0; 2 * NB_BANDS],
         }
     }

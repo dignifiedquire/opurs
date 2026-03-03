@@ -41,19 +41,6 @@ pub struct WeightArray {
     pub data: Vec<u8>,
 }
 
-/// Header for a weight record in a binary blob.
-///
-/// Upstream C: dnn/nnet.h:WeightHead
-#[repr(C)]
-struct WeightHead {
-    head: [u8; 4],
-    version: i32,
-    type_id: i32,
-    size: i32,
-    block_size: i32,
-    name: [u8; 44],
-}
-
 // --- Layer types ---
 
 /// Generic sparse/dense affine layer.
@@ -121,7 +108,12 @@ fn compute_activation_c(output: &mut [f32], input: &[f32], n: usize, activation:
             output[..n].copy_from_slice(&input[..n]);
         }
         ACTIVATION_EXP => softmax(&mut output[..n], &input[..n], arch),
-        ACTIVATION_LINEAR | _ => {
+        ACTIVATION_LINEAR => {
+            if !std::ptr::eq(output.as_ptr(), input.as_ptr()) {
+                output[..n].copy_from_slice(&input[..n]);
+            }
+        }
+        _ => {
             if !std::ptr::eq(output.as_ptr(), input.as_ptr()) {
                 output[..n].copy_from_slice(&input[..n]);
             }
