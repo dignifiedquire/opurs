@@ -300,6 +300,7 @@ pub fn normalise_bands(
 
 /// Upstream C: celt/bands.c:denormalise_bands
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn denormalise_bands(
     m: &OpusCustomMode,
     X: &[f32],
@@ -352,6 +353,7 @@ pub fn denormalise_bands(
 
 /// Upstream C: celt/bands.c:anti_collapse
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn anti_collapse(
     m: &OpusCustomMode,
     X_: &mut [f32],
@@ -494,6 +496,7 @@ fn stereo_merge(X: &mut [f32], Y: &mut [f32], mid: f32, N: i32, _arch: Arch) {
 }
 
 /// Upstream C: celt/bands.c:spreading_decision
+#[allow(clippy::too_many_arguments)]
 pub fn spreading_decision(
     m: &OpusCustomMode,
     X: &[f32],
@@ -697,6 +700,7 @@ fn compute_qn(N: i32, b: i32, offset: i32, pulse_cap: i32, stereo: i32) -> i32 {
 /// arithmetic is confined to this function.
 /// Upstream C: celt/bands.c:compute_theta
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 fn compute_theta(
     ctx: &mut band_ctx<'_, '_>,
     sctx: &mut split_ctx,
@@ -1048,6 +1052,7 @@ fn quant_band_n1(
 
 /// Upstream C: celt/bands.c:quant_partition
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn quant_partition(
     ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
@@ -1394,6 +1399,7 @@ fn quant_partition(
 /// Uses cubic quantization instead of PVQ.
 /// Upstream C: celt/bands.c:cubic_quant_partition
 #[cfg(feature = "qext")]
+#[allow(clippy::too_many_arguments)]
 fn cubic_quant_partition(
     ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
@@ -1477,6 +1483,7 @@ fn cubic_quant_partition(
 
 /// Upstream C: celt/bands.c:quant_band
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn quant_band(
     ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
@@ -1633,6 +1640,7 @@ fn quant_band(
 }
 
 /// Upstream C: celt/bands.c:quant_band_stereo
+#[allow(clippy::too_many_arguments)]
 fn quant_band_stereo(
     ctx: &mut band_ctx<'_, '_>,
     X: &mut [f32],
@@ -2016,6 +2024,7 @@ fn special_hybrid_folding(
 
 /// Upstream C: celt/bands.c:quant_all_bands
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn quant_all_bands<'a>(
     encode: i32,
     m: &'a OpusCustomMode,

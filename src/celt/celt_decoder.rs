@@ -476,6 +476,7 @@ fn deemphasis_stereo_simple(
 }
 /// Upstream C: celt/celt_decoder.c:deemphasis
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn deemphasis(
     in_channels: &[&[f32]],
     pcm: &mut [f32],
@@ -604,6 +605,7 @@ fn deemphasis(
     }
 }
 /// Upstream C: celt/celt_decoder.c:celt_synthesis
+#[allow(clippy::too_many_arguments)]
 fn celt_synthesis(
     mode: &OpusCustomMode,
     X: &[f32],
@@ -1448,6 +1450,7 @@ fn celt_decode_lost(
     st.last_frame_type = curr_frame_type;
 }
 /// Upstream C: celt/celt_decoder.c:celt_decode_with_ec / celt_decode_with_ec_dred
+#[allow(clippy::too_many_arguments)]
 pub fn celt_decode_with_ec(
     st: &mut OpusCustomDecoder,
     data: Option<&[u8]>,

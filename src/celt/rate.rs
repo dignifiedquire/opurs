@@ -85,6 +85,7 @@ pub fn pulses2bits(m: &OpusCustomMode, band: i32, mut LM: i32, pulses: i32) -> i
 
 /// Upstream C: celt/rate.c:interp_bits2pulses
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn interp_bits2pulses(
     m: &OpusCustomMode,
     start: i32,
@@ -346,6 +347,7 @@ fn interp_bits2pulses(
 }
 
 /// Upstream C: celt/rate.c:clt_compute_allocation
+#[allow(clippy::too_many_arguments)]
 pub fn clt_compute_allocation(
     m: &OpusCustomMode,
     start: i32,
@@ -627,6 +629,7 @@ fn median_of_5_val16(x: &[f32]) -> f32 {
 ///
 /// Upstream C: celt/rate.c:clt_compute_extra_allocation
 #[cfg(feature = "qext")]
+#[allow(clippy::too_many_arguments)]
 pub fn clt_compute_extra_allocation(
     m: &OpusCustomMode,
     qext_mode: Option<&OpusCustomMode>,

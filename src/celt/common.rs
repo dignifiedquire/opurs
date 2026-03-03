@@ -32,6 +32,7 @@ fn saturate_sig(x: f32) -> f32 {
 
 #[cfg(feature = "qext")]
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn comb_filter_qext_inplace(
     buf: &mut [f32],
     start: usize,
@@ -98,6 +99,7 @@ pub fn resampling_factor(rate: i32) -> i32 {
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
 /// Upstream C: celt/celt.c:comb_filter_const_c
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_const_c(
     y: &mut [f32],
     y_start: usize,
@@ -132,6 +134,7 @@ pub fn comb_filter_const_c(
 /// `window` may be empty if `overlap` is 0.
 /// Upstream C: celt/celt.c:comb_filter
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn comb_filter(
     y: &mut [f32],
     y_start: usize,
@@ -245,6 +248,7 @@ pub fn comb_filter(
 /// `buf[start - T - 2..]` and writes to `buf[start..start + N]`.
 /// Upstream C: celt/celt.c:comb_filter (in-place variant)
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_inplace(
     buf: &mut [f32],
     start: usize,
@@ -353,6 +357,7 @@ pub fn comb_filter_inplace(
 ///
 /// Upstream C: celt/celt.c:comb_filter_qext
 #[cfg(feature = "qext")]
+#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_qext(
     y: &mut [f32],
     y_start: usize,

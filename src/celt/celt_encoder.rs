@@ -519,6 +519,7 @@ mod tests {
 }
 
 /// Upstream C: celt/celt_encoder.c:transient_analysis
+#[allow(clippy::too_many_arguments)]
 fn transient_analysis(
     in_0: &[f32],
     len: i32,
@@ -779,6 +780,7 @@ fn patch_transient_decision(
     (mean_diff > 1.0f32) as i32
 }
 /// Upstream C: celt/celt_encoder.c:compute_mdcts
+#[allow(clippy::too_many_arguments)]
 fn compute_mdcts(
     mode: &OpusCustomMode,
     shortBlocks: i32,
@@ -858,6 +860,7 @@ fn compute_mdcts(
     }
 }
 /// Upstream C: celt/celt_encoder.c:celt_preemphasis
+#[allow(clippy::too_many_arguments)]
 fn celt_preemphasis(
     pcmp: &[f32],
     inp: &mut [f32],
@@ -935,6 +938,7 @@ fn l1_metric(tmp: &[f32], N: i32, LM: i32, bias: f32) -> f32 {
     L1
 }
 /// Upstream C: celt/celt_encoder.c:tf_analysis
+#[allow(clippy::too_many_arguments)]
 fn tf_analysis(
     m: &OpusCustomMode,
     len: i32,
@@ -1186,6 +1190,7 @@ fn tf_encode(
     }
 }
 /// Upstream C: celt/celt_encoder.c:alloc_trim_analysis
+#[allow(clippy::too_many_arguments)]
 fn alloc_trim_analysis(
     m: &OpusCustomMode,
     X: &[f32],
@@ -1442,6 +1447,7 @@ fn median_of_3(x: &[f32]) -> f32 {
     }
 }
 /// Upstream C: celt/celt_encoder.c:dynalloc_analysis
+#[allow(clippy::too_many_arguments)]
 fn dynalloc_analysis(
     bandLogE: &[f32],
     bandLogE2: &[f32],
@@ -1943,6 +1949,7 @@ fn tone_detect(input: &[f32], CC: i32, N: i32, toneishness: &mut f32, Fs: i32) -
 
 /// Upstream C: celt/celt_encoder.c:run_prefilter
 #[allow(clippy::approx_constant)]
+#[allow(clippy::too_many_arguments)]
 fn run_prefilter(
     st: &mut OpusCustomEncoder,
     in_0: &mut [f32],
@@ -2274,6 +2281,7 @@ fn run_prefilter(
 /// coding context.
 ///
 /// Upstream C: celt/celt_encoder.c:compute_vbr
+#[allow(clippy::too_many_arguments)]
 fn compute_vbr(
     mode: &OpusCustomMode,
     analysis: &AnalysisInfo,
@@ -2422,6 +2430,7 @@ fn compute_vbr(
     };
     target
 }
+#[allow(clippy::too_many_arguments)]
 pub fn celt_encode_with_ec<'b>(
     st: &mut OpusCustomEncoder,
     pcm: &[f32],

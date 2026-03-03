@@ -588,6 +588,7 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
 
 /// Upstream C: celt/vq.c:alg_quant
 #[allow(clippy::needless_range_loop)]
+#[allow(clippy::too_many_arguments)]
 pub fn alg_quant(
     X: &mut [f32],
     N: i32,
@@ -675,6 +676,7 @@ pub fn alg_quant(
 /// Upstream C: celt/vq.c:alg_unquant
 #[inline]
 #[allow(clippy::needless_range_loop)]
+#[allow(clippy::too_many_arguments)]
 pub fn alg_unquant(
     X: &mut [f32],
     N: i32,
