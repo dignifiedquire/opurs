@@ -271,25 +271,25 @@ pub fn silk_NSQ_del_dec_c(
     let frame_len = psEncC.frame_length;
     let subfr_len = psEncC.subfr_length;
     let nStates = psEncC.nStatesDelayedDecision;
+    let n_states = nStates as usize;
 
     lag = NSQ.lagPrev;
 
     // MAX_DEL_DEC_STATES = 4; nStates <= 4
     const MAX_STATES: usize = 4;
-    debug_assert!(nStates as usize <= MAX_STATES);
+    debug_assert!(n_states <= MAX_STATES);
     let mut psDelDec = [NSQ_del_dec_struct::default(); MAX_STATES];
 
-    #[allow(clippy::needless_range_loop)]
-    for k in 0..nStates as usize {
-        psDelDec[k].Seed = (k as i32 + psIndices.Seed as i32) & 3;
-        psDelDec[k].SeedInit = psDelDec[k].Seed;
-        psDelDec[k].RD_Q10 = 0;
-        psDelDec[k].LF_AR_Q14 = NSQ.sLF_AR_shp_Q14;
-        psDelDec[k].Diff_Q14 = NSQ.sDiff_shp_Q14;
-        psDelDec[k].Shape_Q14[0] = NSQ.sLTP_shp_Q14[ltp_mem_len - 1];
-        psDelDec[k].sLPC_Q14[..NSQ_LPC_BUF_LENGTH]
+    for (k, ps_del_dec) in psDelDec.iter_mut().take(n_states).enumerate() {
+        ps_del_dec.Seed = (k as i32 + psIndices.Seed as i32) & 3;
+        ps_del_dec.SeedInit = ps_del_dec.Seed;
+        ps_del_dec.RD_Q10 = 0;
+        ps_del_dec.LF_AR_Q14 = NSQ.sLF_AR_shp_Q14;
+        ps_del_dec.Diff_Q14 = NSQ.sDiff_shp_Q14;
+        ps_del_dec.Shape_Q14[0] = NSQ.sLTP_shp_Q14[ltp_mem_len - 1];
+        ps_del_dec.sLPC_Q14[..NSQ_LPC_BUF_LENGTH]
             .copy_from_slice(&NSQ.sLPC_Q14[..NSQ_LPC_BUF_LENGTH]);
-        psDelDec[k].sAR2_Q14 = NSQ.sAR2_Q14;
+        ps_del_dec.sAR2_Q14 = NSQ.sAR2_Q14;
     }
 
     let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
@@ -347,18 +347,16 @@ pub fn silk_NSQ_del_dec_c(
                     // Find winner among delayed decision states
                     RDmin_Q10 = psDelDec[0].RD_Q10;
                     Winner_ind = 0;
-                    #[allow(clippy::needless_range_loop)]
-                    for i in 1..nStates as usize {
-                        if psDelDec[i].RD_Q10 < RDmin_Q10 {
-                            RDmin_Q10 = psDelDec[i].RD_Q10;
+                    for (i, ps_del_dec) in psDelDec.iter().enumerate().take(n_states).skip(1) {
+                        if ps_del_dec.RD_Q10 < RDmin_Q10 {
+                            RDmin_Q10 = ps_del_dec.RD_Q10;
                             Winner_ind = i as i32;
                         }
                     }
                     // Penalize non-winners
-                    #[allow(clippy::needless_range_loop)]
-                    for i in 0..nStates as usize {
+                    for (i, ps_del_dec) in psDelDec.iter_mut().enumerate().take(n_states) {
                         if i as i32 != Winner_ind {
-                            psDelDec[i].RD_Q10 += silk_int32_MAX >> 4;
+                            ps_del_dec.RD_Q10 += silk_int32_MAX >> 4;
                         }
                     }
                     // Output delayed samples from winner
@@ -513,10 +511,9 @@ pub fn silk_NSQ_del_dec_c(
     // Find final winner
     RDmin_Q10 = psDelDec[0].RD_Q10;
     Winner_ind = 0;
-    #[allow(clippy::needless_range_loop)]
-    for k in 1..nStates as usize {
-        if psDelDec[k].RD_Q10 < RDmin_Q10 {
-            RDmin_Q10 = psDelDec[k].RD_Q10;
+    for (k, ps_del_dec) in psDelDec.iter().enumerate().take(n_states).skip(1) {
+        if ps_del_dec.RD_Q10 < RDmin_Q10 {
+            RDmin_Q10 = ps_del_dec.RD_Q10;
             Winner_ind = k as i32;
         }
     }
@@ -631,8 +628,7 @@ fn silk_noise_shape_quantizer_del_dec(
     let x_Q10 = &x_Q10[..length];
     let AR_shp_Q13 = &AR_shp_Q13[..shapingLPCOrder as usize];
 
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..length {
+    for (i, &x_q10_i) in x_Q10.iter().take(length).enumerate() {
         // LTP prediction (shared across all states)
         if signalType == TYPE_VOICED {
             LTP_pred_Q14 = 2;
@@ -743,7 +739,7 @@ fn silk_noise_shape_quantizer_del_dec(
                 ((tmp1 >> (4 - 1)) + 1) >> 1
             };
 
-            r_Q10 = x_Q10[i] - tmp1;
+            r_Q10 = x_q10_i - tmp1;
             if psDD.Seed < 0 {
                 r_Q10 = -r_Q10;
             }
@@ -825,7 +821,7 @@ fn silk_noise_shape_quantizer_del_dec(
             }
             LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
+            psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_q10_i as u32) << 4) as i32;
             sLF_AR_shp_Q14 = psSampleState[k][0].Diff_Q14 - n_AR_Q14;
             psSampleState[k][0].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][0].LF_AR_Q14 = sLF_AR_shp_Q14;
@@ -838,7 +834,7 @@ fn silk_noise_shape_quantizer_del_dec(
             }
             LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
+            psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_q10_i as u32) << 4) as i32;
             sLF_AR_shp_Q14 = psSampleState[k][1].Diff_Q14 - n_AR_Q14;
             psSampleState[k][1].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][1].LF_AR_Q14 = sLF_AR_shp_Q14;
@@ -856,10 +852,9 @@ fn silk_noise_shape_quantizer_del_dec(
         // Find winner among best candidates
         RDmin_Q10 = psSampleState[0][0].RD_Q10;
         Winner_ind = 0;
-        #[allow(clippy::needless_range_loop)]
-        for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][0].RD_Q10;
+        for (k, ps_sample_state) in psSampleState.iter().enumerate().take(nStates).skip(1) {
+            if ps_sample_state[0].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = ps_sample_state[0].RD_Q10;
                 Winner_ind = k as i32;
             }
         }
@@ -878,14 +873,13 @@ fn silk_noise_shape_quantizer_del_dec(
         RDmin_Q10 = psSampleState[0][1].RD_Q10;
         RDmax_ind = 0;
         RDmin_ind = 0;
-        #[allow(clippy::needless_range_loop)]
-        for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 > RDmax_Q10 {
-                RDmax_Q10 = psSampleState[k][0].RD_Q10;
+        for (k, ps_sample_state) in psSampleState.iter().enumerate().take(nStates).skip(1) {
+            if ps_sample_state[0].RD_Q10 > RDmax_Q10 {
+                RDmax_Q10 = ps_sample_state[0].RD_Q10;
                 RDmax_ind = k as i32;
             }
-            if psSampleState[k][1].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][1].RD_Q10;
+            if ps_sample_state[1].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = ps_sample_state[1].RD_Q10;
                 RDmin_ind = k as i32;
             }
         }
