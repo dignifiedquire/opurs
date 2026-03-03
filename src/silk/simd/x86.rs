@@ -323,50 +323,6 @@ pub unsafe fn silk_inner_product_flp_avx2(data1: &[f32], data2: &[f32]) -> f64 {
     result
 }
 
-/// SSE2 implementation of `silk_inner_product_FLP`.
-/// f32→f64 inner product using SSE2 `_mm_cvtps_pd` for widening.
-///
-/// # Safety
-/// Requires SSE2 support (checked by caller via cpufeatures).
-#[target_feature(enable = "sse2")]
-pub unsafe fn silk_inner_product_flp_sse2(data1: &[f32], data2: &[f32]) -> f64 {
-    let n = data1.len().min(data2.len());
-    let mut sum = _mm_setzero_pd();
-    let mut i = 0usize;
-
-    while i + 3 < n {
-        // Load 4 f32s, convert to 2 pairs of f64
-        let x = _mm_loadu_ps(data1.as_ptr().add(i));
-        let y = _mm_loadu_ps(data2.as_ptr().add(i));
-
-        // Low 2 elements: f32 → f64
-        let x_lo = _mm_cvtps_pd(x);
-        let y_lo = _mm_cvtps_pd(y);
-        sum = _mm_add_pd(sum, _mm_mul_pd(x_lo, y_lo));
-
-        // High 2 elements: f32 → f64
-        let x_hi = _mm_cvtps_pd(_mm_movehl_ps(x, x));
-        let y_hi = _mm_cvtps_pd(_mm_movehl_ps(y, y));
-        sum = _mm_add_pd(sum, _mm_mul_pd(x_hi, y_hi));
-
-        i += 4;
-    }
-
-    // Horizontal sum of f64 pair
-    let hi = _mm_unpackhi_pd(sum, sum);
-    sum = _mm_add_sd(sum, hi);
-    let mut result: f64 = 0.0;
-    _mm_store_sd(&mut result, sum);
-
-    // Handle remaining elements
-    while i < n {
-        result += *data1.get_unchecked(i) as f64 * *data2.get_unchecked(i) as f64;
-        i += 1;
-    }
-
-    result
-}
-
 /// SSE4.1 implementation of the NSQ inner quantizer loop, specialized for
 /// shapingLPCOrder=10 and predictLPCOrder=16.
 /// Port of `silk/x86/NSQ_sse4_1.c:silk_noise_shape_quantizer_10_16_sse4_1`.

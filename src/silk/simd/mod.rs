@@ -194,7 +194,7 @@ pub fn silk_LPC_inverse_pred_gain(A_Q12: &[i16], arch: Arch) -> i32 {
 pub fn use_nsq_sse4_1(arch: Arch) -> bool {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        return arch.has_sse4_1();
+        arch.has_sse4_1()
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
@@ -476,7 +476,7 @@ pub fn silk_nsq_del_dec_scale_states_sse4_1(
 pub fn use_nsq_del_dec_avx2(arch: Arch, n_states: i32) -> bool {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        return arch.has_avx2() && n_states > 2 && n_states <= 4;
+        arch.has_avx2() && n_states > 2 && n_states <= 4
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {

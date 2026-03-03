@@ -771,6 +771,7 @@ impl<'a> OpusExtensionIterator<'a> {
     /// Find the next extension with the given ID.
     ///
     /// Upstream C: src/extensions.c:opus_extension_iterator_find
+    #[cfg(any(feature = "qext", feature = "dred"))]
     pub fn find(&mut self, target_id: i32) -> Result<Option<ExtensionRef>, i32> {
         loop {
             match self.next()? {
