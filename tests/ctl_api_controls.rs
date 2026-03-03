@@ -1183,11 +1183,13 @@ fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
         let (_ret_ignore_b, pcm_ignore_b, rng_ignore_b) = decode_ms_raw(&malformed, true);
         assert_eq!(
             pcm_ignore_a, pcm_ignore_b,
-            "multistream ignore_extensions decode output should be deterministic"
+            "multistream ignore_extensions decode output should be deterministic (seed={seed}, packet_len={})",
+            malformed.len()
         );
         assert_eq!(
             rng_ignore_a, rng_ignore_b,
-            "multistream ignore_extensions decode final range should be deterministic"
+            "multistream ignore_extensions decode final range should be deterministic (seed={seed}, packet_len={})",
+            malformed.len()
         );
 
         let (ret_with_ext_a, pcm_with_ext_a, rng_with_ext_a) = decode_ms_raw(&malformed, false);
@@ -1218,10 +1220,24 @@ fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
                 "multistream malformed extension-aware return code mismatch (rust vs c)"
             );
             if ret_with_ext_a == FRAME_SIZE_20MS_96K {
-                assert_eq!(
-                    pcm_with_ext_a, c_pcm_with_ext,
-                    "multistream malformed extension-aware PCM mismatch (rust vs c)"
-                );
+                if pcm_with_ext_a != c_pcm_with_ext {
+                    let first_diff = pcm_with_ext_a
+                        .iter()
+                        .zip(c_pcm_with_ext.iter())
+                        .position(|(a, b)| a != b)
+                        .unwrap_or(usize::MAX);
+                    panic!(
+                        "multistream malformed extension-aware PCM mismatch (rust vs c): \
+seed={seed}, packet_len={}, first_diff={}, rust_sample={}, c_sample={}, \
+rust_rng_with_ext={}, c_rng_with_ext={}",
+                        malformed.len(),
+                        first_diff,
+                        pcm_with_ext_a.get(first_diff).copied().unwrap_or(0),
+                        c_pcm_with_ext.get(first_diff).copied().unwrap_or(0),
+                        rng_with_ext_a,
+                        c_rng_with_ext,
+                    );
+                }
                 assert_eq!(
                     rng_with_ext_a, c_rng_with_ext,
                     "multistream malformed extension-aware final range mismatch (rust vs c)"

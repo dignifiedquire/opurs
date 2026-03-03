@@ -109,7 +109,7 @@ impl Arch {
     }
 }
 
-#[cfg(all(feature = "simd", feature = "fuzzing"))]
+#[cfg(all(feature = "simd", feature = "fuzzing", not(feature = "tools")))]
 fn fuzz_random_u32() -> u32 {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -137,6 +137,7 @@ fn fuzz_random_u32() -> u32 {
 #[cfg(all(
     feature = "simd",
     feature = "fuzzing",
+    not(feature = "tools"),
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 fn fuzz_downgrade_arch(arch: Arch) -> Arch {
@@ -158,7 +159,12 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     }
 }
 
-#[cfg(all(feature = "simd", feature = "fuzzing", target_arch = "aarch64"))]
+#[cfg(all(
+    feature = "simd",
+    feature = "fuzzing",
+    not(feature = "tools"),
+    target_arch = "aarch64"
+))]
 fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     let max = match arch {
         Arch::Scalar => 0,
@@ -173,7 +179,12 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     }
 }
 
-#[cfg(all(feature = "simd", feature = "fuzzing", target_arch = "arm"))]
+#[cfg(all(
+    feature = "simd",
+    feature = "fuzzing",
+    not(feature = "tools"),
+    target_arch = "arm"
+))]
 fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     let max = match arch {
         Arch::Scalar => 0,
@@ -189,6 +200,14 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
         3 => Arch::Neon,
         _ => Arch::Scalar,
     }
+}
+
+#[cfg(all(feature = "simd", feature = "fuzzing", not(feature = "tools")))]
+fn fuzz_select_arch_once(arch: Arch) -> Arch {
+    use std::sync::OnceLock;
+
+    static SELECTED_ARCH: OnceLock<Arch> = OnceLock::new();
+    *SELECTED_ARCH.get_or_init(|| fuzz_downgrade_arch(arch))
 }
 
 /// Detect the highest supported SIMD architecture at runtime.
@@ -231,9 +250,9 @@ pub fn opus_select_arch() -> Arch {
             arch = Arch::Avx2;
         }
 
-        #[cfg(feature = "fuzzing")]
+        #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
         {
-            arch = fuzz_downgrade_arch(arch);
+            arch = fuzz_select_arch_once(arch);
         }
         arch
     }
@@ -253,8 +272,8 @@ pub fn opus_select_arch() -> Arch {
         } else {
             Arch::Neon
         };
-        #[cfg(feature = "fuzzing")]
-        let arch = fuzz_downgrade_arch(arch);
+        #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
+        let arch = fuzz_select_arch_once(arch);
         arch
     }
 
@@ -313,8 +332,8 @@ pub fn opus_select_arch() -> Arch {
             return arch;
         }
 
-        #[cfg(feature = "fuzzing")]
-        let arch = fuzz_downgrade_arch(arch);
+        #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
+        let arch = fuzz_select_arch_once(arch);
 
         return arch;
     }
