@@ -281,7 +281,6 @@ fn op_pvq_search_N2(
 ///
 /// Upstream C: celt/vq.c:op_pvq_refine
 #[cfg(feature = "qext")]
-#[allow(clippy::needless_range_loop)]
 fn op_pvq_refine(
     Xn: &[f32],
     iy: &mut [i32],
@@ -295,19 +294,17 @@ fn op_pvq_refine(
     let mut rounding = vec![0.0f32; N as usize];
     let mut iysum: i32 = 0;
 
-    for i in 0..N as usize {
-        let tmp = (K as f32 * 256.0) * Xn[i]; // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
-        iy[i] = (0.5 + tmp).floor() as i32;
-        rounding[i] = tmp - (iy[i] as f32 * 128.0); // tmp - SHL32(iy[i], 7)
+    for ((&x_n, iy_i), rounding_i) in Xn.iter().zip(iy.iter_mut()).zip(rounding.iter_mut()) {
+        let tmp = (K as f32 * 256.0) * x_n; // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
+        *iy_i = (0.5 + tmp).floor() as i32;
+        *rounding_i = tmp - (*iy_i as f32 * 128.0); // tmp - SHL32(iy[i], 7)
     }
     if !same {
-        for i in 0..N as usize {
-            iy[i] = (up * iy0[i] + up - 1).min((up * iy0[i] - up + 1).max(iy[i]));
+        for (iy_i, &iy0_i) in iy.iter_mut().zip(iy0.iter()) {
+            *iy_i = (up * iy0_i + up - 1).min((up * iy0_i - up + 1).max(*iy_i));
         }
     }
-    for i in 0..N as usize {
-        iysum += iy[i];
-    }
+    iysum += iy.iter().sum::<i32>();
     if (iysum - K).abs() > 32 {
         return true; // failed
     }
@@ -315,12 +312,12 @@ fn op_pvq_refine(
     while iysum != K {
         let mut roundval: f32 = -1000000.0 * dir as f32;
         let mut roundpos: usize = 0;
-        for i in 0..N as usize {
-            if (rounding[i] - roundval) * dir as f32 > 0.0
+        for (i, &rounding_i) in rounding.iter().enumerate() {
+            if (rounding_i - roundval) * dir as f32 > 0.0
                 && (iy[i] - up * iy0[i]).abs() < (margin - 1)
                 && !(dir == -1 && iy[i] == 0)
             {
-                roundval = rounding[i];
+                roundval = rounding_i;
                 roundpos = i;
             }
         }
@@ -335,7 +332,6 @@ fn op_pvq_refine(
 ///
 /// Upstream C: celt/vq.c:op_pvq_search_extra
 #[cfg(feature = "qext")]
-#[allow(clippy::needless_range_loop)]
 fn op_pvq_search_extra(
     X: &[f32],
     iy: &mut [i32],
@@ -345,20 +341,17 @@ fn op_pvq_search_extra(
     refine: &mut [i32],
     N: i32,
 ) -> f32 {
-    let mut sum: f32 = 0.0;
     let mut failed = false;
     let n = N as usize;
 
-    for i in 0..n {
-        sum += X[i].abs();
-    }
+    let sum: f32 = X.iter().take(n).map(|x| x.abs()).sum();
     let mut Xn = vec![0.0f32; n];
     if sum < EPSILON {
         failed = true;
     } else {
         let rcp_sum = 1.0f32 / sum;
-        for i in 0..n {
-            Xn[i] = X[i].abs() * rcp_sum;
+        for (x_n, x_i) in Xn.iter_mut().zip(X.iter()) {
+            *x_n = x_i.abs() * rcp_sum;
         }
     }
     // First pass: refine base quantization
@@ -369,22 +362,23 @@ fn op_pvq_search_extra(
     failed = failed || op_pvq_refine(&Xn, up_iy, &iy_copy, up * K, up, up, N);
     if failed {
         iy[0] = K;
-        for i in 1..n {
-            iy[i] = 0;
-        }
+        iy[1..].fill(0);
         up_iy[0] = up * K;
-        for i in 1..n {
-            up_iy[i] = 0;
-        }
+        up_iy[1..].fill(0);
     }
     let mut yy: f64 = 0.0;
-    for i in 0..n {
-        yy += up_iy[i] as f64 * up_iy[i] as f64;
-        if X[i] < 0.0 {
-            iy[i] = -iy[i];
-            up_iy[i] = -up_iy[i];
+    for (((&x_i, iy_i), up_iy_i), refine_i) in X
+        .iter()
+        .zip(iy.iter_mut())
+        .zip(up_iy.iter_mut())
+        .zip(refine.iter_mut())
+    {
+        yy += *up_iy_i as f64 * *up_iy_i as f64;
+        if x_i < 0.0 {
+            *iy_i = -*iy_i;
+            *up_iy_i = -*up_iy_i;
         }
-        refine[i] = up_iy[i] - up * iy[i];
+        *refine_i = *up_iy_i - up * *iy_i;
     }
     yy as f32
 }
@@ -430,19 +424,15 @@ fn ec_dec_refine(dec: &mut ec_dec, up: i32, extra_bits: i32, use_entropy: bool) 
 ///
 /// Upstream C: celt/vq.c:cubic_synthesis
 #[cfg(feature = "qext")]
-#[allow(clippy::needless_range_loop)]
 fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign: bool, gain: f32) {
     let n = N as usize;
-    let mut sum: f32 = 0.0;
     #[cfg(feature = "qext")]
     let trace = qext_trace_enabled_vq();
-    for i in 0..n {
-        X[i] = (1 + 2 * iy[i]) as f32 - K as f32;
+    for (x_i, &iy_i) in X.iter_mut().zip(iy.iter()).take(n) {
+        *x_i = (1 + 2 * iy_i) as f32 - K as f32;
     }
     X[face] = if sign { -(K as f32) } else { K as f32 };
-    for i in 0..n {
-        sum += X[i] * X[i];
-    }
+    let sum: f32 = X.iter().take(n).map(|x| x * x).sum();
     // Match upstream float path semantics: C computes `1.f/sqrt(sum)` with `sqrt`
     // operating in double precision before rounding back to float.
     let mag = (1.0f64 / (sum as f64).sqrt()) as f32;
@@ -459,8 +449,8 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
             qext_hash_i32(&iy[..n]),
         );
     }
-    for i in 0..n {
-        X[i] *= mag * gain;
+    for x_i in X.iter_mut().take(n) {
+        *x_i *= mag * gain;
     }
     #[cfg(feature = "qext")]
     if trace {
@@ -481,7 +471,6 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
 ///
 /// Upstream C: celt/vq.c:cubic_quant
 #[cfg(feature = "qext")]
-#[allow(clippy::needless_range_loop)]
 pub fn cubic_quant(
     X: &mut [f32],
     N: i32,
@@ -505,9 +494,9 @@ pub fn cubic_quant(
     }
     let mut face: usize = 0;
     let mut faceval: f32 = -1.0;
-    for i in 0..n {
-        if X[i].abs() > faceval {
-            faceval = X[i].abs();
+    for (i, &x_i) in X.iter().enumerate().take(n) {
+        if x_i.abs() > faceval {
+            faceval = x_i.abs();
             face = i;
         }
     }
@@ -516,12 +505,12 @@ pub fn cubic_quant(
     ec_enc_bits(enc, sign as u32, 1);
     let norm = 0.5 * K as f32 / (faceval + EPSILON);
     let mut iy = vec![0i32; n];
-    for i in 0..n {
-        iy[i] = (K - 1).min(((X[i] + faceval) * norm).floor() as i32);
+    for (iy_i, &x_i) in iy.iter_mut().zip(X.iter()).take(n) {
+        *iy_i = (K - 1).min(((x_i + faceval) * norm).floor() as i32);
     }
-    for i in 0..n {
+    for (i, &iy_i) in iy.iter().enumerate().take(n) {
         if i != face {
-            ec_enc_bits(enc, iy[i] as u32, res as u32);
+            ec_enc_bits(enc, iy_i as u32, res as u32);
         }
     }
     if resynth != 0 {
@@ -534,7 +523,6 @@ pub fn cubic_quant(
 ///
 /// Upstream C: celt/vq.c:cubic_unquant
 #[cfg(feature = "qext")]
-#[allow(clippy::needless_range_loop)]
 pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, gain: f32) -> u32 {
     let n = N as usize;
     let mut K = 1 << res;
@@ -550,9 +538,9 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
     let face = ec_dec_uint(dec, N as u32) as usize;
     let sign = ec_dec_bits(dec, 1) != 0;
     let mut iy = vec![0i32; n];
-    for i in 0..n {
+    for (i, iy_i) in iy.iter_mut().enumerate().take(n) {
         if i != face {
-            iy[i] = ec_dec_bits(dec, res as u32) as i32;
+            *iy_i = ec_dec_bits(dec, res as u32) as i32;
         }
     }
     iy[face] = 0;
@@ -587,7 +575,6 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, 
 }
 
 /// Upstream C: celt/vq.c:alg_quant
-#[allow(clippy::needless_range_loop)]
 #[allow(clippy::too_many_arguments)]
 pub fn alg_quant(
     X: &mut [f32],
@@ -638,8 +625,8 @@ pub fn alg_quant(
             encode_pulses(&iy[..N as usize], K, enc);
             let use_entropy =
                 (ext_enc.storage as i32 * 8 - ec_tell(ext_enc)) > (N - 1) * (extra_bits + 3) + 1;
-            for i in 0..(N - 1) as usize {
-                ec_enc_refine(ext_enc, refine[i], up, extra_bits, use_entropy);
+            for &refine_i in refine.iter().take((N - 1) as usize) {
+                ec_enc_refine(ext_enc, refine_i, up, extra_bits, use_entropy);
             }
             if iy[(N - 1) as usize] == 0 {
                 ec_enc_bits(ext_enc, (up_iy[(N - 1) as usize] < 0) as u32, 1);
@@ -675,7 +662,6 @@ pub fn alg_quant(
 
 /// Upstream C: celt/vq.c:alg_unquant
 #[inline]
-#[allow(clippy::needless_range_loop)]
 #[allow(clippy::too_many_arguments)]
 pub fn alg_unquant(
     X: &mut [f32],
@@ -728,27 +714,26 @@ pub fn alg_unquant(
             let use_entropy =
                 (ext_dec.storage as i32 * 8 - ec_tell(ext_dec)) > (N - 1) * (extra_bits + 3) + 1;
             let mut refine = vec![0i32; n];
-            for i in 0..(N - 1) as usize {
-                refine[i] = ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
+            for refine_i in refine.iter_mut().take((N - 1) as usize) {
+                *refine_i = ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
             }
             let sign = if iy[(N - 1) as usize] == 0 {
                 ec_dec_bits(ext_dec, 1) != 0
             } else {
                 iy[(N - 1) as usize] < 0
             };
-            for i in 0..(N - 1) as usize {
-                iy[i] = iy[i] * up + refine[i];
+            for (iy_i, &refine_i) in iy.iter_mut().zip(refine.iter()).take((N - 1) as usize) {
+                *iy_i = *iy_i * up + refine_i;
             }
             iy[(N - 1) as usize] = up * K;
-            for i in 0..(N - 1) as usize {
-                iy[(N - 1) as usize] -= iy[i].abs();
-            }
+            let tail_abs_sum: i32 = iy.iter().take((N - 1) as usize).map(|v| v.abs()).sum();
+            iy[(N - 1) as usize] -= tail_abs_sum;
             if sign {
                 iy[(N - 1) as usize] = -iy[(N - 1) as usize];
             }
             let mut yy64: f32 = 0.0;
-            for i in 0..n {
-                yy64 += iy[i] as f32 * iy[i] as f32;
+            for iy_i in iy.iter().take(n) {
+                yy64 += *iy_i as f32 * *iy_i as f32;
             }
             Ryy = yy64;
         }
