@@ -333,6 +333,7 @@ pub unsafe fn silk_inner_product_flp_avx2(data1: &[f32], data2: &[f32]) -> f64 {
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
     NSQ: &mut silk_nsq_state,
     signalType: i32,
@@ -659,6 +660,7 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
@@ -774,6 +776,7 @@ pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
     NSQ: &mut silk_nsq_state,
     psDelDec: &mut [NSQ_del_dec_struct],
@@ -1088,9 +1091,9 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
 
         let mut RDmin_Q10 = psSampleState[0][0].RD_Q10;
         let mut Winner_ind: i32 = 0;
-        for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][0].RD_Q10;
+        for (k, sample_state) in psSampleState.iter().take(nStates).enumerate().skip(1) {
+            if sample_state[0].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = sample_state[0].RD_Q10;
                 Winner_ind = k as i32;
             }
         }
@@ -1107,13 +1110,13 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
         RDmin_Q10 = psSampleState[0][1].RD_Q10;
         let mut RDmax_ind: i32 = 0;
         let mut RDmin_ind: i32 = 0;
-        for k in 1..nStates {
-            if psSampleState[k][0].RD_Q10 > RDmax_Q10 {
-                RDmax_Q10 = psSampleState[k][0].RD_Q10;
+        for (k, sample_state) in psSampleState.iter().take(nStates).enumerate().skip(1) {
+            if sample_state[0].RD_Q10 > RDmax_Q10 {
+                RDmax_Q10 = sample_state[0].RD_Q10;
                 RDmax_ind = k as i32;
             }
-            if psSampleState[k][1].RD_Q10 < RDmin_Q10 {
-                RDmin_Q10 = psSampleState[k][1].RD_Q10;
+            if sample_state[1].RD_Q10 < RDmin_Q10 {
+                RDmin_Q10 = sample_state[1].RD_Q10;
                 RDmin_ind = k as i32;
             }
         }
@@ -1183,6 +1186,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn silk_VQ_WMat_EC_sse4_1(
     ind: &mut i8,
     res_nrg_Q15: &mut i32,
@@ -1905,10 +1909,14 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
             silk_mm_smulwb_epi32(psDelDec.sAR2_Q14[0], warping_Q16),
         );
         let mut n_AR_Q14 = _mm_set1_epi32(shapingLPCOrder >> 1);
-        for j in 0..shapingLPCOrder as usize - 1 {
+        for (j, &ar_shp_q13) in AR_shp_Q13
+            .iter()
+            .take(shapingLPCOrder as usize - 1)
+            .enumerate()
+        {
             let tmp1 = psDelDec.sAR2_Q14[j];
             psDelDec.sAR2_Q14[j] = tmp0;
-            n_AR_Q14 = _mm_add_epi32(n_AR_Q14, silk_mm_smulwb_epi32(tmp0, AR_shp_Q13[j] as i32));
+            n_AR_Q14 = _mm_add_epi32(n_AR_Q14, silk_mm_smulwb_epi32(tmp0, ar_shp_q13 as i32));
             tmp0 = _mm_add_epi32(
                 tmp1,
                 silk_mm_smulwb_epi32(_mm_sub_epi32(psDelDec.sAR2_Q14[j + 1], tmp0), warping_Q16),

@@ -466,6 +466,7 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
 /// # Safety
 /// Requires SSE support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse")]
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn comb_filter_const_sse(
     y: &mut [f32],
     y_start: usize,

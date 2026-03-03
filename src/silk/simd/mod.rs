@@ -384,6 +384,7 @@ pub fn silk_NSQ_del_dec(
 /// Run the SSE4.1 NSQ inner quantizer (specialized for order 10/16).
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn silk_noise_shape_quantizer_10_16_sse4_1(
     NSQ: &mut super::structs::silk_nsq_state,
     signalType: i32,

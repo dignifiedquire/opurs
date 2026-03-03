@@ -17,6 +17,7 @@ use core::arch::x86_64::*;
 /// AVX2 fast 2^x approximation via IEEE 754 bit manipulation.
 /// Port of `vec_avx.h:exp8_approx` (AVX2 path).
 #[target_feature(enable = "avx2", enable = "fma")]
+#[allow(clippy::approx_constant)]
 unsafe fn exp8_approx(x: __m256) -> __m256 {
     let k0 = _mm256_set1_ps(0.99992522);
     let k1 = _mm256_set1_ps(0.69583354);
@@ -133,6 +134,7 @@ unsafe fn sigmoid4_approx_sse2(x: __m128) -> __m128 {
 /// SSE2 fast 2^x approximation via IEEE 754 bit manipulation.
 /// Port of non-AVX `vec_avx.h:exp4_approx`.
 #[target_feature(enable = "sse2")]
+#[allow(clippy::approx_constant)]
 unsafe fn exp4_approx_sse2(x: __m128) -> __m128 {
     let k0 = _mm_set1_ps(0.99992522);
     let k1 = _mm_set1_ps(0.69583354);
@@ -167,6 +169,7 @@ unsafe fn exp4_approx_sse2(x: __m128) -> __m128 {
 /// SSE4.1 fast 2^x approximation via IEEE 754 bit manipulation.
 /// Port of non-AVX `vec_avx.h:exp4_approx` when `_mm_floor_ps` is available.
 #[target_feature(enable = "sse4.1")]
+#[allow(clippy::approx_constant)]
 unsafe fn exp4_approx_sse4_1(x: __m128) -> __m128 {
     let k0 = _mm_set1_ps(0.99992522);
     let k1 = _mm_set1_ps(0.69583354);
@@ -456,8 +459,8 @@ pub unsafe fn sgemv_avx2(
     while i + 16 <= rows {
         let mut vy0 = _mm256_setzero_ps();
         let mut vy8 = _mm256_setzero_ps();
-        for j in 0..cols {
-            let vxj = _mm256_broadcast_ss(&x[j]);
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            let vxj = _mm256_set1_ps(xj);
             let w = weights.as_ptr().add(j * col_stride + i);
             let vw0 = _mm256_loadu_ps(w);
             vy0 = _mm256_fmadd_ps(vw0, vxj, vy0);
@@ -472,8 +475,8 @@ pub unsafe fn sgemv_avx2(
     // 8-row blocks
     while i + 8 <= rows {
         let mut vy0 = _mm256_setzero_ps();
-        for j in 0..cols {
-            let vxj = _mm256_broadcast_ss(&x[j]);
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            let vxj = _mm256_set1_ps(xj);
             let vw = _mm256_loadu_ps(weights.as_ptr().add(j * col_stride + i));
             vy0 = _mm256_fmadd_ps(vw, vxj, vy0);
         }
@@ -484,8 +487,8 @@ pub unsafe fn sgemv_avx2(
     // 4-row blocks (SSE)
     while i + 4 <= rows {
         let mut vy0 = _mm_setzero_ps();
-        for j in 0..cols {
-            let vxj = _mm_set1_ps(x[j]);
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            let vxj = _mm_set1_ps(xj);
             let vw = _mm_loadu_ps(weights.as_ptr().add(j * col_stride + i));
             vy0 = _mm_fmadd_ps(vw, vxj, vy0);
         }
@@ -496,8 +499,8 @@ pub unsafe fn sgemv_avx2(
     // Scalar tail
     while i < rows {
         out[i] = 0.0;
-        for j in 0..cols {
-            out[i] += weights[j * col_stride + i] * x[j];
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            out[i] += weights[j * col_stride + i] * xj;
         }
         i += 1;
     }
@@ -521,8 +524,8 @@ pub unsafe fn sgemv_sse2(
 
     while i + 4 <= rows {
         let mut vy = _mm_setzero_ps();
-        for j in 0..cols {
-            let vxj = _mm_set1_ps(x[j]);
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            let vxj = _mm_set1_ps(xj);
             let vw = _mm_loadu_ps(weights.as_ptr().add(j * col_stride + i));
             vy = _mm_add_ps(vy, _mm_mul_ps(vw, vxj));
         }
@@ -532,8 +535,8 @@ pub unsafe fn sgemv_sse2(
 
     while i < rows {
         out[i] = 0.0;
-        for j in 0..cols {
-            out[i] += weights[j * col_stride + i] * x[j];
+        for (j, &xj) in x.iter().take(cols).enumerate() {
+            out[i] += weights[j * col_stride + i] * xj;
         }
         i += 1;
     }
