@@ -18,7 +18,7 @@ use crate::silk::NSQ::silk_NSQ;
 
 /// Upstream C: silk/float/wrappers_FLP.c:silk_A2NLSF_FLP
 pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
-    let mut i: i32 = 0;
+    let mut i: i32;
     let mut a_fix_Q16: [i32; 16] = [0; 16];
     i = 0;
     while i < LPC_order {
@@ -33,7 +33,7 @@ pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_NLSF2A_FLP
 pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: Arch) {
-    let mut i: i32 = 0;
+    let mut i: i32;
     let mut a_fix_Q12: [i16; 16] = [0; 16];
     silk_NLSF2A(
         &mut a_fix_Q12[..LPC_order as usize],
@@ -53,8 +53,8 @@ pub fn silk_process_NLSFs_FLP(
     NLSF_Q15: &mut [i16],
     prev_NLSF_Q15: &[i16],
 ) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut i: i32;
+    let mut j: i32;
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
     silk_process_NLSFs(psEncC, &mut PredCoef_Q12, NLSF_Q15, prev_NLSF_Q15);
     j = 0;
@@ -77,8 +77,8 @@ pub fn silk_NSQ_wrapper_FLP(
     pulses: &mut [i8],
     x: &[f32],
 ) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut i: i32;
+    let mut j: i32;
     let mut x16: [i16; 320] = [0; 320];
     let mut Gains_Q16: [i32; 4] = [0; 4];
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
@@ -192,7 +192,7 @@ pub fn silk_quant_LTP_gains_FLP(
     nb_subfr: i32,
     arch: Arch,
 ) {
-    let mut i: i32 = 0;
+    let mut i: i32;
     let mut pred_gain_dB_Q7: i32 = 0;
     let mut B_Q14: [i16; 20] = [0; 20];
     let mut XX_Q17: [i32; 100] = [0; 100];

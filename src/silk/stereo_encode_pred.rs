@@ -10,7 +10,7 @@ use crate::silk::tables_other::{
 
 /// Upstream C: silk/stereo_encode_pred.c:silk_stereo_encode_pred
 pub fn silk_stereo_encode_pred(psRangeEnc: &mut ec_enc, ix: &[[i8; 3]]) {
-    let mut n: i32 = 0;
+    let mut n: i32;
     n = 5 * ix[0][2_usize] as i32 + ix[1][2_usize] as i32;
     debug_assert!(n < 25);
     ec_enc_icdf(psRangeEnc, n, &silk_stereo_pred_joint_iCDF, 8);

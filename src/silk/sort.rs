@@ -4,9 +4,9 @@
 
 /// Upstream C: silk/sort.c:silk_insertion_sort_increasing
 pub fn silk_insertion_sort_increasing(a: &mut [i32], idx: &mut [i32], L: i32, K: i32) {
-    let mut value: i32 = 0;
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut value: i32;
+    let mut i: i32;
+    let mut j: i32;
     debug_assert!(K > 0);
     debug_assert!(L > 0);
     debug_assert!(L >= K);

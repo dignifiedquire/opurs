@@ -26,10 +26,10 @@ pub fn silk_NLSF_VQ(
 
     assert_eq!(LPC_order & 1, 0);
 
-    let mut diff_Q15: i32 = 0;
-    let mut diffw_Q24: i32 = 0;
-    let mut sum_error_Q24: i32 = 0;
-    let mut pred_Q24: i32 = 0;
+    let mut diff_Q15: i32;
+    let mut diffw_Q24: i32;
+    let mut sum_error_Q24: i32;
+    let mut pred_Q24: i32;
     let mut cb_Q8_ptr = pCB_Q8;
     let mut w_Q9_ptr = pWght_Q9;
 

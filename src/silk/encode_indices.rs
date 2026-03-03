@@ -25,11 +25,11 @@ pub fn silk_encode_indices(
     encode_LBRR: i32,
     condCoding: i32,
 ) {
-    let mut i: i32 = 0;
-    let mut k: i32 = 0;
-    let mut typeOffset: i32 = 0;
-    let mut encode_absolute_lagIndex: i32 = 0;
-    let mut delta_lagIndex: i32 = 0;
+    let mut i: i32;
+    let mut k: i32;
+
+    let mut encode_absolute_lagIndex: i32;
+    let mut delta_lagIndex: i32;
     let mut ec_ix: [i16; 16] = [0; 16];
     let mut pred_Q8: [u8; 16] = [0; 16];
     let psIndices: SideInfoIndices = if encode_LBRR != 0 {
@@ -37,7 +37,7 @@ pub fn silk_encode_indices(
     } else {
         psEncC.indices
     };
-    typeOffset = 2 * psIndices.signalType as i32 + psIndices.quantOffsetType as i32;
+    let typeOffset: i32 = 2 * psIndices.signalType as i32 + psIndices.quantOffsetType as i32;
     debug_assert!((0..6).contains(&typeOffset));
     debug_assert!(encode_LBRR == 0 || typeOffset >= 2);
     if encode_LBRR != 0 || typeOffset >= 2 {
@@ -149,10 +149,8 @@ pub fn silk_encode_indices(
             ec_enc_icdf(psRangeEnc, delta_lagIndex, &silk_pitch_delta_iCDF, 8);
         }
         if encode_absolute_lagIndex != 0 {
-            let mut pitch_high_bits: i32 = 0;
-            let mut pitch_low_bits: i32 = 0;
-            pitch_high_bits = psIndices.lagIndex as i32 / (psEncC.fs_kHz >> 1);
-            pitch_low_bits = psIndices.lagIndex as i32
+            let pitch_high_bits: i32 = psIndices.lagIndex as i32 / (psEncC.fs_kHz >> 1);
+            let pitch_low_bits: i32 = psIndices.lagIndex as i32
                 - pitch_high_bits as i16 as i32 * (psEncC.fs_kHz >> 1) as i16 as i32;
             ec_enc_icdf(psRangeEnc, pitch_high_bits, &silk_pitch_lag_iCDF, 8);
             ec_enc_icdf(

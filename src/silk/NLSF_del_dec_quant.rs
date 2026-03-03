@@ -20,24 +20,24 @@ pub fn silk_NLSF_del_dec_quant(
     mu_Q20: i32,
     order: i16,
 ) -> i32 {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut nStates: i32 = 0;
-    let mut ind_tmp: i32 = 0;
-    let mut ind_min_max: i32 = 0;
-    let mut ind_max_min: i32 = 0;
-    let mut in_Q10: i32 = 0;
-    let mut res_Q10: i32 = 0;
-    let mut pred_Q10: i32 = 0;
-    let mut diff_Q10: i32 = 0;
-    let mut rate0_Q5: i32 = 0;
-    let mut rate1_Q5: i32 = 0;
-    let mut out0_Q10: i16 = 0;
-    let mut out1_Q10: i16 = 0;
-    let mut RD_tmp_Q25: i32 = 0;
-    let mut min_Q25: i32 = 0;
-    let mut min_max_Q25: i32 = 0;
-    let mut max_min_Q25: i32 = 0;
+    let mut i: i32;
+    let mut j: i32;
+    let mut nStates: i32;
+    let mut ind_tmp: i32;
+    let mut ind_min_max: i32;
+    let mut ind_max_min: i32;
+    let mut in_Q10: i32;
+    let mut res_Q10: i32;
+    let mut pred_Q10: i32;
+    let mut diff_Q10: i32;
+    let mut rate0_Q5: i32;
+    let mut rate1_Q5: i32;
+    let mut out0_Q10: i16;
+    let mut out1_Q10: i16;
+    let mut RD_tmp_Q25: i32;
+    let mut min_Q25: i32;
+    let mut min_max_Q25: i32;
+    let mut max_min_Q25: i32;
     let mut ind_sort: [i32; 4] = [0; 4];
     let mut ind: [[i8; 16]; 4] = [[0; 16]; 4];
     let mut prev_out_Q10: [i16; 8] = [0; 8];

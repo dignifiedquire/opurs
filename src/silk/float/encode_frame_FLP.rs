@@ -80,29 +80,16 @@ pub fn silk_encode_frame_FLP(
         GainsUnq_Q16: [0; 4],
         lastGainIndexPrev: 0,
     };
-    let mut i: i32 = 0;
-    let mut iter: i32 = 0;
-    let mut maxIter: i32 = 0;
-    let mut found_upper: i32 = 0;
-    let mut found_lower: i32 = 0;
+    let mut i: i32;
+    let mut iter: i32;
+    let maxIter: i32;
+    let mut found_upper: i32;
+    let mut found_lower: i32;
     let ret: i32 = 0;
     let mut res_pitch: [f32; 672] = [0.; 672];
-    let mut sRangeEnc_copy = ec_ctx_saved::default();
+    let sRangeEnc_copy: ec_ctx_saved;
     let mut sRangeEnc_copy2 = ec_ctx_saved::default();
-    let mut sNSQ_copy: silk_nsq_state = silk_nsq_state {
-        xq: [0; 640],
-        sLTP_shp_Q14: [0; 640],
-        sLPC_Q14: [0; 96],
-        sAR2_Q14: [0; 24],
-        sLF_AR_shp_Q14: 0,
-        sDiff_shp_Q14: 0,
-        lagPrev: 0,
-        sLTP_buf_idx: 0,
-        sLTP_shp_buf_idx: 0,
-        rand_seed: 0,
-        prev_gain_Q16: 0,
-        rewhite_flag: 0,
-    };
+    let sNSQ_copy: silk_nsq_state;
     let mut sNSQ_copy2: silk_nsq_state = silk_nsq_state {
         xq: [0; 640],
         sLTP_shp_Q14: [0; 640],
@@ -117,19 +104,19 @@ pub fn silk_encode_frame_FLP(
         prev_gain_Q16: 0,
         rewhite_flag: 0,
     };
-    let mut seed_copy: i32 = 0;
-    let mut nBits: i32 = 0;
-    let mut nBits_lower: i32 = 0;
-    let mut nBits_upper: i32 = 0;
-    let mut gainMult_lower: i32 = 0;
-    let mut gainMult_upper: i32 = 0;
-    let mut gainsID: i32 = 0;
-    let mut gainsID_lower: i32 = 0;
-    let mut gainsID_upper: i32 = 0;
-    let mut gainMult_Q8: i16 = 0;
-    let mut ec_prevLagIndex_copy: i16 = 0;
-    let mut ec_prevSignalType_copy: i32 = 0;
-    let mut LastGainIndex_copy2: i8 = 0;
+    let seed_copy: i32;
+    let mut nBits: i32;
+    let mut nBits_lower: i32;
+    let mut nBits_upper: i32;
+    let mut gainMult_lower: i32;
+    let mut gainMult_upper: i32;
+    let mut gainsID: i32;
+    let mut gainsID_lower: i32;
+    let mut gainsID_upper: i32;
+    let mut gainMult_Q8: i16;
+    let ec_prevLagIndex_copy: i16;
+    let ec_prevSignalType_copy: i32;
+    let mut LastGainIndex_copy2: i8;
     let mut pGains_Q16: [i32; 4] = [0; 4];
     let mut ec_buf_copy: [u8; 1275] = [0; 1275];
     let mut gain_lock: [i32; 4] = [0, 0, 0, 0];
@@ -362,7 +349,7 @@ pub fn silk_encode_frame_FLP(
                     }
                 }
                 if found_lower == 0 && nBits > maxBits {
-                    let mut j: i32 = 0;
+                    let mut j: i32;
                     i = 0;
                     while i < psEnc.sCmn.nb_subfr as i32 {
                         let mut sum: i32 = 0;
@@ -404,12 +391,11 @@ pub fn silk_encode_frame_FLP(
                 }
                 i = 0;
                 while i < psEnc.sCmn.nb_subfr as i32 {
-                    let mut tmp: i16 = 0;
-                    if gain_lock[i as usize] != 0 {
-                        tmp = best_gain_mult[i as usize];
+                    let tmp: i16 = if gain_lock[i as usize] != 0 {
+                        best_gain_mult[i as usize]
                     } else {
-                        tmp = gainMult_Q8;
-                    }
+                        gainMult_Q8
+                    };
                     pGains_Q16[i as usize] = (((if 0x80000000_u32 as i32 >> 8 > 0x7fffffff >> 8 {
                         if ((sEncCtrl.GainsUnq_Q16[i as usize] as i64 * tmp as i64) >> 16) as i32
                             > 0x80000000_u32 as i32 >> 8

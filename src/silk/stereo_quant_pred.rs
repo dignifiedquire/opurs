@@ -8,14 +8,14 @@ use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/stereo_quant_pred.c:silk_stereo_quant_pred
 pub fn silk_stereo_quant_pred(pred_Q13: &mut [i32], ix: &mut [[i8; 3]]) {
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
-    let mut n: i32 = 0;
-    let mut low_Q13: i32 = 0;
-    let mut step_Q13: i32 = 0;
-    let mut lvl_Q13: i32 = 0;
-    let mut err_min_Q13: i32 = 0;
-    let mut err_Q13: i32 = 0;
+    let mut i: i32;
+    let mut j: i32;
+    let mut n: i32;
+    let mut low_Q13: i32;
+    let mut step_Q13: i32;
+    let mut lvl_Q13: i32;
+    let mut err_min_Q13: i32;
+    let mut err_Q13: i32;
     let mut quant_pred_Q13: i32 = 0;
     n = 0;
     while n < 2 {

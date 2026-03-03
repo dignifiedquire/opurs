@@ -52,13 +52,11 @@ fn ec_write_byte_at_end(this: &mut ec_enc, value: u32) -> i32 {
 #[inline]
 fn ec_enc_carry_out(this: &mut ec_enc, c: i32) {
     if c as u32 != EC_SYM_MAX {
-        
         let carry: i32 = c >> EC_SYM_BITS;
         if this.rem >= 0 {
             this.error |= ec_write_byte(this, (this.rem + carry) as u32);
         }
         if this.ext > 0 {
-            
             let sym: u32 = EC_SYM_MAX.wrapping_add(carry as u32) & EC_SYM_MAX;
             loop {
                 this.error |= ec_write_byte(this, sym);
@@ -110,7 +108,7 @@ pub fn ec_enc_init(buf: &mut [u8]) -> ec_enc<'_> {
 pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode({}, {}, {})", _fl, _fh, _ft);
-    
+
     let r: u32 = celt_udiv(this.rng, _ft);
     if _fl > 0 {
         this.val = this
@@ -128,7 +126,7 @@ pub fn ec_encode(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _ft: u32) {
 pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_encode_bin({}, {}, {})", _fl, _fh, _bits);
-    
+
     let r: u32 = this.rng >> _bits;
     if _fl > 0 {
         this.val = this.val.wrapping_add(
@@ -149,9 +147,8 @@ pub fn ec_encode_bin(this: &mut ec_enc, mut _fl: u32, mut _fh: u32, mut _bits: u
 pub fn ec_enc_bit_logp(this: &mut ec_enc, mut _val: i32, mut _logp: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bit_logp({}, {})", _val, _logp);
-    let mut r: u32 ;
-    
-    
+    let mut r: u32;
+
     r = this.rng;
     let l: u32 = this.val;
     let s: u32 = r >> _logp;
@@ -169,7 +166,7 @@ pub fn ec_enc_icdf(this: &mut ec_enc, s: i32, icdf: &[u8], ftb: u32) {
     // we do a sub-slice here because the C code doesn't have an idea about the icdf length (it doesn't need to)
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_icdf({}, {:?}, {})", s, &icdf[..=(s as usize)], ftb);
-    
+
     let r: u32 = this.rng >> ftb;
     if s > 0 {
         this.val = this.val.wrapping_add(
@@ -209,9 +206,9 @@ pub fn ec_enc_icdf16(this: &mut ec_enc, s: i32, icdf: &[u16], ftb: u32) {
 pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_uint({}, {})", _fl, _ft);
-    let ft: u32 ;
-    let fl: u32 ;
-    let mut ftb: i32 ;
+    let ft: u32;
+    let fl: u32;
+    let mut ftb: i32;
     debug_assert!(_ft > 1);
     _ft = _ft.wrapping_sub(1);
     ftb = EC_CLZ0 - _ft.leading_zeros() as i32;
@@ -231,8 +228,8 @@ pub fn ec_enc_uint(mut _this: &mut ec_enc, mut _fl: u32, mut _ft: u32) {
 pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_bits({}, {})", _fl, _bits);
-    let mut window: ec_window ;
-    let mut used: i32 ;
+    let mut window: ec_window;
+    let mut used: i32;
     window = this.end_window;
     used = this.nend_bits;
     debug_assert!(_bits > 0);
@@ -257,8 +254,7 @@ pub fn ec_enc_bits(this: &mut ec_enc, mut _fl: u32, mut _bits: u32) {
 pub fn ec_enc_patch_initial_bits(this: &mut ec_enc, mut _val: u32, mut _nbits: u32) {
     #[cfg(feature = "ent-dump")]
     eprintln!("ec_enc_patch_initial_bits({}, {})", _val, _nbits);
-    
-    
+
     debug_assert!(_nbits <= 8);
     let shift: i32 = (EC_SYM_BITS as u32).wrapping_sub(_nbits) as i32;
     let mask: u32 = ((((1) << _nbits) - 1) << shift) as u32;
@@ -288,11 +284,11 @@ pub fn ec_enc_shrink(this: &mut ec_enc, new_size: u32) {
 
 /// Upstream C: celt/entenc.c:ec_enc_done
 pub fn ec_enc_done(this: &mut ec_enc) {
-    let mut window: ec_window ;
-    let mut used: i32 ;
-    let mut msk: u32 ;
-    let mut end: u32 ;
-    let mut l: i32 ;
+    let mut window: ec_window;
+    let mut used: i32;
+    let mut msk: u32;
+    let mut end: u32;
+    let mut l: i32;
     /*We output the minimum number of bits that ensures that the symbols encoded
     thus far will be decoded correctly regardless of the bits that follow.*/
     l = EC_CODE_BITS - (EC_CLZ0 - (this.rng).leading_zeros() as i32);

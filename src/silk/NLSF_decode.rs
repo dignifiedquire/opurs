@@ -56,7 +56,7 @@ pub fn silk_NLSF_decode(
     let mut pred_Q8: [u8; 16] = [0; 16];
     let mut ec_ix: [i16; 16] = [0; 16];
     let mut res_Q10: [i16; 16] = [0; 16];
-    let mut NLSF_Q15_tmp: i32 = 0;
+    let mut NLSF_Q15_tmp: i32;
 
     // Unpack entropy table indices and predictor for current CB1 index
     silk_NLSF_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, NLSFIndices[0] as i32);

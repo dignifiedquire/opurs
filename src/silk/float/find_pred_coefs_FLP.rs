@@ -26,7 +26,7 @@ pub fn silk_find_pred_coefs_FLP(
     x: &[f32],
     condCoding: i32,
 ) {
-    let mut i: i32 = 0;
+    let mut i: i32;
     let mut XXLTP: [f32; MAX_NB_SUBFR * LTP_ORDER * LTP_ORDER] = [0.; 100];
     let mut xXLTP: [f32; MAX_NB_SUBFR * LTP_ORDER] = [0.; 20];
     let mut invGains: [f32; MAX_NB_SUBFR] = [0.; 4];

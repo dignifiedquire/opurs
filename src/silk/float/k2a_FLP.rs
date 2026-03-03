@@ -4,11 +4,11 @@
 
 /// Upstream C: silk/float/k2a_FLP.c:silk_k2a_FLP
 pub fn silk_k2a_FLP(A: &mut [f32], rc: &[f32], order: i32) {
-    let mut k: i32 = 0;
-    let mut n: i32 = 0;
-    let mut rck: f32 = 0.;
-    let mut tmp1: f32 = 0.;
-    let mut tmp2: f32 = 0.;
+    let mut k: i32;
+    let mut n: i32;
+    let mut rck: f32;
+    let mut tmp1: f32;
+    let mut tmp2: f32;
     k = 0;
     while k < order {
         rck = rc[k as usize];

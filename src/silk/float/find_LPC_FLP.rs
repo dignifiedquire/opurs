@@ -18,16 +18,16 @@ pub fn silk_find_LPC_FLP(
     x: &[f32],
     minInvGain: f32,
 ) {
-    let mut k: i32 = 0;
-    let mut subfr_length: i32 = 0;
+    let mut k: i32;
+
     let mut a: [f32; 16] = [0.; 16];
-    let mut res_nrg: f32 = 0.;
-    let mut res_nrg_2nd: f32 = 0.;
-    let mut res_nrg_interp: f32 = 0.;
+    let mut res_nrg: f32;
+    let mut res_nrg_2nd: f32;
+    let mut res_nrg_interp: f32;
     let mut NLSF0_Q15: [i16; 16] = [0; 16];
     let mut a_tmp: [f32; 16] = [0.; 16];
     let mut LPC_res: [f32; 384] = [0.; 384];
-    subfr_length = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
+    let subfr_length: i32 = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
     psEncC.indices.NLSFInterpCoef_Q2 = 4;
     res_nrg = silk_burg_modified_FLP(
         &mut a,

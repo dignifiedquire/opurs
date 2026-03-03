@@ -4,9 +4,9 @@
 
 /// Upstream C: silk/float/sort_FLP.c:silk_insertion_sort_decreasing_FLP
 pub fn silk_insertion_sort_decreasing_FLP(a: &mut [f32], idx: &mut [i32], L: i32, K: i32) {
-    let mut value: f32 = 0.;
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut value: f32;
+    let mut i: i32;
+    let mut j: i32;
     debug_assert!(K > 0);
     debug_assert!(L > 0);
     debug_assert!(L >= K);

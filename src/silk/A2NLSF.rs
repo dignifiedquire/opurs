@@ -13,8 +13,8 @@ pub const BIN_DIV_STEPS_A2NLSF_FIX: i32 = 3;
 pub const MAX_ITERATIONS_A2NLSF_FIX: i32 = 16;
 #[inline]
 fn silk_A2NLSF_trans_poly(p: &mut [i32], dd: i32) {
-    let mut k: i32 = 0;
-    let mut n: i32 = 0;
+    let mut k: i32;
+    let mut n: i32;
     k = 2;
     while k <= dd {
         n = dd;
@@ -28,11 +28,11 @@ fn silk_A2NLSF_trans_poly(p: &mut [i32], dd: i32) {
 }
 #[inline]
 fn silk_A2NLSF_eval_poly(p: &[i32], x: i32, dd: i32) -> i32 {
-    let mut n: i32 = 0;
-    let mut x_Q16: i32 = 0;
-    let mut y32: i32 = 0;
+    let mut n: i32;
+
+    let mut y32: i32;
     y32 = p[dd as usize];
-    x_Q16 = ((x as u32) << 4) as i32;
+    let x_Q16: i32 = ((x as u32) << 4) as i32;
     if (8 == dd) as i32 as i64 != 0 {
         y32 = (p[7] as i64 + ((y32 as i64 * x_Q16 as i64) >> 16)) as i32;
         y32 = (p[6] as i64 + ((y32 as i64 * x_Q16 as i64) >> 16)) as i32;
@@ -53,7 +53,7 @@ fn silk_A2NLSF_eval_poly(p: &[i32], x: i32, dd: i32) -> i32 {
 }
 #[inline]
 fn silk_A2NLSF_init(a_Q16: &[i32], P: &mut [i32], Q: &mut [i32], dd: i32) {
-    let mut k: i32 = 0;
+    let mut k: i32;
     P[dd as usize] = (1) << 16;
     Q[dd as usize] = (1) << 16;
     k = 0;
@@ -73,26 +73,26 @@ fn silk_A2NLSF_init(a_Q16: &[i32], P: &mut [i32], Q: &mut [i32], dd: i32) {
 }
 /// Upstream C: silk/A2NLSF.c:silk_A2NLSF
 pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
-    let mut i: i32 = 0;
-    let mut k: i32 = 0;
-    let mut m: i32 = 0;
-    let mut dd: i32 = 0;
-    let mut root_ix: i32 = 0;
-    let mut ffrac: i32 = 0;
-    let mut xlo: i32 = 0;
-    let mut xhi: i32 = 0;
-    let mut xmid: i32 = 0;
-    let mut ylo: i32 = 0;
-    let mut yhi: i32 = 0;
-    let mut ymid: i32 = 0;
-    let mut thr: i32 = 0;
-    let mut nom: i32 = 0;
-    let mut den: i32 = 0;
+    let mut i: i32;
+    let mut k: i32;
+    let mut m: i32;
+
+    let mut root_ix: i32;
+    let mut ffrac: i32;
+    let mut xlo: i32;
+    let mut xhi: i32;
+    let mut xmid: i32;
+    let mut ylo: i32;
+    let mut yhi: i32;
+    let mut ymid: i32;
+    let mut thr: i32;
+    let mut nom: i32;
+    let mut den: i32;
     let mut P: [i32; 13] = [0; 13];
     let mut Q: [i32; 13] = [0; 13];
     // use_Q: false = use P, true = use Q
     let mut use_Q: bool;
-    dd = d >> 1;
+    let dd: i32 = d >> 1;
     silk_A2NLSF_init(a_Q16, &mut P, &mut Q, dd);
     use_Q = false;
     xlo = silk_LSFCosTab_FIX_Q12[0_usize] as i32;

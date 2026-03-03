@@ -10,9 +10,9 @@ pub fn silk_control_audio_bandwidth(
     psEncC: &mut silk_encoder_state,
     encControl: &mut silk_EncControlStruct,
 ) -> i32 {
-    let mut fs_kHz: i32 = 0;
-    let mut orig_kHz: i32 = 0;
-    let mut fs_Hz: i32 = 0;
+    let mut fs_kHz: i32;
+    let mut orig_kHz: i32;
+    let mut fs_Hz: i32;
     orig_kHz = psEncC.fs_kHz;
     if orig_kHz == 0 {
         orig_kHz = psEncC.sLP.saved_fs_kHz;

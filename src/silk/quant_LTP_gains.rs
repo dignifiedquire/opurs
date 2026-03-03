@@ -30,18 +30,18 @@ pub fn silk_quant_LTP_gains(
     nb_subfr: i32,
     _arch: Arch,
 ) {
-    let mut j: i32 = 0;
-    let mut k: i32 = 0;
-    let mut cbk_size: i32 = 0;
+    let mut j: i32;
+    let mut k: i32;
+    let mut cbk_size: i32;
     let mut temp_idx: [i8; 4] = [0; 4];
     let mut res_nrg_Q15_subfr: i32 = 0;
     let mut res_nrg_Q15: i32 = 0;
     let mut rate_dist_Q7_subfr: i32 = 0;
-    let mut rate_dist_Q7: i32 = 0;
-    let mut min_rate_dist_Q7: i32 = 0;
-    let mut sum_log_gain_tmp_Q7: i32 = 0;
-    let mut best_sum_log_gain_Q7: i32 = 0;
-    let mut max_gain_Q7: i32 = 0;
+    let mut rate_dist_Q7: i32;
+    let mut min_rate_dist_Q7: i32;
+    let mut sum_log_gain_tmp_Q7: i32;
+    let mut best_sum_log_gain_Q7: i32;
+    let mut max_gain_Q7: i32;
     let mut gain_Q7: i32 = 0;
     min_rate_dist_Q7 = silk_int32_MAX;
     best_sum_log_gain_Q7 = 0;

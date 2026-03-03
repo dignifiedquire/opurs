@@ -24,7 +24,7 @@ fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
     max_index_Q16: i32,
     index_increment_Q16: i32,
 ) -> &'a mut [i16] {
-    let mut res_Q15: i32 = 0;
+    let mut res_Q15: i32;
 
     /* Interpolate upsampled signal and store in output array */
     let mut index_Q16 = 0;
@@ -77,8 +77,8 @@ pub(super) fn silk_resampler_private_IIR_FIR(
     mut out: &mut [i16],
     mut in_0: &[i16],
 ) {
-    let mut nSamplesIn: usize = 0;
-    let mut max_index_Q16: i32 = 0;
+    let mut nSamplesIn: usize;
+    let mut max_index_Q16: i32;
     // Max: 2 * batch_size(480) + 8 = 968
     let mut buf = [0i16; 2 * RESAMPLER_MAX_BATCH_SIZE_IN + RESAMPLER_ORDER_FIR_12];
 

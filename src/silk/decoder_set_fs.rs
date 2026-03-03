@@ -16,11 +16,11 @@ use crate::silk::tables_pitch_lag::{
 /// Upstream C: silk/decoder_set_fs.c:silk_decoder_set_fs
 pub fn silk_decoder_set_fs(psDec: &mut silk_decoder_state, fs_kHz: i32, fs_API_Hz: i32) -> i32 {
     let mut ret: i32 = 0;
-    let mut frame_length: i32 = 0;
+
     debug_assert!(fs_kHz == 8 || fs_kHz == 12 || fs_kHz == 16);
     debug_assert!(psDec.nb_subfr == 4 || psDec.nb_subfr == 4 / 2);
     psDec.subfr_length = 5 * fs_kHz as usize;
-    frame_length = psDec.nb_subfr as i16 as i32 * psDec.subfr_length as i16 as i32;
+    let frame_length: i32 = psDec.nb_subfr as i16 as i32 * psDec.subfr_length as i16 as i32;
     if psDec.fs_kHz != fs_kHz || psDec.fs_API_hz != fs_API_Hz {
         ret += silk_resampler_init(
             &mut psDec.resampler_state,

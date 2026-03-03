@@ -10,10 +10,10 @@ pub fn silk_warped_autocorrelation_FLP(
     length: i32,
     order: i32,
 ) {
-    let mut n: i32 = 0;
-    let mut i: i32 = 0;
-    let mut tmp1: f64 = 0.;
-    let mut tmp2: f64 = 0.;
+    let mut n: i32;
+    let mut i: i32;
+    let mut tmp1: f64;
+    let mut tmp2: f64;
     let mut state: [f64; 25] = [
         0 as f64, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0.,

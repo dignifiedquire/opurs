@@ -4,9 +4,9 @@
 
 /// Upstream C: silk/float/scale_copy_vector_FLP.c:silk_scale_copy_vector_FLP
 pub fn silk_scale_copy_vector_FLP(data_out: &mut [f32], data_in: &[f32], gain: f32, dataSize: i32) {
-    let mut i: i32 = 0;
-    let mut dataSize4: i32 = 0;
-    dataSize4 = dataSize & 0xfffc;
+    let mut i: i32;
+
+    let dataSize4: i32 = dataSize & 0xfffc;
     i = 0;
     while i < dataSize4 {
         data_out[i as usize] = gain * data_in[i as usize];

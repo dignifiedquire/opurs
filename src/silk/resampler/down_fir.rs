@@ -224,7 +224,7 @@ pub(super) fn silk_resampler_private_down_FIR(
     mut out: &mut [i16],
     mut in_0: &[i16],
 ) {
-    let mut nSamplesIn: usize = 0;
+    let mut nSamplesIn: usize;
 
     // Max: batch_size(480) + fir_order(36) = 516
     let mut buf = [0i32; RESAMPLER_MAX_BATCH_SIZE_IN + SILK_RESAMPLER_MAX_FIR_ORDER];

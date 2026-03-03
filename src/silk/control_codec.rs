@@ -34,7 +34,7 @@ pub fn silk_control_encoder(
     channelNb: i32,
     force_fs_kHz: i32,
 ) -> i32 {
-    let mut fs_kHz: i32 = 0;
+    let mut fs_kHz: i32;
     let mut ret: i32 = 0;
     psEnc.sCmn.useDTX = encControl.useDTX;
     psEnc.sCmn.useCBR = encControl.useCBR;
@@ -77,13 +77,9 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
                 1,
             );
         } else {
-            let mut new_buf_samples: i32 = 0;
-            let mut api_buf_samples: i32 = 0;
-            let mut old_buf_samples: i32 = 0;
-            let mut buf_length_ms: i32 = 0;
-            buf_length_ms = (((psEnc.sCmn.nb_subfr * 5) as u32) << 1) as i32 + LA_SHAPE_MS;
-            old_buf_samples = buf_length_ms * psEnc.sCmn.fs_kHz;
-            new_buf_samples = buf_length_ms * fs_kHz;
+            let buf_length_ms: i32 = (((psEnc.sCmn.nb_subfr * 5) as u32) << 1) as i32 + LA_SHAPE_MS;
+            let old_buf_samples: i32 = buf_length_ms * psEnc.sCmn.fs_kHz;
+            let new_buf_samples: i32 = buf_length_ms * fs_kHz;
             let vla = (if old_buf_samples > new_buf_samples {
                 old_buf_samples
             } else {
@@ -105,7 +101,7 @@ fn silk_setup_resamplers(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32) -> i32
             );
 
             /* Calculate number of samples to temporarily upsample */
-            api_buf_samples = buf_length_ms * (psEnc.sCmn.API_fs_Hz / 1000);
+            let api_buf_samples: i32 = buf_length_ms * (psEnc.sCmn.API_fs_Hz / 1000);
 
             /* Temporary resampling of x_buf data to API_fs_Hz */
             let vla_0 = api_buf_samples as usize;
@@ -320,9 +316,8 @@ fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i3
 /// Upstream C: silk/control_codec.c:silk_setup_LBRR
 #[inline]
 fn silk_setup_LBRR(psEncC: &mut silk_encoder_state, encControl: &silk_EncControlStruct) -> i32 {
-    let mut LBRR_in_previous_packet: i32 = 0;
     let ret: i32 = SILK_NO_ERROR;
-    LBRR_in_previous_packet = psEncC.LBRR_enabled;
+    let LBRR_in_previous_packet: i32 = psEncC.LBRR_enabled;
     psEncC.LBRR_enabled = encControl.LBRR_coded;
     if psEncC.LBRR_enabled != 0 {
         if LBRR_in_previous_packet == 0 {

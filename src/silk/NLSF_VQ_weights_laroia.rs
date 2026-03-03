@@ -15,8 +15,8 @@ const NLSF_W_Q: i32 = 2;
 /// Signal Processing, pp. 641-644, 1991.
 /// Upstream C: silk/NLSF_VQ_weights_laroia.c:silk_NLSF_VQ_weights_laroia
 pub fn silk_NLSF_VQ_weights_laroia(pNLSFW_Q_OUT: &mut [i16], pNLSF_Q15: &[i16]) {
-    let mut tmp1_int: i32 = 0;
-    let mut tmp2_int: i32 = 0;
+    let mut tmp1_int: i32;
+    let mut tmp2_int: i32;
 
     debug_assert_eq!(pNLSF_Q15.len(), pNLSFW_Q_OUT.len());
     let D = pNLSF_Q15.len();

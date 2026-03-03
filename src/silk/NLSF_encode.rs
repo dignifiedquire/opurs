@@ -23,14 +23,14 @@ pub fn silk_NLSF_encode(
     nSurvivors: i32,
     signalType: i32,
 ) -> i32 {
-    let mut i: i32 = 0;
-    let mut s: i32 = 0;
-    let mut ind1: i32 = 0;
+    let mut i: i32;
+    let mut s: i32;
+    let mut ind1: i32;
     let mut bestIndex: i32 = 0;
-    let mut prob_Q8: i32 = 0;
-    let mut bits_q7: i32 = 0;
-    let mut W_tmp_Q9: i32 = 0;
-    let mut ret: i32 = 0;
+    let mut prob_Q8: i32;
+    let mut bits_q7: i32;
+    let mut W_tmp_Q9: i32;
+
     let mut res_Q10: [i16; 16] = [0; 16];
     let mut NLSF_tmp_Q15: [i16; 16] = [0; 16];
     let mut W_adj_Q5: [i16; 16] = [0; 16];
@@ -122,6 +122,6 @@ pub fn silk_NLSF_encode(
         &NLSFIndices[..order + 1],
         psNLSF_CB,
     );
-    ret = RD_Q25[0];
+    let ret: i32 = RD_Q25[0];
     ret
 }

@@ -4,12 +4,12 @@
 
 /// Upstream C: silk/float/schur_FLP.c:silk_schur_FLP
 pub fn silk_schur_FLP(refl_coef: &mut [f32], auto_corr: &[f32], order: i32) -> f32 {
-    let mut k: i32 = 0;
-    let mut n: i32 = 0;
+    let mut k: i32;
+    let mut n: i32;
     let mut C: [[f64; 2]; 25] = [[0.; 2]; 25];
-    let mut Ctmp1: f64 = 0.;
-    let mut Ctmp2: f64 = 0.;
-    let mut rc_tmp: f64 = 0.;
+    let mut Ctmp1: f64;
+    let mut Ctmp2: f64;
+    let mut rc_tmp: f64;
     debug_assert!((0..=24).contains(&order));
     k = 0;
     loop {

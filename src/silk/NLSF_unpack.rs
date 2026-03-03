@@ -11,7 +11,7 @@ pub fn silk_NLSF_unpack(
     psNLSF_CB: &silk_NLSF_CB_struct,
     CB1_index: i32,
 ) {
-    let mut entry: u8 = 0;
+    let mut entry: u8;
     let mut ec_sel_ptr = &psNLSF_CB.ec_sel[(CB1_index * psNLSF_CB.order as i32 / 2) as usize..];
     let mut i = 0usize;
     while i < psNLSF_CB.order as usize {

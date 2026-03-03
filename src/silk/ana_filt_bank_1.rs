@@ -14,13 +14,13 @@ pub fn silk_ana_filt_bank_1(
     outH: &mut [i16],
     N: i32,
 ) {
-    let mut k: i32 = 0;
+    let mut k: i32;
     let N2: i32 = N >> 1;
-    let mut in32: i32 = 0;
-    let mut X: i32 = 0;
-    let mut Y: i32 = 0;
-    let mut out_1: i32 = 0;
-    let mut out_2: i32 = 0;
+    let mut in32: i32;
+    let mut X: i32;
+    let mut Y: i32;
+    let mut out_1: i32;
+    let mut out_2: i32;
     k = 0;
     while k < N2 {
         in32 = ((in_0[(2 * k) as usize] as i32 as u32) << 10) as i32;

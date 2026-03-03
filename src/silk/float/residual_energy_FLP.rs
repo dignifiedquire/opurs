@@ -77,10 +77,9 @@ pub fn silk_residual_energy_FLP(
     nb_subfr: i32,
     LPC_order: i32,
 ) {
-    let mut shift: i32 = 0;
     let mut LPC_res: [f32; 192] = [0.; 192];
     let res_off = LPC_order as usize;
-    shift = LPC_order + subfr_length;
+    let shift: i32 = LPC_order + subfr_length;
     silk_LPC_analysis_filter_FLP(
         &mut LPC_res,
         &a[0],
@@ -152,23 +151,42 @@ mod tests {
         for d in 1usize..=16usize {
             for _ in 0..64 {
                 let mut c = vec![0.0f32; d];
-                let mut wxx_vec = vec![0.0f32; d];
-                for i in 0..d {
-                    c[i] = rng.next_f32();
-                    wxx_vec[i] = rng.next_f32();
+                for c_i in c.iter_mut().take(d) {
+                    *c_i = rng.next_f32();
                 }
 
-                // Build a symmetric matrix exactly as the C path assumes.
+                // Build a positive semidefinite matrix M = A^T * A.
+                let mut a = vec![0.0f32; d * d];
+                for a_i in a.iter_mut().take(d * d) {
+                    *a_i = 0.25 * rng.next_f32();
+                }
+
                 let mut wxx_mat = vec![0.0f32; d * d];
                 for i in 0..d {
-                    for j in i..d {
-                        let v = 0.25 * rng.next_f32();
-                        wxx_mat[i * d + j] = v;
-                        wxx_mat[j * d + i] = v;
+                    for j in 0..d {
+                        let mut acc = 0.0f32;
+                        for k in 0..d {
+                            acc += a[k * d + i] * a[k * d + j];
+                        }
+                        wxx_mat[i * d + j] = acc;
                     }
                 }
 
-                let scalar = rng.next_f32();
+                // Set wXx = M*c and wxx = c^T*M*c + margin, keeping nrg positive.
+                let mut wxx_vec = vec![0.0f32; d];
+                for i in 0..d {
+                    let mut acc = 0.0f32;
+                    for j in 0..d {
+                        acc += wxx_mat[i * d + j] * c[j];
+                    }
+                    wxx_vec[i] = acc;
+                }
+                let mut quad = 0.0f32;
+                for i in 0..d {
+                    quad += c[i] * wxx_vec[i];
+                }
+                let scalar = quad + 0.1;
+
                 let mut rust_mat = wxx_mat.clone();
                 let mut c_mat = wxx_mat.clone();
 

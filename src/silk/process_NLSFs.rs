@@ -15,10 +15,10 @@ pub fn silk_process_NLSFs(
     pNLSF_Q15: &mut [i16],
     prev_NLSFq_Q15: &[i16],
 ) {
-    let mut i: i32 = 0;
-    let mut doInterpolate: i32 = 0;
-    let mut NLSF_mu_Q20: i32 = 0;
-    let mut i_sqr_Q15: i16 = 0;
+    let mut i: i32;
+
+    let mut NLSF_mu_Q20: i32;
+    let i_sqr_Q15: i16;
     let mut pNLSF0_temp_Q15: [i16; 16] = [0; 16];
     let mut pNLSFW_QW: [i16; 16] = [0; 16];
     let mut pNLSFW0_temp_QW: [i16; 16] = [0; 16];
@@ -37,7 +37,7 @@ pub fn silk_process_NLSFs(
         &mut pNLSFW_QW[..psEncC.predictLPCOrder as usize],
         &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
     );
-    doInterpolate =
+    let doInterpolate: i32 =
         (psEncC.useInterpolatedNLSFs == 1 && (psEncC.indices.NLSFInterpCoef_Q2 as i32) < 4) as i32;
     if doInterpolate != 0 {
         silk_interpolate(

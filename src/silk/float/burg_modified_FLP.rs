@@ -17,19 +17,19 @@ pub fn silk_burg_modified_FLP(
     D: i32,
     arch: Arch,
 ) -> f32 {
-    let mut k: i32 = 0;
-    let mut n: i32 = 0;
-    let mut s: i32 = 0;
-    let mut reached_max_gain: i32 = 0;
-    let mut C0: f64 = 0.;
-    let mut invGain: f64 = 0.;
-    let mut num: f64 = 0.;
-    let mut nrg_f: f64 = 0.;
-    let mut nrg_b: f64 = 0.;
-    let mut rc: f64 = 0.;
-    let mut Atmp: f64 = 0.;
-    let mut tmp1: f64 = 0.;
-    let mut tmp2: f64 = 0.;
+    let mut k: i32;
+    let mut n: i32;
+    let mut s: i32;
+    let mut reached_max_gain: i32;
+    let mut C0: f64;
+    let mut invGain: f64;
+    let mut num: f64;
+    let mut nrg_f: f64;
+    let mut nrg_b: f64;
+    let mut rc: f64;
+    let mut Atmp: f64;
+    let mut tmp1: f64;
+    let mut tmp2: f64;
     let mut C_first_row: [f64; 24] = [0.; 24];
     let mut C_last_row: [f64; 24] = [0.; 24];
     let mut CAf: [f64; 25] = [0.; 25];

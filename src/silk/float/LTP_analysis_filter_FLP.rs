@@ -21,10 +21,10 @@ pub fn silk_LTP_analysis_filter_FLP(
     pre_length: i32,
 ) {
     let mut Btmp: [f32; 5] = [0.; 5];
-    let mut inv_gain: f32 = 0.;
-    let mut k: i32 = 0;
-    let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut inv_gain: f32;
+    let mut k: i32;
+    let mut i: i32;
+    let mut j: i32;
     let mut x_off: usize = x_offset;
     let mut res_off: usize = 0;
     k = 0;

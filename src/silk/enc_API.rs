@@ -124,7 +124,7 @@ pub fn silk_Encode(
     let mut flags: i32;
     let mut tmp_payloadSize_ms: i32 = 0;
     let mut tmp_complexity: i32 = 0;
-    let mut ret: i32 = 0;
+    let mut ret: i32;
     let mut nSamplesToBuffer: i32;
     let mut nSamplesFromInput: i32;
     let mut TargetRate_bps: i32;

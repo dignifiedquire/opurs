@@ -22,14 +22,14 @@ pub fn silk_VQ_WMat_EC_c(
     max_gain_Q7: i32,
     L: i32,
 ) {
-    let mut k: i32 = 0;
-    let mut gain_tmp_Q7: i32 = 0;
-    let mut cb_row_off: usize = 0;
+    let mut k: i32;
+    let mut gain_tmp_Q7: i32;
+    let mut cb_row_off: usize;
     let mut neg_xX_Q24: [i32; 5] = [0; 5];
-    let mut sum1_Q15: i32 = 0;
-    let mut sum2_Q24: i32 = 0;
-    let mut bits_res_Q8: i32 = 0;
-    let mut bits_tot_Q8: i32 = 0;
+    let mut sum1_Q15: i32;
+    let mut sum2_Q24: i32;
+    let mut bits_res_Q8: i32;
+    let mut bits_tot_Q8: i32;
     neg_xX_Q24[0_usize] = -(((xX_Q17[0] as u32) << 7) as i32);
     neg_xX_Q24[1_usize] = -(((xX_Q17[1] as u32) << 7) as i32);
     neg_xX_Q24[2_usize] = -(((xX_Q17[2] as u32) << 7) as i32);
@@ -41,10 +41,9 @@ pub fn silk_VQ_WMat_EC_c(
     *ind = 0;
     k = 0;
     while k < L {
-        let mut penalty: i32 = 0;
         gain_tmp_Q7 = cb_gain_Q7[k as usize] as i32;
         sum1_Q15 = (1.001f64 * ((1) << 15) as f64 + 0.5f64) as i32;
-        penalty = (((if gain_tmp_Q7 - max_gain_Q7 > 0 {
+        let penalty: i32 = (((if gain_tmp_Q7 - max_gain_Q7 > 0 {
             gain_tmp_Q7 - max_gain_Q7
         } else {
             0

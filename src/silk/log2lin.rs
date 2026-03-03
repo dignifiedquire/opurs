@@ -9,15 +9,15 @@ use crate::silk::typedefs::silk_int32_MAX;
 /// Convert input to a linear scale
 /// Upstream C: silk/log2lin.c:silk_log2lin
 pub fn silk_log2lin(inLog_Q7: i32) -> i32 {
-    let mut out: i32 = 0;
-    let mut frac_Q7: i32 = 0;
+    let mut out: i32;
+
     if inLog_Q7 < 0 {
         return 0;
     } else if inLog_Q7 >= 3967 {
         return silk_int32_MAX;
     }
     out = (1) << (inLog_Q7 >> 7);
-    frac_Q7 = inLog_Q7 & 0x7f;
+    let frac_Q7: i32 = inLog_Q7 & 0x7f;
     if inLog_Q7 < 2048 {
         out = out
             + ((out

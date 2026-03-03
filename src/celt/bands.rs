@@ -836,7 +836,7 @@ fn compute_theta(
                 itheta = ec_dec_uint(ec, (qn + 1) as u32) as i32;
             }
         } else {
-            let fs_0: i32 ;
+            let fs_0: i32;
             let ft_0 = ((qn >> 1) + 1) * ((qn >> 1) + 1);
             if encode != 0 {
                 fs_0 = if itheta <= qn >> 1 {

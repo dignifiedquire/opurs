@@ -20,12 +20,12 @@ pub fn silk_process_gains_FLP(
     psEncCtrl: &mut silk_encoder_control_FLP,
     condCoding: i32,
 ) {
-    let mut k: i32 = 0;
+    let mut k: i32;
     let mut pGains_Q16: [i32; 4] = [0; 4];
-    let mut s: f32 = 0.;
-    let mut InvMaxSqrVal: f32 = 0.;
-    let mut gain: f32 = 0.;
-    let mut quant_offset: f32 = 0.;
+    let s: f32;
+
+    let mut gain: f32;
+
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
         s = 1.0f32 - 0.5f32 * silk_sigmoid(0.25f32 * (psEncCtrl.LTPredCodGain - 12.0f32));
         k = 0;
@@ -34,8 +34,9 @@ pub fn silk_process_gains_FLP(
             k += 1;
         }
     }
-    InvMaxSqrVal = silk_exp2(0.33f32 * (21.0f32 - psEnc.sCmn.SNR_dB_Q7 as f32 * (1.0 / 128.0)))
-        / psEnc.sCmn.subfr_length as f32;
+    let InvMaxSqrVal: f32 =
+        silk_exp2(0.33f32 * (21.0f32 - psEnc.sCmn.SNR_dB_Q7 as f32 * (1.0 / 128.0)))
+            / psEnc.sCmn.subfr_length as f32;
     k = 0;
     while k < psEnc.sCmn.nb_subfr as i32 {
         gain = psEncCtrl.Gains[k as usize];
@@ -71,7 +72,7 @@ pub fn silk_process_gains_FLP(
             psEnc.sCmn.indices.quantOffsetType = 1;
         }
     }
-    quant_offset = silk_Quantization_Offsets_Q10
+    let quant_offset: f32 = silk_Quantization_Offsets_Q10
         [(psEnc.sCmn.indices.signalType as i32 >> 1) as usize]
         [psEnc.sCmn.indices.quantOffsetType as usize] as i32 as f32
         / 1024.0f32;
