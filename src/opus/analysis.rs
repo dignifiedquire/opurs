@@ -623,6 +623,7 @@ fn silk_resampler_down2_hp(S: &mut [f32; 3], out: &mut [f32], in_0: &[f32], inLe
     }
     hp_ener
 }
+#[allow(clippy::too_many_arguments)]
 fn downmix_and_resample(
     input: &DownmixInput,
     y: &mut [f32],
@@ -941,6 +942,7 @@ const std_feature_bias: [f32; 9] = [
 ];
 pub const LEAKAGE_OFFSET: f32 = 2.5f32;
 pub const LEAKAGE_SLOPE: f32 = 2.0f32;
+#[allow(clippy::too_many_arguments)]
 fn tonality_analysis(
     tonal: &mut TonalityAnalysisState,
     celt_mode: &OpusCustomMode,
@@ -1615,6 +1617,7 @@ fn tonality_analysis(
         tonal.info[info_idx].max_pitch_ratio.to_bits()
     );
 }
+#[allow(clippy::too_many_arguments)]
 pub fn run_analysis(
     analysis: &mut TonalityAnalysisState,
     celt_mode: &OpusCustomMode,

@@ -222,6 +222,7 @@ pub fn opus_packet_get_samples_per_frame(data: u8, fs: i32) -> i32 {
 /// - negative `OPUS_*` code on invalid packet or bad arguments
 ///
 /// Upstream C: src/opus.c:opus_packet_parse_impl
+#[allow(clippy::too_many_arguments)]
 pub fn opus_packet_parse_impl(
     data: &[u8],
     self_delimited: bool,

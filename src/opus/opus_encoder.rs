@@ -887,6 +887,7 @@ fn silk_biquad_float(
     }
 }
 /// Upstream C: src/opus_encoder.c:hp_cutoff
+#[allow(clippy::too_many_arguments)]
 fn hp_cutoff(
     in_0: &[f32],
     cutoff_Hz: i32,
@@ -976,6 +977,7 @@ fn dc_reject(
     };
 }
 /// Upstream C: src/opus_encoder.c:stereo_fade
+#[allow(clippy::too_many_arguments)]
 fn stereo_fade(
     in_0: &[f32],
     out: &mut [f32],
@@ -1014,6 +1016,7 @@ fn stereo_fade(
     }
 }
 /// Upstream C: src/opus_encoder.c:gain_fade
+#[allow(clippy::too_many_arguments)]
 fn gain_fade(
     in_0: &[f32],
     out: &mut [f32],
@@ -1434,6 +1437,7 @@ fn decide_dtx_mode(activity: i32, nb_no_activity_ms_Q1: &mut i32, frame_size_ms_
 }
 /// Upstream C: src/opus_encoder.c:opus_encode_native (multiframe branch)
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 fn encode_multiframe_packet(
     st: &mut OpusEncoder,
     pcm: &[f32],
@@ -2018,6 +2022,7 @@ fn encode_silk_to_celt_redundancy(
 /// Upstream C: src/opus_encoder.c:opus_encode_native
 #[cold]
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 fn encode_celt_to_silk_redundancy(
     celt_enc: &mut OpusCustomEncoder,
     pcm_buf: &[f32],
@@ -2076,6 +2081,7 @@ fn encode_celt_to_silk_redundancy(
 }
 
 /// Upstream C: src/opus_encoder.c:opus_encode_native
+#[allow(clippy::too_many_arguments)]
 pub fn opus_encode_native(
     st: &mut OpusEncoder,
     pcm: &[f32],
