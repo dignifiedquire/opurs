@@ -253,9 +253,9 @@ unsafe fn sgemv16x1_neon(
         let mut y8_11 = vdupq_n_f32(0.0);
         let mut y12_15 = vdupq_n_f32(0.0);
 
-        for j in 0..cols {
+        for (j, &xj_scalar) in x.iter().enumerate().take(cols) {
             let w = weights.as_ptr().add(j * col_stride + i);
-            let xj = vld1q_dup_f32(&x[j]);
+            let xj = vdupq_n_f32(xj_scalar);
             y0_3 = vfmaq_f32(y0_3, vld1q_f32(w), xj);
             y4_7 = vfmaq_f32(y4_7, vld1q_f32(w.add(4)), xj);
             y8_11 = vfmaq_f32(y8_11, vld1q_f32(w.add(8)), xj);
@@ -288,9 +288,9 @@ unsafe fn sgemv8x1_neon(
         let mut y0_3 = vdupq_n_f32(0.0);
         let mut y4_7 = vdupq_n_f32(0.0);
 
-        for j in 0..cols {
+        for (j, &xj_scalar) in x.iter().enumerate().take(cols) {
             let w = weights.as_ptr().add(j * col_stride + i);
-            let xj = vld1q_dup_f32(&x[j]);
+            let xj = vdupq_n_f32(xj_scalar);
             y0_3 = vfmaq_f32(y0_3, vld1q_f32(w), xj);
             y4_7 = vfmaq_f32(y4_7, vld1q_f32(w.add(4)), xj);
         }

@@ -484,9 +484,9 @@ fn compute_fargan_cond(
 // --- De-emphasis ---
 
 fn fargan_deemphasis(pcm: &mut [f32], deemph_mem: &mut f32) {
-    for i in 0..FARGAN_SUBFRAME_SIZE {
-        pcm[i] += FARGAN_DEEMPHASIS * *deemph_mem;
-        *deemph_mem = pcm[i];
+    for sample in pcm.iter_mut().take(FARGAN_SUBFRAME_SIZE) {
+        *sample += FARGAN_DEEMPHASIS * *deemph_mem;
+        *deemph_mem = *sample;
     }
 }
 
@@ -521,9 +521,9 @@ fn run_fargan_subframe(
     // Build pitch prediction and previous samples
     let mut pred = [0.0f32; FARGAN_SUBFRAME_SIZE + 4];
     let mut pos = PITCH_MAX_PERIOD as i32 - period - 2;
-    for i in 0..FARGAN_SUBFRAME_SIZE + 4 {
+    for pred_i in pred.iter_mut().take(FARGAN_SUBFRAME_SIZE + 4) {
         let p = pos.max(0) as usize;
-        pred[i] = (gain_1 * st.pitch_buf[p]).clamp(-1.0, 1.0);
+        *pred_i = (gain_1 * st.pitch_buf[p]).clamp(-1.0, 1.0);
         pos += 1;
         if pos == PITCH_MAX_PERIOD as i32 {
             pos -= period;
@@ -531,8 +531,8 @@ fn run_fargan_subframe(
     }
 
     let mut prev = [0.0f32; FARGAN_SUBFRAME_SIZE];
-    for i in 0..FARGAN_SUBFRAME_SIZE {
-        prev[i] =
+    for (i, prev_i) in prev.iter_mut().enumerate().take(FARGAN_SUBFRAME_SIZE) {
+        *prev_i =
             (gain_1 * st.pitch_buf[PITCH_MAX_PERIOD - FARGAN_SUBFRAME_SIZE + i]).clamp(-1.0, 1.0);
     }
 
@@ -687,8 +687,8 @@ fn run_fargan_subframe(
         ACTIVATION_TANH,
         arch,
     );
-    for i in 0..FARGAN_SUBFRAME_SIZE {
-        pcm[i] *= gain;
+    for sample in pcm.iter_mut().take(FARGAN_SUBFRAME_SIZE) {
+        *sample *= gain;
     }
 
     // Update pitch buffer

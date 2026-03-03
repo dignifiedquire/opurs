@@ -1648,11 +1648,16 @@ fn apply_filterbank(
     x_out[0] = 0.0;
     for b in 0..num_bands - 1 {
         x_out[b + 1] = 0.0;
-        for i in center_bins[b]..center_bins[b + 1] {
+        for (i, &x_in_i) in x_in
+            .iter()
+            .enumerate()
+            .take(center_bins[b + 1])
+            .skip(center_bins[b])
+        {
             let frac =
                 (center_bins[b + 1] - i) as f32 / (center_bins[b + 1] - center_bins[b]) as f32;
-            x_out[b] += band_weights[b] * frac * x_in[i];
-            x_out[b + 1] += band_weights[b + 1] * (1.0 - frac) * x_in[i];
+            x_out[b] += band_weights[b] * frac * x_in_i;
+            x_out[b + 1] += band_weights[b + 1] * (1.0 - frac) * x_in_i;
         }
     }
     x_out[num_bands - 1] += band_weights[num_bands - 1] * x_in[center_bins[num_bands - 1]];
@@ -1685,8 +1690,8 @@ fn calculate_log_spectrum_from_lpc(spec: &mut [f32], a_q12: &[i16], lpc_order: u
     let mut mag = [0.0f32; OSCE_SPEC_NUM_FREQS];
     mag_spec_320_onesided(&mut mag, &buffer);
 
-    for i in 0..OSCE_SPEC_NUM_FREQS {
-        mag[i] = 1.0 / (mag[i] + 1e-9);
+    for mag_i in mag.iter_mut().take(OSCE_SPEC_NUM_FREQS) {
+        *mag_i = 1.0 / (*mag_i + 1e-9);
     }
 
     let mut filtered = [0.0f32; OSCE_CLEAN_SPEC_NUM_BANDS];
@@ -1728,11 +1733,11 @@ fn calculate_cepstrum(cepstrum: &mut [f32], signal: &[f32]) {
         OSCE_NOISY_SPEC_NUM_BANDS,
     );
 
-    for n in 0..OSCE_NOISY_SPEC_NUM_BANDS {
+    for spec_n in spec.iter_mut().take(OSCE_NOISY_SPEC_NUM_BANDS) {
         // C: log(spec[n] + 1e-9f) — log() is double precision
         // black_box prevents LLVM auto-vectorization of ln() (see nndsp::compute_overlap_window).
-        let val = (spec[n] + 1e-9) as f64;
-        spec[n] = std::hint::black_box(val).ln() as f32;
+        let val = (*spec_n + 1e-9) as f64;
+        *spec_n = std::hint::black_box(val).ln() as f32;
     }
 
     // DCT-II (orthonormal) — uses the same dct function from freq.rs
@@ -2956,17 +2961,17 @@ fn apply_valin_activation(x: &mut [f32]) {
     debug_assert!(len <= 2 * BBWENET_TDSHAPE2_FRAME_SIZE);
 
     let mut y = vec![0.0f32; len];
-    for i in 0..len {
-        y[i] = x[i].abs() + 1e-6;
+    for (y_i, &x_i) in y.iter_mut().zip(x.iter()) {
+        *y_i = x_i.abs() + 1e-6;
     }
-    for i in 0..len {
+    for y_i in y.iter_mut().take(len) {
         // C: celt_log(y[i]) = log(y[i]) via double precision
-        y[i] = (y[i] as f64).ln() as f32;
+        *y_i = (*y_i as f64).ln() as f32;
     }
-    for i in 0..len {
+    for (x_i, &y_i) in x.iter_mut().zip(y.iter()).take(len) {
         // C: celt_sin(y[i]) = celt_cos_norm2(0.5f*PI*y[i] - 1.0f)
-        let arg = 0.5 * std::f32::consts::PI * y[i] - 1.0;
-        x[i] *= celt_cos_norm2(arg);
+        let arg = 0.5 * std::f32::consts::PI * y_i - 1.0;
+        *x_i *= celt_cos_norm2(arg);
     }
 }
 

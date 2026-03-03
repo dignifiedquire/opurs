@@ -275,10 +275,10 @@ pub fn compute_pitchdnn(
     // Soft argmax: find peak in output, then weighted average around it
     let mut pos = 0;
     let mut maxval: f32 = -1.0;
-    for i in 0..180 {
-        if output[i] > maxval {
+    for (i, &output_i) in output.iter().enumerate().take(180) {
+        if output_i > maxval {
             pos = i;
-            maxval = output[i];
+            maxval = output_i;
         }
     }
 
@@ -286,9 +286,9 @@ pub fn compute_pitchdnn(
     let mut count: f32 = 0.0;
     let start = pos.saturating_sub(2);
     let end = 179.min(pos + 2);
-    for i in start..=end {
+    for (i, &output_i) in output.iter().enumerate().take(end + 1).skip(start) {
         // C: exp(output[i]) — standard double-precision exp, NOT lpcnet_exp fast approx.
-        let p = (output[i] as f64).exp() as f32;
+        let p = (output_i as f64).exp() as f32;
         sum += p * i as f32;
         count += p;
     }

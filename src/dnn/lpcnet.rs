@@ -297,10 +297,16 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch
     st.if_features[0] = ((1.0 / 64.0)
         * (10.0 * celt_log10(1e-15 + x_fft[0].re * x_fft[0].re) - 6.0))
         .clamp(-1.0, 1.0);
-    for i in 1..PITCH_IF_MAX_FREQ {
+    for (i, (x_fft_i, prev_if_i)) in x_fft
+        .iter()
+        .zip(st.prev_if.iter())
+        .enumerate()
+        .take(PITCH_IF_MAX_FREQ)
+        .skip(1)
+    {
         // C_MULC: prod = X[i] * conj(prev_if[i])
-        let prod_r = x_fft[i].re * st.prev_if[i].re + x_fft[i].im * st.prev_if[i].im;
-        let prod_i = x_fft[i].im * st.prev_if[i].re - x_fft[i].re * st.prev_if[i].im;
+        let prod_r = x_fft_i.re * prev_if_i.re + x_fft_i.im * prev_if_i.im;
+        let prod_i = x_fft_i.im * prev_if_i.re - x_fft_i.re * prev_if_i.im;
         // C: 1.f/sqrt(1e-15f + prod.r*prod.r + prod.i*prod.i) — sqrt(float) promotes to double,
         // 1.f / double → double, truncated to float on assignment.
         let norm_1 = (1.0f64
@@ -309,8 +315,7 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch
         st.if_features[3 * i - 2] = prod_r * norm_1;
         st.if_features[3 * i - 1] = prod_i * norm_1;
         st.if_features[3 * i] = ((1.0 / 64.0)
-            * (10.0 * celt_log10(1e-15 + x_fft[i].re * x_fft[i].re + x_fft[i].im * x_fft[i].im)
-                - 6.0))
+            * (10.0 * celt_log10(1e-15 + x_fft_i.re * x_fft_i.re + x_fft_i.im * x_fft_i.im) - 6.0))
             .clamp(-1.0, 1.0);
     }
     st.prev_if[..PITCH_IF_MAX_FREQ].copy_from_slice(&x_fft[..PITCH_IF_MAX_FREQ]);
@@ -396,15 +401,15 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch
     let mut ener1: f64 = celt_inner_prod(buf, buf, FRAME_SIZE, arch) as f64;
     let mut ener_norm = vec![0.0f32; PITCH_MAX_PERIOD - PITCH_MIN_PERIOD];
 
-    for i in 0..PITCH_MAX_PERIOD - PITCH_MIN_PERIOD {
+    for (i, ener_norm_i) in ener_norm.iter_mut().enumerate() {
         let ener = 1.0 + ener0 as f64 + ener1;
         st.xcorr_features[i] = 2.0 * xcorr[i];
-        ener_norm[i] = ener as f32;
+        *ener_norm_i = ener as f32;
         ener1 +=
             buf[i + FRAME_SIZE] as f64 * buf[i + FRAME_SIZE] as f64 - buf[i] as f64 * buf[i] as f64;
     }
-    for i in 0..PITCH_MAX_PERIOD - PITCH_MIN_PERIOD {
-        st.xcorr_features[i] /= ener_norm[i];
+    for (xcorr_i, &ener_norm_i) in st.xcorr_features.iter_mut().zip(ener_norm.iter()) {
+        *xcorr_i /= ener_norm_i;
     }
 
     // Neural pitch estimation
@@ -767,8 +772,11 @@ pub fn lpcnet_plc_update(st: &mut LPCNetPLCState, pcm: &[i16]) {
         st.predict_pos -= FRAME_SIZE;
     }
     st.pcm.copy_within(FRAME_SIZE.., 0);
-    for i in 0..FRAME_SIZE {
-        st.pcm[PLC_BUF_SIZE - FRAME_SIZE + i] = pcm[i] as f32 / 32768.0;
+    for (dst, &src) in st.pcm[PLC_BUF_SIZE - FRAME_SIZE..]
+        .iter_mut()
+        .zip(pcm.iter().take(FRAME_SIZE))
+    {
+        *dst = src as f32 / 32768.0;
     }
     st.loss_count = 0;
     st.blend = 0;
@@ -790,8 +798,8 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
         while st.analysis_pos + FRAME_SIZE <= PLC_BUF_SIZE {
             let mut x = vec![0.0f32; FRAME_SIZE];
             debug_assert!(st.analysis_pos < PLC_BUF_SIZE);
-            for i in 0..FRAME_SIZE {
-                x[i] = 32768.0 * st.pcm[st.analysis_pos + i];
+            for (i, x_i) in x.iter_mut().enumerate().take(FRAME_SIZE) {
+                *x_i = 32768.0 * st.pcm[st.analysis_pos + i];
             }
             let mut plc_features = vec![0.0f32; 2 * NB_BANDS + NB_FEATURES + 1];
             burg_cepstral_analysis(&mut plc_features, &x);
@@ -866,8 +874,11 @@ pub fn lpcnet_plc_conceal(st: &mut LPCNetPLCState, pcm: &mut [i16], arch: Arch) 
     }
     st.predict_pos = PLC_BUF_SIZE;
     st.pcm.copy_within(FRAME_SIZE.., 0);
-    for i in 0..FRAME_SIZE {
-        st.pcm[PLC_BUF_SIZE - FRAME_SIZE + i] = pcm[i] as f32 / 32768.0;
+    for (dst, &src) in st.pcm[PLC_BUF_SIZE - FRAME_SIZE..]
+        .iter_mut()
+        .zip(pcm.iter().take(FRAME_SIZE))
+    {
+        *dst = src as f32 / 32768.0;
     }
     st.blend = 1;
 }

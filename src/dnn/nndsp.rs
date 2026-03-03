@@ -88,9 +88,9 @@ impl Default for AdaShapeState {
 ///
 /// Upstream C: dnn/nndsp.c:compute_overlap_window
 pub fn compute_overlap_window(window: &mut [f32], overlap_size: usize) {
-    for i in 0..overlap_size {
+    for (i, win_i) in window.iter_mut().enumerate().take(overlap_size) {
         let angle = std::f64::consts::PI * (i as f64 + 0.5) / overlap_size as f64;
-        window[i] = (0.5 + 0.5 * angle.cos()) as f32;
+        *win_i = (0.5 + 0.5 * angle.cos()) as f32;
     }
 }
 
@@ -110,7 +110,7 @@ pub fn scale_kernel(
     kernel_size: usize,
     gain: &[f32],
 ) {
-    for i_out in 0..out_channels {
+    for (i_out, &gain_out) in gain.iter().enumerate().take(out_channels) {
         let mut norm = 0.0f32;
         for i_in in 0..in_channels {
             for i_k in 0..kernel_size {
@@ -123,7 +123,7 @@ pub fn scale_kernel(
         for i_in in 0..in_channels {
             for i_k in 0..kernel_size {
                 let idx = kernel_index!(i_out, i_in, i_k, in_channels, kernel_size);
-                kernel[idx] *= norm * gain[i_out];
+                kernel[idx] *= norm * gain_out;
             }
         }
     }
@@ -138,11 +138,11 @@ pub fn transform_gains(
     filter_gain_a: f32,
     filter_gain_b: f32,
 ) {
-    for i in 0..num_gains {
+    for gain in gains.iter_mut().take(num_gains) {
         // C uses double-precision exp(): float promotes to double, exp in double, truncate back
         // black_box prevents LLVM auto-vectorization of exp() (see compute_overlap_window comment).
-        let val = (filter_gain_a * gains[i] + filter_gain_b) as f64;
-        gains[i] = std::hint::black_box(val).exp() as f32;
+        let val = (filter_gain_a * *gain + filter_gain_b) as f64;
+        *gain = std::hint::black_box(val).exp() as f32;
     }
 }
 
@@ -429,16 +429,16 @@ pub fn adashape_process_frame(
     let tenv = &mut in_buffer[feature_dim..];
     tenv[..tenv_size + 1].fill(0.0);
     let mut mean = 0.0f32;
-    for i in 0..tenv_size {
+    for (i, tenv_i) in tenv.iter_mut().enumerate().take(tenv_size) {
         for k in 0..avg_pool_k {
-            tenv[i] += x_in[i * avg_pool_k + k].abs();
+            *tenv_i += x_in[i * avg_pool_k + k].abs();
         }
-        tenv[i] = celt_log(tenv[i] * f + 1.52587890625e-05f32);
-        mean += tenv[i];
+        *tenv_i = celt_log(*tenv_i * f + 1.52587890625e-05f32);
+        mean += *tenv_i;
     }
     mean /= tenv_size as f32;
-    for i in 0..tenv_size {
-        tenv[i] -= mean;
+    for tenv_i in tenv.iter_mut().take(tenv_size) {
+        *tenv_i -= mean;
     }
     tenv[tenv_size] = mean;
 

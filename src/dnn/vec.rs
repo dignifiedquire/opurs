@@ -295,9 +295,7 @@ pub fn sgemv_scalar(
     col_stride: usize,
     x: &[f32],
 ) {
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    out[..rows].fill(0.0);
     // Process in blocks of 8 when possible for better cache behavior
     if rows & 0xf == 0 {
         // 16-aligned rows
@@ -338,9 +336,7 @@ pub fn sgemv_scalar(
 ///
 /// Upstream C: dnn/vec.h:sparse_sgemv8x4
 pub fn sparse_sgemv8x4_scalar(out: &mut [f32], w: &[f32], idx: &[i32], rows: usize, x: &[f32]) {
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    out[..rows].fill(0.0);
     let mut w_pos = 0;
     let mut idx_pos = 0;
     for i in (0..rows).step_by(8) {
@@ -383,9 +379,7 @@ pub fn cgemv8x4_scalar(
     for i in 0..cols {
         x[i] = (0.5f64 + 127.0f64 * _x[i] as f64).floor() as i8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    out[..rows].fill(0.0);
     let mut w_pos = 0;
     for i in (0..rows).step_by(8) {
         for j in (0..cols).step_by(4) {
@@ -402,8 +396,8 @@ pub fn cgemv8x4_scalar(
             w_pos += 32;
         }
     }
-    for i in 0..rows {
-        out[i] *= scale[i];
+    for (out_i, &scale_i) in out.iter_mut().zip(scale.iter()).take(rows) {
+        *out_i *= scale_i;
     }
 }
 
@@ -515,9 +509,7 @@ pub fn sparse_cgemv8x4_scalar(
     for i in 0..cols {
         x[i] = (0.5f64 + 127.0f64 * _x[i] as f64).floor() as i8;
     }
-    for i in 0..rows {
-        out[i] = 0.0;
-    }
+    out[..rows].fill(0.0);
     let mut w_pos = 0;
     let mut idx_pos = 0;
     for i in (0..rows).step_by(8) {
@@ -820,12 +812,12 @@ mod tests {
             let x = gen_signal(cols, 99);
             let mut out = vec![0.0f32; rows];
             cgemv8x4(&mut out, &w, &scale, rows, cols, &x, arch);
-            for i in 0..rows {
+            for (i, out_i) in out.iter().enumerate().take(rows) {
                 assert!(
-                    out[i].is_finite(),
+                    out_i.is_finite(),
                     "cgemv8x4 non-finite at [{}]: {} ({}x{})",
                     i,
-                    out[i],
+                    out_i,
                     rows,
                     cols
                 );
@@ -873,12 +865,12 @@ mod tests {
         let x = gen_signal(cols, 99);
         let mut out = vec![0.0f32; rows];
         sparse_cgemv8x4(&mut out, &w, &idx, &scale, rows, cols, &x, arch);
-        for i in 0..rows {
+        for (i, out_i) in out.iter().enumerate().take(rows) {
             assert!(
-                out[i].is_finite(),
+                out_i.is_finite(),
                 "sparse_cgemv8x4 non-finite at [{}]: {}",
                 i,
-                out[i]
+                out_i
             );
         }
     }

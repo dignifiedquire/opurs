@@ -251,8 +251,8 @@ fn lpc_from_bands(lpc: &mut [f32], ex: &[f32]) -> f32 {
     // -40 dB noise floor
     ac[0] += ac[0] * 1e-4 + 320.0 / 12.0 / 38.0;
     // Lag windowing
-    for i in 1..LPC_ORDER + 1 {
-        ac[i] *= 1.0 - 6e-5 * (i * i) as f32;
+    for (i, ac_i) in ac.iter_mut().enumerate().skip(1).take(LPC_ORDER) {
+        *ac_i *= 1.0 - 6e-5 * (i * i) as f32;
     }
     let mut rc = [0.0f32; LPC_ORDER];
     lpcn_lpc(lpc, &mut rc, &ac, LPC_ORDER)
@@ -263,8 +263,8 @@ fn lpc_from_bands(lpc: &mut [f32], ex: &[f32]) -> f32 {
 /// Upstream C: dnn/freq.c:lpc_weighting
 pub fn lpc_weighting(lpc: &mut [f32], gamma: f32) {
     let mut gamma_i = gamma;
-    for i in 0..LPC_ORDER {
-        lpc[i] *= gamma_i;
+    for lpc_i in lpc.iter_mut().take(LPC_ORDER) {
+        *lpc_i *= gamma_i;
         gamma_i *= gamma;
     }
 }
@@ -278,10 +278,10 @@ pub fn lpc_from_cepstrum(lpc: &mut [f32], cepstrum: &[f32]) -> f32 {
     tmp[0] += 4.0;
     let mut ex = [0.0f32; NB_BANDS];
     idct(&mut ex, &tmp);
-    for i in 0..NB_BANDS {
+    for (ex_i, &comp) in ex.iter_mut().zip(COMPENSATION.iter()).take(NB_BANDS) {
         // C: pow(10.f, Ex[i]) — both floats promoted to double, result truncated back to float.
         // black_box prevents LLVM auto-vectorization of powf().
-        ex[i] = (std::hint::black_box(10.0f64).powf(ex[i] as f64) * COMPENSATION[i] as f64) as f32;
+        *ex_i = (std::hint::black_box(10.0f64).powf(*ex_i as f64) * comp as f64) as f32;
     }
     lpc_from_bands(lpc, &ex)
 }
@@ -337,8 +337,8 @@ fn compute_burg_cepstrum(pcm: &[f32], burg_cepstrum: &mut [f32], len: usize, ord
 
     // Scale by gain and window normalization
     let scale = 0.45 * g * (1.0 / (WINDOW_SIZE as f32 * WINDOW_SIZE as f32 * WINDOW_SIZE as f32));
-    for i in 0..NB_BANDS {
-        eburg[i] *= scale;
+    for eburg_i in eburg.iter_mut().take(NB_BANDS) {
+        *eburg_i *= scale;
     }
 
     // Log and clamp

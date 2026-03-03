@@ -10,7 +10,6 @@
 #![allow(non_upper_case_globals)]
 // Keep upstream C float literals unchanged for parity/bit-exact behavior.
 #![allow(clippy::excessive_precision)]
-#![allow(clippy::needless_range_loop)]
 
 #[cfg(all(feature = "osce", feature = "builtin-weights"))]
 pub mod bbwenet_data;

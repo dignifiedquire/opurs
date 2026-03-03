@@ -201,8 +201,8 @@ fn compute_linear_c(linear: &LinearLayer, out: &mut [f32], input: &[f32], arch: 
             cgemv8x4(out, &linear.weights, &linear.scale, n, m, input, arch);
         }
     } else {
-        for i in 0..n {
-            out[i] = 0.0;
+        for out_i in out.iter_mut().take(n) {
+            *out_i = 0.0;
         }
     }
 

@@ -167,8 +167,8 @@ pub fn silk_burg_analysis(
         af[n] = rc;
 
         if reached_max_gain {
-            for k in n + 1..d {
-                af[k] = 0.0;
+            for coeff in af.iter_mut().take(d).skip(n + 1) {
+                *coeff = 0.0;
             }
             break;
         }
