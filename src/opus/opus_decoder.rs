@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `src/opus_decoder.c`
 
+#![allow(non_snake_case)]
+
 use crate::arch::opus_select_arch;
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
 use crate::celt::entcode::ec_tell;

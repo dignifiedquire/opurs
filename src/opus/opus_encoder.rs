@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `src/opus_encoder.c`
 
+#![allow(non_snake_case)]
+
 use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
 use crate::opus::repacketizer::FrameSource;
 
@@ -144,16 +146,16 @@ pub struct StereoWidthState {
     pub max_follower: f32,
 }
 pub const PSEUDO_SNR_THRESHOLD: f32 = 316.23f32;
-const mono_voice_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-const mono_music_bandwidth_thresholds: [i32; 8] = [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
-const stereo_voice_bandwidth_thresholds: [i32; 8] =
+const MONO_VOICE_BANDWIDTH_THRESHOLDS: [i32; 8] = [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
+const MONO_MUSIC_BANDWIDTH_THRESHOLDS: [i32; 8] = [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
+const STEREO_VOICE_BANDWIDTH_THRESHOLDS: [i32; 8] =
     [9000, 700, 9000, 700, 13500, 1000, 14000, 2000];
-const stereo_music_bandwidth_thresholds: [i32; 8] =
+const STEREO_MUSIC_BANDWIDTH_THRESHOLDS: [i32; 8] =
     [9000, 700, 9000, 700, 11000, 1000, 12000, 2000];
 const STEREO_VOICE_THRESHOLD: i32 = 19000;
 const STEREO_MUSIC_THRESHOLD: i32 = 17000;
 const MODE_THRESHOLDS: [[i32; 2]; 2] = [[64000, 10000], [44000, 10000]];
-const fec_thresholds: [i32; 10] = [
+const FEC_THRESHOLDS: [i32; 10] = [
     12000, 1000, 14000, 1000, 16000, 1000, 20000, 1000, 22000, 1000,
 ];
 
@@ -1287,9 +1289,9 @@ fn decide_fec(
     let orig_bandwidth: i32 = *bandwidth;
     loop {
         let hysteresis: i32 =
-            fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize];
+            FEC_THRESHOLDS[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND) + 1) as usize];
         let mut LBRR_rate_thres_bps: i32 =
-            fec_thresholds[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND)) as usize];
+            FEC_THRESHOLDS[(2 * (*bandwidth - OPUS_BANDWIDTH_NARROWBAND)) as usize];
         if last_fec == 1 {
             LBRR_rate_thres_bps -= hysteresis;
         }
@@ -1331,7 +1333,7 @@ fn compute_silk_rate_for_hybrid(
     let mut i: i32;
 
     let mut silk_rate: i32;
-    const rate_table: [[i32; 5]; 7] = [
+    const RATE_TABLE: [[i32; 5]; 7] = [
         [0, 0, 0, 0, 0],
         [12000, 10000, 10000, 11000, 11000],
         [16000, 13500, 13500, 15000, 15000],
@@ -1346,19 +1348,19 @@ fn compute_silk_rate_for_hybrid(
         .wrapping_div(::core::mem::size_of::<[i32; 5]>() as u64) as i32;
     i = 1;
     while i < n {
-        if rate_table[i as usize][0_usize] > rate {
+        if RATE_TABLE[i as usize][0_usize] > rate {
             break;
         }
         i += 1;
     }
     if i == n {
-        silk_rate = rate_table[(i - 1) as usize][entry as usize]
-            + (rate - rate_table[(i - 1) as usize][0_usize]) / 2;
+        silk_rate = RATE_TABLE[(i - 1) as usize][entry as usize]
+            + (rate - RATE_TABLE[(i - 1) as usize][0_usize]) / 2;
     } else {
-        let lo: i32 = rate_table[(i - 1) as usize][entry as usize];
-        let hi: i32 = rate_table[i as usize][entry as usize];
-        let x0: i32 = rate_table[(i - 1) as usize][0_usize];
-        let x1: i32 = rate_table[i as usize][0_usize];
+        let lo: i32 = RATE_TABLE[(i - 1) as usize][entry as usize];
+        let hi: i32 = RATE_TABLE[i as usize][entry as usize];
+        let x0: i32 = RATE_TABLE[(i - 1) as usize][0_usize];
+        let x1: i32 = RATE_TABLE[i as usize][0_usize];
         silk_rate = (lo * (x1 - rate) + hi * (rate - x0)) / (x1 - x0);
     }
     if vbr == 0 {
@@ -2442,11 +2444,11 @@ pub fn opus_encode_native(
         let mut bandwidth_thresholds: [i32; 8] = [0; 8];
         let mut bandwidth: i32 = OPUS_BANDWIDTH_FULLBAND;
         if st.channels == 2 && st.force_channels != 1 {
-            voice_bandwidth_thresholds = &stereo_voice_bandwidth_thresholds;
-            music_bandwidth_thresholds = &stereo_music_bandwidth_thresholds;
+            voice_bandwidth_thresholds = &STEREO_VOICE_BANDWIDTH_THRESHOLDS;
+            music_bandwidth_thresholds = &STEREO_MUSIC_BANDWIDTH_THRESHOLDS;
         } else {
-            voice_bandwidth_thresholds = &mono_voice_bandwidth_thresholds;
-            music_bandwidth_thresholds = &mono_music_bandwidth_thresholds;
+            voice_bandwidth_thresholds = &MONO_VOICE_BANDWIDTH_THRESHOLDS;
+            music_bandwidth_thresholds = &MONO_MUSIC_BANDWIDTH_THRESHOLDS;
         }
         i = 0;
         while i < 8 {

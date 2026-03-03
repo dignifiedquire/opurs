@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `src/analysis.c`
 
+#![allow(non_snake_case)]
+
 use num_traits::Zero;
 
 #[derive(Copy, Clone, Default)]
@@ -214,7 +216,7 @@ use crate::opus::mlp::analysis_mlp::run_analysis_mlp;
 const LOG2_E_UPSTREAM: f32 = 1.442695f32;
 use crate::opus::opus_encoder::is_digital_silence;
 
-const dct_table: [f32; 128] = [
+const DCT_TABLE: [f32; 128] = [
     0.250000f32,
     0.250000f32,
     0.250000f32,
@@ -344,7 +346,7 @@ const dct_table: [f32; 128] = [
     0.166664f32,
     -0.273300f32,
 ];
-const analysis_window: [f32; 240] = [
+const ANALYSIS_WINDOW: [f32; 240] = [
     0.000043f32,
     0.000171f32,
     0.000385f32,
@@ -586,7 +588,7 @@ const analysis_window: [f32; 240] = [
     0.999957f32,
     1.000000f32,
 ];
-const tbands: [i32; 19] = [
+const TBANDS: [i32; 19] = [
     4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 136, 160, 192, 240,
 ];
 pub const NB_TONAL_SKIP_BANDS: i32 = 9;
@@ -929,7 +931,7 @@ pub fn tonality_get_info(tonal: &mut TonalityAnalysisState, info_out: &mut Analy
     info_out.music_prob_min = prob_min;
     info_out.music_prob_max = prob_max;
 }
-const std_feature_bias: [f32; 9] = [
+const STD_FEATURE_BIAS: [f32; 9] = [
     5.684947f32,
     3.475288f32,
     1.770634f32,
@@ -1058,7 +1060,7 @@ fn tonality_analysis(
     let mut noisiness: [f32; 240] = [0.; 240];
     i = 0;
     while i < N2 {
-        let w: f32 = analysis_window[i as usize];
+        let w: f32 = ANALYSIS_WINDOW[i as usize];
         in_0[i as usize].re = w * tonal.inmem[i as usize];
         in_0[i as usize].im = w * tonal.inmem[(N2 + i) as usize];
         in_0[(N - i - 1) as usize].re = w * tonal.inmem[(N - i - 1) as usize];
@@ -1189,8 +1191,8 @@ fn tonality_analysis(
         let mut L1: f32;
         let mut L2: f32;
         let mut stationarity: f32;
-        i = tbands[b as usize];
-        while i < tbands[(b + 1) as usize] {
+        i = TBANDS[b as usize];
+        while i < TBANDS[(b + 1) as usize] {
             let binE_0: f32 = out[i as usize].re * out[i as usize].re
                 + out[(N - i) as usize].re * out[(N - i) as usize].re
                 + out[i as usize].im * out[i as usize].im
@@ -1289,7 +1291,7 @@ fn tonality_analysis(
     b = 1;
     while b < NB_TBANDS + 1 {
         let leak_slope: f32 =
-            LEAKAGE_SLOPE * (tbands[b as usize] - tbands[(b - 1) as usize]) as f32 / 4_f32;
+            LEAKAGE_SLOPE * (TBANDS[b as usize] - TBANDS[(b - 1) as usize]) as f32 / 4_f32;
         leakage_from[b as usize] =
             if leakage_from[(b - 1) as usize] + leak_slope < band_log2[b as usize] {
                 leakage_from[(b - 1) as usize] + leak_slope
@@ -1307,7 +1309,7 @@ fn tonality_analysis(
     b = NB_TBANDS - 2;
     while b >= 0 {
         let leak_slope_0: f32 =
-            LEAKAGE_SLOPE * (tbands[(b + 1) as usize] - tbands[b as usize]) as f32 / 4_f32;
+            LEAKAGE_SLOPE * (TBANDS[(b + 1) as usize] - TBANDS[b as usize]) as f32 / 4_f32;
         leakage_from[b as usize] =
             if leakage_from[(b + 1) as usize] + leak_slope_0 < leakage_from[b as usize] {
                 leakage_from[(b + 1) as usize] + leak_slope_0
@@ -1381,8 +1383,8 @@ fn tonality_analysis(
     while b < NB_TBANDS {
         let mut E_1: f32 = 0 as f32;
 
-        let band_start: i32 = tbands[b as usize];
-        let band_end: i32 = tbands[(b + 1) as usize];
+        let band_start: i32 = TBANDS[b as usize];
+        let band_end: i32 = TBANDS[(b + 1) as usize];
         i = band_start;
         while i < band_end {
             let binE_1: f32 = out[i as usize].re * out[i as usize].re
@@ -1486,7 +1488,7 @@ fn tonality_analysis(
         let mut sum: f32 = 0 as f32;
         b = 0;
         while b < 16 {
-            sum += dct_table[(i * 16 + b) as usize] * logE[b as usize];
+            sum += DCT_TABLE[(i * 16 + b) as usize] * logE[b as usize];
             b += 1;
         }
         BFCC[i as usize] = sum;
@@ -1497,7 +1499,7 @@ fn tonality_analysis(
         let mut sum_0: f32 = 0 as f32;
         b = 0;
         while b < 16 {
-            sum_0 += dct_table[(i * 16 + b) as usize]
+            sum_0 += DCT_TABLE[(i * 16 + b) as usize]
                 * 0.5f32
                 * (tonal.highE[b as usize] + tonal.lowE[b as usize]);
             b += 1;
@@ -1579,7 +1581,7 @@ fn tonality_analysis(
     i = 0;
     while i < 9 {
         features[(11 + i) as usize] =
-            celt_sqrt(tonal.std[i as usize]) - std_feature_bias[i as usize];
+            celt_sqrt(tonal.std[i as usize]) - STD_FEATURE_BIAS[i as usize];
         i += 1;
     }
     features[18] = spec_variability - 0.78f32;

@@ -5,8 +5,7 @@
 //!
 //! Upstream C: `dnn/`
 
-// Keep upstream C float literals unchanged for parity/bit-exact behavior.
-#![allow(clippy::excessive_precision)]
+#![allow(clippy::excessive_precision)] // Upstream numeric constants are kept bit-exact.
 
 #[cfg(all(feature = "osce", feature = "builtin-weights"))]
 pub mod bbwenet_data;

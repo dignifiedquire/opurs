@@ -7,8 +7,7 @@
 #![allow(
     clippy::excessive_precision,
     clippy::unreadable_literal,
-    clippy::approx_constant,
-    dead_code
+    clippy::approx_constant
 )]
 
 use super::static_modes_float::{
