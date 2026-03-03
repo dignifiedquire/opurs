@@ -130,6 +130,7 @@ pub fn cgemv8x4(
             return;
         }
 
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
         super::vec::cgemv8x4_scalar(out, w, scale, rows, cols, x);
     }
 }
@@ -178,6 +179,7 @@ pub fn sparse_cgemv8x4(
             return;
         }
 
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
         super::vec::sparse_cgemv8x4_scalar(out, w, idx, scale, rows, cols, x);
     }
 }

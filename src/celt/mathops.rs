@@ -189,7 +189,7 @@ pub fn celt_cos_norm2(x: f32) -> f32 {
 ///
 /// C 1.6.1: `celt_log2(x) * 0.6931471805599453f`
 /// Upstream C: celt/mathops.h:celt_log
-#[cfg(feature = "deep-plc")]
+#[cfg(feature = "osce")]
 #[inline]
 pub fn celt_log(x: f32) -> f32 {
     celt_log2(x) * 0.6931471805599453f32
