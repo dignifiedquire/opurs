@@ -4,88 +4,82 @@
 
 use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
-pub mod NSQ_h {
-    ///
-    /// Short-term prediction using LPC coefficients. `buf32` is indexed as
-    /// `buf32[pos], buf32[pos-1], ..., buf32[pos-order+1]` and `coef16` has
-    /// `order` entries. Here we take `buf32` as a slice ending at `pos+1`
-    /// (i.e. the element at `buf32[buf32.len()-1]` is `buf32[pos]`).
-    /// Upstream C: silk/NSQ.h:silk_noise_shape_quantizer_short_prediction_c
-    #[inline(always)]
-    pub fn silk_noise_shape_quantizer_short_prediction_c(
-        buf32: &[i32],
-        coef16: &[i16],
-        order: i32,
-    ) -> i32 {
-        // buf32 is indexed backwards from the end: buf32[len-1] = pos, buf32[len-2] = pos-1, etc.
-        // Pre-slice to the last 10 elements to hoist bounds checks.
-        let b = buf32.len();
-        let buf = &buf32[b - 10..];
-        let coef = &coef16[..10];
-        let mut out: i32 = order >> 1;
-        out = (out as i64 + ((buf[9] as i64 * coef[0] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[8] as i64 * coef[1] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[7] as i64 * coef[2] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[6] as i64 * coef[3] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[5] as i64 * coef[4] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[4] as i64 * coef[5] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[3] as i64 * coef[6] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[2] as i64 * coef[7] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[1] as i64 * coef[8] as i64) >> 16)) as i32;
-        out = (out as i64 + ((buf[0] as i64 * coef[9] as i64) >> 16)) as i32;
-        if order == 16 {
-            let buf16 = &buf32[b - 16..];
-            let coef16 = &coef16[10..16];
-            out = (out as i64 + ((buf16[5] as i64 * coef16[0] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[4] as i64 * coef16[1] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[3] as i64 * coef16[2] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[2] as i64 * coef16[3] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[1] as i64 * coef16[4] as i64) >> 16)) as i32;
-            out = (out as i64 + ((buf16[0] as i64 * coef16[5] as i64) >> 16)) as i32;
-        }
-        out
+///
+/// Short-term prediction using LPC coefficients. `buf32` is indexed as
+/// `buf32[pos], buf32[pos-1], ..., buf32[pos-order+1]` and `coef16` has
+/// `order` entries. Here we take `buf32` as a slice ending at `pos+1`
+/// (i.e. the element at `buf32[buf32.len()-1]` is `buf32[pos]`).
+/// Upstream C: silk/NSQ.h:silk_noise_shape_quantizer_short_prediction_c
+#[inline(always)]
+pub fn silk_noise_shape_quantizer_short_prediction_c(
+    buf32: &[i32],
+    coef16: &[i16],
+    order: i32,
+) -> i32 {
+    // buf32 is indexed backwards from the end: buf32[len-1] = pos, buf32[len-2] = pos-1, etc.
+    // Pre-slice to the last 10 elements to hoist bounds checks.
+    let b = buf32.len();
+    let buf = &buf32[b - 10..];
+    let coef = &coef16[..10];
+    let mut out: i32 = order >> 1;
+    out = (out as i64 + ((buf[9] as i64 * coef[0] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[8] as i64 * coef[1] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[7] as i64 * coef[2] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[6] as i64 * coef[3] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[5] as i64 * coef[4] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[4] as i64 * coef[5] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[3] as i64 * coef[6] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[2] as i64 * coef[7] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[1] as i64 * coef[8] as i64) >> 16)) as i32;
+    out = (out as i64 + ((buf[0] as i64 * coef[9] as i64) >> 16)) as i32;
+    if order == 16 {
+        let buf16 = &buf32[b - 16..];
+        let coef16 = &coef16[10..16];
+        out = (out as i64 + ((buf16[5] as i64 * coef16[0] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf16[4] as i64 * coef16[1] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf16[3] as i64 * coef16[2] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf16[2] as i64 * coef16[3] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf16[1] as i64 * coef16[4] as i64) >> 16)) as i32;
+        out = (out as i64 + ((buf16[0] as i64 * coef16[5] as i64) >> 16)) as i32;
     }
-
-    ///
-    /// Noise shape feedback loop. `data0` is the new input value,
-    /// `data1` is the shift register (length `order`), `coef` has `order` entries.
-    /// Shifts new value into data1 while computing the weighted sum.
-    /// Upstream C: silk/NSQ.h:silk_NSQ_noise_shape_feedback_loop_c
-    #[inline]
-    pub fn silk_NSQ_noise_shape_feedback_loop_c(
-        data0: i32,
-        data1: &mut [i32],
-        coef: &[i16],
-        order: i32,
-    ) -> i32 {
-        let n = order as usize;
-        let data1 = &mut data1[..n];
-        let coef = &coef[..n];
-        let mut tmp2 = data0;
-        let mut tmp1 = data1[0];
-        data1[0] = tmp2;
-        let mut out: i32 = order >> 1;
-        out = (out as i64 + ((tmp2 as i64 * coef[0] as i64) >> 16)) as i32;
-        let mut j = 2usize;
-        while j < n {
-            tmp2 = data1[j - 1];
-            data1[j - 1] = tmp1;
-            out = (out as i64 + ((tmp1 as i64 * coef[j - 1] as i64) >> 16)) as i32;
-            tmp1 = data1[j];
-            data1[j] = tmp2;
-            out = (out as i64 + ((tmp2 as i64 * coef[j] as i64) >> 16)) as i32;
-            j += 2;
-        }
-        data1[n - 1] = tmp1;
-        out = (out as i64 + ((tmp1 as i64 * coef[n - 1] as i64) >> 16)) as i32;
-        out = ((out as u32) << 1) as i32;
-        out
-    }
+    out
 }
 
-pub use self::NSQ_h::{
-    silk_NSQ_noise_shape_feedback_loop_c, silk_noise_shape_quantizer_short_prediction_c,
-};
+///
+/// Noise shape feedback loop. `data0` is the new input value,
+/// `data1` is the shift register (length `order`), `coef` has `order` entries.
+/// Shifts new value into data1 while computing the weighted sum.
+/// Upstream C: silk/NSQ.h:silk_NSQ_noise_shape_feedback_loop_c
+#[inline]
+pub fn silk_NSQ_noise_shape_feedback_loop_c(
+    data0: i32,
+    data1: &mut [i32],
+    coef: &[i16],
+    order: i32,
+) -> i32 {
+    let n = order as usize;
+    let data1 = &mut data1[..n];
+    let coef = &coef[..n];
+    let mut tmp2 = data0;
+    let mut tmp1 = data1[0];
+    data1[0] = tmp2;
+    let mut out: i32 = order >> 1;
+    out = (out as i64 + ((tmp2 as i64 * coef[0] as i64) >> 16)) as i32;
+    let mut j = 2usize;
+    while j < n {
+        tmp2 = data1[j - 1];
+        data1[j - 1] = tmp1;
+        out = (out as i64 + ((tmp1 as i64 * coef[j - 1] as i64) >> 16)) as i32;
+        tmp1 = data1[j];
+        data1[j] = tmp2;
+        out = (out as i64 + ((tmp2 as i64 * coef[j] as i64) >> 16)) as i32;
+        j += 2;
+    }
+    data1[n - 1] = tmp1;
+    out = (out as i64 + ((tmp1 as i64 * coef[n - 1] as i64) >> 16)) as i32;
+    out = ((out as u32) << 1) as i32;
+    out
+}
 
 /// Dispatch wrapper for short prediction — routes to SIMD when available.
 #[cfg(feature = "simd")]

@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use std::str::FromStr;
 
 pub(crate) trait OpusBackendTrait {
@@ -12,7 +10,7 @@ pub(crate) trait OpusBackendTrait {
     #[cfg(feature = "dred")]
     type DredState;
 
-    fn opus_encoder_create(Fs: i32, channels: i32, application: i32) -> Result<Self::Encoder, i32>;
+    fn opus_encoder_create(fs: i32, channels: i32, application: i32) -> Result<Self::Encoder, i32>;
     fn enc_set_bitrate(st: &mut Self::Encoder, val: i32);
     fn enc_set_bandwidth(st: &mut Self::Encoder, val: i32);
     fn enc_set_vbr(st: &mut Self::Encoder, val: i32);
@@ -32,7 +30,7 @@ pub(crate) trait OpusBackendTrait {
     fn enc_load_dnn_weights(st: &mut Self::Encoder) -> Result<(), i32>;
     fn enc_set_dnn_blob(st: &mut Self::Encoder, data: &[u8]) -> Result<(), i32>;
 
-    fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Self::Decoder, i32>;
+    fn opus_decoder_create(fs: i32, channels: i32) -> Result<Self::Decoder, i32>;
     fn opus_decode24(
         st: &mut Self::Decoder,
         data: &[u8],
@@ -80,7 +78,7 @@ pub(crate) trait OpusBackendTrait {
     ) -> i32;
 
     fn opus_multistream_encoder_create(
-        Fs: i32,
+        fs: i32,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
@@ -108,7 +106,7 @@ pub(crate) trait OpusBackendTrait {
     fn opus_multistream_encoder_destroy(st: Self::MSEncoder);
 
     fn opus_multistream_decoder_create(
-        Fs: i32,
+        fs: i32,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
@@ -144,11 +142,11 @@ mod rust_backend {
         type DredState = OpusDRED;
 
         fn opus_encoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             application: i32,
         ) -> Result<Box<OpusEncoder>, i32> {
-            OpusEncoder::new(Fs, channels, application).map(Box::new)
+            OpusEncoder::new(fs, channels, application).map(Box::new)
         }
 
         fn enc_set_bitrate(st: &mut Box<OpusEncoder>, val: i32) {
@@ -249,8 +247,8 @@ mod rust_backend {
 
         fn opus_encoder_destroy(_st: Box<OpusEncoder>) {}
 
-        fn opus_decoder_create(Fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
-            OpusDecoder::new(Fs, channels as usize).map(Box::new)
+        fn opus_decoder_create(fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
+            OpusDecoder::new(fs, channels as usize).map(Box::new)
         }
 
         fn opus_decode24(
@@ -383,14 +381,14 @@ mod rust_backend {
         }
 
         fn opus_multistream_encoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             streams: i32,
             coupled_streams: i32,
             mapping: &[u8],
             application: i32,
         ) -> Result<Self::MSEncoder, i32> {
-            OpusMSEncoder::new(Fs, channels, streams, coupled_streams, mapping, application)
+            OpusMSEncoder::new(fs, channels, streams, coupled_streams, mapping, application)
                 .map(Box::new)
         }
 
@@ -473,13 +471,13 @@ mod rust_backend {
         fn opus_multistream_encoder_destroy(_st: Self::MSEncoder) {}
 
         fn opus_multistream_decoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             streams: i32,
             coupled_streams: i32,
             mapping: &[u8],
         ) -> Result<Self::MSDecoder, i32> {
-            OpusMSDecoder::new(Fs, channels, streams, coupled_streams, mapping).map(Box::new)
+            OpusMSDecoder::new(fs, channels, streams, coupled_streams, mapping).map(Box::new)
         }
 
         fn opus_multistream_decode(
@@ -545,12 +543,12 @@ mod libopus {
         type DredState = *mut OpusDRED;
 
         fn opus_encoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             application: i32,
         ) -> Result<*mut OpusEncoder, i32> {
             let mut error = 0;
-            let res = unsafe { opus_encoder_create(Fs, channels, application, &mut error) };
+            let res = unsafe { opus_encoder_create(fs, channels, application, &mut error) };
             if res.is_null() {
                 Err(error)
             } else {
@@ -645,9 +643,9 @@ mod libopus {
             unsafe { opus_encoder_destroy(st) }
         }
 
-        fn opus_decoder_create(Fs: i32, channels: i32) -> Result<*mut OpusDecoder, i32> {
+        fn opus_decoder_create(fs: i32, channels: i32) -> Result<*mut OpusDecoder, i32> {
             let mut error = 0;
-            let res = unsafe { opus_decoder_create(Fs, channels, &mut error) };
+            let res = unsafe { opus_decoder_create(fs, channels, &mut error) };
             if res.is_null() {
                 Err(error)
             } else {
@@ -821,7 +819,7 @@ mod libopus {
         }
 
         fn opus_multistream_encoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             streams: i32,
             coupled_streams: i32,
@@ -831,7 +829,7 @@ mod libopus {
             let mut error = 0;
             let res = unsafe {
                 opus_multistream_encoder_create(
-                    Fs,
+                    fs,
                     channels,
                     streams,
                     coupled_streams,
@@ -925,7 +923,7 @@ mod libopus {
         }
 
         fn opus_multistream_decoder_create(
-            Fs: i32,
+            fs: i32,
             channels: i32,
             streams: i32,
             coupled_streams: i32,
@@ -934,7 +932,7 @@ mod libopus {
             let mut error = 0;
             let res = unsafe {
                 opus_multistream_decoder_create(
-                    Fs,
+                    fs,
                     channels,
                     streams,
                     coupled_streams,
