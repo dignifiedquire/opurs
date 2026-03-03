@@ -658,6 +658,7 @@ unsafe fn neon_smulww_loop(a: *const i16, b: i32, o: *mut i32, count: i32) {
 
 /// Copy winner state data to output buffers (8 samples at a time).
 #[target_feature(enable = "neon")]
+#[allow(clippy::too_many_arguments)]
 unsafe fn neon_copy_winner_kernel(
     dd: &NeonDelDecStates,
     offset: i32,
@@ -721,6 +722,7 @@ unsafe fn neon_copy_winner_kernel(
 
 /// Copy winner state outputs using the vectorized kernel plus scalar tail.
 #[target_feature(enable = "neon")]
+#[allow(clippy::too_many_arguments)]
 unsafe fn neon_copy_winner_state(
     dd: &NeonDelDecStates,
     decision_delay: i32,

@@ -9,6 +9,7 @@ use crate::silk::define::LTP_ORDER;
 /// must extend backwards from `x_offset` by at least `max(pitchL) + LTP_ORDER/2`
 /// samples to cover pitch lag history.
 /// Upstream C: silk/float/LTP_analysis_filter_FLP.c:silk_LTP_analysis_filter_FLP
+#[allow(clippy::too_many_arguments)]
 pub fn silk_LTP_analysis_filter_FLP(
     LTP_res: &mut [f32],
     x: &[f32],

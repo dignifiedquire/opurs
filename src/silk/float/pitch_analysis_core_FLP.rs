@@ -24,6 +24,7 @@ use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 use arrayref::array_mut_ref;
 
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_pitch_analysis_core_FLP
+#[allow(clippy::too_many_arguments)]
 pub fn silk_pitch_analysis_core_FLP(
     frame: &[f32],
     pitch_out: &mut [i32],

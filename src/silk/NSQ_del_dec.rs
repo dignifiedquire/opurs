@@ -186,6 +186,7 @@ pub fn silk_NSQ_del_dec(
 }
 
 /// Upstream C: silk/NSQ_del_dec.c:silk_NSQ_del_dec_c
+#[allow(clippy::too_many_arguments)]
 pub fn silk_NSQ_del_dec_c(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
@@ -555,6 +556,7 @@ pub fn silk_NSQ_del_dec_c(
 
 /// Upstream C: silk/NSQ_del_dec.c:silk_noise_shape_quantizer_del_dec
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn silk_noise_shape_quantizer_del_dec(
     NSQ: &mut silk_nsq_state,
     psDelDec: &mut [NSQ_del_dec_struct],
@@ -956,6 +958,7 @@ fn silk_noise_shape_quantizer_del_dec(
 
 /// Upstream C: silk/NSQ_del_dec.c:silk_nsq_del_dec_scale_states
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn silk_nsq_del_dec_scale_states(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,

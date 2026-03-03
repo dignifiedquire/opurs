@@ -18,6 +18,7 @@ use crate::silk::typedefs::silk_int32_MAX;
 use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
+#[allow(clippy::too_many_arguments)]
 pub fn silk_quant_LTP_gains(
     B_Q14: &mut [i16],
     cbk_index: &mut [i8],

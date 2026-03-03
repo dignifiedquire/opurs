@@ -28,6 +28,7 @@ use crate::dnn::lpcnet::LPCNetPLCState;
 /// Returns `(error_code, num_samples_written)`.
 /// Upstream C: silk/decode_frame.c:silk_decode_frame
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn silk_decode_frame(
     psDec: &mut silk_decoder_state,
     psRangeDec: &mut ec_dec,

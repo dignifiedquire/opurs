@@ -8,6 +8,7 @@ use crate::silk::define::LTP_ORDER;
 use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/VQ_WMat_EC.c:silk_VQ_WMat_EC_c
+#[allow(clippy::too_many_arguments)]
 pub fn silk_VQ_WMat_EC_c(
     ind: &mut i8,
     res_nrg_Q15: &mut i32,

@@ -8,6 +8,7 @@ use crate::silk::define::{
 use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/NLSF_del_dec_quant.c:silk_NLSF_del_dec_quant
+#[allow(clippy::too_many_arguments)]
 pub fn silk_NLSF_del_dec_quant(
     indices: &mut [i8],
     x_Q10: &[i16],

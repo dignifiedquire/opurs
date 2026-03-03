@@ -180,6 +180,7 @@ pub fn silk_NSQ_wrapper_FLP(
     };
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_quant_LTP_gains_FLP
+#[allow(clippy::too_many_arguments)]
 pub fn silk_quant_LTP_gains_FLP(
     B: &mut [f32],
     cbk_index: &mut [i8],

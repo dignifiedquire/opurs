@@ -231,6 +231,7 @@ pub fn silk_NSQ(
 }
 
 /// Upstream C: silk/NSQ.c:silk_NSQ_c
+#[allow(clippy::too_many_arguments)]
 pub fn silk_NSQ_c(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
@@ -423,6 +424,7 @@ pub fn silk_NSQ_c(
 /// `xq_off` is the offset into `NSQ.xq` where output samples are written.
 /// Upstream C: silk/NSQ.c:silk_noise_shape_quantizer
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn silk_noise_shape_quantizer(
     NSQ: &mut silk_nsq_state,
     signalType: i32,
@@ -701,6 +703,7 @@ fn silk_noise_shape_quantizer(
 
 /// Upstream C: silk/NSQ.c:silk_nsq_scale_states
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn silk_nsq_scale_states(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
