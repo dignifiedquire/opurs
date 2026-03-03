@@ -202,14 +202,6 @@ fn fuzz_downgrade_arch(arch: Arch) -> Arch {
     }
 }
 
-#[cfg(all(feature = "simd", feature = "fuzzing", not(feature = "tools")))]
-fn fuzz_select_arch_once(arch: Arch) -> Arch {
-    use std::sync::OnceLock;
-
-    static SELECTED_ARCH: OnceLock<Arch> = OnceLock::new();
-    *SELECTED_ARCH.get_or_init(|| fuzz_downgrade_arch(arch))
-}
-
 /// Detect the highest supported SIMD architecture at runtime.
 ///
 /// Mirrors upstream C `opus_select_arch()` from `celt/x86/x86cpu.c` and
@@ -252,7 +244,7 @@ pub fn opus_select_arch() -> Arch {
 
         #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
         {
-            arch = fuzz_select_arch_once(arch);
+            arch = fuzz_downgrade_arch(arch);
         }
         arch
     }
@@ -273,7 +265,7 @@ pub fn opus_select_arch() -> Arch {
             Arch::Neon
         };
         #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
-        let arch = fuzz_select_arch_once(arch);
+        let arch = fuzz_downgrade_arch(arch);
         arch
     }
 
@@ -333,7 +325,7 @@ pub fn opus_select_arch() -> Arch {
         }
 
         #[cfg(all(feature = "fuzzing", not(feature = "tools")))]
-        let arch = fuzz_select_arch_once(arch);
+        let arch = fuzz_downgrade_arch(arch);
 
         return arch;
     }
