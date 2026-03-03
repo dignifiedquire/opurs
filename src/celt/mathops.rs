@@ -1,7 +1,6 @@
 //! Fixed-point and floating-point math operations.
 //!
 //! Upstream C: `celt/mathops.c`
-#![allow(clippy::approx_constant, clippy::excessive_precision)]
 
 use crate::silk::macros::EC_CLZ0;
 
@@ -55,7 +54,7 @@ pub fn fast_atan2f(y: f32, x: f32) -> f32 {
 ///
 /// Upstream C: celt/mathops.h:celt_atan_norm (new in 1.6.1)
 #[inline]
-#[allow(clippy::excessive_precision)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)]
 pub fn celt_atan_norm(x: f32) -> f32 {
     const ATAN2_2_OVER_PI: f32 = 0.636619772367581f32;
     let x_sq = x * x;
@@ -161,7 +160,7 @@ pub fn celt_cos_norm(x: f32) -> f32 {
 /// Upstream C: celt/mathops.h:celt_cos_norm2
 #[cfg(any(feature = "qext", feature = "osce"))]
 #[inline]
-#[allow(clippy::excessive_precision)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)]
 pub fn celt_cos_norm2(x: f32) -> f32 {
     const COS_COEFF_A0: f32 = 9.999999403953552246093750000000e-01;
     const COS_COEFF_A2: f32 = -1.233698248863220214843750000000000;
@@ -191,6 +190,7 @@ pub fn celt_cos_norm2(x: f32) -> f32 {
 /// Upstream C: celt/mathops.h:celt_log
 #[cfg(feature = "osce")]
 #[inline]
+#[allow(clippy::approx_constant, clippy::excessive_precision)]
 pub fn celt_log(x: f32) -> f32 {
     celt_log2(x) * 0.6931471805599453f32
 }
@@ -206,6 +206,7 @@ pub fn celt_log10(x: f32) -> f32 {
 /// `((float)(1.442695040888963387*log(x)))`.
 /// Upstream C: celt/mathops.h:celt_log2
 #[inline]
+#[allow(clippy::approx_constant, clippy::excessive_precision)]
 pub fn celt_log2(x: f32) -> f32 {
     (1.442695040888963387_f64 * (x as f64).ln()) as f32
 }
@@ -215,6 +216,7 @@ pub fn celt_log2(x: f32) -> f32 {
 /// `((float)exp(0.6931471805599453094*(x)))`.
 /// Upstream C: celt/mathops.h:celt_exp2
 #[inline]
+#[allow(clippy::approx_constant, clippy::excessive_precision)]
 pub fn celt_exp2(x: f32) -> f32 {
     (0.6931471805599453094_f64 * x as f64).exp() as f32
 }
