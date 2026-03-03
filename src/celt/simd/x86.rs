@@ -3,8 +3,6 @@
 //! SSE, SSE2, SSE4.1, and AVX2 intrinsics for pitch analysis and related functions.
 //! All functions require `#[target_feature]` and are called only after cpufeatures detection.
 
-#![allow(non_camel_case_types)]
-
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
