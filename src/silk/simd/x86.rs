@@ -3,7 +3,6 @@
 //! SSE4.1 and AVX2 intrinsics for noise shaping, inner products, etc.
 //! All functions require `#[target_feature]` and are called only after cpufeatures detection.
 
-#![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
 #[cfg(target_arch = "x86")]
