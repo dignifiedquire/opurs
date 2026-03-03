@@ -889,8 +889,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
     let mut a_Q12_arch = [0i32; MAX_LPC_ORDER];
     neon_short_prediction_create_arch_coef(&mut a_Q12_arch, a_Q12, predict_order);
 
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..length as usize {
+    for (i, &x_q10_i) in x_Q10.iter().take(length as usize).enumerate() {
         // Long-term prediction (shared)
         let ltp_pred;
         if signal_type == TYPE_VOICED {
@@ -1003,7 +1002,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         let pred_sum = vaddq_s32(vdupq_n_s32(n_ltp), lpc_v);
         r_v = vsubq_s32(pred_sum, r_v);
         r_v = vrshrq_n_s32::<4>(r_v);
-        r_v = vsubq_s32(vdupq_n_s32(x_Q10[i]), r_v);
+        r_v = vsubq_s32(vdupq_n_s32(x_q10_i), r_v);
 
         // Flip sign depending on dither
         let sign_v = vreinterpretq_s32_u32(vcltq_s32(seed_v, vdupq_n_s32(0)));
@@ -1099,7 +1098,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             let exc = vsubq_s32(veorq_s32(vshlq_n_s32::<4>(q_best), sign_v), sign_v);
             let lpc_exc = vaddq_s32(exc, vdupq_n_s32(ltp_pred));
             let xq_v = vaddq_s32(lpc_exc, lpc_v);
-            let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_Q10[i])));
+            let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_q10_i)));
             vst1q_s32(ss[0].Diff_Q14.as_mut_ptr(), diff);
             let slf = vsubq_s32(diff, n_ar_v);
             vst1q_s32(ss[0].sLTP_shp_Q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));
@@ -1112,7 +1111,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             let exc = vsubq_s32(veorq_s32(vshlq_n_s32::<4>(q_second), sign_v), sign_v);
             let lpc_exc = vaddq_s32(exc, vdupq_n_s32(ltp_pred));
             let xq_v = vaddq_s32(lpc_exc, lpc_v);
-            let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_Q10[i])));
+            let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_q10_i)));
             vst1q_s32(ss[1].Diff_Q14.as_mut_ptr(), diff);
             let slf = vsubq_s32(diff, n_ar_v);
             vst1q_s32(ss[1].sLTP_shp_Q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));

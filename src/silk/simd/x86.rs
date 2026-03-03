@@ -831,8 +831,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
         _mm_setzero_si128()
     };
 
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..length as usize {
+    for (i, &x_q10_i) in x_Q10.iter().take(length as usize).enumerate() {
         // ---- LTP prediction (SIMD for 4 taps + 1 scalar) ----
         let mut LTP_pred_Q14: i32;
         if signalType == TYPE_VOICED {
@@ -991,7 +990,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
             tmp1 = tmp2.saturating_sub(tmp1);
             tmp1 = ((tmp1 >> 3) + 1) >> 1;
 
-            let mut r_Q10 = x_Q10[i] - tmp1;
+            let mut r_Q10 = x_q10_i - tmp1;
             if psDD.Seed < 0 {
                 r_Q10 = -r_Q10;
             }
@@ -1059,7 +1058,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
             }
             let mut LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             let mut xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
+            psSampleState[k][0].Diff_Q14 = xq_Q14 - ((x_q10_i as u32) << 4) as i32;
             let mut sLF_AR_shp_Q14 = psSampleState[k][0].Diff_Q14 - n_AR_Q14;
             psSampleState[k][0].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][0].LF_AR_Q14 = sLF_AR_shp_Q14;
@@ -1072,7 +1071,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
             }
             LPC_exc_Q14 = exc_Q14 + LTP_pred_Q14;
             xq_Q14 = LPC_exc_Q14 + LPC_pred_Q14;
-            psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_Q10[i] as u32) << 4) as i32;
+            psSampleState[k][1].Diff_Q14 = xq_Q14 - ((x_q10_i as u32) << 4) as i32;
             sLF_AR_shp_Q14 = psSampleState[k][1].Diff_Q14 - n_AR_Q14;
             psSampleState[k][1].sLTP_shp_Q14 = sLF_AR_shp_Q14.saturating_sub(n_LF_Q14);
             psSampleState[k][1].LF_AR_Q14 = sLF_AR_shp_Q14;
@@ -1809,7 +1808,7 @@ impl NsqDelDecAvx2 {
 
 /// Inner quantizer for one subframe, AVX2 SoA version.
 #[target_feature(enable = "avx2")]
-#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+#[allow(clippy::too_many_arguments)]
 unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
     NSQ: &mut silk_nsq_state,
     psDelDec: &mut NsqDelDecAvx2,
@@ -1843,7 +1842,7 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
     let mut pred_lag_ptr_idx = (NSQ.sLTP_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;
     let Gain_Q10 = Gain_Q16 >> 6;
 
-    for i in 0..length as usize {
+    for (i, &x_q10_i) in x_Q10.iter().take(length as usize).enumerate() {
         // Long-term prediction
         let LTP_pred_Q14: i32;
         if signalType == TYPE_VOICED {
@@ -1939,7 +1938,7 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
         let tmp0 = silk_mm_sub_sat_epi32(tmp1, tmp0); // Q14
         let tmp0 = silk_mm_srai_round_epi32(tmp0, 4); // Q10
 
-        let r_Q10 = _mm_sub_epi32(_mm_set1_epi32(x_Q10[i]), tmp0);
+        let r_Q10 = _mm_sub_epi32(_mm_set1_epi32(x_q10_i), tmp0);
 
         // Flip sign depending on dither
         let r_Q10 = silk_mm_sign_epi32(r_Q10, psDelDec.Seed);
@@ -2005,10 +2004,8 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
         let mut SS_xq_Q14 = _mm256_add_epi32(exc_Q14, _mm256_broadcastsi128_si256(LPC_pred_Q14));
 
         // Update states
-        let mut SS_Diff_Q14 = _mm256_sub_epi32(
-            SS_xq_Q14,
-            _mm256_set1_epi32(((x_Q10[i] as u32) << 4) as i32),
-        );
+        let mut SS_Diff_Q14 =
+            _mm256_sub_epi32(SS_xq_Q14, _mm256_set1_epi32(((x_q10_i as u32) << 4) as i32));
         let mut SS_LF_AR_Q14 = _mm256_sub_epi32(SS_Diff_Q14, _mm256_broadcastsi128_si256(n_AR_Q14));
         let mut SS_sLTP_shp_Q14 =
             silk_mm256_sub_sat_epi32(SS_LF_AR_Q14, _mm256_broadcastsi128_si256(n_LF_Q14));
