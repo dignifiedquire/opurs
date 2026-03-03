@@ -100,7 +100,6 @@ pub fn opus_custom_mode_create(
 ///
 /// Upstream C: celt/modes.c:compute_qext_mode
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 pub fn compute_qext_mode(m: &OpusCustomMode) -> OpusCustomMode {
     let mut qext = *m;
     if m.shortMdctSize * 48000 == 120 * m.Fs {

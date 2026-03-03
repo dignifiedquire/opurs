@@ -517,20 +517,16 @@ pub fn clt_compute_allocation(
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 const LAST_ZERO: [u8; 3] = [64, 50, 0];
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 const LAST_CAP: [u8; 3] = [110, 60, 0];
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 const LAST_OTHER: [u8; 4] = [120, 112, 70, 0];
 
 /// Context-adaptive entropy encoding of a depth value.
 ///
 /// Upstream C: celt/rate.c:ec_enc_depth
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 fn ec_enc_depth(enc: &mut ec_ctx, depth: i32, cap: i32, last: &mut i32) {
     let mut sym = 3;
     if depth == *last {
@@ -559,7 +555,6 @@ fn ec_enc_depth(enc: &mut ec_ctx, depth: i32, cap: i32, last: &mut i32) {
 ///
 /// Upstream C: celt/rate.c:ec_dec_depth
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 fn ec_dec_depth(dec: &mut ec_ctx, cap: i32, last: &mut i32) -> i32 {
     let sym;
     if *last == 0 {
@@ -588,7 +583,6 @@ fn ec_dec_depth(dec: &mut ec_ctx, cap: i32, last: &mut i32) -> i32 {
 ///
 /// Upstream C: celt/rate.c:median_of_5_val16
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 fn median_of_5_val16(x: &[f32]) -> f32 {
     let t2 = x[2];
     let (mut t0, mut t1) = if x[0] > x[1] {
@@ -633,7 +627,6 @@ fn median_of_5_val16(x: &[f32]) -> f32 {
 ///
 /// Upstream C: celt/rate.c:clt_compute_extra_allocation
 #[cfg(feature = "qext")]
-#[allow(dead_code)]
 pub fn clt_compute_extra_allocation(
     m: &OpusCustomMode,
     qext_mode: Option<&OpusCustomMode>,
