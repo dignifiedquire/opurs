@@ -4,8 +4,6 @@
 //! (no runtime detection needed).
 //!
 //! Port of `dnn/vec_neon.h` from libopus 1.6.1.
-// Keep float literals aligned with upstream C constants.
-#![allow(clippy::approx_constant)]
 
 use core::arch::aarch64::*;
 use core::arch::asm;
@@ -17,6 +15,7 @@ use core::arch::asm;
 /// NEON fast exp approximation (4-wide).
 /// Port of `vec_neon.h:exp4_approx`.
 #[target_feature(enable = "neon")]
+#[allow(clippy::approx_constant)]
 unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
     let x = vmaxq_f32(vminq_f32(x, vdupq_n_f32(88.0)), vdupq_n_f32(-88.0));
 
@@ -44,6 +43,7 @@ unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
 /// NEON fast tanh approximation (4-wide).
 /// Port of `vec_neon.h:tanh4_approx`.
 #[target_feature(enable = "neon")]
+#[allow(clippy::approx_constant)]
 unsafe fn tanh4_approx(x: float32x4_t) -> float32x4_t {
     let n0 = vdupq_n_f32(952.52801514);
     let n1 = vdupq_n_f32(96.39235687);

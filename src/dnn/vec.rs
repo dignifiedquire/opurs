@@ -4,8 +4,6 @@
 //! functions from `dnn/vec.h` — sgemv, cgemv, tanh approximation, etc.
 //!
 //! Upstream C: `dnn/vec.h` (generic/no-optimization path)
-#![allow(clippy::approx_constant)]
-// Keep float literals aligned with upstream C constants.
 
 use crate::arch::Arch;
 
@@ -16,9 +14,11 @@ pub const SCALE_1: f32 = 1.0 / 128.0 / 127.0;
 
 const MAX_INPUTS: usize = 2048;
 
+// Keep float literals aligned with upstream C constants.
 /// Fast 2^x approximation via IEEE 754 bit manipulation.
 ///
 /// Upstream C: dnn/vec.h:lpcnet_exp2
+#[allow(clippy::approx_constant)]
 pub fn lpcnet_exp2(x: f32) -> f32 {
     let integer = x.floor() as i32;
     if integer < -50 {
@@ -36,6 +36,7 @@ pub fn lpcnet_exp2(x: f32) -> f32 {
 /// Fast e^x approximation: `lpcnet_exp2(x * 1.44269504)`
 ///
 /// Upstream C: dnn/vec.h:lpcnet_exp
+#[allow(clippy::approx_constant)]
 pub fn lpcnet_exp(x: f32) -> f32 {
     lpcnet_exp2(x * 1.44269504)
 }
@@ -43,6 +44,7 @@ pub fn lpcnet_exp(x: f32) -> f32 {
 /// Fast tanh approximation using Padé rational function.
 ///
 /// Upstream C: dnn/vec.h:tanh_approx
+#[allow(clippy::approx_constant)]
 pub fn tanh_approx(x: f32) -> f32 {
     const N0: f32 = 952.52801514;
     const N1: f32 = 96.39235687;

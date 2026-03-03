@@ -4,8 +4,6 @@
 //! The PLC uses a small neural network + FARGAN to conceal lost frames.
 //!
 //! Upstream C: `dnn/lpcnet_enc.c`, `dnn/lpcnet_plc.c`, `dnn/lpcnet_private.h`
-#![allow(clippy::approx_constant)]
-// Keep float literals aligned with upstream C constants.
 
 use super::fargan::*;
 use super::freq::*;
@@ -18,6 +16,8 @@ use crate::celt::mathops::celt_log2;
 use crate::celt::pitch::{celt_inner_prod, celt_pitch_xcorr};
 
 // --- Constants ---
+
+// Keep float literals aligned with upstream C constants.
 
 const NB_FEATURES: usize = 20;
 pub const NB_TOTAL_FEATURES: usize = 36;
@@ -258,6 +258,7 @@ fn biquad(y: &mut [f32], mem: &mut [f32; 2], x: &[f32], b: &[f32; 2], a: &[f32; 
     mem[1] = mem1;
 }
 
+#[allow(clippy::approx_constant)]
 fn celt_log10(x: f32) -> f32 {
     0.30102999566 * celt_log2(x)
 }
