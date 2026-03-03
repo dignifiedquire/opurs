@@ -2602,16 +2602,16 @@ pub fn osce_reset(state: &mut OSCEState, method: i32) {
 /// Upstream C: dnn/osce.c:osce_enhance_frame
 pub fn osce_enhance_frame(
     model: &OSCEModel,
-    psDec: &mut silk_decoder_state,
-    psDecCtrl: &silk_decoder_control,
+    ps_dec: &mut silk_decoder_state,
+    ps_dec_ctrl: &silk_decoder_control,
     xq: &mut [i16],
     num_bits: i32,
     arch: Arch,
 ) {
     // Enhancement only implemented for 20 ms frame at 16kHz
-    if psDec.fs_kHz != 16 || psDec.nb_subfr != 4 {
-        let method = psDec.osce.method;
-        osce_reset(&mut psDec.osce, method);
+    if ps_dec.fs_kHz != 16 || ps_dec.nb_subfr != 4 {
+        let method = ps_dec.osce.method;
+        osce_reset(&mut ps_dec.osce, method);
         return;
     }
 
@@ -2620,17 +2620,17 @@ pub fn osce_enhance_frame(
     let mut periods = [0i32; 4];
 
     // Build PredCoef_Q12 slices for feature extraction
-    let pred_coef_refs: [&[i16]; 2] = [&psDecCtrl.PredCoef_Q12[0], &psDecCtrl.PredCoef_Q12[1]];
+    let pred_coef_refs: [&[i16]; 2] = [&ps_dec_ctrl.PredCoef_Q12[0], &ps_dec_ctrl.PredCoef_Q12[1]];
 
     osce_calculate_features(
-        &mut psDec.osce.features,
-        psDec.nb_subfr,
-        psDec.LPC_order,
-        psDec.indices.signalType as i32,
+        &mut ps_dec.osce.features,
+        ps_dec.nb_subfr,
+        ps_dec.LPC_order,
+        ps_dec.indices.signalType as i32,
         &pred_coef_refs,
-        &psDecCtrl.pitchL,
-        &psDecCtrl.LTPCoef_Q14,
-        &psDecCtrl.Gains_Q16,
+        &ps_dec_ctrl.pitchL,
+        &ps_dec_ctrl.LTPCoef_Q14,
+        &ps_dec_ctrl.Gains_Q16,
         xq,
         num_bits,
         &mut features,
@@ -2678,7 +2678,7 @@ pub fn osce_enhance_frame(
     }
 
     let method = if model.loaded {
-        psDec.osce.method
+        ps_dec.osce.method
     } else {
         OSCE_METHOD_NONE
     };
@@ -2689,7 +2689,7 @@ pub fn osce_enhance_frame(
             if let Some(ref lace) = model.lace {
                 lace_process_20ms_frame(
                     lace,
-                    &mut psDec.osce.lace_state,
+                    &mut ps_dec.osce.lace_state,
                     &mut out_buffer,
                     &in_buffer,
                     &features,
@@ -2705,7 +2705,7 @@ pub fn osce_enhance_frame(
             if let Some(ref nolace) = model.nolace {
                 nolace_process_20ms_frame(
                     nolace,
-                    &mut psDec.osce.nolace_state,
+                    &mut ps_dec.osce.nolace_state,
                     &mut out_buffer,
                     &in_buffer,
                     &features,
@@ -2744,12 +2744,12 @@ pub fn osce_enhance_frame(
     }
 
     // Cross-fade / bypass on reset (upstream C: osce.c lines 1031-1041)
-    if psDec.osce.features.reset > 1 {
+    if ps_dec.osce.features.reset > 1 {
         out_buffer.copy_from_slice(&in_buffer);
-        psDec.osce.features.reset -= 1;
-    } else if psDec.osce.features.reset == 1 {
+        ps_dec.osce.features.reset -= 1;
+    } else if ps_dec.osce.features.reset == 1 {
         osce_cross_fade_10ms(&mut out_buffer, &in_buffer, 320);
-        psDec.osce.features.reset = 0;
+        ps_dec.osce.features.reset = 0;
     }
 
     // Scale output back to i16

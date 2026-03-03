@@ -5,8 +5,6 @@
 //!
 //! Upstream C: `dnn/`
 
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
 // Keep upstream C float literals unchanged for parity/bit-exact behavior.
 #![allow(clippy::excessive_precision)]
 
