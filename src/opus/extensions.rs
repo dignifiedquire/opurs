@@ -7,7 +7,8 @@
 //!
 //! Upstream C: `src/extensions.c`
 
-// These functions are used by the DNN subsystem (DRED) and QEXT.
+// These APIs are externally consumed (tools/tests) and not all are referenced
+// from the library's internal call graph.
 #![allow(dead_code)]
 
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
