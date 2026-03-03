@@ -8,7 +8,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
-#![allow(clippy::too_many_arguments)]
+// Keep upstream C float literals unchanged for parity/bit-exact behavior.
 #![allow(clippy::excessive_precision)]
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::approx_constant)]

@@ -406,6 +406,7 @@ pub fn compute_generic_conv1d(
 /// Dilated causal 1D convolution.
 ///
 /// Upstream C: dnn/nnet.c:compute_generic_conv1d_dilation
+#[allow(clippy::too_many_arguments)]
 pub fn compute_generic_conv1d_dilation(
     layer: &LinearLayer,
     output: &mut [f32],
@@ -460,6 +461,7 @@ const MAX_CONV2D_INPUTS: usize = 8192;
 /// 2D convolution (generic kernel size).
 ///
 /// Upstream C: dnn/nnet_arch.h:conv2d_float
+#[allow(clippy::too_many_arguments)]
 fn conv2d_float(
     out: &mut [f32],
     weights: &[f32],
@@ -535,6 +537,7 @@ fn conv2d_3x3_float(
 /// Compute Conv2D layer with temporal memory.
 ///
 /// Upstream C: dnn/nnet_arch.h:compute_conv2d_
+#[allow(clippy::too_many_arguments)]
 fn compute_conv2d_c(
     conv: &Conv2dLayer,
     out: &mut [f32],
@@ -607,6 +610,7 @@ fn compute_conv2d_c(
 /// Upstream C RTCD tables:
 /// - dnn/x86/x86_dnn_map.c:DNN_COMPUTE_CONV2D_IMPL
 /// - dnn/arm/arm_dnn_map.c:DNN_COMPUTE_CONV2D_IMPL
+#[allow(clippy::too_many_arguments)]
 pub fn compute_conv2d(
     conv: &Conv2dLayer,
     out: &mut [f32],
@@ -942,6 +946,7 @@ fn bytes_as_i8(data: &[u8]) -> Vec<i8> {
 /// Names can be empty strings to skip optional fields.
 ///
 /// Upstream C: dnn/parse_lpcnet_weights.c:linear_init
+#[allow(clippy::too_many_arguments)]
 pub fn linear_init(
     arrays: &[WeightArray],
     bias_name: &str,
