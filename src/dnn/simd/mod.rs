@@ -127,7 +127,6 @@ pub fn cgemv8x4(
             // arch=0/1 entries that still dispatch to compute_linear_c.
             // Keep USE_SU_BIAS quantization in this fallback too.
             super::vec::cgemv8x4_scalar_su(out, w, scale, rows, cols, x);
-            return;
         }
 
         #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
@@ -176,7 +175,6 @@ pub fn sparse_cgemv8x4(
             }
             // Upstream x86 compute_linear_c also uses USE_SU_BIAS at low arch tiers.
             super::vec::sparse_cgemv8x4_scalar_su(out, w, idx, scale, rows, cols, x);
-            return;
         }
 
         #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
