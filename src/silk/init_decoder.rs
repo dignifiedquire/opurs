@@ -7,7 +7,7 @@ use crate::silk::resampler::ResamplerState;
 use crate::silk::structs::{silk_CNG_struct, silk_PLC_struct, silk_decoder_state, SideInfoIndices};
 use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
 use crate::silk::CNG::silk_cng_reset;
-use crate::silk::PLC::silk_PLC_Reset;
+use crate::silk::PLC::silk_plc_reset;
 
 /// Reset decoder state, preserving model data (OSCE, etc.).
 ///
@@ -52,7 +52,7 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) -> i32 {
     }
 
     silk_cng_reset(dec);
-    silk_PLC_Reset(dec);
+    silk_plc_reset(dec);
 
     0
 }

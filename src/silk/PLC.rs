@@ -37,7 +37,8 @@ const HARM_ATT_Q15: [i16; 2] = [32440, 31130];
 const PLC_RAND_ATTENUATE_V_Q15: [i16; 2] = [31130, 26214];
 const PLC_RAND_ATTENUATE_UV_Q15: [i16; 2] = [32440, 29491];
 
-pub fn silk_PLC_Reset(psDec: &mut silk_decoder_state) {
+/// Upstream C: silk/PLC.c:silk_PLC_Reset
+pub fn silk_plc_reset(psDec: &mut silk_decoder_state) {
     psDec.sPLC.pitchL_Q8 = (psDec.frame_length as i32) << (8 - 1);
     psDec.sPLC.prevGain_Q16[0] = SILK_FIX_CONST!(1, 16);
     psDec.sPLC.prevGain_Q16[1] = SILK_FIX_CONST!(1, 16);
@@ -47,7 +48,7 @@ pub fn silk_PLC_Reset(psDec: &mut silk_decoder_state) {
 
 /// Upstream C: silk/PLC.c:silk_PLC
 #[inline]
-pub fn silk_PLC(
+pub fn silk_plc(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
@@ -56,11 +57,11 @@ pub fn silk_PLC(
     arch: Arch,
 ) {
     if psDec.fs_kHz != psDec.sPLC.fs_kHz {
-        silk_PLC_Reset(psDec);
+        silk_plc_reset(psDec);
         psDec.sPLC.fs_kHz = psDec.fs_kHz;
     }
     if lost != 0 {
-        silk_PLC_conceal(
+        silk_plc_conceal(
             psDec,
             psDecCtrl,
             frame,
@@ -70,7 +71,7 @@ pub fn silk_PLC(
         );
         psDec.lossCnt += 1;
     } else {
-        silk_PLC_update(psDec, psDecCtrl);
+        silk_plc_update(psDec, psDecCtrl);
         #[cfg(feature = "deep-plc")]
         {
             if let Some(lpcnet) = lpcnet {
@@ -95,7 +96,7 @@ pub fn silk_PLC(
 /// psDecCtrl   I/O   Decoder control
 /// ```
 #[inline]
-fn silk_PLC_update(psDec: &mut silk_decoder_state, psDecCtrl: &mut silk_decoder_control) {
+fn silk_plc_update(psDec: &mut silk_decoder_state, psDecCtrl: &mut silk_decoder_control) {
     let psPLC = &mut psDec.sPLC;
 
     /* Update parameters used in case of packet loss */
@@ -164,7 +165,7 @@ fn silk_PLC_update(psDec: &mut silk_decoder_state, psDecCtrl: &mut silk_decoder_
 /// Upstream C: silk/PLC.c:silk_PLC_energy
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn silk_PLC_energy(
+fn silk_plc_energy(
     energy1: &mut i32,
     shift1: &mut i32,
     energy2: &mut i32,
@@ -189,7 +190,7 @@ fn silk_PLC_energy(
 
 /// Upstream C: silk/PLC.c:silk_PLC_conceal
 #[inline]
-fn silk_PLC_conceal(
+fn silk_plc_conceal(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
@@ -213,7 +214,7 @@ fn silk_PLC_conceal(
     let mut shift1: i32 = 0;
     let mut energy2: i32 = 0;
     let mut shift2: i32 = 0;
-    silk_PLC_energy(
+    silk_plc_energy(
         &mut energy1,
         &mut shift1,
         &mut energy2,
@@ -439,7 +440,7 @@ fn silk_PLC_conceal(
 }
 
 /// Upstream C: silk/PLC.c:silk_PLC_glue_frames
-pub fn silk_PLC_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], length: i32) {
+pub fn silk_plc_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], length: i32) {
     let mut i: i32;
     let mut energy_shift: i32 = 0;
     let mut energy: i32 = 0;

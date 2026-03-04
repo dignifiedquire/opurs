@@ -18,7 +18,7 @@ use crate::silk::decode_pulses::silk_decode_pulses;
 use crate::silk::define::{MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::CNG::silk_cng;
-use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
+use crate::silk::PLC::{silk_plc, silk_plc_glue_frames};
 
 #[cfg(feature = "deep-plc")]
 use crate::dnn::lpcnet::LPCNetPLCState;
@@ -98,7 +98,7 @@ pub fn silk_decode_frame(
             osce_enhance_frame(osce_model, psDec, &psDecCtrl, pOut_slice, num_bits, arch);
         }
 
-        silk_PLC(
+        silk_plc(
             psDec,
             &mut psDecCtrl,
             pOut_slice,
@@ -113,7 +113,7 @@ pub fn silk_decode_frame(
         psDec.first_frame_after_reset = 0;
     } else {
         psDec.indices.signalType = psDec.prevSignalType as i8;
-        silk_PLC(
+        silk_plc(
             psDec,
             &mut psDecCtrl,
             pOut_slice,
@@ -140,7 +140,7 @@ pub fn silk_decode_frame(
             .copy_from_slice(&pOut_slice[..psDec.frame_length]);
     }
     silk_cng(psDec, &mut psDecCtrl, pOut_slice);
-    silk_PLC_glue_frames(psDec, pOut_slice, L);
+    silk_plc_glue_frames(psDec, pOut_slice, L);
     psDec.lagPrev = psDecCtrl.pitchL[psDec.nb_subfr - 1];
     (ret, L)
 }
