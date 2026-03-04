@@ -242,32 +242,32 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
 ///
 /// Upstream C: celt/vq.c:op_pvq_search_N2
 #[cfg(feature = "qext")]
-fn op_pvq_search_N2(
-    X: &[f32],
+fn op_pvq_search_n2(
+    x: &[f32],
     iy: &mut [i32],
     up_iy: &mut [i32],
-    K: i32,
+    k: i32,
     up: i32,
     refine: &mut i32,
 ) -> f32 {
-    let sum = X[0].abs() + X[1].abs();
+    let sum = x[0].abs() + x[1].abs();
     if sum < EPSILON {
-        iy[0] = K;
-        up_iy[0] = up * K;
+        iy[0] = k;
+        up_iy[0] = up * k;
         iy[1] = 0;
         up_iy[1] = 0;
         *refine = 0;
-        return (K as f64 * K as f64 * up as f64 * up as f64) as f32;
+        return (k as f64 * k as f64 * up as f64 * up as f64) as f32;
     }
     let rcp_sum = 1.0f32 / sum;
-    iy[0] = (0.5 + K as f32 * X[0] * rcp_sum).floor() as i32;
-    up_iy[0] = (0.5 + up as f32 * K as f32 * X[0] * rcp_sum).floor() as i32;
+    iy[0] = (0.5 + k as f32 * x[0] * rcp_sum).floor() as i32;
+    up_iy[0] = (0.5 + up as f32 * k as f32 * x[0] * rcp_sum).floor() as i32;
     // Constrain up_iy within ±(up-1)/2 of up*iy
     up_iy[0] = (up * iy[0] - (up - 1) / 2).max((up * iy[0] + (up - 1) / 2).min(up_iy[0]));
     let offset = up_iy[0] - up * iy[0];
-    iy[1] = K - iy[0].abs();
-    up_iy[1] = up * K - up_iy[0].abs();
-    if X[1] < 0.0 {
+    iy[1] = k - iy[0].abs();
+    up_iy[1] = up * k - up_iy[0].abs();
+    if x[1] < 0.0 {
         iy[1] = -iy[1];
         up_iy[1] = -up_iy[1];
         *refine = -offset;
@@ -607,7 +607,7 @@ pub fn alg_quant(
             let mut up_iy = [0i32; 2];
             let mut refine = 0i32;
             let up = (1 << extra_bits) - 1;
-            let yy = op_pvq_search_N2(X, &mut iy, &mut up_iy, K, up, &mut refine);
+            let yy = op_pvq_search_n2(X, &mut iy, &mut up_iy, K, up, &mut refine);
             collapse_mask = extract_collapse_mask(&up_iy, N, B);
             encode_pulses(&iy[..N as usize], K, enc);
             ec_enc_uint(ext_enc, (refine + (up - 1) / 2) as u32, up as u32);

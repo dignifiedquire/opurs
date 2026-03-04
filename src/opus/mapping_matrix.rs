@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/mapping_matrix.c`
 
-use crate::celt::float_cast::{float2int, FLOAT2INT16};
+use crate::celt::float_cast::{float2int, float2int16};
 use crate::opus::opus_defines::OPUS_BAD_ARG;
 use crate::opus::opus_private::align;
 
@@ -212,7 +212,7 @@ impl MappingMatrix {
         }
 
         for i in 0..frame_size {
-            let input_sample = FLOAT2INT16(input[input_rows * i]) as i32;
+            let input_sample = float2int16(input[input_rows * i]) as i32;
             for row in 0..output_rows {
                 let coeff = self.data[matrix_index(self.rows, row, input_row)] as i32;
                 let tmp = coeff * input_sample;
@@ -376,7 +376,7 @@ mod tests {
                 .expect("in_short");
         }
 
-        let got = out.iter().map(|x| FLOAT2INT16(*x)).collect::<Vec<_>>();
+        let got = out.iter().map(|x| float2int16(*x)).collect::<Vec<_>>();
         for (index, (&g, &e)) in got.iter().zip(SIMPLE_EXPECTED.iter()).enumerate() {
             assert!(
                 (g as i32 - e as i32).abs() <= 1,
@@ -447,7 +447,7 @@ mod tests {
                 )
                 .expect("in_float");
         }
-        let got_in = out_in.iter().map(|x| FLOAT2INT16(*x)).collect::<Vec<_>>();
+        let got_in = out_in.iter().map(|x| float2int16(*x)).collect::<Vec<_>>();
         for (index, (&g, &e)) in got_in.iter().zip(SIMPLE_EXPECTED.iter()).enumerate() {
             assert!(
                 (g as i32 - e as i32).abs() <= 1,
@@ -468,7 +468,7 @@ mod tests {
                 )
                 .expect("out_float");
         }
-        let got_out = out_out.iter().map(|x| FLOAT2INT16(*x)).collect::<Vec<_>>();
+        let got_out = out_out.iter().map(|x| float2int16(*x)).collect::<Vec<_>>();
         for (index, (&g, &e)) in got_out.iter().zip(SIMPLE_EXPECTED.iter()).enumerate() {
             assert!(
                 (g as i32 - e as i32).abs() <= 1,

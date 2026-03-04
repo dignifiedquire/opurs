@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `src/opus_multistream_decoder.c`
 
-use crate::celt::float_cast::{float2int, FLOAT2INT16};
+use crate::celt::float_cast::{float2int, float2int16};
 use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples, OpusDecoder};
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
@@ -519,7 +519,7 @@ fn map_output_i16(
             let source = &stream_pcm[stream_idx];
             for frame in 0..decoded_samples {
                 output[frame * channels + out_channel] =
-                    FLOAT2INT16(source[frame * stream_channels + stream_channel]);
+                    float2int16(source[frame * stream_channels + stream_channel]);
             }
         }
     }

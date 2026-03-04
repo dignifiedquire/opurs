@@ -33,7 +33,7 @@ use crate::celt::modes::compute_qext_mode;
 use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 use crate::celt::pitch::{celt_inner_prod, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
-    amp2Log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
+    amp2_log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
 };
 use crate::celt::rate::clt_compute_allocation;
 #[cfg(feature = "qext")]
@@ -2815,7 +2815,7 @@ pub fn celt_encode_with_ec<'b>(
     if secondMdct != 0 {
         compute_mdcts(mode, 0, &mut in_0, &mut freq, C, CC, LM, st.upsample);
         compute_band_energies(mode, &freq, &mut bandE, effEnd, C, LM, st.arch);
-        amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE2, C);
+        amp2_log2(mode, effEnd, end, &bandE, &mut bandLogE2, C);
         c = 0;
         while c < C {
             i = 0;
@@ -2857,7 +2857,7 @@ pub fn celt_encode_with_ec<'b>(
             i += 1;
         }
     }
-    amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
+    amp2_log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
     let mut surround_dynalloc = [0.0f32; MAX_C_BANDS];
     surround_dynalloc[..end as usize].fill(0.0);
     let energy_mask: Option<&[f32]> = if st.energy_mask_len == 0 {
@@ -3044,7 +3044,7 @@ pub fn celt_encode_with_ec<'b>(
             st.upsample,
         );
         compute_band_energies(mode, &freq, &mut bandE, effEnd, C, LM, st.arch);
-        amp2Log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
+        amp2_log2(mode, effEnd, end, &bandE, &mut bandLogE, C);
         c = 0;
         while c < C {
             i = 0;
@@ -3553,7 +3553,7 @@ pub fn celt_encode_with_ec<'b>(
             // Compute band energies at higher frequency resolution
             compute_band_energies(qm, &freq, &mut qext_bandE, qext_end, C, LM, st.arch);
             normalise_bands(qm, &freq, &mut X, &qext_bandE, qext_end, C, M);
-            amp2Log2(qm, qext_end, qext_end, &qext_bandE, &mut qext_bandLogE, C);
+            amp2_log2(qm, qext_end, qext_end, &qext_bandE, &mut qext_bandLogE, C);
 
             // Encode stereo params for QEXT bands
             if C == 2 {

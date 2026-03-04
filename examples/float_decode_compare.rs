@@ -74,7 +74,7 @@ fn main() {
                     first_diff_idx = Some(i);
                 }
             }
-            // Check int16 conversion using FLOAT2INT16 (per-sample, ties-to-even)
+            // Check int16 conversion using float2int16 (per-sample, ties-to-even)
             let c_i16 = float2int16(c_float[i]);
             let r_i16 = float2int16(rust_float[i]);
             if c_i16 != r_i16 {
@@ -157,7 +157,7 @@ fn main() {
         total_float_diffs,
         total_float_diffs as f64 / total_samples as f64 * 100.0
     );
-    println!("Total int16 diffs (FLOAT2INT16): {}", total_int16_diffs);
+    println!("Total int16 diffs (float2int16): {}", total_int16_diffs);
     if let Some(f) = first_float_diff_frame {
         println!("First float diff frame: {}", f);
     }

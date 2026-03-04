@@ -596,26 +596,26 @@ pub fn unquant_energy_finalise(
 }
 
 /// Upstream C: celt/quant_bands.c:amp2Log2
-pub fn amp2Log2(
+pub fn amp2_log2(
     m: &OpusCustomMode,
-    effEnd: i32,
+    eff_end: i32,
     end: i32,
-    bandE: &[f32],
-    bandLogE: &mut [f32],
-    C: i32,
+    band_e: &[f32],
+    band_log_e: &mut [f32],
+    channels: i32,
 ) {
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nbEBands as i32;
     let mut c = 0;
     loop {
-        for i in 0..effEnd {
-            bandLogE[(i + c * nbEBands) as usize] =
-                celt_log2(bandE[(i + c * nbEBands) as usize]) - eMeans[i as usize];
+        for i in 0..eff_end {
+            band_log_e[(i + c * nb_ebands) as usize] =
+                celt_log2(band_e[(i + c * nb_ebands) as usize]) - eMeans[i as usize];
         }
-        for i in effEnd..end {
-            bandLogE[(c * nbEBands + i) as usize] = -14.0f32;
+        for i in eff_end..end {
+            band_log_e[(c * nb_ebands + i) as usize] = -14.0f32;
         }
         c += 1;
-        if c >= C {
+        if c >= channels {
             break;
         }
     }

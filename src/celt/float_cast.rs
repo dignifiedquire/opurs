@@ -10,7 +10,7 @@ pub const CELT_SIG_SCALE: f32 = 32768.0f32;
 /// ties-to-even (aarch64: `vcvtns_s32_f32`, x86: `cvtss2si`, or `lrintf`).
 /// Upstream C: celt/float_cast.h:FLOAT2INT16
 #[inline]
-pub fn FLOAT2INT16(x: f32) -> i16 {
+pub fn float2int16(x: f32) -> i16 {
     let x = x * CELT_SIG_SCALE;
     let x = x.max(-32768.0);
     let x = x.min(32767.0);
@@ -44,7 +44,7 @@ pub fn celt_float2int16(input: &[f32], output: &mut [i16], cnt: usize) {
 
     // Scalar tail (or all samples on non-aarch64)
     while i < cnt {
-        output[i] = FLOAT2INT16(input[i]);
+        output[i] = float2int16(input[i]);
         i += 1;
     }
 }
