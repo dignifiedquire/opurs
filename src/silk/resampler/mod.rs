@@ -21,7 +21,7 @@ use rom::{
     RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2,
 };
 use std::cmp::Ordering;
-use up2_hq::{silk_resampler_private_up2_HQ, ResamplerUp2HqState};
+use up2_hq::{silk_resampler_private_up2_hq, ResamplerUp2HqState};
 
 pub use down2::silk_resampler_down2;
 pub use down2_3::silk_resampler_down2_3;
@@ -324,8 +324,8 @@ pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> 
 
     match &mut S.mode {
         ResamplerMode::Up2Hq(state) => {
-            silk_resampler_private_up2_HQ(state, delay_out, delay_in);
-            silk_resampler_private_up2_HQ(state, rest_out, rest_in);
+            silk_resampler_private_up2_hq(state, delay_out, delay_in);
+            silk_resampler_private_up2_hq(state, rest_out, rest_in);
         }
         ResamplerMode::IirFir(state) => {
             silk_resampler_private_IIR_FIR(&S.params, state, delay_out, delay_in);

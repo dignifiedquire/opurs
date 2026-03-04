@@ -8,7 +8,7 @@ use crate::silk::resampler::{ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN};
 use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
 
 use super::rom::{silk_resampler_frac_FIR_12, RESAMPLER_ORDER_FIR_12};
-use super::up2_hq::{silk_resampler_private_up2_HQ, ResamplerUp2HqState};
+use super::up2_hq::{silk_resampler_private_up2_hq, ResamplerUp2HqState};
 
 #[derive(Default, Copy, Clone)]
 pub struct ResamplerIirFirState {
@@ -89,7 +89,7 @@ pub(super) fn silk_resampler_private_IIR_FIR(
     let index_increment_Q16 = resampler_params.inv_ratio_q16;
     loop {
         nSamplesIn = in_0.len().min(resampler_params.batch_size);
-        silk_resampler_private_up2_HQ(
+        silk_resampler_private_up2_hq(
             &mut state.up2_HQ,
             &mut buf[RESAMPLER_ORDER_FIR_12..][..nSamplesIn * 2],
             &in_0[..nSamplesIn],

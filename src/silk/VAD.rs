@@ -9,7 +9,7 @@ use crate::silk::define::{
     VAD_INTERNAL_SUBFRAMES, VAD_NEGATIVE_OFFSET_Q5, VAD_NOISE_LEVEL_SMOOTH_COEF_Q16, VAD_N_BANDS,
 };
 use crate::silk::lin2log::silk_lin2log;
-use crate::silk::sigm_Q15::silk_sigm_Q15;
+use crate::silk::sigm_Q15::silk_sigm_q15;
 use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
 use crate::silk::typedefs::{silk_int32_MAX, silk_uint8_MAX};
 use crate::silk::Inlines::silk_SQRT_APPROX;
@@ -215,8 +215,8 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     sumSquared /= 4;
     let pSNR_dB_Q7: i32 = (3 * silk_SQRT_APPROX(sumSquared)) as i16 as i32;
     SA_Q15 =
-        silk_sigm_Q15(((45000 * pSNR_dB_Q7 as i16 as i64) >> 16) as i32 - VAD_NEGATIVE_OFFSET_Q5);
-    psEncC.input_tilt_Q15 = (((silk_sigm_Q15(input_tilt) - 16384) as u32) << 1) as i32;
+        silk_sigm_q15(((45000 * pSNR_dB_Q7 as i16 as i64) >> 16) as i32 - VAD_NEGATIVE_OFFSET_Q5);
+    psEncC.input_tilt_Q15 = (((silk_sigm_q15(input_tilt) - 16384) as u32) << 1) as i32;
     speech_nrg = 0;
     b = 0;
     while b < VAD_N_BANDS {
@@ -246,7 +246,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
                 * smooth_coef_Q16 as i16 as i64)
                 >> 16)) as i32;
         SNR_Q7 = 3 * (silk_lin2log(psSilk_VAD.NrgRatioSmth_Q8[b as usize]) - 8 * 128);
-        psEncC.input_quality_bands_Q15[b as usize] = silk_sigm_Q15((SNR_Q7 - 16 * 128) >> 4);
+        psEncC.input_quality_bands_Q15[b as usize] = silk_sigm_q15((SNR_Q7 - 16 * 128) >> 4);
         b += 1;
     }
     ret
