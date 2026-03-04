@@ -17,7 +17,7 @@ use crate::silk::float::process_gains_FLP::silk_process_gains_FLP;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::float::wrappers_FLP::silk_NSQ_wrapper_FLP;
 use crate::silk::float::SigProc_FLP::silk_short2float_array;
-use crate::silk::gain_quant::{silk_gains_ID, silk_gains_dequant, silk_gains_quant};
+use crate::silk::gain_quant::{silk_gains_dequant, silk_gains_id, silk_gains_quant};
 use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
 use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
@@ -110,9 +110,9 @@ pub fn silk_encode_frame_FLP(
     let mut nBits_upper: i32;
     let mut gainMult_lower: i32;
     let mut gainMult_upper: i32;
-    let mut gainsID: i32;
-    let mut gainsID_lower: i32;
-    let mut gainsID_upper: i32;
+    let mut gains_id: i32;
+    let mut gains_id_lower: i32;
+    let mut gains_id_upper: i32;
     let mut gainMult_Q8: i16;
     let ec_prevLagIndex_copy: i16;
     let ec_prevSignalType_copy: i32;
@@ -213,9 +213,9 @@ pub fn silk_encode_frame_FLP(
         gainMult_Q8 = (((1) << 8) as f64 + 0.5f64) as i32 as i16;
         found_lower = 0;
         found_upper = 0;
-        gainsID = silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
-        gainsID_lower = -1;
-        gainsID_upper = -1;
+        gains_id = silk_gains_id(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
+        gains_id_lower = -1;
+        gains_id_upper = -1;
         sRangeEnc_copy = psRangeEnc.save();
         sNSQ_copy = psEnc.sCmn.sNSQ;
         seed_copy = psEnc.sCmn.indices.Seed as i32;
@@ -223,9 +223,9 @@ pub fn silk_encode_frame_FLP(
         ec_prevSignalType_copy = psEnc.sCmn.ec_prevSignalType;
         iter = 0;
         loop {
-            if gainsID == gainsID_lower {
+            if gains_id == gains_id_lower {
                 nBits = nBits_lower;
-            } else if gainsID == gainsID_upper {
+            } else if gains_id == gains_id_upper {
                 nBits = nBits_upper;
             } else {
                 if iter > 0 {
@@ -305,7 +305,7 @@ pub fn silk_encode_frame_FLP(
                 }
             }
             if iter == maxIter {
-                if found_lower != 0 && (gainsID == gainsID_lower || nBits > maxBits) {
+                if found_lower != 0 && (gains_id == gains_id_lower || nBits > maxBits) {
                     psRangeEnc.restore(sRangeEnc_copy2);
                     debug_assert!(sRangeEnc_copy2.offs <= 1275);
                     let offs = sRangeEnc_copy2.offs as usize;
@@ -324,12 +324,12 @@ pub fn silk_encode_frame_FLP(
                         };
                         psEnc.sCmn.indices.quantOffsetType = 0;
                         found_upper = 0;
-                        gainsID_upper = -1;
+                        gains_id_upper = -1;
                     } else {
                         found_upper = 1;
                         nBits_upper = nBits;
                         gainMult_upper = gainMult_Q8 as i32;
-                        gainsID_upper = gainsID;
+                        gains_id_upper = gains_id;
                     }
                 } else {
                     if nBits >= maxBits - bits_margin {
@@ -338,8 +338,8 @@ pub fn silk_encode_frame_FLP(
                     found_lower = 1;
                     nBits_lower = nBits;
                     gainMult_lower = gainMult_Q8 as i32;
-                    if gainsID != gainsID_lower {
-                        gainsID_lower = gainsID;
+                    if gains_id != gains_id_lower {
+                        gains_id_lower = gains_id;
                         sRangeEnc_copy2 = psRangeEnc.save();
                         debug_assert!(psRangeEnc.offs <= 1275);
                         let offs = psRangeEnc.offs as usize;
@@ -431,7 +431,8 @@ pub fn silk_encode_frame_FLP(
                     &mut psEnc.sShape.LastGainIndex,
                     condCoding == CODE_CONDITIONALLY,
                 );
-                gainsID = silk_gains_ID(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
+                gains_id =
+                    silk_gains_id(&(&psEnc.sCmn.indices.GainsIndices)[..psEnc.sCmn.nb_subfr]);
                 i = 0;
                 while i < psEnc.sCmn.nb_subfr as i32 {
                     sEncCtrl.Gains[i as usize] = pGains_Q16[i as usize] as f32 / 65536.0f32;

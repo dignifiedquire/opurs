@@ -125,13 +125,13 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
 /// Compute unique identifier of gain indices vector
 /// Upstream C: silk/gain_quant.c:silk_gains_ID
 #[inline]
-pub fn silk_gains_ID(ind: &[i8]) -> i32 {
+pub fn silk_gains_id(ind: &[i8]) -> i32 {
     assert!(ind.len() <= 4);
-    let mut gainsID = 0;
+    let mut gains_id = 0;
 
     for &ind in ind {
-        gainsID = ind as i32 | (gainsID << 8);
+        gains_id = ind as i32 | (gains_id << 8);
     }
 
-    gainsID
+    gains_id
 }
