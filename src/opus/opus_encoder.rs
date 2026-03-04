@@ -36,7 +36,7 @@ use crate::silk::define::{
     TYPE_NO_VOICE_ACTIVITY, VAD_NO_DECISION,
 };
 use crate::silk::enc_API::silk_EncControlStruct;
-use crate::silk::enc_API::{silk_Encode, silk_InitEncoder};
+use crate::silk::enc_API::{silk_encode_api, silk_init_encoder_api};
 use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
@@ -191,7 +191,7 @@ impl OpusEncoder {
         // Build silk encoder state
         let mut silk_enc = silk_encoder::default();
         let mut silk_mode = silk_EncControlStruct::default();
-        let ret = silk_InitEncoder(&mut silk_enc, arch, &mut silk_mode);
+        let ret = silk_init_encoder_api(&mut silk_enc, arch, &mut silk_mode);
         if ret != 0 {
             return Err(OPUS_INTERNAL_ERROR);
         }
@@ -817,7 +817,7 @@ impl OpusEncoder {
 
         self.celt_enc.reset();
         self.sync_celt_controls();
-        silk_InitEncoder(&mut self.silk_enc, self.arch, &mut dummy);
+        silk_init_encoder_api(&mut self.silk_enc, self.arch, &mut dummy);
         self.stream_channels = self.channels;
         self.hybrid_stereo_width_q14 = ((1) << 14) as i16;
         self.prev_hb_gain = Q15ONE;
@@ -1926,7 +1926,7 @@ fn init_silk_after_celt(st: &mut OpusEncoder) {
         signalType: 0,
         offset: 0,
     };
-    silk_InitEncoder(&mut st.silk_enc, st.arch, &mut dummy);
+    silk_init_encoder_api(&mut st.silk_enc, st.arch, &mut dummy);
 }
 
 /// Cold path: apply HB gain fade when gain is changing.
@@ -2955,7 +2955,7 @@ pub fn opus_encode_native(
                 pcm_silk[i as usize] = st.delay_buffer[i as usize];
                 i += 1;
             }
-            silk_Encode(
+            silk_encode_api(
                 &mut st.silk_enc,
                 &mut st.silk_mode,
                 &pcm_silk,
@@ -2972,7 +2972,7 @@ pub fn opus_encode_native(
             pcm_silk[i as usize] = pcm_buf[(total_buffer * st.channels + i) as usize];
             i += 1;
         }
-        ret = silk_Encode(
+        ret = silk_encode_api(
             &mut st.silk_enc,
             &mut st.silk_mode,
             &pcm_silk,

@@ -62,7 +62,7 @@ use crate::silk::tuning_parameters::{
 use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
 
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
-pub fn silk_InitEncoder(
+pub fn silk_init_encoder_api(
     psEnc: &mut silk_encoder,
     arch: Arch,
     encStatus: &mut silk_EncControlStruct,
@@ -78,14 +78,14 @@ pub fn silk_InitEncoder(
     }
     psEnc.nChannelsAPI = 1;
     psEnc.nChannelsInternal = 1;
-    ret += silk_QueryEncoder(psEnc, encStatus);
+    ret += silk_query_encoder(psEnc, encStatus);
     if ret != 0 {
         return ret;
     }
     ret
 }
 /// Upstream C: silk/enc_API.c:silk_QueryEncoder
-fn silk_QueryEncoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct) -> i32 {
+fn silk_query_encoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct) -> i32 {
     let state = &psEnc.state_Fxx[0];
     encStatus.nChannelsAPI = psEnc.nChannelsAPI;
     encStatus.nChannelsInternal = psEnc.nChannelsInternal;
@@ -108,7 +108,7 @@ fn silk_QueryEncoder(psEnc: &silk_encoder, encStatus: &mut silk_EncControlStruct
 }
 /// Upstream C: silk/enc_API.c:silk_Encode
 #[allow(clippy::too_many_arguments)]
-pub fn silk_Encode(
+pub fn silk_encode_api(
     psEnc: &mut silk_encoder,
     encControl: &mut silk_EncControlStruct,
     samplesIn: &[f32],
