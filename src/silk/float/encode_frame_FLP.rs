@@ -20,7 +20,7 @@ use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_dequant, silk_gains_id, silk_gains_quant};
 use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
-use crate::silk::LP_variable_cutoff::silk_LP_variable_cutoff;
+use crate::silk::LP_variable_cutoff::silk_lp_variable_cutoff;
 use crate::silk::SigProc_FIX::silk_min_int;
 use crate::silk::VAD::silk_VAD_GetSA_Q8;
 
@@ -135,7 +135,7 @@ pub fn silk_encode_frame_FLP(
     let ltp_mem = psEnc.sCmn.ltp_mem_length;
     let frame_length = psEnc.sCmn.frame_length;
     let x_frame_off = ltp_mem;
-    silk_LP_variable_cutoff(
+    silk_lp_variable_cutoff(
         &mut psEnc.sCmn.sLP,
         &mut psEnc.sCmn.inputBuf[1..1 + frame_length],
     );

@@ -19,7 +19,7 @@ use crate::silk::SigProc_FIX::silk_SAT16;
 /// Helper function, interpolates the filter taps
 /// Upstream C: silk/LP_variable_cutoff.c:silk_LP_interpolate_filter_taps
 #[inline]
-fn silk_LP_interpolate_filter_taps(
+fn silk_lp_interpolate_filter_taps(
     B_Q28: &mut [i32; 3],
     A_Q28: &mut [i32; 2],
     ind: usize,
@@ -88,7 +88,7 @@ fn silk_LP_interpolate_filter_taps(
 /// frame_length I    Frame length
 /// ```
 /// Upstream C: silk/LP_variable_cutoff.c:silk_LP_variable_cutoff
-pub fn silk_LP_variable_cutoff(psLP: &mut silk_LP_state, frame: &mut [i16]) {
+pub fn silk_lp_variable_cutoff(psLP: &mut silk_LP_state, frame: &mut [i16]) {
     assert!(psLP.transition_frame_no >= 0 && psLP.transition_frame_no <= TRANSITION_FRAMES as i32);
 
     /* Run filter if needed */
@@ -101,7 +101,7 @@ pub fn silk_LP_variable_cutoff(psLP: &mut silk_LP_state, frame: &mut [i16]) {
         let mut B_Q28: [i32; TRANSITION_NB] = [0; TRANSITION_NB];
         let mut A_Q28: [i32; TRANSITION_NA] = [0; TRANSITION_NA];
 
-        silk_LP_interpolate_filter_taps(&mut B_Q28, &mut A_Q28, ind as usize, fac_Q16);
+        silk_lp_interpolate_filter_taps(&mut B_Q28, &mut A_Q28, ind as usize, fac_Q16);
         psLP.transition_frame_no = if 0 > 5120 / (5 * 4) {
             if psLP.transition_frame_no + psLP.mode > 0 {
                 0
