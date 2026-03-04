@@ -17,7 +17,7 @@ use crate::silk::decode_parameters::silk_decode_parameters;
 use crate::silk::decode_pulses::silk_decode_pulses;
 use crate::silk::define::{MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::CNG::silk_CNG;
+use crate::silk::CNG::silk_cng;
 use crate::silk::PLC::{silk_PLC, silk_PLC_glue_frames};
 
 #[cfg(feature = "deep-plc")]
@@ -139,7 +139,7 @@ pub fn silk_decode_frame(
         psDec.outBuf[mv_len..mv_len + psDec.frame_length]
             .copy_from_slice(&pOut_slice[..psDec.frame_length]);
     }
-    silk_CNG(psDec, &mut psDecCtrl, pOut_slice);
+    silk_cng(psDec, &mut psDecCtrl, pOut_slice);
     silk_PLC_glue_frames(psDec, pOut_slice, L);
     psDec.lagPrev = psDecCtrl.pitchL[psDec.nb_subfr - 1];
     (ret, L)

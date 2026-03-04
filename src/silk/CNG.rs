@@ -23,7 +23,8 @@ use crate::silk::NLSF2A::silk_NLSF2A;
 /// rand_seed       I/O   Seed to random index generator
 /// ```
 #[inline]
-fn silk_CNG_exc(exc_Q14: &mut [i32], exc_buf_Q14: &[i32], rand_seed: &mut i32) {
+/// Upstream C: silk/CNG.c:silk_CNG_exc
+fn silk_cng_exc(exc_Q14: &mut [i32], exc_buf_Q14: &[i32], rand_seed: &mut i32) {
     let mut exc_mask = CNG_BUF_MASK_MAX;
     while exc_mask > exc_Q14.len() as i32 {
         exc_mask >>= 1;
@@ -42,7 +43,8 @@ fn silk_CNG_exc(exc_Q14: &mut [i32], exc_buf_Q14: &[i32], rand_seed: &mut i32) {
     *rand_seed = seed;
 }
 
-pub fn silk_CNG_Reset(psDec: &mut silk_decoder_state) {
+/// Upstream C: silk/CNG.c:silk_CNG_Reset
+pub fn silk_cng_reset(psDec: &mut silk_decoder_state) {
     let NLSF_step_Q15 = i16::MAX as i32 / (psDec.LPC_order as i32 + 1);
     let mut NLSF_acc_Q15 = 0;
     for i in 0..psDec.LPC_order {
@@ -62,14 +64,15 @@ pub fn silk_CNG_Reset(psDec: &mut silk_decoder_state) {
 /// length        I     Length of residual
 /// ```
 #[inline]
-pub fn silk_CNG(
+/// Upstream C: silk/CNG.c:silk_CNG
+pub fn silk_cng(
     psDec: &mut silk_decoder_state,
     psDecCtrl: &mut silk_decoder_control,
     frame: &mut [i16],
 ) {
     if psDec.fs_kHz != psDec.sCNG.fs_kHz {
         /* Reset state */
-        silk_CNG_Reset(psDec);
+        silk_cng_reset(psDec);
 
         psDec.sCNG.fs_kHz = psDec.fs_kHz;
     }
@@ -135,7 +138,7 @@ pub fn silk_CNG(
             gain_Q16 = silk_SQRT_APPROX(gain_Q16) << 8;
         }
         let gain_Q10 = gain_Q16 >> 6;
-        silk_CNG_exc(
+        silk_cng_exc(
             &mut CNG_sig_Q14[MAX_LPC_ORDER..MAX_LPC_ORDER + frame.len()],
             &psCNG.CNG_exc_buf_Q14[..frame.len()],
             &mut psCNG.rand_seed,
