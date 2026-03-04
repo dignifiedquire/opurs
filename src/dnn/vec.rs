@@ -5,6 +5,8 @@
 //!
 //! Upstream C: `dnn/vec.h` (generic/no-optimization path)
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use crate::arch::Arch;
 
 /// Scale factor for int8 quantized weights: `128.0 * 127.0`

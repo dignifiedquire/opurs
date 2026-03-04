@@ -5,6 +5,8 @@
 //!
 //! Upstream C: `dnn/lpcnet_enc.c`, `dnn/lpcnet_plc.c`, `dnn/lpcnet_private.h`
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use super::fargan::*;
 use super::freq::*;
 use super::nnet::*;

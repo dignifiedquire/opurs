@@ -5,6 +5,8 @@
 //!
 //! Port of `dnn/vec_neon.h` from libopus 1.6.1.
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use core::arch::aarch64::*;
 use core::arch::asm;
 

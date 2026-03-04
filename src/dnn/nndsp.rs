@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `dnn/nndsp.c`, `dnn/nndsp.h`
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use crate::arch::Arch;
 use crate::celt::mathops::celt_log;
 use crate::celt::pitch::celt_pitch_xcorr;

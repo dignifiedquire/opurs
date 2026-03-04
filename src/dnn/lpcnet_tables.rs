@@ -3,6 +3,8 @@
 //!
 //! Upstream C: `dnn/lpcnet_tables.c`
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use crate::celt::kiss_fft::{kiss_fft_state, kiss_twiddle_cpx};
 use num_complex::Complex32;
 

@@ -5,6 +5,8 @@
 //!
 //! Port of `dnn/vec_avx.h` from libopus 1.6.1.
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

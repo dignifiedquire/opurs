@@ -5,8 +5,6 @@
 //!
 //! Upstream C: `dnn/`
 
-#![allow(clippy::excessive_precision)] // Upstream numeric constants are kept bit-exact.
-
 #[cfg(all(feature = "osce", feature = "builtin-weights"))]
 pub mod bbwenet_data;
 pub mod burg;

@@ -5,6 +5,8 @@
 //! `dnn/osce_config.h`, `dnn/osce_structs.h`
 //! Upstream C: `dnn/osce.c`, `dnn/osce.h`, `dnn/osce_features.c`,
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use crate::arch::Arch;
 use crate::dnn::freq::{forward_transform, NB_BANDS};
 use crate::dnn::nndsp::*;

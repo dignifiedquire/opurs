@@ -3,6 +3,8 @@
 //!
 //! Upstream C: `dnn/dred_encoder.c`, `dnn/dred_encoder.h`
 
+#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
+
 use crate::arch::Arch;
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::{
