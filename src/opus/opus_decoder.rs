@@ -20,7 +20,7 @@ use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::opus::packet::{opus_packet_parse, opus_packet_parse_impl, opus_pcm_soft_clip_impl};
 use crate::opus_packet_get_samples_per_frame;
 use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
-use crate::silk::dec_API::{silk_Decode, silk_InitDecoder, silk_ResetDecoder};
+use crate::silk::dec_API::{silk_decode, silk_init_decoder, silk_reset_decoder};
 #[cfg(feature = "dred")]
 use crate::{
     dnn::dred::{
@@ -82,7 +82,7 @@ impl OpusDecoder {
 
         let mut st = OpusDecoder {
             celt_dec: celt_decoder_init(fs, channels)?,
-            silk_dec: silk_InitDecoder(),
+            silk_dec: silk_init_decoder(),
             channels: channels as i32,
             fs,
             dec_control: silk_DecControlStruct {
@@ -417,7 +417,7 @@ impl OpusDecoder {
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     pub fn reset(&mut self) {
         self.celt_dec.reset();
-        silk_ResetDecoder(&mut self.silk_dec);
+        silk_reset_decoder(&mut self.silk_dec);
         #[cfg(feature = "deep-plc")]
         crate::dnn::lpcnet::lpcnet_plc_reset(&mut self.lpcnet);
         self.stream_channels = self.channels;
@@ -690,7 +690,7 @@ fn opus_decode_frame(
         let mut decoded_samples: i32;
         let mut pcm_ptr_off: usize = 0;
         if st.prev_mode == MODE_CELT_ONLY {
-            silk_ResetDecoder(&mut st.silk_dec);
+            silk_reset_decoder(&mut st.silk_dec);
         }
         st.dec_control.payloadSize_ms = if 10 > 1000 * audiosize / st.fs {
             10
@@ -763,7 +763,7 @@ fn opus_decode_frame(
             } else {
                 &mut pcm[pcm_ptr_off..]
             };
-            silk_ret = silk_Decode(
+            silk_ret = silk_decode(
                 &mut st.silk_dec,
                 &mut st.dec_control,
                 lost_flag,

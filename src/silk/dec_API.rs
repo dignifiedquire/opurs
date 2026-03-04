@@ -43,7 +43,10 @@ use crate::silk::define::{
 use crate::silk::errors::{
     SILK_DEC_INVALID_FRAME_SIZE, SILK_DEC_INVALID_SAMPLING_FREQUENCY, SILK_NO_ERROR,
 };
-use crate::silk::init_decoder::{silk_decoder_state_new, silk_init_decoder, silk_reset_decoder};
+use crate::silk::init_decoder::{
+    silk_decoder_state_new, silk_init_decoder as silk_init_decoder_state,
+    silk_reset_decoder as silk_reset_decoder_state,
+};
 use crate::silk::resampler::silk_resampler;
 use crate::silk::stereo_MS_to_LR::silk_stereo_MS_to_LR;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
@@ -61,7 +64,7 @@ pub struct silk_decoder {
     #[cfg(feature = "osce")]
     pub osce_model: crate::dnn::osce::OSCEModel,
 }
-pub fn silk_InitDecoder() -> silk_decoder {
+pub fn silk_init_decoder() -> silk_decoder {
     silk_decoder {
         channel_state: [silk_decoder_state_new(), silk_decoder_state_new()],
         sStereo: stereo_dec_state::default(),
@@ -76,9 +79,9 @@ pub fn silk_InitDecoder() -> silk_decoder {
 /// Reset decoder state without full reinitialization.
 ///
 /// Upstream C: silk/dec_API.c:silk_ResetDecoder
-pub fn silk_ResetDecoder(dec: &mut silk_decoder) {
+pub fn silk_reset_decoder(dec: &mut silk_decoder) {
     for ch in dec.channel_state.iter_mut() {
-        let _ = silk_reset_decoder(ch);
+        let _ = silk_reset_decoder_state(ch);
     }
     dec.sStereo = stereo_dec_state::default();
     dec.prev_decode_only_middle = false;
@@ -86,7 +89,7 @@ pub fn silk_ResetDecoder(dec: &mut silk_decoder) {
 
 /// Upstream C: silk/dec_API.c:silk_Decode
 #[allow(clippy::too_many_arguments)]
-pub fn silk_Decode(
+pub fn silk_decode(
     decState: &mut silk_decoder,
     decControl: &mut silk_DecControlStruct,
     lostFlag: i32,
@@ -116,7 +119,7 @@ pub fn silk_Decode(
         }
     }
     if decControl.nChannelsInternal > psDec.nChannelsInternal {
-        ret += silk_init_decoder(&mut channel_state[1]);
+        ret += silk_init_decoder_state(&mut channel_state[1]);
     }
     let stereo_to_mono: i32 = (decControl.nChannelsInternal == 1
         && psDec.nChannelsInternal == 2
@@ -573,7 +576,7 @@ mod tests {
         let mut n_samples_out = 0;
         #[cfg(feature = "deep-plc")]
         {
-            silk_Decode(
+            silk_decode(
                 dec,
                 ctrl,
                 FLAG_PACKET_LOST,
@@ -587,7 +590,7 @@ mod tests {
         }
         #[cfg(not(feature = "deep-plc"))]
         {
-            silk_Decode(
+            silk_decode(
                 dec,
                 ctrl,
                 FLAG_PACKET_LOST,
@@ -602,7 +605,7 @@ mod tests {
 
     #[test]
     fn decode_rejects_invalid_payload_size() {
-        let mut dec = silk_InitDecoder();
+        let mut dec = silk_init_decoder();
         let mut ctrl = baseline_control();
         let mut out = [0.0f32; 960];
         ctrl.payloadSize_ms = 15;
@@ -612,7 +615,7 @@ mod tests {
 
     #[test]
     fn decode_rejects_invalid_internal_sampling_frequency() {
-        let mut dec = silk_InitDecoder();
+        let mut dec = silk_init_decoder();
         let mut ctrl = baseline_control();
         let mut out = [0.0f32; 960];
         ctrl.internalSampleRate = 44_100;
