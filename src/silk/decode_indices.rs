@@ -15,7 +15,7 @@ use crate::silk::tables_other::{
     silk_uniform8_iCDF,
 };
 use crate::silk::tables_pitch_lag::{silk_pitch_delta_iCDF, silk_pitch_lag_iCDF};
-use crate::silk::NLSF_unpack::silk_NLSF_unpack;
+use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 
 ///
 /// Decode side-information parameters from payload
@@ -81,7 +81,7 @@ pub fn silk_decode_indices(
     ) as i8;
 
     let mut ec_ix: [i16; 16] = [0; 16];
-    silk_NLSF_unpack(
+    silk_nlsf_unpack(
         &mut ec_ix,
         &mut [0; 16],
         psDec.psNLSF_CB,

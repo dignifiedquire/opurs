@@ -10,7 +10,7 @@ use crate::silk::Inlines::silk_DIV32_varQ;
 use crate::silk::NLSF_decode::silk_NLSF_decode;
 use crate::silk::NLSF_del_dec_quant::silk_NLSF_del_dec_quant;
 use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
-use crate::silk::NLSF_unpack::silk_NLSF_unpack;
+use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 use crate::silk::NLSF_VQ::silk_NLSF_VQ;
 
 /// Upstream C: silk/NLSF_encode.c:silk_NLSF_encode
@@ -83,7 +83,7 @@ pub fn silk_NLSF_encode(
             ) as i16;
             i += 1;
         }
-        silk_NLSF_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, ind1);
+        silk_nlsf_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, ind1);
         let idx_start = (s * MAX_LPC_ORDER as i32) as usize;
         RD_Q25[s as usize] = silk_NLSF_del_dec_quant(
             &mut tempIndices2[idx_start..idx_start + MAX_LPC_ORDER],

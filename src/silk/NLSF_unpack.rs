@@ -5,7 +5,7 @@
 use crate::silk::structs::silk_NLSF_CB_struct;
 
 /// Upstream C: silk/NLSF_unpack.c:silk_NLSF_unpack
-pub fn silk_NLSF_unpack(
+pub fn silk_nlsf_unpack(
     ec_ix: &mut [i16],
     pred_Q8: &mut [u8],
     psNLSF_CB: &silk_NLSF_CB_struct,

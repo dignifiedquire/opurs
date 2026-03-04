@@ -3,7 +3,7 @@
 //! Upstream C: `silk/NLSF_decode.c`
 
 use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
-use crate::silk::NLSF_unpack::silk_NLSF_unpack;
+use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 
 use crate::silk::structs::silk_NLSF_CB_struct;
 
@@ -59,7 +59,7 @@ pub fn silk_NLSF_decode(
     let mut NLSF_Q15_tmp: i32;
 
     // Unpack entropy table indices and predictor for current CB1 index
-    silk_NLSF_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, NLSFIndices[0] as i32);
+    silk_nlsf_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, NLSFIndices[0] as i32);
 
     // Predictive residual dequantizer
     silk_NLSF_residual_dequant(

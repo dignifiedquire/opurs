@@ -15,7 +15,7 @@ use crate::silk::tables_other::{
     silk_uniform8_iCDF,
 };
 use crate::silk::tables_pitch_lag::{silk_pitch_delta_iCDF, silk_pitch_lag_iCDF};
-use crate::silk::NLSF_unpack::silk_NLSF_unpack;
+use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 
 /// Upstream C: silk/encode_indices.c:silk_encode_indices
 pub fn silk_encode_indices(
@@ -83,7 +83,7 @@ pub fn silk_encode_indices(
             [((psIndices.signalType as i32 >> 1) * psEncC.psNLSF_CB.nVectors as i32) as usize..],
         8,
     );
-    silk_NLSF_unpack(
+    silk_nlsf_unpack(
         &mut ec_ix,
         &mut pred_Q8,
         psEncC.psNLSF_CB,
