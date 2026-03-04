@@ -59,7 +59,7 @@ use crate::silk::tables_other::{silk_LBRR_flags_iCDF_ptr, silk_Quantization_Offs
 use crate::silk::tuning_parameters::{
     BITRESERVOIR_DECAY_TIME_MS, MAX_BANDWIDTH_SWITCH_DELAY_MS, SPEECH_ACTIVITY_DTX_THRES,
 };
-use crate::silk::HP_variable_cutoff::silk_HP_variable_cutoff;
+use crate::silk::HP_variable_cutoff::silk_hp_variable_cutoff;
 
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
 pub fn silk_init_encoder_api(
@@ -463,7 +463,7 @@ pub fn silk_encode_api(
             }
             curr_nBitsUsedLBRR = ec_tell(psRangeEnc) - curr_nBitsUsedLBRR;
         }
-        silk_HP_variable_cutoff(&mut psEnc.state_Fxx);
+        silk_hp_variable_cutoff(&mut psEnc.state_Fxx);
         nBits = encControl.bitRate * encControl.payloadSize_ms / 1000;
         if prefillFlag == 0 {
             // psEnc.nBitsUsedLBRR is an exponential moving average of the LBRR usage,

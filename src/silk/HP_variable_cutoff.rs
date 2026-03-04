@@ -13,7 +13,7 @@ use crate::silk::tuning_parameters::{
 };
 
 /// Upstream C: silk/HP_variable_cutoff.c:silk_HP_variable_cutoff
-pub fn silk_HP_variable_cutoff(state_Fxx: &mut [silk_encoder_state_FLP]) {
+pub fn silk_hp_variable_cutoff(state_Fxx: &mut [silk_encoder_state_FLP]) {
     let quality_Q15: i32;
     let pitch_freq_Hz_Q16: i32;
     let mut pitch_freq_log_Q7: i32;
