@@ -123,7 +123,7 @@ pub fn silk_NSQ_noise_shape_feedback_loop(
 /// Dispatches to SSE4.1 on x86, with scalar fallback.
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_VQ_WMat_EC(
+pub fn silk_vq_wmat_ec(
     ind: &mut i8,
     res_nrg_Q15: &mut i32,
     rate_dist_Q8: &mut i32,
@@ -160,7 +160,7 @@ pub fn silk_VQ_WMat_EC(
     }
 
     let _ = arch;
-    super::VQ_WMat_EC::silk_VQ_WMat_EC_c(
+    super::VQ_WMat_EC::silk_vq_wmat_ec_c(
         ind,
         res_nrg_Q15,
         rate_dist_Q8,

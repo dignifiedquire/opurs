@@ -130,7 +130,7 @@ fn bench_feedback_loop(c: &mut Criterion) {
 fn bench_vq_wmat_ec(c: &mut Criterion) {
     #[cfg(feature = "simd")]
     let arch = opurs::internals::opus_select_arch();
-    let mut group = c.benchmark_group("silk_VQ_WMat_EC");
+    let mut group = c.benchmark_group("silk_vq_wmat_ec");
     // LTP_ORDER = 5, typical codebook sizes
     let ltp_order = 5;
     for &l in &[8, 32] {
@@ -151,7 +151,7 @@ fn bench_vq_wmat_ec(c: &mut Criterion) {
                 let mut res_nrg_q15: i32 = 0;
                 let mut rate_dist_q8: i32 = 0;
                 let mut gain_q7: i32 = 0;
-                opurs::internals::silk_VQ_WMat_EC_c(
+                opurs::internals::silk_vq_wmat_ec_c(
                     &mut ind,
                     &mut res_nrg_q15,
                     &mut rate_dist_q8,
@@ -176,7 +176,7 @@ fn bench_vq_wmat_ec(c: &mut Criterion) {
                 let mut res_nrg_q15: i32 = 0;
                 let mut rate_dist_q8: i32 = 0;
                 let mut gain_q7: i32 = 0;
-                opurs::internals::silk_VQ_WMat_EC(
+                opurs::internals::silk_vq_wmat_ec(
                     &mut ind,
                     &mut res_nrg_q15,
                     &mut rate_dist_q8,

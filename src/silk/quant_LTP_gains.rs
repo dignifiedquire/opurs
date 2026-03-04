@@ -8,14 +8,14 @@ use crate::silk::define::LTP_ORDER;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 #[cfg(feature = "simd")]
-use crate::silk::simd::silk_VQ_WMat_EC;
+use crate::silk::simd::silk_vq_wmat_ec;
 use crate::silk::tables_LTP::{
     silk_LTP_gain_BITS_Q5_ptrs, silk_LTP_vq_gain_ptrs_Q7, silk_LTP_vq_ptrs_Q7, silk_LTP_vq_sizes,
 };
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
 use crate::silk::typedefs::silk_int32_MAX;
 #[cfg(not(feature = "simd"))]
-use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
+use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
 #[allow(clippy::too_many_arguments)]
@@ -66,7 +66,7 @@ pub fn silk_quant_LTP_gains(
                     + ((7 * ((1) << 7)) as f64 + 0.5f64) as i32,
             ) - gain_safety;
             #[cfg(feature = "simd")]
-            silk_VQ_WMat_EC(
+            silk_vq_wmat_ec(
                 &mut temp_idx[j as usize],
                 &mut res_nrg_Q15_subfr,
                 &mut rate_dist_Q7_subfr,
@@ -82,7 +82,7 @@ pub fn silk_quant_LTP_gains(
                 _arch,
             );
             #[cfg(not(feature = "simd"))]
-            silk_VQ_WMat_EC_c(
+            silk_vq_wmat_ec_c(
                 &mut temp_idx[j as usize],
                 &mut res_nrg_Q15_subfr,
                 &mut rate_dist_Q7_subfr,

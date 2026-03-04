@@ -9,7 +9,7 @@ use crate::silk::typedefs::silk_int32_MAX;
 
 /// Upstream C: silk/VQ_WMat_EC.c:silk_VQ_WMat_EC_c
 #[allow(clippy::too_many_arguments)]
-pub fn silk_VQ_WMat_EC_c(
+pub fn silk_vq_wmat_ec_c(
     ind: &mut i8,
     res_nrg_Q15: &mut i32,
     rate_dist_Q8: &mut i32,

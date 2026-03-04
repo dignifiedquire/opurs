@@ -201,8 +201,8 @@ pub mod internals {
     pub use crate::silk::NSQ::silk_NSQ_noise_shape_feedback_loop_c;
     // VQ weighted matrix:
     #[cfg(feature = "simd")]
-    pub use crate::silk::simd::silk_VQ_WMat_EC;
-    pub use crate::silk::VQ_WMat_EC::silk_VQ_WMat_EC_c;
+    pub use crate::silk::simd::silk_vq_wmat_ec;
+    pub use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
     // VAD energy:
     #[cfg(feature = "simd")]
     pub use crate::silk::simd::{silk_vad_energy, silk_vad_energy_scalar};
