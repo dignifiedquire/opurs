@@ -62,7 +62,11 @@ while IFS=: read -r file line text; do
     fi
 
     if [ -n "$sym" ] && ! rg -n "(^|[^A-Za-z0-9_])${sym}([^A-Za-z0-9_]|$)" "$full" >/dev/null; then
-      echo "MISSING_SYMBOL $file:$line -> $p"
+      if rg -n -i "(^|[^A-Za-z0-9_])${sym}([^A-Za-z0-9_]|$)" "$full" >/dev/null; then
+        echo "SYMBOL_CASE_MISMATCH $file:$line -> $p"
+      else
+        echo "MISSING_SYMBOL $file:$line -> $p"
+      fi
       fail=1
     fi
   done
