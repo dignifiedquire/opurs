@@ -12,11 +12,11 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
-use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::NSQ_del_dec::{
+use crate::silk::nsq_del_dec::{
     copy_del_dec_state_partial, NSQ_del_dec_struct, NSQ_sample_pair, NSQ_sample_struct,
 };
+use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
+use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::SigProc_FIX::silk_rand;
 
 /// SSE4.1 implementation of `silk_noise_shape_quantizer_short_prediction`.
@@ -246,7 +246,7 @@ pub unsafe fn silk_nsq_del_dec_sse4_1(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    crate::silk::NSQ_del_dec::silk_nsq_del_dec_c(
+    crate::silk::nsq_del_dec::silk_nsq_del_dec_c(
         psEncC,
         NSQ,
         psIndices,

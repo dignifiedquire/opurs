@@ -10,11 +10,11 @@ use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
 use crate::silk::float::structs_FLP::silk_encoder_control_FLP;
 use crate::silk::float::SigProc_FLP::silk_float2int;
 use crate::silk::nsq::silk_nsq;
+use crate::silk::nsq_del_dec::silk_nsq_del_dec;
 use crate::silk::process_NLSFs::silk_process_nlsfs;
 use crate::silk::quant_LTP_gains::silk_quant_ltp_gains;
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
-use crate::silk::NSQ_del_dec::silk_nsq_del_dec;
 
 /// Upstream C: silk/float/wrappers_FLP.c:silk_A2NLSF_FLP
 pub fn silk_a2nlsf_flp(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {

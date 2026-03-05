@@ -362,7 +362,7 @@ pub fn silk_nsq_del_dec(
         }
     }
 
-    super::NSQ_del_dec::silk_nsq_del_dec_c(
+    super::nsq_del_dec::silk_nsq_del_dec_c(
         psEncC,
         NSQ,
         psIndices,
@@ -437,7 +437,7 @@ pub fn silk_noise_shape_quantizer_10_16_sse4_1(
 pub fn silk_nsq_del_dec_scale_states_sse4_1(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
-    psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
+    psDelDec: &mut [super::nsq_del_dec::NSQ_del_dec_struct],
     x16: &[i16],
     x_sc_Q10: &mut [i32],
     sLTP: &[i16],
@@ -535,7 +535,7 @@ pub fn silk_nsq_del_dec_avx2(
 #[allow(clippy::too_many_arguments)]
 pub fn silk_noise_shape_quantizer_del_dec_sse4_1(
     NSQ: &mut super::structs::silk_nsq_state,
-    psDelDec: &mut [super::NSQ_del_dec::NSQ_del_dec_struct],
+    psDelDec: &mut [super::nsq_del_dec::NSQ_del_dec_struct],
     signalType: i32,
     x_Q10: &[i32],
     pulses: &mut [i8],
