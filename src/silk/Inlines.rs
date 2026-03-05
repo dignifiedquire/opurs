@@ -122,12 +122,3 @@ pub fn silk_inverse32_varq(b32: i32, Qres: i32) -> i32 {
         0
     }
 }
-
-#[allow(unused_imports)]
-pub use silk_clz_frac as silk_CLZ_FRAC;
-#[allow(unused_imports)]
-pub use silk_div32_varq as silk_DIV32_varQ;
-#[allow(unused_imports)]
-pub use silk_inverse32_varq as silk_INVERSE32_varQ;
-#[allow(unused_imports)]
-pub use silk_sqrt_approx as silk_SQRT_APPROX;

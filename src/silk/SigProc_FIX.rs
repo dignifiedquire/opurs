@@ -148,22 +148,3 @@ pub fn silk_rand(seed: i32) -> i32 {
 pub fn silk_smmul(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i64) >> 32) as i32
 }
-
-#[allow(unused_imports)]
-pub use silk_limit as silk_LIMIT;
-#[allow(unused_imports)]
-pub use silk_lshift_sat32 as silk_LSHIFT_SAT32;
-#[allow(unused_imports)]
-pub use silk_rand as silk_RAND;
-#[allow(unused_imports)]
-pub use silk_ror32 as silk_ROR32;
-#[allow(unused_imports)]
-pub use silk_rshift_round as silk_RSHIFT_ROUND;
-#[allow(unused_imports)]
-pub use silk_rshift_round64 as silk_RSHIFT_ROUND64;
-#[allow(unused_imports)]
-pub use silk_sat16 as silk_SAT16;
-#[allow(unused_imports)]
-pub use silk_smmul as silk_SMMUL;
-#[allow(unused_imports)]
-pub use silk_smultt as silk_SMULTT;

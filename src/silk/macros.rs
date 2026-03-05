@@ -45,14 +45,3 @@ pub fn silk_smulbb(a32: i32, b32: i32) -> i32 {
 pub fn silk_smulww(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i64) >> 16) as i32
 }
-
-#[allow(unused_imports)]
-pub use silk_clz32 as silk_CLZ32;
-#[allow(unused_imports)]
-pub use silk_smlawb as silk_SMLAWB;
-#[allow(unused_imports)]
-pub use silk_smulbb as silk_SMULBB;
-#[allow(unused_imports)]
-pub use silk_smulwb as silk_SMULWB;
-#[allow(unused_imports)]
-pub use silk_smulww as silk_SMULWW;
