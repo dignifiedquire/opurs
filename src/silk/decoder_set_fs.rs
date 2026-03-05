@@ -5,8 +5,8 @@
 use crate::silk::define::{MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY};
 use crate::silk::resampler::silk_resampler_init;
 use crate::silk::structs::silk_decoder_state;
-use crate::silk::tables_NLSF_CB_NB_MB::SILK_NLSF_CB_NB_MB;
-use crate::silk::tables_NLSF_CB_WB::SILK_NLSF_CB_WB;
+use crate::silk::tables_nlsf_cb_nb_mb::SILK_NLSF_CB_NB_MB;
+use crate::silk::tables_nlsf_cb_wb::SILK_NLSF_CB_WB;
 use crate::silk::tables_other::{SILK_UNIFORM4_ICDF, SILK_UNIFORM6_ICDF, SILK_UNIFORM8_ICDF};
 use crate::silk::tables_pitch_lag::{
     SILK_PITCH_CONTOUR_10_MS_ICDF, SILK_PITCH_CONTOUR_10_MS_NB_ICDF, SILK_PITCH_CONTOUR_ICDF,

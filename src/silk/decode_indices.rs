@@ -8,8 +8,8 @@ use crate::silk::define::{
 };
 use crate::silk::nlsf_unpack::silk_nlsf_unpack;
 use crate::silk::structs::silk_decoder_state;
-use crate::silk::tables_LTP::{SILK_LTP_GAIN_ICDF_PTRS, SILK_LTP_PER_INDEX_ICDF};
 use crate::silk::tables_gain::{SILK_DELTA_GAIN_ICDF, SILK_GAIN_ICDF};
+use crate::silk::tables_ltp::{SILK_LTP_GAIN_ICDF_PTRS, SILK_LTP_PER_INDEX_ICDF};
 use crate::silk::tables_other::{
     SILK_LTPSCALE_ICDF, SILK_NLSF_EXT_ICDF, SILK_NLSF_INTERPOLATION_FACTOR_ICDF,
     SILK_TYPE_OFFSET_NO_VAD_ICDF, SILK_TYPE_OFFSET_VAD_ICDF, SILK_UNIFORM4_ICDF,

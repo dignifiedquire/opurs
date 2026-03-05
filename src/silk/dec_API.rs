@@ -48,8 +48,8 @@ use crate::silk::init_decoder::{
     silk_reset_decoder as silk_reset_decoder_state,
 };
 use crate::silk::resampler::silk_resampler;
-use crate::silk::stereo_MS_to_LR::silk_stereo_ms_to_lr;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
+use crate::silk::stereo_ms_to_lr::silk_stereo_ms_to_lr;
 use crate::silk::structs::{silk_decoder_state, stereo_dec_state};
 use crate::silk::tables_other::SILK_LBRR_FLAGS_ICDF_PTR;
 

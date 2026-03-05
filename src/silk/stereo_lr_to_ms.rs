@@ -1,6 +1,6 @@
 //! Left/right to mid/side conversion.
 //!
-//! Upstream C: `silk/stereo_LR_to_MS.c`
+//! Upstream C: `silk/stereo_lr_to_ms.c`
 
 use crate::silk::define::{LA_SHAPE_MS, STEREO_INTERP_LEN_MS};
 use crate::silk::stereo_find_predictor::silk_stereo_find_predictor;
@@ -14,7 +14,7 @@ use crate::silk::SigProc_FIX::silk_max_int;
 /// `x1` and `x2` are slices starting 2 samples before the frame data
 /// (i.e., they include 2 history samples at index 0..1, frame at 2..frame_length+1).
 /// Total length must be `frame_length + 2`.
-/// Upstream C: silk/stereo_LR_to_MS.c:silk_stereo_LR_to_MS
+/// Upstream C: silk/stereo_lr_to_ms.c:silk_stereo_LR_to_MS
 #[allow(clippy::too_many_arguments)]
 pub fn silk_stereo_lr_to_ms(
     state: &mut stereo_enc_state,

@@ -1,6 +1,6 @@
 //! NLSF processing and interpolation.
 //!
-//! Upstream C: `silk/process_NLSFs.c`
+//! Upstream C: `silk/process_nlsfs.c`
 
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::nlsf2a::silk_nlsf2a;
@@ -8,7 +8,7 @@ use crate::silk::nlsf_encode::silk_nlsf_encode;
 use crate::silk::nlsf_vq_weights_laroia::silk_nlsf_vq_weights_laroia;
 use crate::silk::structs::silk_encoder_state;
 
-/// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
+/// Upstream C: silk/process_nlsfs.c:silk_process_NLSFs
 pub fn silk_process_nlsfs(
     psEncC: &mut silk_encoder_state,
     PredCoef_Q12: &mut [[i16; 16]; 2],

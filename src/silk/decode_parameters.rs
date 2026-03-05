@@ -9,7 +9,7 @@ use crate::silk::gain_quant::silk_gains_dequant;
 use crate::silk::nlsf2a::silk_nlsf2a;
 use crate::silk::nlsf_decode::silk_nlsf_decode;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::tables_LTP::SILK_LTP_VQ_PTRS_Q7;
+use crate::silk::tables_ltp::SILK_LTP_VQ_PTRS_Q7;
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 
 ///

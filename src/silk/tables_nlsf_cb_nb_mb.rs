@@ -1,6 +1,6 @@
 //! NLSF codebook tables for narrowband and mediumband.
 //!
-//! Upstream C: `silk/tables_NLSF_CB_NB_MB.c`
+//! Upstream C: `silk/tables_nlsf_cb_nb_mb.c`
 
 use crate::silk::structs::silk_NLSF_CB_struct;
 

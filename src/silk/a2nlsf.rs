@@ -7,7 +7,7 @@ use crate::silk::typedefs::SILK_INT16_MAX;
 use crate::silk::SigProc_FIX::silk_min_32;
 
 use crate::silk::define::LSF_COS_TAB_SZ_FIX;
-use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
+use crate::silk::table_lsf_cos::SILK_LSFCOSTAB_FIX_Q12;
 
 pub const BIN_DIV_STEPS_A2NLSF_FIX: i32 = 3;
 pub const MAX_ITERATIONS_A2NLSF_FIX: i32 = 16;

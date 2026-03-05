@@ -11,8 +11,8 @@ use crate::silk::float::structs_FLP::silk_encoder_control_FLP;
 use crate::silk::float::SigProc_FLP::silk_float2int;
 use crate::silk::nsq::silk_nsq;
 use crate::silk::nsq_del_dec::silk_nsq_del_dec;
-use crate::silk::process_NLSFs::silk_process_nlsfs;
-use crate::silk::quant_LTP_gains::silk_quant_ltp_gains;
+use crate::silk::process_nlsfs::silk_process_nlsfs;
+use crate::silk::quant_ltp_gains::silk_quant_ltp_gains;
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 

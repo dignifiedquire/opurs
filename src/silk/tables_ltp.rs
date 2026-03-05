@@ -1,6 +1,6 @@
 //! LTP coefficient tables.
 //!
-//! Upstream C: `silk/tables_LTP.c`
+//! Upstream C: `silk/tables_ltp.c`
 
 pub const SILK_LTP_PER_INDEX_ICDF: [u8; 3] = [179, 99, 0];
 const SILK_LTP_GAIN_ICDF_0: [u8; 8] = [71, 56, 43, 30, 21, 12, 6, 0];

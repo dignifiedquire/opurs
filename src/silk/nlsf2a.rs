@@ -10,7 +10,7 @@ use crate::silk::lpc_fit::silk_lpc_fit;
 use crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_lpc_inverse_pred_gain;
-use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
+use crate::silk::table_lsf_cos::SILK_LSFCOSTAB_FIX_Q12;
 use crate::silk::SigProc_FIX::{silk_rshift_round, silk_rshift_round64, SILK_MAX_ORDER_LPC};
 
 pub const QA: i32 = 16;

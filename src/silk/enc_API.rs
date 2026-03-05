@@ -53,8 +53,8 @@ use crate::silk::init_encoder::silk_init_encoder;
 use crate::silk::resampler::silk_resampler;
 
 use crate::silk::hp_variable_cutoff::silk_hp_variable_cutoff;
-use crate::silk::stereo_LR_to_MS::silk_stereo_lr_to_ms;
 use crate::silk::stereo_encode_pred::{silk_stereo_encode_mid_only, silk_stereo_encode_pred};
+use crate::silk::stereo_lr_to_ms::silk_stereo_lr_to_ms;
 use crate::silk::structs::{silk_LP_state, silk_nsq_state};
 use crate::silk::tables_other::{SILK_LBRR_FLAGS_ICDF_PTR, SILK_QUANTIZATION_OFFSETS_Q10};
 use crate::silk::tuning_parameters::{
