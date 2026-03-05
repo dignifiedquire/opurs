@@ -1412,8 +1412,7 @@ fn celt_decode_lost(
                     i += 1;
                 }
             }
-            #[allow(clippy::neg_cmp_op_on_partial_ord)]
-            if !(S1 > 0.2f32 * S2) {
+            if S1.partial_cmp(&(0.2f32 * S2)) != Some(std::cmp::Ordering::Greater) {
                 let mut i = 0;
                 while i < extrapolation_len {
                     st.decode_mem[ch_off + decode_buffer_size - n + i as usize] = 0.0;

@@ -1218,8 +1218,7 @@ fn tonality_analysis(
             n_e += bin_e_0 * 2.0f32 * (0.5f32 - noisiness[i as usize]);
             i += 1;
         }
-        #[allow(clippy::neg_cmp_op_on_partial_ord)]
-        if !(e_0 < 1e9f32) || e_0.is_nan() {
+        if e_0.partial_cmp(&1e9f32) != Some(std::cmp::Ordering::Less) {
             tonal.info[info_idx].valid = 0;
             return;
         }
