@@ -46,7 +46,7 @@ const SILK_TARGETRATE_WB_21: [u8; 191] = [
 /// psEncC         I/O  Pointer to Silk encoder state
 /// TargetRate_bps I    Target max bitrate (bps)
 /// Upstream C: silk/control_SNR.c:silk_control_SNR
-pub fn silk_control_SNR(psEncC: &mut silk_encoder_state, mut TargetRate_bps: i32) {
+pub fn silk_control_snr(psEncC: &mut silk_encoder_state, mut TargetRate_bps: i32) {
     psEncC.TargetRate_bps = TargetRate_bps;
     if psEncC.nb_subfr == 2 {
         TargetRate_bps -= 2000 + psEncC.fs_kHz / 16;

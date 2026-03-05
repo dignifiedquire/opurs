@@ -8,7 +8,7 @@ use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
-use crate::silk::LPC_fit::silk_LPC_fit;
+use crate::silk::LPC_fit::silk_lpc_fit;
 #[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{silk_rshift_round, silk_rshift_round64, SILK_MAX_ORDER_LPC};
@@ -117,7 +117,7 @@ pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     }
 
     /* Convert int32 coefficients to Q12 int16 coefs */
-    silk_LPC_fit(a_Q12, &mut a32_QA1[..d], 12, QA + 1);
+    silk_lpc_fit(a_Q12, &mut a32_QA1[..d], 12, QA + 1);
 
     let mut i = 0;
     #[cfg(feature = "simd")]

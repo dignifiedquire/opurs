@@ -61,7 +61,7 @@ pub fn silk_control_encoder(
     ret += silk_setup_fs(psEnc, fs_kHz, encControl.payloadSize_ms);
     ret += silk_setup_complexity(&mut psEnc.sCmn, encControl.complexity);
     psEnc.sCmn.PacketLoss_perc = encControl.packetLossPercentage;
-    ret += silk_setup_LBRR(&mut psEnc.sCmn, encControl);
+    ret += silk_setup_lbrr(&mut psEnc.sCmn, encControl);
     psEnc.sCmn.controlled_since_last_payload = 1;
     ret
 }
@@ -315,7 +315,7 @@ fn silk_setup_complexity(psEncC: &mut silk_encoder_state, Complexity: i32) -> i3
 }
 /// Upstream C: silk/control_codec.c:silk_setup_LBRR
 #[inline]
-fn silk_setup_LBRR(psEncC: &mut silk_encoder_state, encControl: &silk_EncControlStruct) -> i32 {
+fn silk_setup_lbrr(psEncC: &mut silk_encoder_state, encControl: &silk_EncControlStruct) -> i32 {
     let ret: i32 = SILK_NO_ERROR;
     let LBRR_in_previous_packet: i32 = psEncC.LBRR_enabled;
     psEncC.LBRR_enabled = encControl.LBRR_coded;

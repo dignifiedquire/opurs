@@ -17,7 +17,7 @@ use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16, SILK_FIX_CONST};
 /// ```
 /// Upstream C: silk/LPC_fit.c:silk_LPC_fit
 #[inline]
-pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) {
+pub fn silk_lpc_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) {
     let d = a_QOUT.len();
     assert_eq!(a_QIN.len(), d);
 

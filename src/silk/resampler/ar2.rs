@@ -4,7 +4,7 @@
 
 /* Second order AR filter with single delay elements */
 /// Upstream C: silk/resampler_private_AR2.c:silk_resampler_private_AR2
-pub fn silk_resampler_private_AR2(
+pub fn silk_resampler_private_ar2(
     state: &mut [i32; 2],
     out_Q8: &mut [i32],
     in_0: &[i16],

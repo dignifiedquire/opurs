@@ -39,7 +39,7 @@ use crate::celt::float_cast::float2int16;
 use crate::silk::errors::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 
 use crate::silk::check_control_input::check_control_input;
-use crate::silk::control_SNR::silk_control_SNR;
+use crate::silk::control_SNR::silk_control_snr;
 use crate::silk::control_codec::silk_control_encoder;
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, CODE_INDEPENDENTLY_NO_LTP_SCALING,
@@ -583,7 +583,7 @@ pub fn silk_encode_api(
             }
             if channelRate_bps > 0 {
                 let condCoding_0: i32;
-                silk_control_SNR(&mut psEnc.state_Fxx[n as usize].sCmn, channelRate_bps);
+                silk_control_snr(&mut psEnc.state_Fxx[n as usize].sCmn, channelRate_bps);
                 if psEnc.state_Fxx[0].sCmn.nFramesEncoded - n <= 0 {
                     condCoding_0 = CODE_INDEPENDENTLY;
                 } else if n > 0 && psEnc.prev_decode_only_middle != 0 {

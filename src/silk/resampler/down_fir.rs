@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/resampler_private_down_FIR.c`
 
-use super::ar2::silk_resampler_private_AR2;
+use super::ar2::silk_resampler_private_ar2;
 use super::rom::{RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2};
 use crate::silk::resampler::{
     ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN, SILK_RESAMPLER_MAX_FIR_ORDER,
@@ -234,7 +234,7 @@ pub(super) fn silk_resampler_private_down_FIR(
     let index_increment_Q16 = resampler_params.inv_ratio_q16;
     loop {
         nSamplesIn = in_0.len().min(resampler_params.batch_size);
-        silk_resampler_private_AR2(
+        silk_resampler_private_ar2(
             &mut state.ar2_state,
             &mut buf[params.fir_order..][..nSamplesIn],
             &in_0[..nSamplesIn],
