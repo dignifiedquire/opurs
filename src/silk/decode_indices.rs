@@ -6,6 +6,7 @@ use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, MAX_NB_SUBFR, NLSF_QUANT_MAX_AMPLITUDE, TYPE_VOICED,
 };
+use crate::silk::nlsf_unpack::silk_nlsf_unpack;
 use crate::silk::structs::silk_decoder_state;
 use crate::silk::tables_LTP::{SILK_LTP_GAIN_ICDF_PTRS, SILK_LTP_PER_INDEX_ICDF};
 use crate::silk::tables_gain::{SILK_DELTA_GAIN_ICDF, SILK_GAIN_ICDF};
@@ -15,7 +16,6 @@ use crate::silk::tables_other::{
     SILK_UNIFORM8_ICDF,
 };
 use crate::silk::tables_pitch_lag::{SILK_PITCH_DELTA_ICDF, SILK_PITCH_LAG_ICDF};
-use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 
 ///
 /// Decode side-information parameters from payload

@@ -4,14 +4,14 @@
 
 use crate::silk::define::MAX_LPC_ORDER;
 use crate::silk::lin2log::silk_lin2log;
+use crate::silk::nlsf_decode::silk_nlsf_decode;
+use crate::silk::nlsf_del_dec_quant::silk_nlsf_del_dec_quant;
+use crate::silk::nlsf_stabilize::silk_nlsf_stabilize;
+use crate::silk::nlsf_unpack::silk_nlsf_unpack;
+use crate::silk::nlsf_vq::silk_nlsf_vq;
 use crate::silk::sort::silk_insertion_sort_increasing;
 use crate::silk::structs::silk_NLSF_CB_struct;
 use crate::silk::Inlines::silk_div32_varq;
-use crate::silk::NLSF_decode::silk_nlsf_decode;
-use crate::silk::NLSF_del_dec_quant::silk_nlsf_del_dec_quant;
-use crate::silk::NLSF_stabilize::silk_nlsf_stabilize;
-use crate::silk::NLSF_unpack::silk_nlsf_unpack;
-use crate::silk::NLSF_VQ::silk_nlsf_vq;
 
 /// Upstream C: silk/NLSF_encode.c:silk_NLSF_encode
 pub fn silk_nlsf_encode(

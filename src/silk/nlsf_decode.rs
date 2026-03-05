@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/NLSF_decode.c`
 
-use crate::silk::NLSF_stabilize::silk_nlsf_stabilize;
-use crate::silk::NLSF_unpack::silk_nlsf_unpack;
+use crate::silk::nlsf_stabilize::silk_nlsf_stabilize;
+use crate::silk::nlsf_unpack::silk_nlsf_unpack;
 
 use crate::silk::structs::silk_NLSF_CB_struct;
 

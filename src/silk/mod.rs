@@ -8,13 +8,6 @@
 #[cfg(feature = "simd")]
 pub mod simd;
 
-pub mod NLSF_VQ;
-pub mod NLSF_VQ_weights_laroia;
-pub mod NLSF_decode;
-pub mod NLSF_del_dec_quant;
-pub mod NLSF_encode;
-pub mod NLSF_stabilize;
-pub mod NLSF_unpack;
 pub mod a2nlsf;
 pub mod ana_filt_bank_1;
 pub mod biquad_alt;
@@ -53,6 +46,13 @@ pub mod lpc_analysis_filter;
 pub mod lpc_fit;
 pub mod lpc_inv_pred_gain;
 pub mod nlsf2a;
+pub mod nlsf_decode;
+pub mod nlsf_del_dec_quant;
+pub mod nlsf_encode;
+pub mod nlsf_stabilize;
+pub mod nlsf_unpack;
+pub mod nlsf_vq;
+pub mod nlsf_vq_weights_laroia;
 pub mod nsq;
 pub mod nsq_del_dec;
 pub mod pitch_est_tables;
