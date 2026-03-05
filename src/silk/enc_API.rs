@@ -52,6 +52,7 @@ use crate::silk::float::structs_FLP::{silk_encoder, silk_shape_state_FLP};
 use crate::silk::init_encoder::silk_init_encoder;
 use crate::silk::resampler::silk_resampler;
 
+use crate::silk::hp_variable_cutoff::silk_hp_variable_cutoff;
 use crate::silk::stereo_LR_to_MS::silk_stereo_lr_to_ms;
 use crate::silk::stereo_encode_pred::{silk_stereo_encode_mid_only, silk_stereo_encode_pred};
 use crate::silk::structs::{silk_LP_state, silk_nsq_state};
@@ -59,7 +60,6 @@ use crate::silk::tables_other::{SILK_LBRR_FLAGS_ICDF_PTR, SILK_QUANTIZATION_OFFS
 use crate::silk::tuning_parameters::{
     BITRESERVOIR_DECAY_TIME_MS, MAX_BANDWIDTH_SWITCH_DELAY_MS, SPEECH_ACTIVITY_DTX_THRES,
 };
-use crate::silk::HP_variable_cutoff::silk_hp_variable_cutoff;
 
 /// Upstream C: silk/enc_API.c:silk_InitEncoder
 pub fn silk_init_encoder_api(

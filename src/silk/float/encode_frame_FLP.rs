@@ -18,10 +18,10 @@ use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_sta
 use crate::silk::float::wrappers_FLP::silk_nsq_wrapper_flp;
 use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_dequant, silk_gains_id, silk_gains_quant};
+use crate::silk::lp_variable_cutoff::silk_lp_variable_cutoff;
 use crate::silk::structs::silk_nsq_state;
 use crate::silk::tuning_parameters::{LBRR_SPEECH_ACTIVITY_THRES, SPEECH_ACTIVITY_DTX_THRES};
 use crate::silk::vad::silk_vad_get_sa_q8;
-use crate::silk::LP_variable_cutoff::silk_lp_variable_cutoff;
 use crate::silk::SigProc_FIX::silk_min_int;
 
 /// Upstream C: silk/float/encode_frame_FLP.c:silk_encode_do_VAD_FLP
