@@ -4,8 +4,6 @@
 //! This file is auto-generated from the C static mode tables.
 //! Upstream C: `celt/static_modes_float.h` (ENABLE_QEXT sections)
 
-#![allow(clippy::excessive_precision, clippy::approx_constant)]
-
 use super::static_modes_float::{
     CACHE_BITS50, CACHE_CAPS50, CACHE_INDEX50, FFT_BITREV120, FFT_BITREV240, FFT_BITREV480,
     LOG_N400,
@@ -50,6 +48,7 @@ pub static QEXT_EBANDS_180: [i16; NB_QEXT_BANDS + 1] = [
 /// QEXT logN for shortMdctSize=180 (15 entries; last unused when effEBands==14).
 pub static QEXT_LOGN_180: [i16; 15] = [24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 21, 21, 21];
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub static WINDOW240: [f32; 240] = [
     1.6821922e-05,
     0.00015139297,
@@ -323,6 +322,7 @@ pub static QEXT_CACHE_CAPS50: [u8; 112] = [
 ];
 
 #[rustfmt::skip]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub static FFT_TWIDDLES96000_1920: [kiss_twiddle_cpx; 960] = [
     c!(1.0000000, -0.0000000), c!(0.99997858, -0.0065449380), c!(0.99991433, -0.013089596),
     c!(0.99980724, -0.019633692), c!(0.99965732, -0.026176948), c!(0.99946459, -0.032719083),
@@ -714,6 +714,7 @@ pub static FFT_BITREV960: [i16; 960] = [
     63, 255, 447, 639, 831, 127, 319, 511, 703, 895, 191, 383, 575, 767, 959,
 ];
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 static FFT_STATE96000_1920_0: kiss_fft_state = kiss_fft_state {
     nfft: 960,
     scale: 0.0010416667,
@@ -732,6 +733,7 @@ static FFT_STATE96000_1920_0: kiss_fft_state = kiss_fft_state {
     twiddles: &FFT_TWIDDLES96000_1920,
 };
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 static FFT_STATE96000_1920_1: kiss_fft_state = kiss_fft_state {
     nfft: 480,
     scale: 0.0020833334,
@@ -750,6 +752,7 @@ static FFT_STATE96000_1920_1: kiss_fft_state = kiss_fft_state {
     twiddles: &FFT_TWIDDLES96000_1920,
 };
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 static FFT_STATE96000_1920_2: kiss_fft_state = kiss_fft_state {
     nfft: 240,
     scale: 0.0041666669,
@@ -768,6 +771,7 @@ static FFT_STATE96000_1920_2: kiss_fft_state = kiss_fft_state {
     twiddles: &FFT_TWIDDLES96000_1920,
 };
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 static FFT_STATE96000_1920_3: kiss_fft_state = kiss_fft_state {
     nfft: 120,
     scale: 0.0083333338,
@@ -787,6 +791,7 @@ static FFT_STATE96000_1920_3: kiss_fft_state = kiss_fft_state {
 };
 
 #[rustfmt::skip]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub static MDCT_TWIDDLES1920: [&[f32]; 4] = [
     &[
         0.99999998, 0.99999831, 0.99999396, 0.99998693, 0.99997722,
