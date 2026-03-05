@@ -7,9 +7,10 @@
 #![allow(clippy::excessive_precision, clippy::approx_constant)]
 
 use super::static_modes_float::{
-    cache_bits50, cache_caps50, cache_index50, fft_bitrev120, fft_bitrev240, fft_bitrev480, logN400,
+    CACHE_BITS50, CACHE_CAPS50, CACHE_INDEX50, FFT_BITREV120, FFT_BITREV240, FFT_BITREV480,
+    LOG_N400,
 };
-use super::{band_allocation, eband5ms};
+use super::{BAND_ALLOCATION, EBAND5MS};
 use crate::celt::kiss_fft::{kiss_fft_state, kiss_twiddle_cpx};
 use crate::celt::mdct::MdctLookup;
 use crate::celt::modes::{OpusCustomMode, PulseCache};
@@ -49,7 +50,7 @@ pub static QEXT_EBANDS_180: [i16; NB_QEXT_BANDS + 1] = [
 /// QEXT logN for shortMdctSize=180 (15 entries; last unused when effEBands==14).
 pub static QEXT_LOGN_180: [i16; 15] = [24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 21, 21, 21];
 
-pub static window240: [f32; 240] = [
+pub static WINDOW240: [f32; 240] = [
     1.6821922e-05,
     0.00015139297,
     0.00042051200,
@@ -293,7 +294,7 @@ pub static window240: [f32; 240] = [
 ];
 
 #[rustfmt::skip]
-pub static qext_cache_index50: [i16; 70] = [
+pub static QEXT_CACHE_INDEX50: [i16; 70] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41,
     41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 61, 61,
     61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 72, 72, 72,
@@ -301,7 +302,7 @@ pub static qext_cache_index50: [i16; 70] = [
     80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
 ];
 #[rustfmt::skip]
-pub static qext_cache_bits50: [u8; 86] = [
+pub static QEXT_CACHE_BITS50: [u8; 86] = [
     40, 26, 45, 59, 70, 79, 87, 94, 100, 105, 110, 114, 118, 122, 125,
     128, 131, 136, 141, 146, 150, 153, 157, 160, 163, 168, 173, 178, 182, 185,
     189, 192, 195, 200, 205, 210, 214, 217, 221, 224, 227, 19, 34, 61, 83,
@@ -310,7 +311,7 @@ pub static qext_cache_bits50: [u8; 86] = [
     131, 165, 197, 227, 255, 5, 58, 109, 155, 197, 237,
 ];
 #[rustfmt::skip]
-pub static qext_cache_caps50: [u8; 112] = [
+pub static QEXT_CACHE_CAPS50: [u8; 112] = [
     159, 159, 159, 159, 159, 159, 159, 159, 159, 159, 159, 159, 159, 159, 171,
     171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 163, 163,
     163, 163, 163, 163, 163, 163, 163, 163, 163, 163, 163, 163, 167, 167, 167,
@@ -322,7 +323,7 @@ pub static qext_cache_caps50: [u8; 112] = [
 ];
 
 #[rustfmt::skip]
-pub static fft_twiddles96000_1920: [kiss_twiddle_cpx; 960] = [
+pub static FFT_TWIDDLES96000_1920: [kiss_twiddle_cpx; 960] = [
     c!(1.0000000, -0.0000000), c!(0.99997858, -0.0065449380), c!(0.99991433, -0.013089596),
     c!(0.99980724, -0.019633692), c!(0.99965732, -0.026176948), c!(0.99946459, -0.032719083),
     c!(0.99922904, -0.039259816), c!(0.99895068, -0.045798867), c!(0.99862953, -0.052335956),
@@ -646,7 +647,7 @@ pub static fft_twiddles96000_1920: [kiss_twiddle_cpx; 960] = [
 ];
 
 #[rustfmt::skip]
-pub static fft_bitrev960: [i16; 960] = [
+pub static FFT_BITREV960: [i16; 960] = [
     0, 192, 384, 576, 768, 64, 256, 448, 640, 832, 128, 320, 512, 704, 896,
     16, 208, 400, 592, 784, 80, 272, 464, 656, 848, 144, 336, 528, 720, 912,
     32, 224, 416, 608, 800, 96, 288, 480, 672, 864, 160, 352, 544, 736, 928,
@@ -713,7 +714,7 @@ pub static fft_bitrev960: [i16; 960] = [
     63, 255, 447, 639, 831, 127, 319, 511, 703, 895, 191, 383, 575, 767, 959,
 ];
 
-static fft_state96000_1920_0: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_0: kiss_fft_state = kiss_fft_state {
     nfft: 960,
     scale: 0.0010416667,
     shift: -1,
@@ -727,11 +728,11 @@ static fft_state96000_1920_0: kiss_fft_state = kiss_fft_state {
         (0, 0),
         (0, 0),
     ],
-    bitrev: &fft_bitrev960,
-    twiddles: &fft_twiddles96000_1920,
+    bitrev: &FFT_BITREV960,
+    twiddles: &FFT_TWIDDLES96000_1920,
 };
 
-static fft_state96000_1920_1: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_1: kiss_fft_state = kiss_fft_state {
     nfft: 480,
     scale: 0.0020833334,
     shift: 1,
@@ -745,11 +746,11 @@ static fft_state96000_1920_1: kiss_fft_state = kiss_fft_state {
         (0, 0),
         (0, 0),
     ],
-    bitrev: &fft_bitrev480,
-    twiddles: &fft_twiddles96000_1920,
+    bitrev: &FFT_BITREV480,
+    twiddles: &FFT_TWIDDLES96000_1920,
 };
 
-static fft_state96000_1920_2: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_2: kiss_fft_state = kiss_fft_state {
     nfft: 240,
     scale: 0.0041666669,
     shift: 2,
@@ -763,11 +764,11 @@ static fft_state96000_1920_2: kiss_fft_state = kiss_fft_state {
         (0, 0),
         (0, 0),
     ],
-    bitrev: &fft_bitrev240,
-    twiddles: &fft_twiddles96000_1920,
+    bitrev: &FFT_BITREV240,
+    twiddles: &FFT_TWIDDLES96000_1920,
 };
 
-static fft_state96000_1920_3: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_3: kiss_fft_state = kiss_fft_state {
     nfft: 120,
     scale: 0.0083333338,
     shift: 3,
@@ -781,12 +782,12 @@ static fft_state96000_1920_3: kiss_fft_state = kiss_fft_state {
         (0, 0),
         (0, 0),
     ],
-    bitrev: &fft_bitrev120,
-    twiddles: &fft_twiddles96000_1920,
+    bitrev: &FFT_BITREV120,
+    twiddles: &FFT_TWIDDLES96000_1920,
 };
 
 #[rustfmt::skip]
-pub static mdct_twiddles1920: [&[f32]; 4] = [
+pub static MDCT_TWIDDLES1920: [&[f32]; 4] = [
     &[
         0.99999998, 0.99999831, 0.99999396, 0.99998693, 0.99997722,
         0.99996484, 0.99994978, 0.99993204, 0.99991163, 0.99988854,
@@ -1517,42 +1518,42 @@ pub static mdct_twiddles1920: [&[f32]; 4] = [
     ],
 ];
 
-pub(crate) static mode96000_1920_240: OpusCustomMode = OpusCustomMode {
+pub(crate) static MODE96000_1920_240: OpusCustomMode = OpusCustomMode {
     Fs: 96000,
     overlap: 240,
     nbEBands: 21,
     effEBands: 21,
     preemph: [0.92300415, 0.22000122, 1.5128347, 0.66101074],
-    eBands: &eband5ms,
+    eBands: &EBAND5MS,
     maxLM: 3,
     nbShortMdcts: 8,
     shortMdctSize: 240,
     nbAllocVectors: 11,
-    allocVectors: &band_allocation,
-    logN: &logN400,
-    window: &window240,
+    allocVectors: &BAND_ALLOCATION,
+    logN: &LOG_N400,
+    window: &WINDOW240,
     mdct: MdctLookup {
         n: 3840,
         maxshift: 3,
         kfft: [
-            &fft_state96000_1920_0,
-            &fft_state96000_1920_1,
-            &fft_state96000_1920_2,
-            &fft_state96000_1920_3,
+            &FFT_STATE96000_1920_0,
+            &FFT_STATE96000_1920_1,
+            &FFT_STATE96000_1920_2,
+            &FFT_STATE96000_1920_3,
         ],
-        trig: &mdct_twiddles1920,
+        trig: &MDCT_TWIDDLES1920,
     },
     cache: PulseCache {
         size: 392,
-        index: &cache_index50,
-        bits: &cache_bits50,
-        caps: &cache_caps50,
+        index: &CACHE_INDEX50,
+        bits: &CACHE_BITS50,
+        caps: &CACHE_CAPS50,
     },
     #[cfg(feature = "qext")]
     qext_cache: PulseCache {
         size: 86,
-        index: &qext_cache_index50,
-        bits: &qext_cache_bits50,
-        caps: &qext_cache_caps50,
+        index: &QEXT_CACHE_INDEX50,
+        bits: &QEXT_CACHE_BITS50,
+        caps: &QEXT_CACHE_CAPS50,
     },
 };

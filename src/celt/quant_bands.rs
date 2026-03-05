@@ -10,7 +10,7 @@ use crate::celt::mathops::celt_log2;
 use crate::celt::modes::OpusCustomMode;
 use crate::celt::rate::MAX_FINE_BITS;
 
-pub const eMeans: [f32; 25] = [
+pub const E_MEANS: [f32; 25] = [
     6.437_5_f32,
     6.25_f32,
     5.75_f32,
@@ -609,7 +609,7 @@ pub fn amp2_log2(
     loop {
         for i in 0..eff_end {
             band_log_e[(i + c * nb_ebands) as usize] =
-                celt_log2(band_e[(i + c * nb_ebands) as usize]) - eMeans[i as usize];
+                celt_log2(band_e[(i + c * nb_ebands) as usize]) - E_MEANS[i as usize];
         }
         for i in eff_end..end {
             band_log_e[(c * nb_ebands + i) as usize] = -14.0f32;

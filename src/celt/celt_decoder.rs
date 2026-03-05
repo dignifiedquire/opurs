@@ -7,8 +7,8 @@ use crate::celt::bands::{
 };
 use crate::celt::celt_lpc::{_celt_autocorr, _celt_lpc, celt_fir_c, celt_iir, LPC_ORDER};
 use crate::celt::common::{
-    comb_filter, comb_filter_inplace, init_caps, resampling_factor, spread_icdf, tapset_icdf,
-    tf_select_table, trim_icdf, COMBFILTER_MINPERIOD,
+    comb_filter, comb_filter_inplace, init_caps, resampling_factor, COMBFILTER_MINPERIOD,
+    SPREAD_ICDF, TAPSET_ICDF, TF_SELECT_TABLE, TRIM_ICDF,
 };
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entdec::{
@@ -956,14 +956,14 @@ fn tf_decode(
     }
     tf_select = 0;
     if tf_select_rsv != 0
-        && tf_select_table[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
-            != tf_select_table[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
+        && TF_SELECT_TABLE[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
+            != TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
     {
         tf_select = ec_dec_bit_logp(dec, 1);
     }
     i = start;
     while i < end {
-        tf_res[i as usize] = tf_select_table[LM as usize]
+        tf_res[i as usize] = TF_SELECT_TABLE[LM as usize]
             [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
             as i32;
         i += 1;
@@ -1748,7 +1748,7 @@ fn celt_decode_body(
                 .wrapping_sub(1) as i32;
             let qg: i32 = ec_dec_bits(dec, 3) as i32;
             if ec_tell(dec) + 2 <= total_bits {
-                postfilter_tapset = ec_dec_icdf(dec, &tapset_icdf, 2);
+                postfilter_tapset = ec_dec_icdf(dec, &TAPSET_ICDF, 2);
             }
             postfilter_gain = 0.09375f32 * (qg + 1) as f32;
         }
@@ -1933,7 +1933,7 @@ fn celt_decode_body(
     tell = ec_tell(dec);
     spread_decision = SPREAD_NORMAL;
     if tell + 4 <= total_bits {
-        spread_decision = ec_dec_icdf(dec, &spread_icdf, 5);
+        spread_decision = ec_dec_icdf(dec, &SPREAD_ICDF, 5);
     }
     let mut cap = [0i32; 21];
     init_caps(mode, &mut cap, LM, C);
@@ -1977,7 +1977,7 @@ fn celt_decode_body(
     }
     let mut fine_quant = [0i32; 21];
     let alloc_trim: i32 = if tell + ((6) << BITRES) <= total_bits {
-        ec_dec_icdf(dec, &trim_icdf, 7)
+        ec_dec_icdf(dec, &TRIM_ICDF, 7)
     } else {
         5
     };

@@ -6,10 +6,10 @@ use crate::silk::macros::EC_CLZ0;
 
 use std::f32::consts::PI;
 
-pub const cA: f32 = 0.43157974f32;
-pub const cB: f32 = 0.678_484_f32;
-pub const cC: f32 = 0.08595542f32;
-pub const cE: f32 = PI / 2_f32;
+pub const C_A: f32 = 0.43157974f32;
+pub const C_B: f32 = 0.678_484_f32;
+pub const C_C: f32 = 0.08595542f32;
+pub const C_E: f32 = PI / 2_f32;
 
 /// Upstream C: celt/mathops.h:isqrt32
 pub fn isqrt32(mut _val: u32) -> u32 {
@@ -40,12 +40,12 @@ pub fn fast_atan2f(y: f32, x: f32) -> f32 {
         return 0.0f32;
     }
     if x2 < y2 {
-        let den = (y2 + cB * x2) * (y2 + cC * x2);
-        -x * y * (y2 + cA * x2) / den + (if y < 0.0f32 { -cE } else { cE })
+        let den = (y2 + C_B * x2) * (y2 + C_C * x2);
+        -x * y * (y2 + C_A * x2) / den + (if y < 0.0f32 { -C_E } else { C_E })
     } else {
-        let den = (x2 + cB * y2) * (x2 + cC * y2);
-        x * y * (x2 + cA * y2) / den + (if y < 0.0f32 { -cE } else { cE })
-            - (if x * y < 0.0f32 { -cE } else { cE })
+        let den = (x2 + C_B * y2) * (x2 + C_C * y2);
+        x * y * (x2 + C_A * y2) / den + (if y < 0.0f32 { -C_E } else { C_E })
+            - (if x * y < 0.0f32 { -C_E } else { C_E })
     }
 }
 

@@ -16,7 +16,7 @@ use crate::celt::entenc::ec_enc_icdf;
 #[cfg(feature = "qext")]
 use crate::celt::modes::data_96000::NB_QEXT_BANDS;
 #[cfg(feature = "qext")]
-use crate::celt::quant_bands::eMeans;
+use crate::celt::quant_bands::E_MEANS;
 
 pub const FINE_OFFSET: i32 = 21;
 pub const MAX_FINE_BITS: i32 = 8;
@@ -695,17 +695,17 @@ pub fn clt_compute_extra_allocation(
             Ncoef[iu] = ((m.eBands[iu + 1] as i32 - m.eBands[iu] as i32) * C) << LM;
         }
 
-        // Remove the effect of band width, eMeans and pre-emphasis to compute flat spectrum.
+        // Remove the effect of band width, E_MEANS and pre-emphasis to compute flat spectrum.
         for i in start..end {
             let iu = i as usize;
-            flatE[iu] = bandLogE[iu] - 0.0625 * m.logN[iu] as f32 + eMeans[iu]
+            flatE[iu] = bandLogE[iu] - 0.0625 * m.logN[iu] as f32 + E_MEANS[iu]
                 - 0.0062 * (i + 5) as f32 * (i + 5) as f32;
             min_arr[iu] = 0.0;
         }
         if C == 2 {
             for i in start..end {
                 let iu = i as usize;
-                let alt = bandLogE[m.nbEBands + iu] - 0.0625 * m.logN[iu] as f32 + eMeans[iu]
+                let alt = bandLogE[m.nbEBands + iu] - 0.0625 * m.logN[iu] as f32 + E_MEANS[iu]
                     - 0.0062 * (i + 5) as f32 * (i + 5) as f32;
                 if alt > flatE[iu] {
                     flatE[iu] = alt;
@@ -737,7 +737,7 @@ pub fn clt_compute_extra_allocation(
             for i in 0..qext_end {
                 let iu = i as usize;
                 let eid = (end + i) as usize;
-                flatE[eid] = qext_bandLogE[iu] - 0.0625 * qm.logN[iu] as f32 + eMeans[iu]
+                flatE[eid] = qext_bandLogE[iu] - 0.0625 * qm.logN[iu] as f32 + E_MEANS[iu]
                     - 0.0062 * (end + i + 5) as f32 * (end + i + 5) as f32;
             }
             if C == 2 {
@@ -745,7 +745,7 @@ pub fn clt_compute_extra_allocation(
                     let iu = i as usize;
                     let eid = (end + i) as usize;
                     let alt = qext_bandLogE[NB_QEXT_BANDS + iu] - 0.0625 * qm.logN[iu] as f32
-                        + eMeans[iu]
+                        + E_MEANS[iu]
                         - 0.0062 * (end + i + 5) as f32 * (end + i + 5) as f32;
                     if alt > flatE[eid] {
                         flatE[eid] = alt;

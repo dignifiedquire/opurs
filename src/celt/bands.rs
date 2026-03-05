@@ -11,7 +11,7 @@ use crate::celt::mathops::celt_cos_norm2;
 use crate::celt::mathops::{celt_exp2, celt_rsqrt, celt_rsqrt_norm, celt_sqrt, isqrt32};
 use crate::celt::modes::OpusCustomMode;
 use crate::celt::pitch::{celt_inner_prod, dual_inner_prod};
-use crate::celt::quant_bands::eMeans;
+use crate::celt::quant_bands::E_MEANS;
 use crate::celt::rate::{
     bits2pulses, get_pulses, pulses2bits, QTHETA_OFFSET, QTHETA_OFFSET_TWOPHASE,
 };
@@ -337,7 +337,7 @@ pub fn denormalise_bands(
     let mut off = 0usize;
     for i in start..end {
         let band_len = (M * (eBands[(i + 1) as usize] as i32 - eBands[i as usize] as i32)) as usize;
-        let lg = bandLogE[i as usize] + eMeans[i as usize];
+        let lg = bandLogE[i as usize] + E_MEANS[i as usize];
         let g = celt_exp2(if 32.0 < lg { 32.0f32 } else { lg });
         for (f, &x) in freq_band[off..off + band_len]
             .iter_mut()
@@ -594,7 +594,7 @@ pub fn spreading_decision(
     }
 }
 
-const ordery_table: [i32; 30] = [
+const ORDERY_TABLE: [i32; 30] = [
     1, 0, 3, 0, 2, 1, 7, 0, 4, 3, 6, 1, 5, 2, 15, 0, 8, 7, 12, 3, 11, 4, 14, 1, 9, 6, 13, 2, 10, 5,
 ];
 
@@ -607,7 +607,7 @@ fn deinterleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let tmp = &mut tmp[..N];
     let x = &X[..N];
     if hadamard != 0 {
-        let ordery = &ordery_table[(stride - 2) as usize..];
+        let ordery = &ORDERY_TABLE[(stride - 2) as usize..];
         for i in 0..stride as usize {
             let dst_base = (ordery[i] * N0) as usize;
             for j in 0..N0 as usize {
@@ -633,7 +633,7 @@ fn interleave_hadamard(X: &mut [f32], N0: i32, stride: i32, hadamard: i32) {
     let tmp = &mut tmp[..N];
     let x = &X[..N];
     if hadamard != 0 {
-        let ordery = &ordery_table[(stride - 2) as usize..];
+        let ordery = &ORDERY_TABLE[(stride - 2) as usize..];
         for i in 0..stride as usize {
             let src_base = (ordery[i] * N0) as usize;
             for j in 0..N0 as usize {

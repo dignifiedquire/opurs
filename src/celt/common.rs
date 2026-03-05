@@ -5,10 +5,10 @@
 use crate::arch::Arch;
 use crate::celt::modes::OpusCustomMode;
 
-pub const trim_icdf: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
-pub const spread_icdf: [u8; 4] = [25, 23, 2, 0];
-pub const tapset_icdf: [u8; 3] = [2, 1, 0];
-pub const tf_select_table: [[i8; 8]; 4] = [
+pub const TRIM_ICDF: [u8; 11] = [126, 124, 119, 109, 87, 41, 19, 9, 4, 2, 0];
+pub const SPREAD_ICDF: [u8; 4] = [25, 23, 2, 0];
+pub const TAPSET_ICDF: [u8; 3] = [2, 1, 0];
+pub const TF_SELECT_TABLE: [[i8; 8]; 4] = [
     [0, -1, 0, -1, 0, -1, 0, -1],
     [0, -1, 0, -2, 1, 0, 1, -1],
     [0, -2, 0, -3, 2, 0, 1, -1],
@@ -462,7 +462,7 @@ pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
 }
 
 pub fn opus_strerror(error: i32) -> &'static str {
-    const error_strings: [&str; 8] = [
+    const ERROR_STRINGS: [&str; 8] = [
         "success",
         "invalid argument",
         "buffer too small",
@@ -475,7 +475,7 @@ pub fn opus_strerror(error: i32) -> &'static str {
     if !(-7..=0).contains(&error) {
         "unknown error"
     } else {
-        error_strings[-error as usize]
+        ERROR_STRINGS[-error as usize]
     }
 }
 

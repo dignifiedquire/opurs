@@ -18,7 +18,7 @@ pub struct SILKInfo {
 }
 
 use crate::celt::common::{
-    comb_filter, init_caps, resampling_factor, spread_icdf, tapset_icdf, tf_select_table, trim_icdf,
+    comb_filter, init_caps, resampling_factor, SPREAD_ICDF, TAPSET_ICDF, TF_SELECT_TABLE, TRIM_ICDF,
 };
 use crate::celt::common::{COMBFILTER_MAXPERIOD, COMBFILTER_MINPERIOD};
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
@@ -33,7 +33,7 @@ use crate::celt::modes::compute_qext_mode;
 use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 use crate::celt::pitch::{celt_inner_prod, pitch_downsample, pitch_search, remove_doubling};
 use crate::celt::quant_bands::{
-    amp2_log2, eMeans, quant_coarse_energy, quant_energy_finalise, quant_fine_energy,
+    amp2_log2, quant_coarse_energy, quant_energy_finalise, quant_fine_energy, E_MEANS,
 };
 use crate::celt::rate::clt_compute_allocation;
 #[cfg(feature = "qext")]
@@ -541,7 +541,7 @@ fn transient_analysis(
     // Forward masking: 6.7 dB/ms.
     let mut forward_decay: f32 = 0.0625f32;
     // Table of 6*64/x, trained on real data to minimize average error.
-    const inv_table: [u8; 128] = [
+    const INV_TABLE: [u8; 128] = [
         255, 255, 156, 110, 86, 70, 59, 51, 45, 40, 37, 33, 31, 28, 26, 25, 23, 22, 21, 20, 19, 18,
         17, 16, 16, 15, 15, 14, 13, 13, 12, 12, 12, 12, 11, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9,
         8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5,
@@ -639,12 +639,12 @@ fn transient_analysis(
             } else {
                 (64.0 * norm * (tmp[i as usize] + 1e-15f32)).floor()
             }) as i32;
-            unmask += inv_table[id as usize] as i32;
+            unmask += INV_TABLE[id as usize] as i32;
             i += 4;
         }
         // Normalize and compensate for:
         // - 1/4 sample stride
-        // - factor of 6 baked into inv_table
+        // - factor of 6 baked into INV_TABLE
         unmask = 64 * unmask * 4 / (6 * (len2 - 17));
         if unmask > mask_metric {
             *tf_chan = c;
@@ -1019,11 +1019,11 @@ fn tf_analysis(
     while sel < 2 {
         cost0 = importance[0]
             * (metric[0]
-                - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel) as usize] as i32)
+                - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * sel) as usize] as i32)
                 .abs();
         cost1 = importance[0]
             * (metric[0]
-                - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
+                - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
                     as i32)
                 .abs()
             + (if isTransient != 0 { 0 } else { lambda });
@@ -1042,13 +1042,13 @@ fn tf_analysis(
             cost0 = curr0
                 + importance[i as usize]
                     * (metric[i as usize]
-                        - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel) as usize]
+                        - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * sel) as usize]
                             as i32)
                         .abs();
             cost1 = curr1
                 + importance[i as usize]
                     * (metric[i as usize]
-                        - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
+                        - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * sel + 1) as usize]
                             as i32)
                         .abs();
             i += 1;
@@ -1062,11 +1062,11 @@ fn tf_analysis(
     }
     cost0 = importance[0]
         * (metric[0]
-            - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select) as usize] as i32)
+            - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * tf_select) as usize] as i32)
             .abs();
     cost1 = importance[0]
         * (metric[0]
-            - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select + 1) as usize]
+            - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * tf_select + 1) as usize]
                 as i32)
             .abs()
         + (if isTransient != 0 { 0 } else { lambda });
@@ -1097,13 +1097,13 @@ fn tf_analysis(
         cost0 = curr0_0
             + importance[i as usize]
                 * (metric[i as usize]
-                    - 2 * tf_select_table[LM as usize][(4 * isTransient + 2 * tf_select) as usize]
+                    - 2 * TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 * tf_select) as usize]
                         as i32)
                     .abs();
         cost1 = curr1_0
             + importance[i as usize]
                 * (metric[i as usize]
-                    - 2 * tf_select_table[LM as usize]
+                    - 2 * TF_SELECT_TABLE[LM as usize]
                         [(4 * isTransient + 2 * tf_select + 1) as usize]
                         as i32)
                     .abs();
@@ -1160,8 +1160,8 @@ fn tf_encode(
         i += 1;
     }
     if tf_select_rsv != 0
-        && tf_select_table[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
-            != tf_select_table[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
+        && TF_SELECT_TABLE[LM as usize][((4 * isTransient) + tf_changed) as usize] as i32
+            != TF_SELECT_TABLE[LM as usize][(4 * isTransient + 2 + tf_changed) as usize] as i32
     {
         ec_enc_bit_logp(enc, tf_select, 1);
     } else {
@@ -1169,7 +1169,7 @@ fn tf_encode(
     }
     i = start;
     while i < end {
-        tf_res[i as usize] = tf_select_table[LM as usize]
+        tf_res[i as usize] = TF_SELECT_TABLE[LM as usize]
             [(4 * isTransient + 2 * tf_select + tf_res[i as usize]) as usize]
             as i32;
         i += 1;
@@ -1469,7 +1469,7 @@ fn dynalloc_analysis(
     while i < end {
         noise_floor[i as usize] =
             0.0625f32 * logN[i as usize] as f32 + 0.5f32 + (9 - lsb_depth) as f32
-                - eMeans[i as usize]
+                - E_MEANS[i as usize]
                 + 0.0062f64 as f32 * ((i + 5) * (i + 5)) as f32;
         i += 1;
     }
@@ -2791,7 +2791,7 @@ pub fn celt_encode_with_ec<'b>(
         );
         pitch_index -= 1;
         ec_enc_bits(enc, qg as u32, 3);
-        ec_enc_icdf(enc, prefilter_tapset, &tapset_icdf, 2);
+        ec_enc_icdf(enc, prefilter_tapset, &TAPSET_ICDF, 2);
     }
     if LM > 0 && ec_tell(enc) + 3 <= total_bits {
         if isTransient != 0 {
@@ -3216,7 +3216,7 @@ pub fn celt_encode_with_ec<'b>(
                 &spread_weight,
             );
         }
-        ec_enc_icdf(enc, st.spread_decision, &spread_icdf, 5);
+        ec_enc_icdf(enc, st.spread_decision, &SPREAD_ICDF, 5);
     } else {
         st.spread_decision = SPREAD_NORMAL;
     }
@@ -3274,11 +3274,11 @@ pub fn celt_encode_with_ec<'b>(
         i += 1;
     }
     if C == 2 {
-        const intensity_thresholds: [f32; 21] = [
+        const INTENSITY_THRESHOLDS: [f32; 21] = [
             1_f32, 2_f32, 3_f32, 4_f32, 5_f32, 6_f32, 7_f32, 8_f32, 16_f32, 24_f32, 36_f32, 44_f32,
             50_f32, 56_f32, 62_f32, 67_f32, 72_f32, 79_f32, 88_f32, 106_f32, 134_f32,
         ];
-        const intensity_histeresis: [f32; 21] = [
+        const INTENSITY_HISTERESIS: [f32; 21] = [
             1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 1_f32, 2_f32, 2_f32, 2_f32, 2_f32, 2_f32,
             2_f32, 2_f32, 3_f32, 3_f32, 4_f32, 5_f32, 6_f32, 8_f32, 8_f32,
         ];
@@ -3287,8 +3287,8 @@ pub fn celt_encode_with_ec<'b>(
         }
         st.intensity = hysteresis_decision(
             (equiv_rate / 1000) as f32,
-            &intensity_thresholds,
-            &intensity_histeresis,
+            &INTENSITY_THRESHOLDS,
+            &INTENSITY_HISTERESIS,
             21,
             st.intensity,
         );
@@ -3328,7 +3328,7 @@ pub fn celt_encode_with_ec<'b>(
                 st.arch,
             );
         }
-        ec_enc_icdf(enc, alloc_trim, &trim_icdf, 7);
+        ec_enc_icdf(enc, alloc_trim, &TRIM_ICDF, 7);
         tell = ec_tell_frac(enc) as i32;
     }
     if vbr_rate > 0 {

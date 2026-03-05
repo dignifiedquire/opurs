@@ -38,11 +38,11 @@ pub mod data_96000;
 pub mod static_modes_float;
 
 #[cfg(not(feature = "qext"))]
-pub use self::static_modes_float::static_mode_list;
+pub use self::static_modes_float::STATIC_MODE_LIST;
 #[cfg(feature = "qext")]
-pub const static_mode_list: [&OpusCustomMode; 2] = [
-    &static_modes_float::mode48000_960_120,
-    &data_96000::mode96000_1920_240,
+pub const STATIC_MODE_LIST: [&OpusCustomMode; 2] = [
+    &static_modes_float::MODE48000_960_120,
+    &data_96000::MODE96000_1920_240,
 ];
 use crate::celt::mdct::MdctLookup;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
@@ -52,10 +52,10 @@ use self::data_96000::{
     NB_QEXT_BANDS, QEXT_EBANDS_180, QEXT_EBANDS_240, QEXT_LOGN_180, QEXT_LOGN_240,
 };
 
-const eband5ms: [i16; 22] = [
+const EBAND5MS: [i16; 22] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100,
 ];
-const band_allocation: [u8; 231] = [
+const BAND_ALLOCATION: [u8; 231] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 80, 75, 69, 63, 56, 49, 40,
     34, 29, 20, 18, 10, 0, 0, 0, 0, 0, 0, 0, 0, 110, 100, 90, 84, 78, 71, 65, 58, 51, 45, 39, 32,
     26, 20, 12, 0, 0, 0, 0, 0, 0, 118, 110, 103, 93, 86, 80, 75, 70, 65, 59, 53, 47, 40, 31, 23,
@@ -76,7 +76,7 @@ pub fn opus_custom_mode_create(
     error: Option<&mut i32>,
 ) -> Option<&'static OpusCustomMode> {
     // TODO: maybe return Result instead of error code?
-    for mode in static_mode_list {
+    for mode in STATIC_MODE_LIST {
         for j in 0..4 {
             if Fs == mode.Fs && frame_size << j == mode.shortMdctSize * mode.nbShortMdcts {
                 if let Some(error) = error {
