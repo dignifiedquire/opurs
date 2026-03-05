@@ -203,7 +203,7 @@ pub unsafe fn silk_nsq_sse4_1(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    crate::silk::NSQ::silk_NSQ_c(
+    crate::silk::NSQ::silk_nsq_c(
         psEncC,
         NSQ,
         psIndices,
@@ -246,7 +246,7 @@ pub unsafe fn silk_nsq_del_dec_sse4_1(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    crate::silk::NSQ_del_dec::silk_NSQ_del_dec_c(
+    crate::silk::NSQ_del_dec::silk_nsq_del_dec_c(
         psEncC,
         NSQ,
         psIndices,
@@ -2245,7 +2245,7 @@ unsafe fn silk_nsq_del_dec_scale_states_avx2(
 }
 
 /// Complete AVX2 NSQ del_dec outer function.
-/// Replaces the entire `silk_NSQ_del_dec_c` when nStatesDelayedDecision is 3 or 4 and AVX2 available.
+/// Replaces the entire `silk_nsq_del_dec_c` when nStatesDelayedDecision is 3 or 4 and AVX2 available.
 ///
 /// # Safety
 /// Requires AVX2 support (checked by caller via cpufeatures).

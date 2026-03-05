@@ -166,7 +166,7 @@ pub fn silk_nsq_del_dec(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    silk_NSQ_del_dec_c(
+    silk_nsq_del_dec_c(
         psEncC,
         NSQ,
         psIndices,
@@ -187,7 +187,7 @@ pub fn silk_nsq_del_dec(
 
 /// Upstream C: silk/NSQ_del_dec.c:silk_NSQ_del_dec_c
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec_c(
+pub fn silk_nsq_del_dec_c(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,

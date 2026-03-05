@@ -197,8 +197,8 @@ pub mod internals {
     // Scalar implementation:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_flp_scalar;
     // NSQ noise shape feedback loop:
-    pub use crate::silk::NSQ::silk_NSQ_noise_shape_feedback_loop_c;
     pub use crate::silk::NSQ::silk_nsq_noise_shape_feedback_loop;
+    pub use crate::silk::NSQ::silk_nsq_noise_shape_feedback_loop_c;
     // VQ weighted matrix:
     #[cfg(feature = "simd")]
     pub use crate::silk::simd::silk_vq_wmat_ec;

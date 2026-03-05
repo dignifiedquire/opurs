@@ -116,7 +116,7 @@ pub fn silk_nsq_noise_shape_feedback_loop(
     }
 
     let _ = arch;
-    super::NSQ::silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
+    super::NSQ::silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
 /// SIMD-accelerated VQ_WMat_EC.
@@ -247,7 +247,7 @@ pub fn silk_nsq(
         return;
     }
 
-    super::NSQ::silk_NSQ_c(
+    super::NSQ::silk_nsq_c(
         psEncC,
         NSQ,
         psIndices,
@@ -362,7 +362,7 @@ pub fn silk_nsq_del_dec(
         }
     }
 
-    super::NSQ_del_dec::silk_NSQ_del_dec_c(
+    super::NSQ_del_dec::silk_nsq_del_dec_c(
         psEncC,
         NSQ,
         psIndices,

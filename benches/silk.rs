@@ -102,7 +102,7 @@ fn bench_feedback_loop(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("scalar", order), &order, |b, &order| {
             let mut data1 = generate_i32_signal(order, 123);
             b.iter(|| {
-                black_box(opurs::internals::silk_NSQ_noise_shape_feedback_loop_c(
+                black_box(opurs::internals::silk_nsq_noise_shape_feedback_loop_c(
                     black_box(12345),
                     &mut data1,
                     &coef,

@@ -51,7 +51,7 @@ pub fn silk_noise_shape_quantizer_short_prediction_c(
 /// Shifts new value into data1 while computing the weighted sum.
 /// Upstream C: silk/NSQ.h:silk_NSQ_noise_shape_feedback_loop_c
 #[inline]
-pub fn silk_NSQ_noise_shape_feedback_loop_c(
+pub fn silk_nsq_noise_shape_feedback_loop_c(
     data0: i32,
     data1: &mut [i32],
     coef: &[i16],
@@ -128,7 +128,7 @@ pub fn silk_nsq_noise_shape_feedback_loop(
     order: i32,
     _arch: Arch,
 ) -> i32 {
-    silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
+    silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
 use crate::arch::Arch;
@@ -205,7 +205,7 @@ pub fn silk_nsq(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    silk_NSQ_c(
+    silk_nsq_c(
         psEncC,
         NSQ,
         psIndices,
@@ -226,7 +226,7 @@ pub fn silk_nsq(
 
 /// Upstream C: silk/NSQ.c:silk_NSQ_c
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_c(
+pub fn silk_nsq_c(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
