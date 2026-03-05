@@ -12,7 +12,7 @@ pub const SILK_MAX_ORDER_LPC: usize = 24;
 /// compile it into a 'ror' instruction if available. No need for OPUS_INLINE ASM!
 /// Upstream C: silk/SigProc_FIX.h:silk_ROR32
 #[inline]
-pub fn silk_ROR32(a32: i32, rot: i32) -> i32 {
+pub fn silk_ror32(a32: i32, rot: i32) -> i32 {
     let x: u32 = a32 as u32;
     let r: u32 = rot as u32;
     let m: u32 = -rot as u32;
@@ -27,13 +27,13 @@ pub fn silk_ROR32(a32: i32, rot: i32) -> i32 {
 
 /// Upstream C: silk/SigProc_FIX.h:silk_SMULTT
 #[inline]
-pub fn silk_SMULTT(a32: i32, b32: i32) -> i32 {
+pub fn silk_smultt(a32: i32, b32: i32) -> i32 {
     (a32 >> 16) * (b32 >> 16)
 }
 
 /// Upstream C: silk/SigProc_FIX.h:silk_SAT16
 #[inline]
-pub fn silk_SAT16(a: i32) -> i32 {
+pub fn silk_sat16(a: i32) -> i32 {
     if a > i16::MAX as i32 {
         i16::MAX as i32
     } else if a < i16::MIN as i32 {
@@ -47,13 +47,13 @@ pub fn silk_SAT16(a: i32) -> i32 {
 /// saturates before shifting
 /// Upstream C: silk/SigProc_FIX.h:silk_LSHIFT_SAT32
 #[inline]
-pub fn silk_LSHIFT_SAT32(a: i32, shift: i32) -> i32 {
-    silk_LIMIT(a, i32::MIN >> shift, i32::MAX >> shift) << shift
+pub fn silk_lshift_sat32(a: i32, shift: i32) -> i32 {
+    silk_limit(a, i32::MIN >> shift, i32::MAX >> shift) << shift
 }
 
 /// Upstream C: silk/SigProc_FIX.h:silk_RSHIFT_ROUND
 #[inline]
-pub fn silk_RSHIFT_ROUND(a: i32, shift: i32) -> i32 {
+pub fn silk_rshift_round(a: i32, shift: i32) -> i32 {
     if shift == 1 {
         ((a) >> 1) + ((a) & 1)
     } else {
@@ -63,7 +63,7 @@ pub fn silk_RSHIFT_ROUND(a: i32, shift: i32) -> i32 {
 
 /// Upstream C: silk/SigProc_FIX.h:silk_RSHIFT_ROUND64
 #[inline]
-pub fn silk_RSHIFT_ROUND64(a: i64, shift: i32) -> i64 {
+pub fn silk_rshift_round64(a: i64, shift: i32) -> i64 {
     if shift == 1 {
         ((a) >> 1) + ((a) & 1)
     } else {
@@ -109,7 +109,7 @@ pub fn silk_max_32(a: i32, b: i32) -> i32 {
 
 /// Upstream C: silk/SigProc_FIX.h:silk_LIMIT
 #[inline]
-pub fn silk_LIMIT<T: Ord>(a: T, limit1: T, limit2: T) -> T {
+pub fn silk_limit<T: Ord>(a: T, limit1: T, limit2: T) -> T {
     if limit1 > limit2 {
         if a > limit1 {
             limit1
@@ -138,13 +138,32 @@ pub const RAND_INCREMENT: i32 = 907633515;
 /// bits, take the most significant bits by right-shifting.
 /// Upstream C: silk/SigProc_FIX.h:silk_RAND
 #[inline]
-pub fn silk_RAND(seed: i32) -> i32 {
+pub fn silk_rand(seed: i32) -> i32 {
     seed.wrapping_mul(RAND_MULTIPLIER)
         .wrapping_add(RAND_INCREMENT)
 }
 
 /// Upstream C: silk/SigProc_FIX.h:silk_SMMUL
 #[inline]
-pub fn silk_SMMUL(a32: i32, b32: i32) -> i32 {
+pub fn silk_smmul(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i64) >> 32) as i32
 }
+
+#[allow(unused_imports)]
+pub use silk_limit as silk_LIMIT;
+#[allow(unused_imports)]
+pub use silk_lshift_sat32 as silk_LSHIFT_SAT32;
+#[allow(unused_imports)]
+pub use silk_rand as silk_RAND;
+#[allow(unused_imports)]
+pub use silk_ror32 as silk_ROR32;
+#[allow(unused_imports)]
+pub use silk_rshift_round as silk_RSHIFT_ROUND;
+#[allow(unused_imports)]
+pub use silk_rshift_round64 as silk_RSHIFT_ROUND64;
+#[allow(unused_imports)]
+pub use silk_sat16 as silk_SAT16;
+#[allow(unused_imports)]
+pub use silk_smmul as silk_SMMUL;
+#[allow(unused_imports)]
+pub use silk_smultt as silk_SMULTT;

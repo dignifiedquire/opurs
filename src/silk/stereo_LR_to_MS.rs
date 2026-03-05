@@ -7,7 +7,7 @@ use crate::silk::stereo_find_predictor::silk_stereo_find_predictor;
 use crate::silk::stereo_quant_pred::silk_stereo_quant_pred;
 use crate::silk::structs::stereo_enc_state;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
-use crate::silk::Inlines::silk_DIV32_varQ;
+use crate::silk::Inlines::silk_div32_varq;
 use crate::silk::SigProc_FIX::silk_max_int;
 
 ///
@@ -144,7 +144,7 @@ pub fn silk_stereo_LR_to_MS(
     }
     let min_mid_rate_bps: i32 = 2000 + fs_kHz as i16 as i32 * 600;
     let frac_3_Q16: i32 = 3 * frac_Q16;
-    mid_side_rates_bps[0] = silk_DIV32_varQ(
+    mid_side_rates_bps[0] = silk_div32_varq(
         total_rate_bps,
         (((8 + 5) as i64 * ((1) << 16)) as f64 + 0.5f64) as i32 + frac_3_Q16,
         16 + 3,
@@ -152,7 +152,7 @@ pub fn silk_stereo_LR_to_MS(
     if mid_side_rates_bps[0] < min_mid_rate_bps {
         mid_side_rates_bps[0] = min_mid_rate_bps;
         mid_side_rates_bps[1] = total_rate_bps - mid_side_rates_bps[0];
-        width_Q14 = silk_DIV32_varQ(
+        width_Q14 = silk_div32_varq(
             ((mid_side_rates_bps[1] as u32) << 1) as i32 - min_mid_rate_bps,
             ((((((1) << 16) as f64 + 0.5f64) as i32 + frac_3_Q16) as i64
                 * min_mid_rate_bps as i16 as i64)

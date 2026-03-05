@@ -18,18 +18,18 @@ use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::define::{
     LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_SUB_FRAME_LENGTH, TYPE_VOICED,
 };
-use crate::silk::macros::{silk_CLZ32, silk_SMLAWB, silk_SMULBB, silk_SMULWW};
+use crate::silk::macros::{silk_clz32, silk_smlawb, silk_smulbb, silk_smulww};
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
-use crate::silk::Inlines::{silk_INVERSE32_varQ, silk_SQRT_APPROX};
+use crate::silk::Inlines::{silk_inverse32_varq, silk_sqrt_approx};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 #[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{
-    silk_LSHIFT_SAT32, silk_RAND, silk_RSHIFT_ROUND, silk_SAT16, silk_max_16, silk_max_32,
-    silk_max_int, silk_min_32, silk_min_int, SILK_FIX_CONST,
+    silk_lshift_sat32, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int,
+    silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
 };
 
 pub const NB_ATT: i32 = 2;
@@ -133,18 +133,18 @@ fn silk_plc_update(psDec: &mut silk_decoder_state, psDecCtrl: &mut silk_decoder_
             let scale_Q10 = tmp / std::cmp::max(LTP_Gain_Q14, 1);
             for i in 0..LTP_ORDER {
                 psPLC.LTPCoef_Q14[i] =
-                    (silk_SMULBB(psPLC.LTPCoef_Q14[i] as i32, scale_Q10) >> 10) as i16;
+                    (silk_smulbb(psPLC.LTPCoef_Q14[i] as i32, scale_Q10) >> 10) as i16;
             }
         } else if LTP_Gain_Q14 > V_PITCH_GAIN_START_MAX_Q14 {
             let tmp_0 = V_PITCH_GAIN_START_MAX_Q14 << 14;
             let scale_Q14 = tmp_0 / std::cmp::max(LTP_Gain_Q14, 1);
             for i in 0..LTP_ORDER {
                 psPLC.LTPCoef_Q14[i] =
-                    (silk_SMULBB(psPLC.LTPCoef_Q14[i] as i32, scale_Q14) >> 14) as i16;
+                    (silk_smulbb(psPLC.LTPCoef_Q14[i] as i32, scale_Q14) >> 14) as i16;
             }
         }
     } else {
-        psPLC.pitchL_Q8 = silk_SMULBB(psDec.fs_kHz, 18) << 8;
+        psPLC.pitchL_Q8 = silk_smulbb(psDec.fs_kHz, 18) << 8;
         psPLC.LTPCoef_Q14.fill(0);
     }
 
@@ -267,7 +267,7 @@ fn silk_plc_conceal(
             }
             rand_scale_Q14 = silk_max_16(3277, rand_scale_Q14); /* 0.2 */
             rand_scale_Q14 =
-                (silk_SMULBB(rand_scale_Q14 as i32, psDec.sPLC.prevLTP_scale_Q14 as i32) >> 14)
+                (silk_smulbb(rand_scale_Q14 as i32, psDec.sPLC.prevLTP_scale_Q14 as i32) >> 14)
                     as i16;
         } else {
             /* Reduce random noise for unvoiced frames with high LPC gain */
@@ -290,7 +290,7 @@ fn silk_plc_conceal(
     }
 
     let mut rand_seed = psDec.sPLC.rand_seed;
-    let mut lag = silk_RSHIFT_ROUND(psDec.sPLC.pitchL_Q8, 8);
+    let mut lag = silk_rshift_round(psDec.sPLC.pitchL_Q8, 8);
     let mut sLTP_buf_idx = psDec.ltp_mem_length;
 
     /* Rewhiten LTP state */
@@ -304,7 +304,7 @@ fn silk_plc_conceal(
     );
 
     /* Scale LTP state */
-    let mut inv_gain_Q30 = silk_INVERSE32_varQ(psDec.sPLC.prevGain_Q16[1], 46);
+    let mut inv_gain_Q30 = silk_inverse32_varq(psDec.sPLC.prevGain_Q16[1], 46);
     inv_gain_Q30 = inv_gain_Q30.min(0x7fffffff >> 1);
     for i in (idx + psDec.LPC_order)..psDec.ltp_mem_length {
         sLTP_Q14[i] = ((inv_gain_Q30 as i64 * sLTP[i] as i64) >> 16) as i32;
@@ -319,14 +319,14 @@ fn silk_plc_conceal(
             /* Unrolled LTP prediction */
             let plp = pred_lag_base as usize + i;
             let mut LTP_pred_Q12 = 2i32;
-            LTP_pred_Q12 = silk_SMLAWB(LTP_pred_Q12, sLTP_Q14[plp], B_Q14[0] as i32);
-            LTP_pred_Q12 = silk_SMLAWB(LTP_pred_Q12, sLTP_Q14[plp - 1], B_Q14[1] as i32);
-            LTP_pred_Q12 = silk_SMLAWB(LTP_pred_Q12, sLTP_Q14[plp - 2], B_Q14[2] as i32);
-            LTP_pred_Q12 = silk_SMLAWB(LTP_pred_Q12, sLTP_Q14[plp - 3], B_Q14[3] as i32);
-            LTP_pred_Q12 = silk_SMLAWB(LTP_pred_Q12, sLTP_Q14[plp - 4], B_Q14[4] as i32);
+            LTP_pred_Q12 = silk_smlawb(LTP_pred_Q12, sLTP_Q14[plp], B_Q14[0] as i32);
+            LTP_pred_Q12 = silk_smlawb(LTP_pred_Q12, sLTP_Q14[plp - 1], B_Q14[1] as i32);
+            LTP_pred_Q12 = silk_smlawb(LTP_pred_Q12, sLTP_Q14[plp - 2], B_Q14[2] as i32);
+            LTP_pred_Q12 = silk_smlawb(LTP_pred_Q12, sLTP_Q14[plp - 3], B_Q14[3] as i32);
+            LTP_pred_Q12 = silk_smlawb(LTP_pred_Q12, sLTP_Q14[plp - 4], B_Q14[4] as i32);
 
             /* Generate LPC excitation */
-            rand_seed = silk_RAND(rand_seed);
+            rand_seed = silk_rand(rand_seed);
             let ridx = (rand_seed >> 25 & RAND_BUF_MASK) as usize;
             let rand_val = psDec.exc_Q14[rand_off + ridx];
             sLTP_Q14[sLTP_buf_idx + i] = (((LTP_pred_Q12 as i64
@@ -344,12 +344,12 @@ fn silk_plc_conceal(
         rand_scale_Q14 = ((rand_scale_Q14 as i32 * rand_Gain_Q15 as i16 as i32) >> 15) as i16;
 
         /* Slowly increase pitch lag */
-        psDec.sPLC.pitchL_Q8 = silk_SMLAWB(psDec.sPLC.pitchL_Q8, psDec.sPLC.pitchL_Q8, 655);
+        psDec.sPLC.pitchL_Q8 = silk_smlawb(psDec.sPLC.pitchL_Q8, psDec.sPLC.pitchL_Q8, 655);
         psDec.sPLC.pitchL_Q8 = silk_min_32(
             psDec.sPLC.pitchL_Q8,
             (((18 * psDec.fs_kHz as i16 as i32) as u32) << 8) as i32,
         );
-        lag = silk_RSHIFT_ROUND(psDec.sPLC.pitchL_Q8, 8);
+        lag = silk_rshift_round(psDec.sPLC.pitchL_Q8, 8);
     }
 
     /***************************/
@@ -366,26 +366,26 @@ fn silk_plc_conceal(
         /* Partly unrolled LPC prediction */
         let s = sLPC_off + MAX_LPC_ORDER + i;
         let mut LPC_pred_Q10 = (psDec.LPC_order as i32) >> 1;
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 1], A_Q12[0] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 2], A_Q12[1] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 3], A_Q12[2] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 4], A_Q12[3] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 5], A_Q12[4] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 6], A_Q12[5] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 7], A_Q12[6] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 8], A_Q12[7] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 9], A_Q12[8] as i32);
-        LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - 10], A_Q12[9] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 1], A_Q12[0] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 2], A_Q12[1] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 3], A_Q12[2] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 4], A_Q12[3] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 5], A_Q12[4] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 6], A_Q12[5] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 7], A_Q12[6] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 8], A_Q12[7] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 9], A_Q12[8] as i32);
+        LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - 10], A_Q12[9] as i32);
         for j in 10..psDec.LPC_order {
-            LPC_pred_Q10 = silk_SMLAWB(LPC_pred_Q10, sLTP_Q14[s - j - 1], A_Q12[j] as i32);
+            LPC_pred_Q10 = silk_smlawb(LPC_pred_Q10, sLTP_Q14[s - j - 1], A_Q12[j] as i32);
         }
 
-        /* Add prediction to LPC excitation: silk_ADD_SAT32(x, silk_LSHIFT_SAT32(LPC_pred_Q10, 4)) */
-        sLTP_Q14[s] = sLTP_Q14[s].saturating_add(silk_LSHIFT_SAT32(LPC_pred_Q10, 4));
+        /* Add prediction to LPC excitation: silk_ADD_SAT32(x, silk_lshift_sat32(LPC_pred_Q10, 4)) */
+        sLTP_Q14[s] = sLTP_Q14[s].saturating_add(silk_lshift_sat32(LPC_pred_Q10, 4));
 
         /* Scale with Gain */
-        *frame_i = silk_SAT16(silk_SAT16(silk_RSHIFT_ROUND(
-            silk_SMULWW(sLTP_Q14[s], prevGain_Q10[1]),
+        *frame_i = silk_sat16(silk_sat16(silk_rshift_round(
+            silk_smulww(sLTP_Q14[s], prevGain_Q10[1]),
             8,
         ))) as i16;
     }
@@ -463,11 +463,11 @@ pub fn silk_plc_glue_frames(psDec: &mut silk_decoder_state, frame: &mut [i16], l
             if energy > psPLC.conc_energy {
                 let mut gain_Q16: i32;
                 let mut slope_Q16: i32;
-                let LZ = silk_CLZ32(psPLC.conc_energy) - 1;
+                let LZ = silk_clz32(psPLC.conc_energy) - 1;
                 psPLC.conc_energy = ((psPLC.conc_energy as u32) << LZ) as i32;
                 energy >>= silk_max_32(24 - LZ, 0);
                 let frac_Q24 = psPLC.conc_energy / (if energy > 1 { energy } else { 1 });
-                gain_Q16 = ((silk_SQRT_APPROX(frac_Q24) as u32) << 4) as i32;
+                gain_Q16 = ((silk_sqrt_approx(frac_Q24) as u32) << 4) as i32;
                 slope_Q16 = (((1) << 16) - gain_Q16) / length;
                 slope_Q16 = ((slope_Q16 as u32) << 2) as i32;
                 // When deep-plc is compiled in, skip the energy fade-in for 16 kHz

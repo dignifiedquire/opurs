@@ -9,16 +9,16 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
     MAX_SUB_FRAME_LENGTH, NSQ_LPC_BUF_LENGTH, QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };
-use crate::silk::macros::silk_CLZ32;
-use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
+use crate::silk::macros::silk_clz32;
+use crate::silk::macros::{silk_smlawb, silk_smulwb, silk_smulww};
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::typedefs::SILK_INT32_MAX;
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
+use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND64;
+use crate::silk::SigProc_FIX::silk_rshift_round64;
 use crate::silk::SigProc_FIX::{
-    silk_SMMUL, silk_min_int, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
+    silk_min_int, silk_smmul, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
 };
 
 /// NEON implementation of `silk_noise_shape_quantizer_short_prediction`.
@@ -187,7 +187,7 @@ const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
 fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
-    silk_RSHIFT_ROUND64(a32 as i64 * b32 as i64, Q) as i32
+    silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
 }
 
 /// NEON-accelerated inner function for LPC inverse prediction gain.
@@ -215,12 +215,12 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
         let rc_Q31 = -(A_QA[k] << (31 - QA));
 
         // rc_mult1_Q30 range: [ 1 : 2^30 ]
-        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_SMMUL(rc_Q31, rc_Q31);
+        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
         debug_assert!(rc_mult1_Q30 > (1 << 15));
         debug_assert!(rc_mult1_Q30 <= (1 << 30));
 
         // Update inverse gain
-        invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
+        invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
         debug_assert!(invGain_Q30 >= 0);
         debug_assert!(invGain_Q30 <= (1 << 30));
         if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
@@ -228,8 +228,8 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
         }
 
         // rc_mult2 range: [ 2^30 : SILK_INT32_MAX ]
-        let mult2Q = 32 - silk_CLZ32(rc_mult1_Q30.abs());
-        let rc_mult2 = silk_INVERSE32_varQ(rc_mult1_Q30, mult2Q + 30);
+        let mult2Q = 32 - silk_clz32(rc_mult1_Q30.abs());
+        let rc_mult2 = silk_inverse32_varq(rc_mult1_Q30, mult2Q + 30);
 
         // NEON: Update AR coefficients 4 at a time
         let rc_Q31_s32x2 = vdup_n_s32(rc_Q31);
@@ -292,7 +292,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
         while n < half {
             let tmp1 = A_QA[n];
             let tmp2 = A_QA[k - n - 1];
-            let tmp64 = silk_RSHIFT_ROUND64(
+            let tmp64 = silk_rshift_round64(
                 tmp1.saturating_sub(MUL32_FRAC_Q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
@@ -300,7 +300,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
                 return 0;
             }
             A_QA[n] = tmp64 as i32;
-            let tmp64 = silk_RSHIFT_ROUND64(
+            let tmp64 = silk_rshift_round64(
                 tmp2.saturating_sub(MUL32_FRAC_Q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
@@ -339,10 +339,10 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
     let rc_Q31 = -(A_QA[0] << (31 - QA));
 
     // Range: [ 1 : 2^30 ]
-    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_SMMUL(rc_Q31, rc_Q31);
+    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
 
     // Update inverse gain
-    invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
+    invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
     debug_assert!(invGain_Q30 >= 0);
     debug_assert!(invGain_Q30 <= (1 << 30));
     if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
@@ -463,7 +463,7 @@ struct NeonSampleState {
     LPC_exc_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
 }
 
-/// Helper: saturating round-shift for xq output: silk_RSHIFT_ROUND + silk_SAT16
+/// Helper: saturating round-shift for xq output: silk_rshift_round + silk_sat16
 #[inline]
 fn neon_rshift_round_sat16(val: i32, shift: i32) -> i16 {
     let rounded = if shift == 1 {
@@ -641,7 +641,7 @@ unsafe fn neon_smulww_8(a: *mut i32, b: int32x2_t) {
     vst1q_s32(a.add(4), o1);
 }
 
-/// SMULWW loop: compute o[i] = silk_SMULWW(a[i], b) using NEON.
+/// SMULWW loop: compute o[i] = silk_smulww(a[i], b) using NEON.
 #[target_feature(enable = "neon")]
 unsafe fn neon_smulww_loop(a: *const i16, b: i32, o: *mut i32, count: i32) {
     let b_v = vdup_n_s32(b);
@@ -651,7 +651,7 @@ unsafe fn neon_smulww_loop(a: *const i16, b: i32, o: *mut i32, count: i32) {
         i += 8;
     }
     while i < count {
-        *o.offset(i as isize) = silk_SMULWW(*a.offset(i as isize) as i32, b);
+        *o.offset(i as isize) = silk_smulww(*a.offset(i as isize) as i32, b);
         i += 1;
     }
 }
@@ -896,11 +896,11 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         let ltp_pred;
         if signal_type == TYPE_VOICED {
             let mut p = 2i32;
-            p = silk_SMLAWB(p, sLTP_Q15[pred_lag_idx], b_Q14[0] as i32);
-            p = silk_SMLAWB(p, sLTP_Q15[pred_lag_idx - 1], b_Q14[1] as i32);
-            p = silk_SMLAWB(p, sLTP_Q15[pred_lag_idx - 2], b_Q14[2] as i32);
-            p = silk_SMLAWB(p, sLTP_Q15[pred_lag_idx - 3], b_Q14[3] as i32);
-            p = silk_SMLAWB(p, sLTP_Q15[pred_lag_idx - 4], b_Q14[4] as i32);
+            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx], b_Q14[0] as i32);
+            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 1], b_Q14[1] as i32);
+            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 2], b_Q14[2] as i32);
+            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 3], b_Q14[3] as i32);
+            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 4], b_Q14[4] as i32);
             ltp_pred = ((p as u32) << 1) as i32;
             pred_lag_idx += 1;
         } else {
@@ -911,7 +911,7 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         let n_ltp;
         if lag > 0 {
             let sum = nsq.sLTP_shp_Q14[shp_lag_idx].wrapping_add(nsq.sLTP_shp_Q14[shp_lag_idx - 2]);
-            let mut v = silk_SMULWB(sum, harm_shape_packed);
+            let mut v = silk_smulwb(sum, harm_shape_packed);
             v = (v as i64
                 + ((nsq.sLTP_shp_Q14[shp_lag_idx - 1] as i64 * (harm_shape_packed as i64 >> 16))
                     >> 16)) as i32;
@@ -1291,7 +1291,7 @@ unsafe fn neon_scale_states(
     decision_delay: i32,
 ) {
     let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_INVERSE32_varQ(gains_Q16[subfr as usize].max(1), 47);
+    let mut inv_gain_Q31 = silk_inverse32_varq(gains_Q16[subfr as usize].max(1), 47);
 
     let inv_gain_Q26 = ((inv_gain_Q31 >> 4) + 1) >> 1;
     neon_smulww_loop(
@@ -1303,7 +1303,7 @@ unsafe fn neon_scale_states(
 
     if nsq.rewhite_flag != 0 {
         if subfr == 0 {
-            inv_gain_Q31 = ((silk_SMULWB(inv_gain_Q31, ltp_scale_Q14) as u32) << 2) as i32;
+            inv_gain_Q31 = ((silk_smulwb(inv_gain_Q31, ltp_scale_Q14) as u32) << 2) as i32;
         }
         let start = (nsq.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let count = lag + LTP_ORDER as i32 / 2;
@@ -1316,7 +1316,7 @@ unsafe fn neon_scale_states(
     }
 
     if gains_Q16[subfr as usize] != nsq.prev_gain_Q16 {
-        let gain_adj = silk_DIV32_varQ(nsq.prev_gain_Q16, gains_Q16[subfr as usize], 16);
+        let gain_adj = silk_div32_varq(nsq.prev_gain_Q16, gains_Q16[subfr as usize], 16);
 
         if (-65536..65536).contains(&gain_adj) {
             let gv = vdup_n_s32((gain_adj as u32 as i32) << 15);
@@ -1329,7 +1329,7 @@ unsafe fn neon_scale_states(
                 ii += 8;
             }
             while ii < shp_end {
-                nsq.sLTP_shp_Q14[ii] = silk_SMULWW(gain_adj, nsq.sLTP_shp_Q14[ii]);
+                nsq.sLTP_shp_Q14[ii] = silk_smulww(gain_adj, nsq.sLTP_shp_Q14[ii]);
                 ii += 1;
             }
 
@@ -1342,7 +1342,7 @@ unsafe fn neon_scale_states(
                     ii += 8;
                 }
                 while ii < pe {
-                    sLTP_Q15[ii] = silk_SMULWW(gain_adj, sLTP_Q15[ii]);
+                    sLTP_Q15[ii] = silk_smulww(gain_adj, sLTP_Q15[ii]);
                     ii += 1;
                 }
             }
@@ -1371,7 +1371,7 @@ unsafe fn neon_scale_states(
                 ii += 8;
             }
             while ii < shp_end {
-                nsq.sLTP_shp_Q14[ii] = silk_SMULWW(gain_adj, nsq.sLTP_shp_Q14[ii]);
+                nsq.sLTP_shp_Q14[ii] = silk_smulww(gain_adj, nsq.sLTP_shp_Q14[ii]);
                 ii += 1;
             }
 
@@ -1384,7 +1384,7 @@ unsafe fn neon_scale_states(
                     ii += 8;
                 }
                 while ii < pe {
-                    sLTP_Q15[ii] = silk_SMULWW(gain_adj, sLTP_Q15[ii]);
+                    sLTP_Q15[ii] = silk_smulww(gain_adj, sLTP_Q15[ii]);
                     ii += 1;
                 }
             }

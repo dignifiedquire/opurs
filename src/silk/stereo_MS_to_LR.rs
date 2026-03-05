@@ -6,8 +6,8 @@ use crate::silk::define::STEREO_INTERP_LEN_MS;
 
 use crate::silk::structs::stereo_dec_state;
 
-use crate::silk::macros::{silk_SMLAWB, silk_SMULBB};
-use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
+use crate::silk::macros::{silk_smlawb, silk_smulbb};
+use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
 
 /// Convert adaptive Mid/Side representation to Left/Right stereo signal
 ///
@@ -44,12 +44,12 @@ pub fn silk_stereo_MS_to_LR(
     let mut pred0_Q13 = state.pred_prev_Q13[0] as i32;
     let mut pred1_Q13 = state.pred_prev_Q13[1] as i32;
     let denom_Q16 = ((1) << 16) / (8 * fs_kHz) as i32;
-    let delta0_Q13 = silk_RSHIFT_ROUND(
-        silk_SMULBB(pred_Q13[0] - state.pred_prev_Q13[0] as i32, denom_Q16),
+    let delta0_Q13 = silk_rshift_round(
+        silk_smulbb(pred_Q13[0] - state.pred_prev_Q13[0] as i32, denom_Q16),
         16,
     );
-    let delta1_Q13 = silk_RSHIFT_ROUND(
-        silk_SMULBB(pred_Q13[1] - state.pred_prev_Q13[1] as i32, denom_Q16),
+    let delta1_Q13 = silk_rshift_round(
+        silk_smulbb(pred_Q13[1] - state.pred_prev_Q13[1] as i32, denom_Q16),
         16,
     );
 
@@ -57,9 +57,9 @@ pub fn silk_stereo_MS_to_LR(
         pred0_Q13 += delta0_Q13;
         pred1_Q13 += delta1_Q13;
         let sum = (x1[n] as i32 + x1[n + 2] as i32 + ((x1[n + 1] as i32) << 1)) << 9; /* Q11 */
-        let sum = silk_SMLAWB((x2[n + 1] as i32) << 8, sum, pred0_Q13); /* Q8  */
-        let sum = silk_SMLAWB(sum, (x1[n + 1] as i32) << 11, pred1_Q13); /* Q8  */
-        x2[n + 1] = silk_SAT16(silk_RSHIFT_ROUND(sum, 8)) as i16;
+        let sum = silk_smlawb((x2[n + 1] as i32) << 8, sum, pred0_Q13); /* Q8  */
+        let sum = silk_smlawb(sum, (x1[n + 1] as i32) << 11, pred1_Q13); /* Q8  */
+        x2[n + 1] = silk_sat16(silk_rshift_round(sum, 8)) as i16;
     }
 
     let pred0_Q13 = pred_Q13[0];
@@ -67,9 +67,9 @@ pub fn silk_stereo_MS_to_LR(
 
     for n in STEREO_INTERP_LEN_MS * fs_kHz..frame_length {
         let sum = (x1[n] as i32 + x1[n + 2] as i32 + ((x1[n + 1] as i32) << 1)) << 9; /* Q11 */
-        let sum = silk_SMLAWB((x2[n + 1] as i32) << 8, sum, pred0_Q13); /* Q8  */
-        let sum = silk_SMLAWB(sum, (x1[n + 1] as i32) << 11, pred1_Q13); /* Q8  */
-        x2[n + 1] = silk_SAT16(silk_RSHIFT_ROUND(sum, 8)) as i16;
+        let sum = silk_smlawb((x2[n + 1] as i32) << 8, sum, pred0_Q13); /* Q8  */
+        let sum = silk_smlawb(sum, (x1[n + 1] as i32) << 11, pred1_Q13); /* Q8  */
+        x2[n + 1] = silk_sat16(silk_rshift_round(sum, 8)) as i16;
     }
     state.pred_prev_Q13[0] = pred_Q13[0] as i16;
     state.pred_prev_Q13[1] = pred_Q13[1] as i16;
@@ -79,7 +79,7 @@ pub fn silk_stereo_MS_to_LR(
         let sum = x1[n + 1] as i32 + x2[n + 1] as i32;
         let diff = x1[n + 1] as i32 - x2[n + 1] as i32;
 
-        x1[n + 1] = silk_SAT16(sum) as i16;
-        x2[n + 1] = silk_SAT16(diff) as i16;
+        x1[n + 1] = silk_sat16(sum) as i16;
+        x2[n + 1] = silk_sat16(diff) as i16;
     }
 }

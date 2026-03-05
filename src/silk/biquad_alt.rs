@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/biquad_alt.c`
 
-use crate::silk::macros::{silk_SMLAWB, silk_SMULWB};
-use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
+use crate::silk::macros::{silk_smlawb, silk_smulwb};
+use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
 
 ///
 /// Second order ARMA filter, alternative implementation
@@ -38,17 +38,17 @@ pub fn silk_biquad_alt_stride1(
         let inval = *signal as i32;
 
         /* S[ 0 ], S[ 1 ]: Q12 */
-        let out32_Q14 = silk_SMLAWB(S[0], B_Q28[0], inval) << 2;
+        let out32_Q14 = silk_smlawb(S[0], B_Q28[0], inval) << 2;
 
-        S[0] = S[1] + silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A0_L_Q28), 14);
-        S[0] = silk_SMLAWB(S[0], out32_Q14, A0_U_Q28);
-        S[0] = silk_SMLAWB(S[0], B_Q28[1], inval);
+        S[0] = S[1] + silk_rshift_round(silk_smulwb(out32_Q14, A0_L_Q28), 14);
+        S[0] = silk_smlawb(S[0], out32_Q14, A0_U_Q28);
+        S[0] = silk_smlawb(S[0], B_Q28[1], inval);
 
-        S[1] = silk_RSHIFT_ROUND(silk_SMULWB(out32_Q14, A1_L_Q28), 14);
-        S[1] = silk_SMLAWB(S[1], out32_Q14, A1_U_Q28);
-        S[1] = silk_SMLAWB(S[1], B_Q28[2], inval);
+        S[1] = silk_rshift_round(silk_smulwb(out32_Q14, A1_L_Q28), 14);
+        S[1] = silk_smlawb(S[1], out32_Q14, A1_U_Q28);
+        S[1] = silk_smlawb(S[1], B_Q28[2], inval);
 
         /* Scale back to Q0 and saturate */
-        *signal = silk_SAT16((out32_Q14 + (1 << 14) - 1) >> 14) as i16;
+        *signal = silk_sat16((out32_Q14 + (1 << 14) - 1) >> 14) as i16;
     }
 }

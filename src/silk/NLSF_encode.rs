@@ -6,7 +6,7 @@ use crate::silk::define::MAX_LPC_ORDER;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sort::silk_insertion_sort_increasing;
 use crate::silk::structs::silk_NLSF_CB_struct;
-use crate::silk::Inlines::silk_DIV32_varQ;
+use crate::silk::Inlines::silk_div32_varq;
 use crate::silk::NLSF_decode::silk_NLSF_decode;
 use crate::silk::NLSF_del_dec_quant::silk_NLSF_del_dec_quant;
 use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
@@ -76,7 +76,7 @@ pub fn silk_NLSF_encode(
                 as i16 as i32
                 * W_tmp_Q9 as i16 as i32)
                 >> 14) as i16;
-            W_adj_Q5[i as usize] = silk_DIV32_varQ(
+            W_adj_Q5[i as usize] = silk_div32_varq(
                 pW_Q2[i as usize] as i32,
                 W_tmp_Q9 as i16 as i32 * W_tmp_Q9 as i16 as i32,
                 21,

@@ -4,12 +4,12 @@
 
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
-use crate::silk::SigProc_FIX::silk_LIMIT;
+use crate::silk::SigProc_FIX::silk_limit;
 
 use crate::silk::define::{
     MAX_DELTA_GAIN_QUANT, MAX_QGAIN_DB, MIN_DELTA_GAIN_QUANT, MIN_QGAIN_DB, N_LEVELS_QGAIN,
 };
-use crate::silk::macros::silk_SMULWB;
+use crate::silk::macros::silk_smulwb;
 
 const OFFSET: i32 = MIN_QGAIN_DB * 128 / 6 + 16 * 128;
 const SCALE_Q16: i32 =
@@ -36,18 +36,18 @@ pub fn silk_gains_quant(
 ) {
     for (k, (out, gain)) in ind.iter_mut().zip(gain_Q16.iter_mut()).enumerate() {
         /* Convert to log scale, scale, floor() */
-        let mut ind = silk_SMULWB(SCALE_Q16, silk_lin2log(*gain) - OFFSET) as i8;
+        let mut ind = silk_smulwb(SCALE_Q16, silk_lin2log(*gain) - OFFSET) as i8;
 
         /* Round towards previous quantized gain (hysteresis) */
         if ind < *prev_ind {
             ind += 1;
         }
-        ind = silk_LIMIT(ind, 0, N_LEVELS_QGAIN - 1);
+        ind = silk_limit(ind, 0, N_LEVELS_QGAIN - 1);
 
         /* Compute delta indices and limit */
         if k == 0 && !conditional {
             /* Full index */
-            ind = silk_LIMIT(ind, *prev_ind + MIN_DELTA_GAIN_QUANT, N_LEVELS_QGAIN - 1);
+            ind = silk_limit(ind, *prev_ind + MIN_DELTA_GAIN_QUANT, N_LEVELS_QGAIN - 1);
             *prev_ind = ind;
         } else {
             /* Delta index */
@@ -59,7 +59,7 @@ pub fn silk_gains_quant(
                 ind = double_step_size_threshold + (ind - double_step_size_threshold + 1) / 2;
             }
 
-            ind = silk_LIMIT(ind, MIN_DELTA_GAIN_QUANT, MAX_DELTA_GAIN_QUANT);
+            ind = silk_limit(ind, MIN_DELTA_GAIN_QUANT, MAX_DELTA_GAIN_QUANT);
 
             /* Accumulate deltas */
             if ind > double_step_size_threshold {
@@ -77,7 +77,7 @@ pub fn silk_gains_quant(
 
         /* Scale and convert to linear scale */
         *gain = silk_log2lin(std::cmp::min(
-            silk_SMULWB(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
+            silk_smulwb(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
             3967, /* 3967 = 31 in Q7 */
         ));
     }
@@ -111,11 +111,11 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
                 *prev_ind += ind_tmp;
             }
         }
-        *prev_ind = silk_LIMIT(*prev_ind, 0, N_LEVELS_QGAIN - 1);
+        *prev_ind = silk_limit(*prev_ind, 0, N_LEVELS_QGAIN - 1);
 
         /* Scale and convert to linear scale */
         *out = silk_log2lin(std::cmp::min(
-            silk_SMULWB(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
+            silk_smulwb(INV_SCALE_Q16, *prev_ind as i32) + OFFSET,
             3967, /* 3967 = 31 in Q7 */
         ));
     }

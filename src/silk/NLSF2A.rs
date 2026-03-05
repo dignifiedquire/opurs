@@ -11,7 +11,7 @@ use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
 use crate::silk::LPC_fit::silk_LPC_fit;
 #[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
-use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_RSHIFT_ROUND64, SILK_MAX_ORDER_LPC};
+use crate::silk::SigProc_FIX::{silk_rshift_round, silk_rshift_round64, SILK_MAX_ORDER_LPC};
 
 pub const QA: i32 = 16;
 
@@ -35,10 +35,10 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
 
     for k in 1..dd {
         let ftmp = cLSF[2 * k]; /* QA */
-        out[k + 1] = out[k - 1] * 2 - silk_RSHIFT_ROUND64(ftmp as i64 * out[k] as i64, QA) as i32;
+        out[k + 1] = out[k - 1] * 2 - silk_rshift_round64(ftmp as i64 * out[k] as i64, QA) as i32;
 
         for n in (2..=k).rev() {
-            out[n] += out[n - 2] - silk_RSHIFT_ROUND64(ftmp as i64 * out[n - 1] as i64, QA) as i32;
+            out[n] += out[n - 2] - silk_rshift_round64(ftmp as i64 * out[n - 1] as i64, QA) as i32;
         }
 
         out[1] -= ftmp;
@@ -91,7 +91,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         let cos_val = SILK_LSFCOSTAB_FIX_Q12[f_int as usize] as i32; /* Q12 */
         let delta = SILK_LSFCOSTAB_FIX_Q12[(f_int + 1) as usize] as i32 - cos_val; /* Q12, with a range of 0..200 */
 
-        cos_LSF_QA[ordering as usize] = silk_RSHIFT_ROUND((cos_val << 8) + delta * f_frac, 20 - QA);
+        cos_LSF_QA[ordering as usize] = silk_rshift_round((cos_val << 8) + delta * f_frac, 20 - QA);
         /* QA */
     }
 
@@ -133,7 +133,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         silk_bwexpander_32(a32_QA1, 65536 - (2 << i));
 
         for (a_Q12, &a32_QA1) in a_Q12.iter_mut().zip(a32_QA1.iter()) {
-            *a_Q12 = silk_RSHIFT_ROUND(a32_QA1, QA + 1 - 12) as i16; /* QA+1 -> Q12 */
+            *a_Q12 = silk_rshift_round(a32_QA1, QA + 1 - 12) as i16; /* QA+1 -> Q12 */
         }
 
         i += 1;

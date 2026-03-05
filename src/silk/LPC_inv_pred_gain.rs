@@ -3,17 +3,17 @@
 //! Upstream C: `silk/LPC_inv_pred_gain.c`
 
 use crate::silk::define::MAX_PREDICTION_POWER_GAIN;
-use crate::silk::macros::silk_CLZ32;
-use crate::silk::Inlines::silk_INVERSE32_varQ;
+use crate::silk::macros::silk_clz32;
+use crate::silk::Inlines::silk_inverse32_varq;
 use crate::silk::SigProc_FIX::{
-    silk_RSHIFT_ROUND64, silk_SMMUL, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
+    silk_rshift_round64, silk_smmul, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
 };
 
 const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
 fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
-    silk_RSHIFT_ROUND64(a32 as i64 * b32 as i64, Q) as i32
+    silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
 }
 
 ///
@@ -40,25 +40,25 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
         let rc_Q31 = -(A_QA[k] << (31 - QA));
 
         /* rc_mult1_Q30 range: [ 1 : 2^30 ] */
-        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_SMMUL(rc_Q31, rc_Q31);
+        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
 
         /* Update inverse gain */
         /* invGain_Q30 range: [ 0 : 2^30 ] */
-        invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
+        invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
         if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
             return 0;
         }
 
         /* rc_mult2 range: [ 2^30 : SILK_INT32_MAX ] */
-        let mult2Q = 32 - silk_CLZ32(rc_mult1_Q30.abs());
-        let rc_mult2 = silk_INVERSE32_varQ(rc_mult1_Q30, mult2Q + 30);
+        let mult2Q = 32 - silk_clz32(rc_mult1_Q30.abs());
+        let rc_mult2 = silk_inverse32_varq(rc_mult1_Q30, mult2Q + 30);
 
         /* Update AR coefficient */
         let mut n = 0;
         while n < k.div_ceil(2) {
             let tmp1 = A_QA[n];
             let tmp2 = A_QA[k - n - 1];
-            let tmp64 = silk_RSHIFT_ROUND64(
+            let tmp64 = silk_rshift_round64(
                 tmp1.saturating_sub(MUL32_FRAC_Q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
@@ -67,7 +67,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
                 return 0;
             }
             A_QA[n] = tmp64 as i32;
-            let tmp64 = silk_RSHIFT_ROUND64(
+            let tmp64 = silk_rshift_round64(
                 tmp2.saturating_sub(MUL32_FRAC_Q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
@@ -90,11 +90,11 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
     let rc_Q31 = -(A_QA[0] << (31 - QA));
 
     /* Range: [ 1 : 2^30 ] */
-    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_SMMUL(rc_Q31, rc_Q31);
+    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
 
     /* Update inverse gain */
     /* Range: [ 0 : 2^30 ] */
-    let invGain_Q30 = silk_SMMUL(invGain_Q30, rc_mult1_Q30) << 2;
+    let invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
     if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
         0
     } else {

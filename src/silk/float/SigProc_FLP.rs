@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/SigProc_FLP.h`
 
 use crate::celt::float_cast::float2int;
-use crate::silk::SigProc_FIX::silk_SAT16;
+use crate::silk::SigProc_FIX::silk_sat16;
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_float2int
 #[inline]
@@ -18,7 +18,7 @@ pub fn silk_float2short_array(out: &mut [i16], input: &[f32]) {
     assert_eq!(length, input.len());
 
     for k in (0..length).rev() {
-        out[k] = silk_SAT16(float2int(input[k])) as i16;
+        out[k] = silk_sat16(float2int(input[k])) as i16;
     }
 }
 

@@ -12,7 +12,7 @@ use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sigm_Q15::silk_sigm_q15;
 use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
 use crate::silk::typedefs::{SILK_INT32_MAX, SILK_UINT8_MAX};
-use crate::silk::Inlines::silk_SQRT_APPROX;
+use crate::silk::Inlines::silk_sqrt_approx;
 use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 
 #[cfg(feature = "simd")]
@@ -200,7 +200,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
             SNR_Q7 = silk_lin2log(NrgToNoiseRatio_Q8[b as usize]) - 8 * 128;
             sumSquared += SNR_Q7 as i16 as i32 * SNR_Q7 as i16 as i32;
             if speech_nrg < (1) << 20 {
-                SNR_Q7 = ((((silk_SQRT_APPROX(speech_nrg) as u32) << 6) as i32 as i64
+                SNR_Q7 = ((((silk_sqrt_approx(speech_nrg) as u32) << 6) as i32 as i64
                     * SNR_Q7 as i16 as i64)
                     >> 16) as i32;
             }
@@ -213,7 +213,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         b += 1;
     }
     sumSquared /= 4;
-    let pSNR_dB_Q7: i32 = (3 * silk_SQRT_APPROX(sumSquared)) as i16 as i32;
+    let pSNR_dB_Q7: i32 = (3 * silk_sqrt_approx(sumSquared)) as i16 as i32;
     SA_Q15 =
         silk_sigm_q15(((45000 * pSNR_dB_Q7 as i16 as i64) >> 16) as i32 - VAD_NEGATIVE_OFFSET_Q5);
     psEncC.input_tilt_Q15 = (((silk_sigm_q15(input_tilt) - 16384) as u32) << 1) as i32;
@@ -230,7 +230,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         SA_Q15 >>= 1;
     } else if speech_nrg < 16384 {
         speech_nrg = ((speech_nrg as u32) << 16) as i32;
-        speech_nrg = silk_SQRT_APPROX(speech_nrg);
+        speech_nrg = silk_sqrt_approx(speech_nrg);
         SA_Q15 = (((32768 + speech_nrg) as i64 * SA_Q15 as i16 as i64) >> 16) as i32;
     }
     psEncC.speech_activity_Q8 = silk_min_int(SA_Q15 >> 7, SILK_UINT8_MAX);

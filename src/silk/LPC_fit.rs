@@ -3,7 +3,7 @@
 //! Upstream C: `silk/LPC_fit.c`
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
-use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16, SILK_FIX_CONST};
+use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16, SILK_FIX_CONST};
 
 ///
 /// Convert int32 coefficients to int16 coefs and make sure there's no wrap-around
@@ -36,7 +36,7 @@ pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) 
             }
             k += 1;
         }
-        maxabs = silk_RSHIFT_ROUND(maxabs, QIN - QOUT);
+        maxabs = silk_rshift_round(maxabs, QIN - QOUT);
 
         if maxabs > i16::MAX as i32 {
             /* Reduce magnitude of prediction coefficients */
@@ -54,12 +54,12 @@ pub fn silk_LPC_fit(a_QOUT: &mut [i16], a_QIN: &mut [i32], QOUT: i32, QIN: i32) 
     if i == 10 {
         /* Reached the last iteration, clip the coefficients */
         for (out, input) in a_QOUT.iter_mut().zip(a_QIN.iter_mut()) {
-            *out = silk_SAT16(silk_RSHIFT_ROUND(*input, QIN - QOUT)) as i16;
+            *out = silk_sat16(silk_rshift_round(*input, QIN - QOUT)) as i16;
             *input = (*out as i32) << (QIN - QOUT);
         }
     } else {
         for (out, input) in a_QOUT.iter_mut().zip(a_QIN.iter()) {
-            *out = silk_RSHIFT_ROUND(*input, QIN - QOUT) as i16;
+            *out = silk_rshift_round(*input, QIN - QOUT) as i16;
         }
     };
 }

@@ -6,7 +6,7 @@ use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
 use crate::silk::SigProc_FIX::silk_max_int;
 
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_SQRT_APPROX};
+use crate::silk::Inlines::{silk_div32_varq, silk_sqrt_approx};
 
 /// Upstream C: silk/stereo_find_predictor.c:silk_stereo_find_predictor
 pub fn silk_stereo_find_predictor(
@@ -34,7 +34,7 @@ pub fn silk_stereo_find_predictor(
     nrgx = silk_max_int(nrgx, 1);
     let corr: i32 =
         silk_inner_prod_aligned_scale(&x[..length as usize], &y[..length as usize], scale, length);
-    pred_Q13 = silk_DIV32_varQ(corr, nrgx, 13);
+    pred_Q13 = silk_div32_varq(corr, nrgx, 13);
     pred_Q13 = if -((1) << 14) > (1) << 14 {
         if pred_Q13 > -((1) << 14) {
             -((1) << 14)
@@ -57,16 +57,16 @@ pub fn silk_stereo_find_predictor(
     );
     scale >>= 1;
     mid_res_amp_Q0[0] = (mid_res_amp_Q0[0] as i64
-        + (((((silk_SQRT_APPROX(nrgx) as u32) << scale) as i32 - mid_res_amp_Q0[0]) as i64
+        + (((((silk_sqrt_approx(nrgx) as u32) << scale) as i32 - mid_res_amp_Q0[0]) as i64
             * smooth_coef_Q16 as i16 as i64)
             >> 16)) as i32;
     nrgy -= ((((corr as i64 * pred_Q13 as i16 as i64) >> 16) as i32 as u32) << (3 + 1)) as i32;
     nrgy += ((((nrgx as i64 * pred2_Q10 as i16 as i64) >> 16) as i32 as u32) << 6) as i32;
     mid_res_amp_Q0[1] = (mid_res_amp_Q0[1] as i64
-        + (((((silk_SQRT_APPROX(nrgy) as u32) << scale) as i32 - mid_res_amp_Q0[1]) as i64
+        + (((((silk_sqrt_approx(nrgy) as u32) << scale) as i32 - mid_res_amp_Q0[1]) as i64
             * smooth_coef_Q16 as i16 as i64)
             >> 16)) as i32;
-    *ratio_Q14 = silk_DIV32_varQ(
+    *ratio_Q14 = silk_div32_varq(
         mid_res_amp_Q0[1],
         if mid_res_amp_Q0[0] > 1 {
             mid_res_amp_Q0[0]

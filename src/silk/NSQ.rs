@@ -140,9 +140,9 @@ use crate::silk::define::{
 };
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
+use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::SigProc_FIX::silk_RAND;
+use crate::silk::SigProc_FIX::silk_rand;
 
 /// Dispatch wrapper for NSQ, matching upstream `silk_nsq` RTCD surface.
 #[cfg(feature = "simd")]
@@ -482,7 +482,7 @@ fn silk_noise_shape_quantizer(
     let pulses = &mut pulses[..length];
 
     for i in 0..length {
-        NSQ.rand_seed = silk_RAND(NSQ.rand_seed);
+        NSQ.rand_seed = silk_rand(NSQ.rand_seed);
 
         // LPC prediction: pass slice ending at current position
         LPC_pred_Q10 = silk_noise_shape_quantizer_short_prediction(
@@ -712,7 +712,7 @@ fn silk_nsq_scale_states(
     signal_type: i32,
 ) {
     let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_INVERSE32_varQ(
+    let mut inv_gain_Q31 = silk_inverse32_varq(
         if Gains_Q16[subfr as usize] > 1 {
             Gains_Q16[subfr as usize]
         } else {
@@ -744,7 +744,7 @@ fn silk_nsq_scale_states(
     }
 
     if Gains_Q16[subfr as usize] != NSQ.prev_gain_Q16 {
-        let gain_adj_Q16 = silk_DIV32_varQ(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
+        let gain_adj_Q16 = silk_div32_varq(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
 
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;

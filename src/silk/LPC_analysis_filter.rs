@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/LPC_analysis_filter.c`
 
-use crate::silk::SigProc_FIX::{silk_RSHIFT_ROUND, silk_SAT16};
+use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
 
 ///
 /// LPC analysis filter
@@ -40,10 +40,10 @@ pub fn silk_LPC_analysis_filter(out: &mut [i16], input: &[i16], B: &[i16]) {
         out32_Q12 = ((input[i + d] as i32) << 12).wrapping_sub(out32_Q12);
 
         /* Scale to Q0 */
-        let out32 = silk_RSHIFT_ROUND(out32_Q12, 12);
+        let out32 = silk_rshift_round(out32_Q12, 12);
 
         /* Saturate output */
-        out[i + d] = silk_SAT16(out32) as i16;
+        out[i + d] = silk_sat16(out32) as i16;
     }
 
     /* Set first d output samples to zero */

@@ -4,7 +4,7 @@
 
 use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::STEREO_QUANT_SUB_STEPS;
-use crate::silk::macros::silk_SMULWB;
+use crate::silk::macros::silk_smulwb;
 use crate::silk::tables_other::{
     SILK_STEREO_ONLY_CODE_MID_ICDF, SILK_STEREO_PRED_JOINT_ICDF, SILK_STEREO_PRED_QUANT_Q13,
     SILK_UNIFORM3_ICDF, SILK_UNIFORM5_ICDF,
@@ -37,7 +37,7 @@ pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2])
     while n < 2 {
         ix[n][0] += 3 * ix[n][2];
         let low_Q13 = SILK_STEREO_PRED_QUANT_Q13[ix[n][0]] as i32;
-        let step_Q13 = silk_SMULWB(
+        let step_Q13 = silk_smulwb(
             SILK_STEREO_PRED_QUANT_Q13[ix[n][0] + 1] as i32 - low_Q13,
             SILK_FIX_CONST!(0.5 / STEREO_QUANT_SUB_STEPS as f64, 16),
         );

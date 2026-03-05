@@ -4,10 +4,10 @@
 
 use crate::silk::biquad_alt::silk_biquad_alt_stride1;
 use crate::silk::define::{TRANSITION_FRAMES, TRANSITION_INT_NUM, TRANSITION_NA, TRANSITION_NB};
-use crate::silk::macros::silk_SMLAWB;
+use crate::silk::macros::silk_smlawb;
 use crate::silk::structs::silk_LP_state;
 use crate::silk::tables_other::{SILK_TRANSITION_LP_A_Q28, SILK_TRANSITION_LP_B_Q28};
-use crate::silk::SigProc_FIX::silk_SAT16;
+use crate::silk::SigProc_FIX::silk_sat16;
 
 /*
     Elliptic/Cauer filters designed with 0.1 dB passband ripple,
@@ -32,14 +32,14 @@ fn silk_lp_interpolate_filter_taps(
 
                 /* Piece-wise linear interpolation of B and A */
                 for nb in 0..TRANSITION_NB {
-                    B_Q28[nb] = silk_SMLAWB(
+                    B_Q28[nb] = silk_smlawb(
                         SILK_TRANSITION_LP_B_Q28[ind][nb],
                         SILK_TRANSITION_LP_B_Q28[ind + 1][nb] - SILK_TRANSITION_LP_B_Q28[ind][nb],
                         fac_Q16,
                     );
                 }
                 for na in 0..TRANSITION_NA {
-                    A_Q28[na] = silk_SMLAWB(
+                    A_Q28[na] = silk_smlawb(
                         SILK_TRANSITION_LP_A_Q28[ind][na],
                         SILK_TRANSITION_LP_A_Q28[ind + 1][na] - SILK_TRANSITION_LP_A_Q28[ind][na],
                         fac_Q16,
@@ -47,18 +47,18 @@ fn silk_lp_interpolate_filter_taps(
                 }
             } else {
                 /* (fac_Q16 - (1 << 16)) is in range of a 16-bit int */
-                assert_eq!(fac_Q16 - (1 << 16), silk_SAT16(fac_Q16 - (1 << 16)));
+                assert_eq!(fac_Q16 - (1 << 16), silk_sat16(fac_Q16 - (1 << 16)));
                 /* Piece-wise linear interpolation of B and A */
 
                 for nb in 0..TRANSITION_NB {
-                    B_Q28[nb] = silk_SMLAWB(
+                    B_Q28[nb] = silk_smlawb(
                         SILK_TRANSITION_LP_B_Q28[ind + 1][nb],
                         SILK_TRANSITION_LP_B_Q28[ind + 1][nb] - SILK_TRANSITION_LP_B_Q28[ind][nb],
                         fac_Q16 - (1i32 << 16),
                     );
                 }
                 for na in 0..TRANSITION_NA {
-                    A_Q28[na] = silk_SMLAWB(
+                    A_Q28[na] = silk_smlawb(
                         SILK_TRANSITION_LP_A_Q28[ind + 1][na],
                         SILK_TRANSITION_LP_A_Q28[ind + 1][na] - SILK_TRANSITION_LP_A_Q28[ind][na],
                         fac_Q16 - (1i32 << 16),

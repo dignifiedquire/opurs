@@ -10,9 +10,9 @@ use crate::silk::define::{
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN, SILK_INT32_MAX};
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
+use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
-use crate::silk::SigProc_FIX::{silk_RAND, silk_min_int};
+use crate::silk::SigProc_FIX::{silk_min_int, silk_rand};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -88,7 +88,7 @@ pub struct NSQ_sample_struct {
 
 pub type NSQ_sample_pair = [NSQ_sample_struct; 2];
 
-/// Helper: saturating round-shift for xq output: silk_RSHIFT_ROUND + silk_SAT16
+/// Helper: saturating round-shift for xq output: silk_rshift_round + silk_sat16
 #[inline]
 fn rshift_round_sat16(val: i32, shift: i32) -> i16 {
     let rounded = if shift == 1 {
@@ -675,7 +675,7 @@ fn silk_noise_shape_quantizer_del_dec(
         // Per-state processing
         for k in 0..nStates {
             let psDD = &mut psDelDec[k];
-            psDD.Seed = silk_RAND(psDD.Seed);
+            psDD.Seed = silk_rand(psDD.Seed);
 
             // LPC prediction
             let lpc_idx = NSQ_LPC_BUF_LENGTH - 1 + i;
@@ -976,7 +976,7 @@ fn silk_nsq_del_dec_scale_states(
     decisionDelay: i32,
 ) {
     let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_INVERSE32_varQ(
+    let mut inv_gain_Q31 = silk_inverse32_varq(
         if Gains_Q16[subfr as usize] > 1 {
             Gains_Q16[subfr as usize]
         } else {
@@ -1008,7 +1008,7 @@ fn silk_nsq_del_dec_scale_states(
     }
 
     if Gains_Q16[subfr as usize] != NSQ.prev_gain_Q16 {
-        let gain_adj_Q16 = silk_DIV32_varQ(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
+        let gain_adj_Q16 = silk_div32_varq(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
 
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
         let shp_end = NSQ.sLTP_shp_buf_idx as usize;

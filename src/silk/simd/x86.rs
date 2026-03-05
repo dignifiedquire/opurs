@@ -13,11 +13,11 @@ use crate::silk::define::{
     TYPE_VOICED,
 };
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
+use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::NSQ_del_dec::{
     copy_del_dec_state_partial, NSQ_del_dec_struct, NSQ_sample_pair, NSQ_sample_struct,
 };
-use crate::silk::SigProc_FIX::silk_RAND;
+use crate::silk::SigProc_FIX::silk_rand;
 
 /// SSE4.1 implementation of `silk_noise_shape_quantizer_short_prediction`.
 /// Port of `silk/x86/NSQ_sse4_1.c`.
@@ -543,7 +543,7 @@ pub unsafe fn silk_noise_shape_quantizer_10_16_sse4_1(
 
         let mut r_Q10 = x_sc_Q10[i] - tmp1;
 
-        NSQ.rand_seed = silk_RAND(NSQ.rand_seed);
+        NSQ.rand_seed = silk_rand(NSQ.rand_seed);
         if NSQ.rand_seed < 0 {
             r_Q10 = -r_Q10;
         }
@@ -675,11 +675,11 @@ pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
     decisionDelay: i32,
 ) {
     let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_INVERSE32_varQ(Gains_Q16[subfr as usize].max(1), 47);
+    let mut inv_gain_Q31 = silk_inverse32_varq(Gains_Q16[subfr as usize].max(1), 47);
 
     let inv_gain_Q26 = ((inv_gain_Q31 >> 4) + 1) >> 1;
 
-    // SIMD input scaling: x_sc_Q10[i] = silk_SMULWW(x16[i], inv_gain_Q26)
+    // SIMD input scaling: x_sc_Q10[i] = silk_smulww(x16[i], inv_gain_Q26)
     let xmm_inv_gain = _mm_set1_epi32(inv_gain_Q26);
     let subfr_len = psEncC.subfr_length;
     let mut i = 0usize;
@@ -715,7 +715,7 @@ pub unsafe fn silk_nsq_del_dec_scale_states_sse4_1(
 
     // Gain adjustment
     if Gains_Q16[subfr as usize] != NSQ.prev_gain_Q16 {
-        let gain_adj_Q16 = silk_DIV32_varQ(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
+        let gain_adj_Q16 = silk_div32_varq(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
 
         // SIMD scaling of sLTP_shp_Q14
         let xmm_gain_adj = _mm_set1_epi32(gain_adj_Q16);
@@ -878,7 +878,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
         // ---- Per-state processing ----
         for k in 0..nStates {
             let psDD = &mut psDelDec[k];
-            psDD.Seed = silk_RAND(psDD.Seed);
+            psDD.Seed = silk_rand(psDD.Seed);
 
             // ---- SIMD LPC prediction ----
             let lpc_idx = NSQ_LPC_BUF_LENGTH - 1 + i;
@@ -1580,7 +1580,7 @@ unsafe fn silk_noise_shape_quantizer_short_prediction_x4(
 ) -> __m128i {
     debug_assert!(order == 10 || order == 16);
 
-    // Avoids introducing a bias because silk_SMLAWB() always rounds to -inf
+    // Avoids introducing a bias because silk_smlawb() always rounds to -inf
     let mut out = _mm256_set1_epi32(order >> 1);
     out = _mm256_add_epi32(
         out,
@@ -1848,7 +1848,7 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
         let LTP_pred_Q14: i32;
         if signalType == TYPE_VOICED {
             let mut ltp = 2i32;
-            // silk_SMULWB = (a * (i16)b) >> 16
+            // silk_smulwb = (a * (i16)b) >> 16
             ltp =
                 (ltp as i64 + ((sLTP_Q15[pred_lag_ptr_idx] as i64 * b_Q14[0] as i64) >> 16)) as i32;
             ltp = (ltp as i64 + ((sLTP_Q15[pred_lag_ptr_idx - 1] as i64 * b_Q14[1] as i64) >> 16))
@@ -1872,7 +1872,7 @@ unsafe fn silk_noise_shape_quantizer_del_dec_avx2(
                 NSQ.sLTP_shp_Q14[shp_lag_ptr_idx],
                 NSQ.sLTP_shp_Q14[shp_lag_ptr_idx - 2],
             );
-            // silk_SMULWB
+            // silk_smulwb
             n = ((n as i64 * HarmShapeFIRPacked_Q14 as i16 as i64) >> 16) as i32;
             // silk_SMULWT
             n = (n as i64
@@ -2155,7 +2155,7 @@ unsafe fn silk_nsq_del_dec_scale_states_avx2(
     decisionDelay: i32,
 ) {
     let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_INVERSE32_varQ(Gains_Q16[subfr as usize].max(1), 47);
+    let mut inv_gain_Q31 = silk_inverse32_varq(Gains_Q16[subfr as usize].max(1), 47);
 
     // Scale input
     let inv_gain_Q26 = silk_sar_round_32(inv_gain_Q31, 5);
@@ -2178,7 +2178,7 @@ unsafe fn silk_nsq_del_dec_scale_states_avx2(
     if NSQ.rewhite_flag != 0 {
         if subfr == 0 {
             // Do LTP downscaling
-            // silk_LSHIFT(silk_SMULWB(inv_gain_Q31, LTP_scale_Q14), 2)
+            // silk_LSHIFT(silk_smulwb(inv_gain_Q31, LTP_scale_Q14), 2)
             inv_gain_Q31 = ((((inv_gain_Q31 as i64 * LTP_scale_Q14 as i16 as i64) >> 16) as i32
                 as u32)
                 << 2) as i32;
@@ -2192,7 +2192,7 @@ unsafe fn silk_nsq_del_dec_scale_states_avx2(
 
     // Adjust for changing gain
     if Gains_Q16[subfr as usize] != NSQ.prev_gain_Q16 {
-        let gain_adj_Q16 = silk_DIV32_varQ(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
+        let gain_adj_Q16 = silk_div32_varq(NSQ.prev_gain_Q16, Gains_Q16[subfr as usize], 16);
 
         // Scale long-term shaping state
         let shp_start = (NSQ.sLTP_shp_buf_idx - psEncC.ltp_mem_length as i32) as usize;
