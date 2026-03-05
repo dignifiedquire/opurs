@@ -4,10 +4,10 @@
 
 use crate::arch::{opus_select_arch, Arch};
 use crate::silk::cng::silk_cng_reset;
+use crate::silk::plc::silk_plc_reset;
 use crate::silk::resampler::ResamplerState;
 use crate::silk::structs::{silk_CNG_struct, silk_PLC_struct, silk_decoder_state, SideInfoIndices};
 use crate::silk::tables_NLSF_CB_WB::SILK_NLSF_CB_WB;
-use crate::silk::PLC::silk_plc_reset;
 
 /// Reset decoder state, preserving model data (OSCE, etc.).
 ///

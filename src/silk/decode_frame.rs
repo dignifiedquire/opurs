@@ -17,8 +17,8 @@ use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_parameters::silk_decode_parameters;
 use crate::silk::decode_pulses::silk_decode_pulses;
 use crate::silk::define::{MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH};
+use crate::silk::plc::{silk_plc, silk_plc_glue_frames};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::PLC::{silk_plc, silk_plc_glue_frames};
 
 #[cfg(feature = "deep-plc")]
 use crate::dnn::lpcnet::LPCNetPLCState;
