@@ -138,10 +138,10 @@ use crate::silk::define::{
     HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
+use crate::silk::lpc_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::SigProc_FIX::silk_rand;
 
 /// Dispatch wrapper for NSQ, matching upstream `silk_nsq` RTCD surface.

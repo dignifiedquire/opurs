@@ -8,9 +8,6 @@
 #[cfg(feature = "simd")]
 pub mod simd;
 
-pub mod LPC_analysis_filter;
-pub mod LPC_fit;
-pub mod LPC_inv_pred_gain;
 pub mod NLSF_VQ;
 pub mod NLSF_VQ_weights_laroia;
 pub mod NLSF_decode;
@@ -52,6 +49,9 @@ pub mod interpolate;
 pub mod lin2log;
 pub mod log2lin;
 pub mod lp_variable_cutoff;
+pub mod lpc_analysis_filter;
+pub mod lpc_fit;
+pub mod lpc_inv_pred_gain;
 pub mod nlsf2a;
 pub mod nsq;
 pub mod nsq_del_dec;

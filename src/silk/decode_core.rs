@@ -6,11 +6,11 @@ use crate::silk::define::{
     LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_SUB_FRAME_LENGTH,
     QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };
+use crate::silk::lpc_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::macros::{silk_smlawb, silk_smulwb, silk_smulww};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::SigProc_FIX::{
     silk_lshift_sat32, silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
 };

@@ -154,7 +154,7 @@ pub mod internals {
     pub use crate::celt::modes::{opus_custom_mode_create, OpusCustomMode};
 
     // -- SILK LPC --
-    pub use crate::silk::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
+    pub use crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
     pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
 
     // -- CELT comb filter (for benchmarks) --
