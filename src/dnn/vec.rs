@@ -5,8 +5,6 @@
 //!
 //! Upstream C: `dnn/vec.h` (generic/no-optimization path)
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 use crate::arch::Arch;
 
 /// Scale factor for int8 quantized weights: `128.0 * 127.0`
@@ -20,7 +18,7 @@ const MAX_INPUTS: usize = 2048;
 /// Fast 2^x approximation via IEEE 754 bit manipulation.
 ///
 /// Upstream C: dnn/vec.h:lpcnet_exp2
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub fn lpcnet_exp2(x: f32) -> f32 {
     let integer = x.floor() as i32;
     if integer < -50 {
@@ -38,7 +36,7 @@ pub fn lpcnet_exp2(x: f32) -> f32 {
 /// Fast e^x approximation: `lpcnet_exp2(x * 1.44269504)`
 ///
 /// Upstream C: dnn/vec.h:lpcnet_exp
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub fn lpcnet_exp(x: f32) -> f32 {
     lpcnet_exp2(x * 1.44269504)
 }
@@ -46,7 +44,7 @@ pub fn lpcnet_exp(x: f32) -> f32 {
 /// Fast tanh approximation using Padé rational function.
 ///
 /// Upstream C: dnn/vec.h:tanh_approx
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 pub fn tanh_approx(x: f32) -> f32 {
     const N0: f32 = 952.52801514;
     const N1: f32 = 96.39235687;
