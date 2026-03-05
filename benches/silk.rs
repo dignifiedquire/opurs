@@ -147,25 +147,18 @@ fn bench_vq_wmat_ec(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("scalar", &label), &l, |b, &_l| {
             b.iter(|| {
-                let mut ind: i8 = 0;
-                let mut res_nrg_q15: i32 = 0;
-                let mut rate_dist_q8: i32 = 0;
-                let mut gain_q7: i32 = 0;
-                opurs::internals::silk_vq_wmat_ec_c(
-                    &mut ind,
-                    &mut res_nrg_q15,
-                    &mut rate_dist_q8,
-                    &mut gain_q7,
-                    black_box(&xx_q17),
-                    black_box(&x_x_q17),
-                    &cb_q7,
-                    &cb_gain_q7,
-                    &cl_q5,
-                    ltp_order as i32,
-                    127,
-                    l as i32,
-                );
-                black_box((ind, res_nrg_q15, rate_dist_q8, gain_q7))
+                let vq =
+                    opurs::internals::silk_vq_wmat_ec_c(&opurs::internals::SilkVqWmatEcParams {
+                        xx_q17: &xx_q17,
+                        x_x_q17: &x_x_q17,
+                        cb_q7: &cb_q7,
+                        cb_gain_q7: &cb_gain_q7,
+                        cl_q5: &cl_q5,
+                        subfr_len: ltp_order as i32,
+                        max_gain_q7: 127,
+                        l: l as i32,
+                    });
+                black_box((vq.ind, vq.res_nrg_q15, vq.rate_dist_q8, vq.gain_q7))
             })
         });
 
@@ -181,8 +174,8 @@ fn bench_vq_wmat_ec(c: &mut Criterion) {
                     &mut res_nrg_q15,
                     &mut rate_dist_q8,
                     &mut gain_q7,
-                    black_box(&xx_q17),
-                    black_box(&x_x_q17),
+                    &xx_q17,
+                    &x_x_q17,
                     &cb_q7,
                     &cb_gain_q7,
                     &cl_q5,

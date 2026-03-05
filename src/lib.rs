@@ -202,7 +202,7 @@ pub mod internals {
     // VQ weighted matrix:
     #[cfg(feature = "simd")]
     pub use crate::silk::simd::silk_vq_wmat_ec;
-    pub use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
+    pub use crate::silk::VQ_WMat_EC::{silk_vq_wmat_ec_c, SilkVqWmatEcParams, SilkVqWmatEcResult};
     // VAD energy:
     #[cfg(feature = "simd")]
     pub use crate::silk::simd::{silk_vad_energy, silk_vad_energy_scalar};

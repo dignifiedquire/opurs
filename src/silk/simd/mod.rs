@@ -160,20 +160,20 @@ pub fn silk_vq_wmat_ec(
     }
 
     let _ = arch;
-    super::VQ_WMat_EC::silk_vq_wmat_ec_c(
-        ind,
-        res_nrg_Q15,
-        rate_dist_Q8,
-        gain_Q7,
-        XX_Q17,
-        xX_Q17,
-        cb_Q7,
-        cb_gain_Q7,
-        cl_Q5,
+    let vq = super::VQ_WMat_EC::silk_vq_wmat_ec_c(&super::VQ_WMat_EC::SilkVqWmatEcParams {
+        xx_q17: XX_Q17,
+        x_x_q17: xX_Q17,
+        cb_q7: cb_Q7,
+        cb_gain_q7: cb_gain_Q7,
+        cl_q5: cl_Q5,
         subfr_len,
-        max_gain_Q7,
-        L,
-    );
+        max_gain_q7: max_gain_Q7,
+        l: L,
+    });
+    *ind = vq.ind;
+    *res_nrg_Q15 = vq.res_nrg_q15;
+    *rate_dist_Q8 = vq.rate_dist_q8;
+    *gain_Q7 = vq.gain_q7;
 }
 
 /// SIMD-accelerated LPC inverse prediction gain.

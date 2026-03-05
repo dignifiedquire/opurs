@@ -15,7 +15,7 @@ use crate::silk::tables_LTP::{
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
 use crate::silk::typedefs::SILK_INT32_MAX;
 #[cfg(not(feature = "simd"))]
-use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
+use crate::silk::VQ_WMat_EC::{silk_vq_wmat_ec_c, SilkVqWmatEcParams};
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
 #[allow(clippy::too_many_arguments)]
@@ -82,20 +82,22 @@ pub fn silk_quant_ltp_gains(
                 _arch,
             );
             #[cfg(not(feature = "simd"))]
-            silk_vq_wmat_ec_c(
-                &mut temp_idx[j as usize],
-                &mut res_nrg_Q15_subfr,
-                &mut rate_dist_Q7_subfr,
-                &mut gain_Q7,
-                &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
-                &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
-                &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
-                &cbk_gain_ptr_Q7[..cbk_size as usize],
-                &cl_ptr_Q5[..cbk_size as usize],
-                subfr_len,
-                max_gain_Q7,
-                cbk_size,
-            );
+            {
+                let vq = silk_vq_wmat_ec_c(&SilkVqWmatEcParams {
+                    xx_q17: &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
+                    x_x_q17: &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
+                    cb_q7: &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
+                    cb_gain_q7: &cbk_gain_ptr_Q7[..cbk_size as usize],
+                    cl_q5: &cl_ptr_Q5[..cbk_size as usize],
+                    subfr_len,
+                    max_gain_q7: max_gain_Q7,
+                    l: cbk_size,
+                });
+                temp_idx[j as usize] = vq.ind;
+                res_nrg_Q15_subfr = vq.res_nrg_q15;
+                rate_dist_Q7_subfr = vq.rate_dist_q8;
+                gain_Q7 = vq.gain_q7;
+            }
             res_nrg_Q15 = if (res_nrg_Q15 as u32).wrapping_add(res_nrg_Q15_subfr as u32)
                 & 0x80000000_u32
                 != 0
