@@ -6,7 +6,7 @@ use crate::silk::biquad_alt::silk_biquad_alt_stride1;
 use crate::silk::define::{TRANSITION_FRAMES, TRANSITION_INT_NUM, TRANSITION_NA, TRANSITION_NB};
 use crate::silk::macros::silk_SMLAWB;
 use crate::silk::structs::silk_LP_state;
-use crate::silk::tables_other::{silk_Transition_LP_A_Q28, silk_Transition_LP_B_Q28};
+use crate::silk::tables_other::{SILK_TRANSITION_LP_A_Q28, SILK_TRANSITION_LP_B_Q28};
 use crate::silk::SigProc_FIX::silk_SAT16;
 
 /*
@@ -33,15 +33,15 @@ fn silk_lp_interpolate_filter_taps(
                 /* Piece-wise linear interpolation of B and A */
                 for nb in 0..TRANSITION_NB {
                     B_Q28[nb] = silk_SMLAWB(
-                        silk_Transition_LP_B_Q28[ind][nb],
-                        silk_Transition_LP_B_Q28[ind + 1][nb] - silk_Transition_LP_B_Q28[ind][nb],
+                        SILK_TRANSITION_LP_B_Q28[ind][nb],
+                        SILK_TRANSITION_LP_B_Q28[ind + 1][nb] - SILK_TRANSITION_LP_B_Q28[ind][nb],
                         fac_Q16,
                     );
                 }
                 for na in 0..TRANSITION_NA {
                     A_Q28[na] = silk_SMLAWB(
-                        silk_Transition_LP_A_Q28[ind][na],
-                        silk_Transition_LP_A_Q28[ind + 1][na] - silk_Transition_LP_A_Q28[ind][na],
+                        SILK_TRANSITION_LP_A_Q28[ind][na],
+                        SILK_TRANSITION_LP_A_Q28[ind + 1][na] - SILK_TRANSITION_LP_A_Q28[ind][na],
                         fac_Q16,
                     );
                 }
@@ -52,26 +52,26 @@ fn silk_lp_interpolate_filter_taps(
 
                 for nb in 0..TRANSITION_NB {
                     B_Q28[nb] = silk_SMLAWB(
-                        silk_Transition_LP_B_Q28[ind + 1][nb],
-                        silk_Transition_LP_B_Q28[ind + 1][nb] - silk_Transition_LP_B_Q28[ind][nb],
+                        SILK_TRANSITION_LP_B_Q28[ind + 1][nb],
+                        SILK_TRANSITION_LP_B_Q28[ind + 1][nb] - SILK_TRANSITION_LP_B_Q28[ind][nb],
                         fac_Q16 - (1i32 << 16),
                     );
                 }
                 for na in 0..TRANSITION_NA {
                     A_Q28[na] = silk_SMLAWB(
-                        silk_Transition_LP_A_Q28[ind + 1][na],
-                        silk_Transition_LP_A_Q28[ind + 1][na] - silk_Transition_LP_A_Q28[ind][na],
+                        SILK_TRANSITION_LP_A_Q28[ind + 1][na],
+                        SILK_TRANSITION_LP_A_Q28[ind + 1][na] - SILK_TRANSITION_LP_A_Q28[ind][na],
                         fac_Q16 - (1i32 << 16),
                     );
                 }
             }
         } else {
-            *B_Q28 = silk_Transition_LP_B_Q28[ind];
-            *A_Q28 = silk_Transition_LP_A_Q28[ind];
+            *B_Q28 = SILK_TRANSITION_LP_B_Q28[ind];
+            *A_Q28 = SILK_TRANSITION_LP_A_Q28[ind];
         }
     } else {
-        *B_Q28 = silk_Transition_LP_B_Q28[4];
-        *A_Q28 = silk_Transition_LP_A_Q28[4];
+        *B_Q28 = SILK_TRANSITION_LP_B_Q28[4];
+        *A_Q28 = SILK_TRANSITION_LP_A_Q28[4];
     };
 }
 

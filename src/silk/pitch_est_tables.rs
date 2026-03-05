@@ -25,28 +25,28 @@ pub const PE_SHORTLAG_BIAS: f32 = 0.2f32;
 pub const PE_PREVLAG_BIAS: f32 = 0.2f32;
 pub const PE_FLATCONTOUR_BIAS: f32 = 0.05f32;
 
-pub const silk_CB_lags_stage2_10_ms: [i8; PE_MAX_NB_SUBFR / 2 * 3] = [0, 1, 0, 0, 0, 1];
-pub const silk_CB_lags_stage3_10_ms: [i8; PE_MAX_NB_SUBFR / 2 * 12] = [
+pub const SILK_CB_LAGS_STAGE2_10_MS: [i8; PE_MAX_NB_SUBFR / 2 * 3] = [0, 1, 0, 0, 0, 1];
+pub const SILK_CB_LAGS_STAGE3_10_MS: [i8; PE_MAX_NB_SUBFR / 2 * 12] = [
     0, 0, 1, -1, 1, -1, 2, -2, 2, -2, 3, -3, 0, 1, 0, 1, -1, 2, -1, 2, -2, 3, -2, 3,
 ];
-pub const silk_Lag_range_stage3_10_ms: [[i8; 2]; PE_MAX_NB_SUBFR / 2] = [[-3, 7], [-2, 7]];
-pub const silk_CB_lags_stage2: [i8; PE_MAX_NB_SUBFR * PE_NB_CBKS_STAGE2_EXT] = [
+pub const SILK_LAG_RANGE_STAGE3_10_MS: [[i8; 2]; PE_MAX_NB_SUBFR / 2] = [[-3, 7], [-2, 7]];
+pub const SILK_CB_LAGS_STAGE2: [i8; PE_MAX_NB_SUBFR * PE_NB_CBKS_STAGE2_EXT] = [
     0, 2, -1, -1, -1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
     0, 0, 0, -1, 2, 1, 0, 1, 1, 0, 0, -1, -1,
 ];
-pub const silk_CB_lags_stage3: [i8; PE_MAX_NB_SUBFR * PE_NB_CBKS_STAGE3_MAX] = [
+pub const SILK_CB_LAGS_STAGE3: [i8; PE_MAX_NB_SUBFR * PE_NB_CBKS_STAGE3_MAX] = [
     0, 0, 1, -1, 0, 1, -1, 0, -1, 1, -2, 2, -2, -2, 2, -3, 2, 3, -3, -4, 3, -4, 4, 4, -5, 5, -6,
     -5, 6, -7, 6, 5, 8, -9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 1, -1, 0, 1, -1, -1, 1, -1,
     2, 1, -1, 2, -2, -2, 2, -2, 2, 2, 3, -3, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, -1, 1, 0, 0,
     2, 1, -1, 2, -1, -1, 2, -1, 2, 2, -1, 3, -2, -2, -2, 3, 0, 1, 0, 0, 1, 0, 1, -1, 2, -1, 2, -1,
     2, 3, -2, 3, -2, -2, 4, 4, -3, 5, -3, -4, 6, -4, 6, 5, -5, 8, -6, -5, -7, 9,
 ];
-pub const silk_Lag_range_stage3: [[[i8; 2]; PE_MAX_NB_SUBFR]; SILK_PE_MAX_COMPLEX + 1] = [
+pub const SILK_LAG_RANGE_STAGE3: [[[i8; 2]; PE_MAX_NB_SUBFR]; SILK_PE_MAX_COMPLEX + 1] = [
     [[-5, 8], [-1, 6], [-1, 6], [-4, 10]],
     [[-6, 10], [-2, 6], [-1, 6], [-5, 10]],
     [[-9, 12], [-3, 7], [-2, 7], [-7, 13]],
 ];
-pub const silk_nb_cbk_searchs_stage3: [i8; SILK_PE_MAX_COMPLEX + 1] = [
+pub const SILK_NB_CBK_SEARCHS_STAGE3: [i8; SILK_PE_MAX_COMPLEX + 1] = [
     PE_NB_CBKS_STAGE3_MIN as i8,
     PE_NB_CBKS_STAGE3_MID as i8,
     PE_NB_CBKS_STAGE3_MAX as i8,

@@ -6,7 +6,7 @@ use crate::silk::define::CODE_INDEPENDENTLY;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::macros::silk_SMULBB;
-use crate::silk::tables_other::silk_LTPScales_table_Q14;
+use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 
 /// Upstream C: silk/float/LTP_scale_ctrl_FLP.c:silk_LTP_scale_ctrl_FLP
 pub fn silk_LTP_scale_ctrl_FLP(
@@ -34,5 +34,5 @@ pub fn silk_LTP_scale_ctrl_FLP(
         psEnc.sCmn.indices.LTP_scaleIndex = 0;
     }
     psEncCtrl.LTP_scale =
-        silk_LTPScales_table_Q14[psEnc.sCmn.indices.LTP_scaleIndex as usize] as f32 / 16384.0f32;
+        SILK_LTPSCALES_TABLE_Q14[psEnc.sCmn.indices.LTP_scaleIndex as usize] as f32 / 16384.0f32;
 }

@@ -5,9 +5,9 @@
 #![forbid(unsafe_code)]
 
 use crate::silk::resampler::{ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN};
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
-use super::rom::{silk_resampler_frac_FIR_12, RESAMPLER_ORDER_FIR_12};
+use super::rom::{RESAMPLER_ORDER_FIR_12, SILK_RESAMPLER_FRAC_FIR_12};
 use super::up2_hq::{silk_resampler_private_up2_hq, ResamplerUp2HqState};
 
 #[derive(Default, Copy, Clone)]
@@ -32,29 +32,29 @@ fn silk_resampler_private_IIR_FIR_INTERPOL<'a>(
         let table_index = (((index_Q16 & 0xffff) as i64 * 12_i64) >> 16) as usize;
         let buf_ptr = &buf[(index_Q16 >> 16) as usize..][..8];
 
-        res_Q15 = buf_ptr[0] as i32 * silk_resampler_frac_FIR_12[table_index][0] as i32;
-        res_Q15 += buf_ptr[1] as i32 * silk_resampler_frac_FIR_12[table_index][1] as i32;
-        res_Q15 += buf_ptr[2] as i32 * silk_resampler_frac_FIR_12[table_index][2] as i32;
-        res_Q15 += buf_ptr[3] as i32 * silk_resampler_frac_FIR_12[table_index][3] as i32;
-        res_Q15 += buf_ptr[4] as i32 * silk_resampler_frac_FIR_12[11 - table_index][3] as i32;
-        res_Q15 += buf_ptr[5] as i32 * silk_resampler_frac_FIR_12[11 - table_index][2] as i32;
-        res_Q15 += buf_ptr[6] as i32 * silk_resampler_frac_FIR_12[11 - table_index][1] as i32;
-        res_Q15 += buf_ptr[7] as i32 * silk_resampler_frac_FIR_12[11 - table_index][0] as i32;
+        res_Q15 = buf_ptr[0] as i32 * SILK_RESAMPLER_FRAC_FIR_12[table_index][0] as i32;
+        res_Q15 += buf_ptr[1] as i32 * SILK_RESAMPLER_FRAC_FIR_12[table_index][1] as i32;
+        res_Q15 += buf_ptr[2] as i32 * SILK_RESAMPLER_FRAC_FIR_12[table_index][2] as i32;
+        res_Q15 += buf_ptr[3] as i32 * SILK_RESAMPLER_FRAC_FIR_12[table_index][3] as i32;
+        res_Q15 += buf_ptr[4] as i32 * SILK_RESAMPLER_FRAC_FIR_12[11 - table_index][3] as i32;
+        res_Q15 += buf_ptr[5] as i32 * SILK_RESAMPLER_FRAC_FIR_12[11 - table_index][2] as i32;
+        res_Q15 += buf_ptr[6] as i32 * SILK_RESAMPLER_FRAC_FIR_12[11 - table_index][1] as i32;
+        res_Q15 += buf_ptr[7] as i32 * SILK_RESAMPLER_FRAC_FIR_12[11 - table_index][0] as i32;
 
         out[0] = (if (if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {
             ((res_Q15 >> (15 - 1)) + 1) >> 1
-        }) > silk_int16_MAX
+        }) > SILK_INT16_MAX
         {
-            silk_int16_MAX
+            SILK_INT16_MAX
         } else if (if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {
             ((res_Q15 >> (15 - 1)) + 1) >> 1
-        }) < silk_int16_MIN
+        }) < SILK_INT16_MIN
         {
-            silk_int16_MIN
+            SILK_INT16_MIN
         } else if 15 == 1 {
             (res_Q15 >> 1) + (res_Q15 & 1)
         } else {

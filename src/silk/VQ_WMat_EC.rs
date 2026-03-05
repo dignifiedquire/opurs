@@ -5,7 +5,7 @@
 use crate::silk::lin2log::silk_lin2log;
 
 use crate::silk::define::LTP_ORDER;
-use crate::silk::typedefs::silk_int32_MAX;
+use crate::silk::typedefs::SILK_INT32_MAX;
 
 /// Upstream C: silk/VQ_WMat_EC.c:silk_VQ_WMat_EC_c
 #[allow(clippy::too_many_arguments)]
@@ -36,8 +36,8 @@ pub fn silk_vq_wmat_ec_c(
     neg_xX_Q24[2_usize] = -(((xX_Q17[2] as u32) << 7) as i32);
     neg_xX_Q24[3_usize] = -(((xX_Q17[3] as u32) << 7) as i32);
     neg_xX_Q24[4_usize] = -(((xX_Q17[4] as u32) << 7) as i32);
-    *rate_dist_Q8 = silk_int32_MAX;
-    *res_nrg_Q15 = silk_int32_MAX;
+    *rate_dist_Q8 = SILK_INT32_MAX;
+    *res_nrg_Q15 = SILK_INT32_MAX;
     cb_row_off = 0;
     *ind = 0;
     k = 0;

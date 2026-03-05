@@ -7,8 +7,8 @@ use crate::silk::decode_pitch::silk_decode_pitch;
 use crate::silk::define::{BWE_AFTER_LOSS_Q16, CODE_CONDITIONALLY, LTP_ORDER, TYPE_VOICED};
 use crate::silk::gain_quant::silk_gains_dequant;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::tables_LTP::silk_LTP_vq_ptrs_Q7;
-use crate::silk::tables_other::silk_LTPScales_table_Q14;
+use crate::silk::tables_LTP::SILK_LTP_VQ_PTRS_Q7;
+use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 use crate::silk::NLSF_decode::silk_NLSF_decode;
 use crate::silk::NLSF2A::silk_NLSF2A;
 
@@ -107,7 +107,7 @@ pub fn silk_decode_parameters(
         );
 
         /* Decode Codebook Index */
-        let cbk_ptr_Q7 = silk_LTP_vq_ptrs_Q7[psDec.indices.PERIndex as usize];
+        let cbk_ptr_Q7 = SILK_LTP_VQ_PTRS_Q7[psDec.indices.PERIndex as usize];
 
         for k in 0..psDec.nb_subfr {
             let Ix = psDec.indices.LTPIndex[k] as usize;
@@ -123,7 +123,7 @@ pub fn silk_decode_parameters(
         /* Decode LTP scaling */
         /**********************/
         let Ix = psDec.indices.LTP_scaleIndex as usize;
-        psDecCtrl.LTP_scale_Q14 = silk_LTPScales_table_Q14[Ix] as i32;
+        psDecCtrl.LTP_scale_Q14 = SILK_LTPSCALES_TABLE_Q14[Ix] as i32;
     } else {
         pitchL.fill(0);
         LTPCoef_Q14.fill(0);

@@ -8,8 +8,8 @@ use crate::silk::float::structs_FLP::{
     silk_encoder_control_FLP, silk_encoder_state_FLP, silk_shape_state_FLP,
 };
 use crate::silk::tuning_parameters::{
-    BG_SNR_DECR_dB, HARM_SNR_INCR_dB, BANDWIDTH_EXPANSION, ENERGY_VARIATION_THRESHOLD_QNT_OFFSET,
-    FIND_PITCH_WHITE_NOISE_FRACTION, HARMONIC_SHAPING, HARM_HP_NOISE_COEF,
+    BANDWIDTH_EXPANSION, BG_SNR_DECR_DB, ENERGY_VARIATION_THRESHOLD_QNT_OFFSET,
+    FIND_PITCH_WHITE_NOISE_FRACTION, HARMONIC_SHAPING, HARM_HP_NOISE_COEF, HARM_SNR_INCR_DB,
     HIGH_RATE_OR_LOW_QUALITY_HARMONIC_SHAPING, HP_NOISE_COEF, LOW_FREQ_SHAPING,
     LOW_QUALITY_LOW_FREQ_SHAPING_DECR, SHAPE_WHITE_NOISE_FRACTION, SUBFR_SMTH_COEF,
 };
@@ -170,14 +170,14 @@ pub fn silk_noise_shape_analysis_FLP(
     psEncCtrl.coding_quality = silk_sigmoid(0.25f32 * (SNR_adj_dB - 20.0f32));
     if psEnc.sCmn.useCBR == 0 {
         b = 1.0f32 - psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
-        SNR_adj_dB -= BG_SNR_DECR_dB
+        SNR_adj_dB -= BG_SNR_DECR_DB
             * psEncCtrl.coding_quality
             * (0.5f32 + 0.5f32 * psEncCtrl.input_quality)
             * b
             * b;
     }
     if psEnc.sCmn.indices.signalType as i32 == TYPE_VOICED {
-        SNR_adj_dB += HARM_SNR_INCR_dB * psEnc.LTPCorr;
+        SNR_adj_dB += HARM_SNR_INCR_DB * psEnc.LTPCorr;
     } else {
         SNR_adj_dB += (-0.4f32 * psEnc.sCmn.SNR_dB_Q7 as f32 * (1_f32 / 128.0f32) + 6.0f32)
             * (1.0f32 - psEncCtrl.input_quality);

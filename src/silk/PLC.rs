@@ -4,7 +4,7 @@
 
 use crate::arch::Arch;
 
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 // const BWE_COEF: f64 = 0.99;
 
 /// 0.7 in Q14
@@ -181,7 +181,7 @@ fn silk_plc_energy(
         let exc_off = (k + nb_subfr - 2) * subfr_length;
         for i in 0..subfr_length {
             let val = ((exc_Q14[i + exc_off] as i64 * prevGain_Q10[k] as i64) >> 16) as i32 >> 8;
-            exc_buf[k * subfr_length + i] = val.clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+            exc_buf[k * subfr_length + i] = val.clamp(SILK_INT16_MIN, SILK_INT16_MAX) as i16;
         }
     }
     silk_sum_sqr_shift(energy1, shift1, &exc_buf[..subfr_length]);

@@ -12,8 +12,8 @@ use crate::silk::define::{
 use crate::silk::macros::silk_CLZ32;
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
-use crate::silk::typedefs::silk_int32_MAX;
+use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
+use crate::silk::typedefs::SILK_INT32_MAX;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::silk_RSHIFT_ROUND64;
@@ -227,7 +227,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             return 0;
         }
 
-        // rc_mult2 range: [ 2^30 : silk_int32_MAX ]
+        // rc_mult2 range: [ 2^30 : SILK_INT32_MAX ]
         let mult2Q = 32 - silk_CLZ32(rc_mult1_Q30.abs());
         let rc_mult2 = silk_INVERSE32_varQ(rc_mult1_Q30, mult2Q + 30);
 
@@ -1467,7 +1467,7 @@ pub unsafe fn silk_nsq_del_dec_neon(
         );
     }
 
-    let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
+    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
     let mut smpl_buf_idx = 0i32;
 
@@ -1525,9 +1525,9 @@ pub unsafe fn silk_nsq_del_dec_neon(
                             winner = ii;
                         }
                     }
-                    dd.RD_Q10[winner] -= silk_int32_MAX >> 4;
+                    dd.RD_Q10[winner] -= SILK_INT32_MAX >> 4;
                     let mut rv = vld1q_s32(dd.RD_Q10.as_ptr());
-                    rv = vaddq_s32(rv, vdupq_n_s32(silk_int32_MAX >> 4));
+                    rv = vaddq_s32(rv, vdupq_n_s32(SILK_INT32_MAX >> 4));
                     vst1q_s32(dd.RD_Q10.as_mut_ptr(), rv);
 
                     neon_copy_winner_state(

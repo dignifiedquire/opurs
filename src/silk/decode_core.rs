@@ -8,7 +8,7 @@ use crate::silk::define::{
 };
 use crate::silk::macros::{silk_SMLAWB, silk_SMULWB, silk_SMULWW};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::{
@@ -39,7 +39,7 @@ pub fn silk_decode_core(
     let mut res_Q14 = [0i32; MAX_SUB_FRAME_LENGTH];
     let mut sLPC_Q14 = [0i32; MAX_SUB_FRAME_LENGTH + MAX_LPC_ORDER];
 
-    let offset_Q10 = silk_Quantization_Offsets_Q10[(psDec.indices.signalType as i32 >> 1) as usize]
+    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psDec.indices.signalType as i32 >> 1) as usize]
         [psDec.indices.quantOffsetType as usize] as i32;
 
     let NLSF_interpolation_flag = if (psDec.indices.NLSFInterpCoef_Q2 as i32) < (1) << 2 {

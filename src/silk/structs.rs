@@ -5,7 +5,7 @@
 use crate::arch::Arch;
 use crate::silk::define::{LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_NB_SUBFR};
 use crate::silk::resampler::ResamplerState;
-use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;
+use crate::silk::tables_NLSF_CB_NB_MB::SILK_NLSF_CB_NB_MB;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -362,7 +362,7 @@ impl Default for silk_encoder_state {
             prefillFlag: 0,
             pitch_lag_low_bits_iCDF: &[],
             pitch_contour_iCDF: &[],
-            psNLSF_CB: &silk_NLSF_CB_NB_MB,
+            psNLSF_CB: &SILK_NLSF_CB_NB_MB,
             input_quality_bands_Q15: [0; 4],
             input_tilt_Q15: 0,
             SNR_dB_Q7: 0,

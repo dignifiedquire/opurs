@@ -12,7 +12,7 @@ use crate::silk::float::SigProc_FLP::silk_float2int;
 use crate::silk::process_NLSFs::silk_process_NLSFs;
 use crate::silk::quant_LTP_gains::silk_quant_LTP_gains;
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::tables_other::silk_LTPScales_table_Q14;
+use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 use crate::silk::NSQ_del_dec::silk_nsq_del_dec;
 use crate::silk::NSQ::silk_nsq;
 
@@ -131,7 +131,7 @@ pub fn silk_NSQ_wrapper_FLP(
         i += 1;
     }
     let LTP_scale_Q14: i32 = if psIndices.signalType as i32 == TYPE_VOICED {
-        silk_LTPScales_table_Q14[psIndices.LTP_scaleIndex as usize] as i32
+        SILK_LTPSCALES_TABLE_Q14[psIndices.LTP_scaleIndex as usize] as i32
     } else {
         0
     };

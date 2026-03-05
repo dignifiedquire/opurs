@@ -8,7 +8,7 @@
 //!
 
 use crate::silk::sort::silk_insertion_sort_increasing_all_values_int16;
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 pub const MAX_LOOPS: i32 = 20;
@@ -117,10 +117,10 @@ pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
         while i < L {
             NLSF_Q15[i] = silk_max_int(
                 NLSF_Q15[i] as i32,
-                (if NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32 > silk_int16_MAX {
-                    silk_int16_MAX
-                } else if (NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32) < silk_int16_MIN {
-                    silk_int16_MIN
+                (if NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32 > SILK_INT16_MAX {
+                    SILK_INT16_MAX
+                } else if (NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32) < SILK_INT16_MIN {
+                    SILK_INT16_MIN
                 } else {
                     NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32
                 }) as i16 as i32,

@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/ana_filt_bank_1.c`
 
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 const A_FB1_20: i16 = ((5394) << 1) as i16;
 const A_FB1_21: i16 = -24290_i16;
@@ -37,16 +37,16 @@ pub fn silk_ana_filt_bank_1(
             ((out_2 + out_1) >> 1) + ((out_2 + out_1) & 1)
         } else {
             (((out_2 + out_1) >> (11 - 1)) + 1) >> 1
-        }) > silk_int16_MAX
+        }) > SILK_INT16_MAX
         {
-            silk_int16_MAX
+            SILK_INT16_MAX
         } else if (if 11 == 1 {
             ((out_2 + out_1) >> 1) + ((out_2 + out_1) & 1)
         } else {
             (((out_2 + out_1) >> (11 - 1)) + 1) >> 1
-        }) < silk_int16_MIN
+        }) < SILK_INT16_MIN
         {
-            silk_int16_MIN
+            SILK_INT16_MIN
         } else if 11 == 1 {
             ((out_2 + out_1) >> 1) + ((out_2 + out_1) & 1)
         } else {
@@ -56,16 +56,16 @@ pub fn silk_ana_filt_bank_1(
             ((out_2 - out_1) >> 1) + ((out_2 - out_1) & 1)
         } else {
             (((out_2 - out_1) >> (11 - 1)) + 1) >> 1
-        }) > silk_int16_MAX
+        }) > SILK_INT16_MAX
         {
-            silk_int16_MAX
+            SILK_INT16_MAX
         } else if (if 11 == 1 {
             ((out_2 - out_1) >> 1) + ((out_2 - out_1) & 1)
         } else {
             (((out_2 - out_1) >> (11 - 1)) + 1) >> 1
-        }) < silk_int16_MIN
+        }) < SILK_INT16_MIN
         {
-            silk_int16_MIN
+            SILK_INT16_MIN
         } else if 11 == 1 {
             ((out_2 - out_1) >> 1) + ((out_2 - out_1) & 1)
         } else {

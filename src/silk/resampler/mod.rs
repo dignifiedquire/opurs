@@ -16,9 +16,9 @@ mod down2_3;
 use down_fir::{silk_resampler_private_down_FIR, ResamplerDownFirParams, ResamplerDownFirState};
 use iir_fir::{silk_resampler_private_IIR_FIR, ResamplerIirFirState};
 use rom::{
-    silk_Resampler_1_2_COEFS, silk_Resampler_1_3_COEFS, silk_Resampler_1_4_COEFS,
-    silk_Resampler_1_6_COEFS, silk_Resampler_2_3_COEFS, silk_Resampler_3_4_COEFS,
     RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2,
+    SILK_RESAMPLER_1_2_COEFS, SILK_RESAMPLER_1_3_COEFS, SILK_RESAMPLER_1_4_COEFS,
+    SILK_RESAMPLER_1_6_COEFS, SILK_RESAMPLER_2_3_COEFS, SILK_RESAMPLER_3_4_COEFS,
 };
 use std::cmp::Ordering;
 use up2_hq::{silk_resampler_private_up2_hq, ResamplerUp2HqState};
@@ -54,7 +54,7 @@ pub(crate) const RESAMPLER_MAX_BATCH_SIZE_IN: usize =
 
 #[rustfmt::skip]
 #[cfg(feature = "qext")]
-const delay_matrix_enc: [[i8; 3]; 6] = [
+const DELAY_MATRIX_ENC: [[i8; 3]; 6] = [
     /* in  \ out  8  12  16 */
     /*  8 */   [  6,  0,  3 ],
     /* 12 */   [  0,  7,  3 ],
@@ -65,7 +65,7 @@ const delay_matrix_enc: [[i8; 3]; 6] = [
 ];
 #[rustfmt::skip]
 #[cfg(not(feature = "qext"))]
-const delay_matrix_enc: [[i8; 3]; 5] = [
+const DELAY_MATRIX_ENC: [[i8; 3]; 5] = [
     /* in  \ out  8  12  16 */
     /*  8 */   [  6,  0,  3 ],
     /* 12 */   [  0,  7,  3 ],
@@ -75,7 +75,7 @@ const delay_matrix_enc: [[i8; 3]; 5] = [
 ];
 #[rustfmt::skip]
 #[cfg(feature = "qext")]
-const delay_matrix_dec: [[i8; 6]; 3] = [
+const DELAY_MATRIX_DEC: [[i8; 6]; 3] = [
     /* in  \ out  8  12  16  24  48  96 */
     /*  8 */   [  4,  0,  2,  0,  0,  0 ],
     /* 12 */   [  0,  9,  4,  7,  4,  4 ],
@@ -83,7 +83,7 @@ const delay_matrix_dec: [[i8; 6]; 3] = [
 ];
 #[rustfmt::skip]
 #[cfg(not(feature = "qext"))]
-const delay_matrix_dec: [[i8; 5]; 3] = [
+const DELAY_MATRIX_DEC: [[i8; 5]; 3] = [
     /* in  \ out  8  12  16  24  48 */
     /*  8 */   [  4,  0,  2,  0,  0 ],
     /* 12 */   [  0,  9,  4,  7,  4 ],
@@ -175,7 +175,7 @@ pub fn silk_resampler_init(
                 return SILK_RESAMPLER_INVALID;
             }
         };
-        delay_matrix_enc[in_id][out_id] as i32
+        DELAY_MATRIX_ENC[in_id][out_id] as i32
     } else {
         #[cfg(feature = "qext")]
         let output_valid = matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
@@ -199,7 +199,7 @@ pub fn silk_resampler_init(
                 return SILK_RESAMPLER_INVALID;
             }
         };
-        delay_matrix_dec[in_id][out_id] as i32
+        DELAY_MATRIX_DEC[in_id][out_id] as i32
     };
 
     let Fs_in_kHz = Fs_Hz_in / 1000;
@@ -227,42 +227,42 @@ pub fn silk_resampler_init(
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR0,
                     fir_fracs: 3,
-                    coefs: &silk_Resampler_3_4_COEFS,
+                    coefs: &SILK_RESAMPLER_3_4_COEFS,
                 }
             } else if Fs_Hz_out * 3 == Fs_Hz_in * 2 {
                 // Fs_out : Fs_in = 2 : 3
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR0,
                     fir_fracs: 2,
-                    coefs: &silk_Resampler_2_3_COEFS,
+                    coefs: &SILK_RESAMPLER_2_3_COEFS,
                 }
             } else if Fs_Hz_out * 2 == Fs_Hz_in {
                 // Fs_out : Fs_in = 1 : 2
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR1,
                     fir_fracs: 1,
-                    coefs: &silk_Resampler_1_2_COEFS,
+                    coefs: &SILK_RESAMPLER_1_2_COEFS,
                 }
             } else if Fs_Hz_out * 3 == Fs_Hz_in {
                 // Fs_out : Fs_in = 1 : 3
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
                     fir_fracs: 1,
-                    coefs: &silk_Resampler_1_3_COEFS,
+                    coefs: &SILK_RESAMPLER_1_3_COEFS,
                 }
             } else if Fs_Hz_out * 4 == Fs_Hz_in {
                 // Fs_out : Fs_in = 1 : 4
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
                     fir_fracs: 1,
-                    coefs: &silk_Resampler_1_4_COEFS,
+                    coefs: &SILK_RESAMPLER_1_4_COEFS,
                 }
             } else if Fs_Hz_out * 6 == Fs_Hz_in {
                 // Fs_out : Fs_in = 1 : 6
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
                     fir_fracs: 1,
-                    coefs: &silk_Resampler_1_6_COEFS,
+                    coefs: &SILK_RESAMPLER_1_6_COEFS,
                 }
             } else {
                 debug_assert!(false, "libopus: assert(0) called");

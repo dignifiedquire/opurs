@@ -49,7 +49,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
             return 0;
         }
 
-        /* rc_mult2 range: [ 2^30 : silk_int32_MAX ] */
+        /* rc_mult2 range: [ 2^30 : SILK_INT32_MAX ] */
         let mult2Q = 32 - silk_CLZ32(rc_mult1_Q30.abs());
         let rc_mult2 = silk_INVERSE32_varQ(rc_mult1_Q30, mult2Q + 30);
 

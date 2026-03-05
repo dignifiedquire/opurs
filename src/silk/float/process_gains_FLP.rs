@@ -8,7 +8,7 @@ use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_sta
 use crate::silk::float::SigProc_FLP::silk_sigmoid;
 use crate::silk::gain_quant::silk_gains_quant;
 use crate::silk::mathops::silk_exp2;
-use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::tuning_parameters::{
     LAMBDA_CODING_QUALITY, LAMBDA_DELAYED_DECISIONS, LAMBDA_INPUT_QUALITY, LAMBDA_OFFSET,
     LAMBDA_QUANT_OFFSET, LAMBDA_SPEECH_ACT,
@@ -72,7 +72,7 @@ pub fn silk_process_gains_FLP(
             psEnc.sCmn.indices.quantOffsetType = 1;
         }
     }
-    let quant_offset: f32 = silk_Quantization_Offsets_Q10
+    let quant_offset: f32 = SILK_QUANTIZATION_OFFSETS_Q10
         [(psEnc.sCmn.indices.signalType as i32 >> 1) as usize]
         [psEnc.sCmn.indices.quantOffsetType as usize] as i32 as f32
         / 1024.0f32;

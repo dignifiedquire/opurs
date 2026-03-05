@@ -5,7 +5,7 @@
 use crate::silk::define::{
     NLSF_QUANT_DEL_DEC_STATES, NLSF_QUANT_MAX_AMPLITUDE, NLSF_QUANT_MAX_AMPLITUDE_EXT,
 };
-use crate::silk::typedefs::silk_int32_MAX;
+use crate::silk::typedefs::SILK_INT32_MAX;
 
 /// Upstream C: silk/NLSF_del_dec_quant.c:silk_NLSF_del_dec_quant
 #[allow(clippy::too_many_arguments)]
@@ -168,7 +168,7 @@ pub fn silk_NLSF_del_dec_quant(
                 j += 1;
             }
             loop {
-                min_max_Q25 = silk_int32_MAX;
+                min_max_Q25 = SILK_INT32_MAX;
                 max_min_Q25 = 0;
                 ind_min_max = 0;
                 ind_max_min = 0;
@@ -194,7 +194,7 @@ pub fn silk_NLSF_del_dec_quant(
                 prev_out_Q10[ind_max_min as usize] =
                     prev_out_Q10[(ind_min_max + NLSF_QUANT_DEL_DEC_STATES) as usize];
                 RD_min_Q25[ind_max_min as usize] = 0;
-                RD_max_Q25[ind_min_max as usize] = silk_int32_MAX;
+                RD_max_Q25[ind_min_max as usize] = SILK_INT32_MAX;
                 let tmp = ind[ind_min_max as usize];
                 ind[ind_max_min as usize] = tmp;
             }
@@ -208,7 +208,7 @@ pub fn silk_NLSF_del_dec_quant(
         i -= 1;
     }
     ind_tmp = 0;
-    min_Q25 = silk_int32_MAX;
+    min_Q25 = SILK_INT32_MAX;
     j = 0;
     while j < 2 * NLSF_QUANT_DEL_DEC_STATES {
         if min_Q25 > RD_Q25[j as usize] {

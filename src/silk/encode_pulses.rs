@@ -6,10 +6,10 @@ use crate::celt::entenc::{ec_enc, ec_enc_icdf};
 use crate::silk::code_signs::silk_encode_signs;
 use crate::silk::define::{N_RATE_LEVELS, SHELL_CODEC_FRAME_LENGTH, SILK_MAX_PULSES};
 use crate::silk::shell_coder::silk_shell_encoder;
-use crate::silk::tables_other::silk_lsb_iCDF;
+use crate::silk::tables_other::SILK_LSB_ICDF;
 use crate::silk::tables_pulses_per_block::{
-    silk_max_pulses_table, silk_pulses_per_block_BITS_Q5, silk_pulses_per_block_iCDF,
-    silk_rate_levels_BITS_Q5, silk_rate_levels_iCDF,
+    SILK_MAX_PULSES_TABLE, SILK_PULSES_PER_BLOCK_BITS_Q5, SILK_PULSES_PER_BLOCK_ICDF,
+    SILK_RATE_LEVELS_BITS_Q5, SILK_RATE_LEVELS_ICDF,
 };
 use itertools::izip;
 
@@ -99,13 +99,13 @@ pub fn silk_encode_pulses(
 
             let Some(pulses_comb) = Some(pulses_comb.as_mut_slice())
                 /* 1+1 -> 2 */
-                .and_then(|pulses_comb| combine_and_check(pulses_comb, silk_max_pulses_table[0]))
+                .and_then(|pulses_comb| combine_and_check(pulses_comb, SILK_MAX_PULSES_TABLE[0]))
                 /* 2+2 -> 4 */
-                .and_then(|pulses_comb| combine_and_check(pulses_comb, silk_max_pulses_table[1]))
+                .and_then(|pulses_comb| combine_and_check(pulses_comb, SILK_MAX_PULSES_TABLE[1]))
                 /* 4+4 -> 8 */
-                .and_then(|pulses_comb| combine_and_check(pulses_comb, silk_max_pulses_table[2]))
+                .and_then(|pulses_comb| combine_and_check(pulses_comb, SILK_MAX_PULSES_TABLE[2]))
                 /* 8+8 -> 16 */
-                .and_then(|pulses_comb| combine_and_check(pulses_comb, silk_max_pulses_table[3]))
+                .and_then(|pulses_comb| combine_and_check(pulses_comb, SILK_MAX_PULSES_TABLE[3]))
             else {
                 /* We need to downscale the quantization signal */
                 *nRshifts += 1;
@@ -136,8 +136,8 @@ pub fn silk_encode_pulses(
         let mut minSumBits_Q5 = i32::MAX;
 
         for (k, (nBits_ptr, sumBits_Q5)) in izip!(
-            silk_pulses_per_block_BITS_Q5.iter(),
-            silk_rate_levels_BITS_Q5[(signalType >> 1) as usize]
+            SILK_PULSES_PER_BLOCK_BITS_Q5.iter(),
+            SILK_RATE_LEVELS_BITS_Q5[(signalType >> 1) as usize]
         )
         .enumerate()
         {
@@ -165,14 +165,14 @@ pub fn silk_encode_pulses(
     ec_enc_icdf(
         psRangeEnc,
         RateLevelIndex as i32,
-        &silk_rate_levels_iCDF[(signalType >> 1) as usize],
+        &SILK_RATE_LEVELS_ICDF[(signalType >> 1) as usize],
         8,
     );
 
     /***************************************************/
     /* Sum-Weighted-Pulses Encoding                    */
     /***************************************************/
-    let cdf_ptr = &silk_pulses_per_block_iCDF[RateLevelIndex];
+    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[RateLevelIndex];
     for (&sum_pulse, &nRshifts) in izip!(&sum_pulses[..iter], &nRshifts[..iter]) {
         if nRshifts == 0 {
             ec_enc_icdf(psRangeEnc, sum_pulse, cdf_ptr, 8);
@@ -183,7 +183,7 @@ pub fn silk_encode_pulses(
                 ec_enc_icdf(
                     psRangeEnc,
                     SILK_MAX_PULSES as i32 + 1,
-                    &silk_pulses_per_block_iCDF[N_RATE_LEVELS - 1],
+                    &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1],
                     8,
                 );
             }
@@ -191,7 +191,7 @@ pub fn silk_encode_pulses(
             ec_enc_icdf(
                 psRangeEnc,
                 sum_pulse,
-                &silk_pulses_per_block_iCDF[N_RATE_LEVELS - 1],
+                &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1],
                 8,
             );
         }
@@ -224,10 +224,10 @@ pub fn silk_encode_pulses(
 
                 for j in (1..=nLS).rev() {
                     let bit = abs_q >> j & 1;
-                    ec_enc_icdf(psRangeEnc, bit, &silk_lsb_iCDF, 8);
+                    ec_enc_icdf(psRangeEnc, bit, &SILK_LSB_ICDF, 8);
                 }
                 let bit = abs_q & 1;
-                ec_enc_icdf(psRangeEnc, bit, &silk_lsb_iCDF, 8);
+                ec_enc_icdf(psRangeEnc, bit, &SILK_LSB_ICDF, 8);
             }
         }
     }

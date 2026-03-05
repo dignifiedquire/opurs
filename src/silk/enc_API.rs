@@ -55,7 +55,7 @@ use crate::silk::resampler::silk_resampler;
 use crate::silk::stereo_LR_to_MS::silk_stereo_LR_to_MS;
 use crate::silk::stereo_encode_pred::{silk_stereo_encode_mid_only, silk_stereo_encode_pred};
 use crate::silk::structs::{silk_LP_state, silk_nsq_state};
-use crate::silk::tables_other::{silk_LBRR_flags_iCDF_ptr, silk_Quantization_Offsets_Q10};
+use crate::silk::tables_other::{SILK_LBRR_FLAGS_ICDF_PTR, SILK_QUANTIZATION_OFFSETS_Q10};
 use crate::silk::tuning_parameters::{
     BITRESERVOIR_DECAY_TIME_MS, MAX_BANDWIDTH_SWITCH_DELAY_MS, SPEECH_ACTIVITY_DTX_THRES,
 };
@@ -407,7 +407,7 @@ pub fn silk_encode_api(
                     ec_enc_icdf(
                         psRangeEnc,
                         LBRR_symbol - 1,
-                        silk_LBRR_flags_iCDF_ptr
+                        SILK_LBRR_FLAGS_ICDF_PTR
                             [(psEnc.state_Fxx[n as usize].sCmn.nFramesPerPacket - 2) as usize],
                         8,
                     );
@@ -687,7 +687,7 @@ pub fn silk_encode_api(
         }
     }
     encControl.signalType = psEnc.state_Fxx[0].sCmn.indices.signalType as i32;
-    encControl.offset = silk_Quantization_Offsets_Q10
+    encControl.offset = SILK_QUANTIZATION_OFFSETS_Q10
         [(psEnc.state_Fxx[0].sCmn.indices.signalType as i32 >> 1) as usize]
         [psEnc.state_Fxx[0].sCmn.indices.quantOffsetType as usize] as i32;
     ret

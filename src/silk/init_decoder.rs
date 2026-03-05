@@ -5,7 +5,7 @@
 use crate::arch::{opus_select_arch, Arch};
 use crate::silk::resampler::ResamplerState;
 use crate::silk::structs::{silk_CNG_struct, silk_PLC_struct, silk_decoder_state, SideInfoIndices};
-use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
+use crate::silk::tables_NLSF_CB_WB::SILK_NLSF_CB_WB;
 use crate::silk::CNG::silk_cng_reset;
 use crate::silk::PLC::silk_plc_reset;
 
@@ -39,7 +39,7 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder_state) -> i32 {
     dec.LBRR_flag = 0;
     dec.LBRR_flags = [0; 3];
     dec.resampler_state = ResamplerState::default();
-    dec.psNLSF_CB = &silk_NLSF_CB_WB;
+    dec.psNLSF_CB = &SILK_NLSF_CB_WB;
     dec.indices = SideInfoIndices::default();
     dec.sCNG = silk_CNG_struct::default();
     dec.lossCnt = 0;
@@ -84,7 +84,7 @@ fn zeroed_decoder_state() -> silk_decoder_state {
         LBRR_flag: 0,
         LBRR_flags: [0; 3],
         resampler_state: ResamplerState::default(),
-        psNLSF_CB: &silk_NLSF_CB_WB,
+        psNLSF_CB: &SILK_NLSF_CB_WB,
         indices: SideInfoIndices::default(),
         sCNG: silk_CNG_struct::default(),
         lossCnt: 0,

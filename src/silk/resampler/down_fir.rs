@@ -7,7 +7,7 @@ use super::rom::{RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER
 use crate::silk::resampler::{
     ResamplerParams, RESAMPLER_MAX_BATCH_SIZE_IN, SILK_RESAMPLER_MAX_FIR_ORDER,
 };
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 #[derive(Copy, Clone)]
 pub struct ResamplerDownFirParams {
@@ -83,16 +83,16 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) > silk_int16_MAX
+                }) > SILK_INT16_MAX
                 {
-                    silk_int16_MAX
+                    SILK_INT16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) < silk_int16_MIN
+                }) < SILK_INT16_MIN
                 {
-                    silk_int16_MIN
+                    SILK_INT16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
@@ -129,16 +129,16 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) > silk_int16_MAX
+                }) > SILK_INT16_MAX
                 {
-                    silk_int16_MAX
+                    SILK_INT16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) < silk_int16_MIN
+                }) < SILK_INT16_MIN
                 {
-                    silk_int16_MIN
+                    SILK_INT16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
@@ -187,16 +187,16 @@ fn silk_resampler_private_down_FIR_INTERPOL<'a>(
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) > silk_int16_MAX
+                }) > SILK_INT16_MAX
                 {
-                    silk_int16_MAX
+                    SILK_INT16_MAX
                 } else if (if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {
                     ((res_Q6 >> (6 - 1)) + 1) >> 1
-                }) < silk_int16_MIN
+                }) < SILK_INT16_MIN
                 {
-                    silk_int16_MIN
+                    SILK_INT16_MIN
                 } else if 6 == 1 {
                     (res_Q6 >> 1) + (res_Q6 & 1)
                 } else {

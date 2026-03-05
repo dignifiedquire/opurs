@@ -11,7 +11,7 @@ use crate::silk::define::{
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sigm_Q15::silk_sigm_q15;
 use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
-use crate::silk::typedefs::{silk_int32_MAX, silk_uint8_MAX};
+use crate::silk::typedefs::{SILK_INT32_MAX, SILK_UINT8_MAX};
 use crate::silk::Inlines::silk_SQRT_APPROX;
 use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 
@@ -162,7 +162,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
                     & 0x80000000_u32
                     != 0
                 {
-                    silk_int32_MAX
+                    SILK_INT32_MAX
                 } else {
                     Xnrg[b as usize] + sumSquared
                 };
@@ -172,7 +172,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
                     & 0x80000000_u32
                     != 0
                 {
-                    silk_int32_MAX
+                    SILK_INT32_MAX
                 } else {
                     Xnrg[b as usize] + (sumSquared >> 1)
                 };
@@ -233,7 +233,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         speech_nrg = silk_SQRT_APPROX(speech_nrg);
         SA_Q15 = (((32768 + speech_nrg) as i64 * SA_Q15 as i16 as i64) >> 16) as i32;
     }
-    psEncC.speech_activity_Q8 = silk_min_int(SA_Q15 >> 7, silk_uint8_MAX);
+    psEncC.speech_activity_Q8 = silk_min_int(SA_Q15 >> 7, SILK_UINT8_MAX);
     smooth_coef_Q16 =
         ((4096 * ((SA_Q15 as i64 * SA_Q15 as i16 as i64) >> 16) as i32 as i16 as i64) >> 16) as i32;
     if psEncC.frame_length as i32 == 10 * psEncC.fs_kHz {
@@ -288,7 +288,7 @@ fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
             & 0x80000000_u32
             != 0
         {
-            silk_int32_MAX
+            SILK_INT32_MAX
         } else {
             pX[k as usize] + psSilk_VAD.NoiseLevelBias[k as usize]
         };

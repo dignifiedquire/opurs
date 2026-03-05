@@ -9,7 +9,7 @@ use crate::silk::float::wrappers_FLP::{silk_A2NLSF_FLP, silk_NLSF2A_FLP};
 use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
-use crate::silk::typedefs::silk_float_MAX;
+use crate::silk::typedefs::SILK_FLOAT_MAX;
 
 /// Upstream C: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
 pub fn silk_find_LPC_FLP(
@@ -53,7 +53,7 @@ pub fn silk_find_LPC_FLP(
             psEncC.arch,
         );
         silk_A2NLSF_FLP(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
-        res_nrg_2nd = silk_float_MAX;
+        res_nrg_2nd = SILK_FLOAT_MAX;
         k = 3;
         while k >= 0 {
             silk_interpolate(

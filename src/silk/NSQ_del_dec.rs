@@ -8,8 +8,8 @@ use crate::silk::define::{
     NSQ_LPC_BUF_LENGTH, TYPE_VOICED,
 };
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN, silk_int32_MAX};
+use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN, SILK_INT32_MAX};
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::{silk_RAND, silk_min_int};
@@ -96,10 +96,10 @@ fn rshift_round_sat16(val: i32, shift: i32) -> i16 {
     } else {
         ((val >> (shift - 1)) + 1) >> 1
     };
-    if rounded > silk_int16_MAX {
-        silk_int16_MAX as i16
-    } else if rounded < silk_int16_MIN {
-        silk_int16_MIN as i16
+    if rounded > SILK_INT16_MAX {
+        SILK_INT16_MAX as i16
+    } else if rounded < SILK_INT16_MIN {
+        SILK_INT16_MIN as i16
     } else {
         rounded as i16
     }
@@ -293,7 +293,7 @@ pub fn silk_NSQ_del_dec_c(
         ps_del_dec.sAR2_Q14 = NSQ.sAR2_Q14;
     }
 
-    let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
+    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
     smpl_buf_idx = 0;
     decisionDelay = silk_min_int(DECISION_DELAY, subfr_len as i32);
@@ -357,7 +357,7 @@ pub fn silk_NSQ_del_dec_c(
                     // Penalize non-winners
                     for (i, ps_del_dec) in psDelDec.iter_mut().enumerate().take(n_states) {
                         if i as i32 != Winner_ind {
-                            ps_del_dec.RD_Q10 += silk_int32_MAX >> 4;
+                            ps_del_dec.RD_Q10 += SILK_INT32_MAX >> 4;
                         }
                     }
                     // Output delayed samples from winner

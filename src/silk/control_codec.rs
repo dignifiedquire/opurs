@@ -16,12 +16,12 @@ use crate::silk::pitch_est_tables::{
 };
 use crate::silk::resampler::{silk_resampler, silk_resampler_init, ResamplerState};
 use crate::silk::structs::silk_encoder_state;
-use crate::silk::tables_NLSF_CB_NB_MB::silk_NLSF_CB_NB_MB;
-use crate::silk::tables_NLSF_CB_WB::silk_NLSF_CB_WB;
-use crate::silk::tables_other::{silk_uniform4_iCDF, silk_uniform6_iCDF, silk_uniform8_iCDF};
+use crate::silk::tables_NLSF_CB_NB_MB::SILK_NLSF_CB_NB_MB;
+use crate::silk::tables_NLSF_CB_WB::SILK_NLSF_CB_WB;
+use crate::silk::tables_other::{SILK_UNIFORM4_ICDF, SILK_UNIFORM6_ICDF, SILK_UNIFORM8_ICDF};
 use crate::silk::tables_pitch_lag::{
-    silk_pitch_contour_10_ms_NB_iCDF, silk_pitch_contour_10_ms_iCDF, silk_pitch_contour_NB_iCDF,
-    silk_pitch_contour_iCDF,
+    SILK_PITCH_CONTOUR_10_MS_ICDF, SILK_PITCH_CONTOUR_10_MS_NB_ICDF, SILK_PITCH_CONTOUR_ICDF,
+    SILK_PITCH_CONTOUR_NB_ICDF,
 };
 use crate::silk::tuning_parameters::WARPING_MULTIPLIER;
 use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
@@ -146,9 +146,9 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
             psEnc.sCmn.pitch_LPC_win_length =
                 (10 + ((2) << 1)) as i16 as i32 * fs_kHz as i16 as i32;
             if psEnc.sCmn.fs_kHz == 8 {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_10_ms_NB_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_10_MS_NB_ICDF;
             } else {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_10_ms_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_10_MS_ICDF;
             }
         } else {
             psEnc.sCmn.nFramesPerPacket = PacketSize_ms / (5 * 4);
@@ -157,9 +157,9 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
             psEnc.sCmn.pitch_LPC_win_length =
                 (20 + ((2) << 1)) as i16 as i32 * fs_kHz as i16 as i32;
             if psEnc.sCmn.fs_kHz == 8 {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_NB_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_NB_ICDF;
             } else {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_ICDF;
             }
         }
         psEnc.sCmn.PacketSize_ms = PacketSize_ms;
@@ -184,21 +184,21 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
         psEnc.sCmn.fs_kHz = fs_kHz;
         if psEnc.sCmn.fs_kHz == 8 {
             if psEnc.sCmn.nb_subfr == MAX_NB_SUBFR {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_NB_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_NB_ICDF;
             } else {
-                psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_10_ms_NB_iCDF;
+                psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_10_MS_NB_ICDF;
             }
         } else if psEnc.sCmn.nb_subfr == MAX_NB_SUBFR {
-            psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_iCDF;
+            psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_ICDF;
         } else {
-            psEnc.sCmn.pitch_contour_iCDF = &silk_pitch_contour_10_ms_iCDF;
+            psEnc.sCmn.pitch_contour_iCDF = &SILK_PITCH_CONTOUR_10_MS_ICDF;
         }
         if psEnc.sCmn.fs_kHz == 8 || psEnc.sCmn.fs_kHz == 12 {
             psEnc.sCmn.predictLPCOrder = MIN_LPC_ORDER as i32;
-            psEnc.sCmn.psNLSF_CB = &silk_NLSF_CB_NB_MB;
+            psEnc.sCmn.psNLSF_CB = &SILK_NLSF_CB_NB_MB;
         } else {
             psEnc.sCmn.predictLPCOrder = MAX_LPC_ORDER as i32;
-            psEnc.sCmn.psNLSF_CB = &silk_NLSF_CB_WB;
+            psEnc.sCmn.psNLSF_CB = &SILK_NLSF_CB_WB;
         }
         psEnc.sCmn.subfr_length = SUB_FRAME_LENGTH_MS * fs_kHz as usize;
         psEnc.sCmn.frame_length = psEnc.sCmn.subfr_length * psEnc.sCmn.nb_subfr;
@@ -213,11 +213,11 @@ fn silk_setup_fs(psEnc: &mut silk_encoder_state_FLP, fs_kHz: i32, PacketSize_ms:
                 (10 + ((2) << 1)) as i16 as i32 * fs_kHz as i16 as i32;
         }
         if psEnc.sCmn.fs_kHz == 16 {
-            psEnc.sCmn.pitch_lag_low_bits_iCDF = &silk_uniform8_iCDF;
+            psEnc.sCmn.pitch_lag_low_bits_iCDF = &SILK_UNIFORM8_ICDF;
         } else if psEnc.sCmn.fs_kHz == 12 {
-            psEnc.sCmn.pitch_lag_low_bits_iCDF = &silk_uniform6_iCDF;
+            psEnc.sCmn.pitch_lag_low_bits_iCDF = &SILK_UNIFORM6_ICDF;
         } else {
-            psEnc.sCmn.pitch_lag_low_bits_iCDF = &silk_uniform4_iCDF;
+            psEnc.sCmn.pitch_lag_low_bits_iCDF = &SILK_UNIFORM4_ICDF;
         }
     }
     debug_assert!(psEnc.sCmn.subfr_length * psEnc.sCmn.nb_subfr == psEnc.sCmn.frame_length);

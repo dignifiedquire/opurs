@@ -7,7 +7,7 @@ use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_lpc_inverse_pred_gain;
-use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;
+use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
 use crate::silk::LPC_fit::silk_LPC_fit;
 #[cfg(not(feature = "simd"))]
 use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
@@ -61,16 +61,16 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
 
     /* This ordering was found to maximize quality. It improves the numerical accuracy of
     silk_NLSF2A_find_poly() compared to "standard" ordering. */
-    const ordering16: [u8; 16] = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
-    const ordering10: [u8; 10] = [0, 9, 6, 3, 4, 5, 8, 1, 2, 7];
+    const ORDERING16: [u8; 16] = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
+    const ORDERING10: [u8; 10] = [0, 9, 6, 3, 4, 5, 8, 1, 2, 7];
 
     debug_assert!(d == 10 || d == 16);
 
     /* convert LSFs to 2*cos(LSF), using piecewise linear curve from table */
     let ordering = if d == 16 {
-        ordering16.as_slice()
+        ORDERING16.as_slice()
     } else {
-        ordering10.as_slice()
+        ORDERING10.as_slice()
     };
 
     let mut cos_LSF_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
@@ -88,8 +88,8 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         debug_assert!(f_int < LSF_COS_TAB_SZ_FIX);
 
         /* Read start and end value from table */
-        let cos_val = silk_LSFCosTab_FIX_Q12[f_int as usize] as i32; /* Q12 */
-        let delta = silk_LSFCosTab_FIX_Q12[(f_int + 1) as usize] as i32 - cos_val; /* Q12, with a range of 0..200 */
+        let cos_val = SILK_LSFCOSTAB_FIX_Q12[f_int as usize] as i32; /* Q12 */
+        let delta = SILK_LSFCOSTAB_FIX_Q12[(f_int + 1) as usize] as i32 - cos_val; /* Q12, with a range of 0..200 */
 
         cos_LSF_QA[ordering as usize] = silk_RSHIFT_ROUND((cos_val << 8) + delta * f_frac, 20 - QA);
         /* QA */

@@ -51,7 +51,7 @@ use crate::silk::resampler::silk_resampler;
 use crate::silk::stereo_MS_to_LR::silk_stereo_MS_to_LR;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
 use crate::silk::structs::{silk_decoder_state, stereo_dec_state};
-use crate::silk::tables_other::silk_LBRR_flags_iCDF_ptr;
+use crate::silk::tables_other::SILK_LBRR_FLAGS_ICDF_PTR;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -189,7 +189,7 @@ pub fn silk_decode(
                 } else {
                     LBRR_symbol = ec_dec_icdf(
                         psRangeDec,
-                        silk_LBRR_flags_iCDF_ptr
+                        SILK_LBRR_FLAGS_ICDF_PTR
                             [(channel_state[n as usize].nFramesPerPacket - 2) as usize],
                         8,
                     ) + 1;

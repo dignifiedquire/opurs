@@ -3,11 +3,11 @@
 //! Upstream C: `silk/A2NLSF.c`
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
-use crate::silk::typedefs::silk_int16_MAX;
+use crate::silk::typedefs::SILK_INT16_MAX;
 use crate::silk::SigProc_FIX::silk_min_32;
 
 use crate::silk::define::LSF_COS_TAB_SZ_FIX;
-use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;
+use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
 
 pub const BIN_DIV_STEPS_A2NLSF_FIX: i32 = 3;
 pub const MAX_ITERATIONS_A2NLSF_FIX: i32 = 16;
@@ -95,7 +95,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
     let dd: i32 = d >> 1;
     silk_A2NLSF_init(a_Q16, &mut P, &mut Q, dd);
     use_Q = false;
-    xlo = silk_LSFCosTab_FIX_Q12[0_usize] as i32;
+    xlo = SILK_LSFCOSTAB_FIX_Q12[0_usize] as i32;
     ylo = silk_A2NLSF_eval_poly(&P, xlo, dd);
     if ylo < 0 {
         NLSF[0] = 0;
@@ -109,7 +109,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
     i = 0;
     thr = 0;
     loop {
-        xhi = silk_LSFCosTab_FIX_Q12[k as usize] as i32;
+        xhi = SILK_LSFCOSTAB_FIX_Q12[k as usize] as i32;
         yhi = silk_A2NLSF_eval_poly(if use_Q { &Q } else { &P }, xhi, dd);
         if ylo <= 0 && yhi >= thr || ylo >= 0 && yhi <= -thr {
             if yhi == 0 {
@@ -142,13 +142,13 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
                 ffrac += ylo / ((ylo - yhi) >> (8 - 3));
             }
             NLSF[root_ix as usize] =
-                silk_min_32(((k as u32) << 8) as i32 + ffrac, silk_int16_MAX) as i16;
+                silk_min_32(((k as u32) << 8) as i32 + ffrac, SILK_INT16_MAX) as i16;
             root_ix += 1;
             if root_ix >= d {
                 break;
             }
             use_Q = (root_ix & 1) != 0;
-            xlo = silk_LSFCosTab_FIX_Q12[(k - 1) as usize] as i32;
+            xlo = SILK_LSFCOSTAB_FIX_Q12[(k - 1) as usize] as i32;
             ylo = (((1 - (root_ix & 2)) as u32) << 12) as i32;
         } else {
             k += 1;
@@ -169,7 +169,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
                 silk_bwexpander_32(&mut a_Q16[..d as usize], 65536 - ((1) << i));
                 silk_A2NLSF_init(a_Q16, &mut P, &mut Q, dd);
                 use_Q = false;
-                xlo = silk_LSFCosTab_FIX_Q12[0_usize] as i32;
+                xlo = SILK_LSFCOSTAB_FIX_Q12[0_usize] as i32;
                 ylo = silk_A2NLSF_eval_poly(&P, xlo, dd);
                 if ylo < 0 {
                     NLSF[0] = 0;

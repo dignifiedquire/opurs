@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/NSQ.c`
 
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 ///
 /// Short-term prediction using LPC coefficients. `buf32` is indexed as
@@ -139,7 +139,7 @@ use crate::silk::define::{
     TYPE_VOICED,
 };
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::silk_RAND;
@@ -249,7 +249,7 @@ pub fn silk_NSQ_c(
 
     NSQ.rand_seed = psIndices.Seed as i32;
     lag = NSQ.lagPrev;
-    let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
+    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
 
     // Precompute quantization lookup table for SSE4.1 path (x86 only)
@@ -653,17 +653,17 @@ fn silk_noise_shape_quantizer(
                 + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
         } else {
             ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
-        }) > silk_int16_MAX
+        }) > SILK_INT16_MAX
         {
-            silk_int16_MAX
+            SILK_INT16_MAX
         } else if (if 8 == 1 {
             (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
                 + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)
         } else {
             ((((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> (8 - 1)) + 1) >> 1
-        }) < silk_int16_MIN
+        }) < SILK_INT16_MIN
         {
-            silk_int16_MIN
+            SILK_INT16_MIN
         } else if 8 == 1 {
             (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 >> 1)
                 + (((xq_Q14 as i64 * Gain_Q10 as i64) >> 16) as i32 & 1)

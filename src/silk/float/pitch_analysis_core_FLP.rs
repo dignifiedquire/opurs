@@ -4,7 +4,7 @@
 
 use crate::arch::Arch;
 
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 use crate::celt::pitch::celt_pitch_xcorr;
 use crate::silk::float::energy_FLP::silk_energy_FLP;
@@ -12,12 +12,12 @@ use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
 use crate::silk::float::sort_FLP::silk_insertion_sort_decreasing_FLP;
 use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_log2, silk_short2float_array};
 use crate::silk::pitch_est_tables::{
-    silk_CB_lags_stage2, silk_CB_lags_stage2_10_ms, silk_CB_lags_stage3, silk_CB_lags_stage3_10_ms,
-    silk_Lag_range_stage3, silk_Lag_range_stage3_10_ms, silk_nb_cbk_searchs_stage3,
     PE_FLATCONTOUR_BIAS, PE_LTP_MEM_LENGTH_MS, PE_MAX_LAG_MS, PE_MAX_NB_SUBFR, PE_MIN_LAG_MS,
     PE_NB_CBKS_STAGE2, PE_NB_CBKS_STAGE2_10MS, PE_NB_CBKS_STAGE2_EXT, PE_NB_CBKS_STAGE3_10MS,
     PE_NB_CBKS_STAGE3_MAX, PE_NB_STAGE3_LAGS, PE_PREVLAG_BIAS, PE_SHORTLAG_BIAS,
-    PE_SUBFR_LENGTH_MS, SILK_PE_MIN_COMPLEX,
+    PE_SUBFR_LENGTH_MS, SILK_CB_LAGS_STAGE2, SILK_CB_LAGS_STAGE2_10_MS, SILK_CB_LAGS_STAGE3,
+    SILK_CB_LAGS_STAGE3_10_MS, SILK_LAG_RANGE_STAGE3, SILK_LAG_RANGE_STAGE3_10_MS,
+    SILK_NB_CBK_SEARCHS_STAGE3, SILK_PE_MIN_COMPLEX,
 };
 use crate::silk::resampler::{silk_resampler_down2, silk_resampler_down2_3};
 use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
@@ -154,13 +154,13 @@ pub fn silk_pitch_analysis_core_FLP(
     while i > 0 {
         frame_4kHz[i as usize] = (if frame_4kHz[i as usize] as i32 as f32
             + frame_4kHz[(i - 1) as usize]
-            > silk_int16_MAX as f32
+            > SILK_INT16_MAX as f32
         {
-            silk_int16_MAX as f32
+            SILK_INT16_MAX as f32
         } else if frame_4kHz[i as usize] as i32 as f32 + frame_4kHz[(i - 1) as usize]
-            < silk_int16_MIN as f32
+            < SILK_INT16_MIN as f32
         {
-            silk_int16_MIN as f32
+            SILK_INT16_MIN as f32
         } else {
             frame_4kHz[i as usize] as i32 as f32 + frame_4kHz[(i - 1) as usize]
         }) as i16 as f32;
@@ -325,7 +325,7 @@ pub fn silk_pitch_analysis_core_FLP(
     }
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
         cbk_size = PE_NB_CBKS_STAGE2_EXT as i32;
-        Lag_CB = &silk_CB_lags_stage2;
+        Lag_CB = &SILK_CB_LAGS_STAGE2;
         if Fs_kHz == 8 && complexity > SILK_PE_MIN_COMPLEX {
             nb_cbk_search = PE_NB_CBKS_STAGE2_EXT as i32;
         } else {
@@ -333,7 +333,7 @@ pub fn silk_pitch_analysis_core_FLP(
         }
     } else {
         cbk_size = PE_NB_CBKS_STAGE2_10MS as i32;
-        Lag_CB = &silk_CB_lags_stage2_10_ms;
+        Lag_CB = &SILK_CB_LAGS_STAGE2_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE2_10MS as i32;
     }
     k = 0;
@@ -431,13 +431,13 @@ pub fn silk_pitch_analysis_core_FLP(
         contour_bias = PE_FLATCONTOUR_BIAS / lag as f32;
         let Lag_CB: &[i8];
         if nb_subfr == PE_MAX_NB_SUBFR as i32 {
-            nb_cbk_search = silk_nb_cbk_searchs_stage3[complexity as usize] as i32;
+            nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
             cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
-            Lag_CB = &silk_CB_lags_stage3;
+            Lag_CB = &SILK_CB_LAGS_STAGE3;
         } else {
             nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
             cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
-            Lag_CB = &silk_CB_lags_stage3_10_ms;
+            Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
         }
         let target_st3 = (PE_LTP_MEM_LENGTH_MS * Fs_kHz) as usize;
         energy_tmp =
@@ -462,7 +462,7 @@ pub fn silk_pitch_analysis_core_FLP(
                 } else {
                     CCmax_new = 0.0f32;
                 }
-                if CCmax_new > CCmax && d + silk_CB_lags_stage3[j as usize] as i32 <= max_lag {
+                if CCmax_new > CCmax && d + SILK_CB_LAGS_STAGE3[j as usize] as i32 <= max_lag {
                     CCmax = CCmax_new;
                     lag_new = d;
                     CBimax = j;
@@ -548,14 +548,14 @@ fn silk_P_Ana_calc_corr_st3(
     debug_assert!(complexity >= 0);
     debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
-        Lag_range = &silk_Lag_range_stage3[complexity as usize];
-        Lag_CB = &silk_CB_lags_stage3;
-        nb_cbk_search = silk_nb_cbk_searchs_stage3[complexity as usize] as i32;
+        Lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
+        Lag_CB = &SILK_CB_LAGS_STAGE3;
+        nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
         debug_assert!(nb_subfr == 4 >> 1);
-        Lag_range = &silk_Lag_range_stage3_10_ms;
-        Lag_CB = &silk_CB_lags_stage3_10_ms;
+        Lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
+        Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
         cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
     }
@@ -623,14 +623,14 @@ fn silk_P_Ana_calc_energy_st3(
     debug_assert!(complexity >= 0);
     debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
-        Lag_range = &silk_Lag_range_stage3[complexity as usize];
-        Lag_CB = &silk_CB_lags_stage3;
-        nb_cbk_search = silk_nb_cbk_searchs_stage3[complexity as usize] as i32;
+        Lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
+        Lag_CB = &SILK_CB_LAGS_STAGE3;
+        nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
         debug_assert!(nb_subfr == 4 >> 1);
-        Lag_range = &silk_Lag_range_stage3_10_ms;
-        Lag_CB = &silk_CB_lags_stage3_10_ms;
+        Lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
+        Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
         cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
     }

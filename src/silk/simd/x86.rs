@@ -2269,7 +2269,7 @@ pub unsafe fn silk_nsq_del_dec_avx2(
     LTP_scale_Q14: i32,
 ) {
     use crate::silk::define::MAX_LPC_ORDER;
-    use crate::silk::tables_other::silk_Quantization_Offsets_Q10;
+    use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 
     let ltp_mem_len = psEncC.ltp_mem_length;
     let frame_len = psEncC.frame_length;
@@ -2305,7 +2305,7 @@ pub unsafe fn silk_nsq_del_dec_avx2(
         psDelDec.sAR2_Q14[ii] = _mm_set1_epi32(NSQ.sAR2_Q14[ii]);
     }
 
-    let offset_Q10 = silk_Quantization_Offsets_Q10[(psIndices.signalType as i32 >> 1) as usize]
+    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psIndices.signalType as i32 >> 1) as usize]
         [psIndices.quantOffsetType as usize] as i32;
     let mut smpl_buf_idx: i32 = 0;
 

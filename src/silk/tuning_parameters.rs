@@ -55,9 +55,9 @@ pub const LBRR_SPEECH_ACTIVITY_THRES: f32 = 0.3;
 //*******************
 
 /// reduction in coding SNR during low speech activity
-pub const BG_SNR_DECR_dB: f32 = 2.0f32;
+pub const BG_SNR_DECR_DB: f32 = 2.0f32;
 /// factor for reducing quantization noise during voiced speech
-pub const HARM_SNR_INCR_dB: f32 = 2.0f32;
+pub const HARM_SNR_INCR_DB: f32 = 2.0f32;
 /// threshold for sparseness measure above which to use lower quantization offset during unvoiced
 pub const ENERGY_VARIATION_THRESHOLD_QNT_OFFSET: f32 = 0.6f32;
 /// warping control

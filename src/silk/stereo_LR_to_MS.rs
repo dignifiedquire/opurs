@@ -6,7 +6,7 @@ use crate::silk::define::{LA_SHAPE_MS, STEREO_INTERP_LEN_MS};
 use crate::silk::stereo_find_predictor::silk_stereo_find_predictor;
 use crate::silk::stereo_quant_pred::silk_stereo_quant_pred;
 use crate::silk::structs::stereo_enc_state;
-use crate::silk::typedefs::{silk_int16_MAX, silk_int16_MIN};
+use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 use crate::silk::Inlines::silk_DIV32_varQ;
 use crate::silk::SigProc_FIX::silk_max_int;
 
@@ -56,7 +56,7 @@ pub fn silk_stereo_LR_to_MS(
         sum = x1[n as usize] as i32 + x2[n as usize] as i32;
         diff = x1[n as usize] as i32 - x2[n as usize] as i32;
         x1[n as usize] = ((sum >> 1) + (sum & 1)) as i16;
-        side[n as usize] = ((diff >> 1) + (diff & 1)).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+        side[n as usize] = ((diff >> 1) + (diff & 1)).clamp(SILK_INT16_MIN, SILK_INT16_MAX) as i16;
         n += 1;
     }
 
@@ -301,7 +301,7 @@ pub fn silk_stereo_LR_to_MS(
         // x2 output index: in C, x2.offset(n-1) = inputBuf[2 + n - 1] = inputBuf[n+1]
         // In our version with x2 starting at inputBuf[0]: x2[n+1]
         x2[(n + 1) as usize] =
-            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+            (((sum >> (8 - 1)) + 1) >> 1).clamp(SILK_INT16_MIN, SILK_INT16_MAX) as i16;
         n += 1;
     }
     pred0_Q13 = -pred_Q13[0_usize];
@@ -320,7 +320,7 @@ pub fn silk_stereo_LR_to_MS(
                 * pred1_Q13 as i16 as i64)
                 >> 16)) as i32;
         x2[(n + 1) as usize] =
-            (((sum >> (8 - 1)) + 1) >> 1).clamp(silk_int16_MIN, silk_int16_MAX) as i16;
+            (((sum >> (8 - 1)) + 1) >> 1).clamp(SILK_INT16_MIN, SILK_INT16_MAX) as i16;
         n += 1;
     }
     state.pred_prev_Q13[0_usize] = pred_Q13[0_usize] as i16;

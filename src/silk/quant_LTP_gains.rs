@@ -10,10 +10,10 @@ use crate::silk::log2lin::silk_log2lin;
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_vq_wmat_ec;
 use crate::silk::tables_LTP::{
-    silk_LTP_gain_BITS_Q5_ptrs, silk_LTP_vq_gain_ptrs_Q7, silk_LTP_vq_ptrs_Q7, silk_LTP_vq_sizes,
+    SILK_LTP_GAIN_BITS_Q5_PTRS, SILK_LTP_VQ_GAIN_PTRS_Q7, SILK_LTP_VQ_PTRS_Q7, SILK_LTP_VQ_SIZES,
 };
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
-use crate::silk::typedefs::silk_int32_MAX;
+use crate::silk::typedefs::SILK_INT32_MAX;
 #[cfg(not(feature = "simd"))]
 use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
 
@@ -44,15 +44,15 @@ pub fn silk_quant_LTP_gains(
     let mut best_sum_log_gain_Q7: i32;
     let mut max_gain_Q7: i32;
     let mut gain_Q7: i32 = 0;
-    min_rate_dist_Q7 = silk_int32_MAX;
+    min_rate_dist_Q7 = SILK_INT32_MAX;
     best_sum_log_gain_Q7 = 0;
     k = 0;
     while k < 3 {
         let gain_safety: i32 = (0.4f64 * ((1) << 7) as f64 + 0.5f64) as i32;
-        let cl_ptr_Q5 = silk_LTP_gain_BITS_Q5_ptrs[k as usize];
-        let cbk_ptr_Q7 = silk_LTP_vq_ptrs_Q7[k as usize].as_flattened();
-        let cbk_gain_ptr_Q7 = silk_LTP_vq_gain_ptrs_Q7[k as usize];
-        cbk_size = silk_LTP_vq_sizes[k as usize] as i32;
+        let cl_ptr_Q5 = SILK_LTP_GAIN_BITS_Q5_PTRS[k as usize];
+        let cbk_ptr_Q7 = SILK_LTP_VQ_PTRS_Q7[k as usize].as_flattened();
+        let cbk_gain_ptr_Q7 = SILK_LTP_VQ_GAIN_PTRS_Q7[k as usize];
+        cbk_size = SILK_LTP_VQ_SIZES[k as usize] as i32;
         let mut xx_off: usize = 0;
         let mut xx_off_small: usize = 0;
         res_nrg_Q15 = 0;
@@ -100,7 +100,7 @@ pub fn silk_quant_LTP_gains(
                 & 0x80000000_u32
                 != 0
             {
-                silk_int32_MAX
+                SILK_INT32_MAX
             } else {
                 res_nrg_Q15 + res_nrg_Q15_subfr
             };
@@ -108,7 +108,7 @@ pub fn silk_quant_LTP_gains(
                 & 0x80000000_u32
                 != 0
             {
-                silk_int32_MAX
+                SILK_INT32_MAX
             } else {
                 rate_dist_Q7 + rate_dist_Q7_subfr
             };
@@ -132,7 +132,7 @@ pub fn silk_quant_LTP_gains(
         }
         k += 1;
     }
-    let best_cbk = silk_LTP_vq_ptrs_Q7[*periodicity_index as usize];
+    let best_cbk = SILK_LTP_VQ_PTRS_Q7[*periodicity_index as usize];
     j = 0;
     while j < nb_subfr {
         k = 0;

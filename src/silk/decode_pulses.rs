@@ -6,8 +6,8 @@ use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::code_signs::silk_decode_signs;
 use crate::silk::define::{N_RATE_LEVELS, SHELL_CODEC_FRAME_LENGTH, SILK_MAX_PULSES};
 use crate::silk::shell_coder::silk_shell_decoder;
-use crate::silk::tables_other::silk_lsb_iCDF;
-use crate::silk::tables_pulses_per_block::{silk_pulses_per_block_iCDF, silk_rate_levels_iCDF};
+use crate::silk::tables_other::SILK_LSB_ICDF;
+use crate::silk::tables_pulses_per_block::{SILK_PULSES_PER_BLOCK_ICDF, SILK_RATE_LEVELS_ICDF};
 use itertools::izip;
 
 ///
@@ -35,7 +35,7 @@ pub fn silk_decode_pulses(
     /*********************/
     let RateLevelIndex = ec_dec_icdf(
         psRangeDec,
-        &(silk_rate_levels_iCDF[(signalType >> 1) as usize]),
+        &(SILK_RATE_LEVELS_ICDF[(signalType >> 1) as usize]),
         8,
     );
     let frame_length = pulses.len();
@@ -54,7 +54,7 @@ pub fn silk_decode_pulses(
     /***************************************************/
     /* Sum-Weighted-Pulses Decoding                    */
     /***************************************************/
-    let cdf_ptr = &silk_pulses_per_block_iCDF[RateLevelIndex as usize];
+    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[RateLevelIndex as usize];
     for (out_nLshifts, out_sum_pulse) in izip!(nLshifts.iter_mut(), sum_pulses.iter_mut()) {
         let mut nLshifts = 0;
         let mut sum_pulses = ec_dec_icdf(psRangeDec, cdf_ptr, 8);
@@ -64,7 +64,7 @@ pub fn silk_decode_pulses(
             /* When we've already got 10 LSBs, we shift the table to not allow (SILK_MAX_PULSES + 1) */
             sum_pulses = ec_dec_icdf(
                 psRangeDec,
-                &silk_pulses_per_block_iCDF[N_RATE_LEVELS - 1][(nLshifts == 10) as i32 as usize..],
+                &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1][(nLshifts == 10) as i32 as usize..],
                 8,
             );
         }
@@ -102,7 +102,7 @@ pub fn silk_decode_pulses(
 
                     for _ in 0..nLshifts {
                         abs_q = ((abs_q as u32) << 1) as i32;
-                        abs_q += ec_dec_icdf(psRangeDec, &silk_lsb_iCDF, 8);
+                        abs_q += ec_dec_icdf(psRangeDec, &SILK_LSB_ICDF, 8);
                     }
 
                     *pulse = abs_q as i16;

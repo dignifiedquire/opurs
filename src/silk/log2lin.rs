@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/log2lin.c`
 
-use crate::silk::typedefs::silk_int32_MAX;
+use crate::silk::typedefs::SILK_INT32_MAX;
 
 ///
 /// Approximation of 2^() (very close inverse of silk_lin2log()) */
@@ -14,7 +14,7 @@ pub fn silk_log2lin(inLog_Q7: i32) -> i32 {
     if inLog_Q7 < 0 {
         return 0;
     } else if inLog_Q7 >= 3967 {
-        return silk_int32_MAX;
+        return SILK_INT32_MAX;
     }
     out = (1) << (inLog_Q7 >> 7);
     let frac_Q7: i32 = inLog_Q7 & 0x7f;

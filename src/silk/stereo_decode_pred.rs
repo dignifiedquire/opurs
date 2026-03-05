@@ -6,8 +6,8 @@ use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::STEREO_QUANT_SUB_STEPS;
 use crate::silk::macros::silk_SMULWB;
 use crate::silk::tables_other::{
-    silk_stereo_only_code_mid_iCDF, silk_stereo_pred_joint_iCDF, silk_stereo_pred_quant_Q13,
-    silk_uniform3_iCDF, silk_uniform5_iCDF,
+    SILK_STEREO_ONLY_CODE_MID_ICDF, SILK_STEREO_PRED_JOINT_ICDF, SILK_STEREO_PRED_QUANT_Q13,
+    SILK_UNIFORM3_ICDF, SILK_UNIFORM5_ICDF,
 };
 use crate::silk::SigProc_FIX::SILK_FIX_CONST;
 
@@ -18,7 +18,7 @@ use crate::silk::SigProc_FIX::SILK_FIX_CONST;
 /// pred_Q13[]    O     Predictors
 /// ```
 pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2]) {
-    let n = ec_dec_icdf(psRangeDec, &silk_stereo_pred_joint_iCDF, 8) as usize;
+    let n = ec_dec_icdf(psRangeDec, &SILK_STEREO_PRED_JOINT_ICDF, 8) as usize;
 
     let mut ix: [[usize; 3]; 2] = [[0; 3]; 2];
     ix[0][2] = n / 5;
@@ -27,8 +27,8 @@ pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2])
     /* Entropy decoding */
     let mut n = 0;
     while n < 2 {
-        ix[n][0] = ec_dec_icdf(psRangeDec, &silk_uniform3_iCDF, 8) as usize;
-        ix[n][1] = ec_dec_icdf(psRangeDec, &silk_uniform5_iCDF, 8) as usize;
+        ix[n][0] = ec_dec_icdf(psRangeDec, &SILK_UNIFORM3_ICDF, 8) as usize;
+        ix[n][1] = ec_dec_icdf(psRangeDec, &SILK_UNIFORM5_ICDF, 8) as usize;
         n += 1;
     }
 
@@ -36,9 +36,9 @@ pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2])
     let mut n = 0;
     while n < 2 {
         ix[n][0] += 3 * ix[n][2];
-        let low_Q13 = silk_stereo_pred_quant_Q13[ix[n][0]] as i32;
+        let low_Q13 = SILK_STEREO_PRED_QUANT_Q13[ix[n][0]] as i32;
         let step_Q13 = silk_SMULWB(
-            silk_stereo_pred_quant_Q13[ix[n][0] + 1] as i32 - low_Q13,
+            SILK_STEREO_PRED_QUANT_Q13[ix[n][0] + 1] as i32 - low_Q13,
             SILK_FIX_CONST!(0.5 / STEREO_QUANT_SUB_STEPS as f64, 16),
         );
 
@@ -58,5 +58,5 @@ pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2])
 /// ```
 pub fn silk_stereo_decode_mid_only(psRangeDec: &mut ec_dec, decode_only_mid: &mut bool) {
     /* Decode flag that only mid channel is coded */
-    *decode_only_mid = ec_dec_icdf(psRangeDec, &silk_stereo_only_code_mid_iCDF, 8) != 0;
+    *decode_only_mid = ec_dec_icdf(psRangeDec, &SILK_STEREO_ONLY_CODE_MID_ICDF, 8) != 0;
 }
