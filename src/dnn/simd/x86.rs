@@ -140,11 +140,11 @@ unsafe fn sigmoid4_approx_sse2(x: __m128) -> __m128 {
 #[target_feature(enable = "sse2")]
 #[allow(clippy::approx_constant)]
 unsafe fn exp4_approx_sse2(x: __m128) -> __m128 {
-    let k0 = _mm_set1_ps(0.99992522);
+    let k0 = _mm_set1_ps(0.999_925_2);
     let k1 = _mm_set1_ps(0.69583354);
     let k2 = _mm_set1_ps(0.22606716);
-    let k3 = _mm_set1_ps(0.078024523);
-    let log2_e = _mm_set1_ps(1.44269504);
+    let k3 = _mm_set1_ps(0.078_024_52);
+    let log2_e = _mm_set1_ps(1.442_695);
     let max_in = _mm_set1_ps(50.0);
     let min_in = _mm_set1_ps(-50.0);
     let mask = _mm_set1_epi32(0x7fff_ffffu32 as i32);
@@ -175,11 +175,11 @@ unsafe fn exp4_approx_sse2(x: __m128) -> __m128 {
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::approx_constant)]
 unsafe fn exp4_approx_sse4_1(x: __m128) -> __m128 {
-    let k0 = _mm_set1_ps(0.99992522);
+    let k0 = _mm_set1_ps(0.999_925_2);
     let k1 = _mm_set1_ps(0.69583354);
     let k2 = _mm_set1_ps(0.22606716);
-    let k3 = _mm_set1_ps(0.078024523);
-    let log2_e = _mm_set1_ps(1.44269504);
+    let k3 = _mm_set1_ps(0.078_024_52);
+    let log2_e = _mm_set1_ps(1.442_695);
     let max_in = _mm_set1_ps(50.0);
     let min_in = _mm_set1_ps(-50.0);
     let mask = _mm_set1_epi32(0x7fff_ffffu32 as i32);
