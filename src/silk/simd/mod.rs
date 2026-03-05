@@ -160,7 +160,7 @@ pub fn silk_vq_wmat_ec(
     }
 
     let _ = arch;
-    let vq = super::VQ_WMat_EC::silk_vq_wmat_ec_c(&super::VQ_WMat_EC::SilkVqWmatEcParams {
+    let vq = super::vq_wmat_ec::silk_vq_wmat_ec_c(&super::vq_wmat_ec::SilkVqWmatEcParams {
         xx_q17: XX_Q17,
         x_x_q17: xX_Q17,
         cb_q7: cb_Q7,

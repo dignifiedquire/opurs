@@ -15,7 +15,7 @@ use crate::silk::tables_LTP::{
 use crate::silk::tuning_parameters::MAX_SUM_LOG_GAIN_DB;
 use crate::silk::typedefs::SILK_INT32_MAX;
 #[cfg(not(feature = "simd"))]
-use crate::silk::VQ_WMat_EC::{silk_vq_wmat_ec_c, SilkVqWmatEcParams};
+use crate::silk::vq_wmat_ec::{silk_vq_wmat_ec_c, SilkVqWmatEcParams};
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
 #[allow(clippy::too_many_arguments)]
