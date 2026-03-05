@@ -15,7 +15,7 @@ use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::typedefs::SILK_INT32_MAX;
 use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::SigProc_FIX::silk_rshift_round64;
 use crate::silk::SigProc_FIX::{
     silk_min_int, silk_smmul, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
@@ -186,7 +186,7 @@ pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
 const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
-fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
+fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
     silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
 }
 
@@ -249,7 +249,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             );
 
             // vqrdmulhq_lane_s32: saturating rounding doubling multiply high
-            // Equivalent to MUL32_FRAC_Q(x, rc_Q31, 31)
+            // Equivalent to mul32_frac_q(x, rc_Q31, 31)
             let t0_s32x4 = vqrdmulhq_lane_s32::<0>(tmp2_s32x4, rc_Q31_s32x2);
             let t1_s32x4 = vqrdmulhq_lane_s32::<0>(tmp1_s32x4, rc_Q31_s32x2);
             let t_QA0_s32x4 = vqsubq_s32(tmp1_s32x4, t0_s32x4);
@@ -293,7 +293,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             let tmp1 = A_QA[n];
             let tmp2 = A_QA[k - n - 1];
             let tmp64 = silk_rshift_round64(
-                tmp1.saturating_sub(MUL32_FRAC_Q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
+                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
@@ -301,7 +301,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             }
             A_QA[n] = tmp64 as i32;
             let tmp64 = silk_rshift_round64(
-                tmp2.saturating_sub(MUL32_FRAC_Q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
+                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
@@ -365,7 +365,7 @@ pub unsafe fn silk_LPC_inverse_pred_gain_neon(A_Q12: &[i16]) -> i32 {
     let order = A_Q12.len();
 
     if SILK_MAX_ORDER_LPC != 24 || (order & 1) != 0 {
-        return crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c(A_Q12);
+        return crate::silk::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c(A_Q12);
     }
 
     let mut Atmp_QA = [0i32; SILK_MAX_ORDER_LPC];
@@ -1548,7 +1548,7 @@ pub unsafe fn silk_nsq_del_dec_neon(
                 let start_idx =
                     ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
                 debug_assert!(start_idx > 0);
-                silk_LPC_analysis_filter(
+                silk_lpc_analysis_filter(
                     &mut sLTP[start_idx as usize..ltp_mem_len],
                     &nsq.xq[(start_idx + k * subfr_len as i32) as usize..]
                         [..ltp_mem_len - start_idx as usize],

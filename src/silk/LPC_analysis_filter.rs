@@ -20,7 +20,7 @@ use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
 /// ```
 /// Upstream C: silk/LPC_analysis_filter.c:silk_LPC_analysis_filter
 #[inline]
-pub fn silk_LPC_analysis_filter(out: &mut [i16], input: &[i16], B: &[i16]) {
+pub fn silk_lpc_analysis_filter(out: &mut [i16], input: &[i16], B: &[i16]) {
     let len = input.len();
     let d = B.len();
 

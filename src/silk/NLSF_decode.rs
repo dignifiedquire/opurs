@@ -13,7 +13,7 @@ use crate::silk::structs::silk_NLSF_CB_struct;
 /// Returns RD value in Q30
 /// Upstream C: silk/NLSF_decode.c:silk_NLSF_residual_dequant
 #[inline]
-fn silk_NLSF_residual_dequant(
+fn silk_nlsf_residual_dequant(
     x_Q10: &mut [i16],
     indices: &[i8],
     pred_coef_Q8: &[u8],
@@ -45,7 +45,7 @@ fn silk_NLSF_residual_dequant(
 ///
 /// NLSF vector decoder
 /// Upstream C: silk/NLSF_decode.c:silk_NLSF_decode
-pub fn silk_NLSF_decode(
+pub fn silk_nlsf_decode(
     pNLSF_Q15: &mut [i16],
     NLSFIndices: &[i8],
     psNLSF_CB: &silk_NLSF_CB_struct,
@@ -62,7 +62,7 @@ pub fn silk_NLSF_decode(
     silk_nlsf_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, NLSFIndices[0] as i32);
 
     // Predictive residual dequantizer
-    silk_NLSF_residual_dequant(
+    silk_nlsf_residual_dequant(
         &mut res_Q10[..psNLSF_CB.order as usize],
         &NLSFIndices[1..],
         &pred_Q8[..psNLSF_CB.order as usize],

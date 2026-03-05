@@ -6,10 +6,10 @@ use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::NLSF_VQ_weights_laroia::silk_NLSF_VQ_weights_laroia;
 use crate::silk::NLSF_encode::silk_NLSF_encode;
-use crate::silk::NLSF2A::silk_NLSF2A;
+use crate::silk::NLSF2A::silk_nlsf2a;
 
 /// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
-pub fn silk_process_NLSFs(
+pub fn silk_process_nlsfs(
     psEncC: &mut silk_encoder_state,
     PredCoef_Q12: &mut [[i16; 16]; 2],
     pNLSF_Q15: &mut [i16],
@@ -70,7 +70,7 @@ pub fn silk_process_NLSFs(
         psEncC.NLSF_MSVQ_Survivors,
         psEncC.indices.signalType as i32,
     );
-    silk_NLSF2A(
+    silk_nlsf2a(
         &mut PredCoef_Q12[1][..psEncC.predictLPCOrder as usize],
         &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
         psEncC.arch,
@@ -82,7 +82,7 @@ pub fn silk_process_NLSFs(
             &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
             psEncC.indices.NLSFInterpCoef_Q2 as i32,
         );
-        silk_NLSF2A(
+        silk_nlsf2a(
             &mut PredCoef_Q12[0][..psEncC.predictLPCOrder as usize],
             &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
             psEncC.arch,

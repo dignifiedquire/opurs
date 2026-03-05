@@ -10,7 +10,7 @@ use crate::silk::macros::{silk_smlawb, silk_smulwb, silk_smulww};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::SigProc_FIX::{
     silk_lshift_sat32, silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
 };
@@ -137,7 +137,7 @@ pub fn silk_decode_core(
                         .copy_from_slice(&xq[..2 * psDec.subfr_length]);
                 }
 
-                silk_LPC_analysis_filter(
+                silk_lpc_analysis_filter(
                     &mut sLTP[start_idx..psDec.ltp_mem_length],
                     &psDec.outBuf[start_idx + k * psDec.subfr_length..]
                         [..(psDec.ltp_mem_length - start_idx)],

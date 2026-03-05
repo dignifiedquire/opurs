@@ -10,7 +10,7 @@ use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
 use crate::silk::LPC_fit::silk_LPC_fit;
 #[cfg(not(feature = "simd"))]
-use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
+use crate::silk::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{silk_rshift_round, silk_rshift_round64, SILK_MAX_ORDER_LPC};
 
 pub const QA: i32 = 16;
@@ -25,7 +25,7 @@ pub const QA: i32 = 16;
 /// ```
 /// Upstream C: silk/NLSF2A.c:silk_NLSF2A_find_poly
 #[inline]
-fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
+fn silk_nlsf2a_find_poly(out: &mut [i32], cLSF: &[i32]) {
     let d = cLSF.len();
     let dd = d / 2;
     assert_eq!(out.len(), dd + 1);
@@ -56,11 +56,11 @@ fn silk_NLSF2A_find_poly(out: &mut [i32], cLSF: &[i32]) {
 /// ```
 /// Upstream C: silk/NLSF2A.c:silk_NLSF2A
 #[inline]
-pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
+pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     let d = a_Q12.len();
 
     /* This ordering was found to maximize quality. It improves the numerical accuracy of
-    silk_NLSF2A_find_poly() compared to "standard" ordering. */
+    silk_nlsf2a_find_poly() compared to "standard" ordering. */
     const ORDERING16: [u8; 16] = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
     const ORDERING10: [u8; 10] = [0, 9, 6, 3, 4, 5, 8, 1, 2, 7];
 
@@ -102,8 +102,8 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     let mut Q: [i32; SILK_MAX_ORDER_LPC / 2 + 1] = [0; 13];
     let P = &mut P[..dd + 1];
     let Q = &mut Q[..dd + 1];
-    silk_NLSF2A_find_poly(P, &cos_LSF_QA[..d]);
-    silk_NLSF2A_find_poly(Q, &cos_LSF_QA[1..][..d]);
+    silk_nlsf2a_find_poly(P, &cos_LSF_QA[..d]);
+    silk_nlsf2a_find_poly(Q, &cos_LSF_QA[1..][..d]);
 
     /* convert even and odd polynomials to opus_int32 Q12 filter coefs */
     let mut a32_QA1: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
@@ -125,7 +125,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
     #[cfg(not(feature = "simd"))]
     let pred_gain_fn = {
         let _ = arch;
-        silk_LPC_inverse_pred_gain_c
+        silk_lpc_inverse_pred_gain_c
     };
     while pred_gain_fn(a_Q12) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS {
         /* Prediction coefficients are (too close to) unstable; apply bandwidth expansion   */

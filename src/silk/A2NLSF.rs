@@ -12,7 +12,7 @@ use crate::silk::table_LSF_cos::SILK_LSFCOSTAB_FIX_Q12;
 pub const BIN_DIV_STEPS_A2NLSF_FIX: i32 = 3;
 pub const MAX_ITERATIONS_A2NLSF_FIX: i32 = 16;
 #[inline]
-fn silk_A2NLSF_trans_poly(p: &mut [i32], dd: i32) {
+fn silk_a2nlsf_trans_poly(p: &mut [i32], dd: i32) {
     let mut k: i32;
     let mut n: i32;
     k = 2;
@@ -27,7 +27,7 @@ fn silk_A2NLSF_trans_poly(p: &mut [i32], dd: i32) {
     }
 }
 #[inline]
-fn silk_A2NLSF_eval_poly(p: &[i32], x: i32, dd: i32) -> i32 {
+fn silk_a2nlsf_eval_poly(p: &[i32], x: i32, dd: i32) -> i32 {
     let mut n: i32;
 
     let mut y32: i32;
@@ -52,7 +52,7 @@ fn silk_A2NLSF_eval_poly(p: &[i32], x: i32, dd: i32) -> i32 {
     y32
 }
 #[inline]
-fn silk_A2NLSF_init(a_Q16: &[i32], P: &mut [i32], Q: &mut [i32], dd: i32) {
+fn silk_a2nlsf_init(a_Q16: &[i32], P: &mut [i32], Q: &mut [i32], dd: i32) {
     let mut k: i32;
     P[dd as usize] = (1) << 16;
     Q[dd as usize] = (1) << 16;
@@ -68,11 +68,11 @@ fn silk_A2NLSF_init(a_Q16: &[i32], P: &mut [i32], Q: &mut [i32], dd: i32) {
         Q[(k - 1) as usize] += Q[k as usize];
         k -= 1;
     }
-    silk_A2NLSF_trans_poly(P, dd);
-    silk_A2NLSF_trans_poly(Q, dd);
+    silk_a2nlsf_trans_poly(P, dd);
+    silk_a2nlsf_trans_poly(Q, dd);
 }
 /// Upstream C: silk/A2NLSF.c:silk_A2NLSF
-pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
+pub fn silk_a2nlsf(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
     let mut i: i32;
     let mut k: i32;
     let mut m: i32;
@@ -93,14 +93,14 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
     // use_Q: false = use P, true = use Q
     let mut use_Q: bool;
     let dd: i32 = d >> 1;
-    silk_A2NLSF_init(a_Q16, &mut P, &mut Q, dd);
+    silk_a2nlsf_init(a_Q16, &mut P, &mut Q, dd);
     use_Q = false;
     xlo = SILK_LSFCOSTAB_FIX_Q12[0_usize] as i32;
-    ylo = silk_A2NLSF_eval_poly(&P, xlo, dd);
+    ylo = silk_a2nlsf_eval_poly(&P, xlo, dd);
     if ylo < 0 {
         NLSF[0] = 0;
         use_Q = true;
-        ylo = silk_A2NLSF_eval_poly(&Q, xlo, dd);
+        ylo = silk_a2nlsf_eval_poly(&Q, xlo, dd);
         root_ix = 1;
     } else {
         root_ix = 0;
@@ -110,7 +110,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
     thr = 0;
     loop {
         xhi = SILK_LSFCOSTAB_FIX_Q12[k as usize] as i32;
-        yhi = silk_A2NLSF_eval_poly(if use_Q { &Q } else { &P }, xhi, dd);
+        yhi = silk_a2nlsf_eval_poly(if use_Q { &Q } else { &P }, xhi, dd);
         if ylo <= 0 && yhi >= thr || ylo >= 0 && yhi <= -thr {
             if yhi == 0 {
                 thr = 1;
@@ -121,7 +121,7 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
             m = 0;
             while m < BIN_DIV_STEPS_A2NLSF_FIX {
                 xmid = ((xlo + xhi) >> 1) + ((xlo + xhi) & 1);
-                ymid = silk_A2NLSF_eval_poly(if use_Q { &Q } else { &P }, xmid, dd);
+                ymid = silk_a2nlsf_eval_poly(if use_Q { &Q } else { &P }, xmid, dd);
                 if ylo <= 0 && ymid >= 0 || ylo >= 0 && ymid <= 0 {
                     xhi = xmid;
                     yhi = ymid;
@@ -167,14 +167,14 @@ pub fn silk_A2NLSF(NLSF: &mut [i16], a_Q16: &mut [i32], d: i32) {
                     return;
                 }
                 silk_bwexpander_32(&mut a_Q16[..d as usize], 65536 - ((1) << i));
-                silk_A2NLSF_init(a_Q16, &mut P, &mut Q, dd);
+                silk_a2nlsf_init(a_Q16, &mut P, &mut Q, dd);
                 use_Q = false;
                 xlo = SILK_LSFCOSTAB_FIX_Q12[0_usize] as i32;
-                ylo = silk_A2NLSF_eval_poly(&P, xlo, dd);
+                ylo = silk_a2nlsf_eval_poly(&P, xlo, dd);
                 if ylo < 0 {
                     NLSF[0] = 0;
                     use_Q = true;
-                    ylo = silk_A2NLSF_eval_poly(&Q, xlo, dd);
+                    ylo = silk_a2nlsf_eval_poly(&Q, xlo, dd);
                     root_ix = 1;
                 } else {
                     root_ix = 0;

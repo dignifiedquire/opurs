@@ -12,7 +12,7 @@ use crate::silk::Inlines::silk_sqrt_approx;
 use crate::silk::SigProc_FIX::{
     silk_lshift_sat32, silk_rand, silk_rshift_round, silk_sat16, silk_smultt,
 };
-use crate::silk::NLSF2A::silk_NLSF2A;
+use crate::silk::NLSF2A::silk_nlsf2a;
 
 /// Generates excitation for CNG LPC synthesis
 ///
@@ -147,7 +147,7 @@ pub fn silk_cng(
         let mut A_Q12: [i16; MAX_LPC_ORDER] = [0; 16];
 
         /* Convert CNG NLSF to filter representation */
-        silk_NLSF2A(
+        silk_nlsf2a(
             &mut A_Q12[..psDec.LPC_order],
             &psCNG.CNG_smth_NLSF_Q15[..psDec.LPC_order],
             psDec.arch,

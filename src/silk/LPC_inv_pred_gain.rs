@@ -12,7 +12,7 @@ use crate::silk::SigProc_FIX::{
 const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
-fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
+fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
     silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
 }
 
@@ -25,7 +25,7 @@ fn MUL32_FRAC_Q(a32: i32, b32: i32, Q: i32) -> i32 {
 /// order                        I   Prediction order
 /// ```
 /// Upstream C: silk/LPC_inv_pred_gain.c:LPC_inverse_pred_gain_QA_c
-fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
+fn lpc_inverse_pred_gain_qa_c(A_QA: &mut [i32]) -> i32 {
     let order = A_QA.len();
 
     let mut invGain_Q30 = SILK_FIX_CONST!(1.0, 30);
@@ -59,7 +59,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
             let tmp1 = A_QA[n];
             let tmp2 = A_QA[k - n - 1];
             let tmp64 = silk_rshift_round64(
-                tmp1.saturating_sub(MUL32_FRAC_Q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
+                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
 
@@ -68,7 +68,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
             }
             A_QA[n] = tmp64 as i32;
             let tmp64 = silk_rshift_round64(
-                tmp2.saturating_sub(MUL32_FRAC_Q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
+                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
                 mult2Q,
             );
 
@@ -112,7 +112,7 @@ fn LPC_inverse_pred_gain_QA_c(A_QA: &mut [i32]) -> i32 {
 /// ```
 /// Upstream C: silk/LPC_inv_pred_gain.c:silk_LPC_inverse_pred_gain_c
 #[inline]
-pub fn silk_LPC_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
+pub fn silk_lpc_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
     let mut Atmp_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
     let mut DC_resp: i32 = 0;
 
@@ -129,5 +129,5 @@ pub fn silk_LPC_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
     if DC_resp >= 4096 {
         return 0;
     }
-    LPC_inverse_pred_gain_QA_c(Atmp_QA)
+    lpc_inverse_pred_gain_qa_c(Atmp_QA)
 }

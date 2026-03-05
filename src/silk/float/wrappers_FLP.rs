@@ -3,13 +3,13 @@
 //! Upstream C: `silk/float/wrappers_FLP.c`
 
 use crate::arch::Arch;
-use crate::silk::A2NLSF::silk_A2NLSF;
-use crate::silk::NLSF2A::silk_NLSF2A;
+use crate::silk::A2NLSF::silk_a2nlsf;
+use crate::silk::NLSF2A::silk_nlsf2a;
 
 use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
 use crate::silk::float::structs_FLP::silk_encoder_control_FLP;
 use crate::silk::float::SigProc_FLP::silk_float2int;
-use crate::silk::process_NLSFs::silk_process_NLSFs;
+use crate::silk::process_NLSFs::silk_process_nlsfs;
 use crate::silk::quant_LTP_gains::silk_quant_LTP_gains;
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
@@ -25,7 +25,7 @@ pub fn silk_a2nlsf_flp(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
         a_fix_Q16[i as usize] = silk_float2int(pAR[i as usize] * 65536.0f32);
         i += 1;
     }
-    silk_A2NLSF(
+    silk_a2nlsf(
         &mut NLSF_Q15[..LPC_order as usize],
         &mut a_fix_Q16,
         LPC_order,
@@ -35,7 +35,7 @@ pub fn silk_a2nlsf_flp(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
 pub fn silk_nlsf2a_flp(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: Arch) {
     let mut i: i32;
     let mut a_fix_Q12: [i16; 16] = [0; 16];
-    silk_NLSF2A(
+    silk_nlsf2a(
         &mut a_fix_Q12[..LPC_order as usize],
         &NLSF_Q15[..LPC_order as usize],
         arch,
@@ -56,7 +56,7 @@ pub fn silk_process_nlsfs_flp(
     let mut i: i32;
     let mut j: i32;
     let mut PredCoef_Q12: [[i16; 16]; 2] = [[0; 16]; 2];
-    silk_process_NLSFs(psEncC, &mut PredCoef_Q12, NLSF_Q15, prev_NLSF_Q15);
+    silk_process_nlsfs(psEncC, &mut PredCoef_Q12, NLSF_Q15, prev_NLSF_Q15);
     j = 0;
     while j < 2 {
         i = 0;

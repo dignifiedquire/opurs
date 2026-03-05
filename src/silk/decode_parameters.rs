@@ -9,8 +9,8 @@ use crate::silk::gain_quant::silk_gains_dequant;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::tables_LTP::SILK_LTP_VQ_PTRS_Q7;
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
-use crate::silk::NLSF_decode::silk_NLSF_decode;
-use crate::silk::NLSF2A::silk_NLSF2A;
+use crate::silk::NLSF_decode::silk_nlsf_decode;
+use crate::silk::NLSF2A::silk_nlsf2a;
 
 ///
 /// Decode parameters from payload
@@ -55,10 +55,10 @@ pub fn silk_decode_parameters(
     /****************/
     let mut pNLSF_Q15: [i16; 16] = [0; 16];
     let pNLSF_Q15 = &mut pNLSF_Q15[..psDec.LPC_order];
-    silk_NLSF_decode(pNLSF_Q15, NLSFIndices, psDec.psNLSF_CB);
+    silk_nlsf_decode(pNLSF_Q15, NLSFIndices, psDec.psNLSF_CB);
 
     /* Convert NLSF parameters to AR prediction filter coefficients */
-    silk_NLSF2A(PredCoef_Q12_1, pNLSF_Q15, psDec.arch);
+    silk_nlsf2a(PredCoef_Q12_1, pNLSF_Q15, psDec.arch);
 
     /* If just reset, e.g., because internal Fs changed, do not allow interpolation */
     /* improves the case of packet loss in the first frame after a switch           */
@@ -79,7 +79,7 @@ pub fn silk_decode_parameters(
         }
 
         /* Convert NLSF parameters to AR prediction filter coefficients */
-        silk_NLSF2A(PredCoef_Q12_0, pNLSF0_Q15, psDec.arch);
+        silk_nlsf2a(PredCoef_Q12_0, pNLSF0_Q15, psDec.arch);
     } else {
         /* Copy LPC coefficients for first half from second half */
         PredCoef_Q12_0.copy_from_slice(PredCoef_Q12_1);

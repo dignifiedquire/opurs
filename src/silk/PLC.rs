@@ -24,9 +24,9 @@ use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
 use crate::silk::Inlines::{silk_inverse32_varq, silk_sqrt_approx};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 #[cfg(not(feature = "simd"))]
-use crate::silk::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c;
+use crate::silk::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
 use crate::silk::SigProc_FIX::{
     silk_lshift_sat32, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int,
     silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
@@ -278,7 +278,7 @@ fn silk_plc_conceal(
                 }
                 #[cfg(not(feature = "simd"))]
                 {
-                    silk_LPC_inverse_pred_gain_c(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order])
+                    silk_lpc_inverse_pred_gain_c(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order])
                 }
             };
             let mut down_scale_Q30 = silk_min_32((1i32) << 30 >> 3, invGain_Q30);
@@ -297,7 +297,7 @@ fn silk_plc_conceal(
     let idx = psDec.ltp_mem_length as i32 - lag - psDec.LPC_order as i32 - LTP_ORDER as i32 / 2;
     debug_assert!(idx > 0);
     let idx = idx as usize;
-    silk_LPC_analysis_filter(
+    silk_lpc_analysis_filter(
         &mut sLTP[idx..psDec.ltp_mem_length],
         &psDec.outBuf[idx..psDec.ltp_mem_length],
         &A_Q12[..psDec.LPC_order],

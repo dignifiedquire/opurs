@@ -141,7 +141,7 @@ use crate::silk::define::{
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
+use crate::silk::LPC_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::SigProc_FIX::silk_rand;
 
 /// Dispatch wrapper for NSQ, matching upstream `silk_nsq` RTCD surface.
@@ -309,7 +309,7 @@ pub fn silk_NSQ_c(
                 start_idx =
                     ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
                 debug_assert!(start_idx > 0);
-                silk_LPC_analysis_filter(
+                silk_lpc_analysis_filter(
                     &mut sLTP[start_idx as usize..ltp_mem_len],
                     &NSQ.xq[(start_idx + k * subfr_len as i32) as usize..]
                         [..(ltp_mem_len - start_idx as usize)],

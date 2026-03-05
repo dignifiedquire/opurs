@@ -224,7 +224,7 @@ fn bench_lpc_inverse_pred_gain(c: &mut Criterion) {
             .collect();
         group.bench_with_input(BenchmarkId::new("scalar", order), &order, |b, &_order| {
             b.iter(|| {
-                black_box(opurs::internals::silk_LPC_inverse_pred_gain_c(black_box(
+                black_box(opurs::internals::silk_lpc_inverse_pred_gain_c(black_box(
                     &a_q12,
                 )))
             })

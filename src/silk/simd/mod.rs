@@ -186,7 +186,7 @@ pub fn silk_lpc_inverse_pred_gain(A_Q12: &[i16], arch: Arch) -> i32 {
     }
 
     let _ = arch;
-    super::LPC_inv_pred_gain::silk_LPC_inverse_pred_gain_c(A_Q12)
+    super::LPC_inv_pred_gain::silk_lpc_inverse_pred_gain_c(A_Q12)
 }
 
 /// Returns true if the SSE4.1 NSQ quantizer should be used.

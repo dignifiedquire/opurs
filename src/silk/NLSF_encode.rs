@@ -7,7 +7,7 @@ use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sort::silk_insertion_sort_increasing;
 use crate::silk::structs::silk_NLSF_CB_struct;
 use crate::silk::Inlines::silk_div32_varq;
-use crate::silk::NLSF_decode::silk_NLSF_decode;
+use crate::silk::NLSF_decode::silk_nlsf_decode;
 use crate::silk::NLSF_del_dec_quant::silk_NLSF_del_dec_quant;
 use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
 use crate::silk::NLSF_unpack::silk_nlsf_unpack;
@@ -117,7 +117,7 @@ pub fn silk_NLSF_encode(
     NLSFIndices[0] = tempIndices1[bestIndex as usize] as i8;
     let best_start = (bestIndex * 16) as usize;
     NLSFIndices[1..1 + order].copy_from_slice(&tempIndices2[best_start..best_start + order]);
-    silk_NLSF_decode(
+    silk_nlsf_decode(
         &mut pNLSF_Q15[..order],
         &NLSFIndices[..order + 1],
         psNLSF_CB,

@@ -1,13 +1,13 @@
 /// Tests for SILK LPC inverse prediction gain matching upstream
 /// `silk/tests/test_unit_LPC_inv_pred_gain.c`.
 ///
-/// Tests that silk_LPC_inverse_pred_gain_c() never reports a filter as stable
+/// Tests that silk_lpc_inverse_pred_gain_c() never reports a filter as stable
 /// when it is definitely unstable (verified by impulse response simulation).
 ///
 /// Upstream C: silk/tests/test_unit_LPC_inv_pred_gain.c
 mod test_common;
 
-use opurs::internals::{silk_LPC_inverse_pred_gain_c, SILK_MAX_ORDER_LPC};
+use opurs::internals::{silk_lpc_inverse_pred_gain_c, SILK_MAX_ORDER_LPC};
 use test_common::TestRng;
 
 /// Check filter stability via impulse response simulation.
@@ -66,7 +66,7 @@ fn check_stability(a_q12: &[i16], order: usize) -> bool {
 /// Run 10,000 iterations of random filter stability testing.
 ///
 /// For each iteration, test all even orders 2..=SILK_MAX_ORDER_LPC with
-/// 16 dynamic range shifts. Verify that when silk_LPC_inverse_pred_gain_c()
+/// 16 dynamic range shifts. Verify that when silk_lpc_inverse_pred_gain_c()
 /// reports stable (gain != 0), the filter is not definitely unstable.
 #[test]
 fn test_lpc_inverse_pred_gain() {
@@ -80,7 +80,7 @@ fn test_lpc_inverse_pred_gain() {
                     *coeff = (rng.next_i32() as i16) >> shift;
                 }
 
-                let gain = silk_LPC_inverse_pred_gain_c(&a_q12[..order]);
+                let gain = silk_lpc_inverse_pred_gain_c(&a_q12[..order]);
 
                 if gain != 0 && !check_stability(&a_q12, order) {
                     panic!(
