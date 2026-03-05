@@ -2,8 +2,6 @@
 //!
 //! Upstream C: `dnn/nndsp.c`, `dnn/nndsp.h`
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 use crate::arch::Arch;
 use crate::celt::mathops::celt_log;
 use crate::celt::pitch::celt_pitch_xcorr;
@@ -22,6 +20,8 @@ pub const ADACOMB_MAX_OVERLAP_SIZE: usize = 40;
 
 pub const ADASHAPE_MAX_INPUT_DIM: usize = 512;
 pub const ADASHAPE_MAX_FRAME_SIZE: usize = 240;
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literal bit-exact.
+const TENV_EPSILON: f32 = 1.52587890625e-05f32;
 
 /// Upstream C: dnn/nndsp.h:AdaConvState
 #[derive(Clone)]
@@ -435,7 +435,7 @@ pub fn adashape_process_frame(
         for k in 0..avg_pool_k {
             *tenv_i += x_in[i * avg_pool_k + k].abs();
         }
-        *tenv_i = celt_log(*tenv_i * f + 1.52587890625e-05f32);
+        *tenv_i = celt_log(*tenv_i * f + TENV_EPSILON);
         mean += *tenv_i;
     }
     mean /= tenv_size as f32;
