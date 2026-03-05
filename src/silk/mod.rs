@@ -8,7 +8,6 @@
 #[cfg(feature = "simd")]
 pub mod simd;
 
-pub mod A2NLSF;
 pub mod CNG;
 pub mod HP_variable_cutoff;
 pub mod LPC_analysis_filter;
@@ -28,6 +27,7 @@ pub mod NSQ_del_dec;
 pub mod PLC;
 pub mod VAD;
 pub mod VQ_WMat_EC;
+pub mod a2nlsf;
 pub mod ana_filt_bank_1;
 pub mod biquad_alt;
 pub mod bwexpander;

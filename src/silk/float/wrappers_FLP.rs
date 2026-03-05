@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/wrappers_FLP.c`
 
 use crate::arch::Arch;
-use crate::silk::A2NLSF::silk_a2nlsf;
+use crate::silk::a2nlsf::silk_a2nlsf;
 use crate::silk::NLSF2A::silk_nlsf2a;
 
 use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
