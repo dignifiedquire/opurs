@@ -20,18 +20,26 @@ fn read_pcm16(raw_data: &[u8], nchannels: usize) -> (Vec<f32>, usize) {
     (samples, len / nchannels)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn band_energy(
-    mut out: Option<&mut [f32]>,
-    ps: &mut [f32],
-    bands: &[usize],
-    input: &[f32],
+struct BandEnergyParams<'a> {
+    bands: &'a [usize],
+    input: &'a [f32],
     channels: usize,
     frames: usize,
     window_size: usize,
     step: usize,
     downsample: usize,
-) {
+}
+
+fn band_energy(mut out: Option<&mut [f32]>, ps: &mut [f32], params: BandEnergyParams<'_>) {
+    let BandEnergyParams {
+        bands,
+        input,
+        channels,
+        frames,
+        window_size,
+        step,
+        downsample,
+    } = params;
     let mut window = vec![0f32; window_size];
     let mut c = vec![0f32; window_size];
     let mut s = vec![0f32; window_size];
@@ -187,26 +195,30 @@ pub fn opus_compare(params: CompareParams, true_file: &[u8], tested_file: &[u8])
     band_energy(
         Some(&mut xb),
         &mut x_bands,
-        &BANDS[..NBANDS + 1],
-        &x,
-        nchannels,
-        nframes,
-        TEST_WIN_SIZE,
-        TEST_WIN_STEP,
-        1,
+        BandEnergyParams {
+            bands: &BANDS[..NBANDS + 1],
+            input: &x,
+            channels: nchannels,
+            frames: nframes,
+            window_size: TEST_WIN_SIZE,
+            step: TEST_WIN_STEP,
+            downsample: 1,
+        },
     );
     drop(x);
 
     band_energy(
         None,
         &mut y_bands,
-        &BANDS[..ybands + 1],
-        &y,
-        nchannels,
-        nframes,
-        TEST_WIN_SIZE / downsample,
-        TEST_WIN_STEP / downsample,
-        downsample,
+        BandEnergyParams {
+            bands: &BANDS[..ybands + 1],
+            input: &y,
+            channels: nchannels,
+            frames: nframes,
+            window_size: TEST_WIN_SIZE / downsample,
+            step: TEST_WIN_STEP / downsample,
+            downsample,
+        },
     );
     drop(y);
 
