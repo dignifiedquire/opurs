@@ -5,7 +5,7 @@
 ///
 /// Compute quantization errors for an LPC_order element input vector for a VQ codebook
 /// Upstream C: silk/NLSF_VQ.c:silk_NLSF_VQ
-pub fn silk_NLSF_VQ(
+pub fn silk_nlsf_vq(
     // Quantization errors [K]
     err_Q24: &mut [i32],
     // Input vectors to be quantized [LPC_order]

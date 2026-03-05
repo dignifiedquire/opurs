@@ -4,8 +4,8 @@
 
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
-use crate::silk::NLSF_VQ_weights_laroia::silk_NLSF_VQ_weights_laroia;
-use crate::silk::NLSF_encode::silk_NLSF_encode;
+use crate::silk::NLSF_VQ_weights_laroia::silk_nlsf_vq_weights_laroia;
+use crate::silk::NLSF_encode::silk_nlsf_encode;
 use crate::silk::NLSF2A::silk_nlsf2a;
 
 /// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
@@ -33,7 +33,7 @@ pub fn silk_process_nlsfs(
         NLSF_mu_Q20 = NLSF_mu_Q20 + (NLSF_mu_Q20 >> 1);
     }
     assert!(NLSF_mu_Q20 > 0);
-    silk_NLSF_VQ_weights_laroia(
+    silk_nlsf_vq_weights_laroia(
         &mut pNLSFW_QW[..psEncC.predictLPCOrder as usize],
         &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
     );
@@ -46,7 +46,7 @@ pub fn silk_process_nlsfs(
             &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
             psEncC.indices.NLSFInterpCoef_Q2 as i32,
         );
-        silk_NLSF_VQ_weights_laroia(
+        silk_nlsf_vq_weights_laroia(
             &mut pNLSFW0_temp_QW[..psEncC.predictLPCOrder as usize],
             &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
         );
@@ -61,7 +61,7 @@ pub fn silk_process_nlsfs(
             i += 1;
         }
     }
-    silk_NLSF_encode(
+    silk_nlsf_encode(
         &mut psEncC.indices.NLSFIndices,
         pNLSF_Q15,
         psEncC.psNLSF_CB,

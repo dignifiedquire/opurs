@@ -8,13 +8,13 @@ use crate::silk::sort::silk_insertion_sort_increasing;
 use crate::silk::structs::silk_NLSF_CB_struct;
 use crate::silk::Inlines::silk_div32_varq;
 use crate::silk::NLSF_decode::silk_nlsf_decode;
-use crate::silk::NLSF_del_dec_quant::silk_NLSF_del_dec_quant;
-use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
+use crate::silk::NLSF_del_dec_quant::silk_nlsf_del_dec_quant;
+use crate::silk::NLSF_stabilize::silk_nlsf_stabilize;
 use crate::silk::NLSF_unpack::silk_nlsf_unpack;
-use crate::silk::NLSF_VQ::silk_NLSF_VQ;
+use crate::silk::NLSF_VQ::silk_nlsf_vq;
 
 /// Upstream C: silk/NLSF_encode.c:silk_NLSF_encode
-pub fn silk_NLSF_encode(
+pub fn silk_nlsf_encode(
     NLSFIndices: &mut [i8],
     pNLSF_Q15: &mut [i16],
     psNLSF_CB: &silk_NLSF_CB_struct,
@@ -38,7 +38,7 @@ pub fn silk_NLSF_encode(
     let mut ec_ix: [i16; 16] = [0; 16];
     let order = psNLSF_CB.order as usize;
     assert!((0..=2).contains(&signalType));
-    silk_NLSF_stabilize(&mut pNLSF_Q15[..order], psNLSF_CB.deltaMin_Q15);
+    silk_nlsf_stabilize(&mut pNLSF_Q15[..order], psNLSF_CB.deltaMin_Q15);
     let vla = psNLSF_CB.nVectors as usize;
     // nVectors max: 32; nSurvivors max: 16
     const MAX_VECTORS: usize = 32;
@@ -46,7 +46,7 @@ pub fn silk_NLSF_encode(
     debug_assert!(vla <= MAX_VECTORS);
     debug_assert!(nSurvivors as usize <= MAX_SURVIVORS);
     let mut err_Q24 = [0i32; MAX_VECTORS];
-    silk_NLSF_VQ(
+    silk_nlsf_vq(
         &mut err_Q24,
         &pNLSF_Q15[..order],
         psNLSF_CB.CB1_NLSF_Q8,
@@ -85,7 +85,7 @@ pub fn silk_NLSF_encode(
         }
         silk_nlsf_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, ind1);
         let idx_start = (s * MAX_LPC_ORDER as i32) as usize;
-        RD_Q25[s as usize] = silk_NLSF_del_dec_quant(
+        RD_Q25[s as usize] = silk_nlsf_del_dec_quant(
             &mut tempIndices2[idx_start..idx_start + MAX_LPC_ORDER],
             &res_Q10,
             &W_adj_Q5,

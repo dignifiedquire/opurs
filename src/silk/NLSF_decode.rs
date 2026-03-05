@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/NLSF_decode.c`
 
-use crate::silk::NLSF_stabilize::silk_NLSF_stabilize;
+use crate::silk::NLSF_stabilize::silk_nlsf_stabilize;
 use crate::silk::NLSF_unpack::silk_nlsf_unpack;
 
 use crate::silk::structs::silk_NLSF_CB_struct;
@@ -82,5 +82,5 @@ pub fn silk_nlsf_decode(
             + ((pCB_element as i16 as u32) << 7) as i32;
         *out = NLSF_Q15_tmp.clamp(0, 32767) as i16;
     }
-    silk_NLSF_stabilize(pNLSF_Q15, psNLSF_CB.deltaMin_Q15);
+    silk_nlsf_stabilize(pNLSF_Q15, psNLSF_CB.deltaMin_Q15);
 }

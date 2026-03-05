@@ -16,7 +16,7 @@ pub const MAX_LOOPS: i32 = 20;
 ///
 /// NLSF stabilizer, for a single input data vector
 /// Upstream C: silk/NLSF_stabilize.c:silk_NLSF_stabilize
-pub fn silk_NLSF_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
+pub fn silk_nlsf_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
     let mut i: usize;
     let mut I: usize;
     let mut k: usize;
