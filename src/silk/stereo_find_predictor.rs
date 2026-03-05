@@ -3,10 +3,10 @@
 //! Upstream C: `silk/stereo_find_predictor.c`
 
 use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
+use crate::silk::sigproc_fix::silk_max_int;
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
-use crate::silk::SigProc_FIX::silk_max_int;
 
-use crate::silk::Inlines::{silk_div32_varq, silk_sqrt_approx};
+use crate::silk::inlines::{silk_div32_varq, silk_sqrt_approx};
 
 /// Upstream C: silk/stereo_find_predictor.c:silk_stereo_find_predictor
 pub fn silk_stereo_find_predictor(

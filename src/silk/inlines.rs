@@ -3,7 +3,7 @@
 //! Upstream C: `silk/Inlines.h`
 
 use crate::silk::macros::silk_clz32;
-use crate::silk::SigProc_FIX::silk_ror32;
+use crate::silk::sigproc_fix::silk_ror32;
 
 ///
 /// get number of leading zeros and fractional part (the bits right after the leading one

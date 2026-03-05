@@ -12,12 +12,12 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_SHAPE_LPC_ORDER, NSQ_LPC_BUF_LENGTH,
     TYPE_VOICED,
 };
+use crate::silk::inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::nsq_del_dec::{
     copy_del_dec_state_partial, NSQ_del_dec_struct, NSQ_sample_pair, NSQ_sample_struct,
 };
+use crate::silk::sigproc_fix::silk_rand;
 use crate::silk::structs::{silk_encoder_state, silk_nsq_state, NsqConfig, SideInfoIndices};
-use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::SigProc_FIX::silk_rand;
 
 /// SSE4.1 implementation of `silk_noise_shape_quantizer_short_prediction`.
 /// Port of `silk/x86/NSQ_sse4_1.c`.
@@ -2310,19 +2310,19 @@ pub unsafe fn silk_nsq_del_dec_avx2(
     let mut smpl_buf_idx: i32 = 0;
 
     let mut decisionDelay =
-        crate::silk::SigProc_FIX::silk_min_int(DECISION_DELAY, subfr_len as i32);
+        crate::silk::sigproc_fix::silk_min_int(DECISION_DELAY, subfr_len as i32);
 
     // For voiced frames limit the decision delay
     if psIndices.signalType as i32 == TYPE_VOICED {
         for &pl in pitchL.iter().take(psEncC.nb_subfr) {
-            decisionDelay = crate::silk::SigProc_FIX::silk_min_int(
+            decisionDelay = crate::silk::sigproc_fix::silk_min_int(
                 decisionDelay,
                 pl - LTP_ORDER as i32 / 2 - 1,
             );
         }
     } else if lag > 0 {
         decisionDelay =
-            crate::silk::SigProc_FIX::silk_min_int(decisionDelay, lag - LTP_ORDER as i32 / 2 - 1);
+            crate::silk::sigproc_fix::silk_min_int(decisionDelay, lag - LTP_ORDER as i32 / 2 - 1);
     }
 
     let LSF_interpolation_flag: i32 = if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {

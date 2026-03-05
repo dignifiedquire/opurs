@@ -5,11 +5,11 @@
 use crate::celt::entdec::{ec_dec, ec_dec_icdf};
 use crate::silk::define::STEREO_QUANT_SUB_STEPS;
 use crate::silk::macros::silk_smulwb;
+use crate::silk::sigproc_fix::SILK_FIX_CONST;
 use crate::silk::tables_other::{
     SILK_STEREO_ONLY_CODE_MID_ICDF, SILK_STEREO_PRED_JOINT_ICDF, SILK_STEREO_PRED_QUANT_Q13,
     SILK_UNIFORM3_ICDF, SILK_UNIFORM5_ICDF,
 };
-use crate::silk::SigProc_FIX::SILK_FIX_CONST;
 
 /// Decode mid/side predictors
 ///

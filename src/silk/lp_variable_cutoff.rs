@@ -5,9 +5,9 @@
 use crate::silk::biquad_alt::silk_biquad_alt_stride1;
 use crate::silk::define::{TRANSITION_FRAMES, TRANSITION_INT_NUM, TRANSITION_NA, TRANSITION_NB};
 use crate::silk::macros::silk_smlawb;
+use crate::silk::sigproc_fix::silk_sat16;
 use crate::silk::structs::silk_LP_state;
 use crate::silk::tables_other::{SILK_TRANSITION_LP_A_Q28, SILK_TRANSITION_LP_B_Q28};
-use crate::silk::SigProc_FIX::silk_sat16;
 
 /*
     Elliptic/Cauer filters designed with 0.1 dB passband ripple,

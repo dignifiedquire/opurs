@@ -155,7 +155,7 @@ pub mod internals {
 
     // -- SILK LPC --
     pub use crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
-    pub use crate::silk::SigProc_FIX::SILK_MAX_ORDER_LPC;
+    pub use crate::silk::sigproc_fix::SILK_MAX_ORDER_LPC;
 
     // -- CELT comb filter (for benchmarks) --
     pub use crate::celt::common::{comb_filter, comb_filter_const_c};

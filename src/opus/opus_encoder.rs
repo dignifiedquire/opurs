@@ -35,8 +35,8 @@ use crate::silk::define::{
     DTX_ACTIVITY_THRESHOLD, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX,
     TYPE_NO_VOICE_ACTIVITY, VAD_NO_DECISION,
 };
-use crate::silk::enc_API::silk_EncControlStruct;
-use crate::silk::enc_API::{silk_encode_api, silk_init_encoder_api};
+use crate::silk::enc_api::silk_EncControlStruct;
+use crate::silk::enc_api::{silk_encode_api, silk_init_encoder_api};
 use crate::silk::float::structs_FLP::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;

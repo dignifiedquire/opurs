@@ -20,7 +20,7 @@ use crate::silk::pitch_est_tables::{
     SILK_NB_CBK_SEARCHS_STAGE3, SILK_PE_MIN_COMPLEX,
 };
 use crate::silk::resampler::{silk_resampler_down2, silk_resampler_down2_3};
-use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
+use crate::silk::sigproc_fix::{silk_max_int, silk_min_int};
 use arrayref::array_mut_ref;
 
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_pitch_analysis_core_FLP

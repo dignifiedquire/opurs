@@ -9,17 +9,17 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
     MAX_SUB_FRAME_LENGTH, NSQ_LPC_BUF_LENGTH, QUANT_LEVEL_ADJUST_Q10, TYPE_VOICED,
 };
+use crate::silk::inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::lpc_analysis_filter::silk_lpc_analysis_filter;
 use crate::silk::macros::silk_clz32;
 use crate::silk::macros::{silk_smlawb, silk_smulwb, silk_smulww};
+use crate::silk::sigproc_fix::silk_rshift_round64;
+use crate::silk::sigproc_fix::{
+    silk_min_int, silk_smmul, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
+};
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::typedefs::SILK_INT32_MAX;
-use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::SigProc_FIX::silk_rshift_round64;
-use crate::silk::SigProc_FIX::{
-    silk_min_int, silk_smmul, RAND_INCREMENT, RAND_MULTIPLIER, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
-};
 
 /// NEON implementation of `silk_noise_shape_quantizer_short_prediction`.
 /// Port of `silk/arm/NSQ_neon.h`.

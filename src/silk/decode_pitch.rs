@@ -7,7 +7,7 @@ use crate::silk::pitch_est_tables::{
     PE_NB_CBKS_STAGE2_EXT, PE_NB_CBKS_STAGE3_10MS, PE_NB_CBKS_STAGE3_MAX, SILK_CB_LAGS_STAGE2,
     SILK_CB_LAGS_STAGE2_10_MS, SILK_CB_LAGS_STAGE3, SILK_CB_LAGS_STAGE3_10_MS,
 };
-use crate::silk::SigProc_FIX::silk_limit;
+use crate::silk::sigproc_fix::silk_limit;
 
 ///
 /// Pitch analyzer function

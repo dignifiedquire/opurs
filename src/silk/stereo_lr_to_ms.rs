@@ -3,12 +3,12 @@
 //! Upstream C: `silk/stereo_lr_to_ms.c`
 
 use crate::silk::define::{LA_SHAPE_MS, STEREO_INTERP_LEN_MS};
+use crate::silk::inlines::silk_div32_varq;
+use crate::silk::sigproc_fix::silk_max_int;
 use crate::silk::stereo_find_predictor::silk_stereo_find_predictor;
 use crate::silk::stereo_quant_pred::silk_stereo_quant_pred;
 use crate::silk::structs::stereo_enc_state;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
-use crate::silk::Inlines::silk_div32_varq;
-use crate::silk::SigProc_FIX::silk_max_int;
 
 ///
 /// `x1` and `x2` are slices starting 2 samples before the frame data

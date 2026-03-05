@@ -18,19 +18,19 @@ use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::define::{
     LTP_ORDER, MAX_FRAME_LENGTH, MAX_LPC_ORDER, MAX_SUB_FRAME_LENGTH, TYPE_VOICED,
 };
+use crate::silk::inlines::{silk_inverse32_varq, silk_sqrt_approx};
 use crate::silk::lpc_analysis_filter::silk_lpc_analysis_filter;
 #[cfg(not(feature = "simd"))]
 use crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c;
 use crate::silk::macros::{silk_clz32, silk_smlawb, silk_smulbb, silk_smulww};
+use crate::silk::sigproc_fix::{
+    silk_lshift_sat32, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int,
+    silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
+};
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
-use crate::silk::Inlines::{silk_inverse32_varq, silk_sqrt_approx};
-use crate::silk::SigProc_FIX::{
-    silk_lshift_sat32, silk_max_16, silk_max_32, silk_max_int, silk_min_32, silk_min_int,
-    silk_rand, silk_rshift_round, silk_sat16, SILK_FIX_CONST,
-};
 
 pub const NB_ATT: i32 = 2;
 const HARM_ATT_Q15: [i16; 2] = [32440, 31130];

@@ -11,7 +11,7 @@ use crate::celt::entcode::ec_tell;
 use crate::dnn::osce::{osce_enhance_frame, osce_reset, OSCEModel};
 
 use crate::silk::cng::silk_cng;
-use crate::silk::dec_API::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};
+use crate::silk::dec_api::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};
 use crate::silk::decode_core::silk_decode_core;
 use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_parameters::silk_decode_parameters;

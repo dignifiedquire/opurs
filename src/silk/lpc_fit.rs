@@ -3,7 +3,7 @@
 //! Upstream C: `silk/LPC_fit.c`
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
-use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16, SILK_FIX_CONST};
+use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16, SILK_FIX_CONST};
 
 ///
 /// Convert int32 coefficients to int16 coefs and make sure there's no wrap-around

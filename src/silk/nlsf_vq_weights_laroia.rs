@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/NLSF_VQ_weights_laroia.c`
 
+use crate::silk::sigproc_fix::{silk_max_int, silk_min_int};
 use crate::silk::typedefs::SILK_INT16_MAX;
-use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 const NLSF_W_Q: i32 = 2;
 

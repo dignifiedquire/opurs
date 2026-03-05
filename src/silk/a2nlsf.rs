@@ -3,8 +3,8 @@
 //! Upstream C: `silk/A2NLSF.c`
 
 use crate::silk::bwexpander_32::silk_bwexpander_32;
+use crate::silk::sigproc_fix::silk_min_32;
 use crate::silk::typedefs::SILK_INT16_MAX;
-use crate::silk::SigProc_FIX::silk_min_32;
 
 use crate::silk::define::LSF_COS_TAB_SZ_FIX;
 use crate::silk::table_lsf_cos::SILK_LSFCOSTAB_FIX_Q12;

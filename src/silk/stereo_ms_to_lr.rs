@@ -7,7 +7,7 @@ use crate::silk::define::STEREO_INTERP_LEN_MS;
 use crate::silk::structs::stereo_dec_state;
 
 use crate::silk::macros::{silk_smlawb, silk_smulbb};
-use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
+use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 
 /// Convert adaptive Mid/Side representation to Left/Right stereo signal
 ///

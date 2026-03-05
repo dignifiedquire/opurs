@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/lin2log.c`
 
-use crate::silk::Inlines::silk_clz_frac;
+use crate::silk::inlines::silk_clz_frac;
 
 ///
 // Approximation of 128 * log2() (very close inverse of silk_log2lin())

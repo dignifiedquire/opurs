@@ -3,7 +3,7 @@
 //! Upstream C: `silk/sum_sqr_shift.c`
 
 use crate::silk::macros::{silk_clz32, silk_smulbb};
-use crate::silk::SigProc_FIX::silk_max_32;
+use crate::silk::sigproc_fix::silk_max_32;
 
 /// Rust-specific helper: inner loop for silk_sum_sqr_shift
 fn silk_sum_sqr_shift_inner(mut nrg: i32, shft: i32, x: &[i16]) -> i32 {

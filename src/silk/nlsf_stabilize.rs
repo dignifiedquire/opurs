@@ -7,9 +7,9 @@
 //!  - Output are sorted NLSF coefficients
 //!
 
+use crate::silk::sigproc_fix::{silk_max_int, silk_min_int};
 use crate::silk::sort::silk_insertion_sort_increasing_all_values_int16;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
-use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 pub const MAX_LOOPS: i32 = 20;
 

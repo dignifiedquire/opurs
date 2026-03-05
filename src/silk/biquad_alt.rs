@@ -3,7 +3,7 @@
 //! Upstream C: `silk/biquad_alt.c`
 
 use crate::silk::macros::{silk_smlawb, silk_smulwb};
-use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
+use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 
 ///
 /// Second order ARMA filter, alternative implementation

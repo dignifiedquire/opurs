@@ -6,13 +6,13 @@ use crate::silk::define::{
     CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16, CNG_NLSF_SMTH_Q16,
     MAX_FRAME_LENGTH, MAX_LPC_ORDER, TYPE_NO_VOICE_ACTIVITY,
 };
+use crate::silk::inlines::silk_sqrt_approx;
 use crate::silk::macros::{silk_smlawb, silk_smulwb, silk_smulww};
 use crate::silk::nlsf2a::silk_nlsf2a;
-use crate::silk::structs::{silk_CNG_struct, silk_decoder_control, silk_decoder_state};
-use crate::silk::Inlines::silk_sqrt_approx;
-use crate::silk::SigProc_FIX::{
+use crate::silk::sigproc_fix::{
     silk_lshift_sat32, silk_rand, silk_rshift_round, silk_sat16, silk_smultt,
 };
+use crate::silk::structs::{silk_CNG_struct, silk_decoder_control, silk_decoder_state};
 
 /// Generates excitation for CNG LPC synthesis
 ///

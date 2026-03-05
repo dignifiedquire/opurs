@@ -3,9 +3,9 @@
 //! Upstream C: `silk/LPC_inv_pred_gain.c`
 
 use crate::silk::define::MAX_PREDICTION_POWER_GAIN;
+use crate::silk::inlines::silk_inverse32_varq;
 use crate::silk::macros::silk_clz32;
-use crate::silk::Inlines::silk_inverse32_varq;
-use crate::silk::SigProc_FIX::{
+use crate::silk::sigproc_fix::{
     silk_rshift_round64, silk_smmul, SILK_FIX_CONST, SILK_MAX_ORDER_LPC,
 };
 

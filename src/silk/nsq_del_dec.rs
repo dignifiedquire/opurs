@@ -7,12 +7,12 @@ use crate::silk::define::{
     DECISION_DELAY, HARM_SHAPE_FIR_TAPS, LTP_ORDER, MAX_LPC_ORDER, MAX_SHAPE_LPC_ORDER,
     NSQ_LPC_BUF_LENGTH, TYPE_VOICED,
 };
+use crate::silk::inlines::{silk_div32_varq, silk_inverse32_varq};
 use crate::silk::lpc_analysis_filter::silk_lpc_analysis_filter;
+use crate::silk::sigproc_fix::{silk_min_int, silk_rand};
 use crate::silk::structs::{silk_nsq_state, NsqConfig, SideInfoIndices};
 use crate::silk::tables_other::SILK_QUANTIZATION_OFFSETS_Q10;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN, SILK_INT32_MAX};
-use crate::silk::Inlines::{silk_div32_varq, silk_inverse32_varq};
-use crate::silk::SigProc_FIX::{silk_min_int, silk_rand};
 
 #[derive(Copy, Clone)]
 #[repr(C)]

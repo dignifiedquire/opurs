@@ -19,8 +19,8 @@ use crate::opus::opus_defines::{OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::opus::packet::{opus_packet_parse, opus_packet_parse_impl, opus_pcm_soft_clip_impl};
 use crate::opus_packet_get_samples_per_frame;
-use crate::silk::dec_API::{silk_DecControlStruct, silk_decoder};
-use crate::silk::dec_API::{silk_decode, silk_init_decoder, silk_reset_decoder};
+use crate::silk::dec_api::{silk_DecControlStruct, silk_decoder};
+use crate::silk::dec_api::{silk_decode, silk_init_decoder, silk_reset_decoder};
 #[cfg(feature = "dred")]
 use crate::{
     dnn::dred::{

@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/SigProc_FLP.h`
 
 use crate::celt::float_cast::float2int;
-use crate::silk::SigProc_FIX::silk_sat16;
+use crate::silk::sigproc_fix::silk_sat16;
 
 /// Upstream C: silk/float/SigProc_FLP.h:silk_float2int
 #[inline]

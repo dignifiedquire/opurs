@@ -3,7 +3,7 @@
 //! Upstream C: `silk/bwexpander_32.c`
 
 use crate::silk::macros::silk_smulww;
-use crate::silk::SigProc_FIX::silk_rshift_round;
+use crate::silk::sigproc_fix::silk_rshift_round;
 
 ///
 /// Chirp (bandwidth expand) LP AR filter

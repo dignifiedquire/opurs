@@ -39,8 +39,8 @@ use crate::celt::float_cast::float2int16;
 use crate::silk::errors::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 
 use crate::silk::check_control_input::check_control_input;
-use crate::silk::control_SNR::silk_control_snr;
 use crate::silk::control_codec::silk_control_encoder;
+use crate::silk::control_snr::silk_control_snr;
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, CODE_INDEPENDENTLY_NO_LTP_SCALING,
     ENCODER_NUM_CHANNELS, TYPE_NO_VOICE_ACTIVITY,

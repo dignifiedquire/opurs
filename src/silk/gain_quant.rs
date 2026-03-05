@@ -4,7 +4,7 @@
 
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
-use crate::silk::SigProc_FIX::silk_limit;
+use crate::silk::sigproc_fix::silk_limit;
 
 use crate::silk::define::{
     MAX_DELTA_GAIN_QUANT, MAX_QGAIN_DB, MIN_DELTA_GAIN_QUANT, MIN_QGAIN_DB, N_LEVELS_QGAIN,

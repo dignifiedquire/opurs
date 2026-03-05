@@ -3,7 +3,7 @@
 //! Upstream C: `silk/check_control_input.c`
 
 use crate::silk::define::ENCODER_NUM_CHANNELS;
-use crate::silk::enc_API::silk_EncControlStruct;
+use crate::silk::enc_api::silk_EncControlStruct;
 pub use crate::silk::errors::{
     SILK_ENC_FS_NOT_SUPPORTED, SILK_ENC_INVALID_CBR_SETTING, SILK_ENC_INVALID_COMPLEXITY_SETTING,
     SILK_ENC_INVALID_DTX_SETTING, SILK_ENC_INVALID_INBAND_FEC_SETTING, SILK_ENC_INVALID_LOSS_RATE,

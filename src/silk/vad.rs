@@ -8,12 +8,12 @@ use crate::silk::ana_filt_bank_1::silk_ana_filt_bank_1;
 use crate::silk::define::{
     VAD_INTERNAL_SUBFRAMES, VAD_NEGATIVE_OFFSET_Q5, VAD_NOISE_LEVEL_SMOOTH_COEF_Q16, VAD_N_BANDS,
 };
+use crate::silk::inlines::silk_sqrt_approx;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::sigm_q15::silk_sigm_q15;
+use crate::silk::sigproc_fix::{silk_max_32, silk_max_int, silk_min_int};
 use crate::silk::structs::{silk_VAD_state, silk_encoder_state};
 use crate::silk::typedefs::{SILK_INT32_MAX, SILK_UINT8_MAX};
-use crate::silk::Inlines::silk_sqrt_approx;
-use crate::silk::SigProc_FIX::{silk_max_32, silk_max_int, silk_min_int};
 
 #[cfg(feature = "simd")]
 use crate::silk::simd::silk_vad_energy;

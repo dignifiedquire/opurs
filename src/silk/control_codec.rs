@@ -7,7 +7,7 @@ use crate::silk::define::{
     LA_SHAPE_MS, MAX_DEL_DEC_STATES, MAX_LPC_ORDER, MAX_NB_SUBFR, MIN_LPC_ORDER,
     SUB_FRAME_LENGTH_MS, TYPE_NO_VOICE_ACTIVITY,
 };
-use crate::silk::enc_API::silk_EncControlStruct;
+use crate::silk::enc_api::silk_EncControlStruct;
 use crate::silk::errors::{SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR};
 use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
 use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_short2float_array};
@@ -15,6 +15,7 @@ use crate::silk::pitch_est_tables::{
     SILK_PE_MAX_COMPLEX, SILK_PE_MID_COMPLEX, SILK_PE_MIN_COMPLEX,
 };
 use crate::silk::resampler::{silk_resampler, silk_resampler_init, ResamplerState};
+use crate::silk::sigproc_fix::{silk_max_int, silk_min_int};
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::tables_nlsf_cb_nb_mb::SILK_NLSF_CB_NB_MB;
 use crate::silk::tables_nlsf_cb_wb::SILK_NLSF_CB_WB;
@@ -24,7 +25,6 @@ use crate::silk::tables_pitch_lag::{
     SILK_PITCH_CONTOUR_NB_ICDF,
 };
 use crate::silk::tuning_parameters::WARPING_MULTIPLIER;
-use crate::silk::SigProc_FIX::{silk_max_int, silk_min_int};
 
 /// Upstream C: silk/control_codec.c:silk_control_encoder
 pub fn silk_control_encoder(

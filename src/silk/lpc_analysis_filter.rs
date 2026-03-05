@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/LPC_analysis_filter.c`
 
-use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
+use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 
 ///
 /// LPC analysis filter
