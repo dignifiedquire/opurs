@@ -17,7 +17,7 @@ use crate::silk::NSQ_del_dec::silk_nsq_del_dec;
 use crate::silk::NSQ::silk_nsq;
 
 /// Upstream C: silk/float/wrappers_FLP.c:silk_A2NLSF_FLP
-pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
+pub fn silk_a2nlsf_flp(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
     let mut i: i32;
     let mut a_fix_Q16: [i32; 16] = [0; 16];
     i = 0;
@@ -32,7 +32,7 @@ pub fn silk_A2NLSF_FLP(NLSF_Q15: &mut [i16], pAR: &[f32], LPC_order: i32) {
     );
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_NLSF2A_FLP
-pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: Arch) {
+pub fn silk_nlsf2a_flp(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: Arch) {
     let mut i: i32;
     let mut a_fix_Q12: [i16; 16] = [0; 16];
     silk_NLSF2A(
@@ -47,7 +47,7 @@ pub fn silk_NLSF2A_FLP(pAR: &mut [f32], NLSF_Q15: &[i16], LPC_order: i32, arch: 
     }
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_process_NLSFs_FLP
-pub fn silk_process_NLSFs_FLP(
+pub fn silk_process_nlsfs_flp(
     psEncC: &mut silk_encoder_state,
     PredCoef: &mut [[f32; 16]; 2],
     NLSF_Q15: &mut [i16],
@@ -69,7 +69,7 @@ pub fn silk_process_NLSFs_FLP(
     }
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_NSQ_wrapper_FLP
-pub fn silk_NSQ_wrapper_FLP(
+pub fn silk_nsq_wrapper_flp(
     psEncC: &NsqConfig,
     psEncCtrl: &silk_encoder_control_FLP,
     psIndices: &mut SideInfoIndices,
@@ -181,7 +181,7 @@ pub fn silk_NSQ_wrapper_FLP(
 }
 /// Upstream C: silk/float/wrappers_FLP.c:silk_quant_LTP_gains_FLP
 #[allow(clippy::too_many_arguments)]
-pub fn silk_quant_LTP_gains_FLP(
+pub fn silk_quant_ltp_gains_flp(
     B: &mut [f32],
     cbk_index: &mut [i8],
     periodicity_index: &mut i8,

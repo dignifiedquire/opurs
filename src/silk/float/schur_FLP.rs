@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/schur_FLP.c`
 
 /// Upstream C: silk/float/schur_FLP.c:silk_schur_FLP
-pub fn silk_schur_FLP(refl_coef: &mut [f32], auto_corr: &[f32], order: i32) -> f32 {
+pub fn silk_schur_flp(refl_coef: &mut [f32], auto_corr: &[f32], order: i32) -> f32 {
     let mut k: i32;
     let mut n: i32;
     let mut C: [[f64; 2]; 25] = [[0.; 2]; 25];

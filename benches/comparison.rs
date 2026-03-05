@@ -135,12 +135,12 @@ fn bench_silk_inner_product_flp_comparison(c: &mut Criterion) {
         let d2 = generate_signal(n, 123);
 
         group.bench_with_input(BenchmarkId::new("rust_scalar", n), &n, |b, &_n| {
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP_scalar(&d1, &d2)))
+            b.iter(|| black_box(opurs::internals::silk_inner_product_flp_scalar(&d1, &d2)))
         });
 
         group.bench_with_input(BenchmarkId::new("rust_dispatch", n), &n, |b, &_n| {
             let arch = opurs::internals::opus_select_arch();
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2, arch)))
+            b.iter(|| black_box(opurs::internals::silk_inner_product_flp(&d1, &d2, arch)))
         });
 
         group.bench_with_input(BenchmarkId::new("c_scalar", n), &n, |b, &n| {

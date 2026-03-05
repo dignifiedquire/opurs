@@ -140,7 +140,7 @@ pub unsafe fn silk_NSQ_noise_shape_feedback_loop_neon(
     crate::silk::NSQ::silk_NSQ_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
-/// NEON implementation of `silk_inner_product_FLP`.
+/// NEON implementation of `silk_inner_product_flp`.
 /// f32→f64 inner product using NEON widening conversion and FMA.
 ///
 /// # Safety

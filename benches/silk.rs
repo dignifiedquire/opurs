@@ -80,16 +80,16 @@ fn bench_inner_prod_aligned_scale(c: &mut Criterion) {
 }
 
 fn bench_inner_product_flp(c: &mut Criterion) {
-    let mut group = c.benchmark_group("silk_inner_product_FLP");
+    let mut group = c.benchmark_group("silk_inner_product_flp");
     for &n in &[64, 240, 480, 960] {
         let d1 = generate_f32_signal(n, 42);
         let d2 = generate_f32_signal(n, 123);
         group.bench_with_input(BenchmarkId::new("scalar", n), &n, |b, &_n| {
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP_scalar(&d1, &d2)))
+            b.iter(|| black_box(opurs::internals::silk_inner_product_flp_scalar(&d1, &d2)))
         });
         group.bench_with_input(BenchmarkId::new("dispatch", n), &n, |b, &_n| {
             let arch = opurs::internals::opus_select_arch();
-            b.iter(|| black_box(opurs::internals::silk_inner_product_FLP(&d1, &d2, arch)))
+            b.iter(|| black_box(opurs::internals::silk_inner_product_flp(&d1, &d2, arch)))
         });
     }
     group.finish();

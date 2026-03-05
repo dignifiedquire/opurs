@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/warped_autocorrelation_FLP.c`
 
 /// Upstream C: silk/float/warped_autocorrelation_FLP.c:silk_warped_autocorrelation_FLP
-pub fn silk_warped_autocorrelation_FLP(
+pub fn silk_warped_autocorrelation_flp(
     corr: &mut [f32],
     input: &[f32],
     warping: f32,

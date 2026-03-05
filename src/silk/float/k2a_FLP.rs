@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/k2a_FLP.c`
 
 /// Upstream C: silk/float/k2a_FLP.c:silk_k2a_FLP
-pub fn silk_k2a_FLP(A: &mut [f32], rc: &[f32], order: i32) {
+pub fn silk_k2a_flp(A: &mut [f32], rc: &[f32], order: i32) {
     let mut k: i32;
     let mut n: i32;
     let mut rck: f32;

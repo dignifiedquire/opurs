@@ -265,7 +265,7 @@ pub unsafe fn silk_nsq_del_dec_sse4_1(
     );
 }
 
-/// AVX2+FMA implementation of `silk_inner_product_FLP`.
+/// AVX2+FMA implementation of `silk_inner_product_flp`.
 /// f32→f64 inner product using dual 256-bit accumulators with fused multiply-add.
 /// Port of `silk/float/x86/inner_product_FLP_avx2.c`.
 ///

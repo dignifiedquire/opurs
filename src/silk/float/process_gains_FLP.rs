@@ -15,7 +15,7 @@ use crate::silk::tuning_parameters::{
 };
 
 /// Upstream C: silk/float/process_gains_FLP.c:silk_process_gains_FLP
-pub fn silk_process_gains_FLP(
+pub fn silk_process_gains_flp(
     psEnc: &mut silk_encoder_state_FLP,
     psEncCtrl: &mut silk_encoder_control_FLP,
     condCoding: i32,

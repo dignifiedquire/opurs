@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/find_LTP_FLP.c`
 
 use crate::silk::float::corrMatrix_FLP::{silk_corrMatrix_FLP, silk_corrVector_FLP};
-use crate::silk::float::energy_FLP::silk_energy_FLP;
+use crate::silk::float::energy_FLP::silk_energy_flp;
 use crate::silk::tuning_parameters::LTP_CORR_INV_MAX;
 use crate::util::nalgebra::MatrixViewRMut;
 use nalgebra::{Const, Dim, DimMul, DimProd, Dyn, VectorView};
@@ -53,7 +53,7 @@ pub fn silk_find_LTP_FLP<NbSubfr>(
         silk_corrMatrix_FLP(&lag_frame, Dyn(subfr_length), &mut XX_ptr);
         silk_corrVector_FLP(&lag_frame, &r_frame, &mut xX_ptr);
 
-        let xx = silk_energy_FLP(&r[r_ptr..][..subfr_length + LTP_ORDER]) as f32;
+        let xx = silk_energy_flp(&r[r_ptr..][..subfr_length + LTP_ORDER]) as f32;
         let temp = 1.0 / xx.max(LTP_CORR_INV_MAX * 0.5 * (XX_ptr[(0, 0)] + XX_ptr[(4, 4)]) + 1.0);
         XX_ptr *= temp;
         xX_ptr *= temp;

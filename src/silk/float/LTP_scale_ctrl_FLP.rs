@@ -9,7 +9,7 @@ use crate::silk::macros::silk_SMULBB;
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 
 /// Upstream C: silk/float/LTP_scale_ctrl_FLP.c:silk_LTP_scale_ctrl_FLP
-pub fn silk_LTP_scale_ctrl_FLP(
+pub fn silk_ltp_scale_ctrl_flp(
     psEnc: &mut silk_encoder_state_FLP,
     psEncCtrl: &mut silk_encoder_control_FLP,
     condCoding: i32,

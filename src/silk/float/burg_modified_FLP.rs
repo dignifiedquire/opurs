@@ -3,12 +3,12 @@
 //! Upstream C: `silk/float/burg_modified_FLP.c`
 
 use crate::arch::Arch;
-use crate::silk::float::energy_FLP::silk_energy_FLP;
-use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
+use crate::silk::float::energy_FLP::silk_energy_flp;
+use crate::silk::float::inner_product_FLP::silk_inner_product_flp;
 use crate::silk::tuning_parameters::FIND_LPC_COND_FAC;
 
 /// Upstream C: silk/float/burg_modified_FLP.c:silk_burg_modified_FLP
-pub fn silk_burg_modified_FLP(
+pub fn silk_burg_modified_flp(
     A: &mut [f32],
     x: &[f32],
     minInvGain: f32,
@@ -36,7 +36,7 @@ pub fn silk_burg_modified_FLP(
     let mut CAb: [f64; 25] = [0.; 25];
     let mut Af: [f64; 24] = [0.; 24];
     debug_assert!(subfr_length * nb_subfr <= 384);
-    C0 = silk_energy_FLP(&x[..(nb_subfr * subfr_length) as usize]);
+    C0 = silk_energy_flp(&x[..(nb_subfr * subfr_length) as usize]);
     C_first_row[..24].fill(0.0);
     s = 0;
     while s < nb_subfr {
@@ -44,7 +44,7 @@ pub fn silk_burg_modified_FLP(
         n = 1;
         while n < D + 1 {
             let size = (subfr_length - n) as usize;
-            C_first_row[(n - 1) as usize] += silk_inner_product_FLP(
+            C_first_row[(n - 1) as usize] += silk_inner_product_flp(
                 &x[x_off..x_off + size],
                 &x[x_off + n as usize..x_off + n as usize + size],
                 arch,
@@ -155,7 +155,7 @@ pub fn silk_burg_modified_FLP(
         s = 0;
         while s < nb_subfr {
             let x_off = (s * subfr_length) as usize;
-            C0 -= silk_energy_FLP(&x[x_off..x_off + D as usize]);
+            C0 -= silk_energy_flp(&x[x_off..x_off + D as usize]);
             s += 1;
         }
         nrg_f = C0 * invGain;

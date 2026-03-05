@@ -10,12 +10,12 @@ use crate::silk::define::{
 };
 use crate::silk::encode_indices::silk_encode_indices;
 use crate::silk::encode_pulses::silk_encode_pulses;
-use crate::silk::float::find_pitch_lags_FLP::silk_find_pitch_lags_FLP;
-use crate::silk::float::find_pred_coefs_FLP::silk_find_pred_coefs_FLP;
-use crate::silk::float::noise_shape_analysis_FLP::silk_noise_shape_analysis_FLP;
-use crate::silk::float::process_gains_FLP::silk_process_gains_FLP;
+use crate::silk::float::find_pitch_lags_FLP::silk_find_pitch_lags_flp;
+use crate::silk::float::find_pred_coefs_FLP::silk_find_pred_coefs_flp;
+use crate::silk::float::noise_shape_analysis_FLP::silk_noise_shape_analysis_flp;
+use crate::silk::float::process_gains_FLP::silk_process_gains_flp;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
-use crate::silk::float::wrappers_FLP::silk_NSQ_wrapper_FLP;
+use crate::silk::float::wrappers_FLP::silk_nsq_wrapper_flp;
 use crate::silk::float::SigProc_FLP::silk_short2float_array;
 use crate::silk::gain_quant::{silk_gains_dequant, silk_gains_id, silk_gains_quant};
 use crate::silk::structs::silk_nsq_state;
@@ -25,7 +25,7 @@ use crate::silk::SigProc_FIX::silk_min_int;
 use crate::silk::VAD::silk_vad_get_sa_q8;
 
 /// Upstream C: silk/float/encode_frame_FLP.c:silk_encode_do_VAD_FLP
-pub fn silk_encode_do_VAD_FLP(psEnc: &mut silk_encoder_state_FLP, activity: i32) {
+pub fn silk_encode_do_vad_flp(psEnc: &mut silk_encoder_state_FLP, activity: i32) {
     let activity_threshold: i32 =
         ((SPEECH_ACTIVITY_DTX_THRES * ((1) << 8) as f32) as f64 + 0.5f64) as i32;
     let mut vad_input = [0i16; 321];
@@ -52,7 +52,7 @@ pub fn silk_encode_do_VAD_FLP(psEnc: &mut silk_encoder_state_FLP, activity: i32)
     };
 }
 /// Upstream C: silk/float/encode_frame_FLP.c:silk_encode_frame_FLP
-pub fn silk_encode_frame_FLP(
+pub fn silk_encode_frame_flp(
     psEnc: &mut silk_encoder_state_FLP,
     pnBytesOut: &mut i32,
     mut psRangeEnc: Option<&mut ec_enc>,
@@ -167,7 +167,7 @@ pub fn silk_encode_frame_FLP(
             let frame_len = psEnc.sCmn.frame_length;
             let la_pitch = psEnc.sCmn.la_pitch as usize;
             let buf_len = la_pitch + frame_len + ltp_mem;
-            silk_find_pitch_lags_FLP(
+            silk_find_pitch_lags_flp(
                 psEnc,
                 &mut sEncCtrl,
                 &mut res_pitch[..buf_len],
@@ -185,7 +185,7 @@ pub fn silk_encode_frame_FLP(
             // x range: from x_start, the function reads shapeWinLength per subframe,
             // advancing by subfr_length each iteration
             let x_len = (nb_subfr - 1) * subfr_len + psEnc.sCmn.shapeWinLength as usize;
-            silk_noise_shape_analysis_FLP(
+            silk_noise_shape_analysis_flp(
                 psEnc,
                 &mut sEncCtrl,
                 &res_pitch[ltp_mem..ltp_mem + nb_subfr * subfr_len],
@@ -199,7 +199,7 @@ pub fn silk_encode_frame_FLP(
             let subfr_len = psEnc.sCmn.subfr_length;
             let res_total = ltp_mem + nb_subfr * subfr_len + crate::silk::define::LTP_ORDER;
             let x_total = ltp_mem + nb_subfr * subfr_len;
-            silk_find_pred_coefs_FLP(
+            silk_find_pred_coefs_flp(
                 psEnc,
                 &mut sEncCtrl,
                 &res_pitch[..res_total],
@@ -207,8 +207,8 @@ pub fn silk_encode_frame_FLP(
                 condCoding,
             );
         }
-        silk_process_gains_FLP(&mut *psEnc, &mut sEncCtrl, condCoding);
-        silk_LBRR_encode_FLP(psEnc, &mut sEncCtrl, x_frame_off, condCoding);
+        silk_process_gains_flp(&mut *psEnc, &mut sEncCtrl, condCoding);
+        silk_lbrr_encode_flp(psEnc, &mut sEncCtrl, x_frame_off, condCoding);
         maxIter = 6;
         gainMult_Q8 = (((1) << 8) as f64 + 0.5f64) as i32 as i16;
         found_lower = 0;
@@ -239,7 +239,7 @@ pub fn silk_encode_frame_FLP(
                     let total_len = psEnc.sCmn.nb_subfr * psEnc.sCmn.subfr_length;
                     let frame_len = psEnc.sCmn.frame_length;
                     let cfg = psEnc.sCmn.nsq_config();
-                    silk_NSQ_wrapper_FLP(
+                    silk_nsq_wrapper_flp(
                         &cfg,
                         &sEncCtrl,
                         &mut psEnc.sCmn.indices,
@@ -461,7 +461,7 @@ pub fn silk_encode_frame_FLP(
 }
 /// Upstream C: silk/float/encode_frame_FLP.c:silk_LBRR_encode_FLP
 #[inline]
-fn silk_LBRR_encode_FLP(
+pub fn silk_lbrr_encode_flp(
     psEnc: &mut silk_encoder_state_FLP,
     psEncCtrl: &mut silk_encoder_control_FLP,
     x_frame_off: usize,
@@ -504,7 +504,7 @@ fn silk_LBRR_encode_FLP(
             let total_len = psEnc.sCmn.nb_subfr * psEnc.sCmn.subfr_length;
             let frame_len = psEnc.sCmn.frame_length;
             let cfg = psEnc.sCmn.nsq_config();
-            silk_NSQ_wrapper_FLP(
+            silk_nsq_wrapper_flp(
                 &cfg,
                 psEncCtrl,
                 &mut psEnc.sCmn.indices_LBRR[nFramesEncoded],

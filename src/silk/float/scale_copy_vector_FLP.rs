@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/scale_copy_vector_FLP.c`
 
 /// Upstream C: silk/float/scale_copy_vector_FLP.c:silk_scale_copy_vector_FLP
-pub fn silk_scale_copy_vector_FLP(data_out: &mut [f32], data_in: &[f32], gain: f32, dataSize: i32) {
+pub fn silk_scale_copy_vector_flp(data_out: &mut [f32], data_in: &[f32], gain: f32, dataSize: i32) {
     let mut i: i32;
 
     let dataSize4: i32 = dataSize & 0xfffc;

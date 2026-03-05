@@ -47,7 +47,7 @@ use crate::silk::define::{
 };
 use crate::silk::encode_indices::silk_encode_indices;
 use crate::silk::encode_pulses::silk_encode_pulses;
-use crate::silk::float::encode_frame_FLP::{silk_encode_do_VAD_FLP, silk_encode_frame_FLP};
+use crate::silk::float::encode_frame_FLP::{silk_encode_do_vad_flp, silk_encode_frame_flp};
 use crate::silk::float::structs_FLP::{silk_encoder, silk_shape_state_FLP};
 use crate::silk::init_encoder::silk_init_encoder;
 use crate::silk::resampler::silk_resampler;
@@ -535,7 +535,7 @@ pub fn silk_encode_api(
                     psEnc.state_Fxx[1].sCmn.sNSQ.prev_gain_Q16 = 65536;
                     psEnc.state_Fxx[1].sCmn.first_frame_after_reset = 1;
                 }
-                silk_encode_do_VAD_FLP(&mut psEnc.state_Fxx[1], activity);
+                silk_encode_do_vad_flp(&mut psEnc.state_Fxx[1], activity);
             } else {
                 psEnc.state_Fxx[1].sCmn.VAD_flags
                     [psEnc.state_Fxx[0].sCmn.nFramesEncoded as usize] = 0;
@@ -556,7 +556,7 @@ pub fn silk_encode_api(
                 .sMid
                 .copy_from_slice(&psEnc.state_Fxx[0].sCmn.inputBuf[frame_length..frame_length + 2]);
         }
-        silk_encode_do_VAD_FLP(&mut psEnc.state_Fxx[0], activity);
+        silk_encode_do_vad_flp(&mut psEnc.state_Fxx[0], activity);
         n = 0;
         while n < encControl.nChannelsInternal {
             let mut maxBits: i32;
@@ -592,7 +592,7 @@ pub fn silk_encode_api(
                     condCoding_0 = CODE_CONDITIONALLY;
                 }
                 let ps_range_enc = psRangeEnc.as_deref_mut();
-                ret = silk_encode_frame_FLP(
+                ret = silk_encode_frame_flp(
                     &mut psEnc.state_Fxx[n as usize],
                     nBytesOut,
                     ps_range_enc,

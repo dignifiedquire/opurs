@@ -3,16 +3,16 @@
 //! Upstream C: `silk/float/find_LPC_FLP.c`
 
 use crate::silk::define::MAX_NB_SUBFR;
-use crate::silk::float::burg_modified_FLP::silk_burg_modified_FLP;
-use crate::silk::float::energy_FLP::silk_energy_FLP;
-use crate::silk::float::wrappers_FLP::{silk_A2NLSF_FLP, silk_NLSF2A_FLP};
-use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;
+use crate::silk::float::burg_modified_FLP::silk_burg_modified_flp;
+use crate::silk::float::energy_FLP::silk_energy_flp;
+use crate::silk::float::wrappers_FLP::{silk_a2nlsf_flp, silk_nlsf2a_flp};
+use crate::silk::float::LPC_analysis_filter_FLP::silk_lpc_analysis_filter_flp;
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::typedefs::SILK_FLOAT_MAX;
 
 /// Upstream C: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
-pub fn silk_find_LPC_FLP(
+pub fn silk_find_lpc_flp(
     psEncC: &mut silk_encoder_state,
     NLSF_Q15: &mut [i16],
     x: &[f32],
@@ -29,7 +29,7 @@ pub fn silk_find_LPC_FLP(
     let mut LPC_res: [f32; 384] = [0.; 384];
     let subfr_length: i32 = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
     psEncC.indices.NLSFInterpCoef_Q2 = 4;
-    res_nrg = silk_burg_modified_FLP(
+    res_nrg = silk_burg_modified_flp(
         &mut a,
         x,
         minInvGain,
@@ -43,7 +43,7 @@ pub fn silk_find_LPC_FLP(
         && psEncC.nb_subfr == MAX_NB_SUBFR
     {
         let half_off = (MAX_NB_SUBFR as i32 / 2 * subfr_length) as usize;
-        res_nrg -= silk_burg_modified_FLP(
+        res_nrg -= silk_burg_modified_flp(
             &mut a_tmp,
             &x[half_off..],
             minInvGain,
@@ -52,7 +52,7 @@ pub fn silk_find_LPC_FLP(
             psEncC.predictLPCOrder,
             psEncC.arch,
         );
-        silk_A2NLSF_FLP(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
+        silk_a2nlsf_flp(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
         res_nrg_2nd = SILK_FLOAT_MAX;
         k = 3;
         while k >= 0 {
@@ -62,18 +62,18 @@ pub fn silk_find_LPC_FLP(
                 &NLSF_Q15[..psEncC.predictLPCOrder as usize],
                 k,
             );
-            silk_NLSF2A_FLP(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder, psEncC.arch);
-            silk_LPC_analysis_filter_FLP(
+            silk_nlsf2a_flp(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder, psEncC.arch);
+            silk_lpc_analysis_filter_flp(
                 &mut LPC_res,
                 &a_tmp,
                 &x[..(2 * subfr_length) as usize],
                 2 * subfr_length,
                 psEncC.predictLPCOrder,
             );
-            res_nrg_interp = (silk_energy_FLP(
+            res_nrg_interp = (silk_energy_flp(
                 &LPC_res[psEncC.predictLPCOrder as usize..]
                     [..(subfr_length - psEncC.predictLPCOrder) as usize],
-            ) + silk_energy_FLP(
+            ) + silk_energy_flp(
                 &LPC_res[(psEncC.predictLPCOrder + subfr_length) as usize..]
                     [..(subfr_length - psEncC.predictLPCOrder) as usize],
             )) as f32;
@@ -88,7 +88,7 @@ pub fn silk_find_LPC_FLP(
         }
     }
     if psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4 {
-        silk_A2NLSF_FLP(NLSF_Q15, &a, psEncC.predictLPCOrder);
+        silk_a2nlsf_flp(NLSF_Q15, &a, psEncC.predictLPCOrder);
     }
     debug_assert!(
         psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4

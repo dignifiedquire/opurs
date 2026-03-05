@@ -14,19 +14,19 @@ use crate::silk::tuning_parameters::{
     LOW_QUALITY_LOW_FREQ_SHAPING_DECR, SHAPE_WHITE_NOISE_FRACTION, SUBFR_SMTH_COEF,
 };
 
-use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
-use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;
-use crate::silk::float::bwexpander_FLP::silk_bwexpander_FLP;
-use crate::silk::float::energy_FLP::silk_energy_FLP;
-use crate::silk::float::k2a_FLP::silk_k2a_FLP;
-use crate::silk::float::schur_FLP::silk_schur_FLP;
-use crate::silk::float::warped_autocorrelation_FLP::silk_warped_autocorrelation_FLP;
+use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_flp;
+use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_flp;
+use crate::silk::float::bwexpander_FLP::silk_bwexpander_flp;
+use crate::silk::float::energy_FLP::silk_energy_flp;
+use crate::silk::float::k2a_FLP::silk_k2a_flp;
+use crate::silk::float::schur_FLP::silk_schur_flp;
+use crate::silk::float::warped_autocorrelation_FLP::silk_warped_autocorrelation_flp;
 use crate::silk::float::SigProc_FLP::{silk_log2, silk_sigmoid};
 use crate::silk::mathops::silk_exp2;
 
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_gain
 #[inline]
-fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
+pub fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
     let mut i: i32;
     let mut gain: f32;
     lambda = -lambda;
@@ -40,7 +40,7 @@ fn warped_gain(coefs: &[f32], mut lambda: f32, order: i32) -> f32 {
 }
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_true2monic_coefs
 #[inline]
-fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i32) {
+pub fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i32) {
     let mut i: i32;
     let mut iter: i32;
     let mut ind: i32 = 0;
@@ -87,7 +87,7 @@ fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i3
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(coefs, order, chirp);
+        silk_bwexpander_flp(coefs, order, chirp);
         i = order - 1;
         while i > 0 {
             coefs[(i - 1) as usize] -= lambda * coefs[i as usize];
@@ -104,7 +104,7 @@ fn warped_true2monic_coefs(coefs: &mut [f32], lambda: f32, limit: f32, order: i3
 }
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:limit_coefs
 #[inline]
-fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
+pub fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
     let mut i: i32;
     let mut iter: i32;
     let mut ind: i32 = 0;
@@ -128,13 +128,13 @@ fn limit_coefs(coefs: &mut [f32], limit: f32, order: i32) {
         }
         chirp = 0.99f32
             - (0.8f32 + 0.1f32 * iter as f32) * (maxabs - limit) / (maxabs * (ind + 1) as f32);
-        silk_bwexpander_FLP(coefs, order, chirp);
+        silk_bwexpander_flp(coefs, order, chirp);
         iter += 1;
     }
 }
 
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:silk_noise_shape_analysis_FLP
-pub fn silk_noise_shape_analysis_FLP(
+pub fn silk_noise_shape_analysis_flp(
     psEnc: &mut silk_encoder_state_FLP,
     psEncCtrl: &mut silk_encoder_control_FLP,
     pitch_res: &[f32],
@@ -192,7 +192,7 @@ pub fn silk_noise_shape_analysis_FLP(
         k = 0;
         while k < nSegs {
             nrg = nSamples as f32
-                + silk_energy_FLP(&pitch_res[pitch_res_off..pitch_res_off + nSamples as usize])
+                + silk_energy_flp(&pitch_res[pitch_res_off..pitch_res_off + nSamples as usize])
                     as f32;
             log_energy = silk_log2(nrg as f64);
             if k > 0 {
@@ -218,7 +218,7 @@ pub fn silk_noise_shape_analysis_FLP(
 
         let flat_part: i32 = psEnc.sCmn.fs_kHz * 3;
         let slope_part: i32 = (psEnc.sCmn.shapeWinLength - flat_part) / 2;
-        silk_apply_sine_window_FLP(
+        silk_apply_sine_window_flp(
             &mut x_windowed[..slope_part as usize],
             &x[x_off..x_off + slope_part as usize],
             1,
@@ -229,7 +229,7 @@ pub fn silk_noise_shape_analysis_FLP(
             &x[x_off + shift as usize..x_off + shift as usize + flat_part as usize],
         );
         shift += flat_part;
-        silk_apply_sine_window_FLP(
+        silk_apply_sine_window_flp(
             &mut x_windowed[shift as usize..shift as usize + slope_part as usize],
             &x[x_off + shift as usize..x_off + shift as usize + slope_part as usize],
             2,
@@ -237,7 +237,7 @@ pub fn silk_noise_shape_analysis_FLP(
         );
         x_off += psEnc.sCmn.subfr_length;
         if psEnc.sCmn.warping_Q16 > 0 {
-            silk_warped_autocorrelation_FLP(
+            silk_warped_autocorrelation_flp(
                 &mut auto_corr,
                 &x_windowed,
                 warping,
@@ -245,15 +245,15 @@ pub fn silk_noise_shape_analysis_FLP(
                 psEnc.sCmn.shapingLPCOrder,
             );
         } else {
-            silk_autocorrelation_FLP(
+            silk_autocorrelation_flp(
                 &mut auto_corr[..(psEnc.sCmn.shapingLPCOrder + 1) as usize],
                 &x_windowed[..psEnc.sCmn.shapeWinLength as usize],
                 psEnc.sCmn.arch,
             );
         }
         auto_corr[0_usize] += auto_corr[0_usize] * SHAPE_WHITE_NOISE_FRACTION + 1.0f32;
-        nrg = silk_schur_FLP(&mut rc, &auto_corr, psEnc.sCmn.shapingLPCOrder);
-        silk_k2a_FLP(
+        nrg = silk_schur_flp(&mut rc, &auto_corr, psEnc.sCmn.shapingLPCOrder);
+        silk_k2a_flp(
             &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
             &rc,
             psEnc.sCmn.shapingLPCOrder,
@@ -266,7 +266,7 @@ pub fn silk_noise_shape_analysis_FLP(
                 psEnc.sCmn.shapingLPCOrder,
             );
         }
-        silk_bwexpander_FLP(
+        silk_bwexpander_flp(
             &mut (&mut psEncCtrl.AR)[(k * MAX_SHAPE_LPC_ORDER) as usize..],
             psEnc.sCmn.shapingLPCOrder,
             BWExp,

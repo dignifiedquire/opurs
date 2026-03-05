@@ -4,20 +4,20 @@
 
 use crate::arch::Arch;
 use crate::silk::define::{TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, TYPE_VOICED};
-use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_FLP;
-use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_FLP;
-use crate::silk::float::bwexpander_FLP::silk_bwexpander_FLP;
-use crate::silk::float::k2a_FLP::silk_k2a_FLP;
-use crate::silk::float::pitch_analysis_core_FLP::silk_pitch_analysis_core_FLP;
-use crate::silk::float::schur_FLP::silk_schur_FLP;
+use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_flp;
+use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_flp;
+use crate::silk::float::bwexpander_FLP::silk_bwexpander_flp;
+use crate::silk::float::k2a_FLP::silk_k2a_flp;
+use crate::silk::float::pitch_analysis_core_FLP::silk_pitch_analysis_core_flp;
+use crate::silk::float::schur_FLP::silk_schur_flp;
 use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
-use crate::silk::float::LPC_analysis_filter_FLP::silk_LPC_analysis_filter_FLP;
+use crate::silk::float::LPC_analysis_filter_FLP::silk_lpc_analysis_filter_flp;
 use crate::silk::tuning_parameters::{
     FIND_PITCH_BANDWIDTH_EXPANSION, FIND_PITCH_WHITE_NOISE_FRACTION,
 };
 
 /// Upstream C: silk/float/find_pitch_lags_FLP.c:silk_find_pitch_lags_FLP
-pub fn silk_find_pitch_lags_FLP(
+pub fn silk_find_pitch_lags_flp(
     psEnc: &mut silk_encoder_state_FLP,
     psEncCtrl: &mut silk_encoder_control_FLP,
     res: &mut [f32],
@@ -39,7 +39,7 @@ pub fn silk_find_pitch_lags_FLP(
     let win_len = psEnc.sCmn.pitch_LPC_win_length as usize;
     let x_buf_off = buf_len as usize - win_len;
     // Apply first half sine window
-    silk_apply_sine_window_FLP(
+    silk_apply_sine_window_flp(
         &mut Wsig[..la],
         &x_buf[x_buf_off..x_buf_off + la],
         1,
@@ -50,31 +50,31 @@ pub fn silk_find_pitch_lags_FLP(
     Wsig[la..la + flat_len].copy_from_slice(&x_buf[x_buf_off + la..x_buf_off + la + flat_len]);
     // Apply second half sine window
     let shift = la + flat_len;
-    silk_apply_sine_window_FLP(
+    silk_apply_sine_window_flp(
         &mut Wsig[shift..shift + la],
         &x_buf[x_buf_off + shift..x_buf_off + shift + la],
         2,
         la as i32,
     );
-    silk_autocorrelation_FLP(
+    silk_autocorrelation_flp(
         &mut auto_corr[..(psEnc.sCmn.pitchEstimationLPCOrder + 1) as usize],
         &Wsig[..psEnc.sCmn.pitch_LPC_win_length as usize],
         arch,
     );
     auto_corr[0_usize] += auto_corr[0_usize] * FIND_PITCH_WHITE_NOISE_FRACTION + 1_f32;
-    let res_nrg: f32 = silk_schur_FLP(
+    let res_nrg: f32 = silk_schur_flp(
         &mut refl_coef,
         &auto_corr,
         psEnc.sCmn.pitchEstimationLPCOrder,
     );
     psEncCtrl.predGain = auto_corr[0_usize] / (if res_nrg > 1.0f32 { res_nrg } else { 1.0f32 });
-    silk_k2a_FLP(&mut A, &refl_coef, psEnc.sCmn.pitchEstimationLPCOrder);
-    silk_bwexpander_FLP(
+    silk_k2a_flp(&mut A, &refl_coef, psEnc.sCmn.pitchEstimationLPCOrder);
+    silk_bwexpander_flp(
         &mut A,
         psEnc.sCmn.pitchEstimationLPCOrder,
         FIND_PITCH_BANDWIDTH_EXPANSION,
     );
-    silk_LPC_analysis_filter_FLP(
+    silk_lpc_analysis_filter_flp(
         &mut res[..buf_len as usize],
         &A,
         x_buf,
@@ -89,7 +89,7 @@ pub fn silk_find_pitch_lags_FLP(
         thrhld -= 0.1f32 * psEnc.sCmn.speech_activity_Q8 as f32 * (1.0f32 / 256.0f32);
         thrhld -= 0.15f32 * (psEnc.sCmn.prevSignalType as i32 >> 1) as f32;
         thrhld -= 0.1f32 * psEnc.sCmn.input_tilt_Q15 as f32 * (1.0f32 / 32768.0f32);
-        if silk_pitch_analysis_core_FLP(
+        if silk_pitch_analysis_core_flp(
             res,
             &mut psEncCtrl.pitchL,
             &mut psEnc.sCmn.indices.lagIndex,

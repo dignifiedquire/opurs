@@ -7,9 +7,9 @@ use crate::arch::Arch;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 use crate::celt::pitch::celt_pitch_xcorr;
-use crate::silk::float::energy_FLP::silk_energy_FLP;
-use crate::silk::float::inner_product_FLP::silk_inner_product_FLP;
-use crate::silk::float::sort_FLP::silk_insertion_sort_decreasing_FLP;
+use crate::silk::float::energy_FLP::silk_energy_flp;
+use crate::silk::float::inner_product_FLP::silk_inner_product_flp;
+use crate::silk::float::sort_FLP::silk_insertion_sort_decreasing_flp;
 use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_log2, silk_short2float_array};
 use crate::silk::pitch_est_tables::{
     PE_FLATCONTOUR_BIAS, PE_LTP_MEM_LENGTH_MS, PE_MAX_LAG_MS, PE_MAX_NB_SUBFR, PE_MIN_LAG_MS,
@@ -25,7 +25,7 @@ use arrayref::array_mut_ref;
 
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_pitch_analysis_core_FLP
 #[allow(clippy::too_many_arguments)]
-pub fn silk_pitch_analysis_core_FLP(
+pub fn silk_pitch_analysis_core_flp(
     frame: &[f32],
     pitch_out: &mut [i32],
     lagIndex: &mut i16,
@@ -186,8 +186,8 @@ pub fn silk_pitch_analysis_core_FLP(
             );
         }
         cross_corr = xcorr[(max_lag_4kHz - min_lag_4kHz) as usize] as f64;
-        normalizer = silk_energy_FLP(&frame_4kHz[target_off..target_off + sf_length_8kHz as usize])
-            + silk_energy_FLP(&frame_4kHz[basis_off..basis_off + sf_length_8kHz as usize])
+        normalizer = silk_energy_flp(&frame_4kHz[target_off..target_off + sf_length_8kHz as usize])
+            + silk_energy_flp(&frame_4kHz[basis_off..basis_off + sf_length_8kHz as usize])
             + (sf_length_8kHz as f32 * 4000.0f32) as f64;
         C[0][min_lag_4kHz as usize] += (2_f64 * cross_corr / normalizer) as f32;
         // basis_off_d starts at basis_off and decrements
@@ -212,7 +212,7 @@ pub fn silk_pitch_analysis_core_FLP(
     }
     length_d_srch = 4 + 2 * complexity;
     debug_assert!(3 * length_d_srch <= 24);
-    silk_insertion_sort_decreasing_FLP(
+    silk_insertion_sort_decreasing_flp(
         &mut C[0][min_lag_4kHz as usize..],
         &mut d_srch,
         max_lag_4kHz - min_lag_4kHz + 1,
@@ -288,18 +288,18 @@ pub fn silk_pitch_analysis_core_FLP(
     k = 0;
     while k < nb_subfr {
         energy_tmp =
-            silk_energy_FLP(&frame_8[target_off..target_off + sf_length_8kHz as usize]) + 1.0f64;
+            silk_energy_flp(&frame_8[target_off..target_off + sf_length_8kHz as usize]) + 1.0f64;
         j = 0;
         while j < length_d_comp {
             d = d_comp[j as usize] as i32;
             let basis_off = target_off - d as usize;
-            cross_corr = silk_inner_product_FLP(
+            cross_corr = silk_inner_product_flp(
                 &frame_8[basis_off..basis_off + sf_length_8kHz as usize],
                 &frame_8[target_off..target_off + sf_length_8kHz as usize],
                 arch,
             );
             if cross_corr > 0.0f32 as f64 {
-                energy = silk_energy_FLP(&frame_8[basis_off..basis_off + sf_length_8kHz as usize]);
+                energy = silk_energy_flp(&frame_8[basis_off..basis_off + sf_length_8kHz as usize]);
                 C[k as usize][d as usize] = (2_f64 * cross_corr / (energy + energy_tmp)) as f32;
             } else {
                 C[k as usize][d as usize] = 0.0f32;
@@ -410,7 +410,7 @@ pub fn silk_pitch_analysis_core_FLP(
         lag_new = lag;
         CBimax = 0;
         CCmax = -1000.0f32;
-        silk_P_Ana_calc_corr_st3(
+        silk_p_ana_calc_corr_st3(
             &mut cross_corr_st3,
             frame,
             start_lag,
@@ -419,7 +419,7 @@ pub fn silk_pitch_analysis_core_FLP(
             complexity,
             arch,
         );
-        silk_P_Ana_calc_energy_st3(
+        silk_p_ana_calc_energy_st3(
             &mut energies_st3,
             frame,
             start_lag,
@@ -441,7 +441,7 @@ pub fn silk_pitch_analysis_core_FLP(
         }
         let target_st3 = (PE_LTP_MEM_LENGTH_MS * Fs_kHz) as usize;
         energy_tmp =
-            silk_energy_FLP(&frame[target_st3..target_st3 + (nb_subfr * sf_length) as usize])
+            silk_energy_flp(&frame[target_st3..target_st3 + (nb_subfr * sf_length) as usize])
                 + 1.0f64;
         d = start_lag;
         while d <= end_lag {
@@ -522,7 +522,7 @@ pub fn silk_pitch_analysis_core_FLP(
     0
 }
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_corr_st3
-fn silk_P_Ana_calc_corr_st3(
+fn silk_p_ana_calc_corr_st3(
     cross_corr_st3: &mut [[[f32; 5]; 34]; 4],
     frame: &[f32],
     start_lag: i32,
@@ -599,7 +599,7 @@ fn silk_P_Ana_calc_corr_st3(
     }
 }
 /// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_energy_st3
-fn silk_P_Ana_calc_energy_st3(
+fn silk_p_ana_calc_energy_st3(
     energies_st3: &mut [[[f32; 5]; 34]; 4],
     frame: &[f32],
     start_lag: i32,
@@ -639,7 +639,7 @@ fn silk_P_Ana_calc_energy_st3(
     while k < nb_subfr {
         lag_counter = 0;
         let basis_off = target_off - (start_lag + Lag_range[k as usize][0] as i32) as usize;
-        energy = silk_energy_FLP(&frame[basis_off..basis_off + sf_length as usize]) + 1e-3f64;
+        energy = silk_energy_flp(&frame[basis_off..basis_off + sf_length as usize]) + 1e-3f64;
         scratch_mem[lag_counter as usize] = energy as f32;
         lag_counter += 1;
         lag_diff = Lag_range[k as usize][1] as i32 - Lag_range[k as usize][0] as i32 + 1;
