@@ -10,6 +10,7 @@ use crate::celt::entcode::ec_tell;
 #[cfg(feature = "osce")]
 use crate::dnn::osce::{osce_enhance_frame, osce_reset, OSCEModel};
 
+use crate::silk::cng::silk_cng;
 use crate::silk::dec_API::{FLAG_DECODE_LBRR, FLAG_DECODE_NORMAL};
 use crate::silk::decode_core::silk_decode_core;
 use crate::silk::decode_indices::silk_decode_indices;
@@ -17,7 +18,6 @@ use crate::silk::decode_parameters::silk_decode_parameters;
 use crate::silk::decode_pulses::silk_decode_pulses;
 use crate::silk::define::{MAX_FRAME_LENGTH, SHELL_CODEC_FRAME_LENGTH};
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
-use crate::silk::CNG::silk_cng;
 use crate::silk::PLC::{silk_plc, silk_plc_glue_frames};
 
 #[cfg(feature = "deep-plc")]

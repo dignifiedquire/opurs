@@ -8,7 +8,6 @@
 #[cfg(feature = "simd")]
 pub mod simd;
 
-pub mod CNG;
 pub mod HP_variable_cutoff;
 pub mod LPC_analysis_filter;
 pub mod LPC_fit;
@@ -33,6 +32,7 @@ pub mod biquad_alt;
 pub mod bwexpander;
 pub mod bwexpander_32;
 pub mod check_control_input;
+pub mod cng;
 pub mod code_signs;
 pub mod control_SNR;
 pub mod control_audio_bandwidth;
