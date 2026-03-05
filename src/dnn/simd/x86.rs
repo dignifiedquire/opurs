@@ -5,8 +5,6 @@
 //!
 //! Port of `dnn/vec_avx.h` from libopus 1.6.1.
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -19,7 +17,7 @@ use core::arch::x86_64::*;
 /// AVX2 fast 2^x approximation via IEEE 754 bit manipulation.
 /// Port of `vec_avx.h:exp8_approx` (AVX2 path).
 #[target_feature(enable = "avx2", enable = "fma")]
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn exp8_approx(x: __m256) -> __m256 {
     let k0 = _mm256_set1_ps(0.99992522);
     let k1 = _mm256_set1_ps(0.69583354);
@@ -46,6 +44,7 @@ unsafe fn exp8_approx(x: __m256) -> __m256 {
 /// AVX2 fast tanh approximation using Padé rational function.
 /// Port of `vec_avx.h:tanh8_approx`.
 #[target_feature(enable = "avx2", enable = "fma")]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn tanh8_approx(x: __m256) -> __m256 {
     let n0 = _mm256_set1_ps(952.52801514);
     let n1 = _mm256_set1_ps(96.39235687);
@@ -68,6 +67,7 @@ unsafe fn tanh8_approx(x: __m256) -> __m256 {
 /// AVX2 fast sigmoid approximation using Padé rational function.
 /// Port of `vec_avx.h:sigmoid8_approx`.
 #[target_feature(enable = "avx2", enable = "fma")]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn sigmoid8_approx(x: __m256) -> __m256 {
     let n0 = _mm256_set1_ps(238.13200378);
     let n1 = _mm256_set1_ps(6.02452230);
@@ -91,6 +91,7 @@ unsafe fn sigmoid8_approx(x: __m256) -> __m256 {
 /// SSE2 fast tanh approximation using Padé rational function.
 /// Port of non-AVX `vec_avx.h:tanh4_approx`.
 #[target_feature(enable = "sse2")]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn tanh4_approx_sse2(x: __m128) -> __m128 {
     let n0 = _mm_set1_ps(952.52801514);
     let n1 = _mm_set1_ps(96.39235687);
@@ -113,6 +114,7 @@ unsafe fn tanh4_approx_sse2(x: __m128) -> __m128 {
 /// SSE2 fast sigmoid approximation using Padé rational function.
 /// Port of non-AVX `vec_avx.h:sigmoid4_approx`.
 #[target_feature(enable = "sse2")]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn sigmoid4_approx_sse2(x: __m128) -> __m128 {
     let n0 = _mm_set1_ps(238.13200378);
     let n1 = _mm_set1_ps(6.02452230);
