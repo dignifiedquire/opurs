@@ -5,8 +5,6 @@
 //!
 //! Port of `dnn/vec_neon.h` from libopus 1.6.1.
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 use core::arch::aarch64::*;
 use core::arch::asm;
 
@@ -17,7 +15,7 @@ use core::arch::asm;
 /// NEON fast exp approximation (4-wide).
 /// Port of `vec_neon.h:exp4_approx`.
 #[target_feature(enable = "neon")]
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
     let x = vmaxq_f32(vminq_f32(x, vdupq_n_f32(88.0)), vdupq_n_f32(-88.0));
 
@@ -45,7 +43,7 @@ unsafe fn exp4_approx(x: float32x4_t) -> float32x4_t {
 /// NEON fast tanh approximation (4-wide).
 /// Port of `vec_neon.h:tanh4_approx`.
 #[target_feature(enable = "neon")]
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn tanh4_approx(x: float32x4_t) -> float32x4_t {
     let n0 = vdupq_n_f32(952.52801514);
     let n1 = vdupq_n_f32(96.39235687);
@@ -68,6 +66,7 @@ unsafe fn tanh4_approx(x: float32x4_t) -> float32x4_t {
 /// NEON fast sigmoid approximation (4-wide).
 /// Port of `vec_neon.h:sigmoid4_approx`.
 #[target_feature(enable = "neon")]
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 unsafe fn sigmoid4_approx(x: float32x4_t) -> float32x4_t {
     let n0 = vdupq_n_f32(238.13200378);
     let n1 = vdupq_n_f32(6.02452230);
