@@ -16,7 +16,7 @@ use crate::silk::SigProc_FIX::silk_max_int;
 /// Total length must be `frame_length + 2`.
 /// Upstream C: silk/stereo_LR_to_MS.c:silk_stereo_LR_to_MS
 #[allow(clippy::too_many_arguments)]
-pub fn silk_stereo_LR_to_MS(
+pub fn silk_stereo_lr_to_ms(
     state: &mut stereo_enc_state,
     x1: &mut [i16],
     x2: &mut [i16],

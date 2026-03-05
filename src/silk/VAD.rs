@@ -30,7 +30,7 @@ fn silk_vad_energy(x: &[i16], _arch: Arch) -> i32 {
 }
 
 /// Upstream C: silk/VAD.c:silk_VAD_Init
-pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
+pub fn silk_vad_init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
     let mut b: i32;
     let ret: i32 = 0;
     *psSilk_VAD = Default::default();
@@ -55,7 +55,7 @@ pub fn silk_VAD_Init(psSilk_VAD: &mut silk_VAD_state) -> i32 {
 }
 const TILT_WEIGHTS: [i32; 4] = [30000, 6000, -(12000), -(12000)];
 /// Upstream C: silk/VAD.c:silk_VAD_GetSA_Q8_c
-pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+pub fn silk_vad_get_sa_q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
     let mut SA_Q15: i32;
 
     let mut input_tilt: i32;
@@ -183,7 +183,7 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
         psSilk_VAD.XnrgSubfr[b as usize] = sumSquared;
         b += 1;
     }
-    silk_VAD_GetNoiseLevels(&Xnrg, psSilk_VAD);
+    silk_vad_get_noise_levels(&Xnrg, psSilk_VAD);
     sumSquared = 0;
     input_tilt = 0;
     b = 0;
@@ -263,12 +263,12 @@ pub fn silk_vad_get_sa_q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn silk_vad_get_sa_q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
-    silk_VAD_GetSA_Q8_c(psEncC, pIn)
+    silk_vad_get_sa_q8_c(psEncC, pIn)
 }
 
 /// Upstream C: silk/VAD.c:silk_VAD_GetNoiseLevels
 #[inline]
-fn silk_VAD_GetNoiseLevels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
+fn silk_vad_get_noise_levels(pX: &[i32; 4], psSilk_VAD: &mut silk_VAD_state) {
     let mut k: i32;
     let mut nl: i32;
     let mut nrg: i32;

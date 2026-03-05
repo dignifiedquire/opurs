@@ -176,7 +176,7 @@ pub unsafe fn silk_vad_energy_sse2(x: &[i16]) -> i32 {
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
 pub unsafe fn silk_vad_get_sa_q8_sse4_1(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
-    crate::silk::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
+    crate::silk::VAD::silk_vad_get_sa_q8_c(psEncC, pIn)
 }
 
 /// SSE4.1 full-function NSQ entry.

@@ -85,7 +85,7 @@ pub fn silk_vad_get_sa_q8(psEncC: &mut super::structs::silk_encoder_state, pIn: 
         return unsafe { x86::silk_vad_get_sa_q8_sse4_1(psEncC, pIn) };
     }
 
-    super::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
+    super::VAD::silk_vad_get_sa_q8_c(psEncC, pIn)
 }
 
 /// Scalar implementation of VAD energy accumulation.

@@ -52,7 +52,7 @@ use crate::silk::float::structs_FLP::{silk_encoder, silk_shape_state_FLP};
 use crate::silk::init_encoder::silk_init_encoder;
 use crate::silk::resampler::silk_resampler;
 
-use crate::silk::stereo_LR_to_MS::silk_stereo_LR_to_MS;
+use crate::silk::stereo_LR_to_MS::silk_stereo_lr_to_ms;
 use crate::silk::stereo_encode_pred::{silk_stereo_encode_mid_only, silk_stereo_encode_pred};
 use crate::silk::structs::{silk_LP_state, silk_nsq_state};
 use crate::silk::tables_other::{SILK_LBRR_FLAGS_ICDF_PTR, SILK_QUANTIZATION_OFFSETS_Q10};
@@ -507,7 +507,7 @@ pub fn silk_encode_api(
                 let [s0, s1] = &mut psEnc.state_Fxx;
                 let x1 = &mut s0.sCmn.inputBuf[..frame_length + 2];
                 let x2 = &mut s1.sCmn.inputBuf[..frame_length + 2];
-                silk_stereo_LR_to_MS(
+                silk_stereo_lr_to_ms(
                     &mut psEnc.sStereo,
                     x1,
                     x2,

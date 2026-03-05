@@ -48,7 +48,7 @@ use crate::silk::init_decoder::{
     silk_reset_decoder as silk_reset_decoder_state,
 };
 use crate::silk::resampler::silk_resampler;
-use crate::silk::stereo_MS_to_LR::silk_stereo_MS_to_LR;
+use crate::silk::stereo_MS_to_LR::silk_stereo_ms_to_lr;
 use crate::silk::stereo_decode_pred::{silk_stereo_decode_mid_only, silk_stereo_decode_pred};
 use crate::silk::structs::{silk_decoder_state, stereo_dec_state};
 use crate::silk::tables_other::SILK_LBRR_FLAGS_ICDF_PTR;
@@ -367,7 +367,7 @@ pub fn silk_decode(
 
     if decControl.nChannelsAPI == 2 && decControl.nChannelsInternal == 2 {
         let (ch0_slice, ch1_slice) = samplesOut1_tmp_storage.split_at_mut(ch1_off);
-        silk_stereo_MS_to_LR(
+        silk_stereo_ms_to_lr(
             &mut psDec.sStereo,
             &mut ch0_slice[ch0_off..ch0_off + nSamplesOutDec as usize + 2],
             &mut ch1_slice[..nSamplesOutDec as usize + 2],

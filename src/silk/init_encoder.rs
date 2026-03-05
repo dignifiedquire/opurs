@@ -6,7 +6,7 @@ use crate::arch::Arch;
 use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::tuning_parameters::VARIABLE_HP_MIN_CUTOFF_HZ;
-use crate::silk::VAD::silk_VAD_Init;
+use crate::silk::VAD::silk_vad_init;
 
 /// Upstream C: silk/init_encoder.c:silk_init_encoder
 pub fn silk_init_encoder(psEnc: &mut silk_encoder_state_FLP, arch: Arch) -> i32 {
@@ -19,6 +19,6 @@ pub fn silk_init_encoder(psEnc: &mut silk_encoder_state_FLP, arch: Arch) -> i32 
             << 8) as i32;
     psEnc.sCmn.variable_HP_smth2_Q15 = psEnc.sCmn.variable_HP_smth1_Q15;
     psEnc.sCmn.first_frame_after_reset = 1;
-    ret += silk_VAD_Init(&mut psEnc.sCmn.sVAD);
+    ret += silk_vad_init(&mut psEnc.sCmn.sVAD);
     ret
 }

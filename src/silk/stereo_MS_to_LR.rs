@@ -19,7 +19,8 @@ use crate::silk::SigProc_FIX::{silk_rshift_round, silk_sat16};
 /// fs_kHz         I     Samples rate (kHz)
 /// frame_length   I     Number of samples
 /// ```
-pub fn silk_stereo_MS_to_LR(
+/// Upstream C: silk/stereo_MS_to_LR.c:silk_stereo_MS_to_LR
+pub fn silk_stereo_ms_to_lr(
     state: &mut stereo_dec_state,
     x1: &mut [i16],
     x2: &mut [i16],
