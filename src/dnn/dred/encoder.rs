@@ -3,8 +3,6 @@
 //!
 //! Upstream C: `dnn/dred_encoder.c`, `dnn/dred_encoder.h`
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 use crate::arch::Arch;
 use crate::celt::entcode::{ec_ctx_saved, ec_tell};
 use crate::celt::entenc::{
@@ -157,6 +155,7 @@ fn filter_df2t(
 /// Convert audio from encoder sample rate to 16kHz.
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_convert_to_16k
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 fn dred_convert_to_16k(
     fs: i32,
     channels: i32,
