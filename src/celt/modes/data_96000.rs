@@ -4,11 +4,7 @@
 //! This file is auto-generated from the C static mode tables.
 //! Upstream C: `celt/static_modes_float.h` (ENABLE_QEXT sections)
 
-#![allow(
-    clippy::excessive_precision,
-    clippy::unreadable_literal,
-    clippy::approx_constant
-)]
+#![allow(clippy::excessive_precision, clippy::approx_constant)]
 
 use super::static_modes_float::{
     cache_bits50, cache_caps50, cache_index50, fft_bitrev120, fft_bitrev240, fft_bitrev480, logN400,
