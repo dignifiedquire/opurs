@@ -5,8 +5,6 @@
 //!
 //! Upstream C: `dnn/lpcnet_enc.c`, `dnn/lpcnet_plc.c`, `dnn/lpcnet_private.h`
 
-#![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-
 use super::fargan::*;
 use super::freq::*;
 use super::nnet::*;
@@ -260,7 +258,7 @@ fn biquad(y: &mut [f32], mem: &mut [f32; 2], x: &[f32], b: &[f32; 2], a: &[f32; 
     mem[1] = mem1;
 }
 
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literal bit-exact.
 fn celt_log10(x: f32) -> f32 {
     0.30102999566 * celt_log2(x)
 }
