@@ -35,15 +35,12 @@ pub fn silk_quant_ltp_gains(
     let mut k: i32;
     let mut cbk_size: i32;
     let mut temp_idx: [i8; 4] = [0; 4];
-    let mut res_nrg_Q15_subfr: i32 = 0;
     let mut res_nrg_Q15: i32 = 0;
-    let mut rate_dist_Q7_subfr: i32 = 0;
     let mut rate_dist_Q7: i32;
     let mut min_rate_dist_Q7: i32;
     let mut sum_log_gain_tmp_Q7: i32;
     let mut best_sum_log_gain_Q7: i32;
     let mut max_gain_Q7: i32;
-    let mut gain_Q7: i32 = 0;
     min_rate_dist_Q7 = SILK_INT32_MAX;
     best_sum_log_gain_Q7 = 0;
     k = 0;
@@ -65,39 +62,45 @@ pub fn silk_quant_ltp_gains(
                     - sum_log_gain_tmp_Q7
                     + ((7 * ((1) << 7)) as f64 + 0.5f64) as i32,
             ) - gain_safety;
-            #[cfg(feature = "simd")]
-            silk_vq_wmat_ec(
-                &mut temp_idx[j as usize],
-                &mut res_nrg_Q15_subfr,
-                &mut rate_dist_Q7_subfr,
-                &mut gain_Q7,
-                &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
-                &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
-                &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
-                &cbk_gain_ptr_Q7[..cbk_size as usize],
-                &cl_ptr_Q5[..cbk_size as usize],
-                subfr_len,
-                max_gain_Q7,
-                cbk_size,
-                _arch,
-            );
-            #[cfg(not(feature = "simd"))]
-            {
-                let vq = silk_vq_wmat_ec_c(&SilkVqWmatEcParams {
-                    xx_q17: &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
-                    x_x_q17: &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
-                    cb_q7: &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
-                    cb_gain_q7: &cbk_gain_ptr_Q7[..cbk_size as usize],
-                    cl_q5: &cl_ptr_Q5[..cbk_size as usize],
-                    subfr_len,
-                    max_gain_q7: max_gain_Q7,
-                    l: cbk_size,
-                });
-                temp_idx[j as usize] = vq.ind;
-                res_nrg_Q15_subfr = vq.res_nrg_q15;
-                rate_dist_Q7_subfr = vq.rate_dist_q8;
-                gain_Q7 = vq.gain_q7;
-            }
+            let (res_nrg_Q15_subfr, rate_dist_Q7_subfr, gain_Q7) = {
+                #[cfg(feature = "simd")]
+                {
+                    let mut res_nrg_Q15_subfr: i32 = 0;
+                    let mut rate_dist_Q7_subfr: i32 = 0;
+                    let mut gain_Q7: i32 = 0;
+                    silk_vq_wmat_ec(
+                        &mut temp_idx[j as usize],
+                        &mut res_nrg_Q15_subfr,
+                        &mut rate_dist_Q7_subfr,
+                        &mut gain_Q7,
+                        &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
+                        &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
+                        &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
+                        &cbk_gain_ptr_Q7[..cbk_size as usize],
+                        &cl_ptr_Q5[..cbk_size as usize],
+                        subfr_len,
+                        max_gain_Q7,
+                        cbk_size,
+                        _arch,
+                    );
+                    (res_nrg_Q15_subfr, rate_dist_Q7_subfr, gain_Q7)
+                }
+                #[cfg(not(feature = "simd"))]
+                {
+                    let vq = silk_vq_wmat_ec_c(&SilkVqWmatEcParams {
+                        xx_q17: &XX_Q17[xx_off..xx_off + LTP_ORDER * LTP_ORDER],
+                        x_x_q17: &xX_Q17[xx_off_small..xx_off_small + LTP_ORDER],
+                        cb_q7: &cbk_ptr_Q7[..cbk_size as usize * LTP_ORDER],
+                        cb_gain_q7: &cbk_gain_ptr_Q7[..cbk_size as usize],
+                        cl_q5: &cl_ptr_Q5[..cbk_size as usize],
+                        subfr_len,
+                        max_gain_q7: max_gain_Q7,
+                        l: cbk_size,
+                    });
+                    temp_idx[j as usize] = vq.ind;
+                    (vq.res_nrg_q15, vq.rate_dist_q8, vq.gain_q7)
+                }
+            };
             res_nrg_Q15 = if (res_nrg_Q15 as u32).wrapping_add(res_nrg_Q15_subfr as u32)
                 & 0x80000000_u32
                 != 0
