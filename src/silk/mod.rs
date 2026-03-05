@@ -23,7 +23,6 @@ pub mod NLSF_stabilize;
 pub mod NLSF_unpack;
 pub mod NSQ;
 pub mod NSQ_del_dec;
-pub mod VAD;
 pub mod VQ_WMat_EC;
 pub mod a2nlsf;
 pub mod ana_filt_bank_1;
@@ -80,6 +79,7 @@ pub mod tables_gain;
 pub mod tables_other;
 pub mod tables_pitch_lag;
 pub mod tables_pulses_per_block;
+pub mod vad;
 // stuff for structs that do not have a clear home, named after the header files
 pub mod Inlines;
 pub mod SigProc_FIX;
