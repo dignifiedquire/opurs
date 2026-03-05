@@ -6,11 +6,11 @@ use crate::silk::bwexpander::silk_bwexpander;
 use crate::silk::decode_pitch::silk_decode_pitch;
 use crate::silk::define::{BWE_AFTER_LOSS_Q16, CODE_CONDITIONALLY, LTP_ORDER, TYPE_VOICED};
 use crate::silk::gain_quant::silk_gains_dequant;
+use crate::silk::nlsf2a::silk_nlsf2a;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::tables_LTP::SILK_LTP_VQ_PTRS_Q7;
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;
 use crate::silk::NLSF_decode::silk_nlsf_decode;
-use crate::silk::NLSF2A::silk_nlsf2a;
 
 ///
 /// Decode parameters from payload

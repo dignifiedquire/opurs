@@ -4,7 +4,7 @@
 
 use crate::arch::Arch;
 use crate::silk::a2nlsf::silk_a2nlsf;
-use crate::silk::NLSF2A::silk_nlsf2a;
+use crate::silk::nlsf2a::silk_nlsf2a;
 
 use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
 use crate::silk::float::structs_FLP::silk_encoder_control_FLP;

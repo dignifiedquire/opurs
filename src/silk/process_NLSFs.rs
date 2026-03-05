@@ -3,10 +3,10 @@
 //! Upstream C: `silk/process_NLSFs.c`
 
 use crate::silk::interpolate::silk_interpolate;
+use crate::silk::nlsf2a::silk_nlsf2a;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::NLSF_VQ_weights_laroia::silk_nlsf_vq_weights_laroia;
 use crate::silk::NLSF_encode::silk_nlsf_encode;
-use crate::silk::NLSF2A::silk_nlsf2a;
 
 /// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
 pub fn silk_process_nlsfs(
