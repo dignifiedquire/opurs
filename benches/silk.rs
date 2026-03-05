@@ -114,7 +114,7 @@ fn bench_feedback_loop(c: &mut Criterion) {
             let arch = opurs::internals::opus_select_arch();
             let mut data1 = generate_i32_signal(order, 123);
             b.iter(|| {
-                black_box(opurs::internals::silk_NSQ_noise_shape_feedback_loop(
+                black_box(opurs::internals::silk_nsq_noise_shape_feedback_loop(
                     black_box(12345),
                     &mut data1,
                     &coef,
@@ -215,7 +215,7 @@ fn bench_vad_energy(c: &mut Criterion) {
 }
 
 fn bench_lpc_inverse_pred_gain(c: &mut Criterion) {
-    let mut group = c.benchmark_group("silk_LPC_inverse_pred_gain");
+    let mut group = c.benchmark_group("silk_lpc_inverse_pred_gain");
     for &order in &[10, 16] {
         // Generate stable LPC coefficients (small values in Q12)
         let a_q12: Vec<i16> = generate_i16_signal(order, 42)
@@ -233,7 +233,7 @@ fn bench_lpc_inverse_pred_gain(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("dispatch", order), &order, |b, &_order| {
             let arch = opurs::internals::opus_select_arch();
             b.iter(|| {
-                black_box(opurs::internals::silk_LPC_inverse_pred_gain(
+                black_box(opurs::internals::silk_lpc_inverse_pred_gain(
                     black_box(&a_q12),
                     arch,
                 ))

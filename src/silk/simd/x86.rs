@@ -3,8 +3,6 @@
 //! SSE4.1 and AVX2 intrinsics for noise shaping, inner products, etc.
 //! All functions require `#[target_feature]` and are called only after cpufeatures detection.
 
-#![allow(non_snake_case)]
-
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -172,23 +170,23 @@ pub unsafe fn silk_vad_energy_sse2(x: &[i16]) -> i32 {
 }
 
 /// SSE4.1 full-function VAD entry.
-/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_VAD_GetSA_Q8`.
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_vad_get_sa_q8`.
 ///
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn silk_VAD_GetSA_Q8_sse4_1(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+pub unsafe fn silk_vad_get_sa_q8_sse4_1(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
     crate::silk::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
 }
 
 /// SSE4.1 full-function NSQ entry.
-/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_NSQ`.
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_nsq`.
 ///
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_sse4_1(
+pub unsafe fn silk_nsq_sse4_1(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -225,13 +223,13 @@ pub unsafe fn silk_NSQ_sse4_1(
 }
 
 /// SSE4.1 full-function NSQ-del-dec entry.
-/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_NSQ_del_dec` (SSE tier).
+/// Mirrors upstream RTCD surface `silk/x86/main_sse.h:silk_nsq_del_dec` (SSE tier).
 ///
 /// # Safety
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_del_dec_sse4_1(
+pub unsafe fn silk_nsq_del_dec_sse4_1(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -1186,7 +1184,7 @@ pub unsafe fn silk_noise_shape_quantizer_del_dec_sse4_1(
 /// Requires SSE4.1 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse4.1")]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_VQ_WMat_EC_sse4_1(
+pub unsafe fn silk_vq_wmat_ec_sse4_1(
     ind: &mut i8,
     res_nrg_Q15: &mut i32,
     rate_dist_Q8: &mut i32,
@@ -2253,7 +2251,7 @@ unsafe fn silk_nsq_del_dec_scale_states_avx2(
 /// Requires AVX2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "avx2")]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_del_dec_avx2(
+pub unsafe fn silk_nsq_del_dec_avx2(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,

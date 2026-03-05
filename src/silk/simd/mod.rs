@@ -77,12 +77,12 @@ pub fn silk_vad_energy(x: &[i16], arch: Arch) -> i32 {
     silk_vad_energy_scalar(x)
 }
 
-/// Full-function VAD dispatch, matching upstream RTCD `silk_VAD_GetSA_Q8`.
+/// Full-function VAD dispatch, matching upstream RTCD `silk_vad_get_sa_q8`.
 #[inline]
-pub fn silk_VAD_GetSA_Q8(psEncC: &mut super::structs::silk_encoder_state, pIn: &[i16]) -> i32 {
+pub fn silk_vad_get_sa_q8(psEncC: &mut super::structs::silk_encoder_state, pIn: &[i16]) -> i32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if psEncC.arch.has_sse4_1() {
-        return unsafe { x86::silk_VAD_GetSA_Q8_sse4_1(psEncC, pIn) };
+        return unsafe { x86::silk_vad_get_sa_q8_sse4_1(psEncC, pIn) };
     }
 
     super::VAD::silk_VAD_GetSA_Q8_c(psEncC, pIn)
@@ -101,7 +101,7 @@ pub fn silk_vad_energy_scalar(x: &[i16]) -> i32 {
 /// SIMD-accelerated noise shape feedback loop.
 /// Dispatches to NEON on aarch64, with scalar fallback.
 #[inline(always)]
-pub fn silk_NSQ_noise_shape_feedback_loop(
+pub fn silk_nsq_noise_shape_feedback_loop(
     data0: i32,
     data1: &mut [i32],
     coef: &[i16],
@@ -141,7 +141,7 @@ pub fn silk_vq_wmat_ec(
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse4_1() {
         unsafe {
-            x86::silk_VQ_WMat_EC_sse4_1(
+            x86::silk_vq_wmat_ec_sse4_1(
                 ind,
                 res_nrg_Q15,
                 rate_dist_Q8,
@@ -179,7 +179,7 @@ pub fn silk_vq_wmat_ec(
 /// SIMD-accelerated LPC inverse prediction gain.
 /// Dispatches to NEON on aarch64, with scalar fallback.
 #[inline]
-pub fn silk_LPC_inverse_pred_gain(A_Q12: &[i16], arch: Arch) -> i32 {
+pub fn silk_lpc_inverse_pred_gain(A_Q12: &[i16], arch: Arch) -> i32 {
     #[cfg(target_arch = "aarch64")]
     if arch.has_neon() {
         return unsafe { aarch64::silk_LPC_inverse_pred_gain_neon(A_Q12) };
@@ -203,10 +203,10 @@ pub fn use_nsq_sse4_1(arch: Arch) -> bool {
     }
 }
 
-/// Full-function NSQ dispatch, matching upstream RTCD `silk_NSQ`.
+/// Full-function NSQ dispatch, matching upstream RTCD `silk_nsq`.
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ(
+pub fn silk_nsq(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -226,7 +226,7 @@ pub fn silk_NSQ(
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if psEncC.arch.has_sse4_1() {
         unsafe {
-            x86::silk_NSQ_sse4_1(
+            x86::silk_nsq_sse4_1(
                 psEncC,
                 NSQ,
                 psIndices,
@@ -266,10 +266,10 @@ pub fn silk_NSQ(
     );
 }
 
-/// Full-function NSQ-del-dec dispatch, matching upstream RTCD `silk_NSQ_del_dec`.
+/// Full-function NSQ-del-dec dispatch, matching upstream RTCD `silk_nsq_del_dec`.
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec(
+pub fn silk_nsq_del_dec(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -292,7 +292,7 @@ pub fn silk_NSQ_del_dec(
             && use_nsq_del_dec_avx2(psEncC.arch, psEncC.nStatesDelayedDecision)
         {
             unsafe {
-                x86::silk_NSQ_del_dec_avx2(
+                x86::silk_nsq_del_dec_avx2(
                     psEncC,
                     NSQ,
                     psIndices,
@@ -314,7 +314,7 @@ pub fn silk_NSQ_del_dec(
         }
         if psEncC.arch.has_sse4_1() {
             unsafe {
-                x86::silk_NSQ_del_dec_sse4_1(
+                x86::silk_nsq_del_dec_sse4_1(
                     psEncC,
                     NSQ,
                     psIndices,
@@ -340,7 +340,7 @@ pub fn silk_NSQ_del_dec(
     {
         if use_neon_nsq_del_dec(psEncC.arch, psEncC.nStatesDelayedDecision) {
             unsafe {
-                aarch64::silk_NSQ_del_dec_neon(
+                aarch64::silk_nsq_del_dec_neon(
                     psEncC,
                     NSQ,
                     psIndices,
@@ -490,7 +490,7 @@ pub fn use_nsq_del_dec_avx2(arch: Arch, n_states: i32) -> bool {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec_avx2(
+pub fn silk_nsq_del_dec_avx2(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -509,7 +509,7 @@ pub fn silk_NSQ_del_dec_avx2(
 ) {
     // SAFETY: call sites gate this wrapper with `use_nsq_del_dec_avx2`.
     unsafe {
-        x86::silk_NSQ_del_dec_avx2(
+        x86::silk_nsq_del_dec_avx2(
             psEncC,
             NSQ,
             psIndices,
@@ -615,7 +615,7 @@ pub fn use_neon_nsq_del_dec(arch: Arch, n_states: i32) -> bool {
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec_neon(
+pub fn silk_nsq_del_dec_neon(
     psEncC: &super::structs::NsqConfig,
     NSQ: &mut super::structs::silk_nsq_state,
     psIndices: &mut super::structs::SideInfoIndices,
@@ -634,7 +634,7 @@ pub fn silk_NSQ_del_dec_neon(
 ) {
     // SAFETY: call sites gate this wrapper with `use_neon_nsq_del_dec`.
     unsafe {
-        aarch64::silk_NSQ_del_dec_neon(
+        aarch64::silk_nsq_del_dec_neon(
             psEncC,
             NSQ,
             psIndices,

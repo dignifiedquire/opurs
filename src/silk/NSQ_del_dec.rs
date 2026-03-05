@@ -105,11 +105,11 @@ fn rshift_round_sat16(val: i32, shift: i32) -> i16 {
     }
 }
 
-/// Dispatch wrapper for NSQ delayed-decision, matching upstream `silk_NSQ_del_dec`.
+/// Dispatch wrapper for NSQ delayed-decision, matching upstream `silk_nsq_del_dec`.
 #[cfg(feature = "simd")]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec(
+pub fn silk_nsq_del_dec(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -126,7 +126,7 @@ pub fn silk_NSQ_del_dec(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    super::simd::silk_NSQ_del_dec(
+    super::simd::silk_nsq_del_dec(
         psEncC,
         NSQ,
         psIndices,
@@ -149,7 +149,7 @@ pub fn silk_NSQ_del_dec(
 #[cfg(not(feature = "simd"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ_del_dec(
+pub fn silk_nsq_del_dec(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -209,7 +209,7 @@ pub fn silk_NSQ_del_dec_c(
     {
         if super::simd::use_nsq_del_dec_avx2(psEncC.arch, psEncC.nStatesDelayedDecision) {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-            super::simd::silk_NSQ_del_dec_avx2(
+            super::simd::silk_nsq_del_dec_avx2(
                 psEncC,
                 NSQ,
                 psIndices,
@@ -236,7 +236,7 @@ pub fn silk_NSQ_del_dec_c(
     {
         if super::simd::use_neon_nsq_del_dec(psEncC.arch, psEncC.nStatesDelayedDecision) {
             #[cfg(target_arch = "aarch64")]
-            super::simd::silk_NSQ_del_dec_neon(
+            super::simd::silk_nsq_del_dec_neon(
                 psEncC,
                 NSQ,
                 psIndices,

@@ -252,17 +252,17 @@ pub fn silk_VAD_GetSA_Q8_c(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 
     ret
 }
 
-/// Dispatch wrapper for VAD speech activity, matching upstream `silk_VAD_GetSA_Q8`.
+/// Dispatch wrapper for VAD speech activity, matching upstream `silk_vad_get_sa_q8`.
 #[cfg(feature = "simd")]
 #[inline]
-pub fn silk_VAD_GetSA_Q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
-    super::simd::silk_VAD_GetSA_Q8(psEncC, pIn)
+pub fn silk_vad_get_sa_q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+    super::simd::silk_vad_get_sa_q8(psEncC, pIn)
 }
 
 /// Scalar-only build wrapper for VAD speech activity.
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn silk_VAD_GetSA_Q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
+pub fn silk_vad_get_sa_q8(psEncC: &mut silk_encoder_state, pIn: &[i16]) -> i32 {
     silk_VAD_GetSA_Q8_c(psEncC, pIn)
 }
 

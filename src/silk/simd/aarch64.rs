@@ -82,7 +82,7 @@ pub unsafe fn silk_noise_shape_quantizer_short_prediction_neon(
     out
 }
 
-/// NEON implementation of `silk_NSQ_noise_shape_feedback_loop`.
+/// NEON implementation of `silk_nsq_noise_shape_feedback_loop`.
 /// Port of `silk/arm/NSQ_neon.c:silk_NSQ_noise_shape_feedback_loop_neon`.
 ///
 /// Only handles order == 8 with NEON. Other orders fall through to scalar.
@@ -352,7 +352,7 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
     }
 }
 
-/// NEON implementation of `silk_LPC_inverse_pred_gain`.
+/// NEON implementation of `silk_lpc_inverse_pred_gain`.
 /// Port of `silk/arm/LPC_inv_pred_gain_neon_intr.c:silk_LPC_inverse_pred_gain_neon`.
 ///
 /// Uses NEON widening shifts for Q12→QA conversion and NEON pairwise adds
@@ -1414,7 +1414,7 @@ unsafe fn neon_scale_states(
 /// Requires aarch64 NEON (always available on aarch64).
 #[target_feature(enable = "neon")]
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn silk_NSQ_del_dec_neon(
+pub unsafe fn silk_nsq_del_dec_neon(
     psEncC: &NsqConfig,
     nsq: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,

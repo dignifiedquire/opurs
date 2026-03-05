@@ -20,7 +20,7 @@ use crate::silk::define::{
 };
 use crate::silk::macros::{silk_CLZ32, silk_SMLAWB, silk_SMULBB, silk_SMULWW};
 #[cfg(feature = "simd")]
-use crate::silk::simd::silk_LPC_inverse_pred_gain;
+use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 use crate::silk::sum_sqr_shift::silk_sum_sqr_shift;
 use crate::silk::Inlines::{silk_INVERSE32_varQ, silk_SQRT_APPROX};
@@ -274,7 +274,7 @@ fn silk_plc_conceal(
             let invGain_Q30 = {
                 #[cfg(feature = "simd")]
                 {
-                    silk_LPC_inverse_pred_gain(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order], _arch)
+                    silk_lpc_inverse_pred_gain(&psDec.sPLC.prevLPC_Q12[..psDec.LPC_order], _arch)
                 }
                 #[cfg(not(feature = "simd"))]
                 {

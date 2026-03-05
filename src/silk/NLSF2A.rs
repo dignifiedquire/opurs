@@ -6,7 +6,7 @@ use crate::arch::Arch;
 use crate::silk::bwexpander_32::silk_bwexpander_32;
 use crate::silk::define::{LSF_COS_TAB_SZ_FIX, MAX_LPC_STABILIZE_ITERATIONS};
 #[cfg(feature = "simd")]
-use crate::silk::simd::silk_LPC_inverse_pred_gain;
+use crate::silk::simd::silk_lpc_inverse_pred_gain;
 use crate::silk::table_LSF_cos::silk_LSFCosTab_FIX_Q12;
 use crate::silk::LPC_fit::silk_LPC_fit;
 #[cfg(not(feature = "simd"))]
@@ -121,7 +121,7 @@ pub fn silk_NLSF2A(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
 
     let mut i = 0;
     #[cfg(feature = "simd")]
-    let pred_gain_fn = |a: &[i16]| silk_LPC_inverse_pred_gain(a, arch);
+    let pred_gain_fn = |a: &[i16]| silk_lpc_inverse_pred_gain(a, arch);
     #[cfg(not(feature = "simd"))]
     let pred_gain_fn = {
         let _ = arch;

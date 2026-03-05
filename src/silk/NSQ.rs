@@ -108,20 +108,20 @@ pub fn silk_noise_shape_quantizer_short_prediction(
 /// Dispatch wrapper for noise shape feedback loop — routes to SIMD when available.
 #[cfg(feature = "simd")]
 #[inline(always)]
-pub fn silk_NSQ_noise_shape_feedback_loop(
+pub fn silk_nsq_noise_shape_feedback_loop(
     data0: i32,
     data1: &mut [i32],
     coef: &[i16],
     order: i32,
     arch: Arch,
 ) -> i32 {
-    super::simd::silk_NSQ_noise_shape_feedback_loop(data0, data1, coef, order, arch)
+    super::simd::silk_nsq_noise_shape_feedback_loop(data0, data1, coef, order, arch)
 }
 
 /// Dispatch wrapper for noise shape feedback loop (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-pub fn silk_NSQ_noise_shape_feedback_loop(
+pub fn silk_nsq_noise_shape_feedback_loop(
     data0: i32,
     data1: &mut [i32],
     coef: &[i16],
@@ -144,11 +144,11 @@ use crate::silk::Inlines::{silk_DIV32_varQ, silk_INVERSE32_varQ};
 use crate::silk::LPC_analysis_filter::silk_LPC_analysis_filter;
 use crate::silk::SigProc_FIX::silk_RAND;
 
-/// Dispatch wrapper for NSQ, matching upstream `silk_NSQ` RTCD surface.
+/// Dispatch wrapper for NSQ, matching upstream `silk_nsq` RTCD surface.
 #[cfg(feature = "simd")]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ(
+pub fn silk_nsq(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -165,7 +165,7 @@ pub fn silk_NSQ(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    super::simd::silk_NSQ(
+    super::simd::silk_nsq(
         psEncC,
         NSQ,
         psIndices,
@@ -188,7 +188,7 @@ pub fn silk_NSQ(
 #[cfg(not(feature = "simd"))]
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn silk_NSQ(
+pub fn silk_nsq(
     psEncC: &NsqConfig,
     NSQ: &mut silk_nsq_state,
     psIndices: &mut SideInfoIndices,
@@ -517,7 +517,7 @@ fn silk_noise_shape_quantizer(
 
         // Noise shape feedback
         debug_assert!(shapingLPCOrder & 1 == 0);
-        n_AR_Q12 = silk_NSQ_noise_shape_feedback_loop(
+        n_AR_Q12 = silk_nsq_noise_shape_feedback_loop(
             NSQ.sDiff_shp_Q14,
             &mut NSQ.sAR2_Q14,
             AR_shp_Q13,
@@ -775,7 +775,7 @@ fn silk_nsq_scale_states(
 }
 
 /// Build the precomputed quantization lookup table used by the SSE4.1 quantizer.
-/// Port of the table initialization from `silk/x86/NSQ_sse4_1.c:silk_NSQ_sse4_1`.
+/// Port of the table initialization from `silk/x86/NSQ_sse4_1.c:silk_nsq_sse4_1`.
 ///
 /// table[32 + q1_Q0] = [q1_Q10, q2_Q10, 2*(q1_Q10 - q2_Q10), rd1_Q20 - rd2_Q20 + q1² - q2²]
 #[cfg(all(feature = "simd", any(target_arch = "x86", target_arch = "x86_64")))]
