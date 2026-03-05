@@ -19,7 +19,7 @@ use crate::silk::VQ_WMat_EC::silk_vq_wmat_ec_c;
 
 /// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
 #[allow(clippy::too_many_arguments)]
-pub fn silk_quant_LTP_gains(
+pub fn silk_quant_ltp_gains(
     B_Q14: &mut [i16],
     cbk_index: &mut [i8],
     periodicity_index: &mut i8,
