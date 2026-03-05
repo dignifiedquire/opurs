@@ -1,8 +1,8 @@
 //! Static mode tables for floating-point operation.
 //!
 //! Upstream C: `celt/static_modes_float.h`
-#![allow(clippy::excessive_precision)]
 
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 #[rustfmt::skip]
 pub static WINDOW120: [f32; 120] = [
     6.7286966e-05, 0.00060551348, 0.001_681_597, 0.0032947962, 0.0054439943,
@@ -95,7 +95,7 @@ macro_rules! c {
     };
 }
 
-#[allow(clippy::approx_constant)]
+#[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 #[rustfmt::skip]
 pub static FFT_TWIDDLES48000_960: [kiss_twiddle_cpx; 480] = [
     c!(1.0000000, -0.0000000), c!(0.99991433, -0.013089596),
@@ -479,6 +479,7 @@ pub static FFT_STATE48000_960_3: kiss_fft_state = kiss_fft_state {
     bitrev: &FFT_BITREV60,
     twiddles: &FFT_TWIDDLES48000_960,
 };
+#[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 #[rustfmt::skip]
 pub static MDCT_TWIDDLES960: [&[f32]; 4] = [
     &[
