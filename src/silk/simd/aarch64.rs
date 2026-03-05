@@ -137,7 +137,7 @@ pub unsafe fn silk_NSQ_noise_shape_feedback_loop_neon(
     }
 
     // Fall through to scalar for other orders
-    crate::silk::NSQ::silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
+    crate::silk::nsq::silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
 /// NEON implementation of `silk_inner_product_flp`.

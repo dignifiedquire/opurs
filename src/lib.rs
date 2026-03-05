@@ -191,14 +191,14 @@ pub mod internals {
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_flp;
     pub use crate::silk::float::residual_energy_FLP::silk_residual_energy_covar_flp;
     pub use crate::silk::inner_prod_aligned::silk_inner_prod_aligned_scale;
-    pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction_c;
+    pub use crate::silk::nsq::silk_noise_shape_quantizer_short_prediction_c;
     // SIMD dispatch wrapper for short prediction:
-    pub use crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction;
+    pub use crate::silk::nsq::silk_noise_shape_quantizer_short_prediction;
     // Scalar implementation:
     pub use crate::silk::float::inner_product_FLP::silk_inner_product_flp_scalar;
     // NSQ noise shape feedback loop:
-    pub use crate::silk::NSQ::silk_nsq_noise_shape_feedback_loop;
-    pub use crate::silk::NSQ::silk_nsq_noise_shape_feedback_loop_c;
+    pub use crate::silk::nsq::silk_nsq_noise_shape_feedback_loop;
+    pub use crate::silk::nsq::silk_nsq_noise_shape_feedback_loop_c;
     // VQ weighted matrix:
     #[cfg(feature = "simd")]
     pub use crate::silk::simd::silk_vq_wmat_ec;

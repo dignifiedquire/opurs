@@ -203,7 +203,7 @@ pub unsafe fn silk_nsq_sse4_1(
     Lambda_Q10: i32,
     LTP_scale_Q14: i32,
 ) {
-    crate::silk::NSQ::silk_nsq_c(
+    crate::silk::nsq::silk_nsq_c(
         psEncC,
         NSQ,
         psIndices,

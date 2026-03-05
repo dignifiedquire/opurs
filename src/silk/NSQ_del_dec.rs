@@ -679,7 +679,7 @@ fn silk_noise_shape_quantizer_del_dec(
 
             // LPC prediction
             let lpc_idx = NSQ_LPC_BUF_LENGTH - 1 + i;
-            LPC_pred_Q14 = crate::silk::NSQ::silk_noise_shape_quantizer_short_prediction(
+            LPC_pred_Q14 = crate::silk::nsq::silk_noise_shape_quantizer_short_prediction(
                 &psDD.sLPC_Q14[..lpc_idx + 1],
                 a_Q12,
                 predictLPCOrder,

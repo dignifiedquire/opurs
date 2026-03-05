@@ -41,7 +41,7 @@ pub fn silk_noise_shape_quantizer_short_prediction(
     }
 
     let _ = arch;
-    super::NSQ::silk_noise_shape_quantizer_short_prediction_c(buf32, coef16, order)
+    super::nsq::silk_noise_shape_quantizer_short_prediction_c(buf32, coef16, order)
 }
 
 /// SIMD-accelerated f32→f64 inner product.
@@ -116,7 +116,7 @@ pub fn silk_nsq_noise_shape_feedback_loop(
     }
 
     let _ = arch;
-    super::NSQ::silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
+    super::nsq::silk_nsq_noise_shape_feedback_loop_c(data0, data1, coef, order)
 }
 
 /// SIMD-accelerated VQ_WMat_EC.
@@ -247,7 +247,7 @@ pub fn silk_nsq(
         return;
     }
 
-    super::NSQ::silk_nsq_c(
+    super::nsq::silk_nsq_c(
         psEncC,
         NSQ,
         psIndices,
