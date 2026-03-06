@@ -102,8 +102,8 @@ pub fn comb_filter_const(
     y_start: usize,
     x: &[f32],
     x_start: usize,
-    T: i32,
-    N: i32,
+    t: i32,
+    n: i32,
     g10: f32,
     g11: f32,
     g12: f32,
@@ -111,11 +111,11 @@ pub fn comb_filter_const(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return x86::comb_filter_const_sse_dispatch(y, y_start, x, x_start, T, N, g10, g11, g12);
+        return x86::comb_filter_const_sse_dispatch(y, y_start, x, x_start, t, n, g10, g11, g12);
     }
 
     let _ = arch;
-    super::common::comb_filter_const_c(y, y_start, x, x_start, T, N, g10, g11, g12);
+    super::common::comb_filter_const_c(y, y_start, x, x_start, t, n, g10, g11, g12);
 }
 
 /// SIMD-accelerated constant-coefficient in-place comb filter.
@@ -125,8 +125,8 @@ pub fn comb_filter_const(
 pub fn comb_filter_const_inplace(
     buf: &mut [f32],
     start: usize,
-    T: i32,
-    N: i32,
+    t: i32,
+    n: i32,
     g10: f32,
     g11: f32,
     g12: f32,
@@ -134,18 +134,18 @@ pub fn comb_filter_const_inplace(
 ) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse() {
-        return x86::comb_filter_const_inplace_sse_dispatch(buf, start, T, N, g10, g11, g12);
+        return x86::comb_filter_const_inplace_sse_dispatch(buf, start, t, n, g10, g11, g12);
     }
 
     let _ = arch;
-    let t = T as usize;
-    let n = N as usize;
-    let mut x4 = buf[start - t - 2];
-    let mut x3 = buf[start - t - 1];
-    let mut x2 = buf[start - t];
-    let mut x1 = buf[start - t + 1];
-    for i in 0..n {
-        let x0 = buf[start + i - t + 2];
+    let t_usize = t as usize;
+    let n_usize = n as usize;
+    let mut x4 = buf[start - t_usize - 2];
+    let mut x3 = buf[start - t_usize - 1];
+    let mut x2 = buf[start - t_usize];
+    let mut x1 = buf[start - t_usize + 1];
+    for i in 0..n_usize {
+        let x0 = buf[start + i - t_usize + 2];
         buf[start + i] = buf[start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4);
         x4 = x3;
         x3 = x2;
@@ -159,12 +159,12 @@ pub fn comb_filter_const_inplace(
 /// The SSE2 version handles any N by zero-padding arrays to N+3 elements,
 /// matching C which always uses SSE2 at arch >= 2 regardless of alignment.
 #[inline(always)]
-pub fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
+pub fn op_pvq_search(x: &mut [f32], iy: &mut [i32], k: i32, n: i32, arch: Arch) -> f32 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     if arch.has_sse2() {
-        return x86::op_pvq_search_sse2_dispatch(X, iy, K, N);
+        return x86::op_pvq_search_sse2_dispatch(x, iy, k, n);
     }
 
     let _ = arch;
-    super::vq::op_pvq_search_c(X, iy, K, N, arch)
+    super::vq::op_pvq_search_c(x, iy, k, n, arch)
 }

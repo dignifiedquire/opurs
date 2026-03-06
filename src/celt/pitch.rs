@@ -195,17 +195,17 @@ pub fn xcorr_kernel_scalar(x: &[f32], y: &[f32], sum: &mut [f32; 4], len: usize)
 
 ///
 /// Computes the inner product (dot product) of `x` and `y`.
-/// Both slices must have at least `N` elements.
+/// Both slices must have at least `n` elements.
 ///
 /// When the `simd` feature is enabled, callers should use the dispatch layer
 /// in `celt::simd::celt_inner_prod` instead of calling this directly.
 /// Upstream C: celt/pitch.h:celt_inner_prod_c
 #[inline]
-pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], N: usize) -> f32 {
+pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], n: usize) -> f32 {
     let mut xy: f32 = 0.0;
-    let x = &x[..N];
-    let y = &y[..N];
-    for i in 0..N {
+    let x = &x[..n];
+    let y = &y[..n];
+    for i in 0..n {
         xy += x[i] * y[i];
     }
     xy
