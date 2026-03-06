@@ -1,6 +1,6 @@
 //! LPC inverse prediction gain computation.
 //!
-//! Upstream C: `silk/LPC_inv_pred_gain.c`
+//! Upstream c: `silk/LPC_inv_pred_gain.c`
 
 use crate::silk::define::MAX_PREDICTION_POWER_GAIN;
 use crate::silk::inlines::silk_inverse32_varq;
@@ -12,8 +12,8 @@ use crate::silk::sigproc_fix::{
 const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
-fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
-    silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
+fn mul32_frac_q(a32: i32, b32: i32, q: i32) -> i32 {
+    silk_rshift_round64(a32 as i64 * b32 as i64, q) as i32
 }
 
 ///
@@ -21,84 +21,84 @@ fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
 ///
 /// ```text
 ///                              O   Returns inverse prediction gain in energy domain, Q30
-/// A_QA[ SILK_MAX_ORDER_LPC ]   I   Prediction coefficients
+/// a_qa[ SILK_MAX_ORDER_LPC ]   I   Prediction coefficients
 /// order                        I   Prediction order
 /// ```
-/// Upstream C: silk/LPC_inv_pred_gain.c:LPC_inverse_pred_gain_QA_c
-fn lpc_inverse_pred_gain_qa_c(A_QA: &mut [i32]) -> i32 {
-    let order = A_QA.len();
+/// Upstream c: silk/LPC_inv_pred_gain.c:LPC_inverse_pred_gain_QA_c
+fn lpc_inverse_pred_gain_qa_c(a_qa: &mut [i32]) -> i32 {
+    let order = a_qa.len();
 
-    let mut invGain_Q30 = SILK_FIX_CONST!(1.0, 30);
+    let mut inv_gain_q30 = SILK_FIX_CONST!(1.0, 30);
     let mut k = order - 1;
     while k > 0 {
         /* Check for stability */
-        if A_QA[k] > A_LIMIT || A_QA[k] < -A_LIMIT {
+        if a_qa[k] > A_LIMIT || a_qa[k] < -A_LIMIT {
             return 0;
         }
 
         /* Set RC equal to negated AR coef */
-        let rc_Q31 = -(A_QA[k] << (31 - QA));
+        let rc_q31 = -(a_qa[k] << (31 - QA));
 
-        /* rc_mult1_Q30 range: [ 1 : 2^30 ] */
-        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
+        /* rc_mult1_q30 range: [ 1 : 2^30 ] */
+        let rc_mult1_q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_q31, rc_q31);
 
         /* Update inverse gain */
-        /* invGain_Q30 range: [ 0 : 2^30 ] */
-        invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
-        if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
+        /* inv_gain_q30 range: [ 0 : 2^30 ] */
+        inv_gain_q30 = silk_smmul(inv_gain_q30, rc_mult1_q30) << 2;
+        if inv_gain_q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
             return 0;
         }
 
         /* rc_mult2 range: [ 2^30 : SILK_INT32_MAX ] */
-        let mult2Q = 32 - silk_clz32(rc_mult1_Q30.abs());
-        let rc_mult2 = silk_inverse32_varq(rc_mult1_Q30, mult2Q + 30);
+        let mult2_q = 32 - silk_clz32(rc_mult1_q30.abs());
+        let rc_mult2 = silk_inverse32_varq(rc_mult1_q30, mult2_q + 30);
 
         /* Update AR coefficient */
         let mut n = 0;
         while n < k.div_ceil(2) {
-            let tmp1 = A_QA[n];
-            let tmp2 = A_QA[k - n - 1];
+            let tmp1 = a_qa[n];
+            let tmp2 = a_qa[k - n - 1];
             let tmp64 = silk_rshift_round64(
-                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
-                mult2Q,
+                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_q31, 31)) as i64 * rc_mult2 as i64,
+                mult2_q,
             );
 
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
                 return 0;
             }
-            A_QA[n] = tmp64 as i32;
+            a_qa[n] = tmp64 as i32;
             let tmp64 = silk_rshift_round64(
-                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
-                mult2Q,
+                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_q31, 31)) as i64 * rc_mult2 as i64,
+                mult2_q,
             );
 
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
                 return 0;
             }
-            A_QA[k - n - 1] = tmp64 as i32;
+            a_qa[k - n - 1] = tmp64 as i32;
             n += 1;
         }
         k -= 1;
     }
 
     /* Check for stability */
-    if A_QA[k] > A_LIMIT || A_QA[k] < -A_LIMIT {
+    if a_qa[k] > A_LIMIT || a_qa[k] < -A_LIMIT {
         return 0;
     }
 
     /* Set RC equal to negated AR coef */
-    let rc_Q31 = -(A_QA[0] << (31 - QA));
+    let rc_q31 = -(a_qa[0] << (31 - QA));
 
     /* Range: [ 1 : 2^30 ] */
-    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
+    let rc_mult1_q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_q31, rc_q31);
 
     /* Update inverse gain */
     /* Range: [ 0 : 2^30 ] */
-    let invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
-    if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
+    let inv_gain_q30 = silk_smmul(inv_gain_q30, rc_mult1_q30) << 2;
+    if inv_gain_q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
         0
     } else {
-        invGain_Q30
+        inv_gain_q30
     }
 }
 
@@ -107,27 +107,27 @@ fn lpc_inverse_pred_gain_qa_c(A_QA: &mut [i32]) -> i32 {
 ///
 /// ```text
 ///         O   Returns inverse prediction gain in energy domain, Q30
-/// A_Q12   I   Prediction coefficients, Q12 [order]
+/// a_q12   I   Prediction coefficients, Q12 [order]
 /// order   I   Prediction order
 /// ```
-/// Upstream C: silk/LPC_inv_pred_gain.c:silk_LPC_inverse_pred_gain_c
+/// Upstream c: silk/LPC_inv_pred_gain.c:silk_LPC_inverse_pred_gain_c
 #[inline]
-pub fn silk_lpc_inverse_pred_gain_c(A_Q12: &[i16]) -> i32 {
-    let mut Atmp_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
-    let mut DC_resp: i32 = 0;
+pub fn silk_lpc_inverse_pred_gain_c(a_q12: &[i16]) -> i32 {
+    let mut atmp_qa: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
+    let mut dc_resp: i32 = 0;
 
-    let Atmp_QA = &mut Atmp_QA[..A_Q12.len()];
+    let atmp_qa = &mut atmp_qa[..a_q12.len()];
 
-    /* Increase Q domain of the AR coefficients */
+    /* Increase q domain of the AR coefficients */
     let mut k = 0;
-    while k < A_Q12.len() {
-        DC_resp += A_Q12[k] as i32;
-        Atmp_QA[k] = (A_Q12[k] as i32) << (QA - 12);
+    while k < a_q12.len() {
+        dc_resp += a_q12[k] as i32;
+        atmp_qa[k] = (a_q12[k] as i32) << (QA - 12);
         k += 1;
     }
     /* If the DC is unstable, we don't even need to do the full calculations */
-    if DC_resp >= 4096 {
+    if dc_resp >= 4096 {
         return 0;
     }
-    lpc_inverse_pred_gain_qa_c(Atmp_QA)
+    lpc_inverse_pred_gain_qa_c(atmp_qa)
 }

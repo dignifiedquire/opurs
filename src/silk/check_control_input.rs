@@ -1,6 +1,6 @@
 //! Input validation for encoder control.
 //!
-//! Upstream C: `silk/check_control_input.c`
+//! Upstream c: `silk/check_control_input.c`
 
 use crate::silk::define::ENCODER_NUM_CHANNELS;
 use crate::silk::enc_api::silk_EncControlStruct;
@@ -10,7 +10,7 @@ pub use crate::silk::errors::{
     SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR, SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR,
 };
 
-/// Upstream C: silk/check_control_input.c:check_control_input
+/// Upstream c: silk/check_control_input.c:check_control_input
 #[inline]
 fn api_sample_rate_supported(api_sample_rate: i32) -> bool {
     matches!(
@@ -28,53 +28,54 @@ fn api_sample_rate_supported(api_sample_rate: i32) -> bool {
     }
 }
 
-/// Upstream C: silk/check_control_input.c:check_control_input
-pub fn check_control_input(encControl: &silk_EncControlStruct) -> i32 {
-    if !api_sample_rate_supported(encControl.API_sampleRate)
-        || encControl.desiredInternalSampleRate != 8000
-            && encControl.desiredInternalSampleRate != 12000
-            && encControl.desiredInternalSampleRate != 16000
-        || encControl.maxInternalSampleRate != 8000
-            && encControl.maxInternalSampleRate != 12000
-            && encControl.maxInternalSampleRate != 16000
-        || encControl.minInternalSampleRate != 8000
-            && encControl.minInternalSampleRate != 12000
-            && encControl.minInternalSampleRate != 16000
-        || encControl.minInternalSampleRate > encControl.desiredInternalSampleRate
-        || encControl.maxInternalSampleRate < encControl.desiredInternalSampleRate
-        || encControl.minInternalSampleRate > encControl.maxInternalSampleRate
+/// Upstream c: silk/check_control_input.c:check_control_input
+pub fn check_control_input(enc_control: &silk_EncControlStruct) -> i32 {
+    if !api_sample_rate_supported(enc_control.api_sample_rate)
+        || enc_control.desired_internal_sample_rate != 8000
+            && enc_control.desired_internal_sample_rate != 12000
+            && enc_control.desired_internal_sample_rate != 16000
+        || enc_control.max_internal_sample_rate != 8000
+            && enc_control.max_internal_sample_rate != 12000
+            && enc_control.max_internal_sample_rate != 16000
+        || enc_control.min_internal_sample_rate != 8000
+            && enc_control.min_internal_sample_rate != 12000
+            && enc_control.min_internal_sample_rate != 16000
+        || enc_control.min_internal_sample_rate > enc_control.desired_internal_sample_rate
+        || enc_control.max_internal_sample_rate < enc_control.desired_internal_sample_rate
+        || enc_control.min_internal_sample_rate > enc_control.max_internal_sample_rate
     {
         return SILK_ENC_FS_NOT_SUPPORTED;
     }
-    if encControl.payloadSize_ms != 10
-        && encControl.payloadSize_ms != 20
-        && encControl.payloadSize_ms != 40
-        && encControl.payloadSize_ms != 60
+    if enc_control.payload_size_ms != 10
+        && enc_control.payload_size_ms != 20
+        && enc_control.payload_size_ms != 40
+        && enc_control.payload_size_ms != 60
     {
         return SILK_ENC_PACKET_SIZE_NOT_SUPPORTED;
     }
-    if encControl.packetLossPercentage < 0 || encControl.packetLossPercentage > 100 {
+    if enc_control.packet_loss_percentage < 0 || enc_control.packet_loss_percentage > 100 {
         return SILK_ENC_INVALID_LOSS_RATE;
     }
-    if encControl.useDTX < 0 || encControl.useDTX > 1 {
+    if enc_control.use_dtx < 0 || enc_control.use_dtx > 1 {
         return SILK_ENC_INVALID_DTX_SETTING;
     }
-    if encControl.useCBR < 0 || encControl.useCBR > 1 {
+    if enc_control.use_cbr < 0 || enc_control.use_cbr > 1 {
         return SILK_ENC_INVALID_CBR_SETTING;
     }
-    if encControl.useInBandFEC < 0 || encControl.useInBandFEC > 1 {
+    if enc_control.use_in_band_fec < 0 || enc_control.use_in_band_fec > 1 {
         return SILK_ENC_INVALID_INBAND_FEC_SETTING;
     }
-    if encControl.nChannelsAPI < 1 || encControl.nChannelsAPI > ENCODER_NUM_CHANNELS {
+    if enc_control.n_channels_api < 1 || enc_control.n_channels_api > ENCODER_NUM_CHANNELS {
         return SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR;
     }
-    if encControl.nChannelsInternal < 1 || encControl.nChannelsInternal > ENCODER_NUM_CHANNELS {
+    if enc_control.n_channels_internal < 1 || enc_control.n_channels_internal > ENCODER_NUM_CHANNELS
+    {
         return SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR;
     }
-    if encControl.nChannelsInternal > encControl.nChannelsAPI {
+    if enc_control.n_channels_internal > enc_control.n_channels_api {
         return SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR;
     }
-    if encControl.complexity < 0 || encControl.complexity > 10 {
+    if enc_control.complexity < 0 || enc_control.complexity > 10 {
         return SILK_ENC_INVALID_COMPLEXITY_SETTING;
     }
     SILK_NO_ERROR
@@ -86,31 +87,31 @@ mod tests {
 
     fn baseline_control() -> silk_EncControlStruct {
         silk_EncControlStruct {
-            nChannelsAPI: 1,
-            nChannelsInternal: 1,
-            API_sampleRate: 48_000,
-            maxInternalSampleRate: 16_000,
-            minInternalSampleRate: 8_000,
-            desiredInternalSampleRate: 16_000,
-            payloadSize_ms: 20,
-            bitRate: 24_000,
-            packetLossPercentage: 0,
+            n_channels_api: 1,
+            n_channels_internal: 1,
+            api_sample_rate: 48_000,
+            max_internal_sample_rate: 16_000,
+            min_internal_sample_rate: 8_000,
+            desired_internal_sample_rate: 16_000,
+            payload_size_ms: 20,
+            bit_rate: 24_000,
+            packet_loss_percentage: 0,
             complexity: 10,
-            useInBandFEC: 0,
-            useDRED: 0,
-            LBRR_coded: 0,
-            useDTX: 0,
-            useCBR: 0,
-            maxBits: 0,
-            toMono: 0,
-            opusCanSwitch: 0,
-            reducedDependency: 0,
-            internalSampleRate: 0,
-            allowBandwidthSwitch: 0,
-            inWBmodeWithoutVariableLP: 0,
-            stereoWidth_Q14: 0,
-            switchReady: 0,
-            signalType: 0,
+            use_in_band_fec: 0,
+            use_dred: 0,
+            lbrr_coded: 0,
+            use_dtx: 0,
+            use_cbr: 0,
+            max_bits: 0,
+            to_mono: 0,
+            opus_can_switch: 0,
+            reduced_dependency: 0,
+            internal_sample_rate: 0,
+            allow_bandwidth_switch: 0,
+            in_wbmode_without_variable_lp: 0,
+            stereo_width_q14: 0,
+            switch_ready: 0,
+            signal_type: 0,
             offset: 0,
         }
     }
@@ -124,7 +125,7 @@ mod tests {
     #[test]
     fn invalid_payload_size_returns_expected_error() {
         let mut ctrl = baseline_control();
-        ctrl.payloadSize_ms = 15;
+        ctrl.payload_size_ms = 15;
         assert_eq!(
             check_control_input(&ctrl),
             SILK_ENC_PACKET_SIZE_NOT_SUPPORTED
@@ -134,7 +135,7 @@ mod tests {
     #[test]
     fn invalid_loss_rate_returns_expected_error() {
         let mut ctrl = baseline_control();
-        ctrl.packetLossPercentage = 101;
+        ctrl.packet_loss_percentage = 101;
         assert_eq!(check_control_input(&ctrl), SILK_ENC_INVALID_LOSS_RATE);
     }
 
@@ -151,8 +152,8 @@ mod tests {
     #[test]
     fn invalid_channel_relationship_returns_expected_error() {
         let mut ctrl = baseline_control();
-        ctrl.nChannelsAPI = 1;
-        ctrl.nChannelsInternal = 2;
+        ctrl.n_channels_api = 1;
+        ctrl.n_channels_internal = 2;
         assert_eq!(
             check_control_input(&ctrl),
             SILK_ENC_INVALID_NUMBER_OF_CHANNELS_ERROR
@@ -163,7 +164,7 @@ mod tests {
     #[cfg(not(feature = "qext"))]
     fn non_qext_rejects_96k_api_rate() {
         let mut ctrl = baseline_control();
-        ctrl.API_sampleRate = 96_000;
+        ctrl.api_sample_rate = 96_000;
         assert_eq!(check_control_input(&ctrl), SILK_ENC_FS_NOT_SUPPORTED);
     }
 
@@ -171,7 +172,7 @@ mod tests {
     #[cfg(feature = "qext")]
     fn qext_accepts_96k_api_rate() {
         let mut ctrl = baseline_control();
-        ctrl.API_sampleRate = 96_000;
+        ctrl.api_sample_rate = 96_000;
         assert_eq!(check_control_input(&ctrl), SILK_NO_ERROR);
     }
 }

@@ -1,6 +1,6 @@
 //! Gain quantization.
 //!
-//! Upstream C: `silk/gain_quant.c`
+//! Upstream c: `silk/gain_quant.c`
 
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
@@ -22,19 +22,19 @@ const INV_SCALE_Q16: i32 =
 ///
 /// ```text
 /// ind[ MAX_NB_SUBFR ]        O     gain indices
-/// gain_Q16[ MAX_NB_SUBFR ]   I/O   gains (quantized out)
+/// gain_q16[ MAX_NB_SUBFR ]   I/O   gains (quantized out)
 /// prev_ind                   I/O   last index in previous frame
 /// conditional                I     first gain is delta coded if 1
 /// nb_subfr                   I     number of subframes
 /// ```
-/// Upstream C: silk/gain_quant.c:silk_gains_quant
+/// Upstream c: silk/gain_quant.c:silk_gains_quant
 pub fn silk_gains_quant(
     ind: &mut [i8],
-    gain_Q16: &mut [i32],
+    gain_q16: &mut [i32],
     prev_ind: &mut i8,
     conditional: bool,
 ) {
-    for (k, (out, gain)) in ind.iter_mut().zip(gain_Q16.iter_mut()).enumerate() {
+    for (k, (out, gain)) in ind.iter_mut().zip(gain_q16.iter_mut()).enumerate() {
         /* Convert to log scale, scale, floor() */
         let mut ind = silk_smulwb(SCALE_Q16, silk_lin2log(*gain) - OFFSET) as i8;
 
@@ -87,15 +87,15 @@ pub fn silk_gains_quant(
 /// Gains scalar dequantization, uniform on log scale
 ///
 /// ```text
-/// gain_Q16[ MAX_NB_SUBFR ]   O     quantized gains
+/// gain_q16[ MAX_NB_SUBFR ]   O     quantized gains
 /// ind[ MAX_NB_SUBFR ]        I     gain indices
 /// prev_ind                   I/O   last index in previous frame
 /// conditional                I     first gain is delta coded if 1
 /// nb_subfr                   I     number of subframes
 /// ```
-/// Upstream C: silk/gain_quant.c:silk_gains_dequant
-pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, conditional: bool) {
-    for (k, (out, &ind)) in gain_Q16.iter_mut().zip(ind.iter()).enumerate() {
+/// Upstream c: silk/gain_quant.c:silk_gains_dequant
+pub fn silk_gains_dequant(gain_q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, conditional: bool) {
+    for (k, (out, &ind)) in gain_q16.iter_mut().zip(ind.iter()).enumerate() {
         if k == 0 && !conditional {
             /* Gain index is not allowed to go down more than 16 steps (~21.8 dB) */
             *prev_ind = std::cmp::max(ind, *prev_ind - 16);
@@ -123,7 +123,7 @@ pub fn silk_gains_dequant(gain_Q16: &mut [i32], ind: &[i8], prev_ind: &mut i8, c
 
 ///
 /// Compute unique identifier of gain indices vector
-/// Upstream C: silk/gain_quant.c:silk_gains_ID
+/// Upstream c: silk/gain_quant.c:silk_gains_ID
 #[inline]
 pub fn silk_gains_id(ind: &[i8]) -> i32 {
     assert!(ind.len() <= 4);

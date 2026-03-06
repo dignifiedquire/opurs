@@ -1,3 +1,3 @@
 //! Debug utilities (stub).
 //!
-//! Upstream C: `silk/debug.c`
+//! Upstream c: `silk/debug.c`

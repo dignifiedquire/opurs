@@ -2611,7 +2611,7 @@ pub fn osce_enhance_frame(
     arch: Arch,
 ) {
     // Enhancement only implemented for 20 ms frame at 16kHz
-    if ps_dec.fs_kHz != 16 || ps_dec.nb_subfr != 4 {
+    if ps_dec.fs_k_hz != 16 || ps_dec.nb_subfr != 4 {
         let method = ps_dec.osce.method;
         osce_reset(&mut ps_dec.osce, method);
         return;
@@ -2621,18 +2621,19 @@ pub fn osce_enhance_frame(
     let mut numbits = [0.0f32; 2];
     let mut periods = [0i32; 4];
 
-    // Build PredCoef_Q12 slices for feature extraction
-    let pred_coef_refs: [&[i16]; 2] = [&ps_dec_ctrl.PredCoef_Q12[0], &ps_dec_ctrl.PredCoef_Q12[1]];
+    // Build pred_coef_q12 slices for feature extraction
+    let pred_coef_refs: [&[i16]; 2] =
+        [&ps_dec_ctrl.pred_coef_q12[0], &ps_dec_ctrl.pred_coef_q12[1]];
 
     osce_calculate_features(
         &mut ps_dec.osce.features,
         ps_dec.nb_subfr,
-        ps_dec.LPC_order,
-        ps_dec.indices.signalType as i32,
+        ps_dec.lpc_order,
+        ps_dec.indices.signal_type as i32,
         &pred_coef_refs,
-        &ps_dec_ctrl.pitchL,
-        &ps_dec_ctrl.LTPCoef_Q14,
-        &ps_dec_ctrl.Gains_Q16,
+        &ps_dec_ctrl.pitch_l,
+        &ps_dec_ctrl.ltpcoef_q14,
+        &ps_dec_ctrl.gains_q16,
         xq,
         num_bits,
         &mut features,

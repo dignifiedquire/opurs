@@ -2,9 +2,6 @@
 //!
 //! Upstream C: `celt/`
 
-#![allow(non_camel_case_types)] // Transitional: remaining C-style identifiers are being migrated to Rust naming.
-#![allow(non_snake_case)] // Transitional: remaining C-style identifiers are being migrated to Rust naming.
-
 #[cfg(feature = "simd")]
 pub mod simd;
 

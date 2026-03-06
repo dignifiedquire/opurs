@@ -1,17 +1,17 @@
 //! Floating-point signal processing utilities.
 //!
-//! Upstream C: `silk/float/SigProc_FLP.h`
+//! Upstream c: `silk/float/SigProc_FLP.h`
 
 use crate::celt::float_cast::float2int;
 use crate::silk::sigproc_fix::silk_sat16;
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_float2int
+/// Upstream c: silk/float/SigProc_FLP.h:silk_float2int
 #[inline]
 pub fn silk_float2int(x: f32) -> i32 {
     float2int(x)
 }
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_float2short_array
+/// Upstream c: silk/float/SigProc_FLP.h:silk_float2short_array
 #[inline]
 pub fn silk_float2short_array(out: &mut [i16], input: &[f32]) {
     let length = out.len();
@@ -22,7 +22,7 @@ pub fn silk_float2short_array(out: &mut [i16], input: &[f32]) {
     }
 }
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_short2float_array
+/// Upstream c: silk/float/SigProc_FLP.h:silk_short2float_array
 #[inline]
 pub fn silk_short2float_array(out: &mut [f32], input: &[i16]) {
     let length = out.len();
@@ -33,13 +33,13 @@ pub fn silk_short2float_array(out: &mut [f32], input: &[i16]) {
     }
 }
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_log2
+/// Upstream c: silk/float/SigProc_FLP.h:silk_log2
 #[inline]
 pub fn silk_log2(x: f64) -> f32 {
     (std::f64::consts::LOG2_10 * x.log10()) as f32
 }
 
-/// Upstream C: silk/float/SigProc_FLP.h:silk_sigmoid
+/// Upstream c: silk/float/SigProc_FLP.h:silk_sigmoid
 #[inline]
 pub fn silk_sigmoid(x: f32) -> f32 {
     (1.0f64 / (1.0f64 + (-x as f64).exp())) as f32

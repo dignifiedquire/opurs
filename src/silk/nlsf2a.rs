@@ -1,6 +1,6 @@
 //! Conversion from LSF to LPC coefficients.
 //!
-//! Upstream C: `silk/NLSF2A.c`
+//! Upstream c: `silk/NLSF2A.c`
 
 use crate::arch::Arch;
 use crate::silk::bwexpander_32::silk_bwexpander_32;
@@ -20,21 +20,21 @@ pub const QA: i32 = 16;
 ///
 /// ```text
 /// out     O   intermediate polynomial, QA [dd+1]
-/// cLSF    I   vector of interleaved 2*cos(LSFs), QA [d]
-/// dd      I   polynomial order (= 1/2 * filter order)
+/// c_lsf    I   vector of interleaved 2*cos(LSFs), QA [d]
+/// dd      I   polynomial Order (= 1/2 * filter Order)
 /// ```
-/// Upstream C: silk/NLSF2A.c:silk_NLSF2A_find_poly
+/// Upstream c: silk/NLSF2A.c:silk_NLSF2A_find_poly
 #[inline]
-fn silk_nlsf2a_find_poly(out: &mut [i32], cLSF: &[i32]) {
-    let d = cLSF.len();
+fn silk_nlsf2a_find_poly(out: &mut [i32], c_lsf: &[i32]) {
+    let d = c_lsf.len();
     let dd = d / 2;
     assert_eq!(out.len(), dd + 1);
 
     out[0] = 1 << QA;
-    out[1] = -cLSF[0];
+    out[1] = -c_lsf[0];
 
     for k in 1..dd {
-        let ftmp = cLSF[2 * k]; /* QA */
+        let ftmp = c_lsf[2 * k]; /* QA */
         out[k + 1] = out[k - 1] * 2 - silk_rshift_round64(ftmp as i64 * out[k] as i64, QA) as i32;
 
         for n in (2..=k).rev() {
@@ -49,15 +49,15 @@ fn silk_nlsf2a_find_poly(out: &mut [i32], cLSF: &[i32]) {
 /// compute whitening filter coefficients from normalized line spectral frequencies
 ///
 /// ```text
-/// a_Q12   O   monic whitening filter coefficients in Q12,  [ d ]
-/// NLSF    I   normalized line spectral frequencies in Q15, [ d ]
-/// d       I   filter order (should be even)
+/// a_q12   O   monic whitening filter coefficients in Q12,  [ d ]
+/// nlsf    I   normalized line spectral frequencies in Q15, [ d ]
+/// d       I   filter Order (should be even)
 /// arch    I   Run-time architecture
 /// ```
-/// Upstream C: silk/NLSF2A.c:silk_NLSF2A
+/// Upstream c: silk/NLSF2A.c:silk_NLSF2A
 #[inline]
-pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
-    let d = a_Q12.len();
+pub fn silk_nlsf2a(a_q12: &mut [i16], nlsf: &[i16], arch: Arch) {
+    let d = a_q12.len();
 
     /* This ordering was found to maximize quality. It improves the numerical accuracy of
     silk_nlsf2a_find_poly() compared to "standard" ordering. */
@@ -73,16 +73,16 @@ pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         ORDERING10.as_slice()
     };
 
-    let mut cos_LSF_QA: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
-    let cos_LSF_QA = &mut cos_LSF_QA[..d + 1];
-    for (&ordering, &NLSF) in ordering.iter().zip(NLSF.iter()) {
-        debug_assert!(NLSF >= 0);
+    let mut cos_lsf_qa: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
+    let cos_lsf_qa = &mut cos_lsf_qa[..d + 1];
+    for (&ordering, &nlsf) in ordering.iter().zip(nlsf.iter()) {
+        debug_assert!(nlsf >= 0);
 
         /* f_int on a scale 0-127 (rounded down) */
-        let f_int = NLSF as i32 >> (15 - 7);
+        let f_int = nlsf as i32 >> (15 - 7);
 
         /* f_frac, range: 0..255 */
-        let f_frac = NLSF as i32 - (f_int << (15 - 7));
+        let f_frac = nlsf as i32 - (f_int << (15 - 7));
 
         debug_assert!(f_int >= 0);
         debug_assert!(f_int < LSF_COS_TAB_SZ_FIX);
@@ -91,35 +91,35 @@ pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         let cos_val = SILK_LSFCOSTAB_FIX_Q12[f_int as usize] as i32; /* Q12 */
         let delta = SILK_LSFCOSTAB_FIX_Q12[(f_int + 1) as usize] as i32 - cos_val; /* Q12, with a range of 0..200 */
 
-        cos_LSF_QA[ordering as usize] = silk_rshift_round((cos_val << 8) + delta * f_frac, 20 - QA);
+        cos_lsf_qa[ordering as usize] = silk_rshift_round((cos_val << 8) + delta * f_frac, 20 - QA);
         /* QA */
     }
 
     let dd = d / 2;
 
     /* generate even and odd polynomials using convolution */
-    let mut P: [i32; SILK_MAX_ORDER_LPC / 2 + 1] = [0; 13];
-    let mut Q: [i32; SILK_MAX_ORDER_LPC / 2 + 1] = [0; 13];
-    let P = &mut P[..dd + 1];
-    let Q = &mut Q[..dd + 1];
-    silk_nlsf2a_find_poly(P, &cos_LSF_QA[..d]);
-    silk_nlsf2a_find_poly(Q, &cos_LSF_QA[1..][..d]);
+    let mut p: [i32; SILK_MAX_ORDER_LPC / 2 + 1] = [0; 13];
+    let mut q: [i32; SILK_MAX_ORDER_LPC / 2 + 1] = [0; 13];
+    let p = &mut p[..dd + 1];
+    let q = &mut q[..dd + 1];
+    silk_nlsf2a_find_poly(p, &cos_lsf_qa[..d]);
+    silk_nlsf2a_find_poly(q, &cos_lsf_qa[1..][..d]);
 
     /* convert even and odd polynomials to opus_int32 Q12 filter coefs */
-    let mut a32_QA1: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
-    let a32_QA1 = &mut a32_QA1[..d];
+    let mut a32_qa1: [i32; SILK_MAX_ORDER_LPC] = [0; 24];
+    let a32_qa1 = &mut a32_qa1[..d];
     for k in 0..dd {
-        let Ptmp = P[k + 1] + P[k];
-        let Qtmp = Q[k + 1] - Q[k];
-        /* the Ptmp and Qtmp values at this stage need to fit in int32 */
-        a32_QA1[k] = -Qtmp - Ptmp; /* QA+1 */
-        a32_QA1[d - k - 1] = Qtmp - Ptmp; /* QA+1 */
+        let ptmp = p[k + 1] + p[k];
+        let qtmp = q[k + 1] - q[k];
+        /* the ptmp and qtmp values at this stage need to fit in int32 */
+        a32_qa1[k] = -qtmp - ptmp; /* QA+1 */
+        a32_qa1[d - k - 1] = qtmp - ptmp; /* QA+1 */
     }
 
     /* Convert int32 coefficients to Q12 int16 coefs */
-    silk_lpc_fit(a_Q12, &mut a32_QA1[..d], 12, QA + 1);
+    silk_lpc_fit(a_q12, &mut a32_qa1[..d], 12, QA + 1);
 
-    let mut i = 0;
+    let mut _i = 0;
     #[cfg(feature = "simd")]
     let pred_gain_fn = |a: &[i16]| silk_lpc_inverse_pred_gain(a, arch);
     #[cfg(not(feature = "simd"))]
@@ -127,15 +127,15 @@ pub fn silk_nlsf2a(a_Q12: &mut [i16], NLSF: &[i16], arch: Arch) {
         let _ = arch;
         silk_lpc_inverse_pred_gain_c
     };
-    while pred_gain_fn(a_Q12) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS {
+    while pred_gain_fn(a_q12) == 0 && _i < MAX_LPC_STABILIZE_ITERATIONS {
         /* Prediction coefficients are (too close to) unstable; apply bandwidth expansion   */
         /* on the unscaled coefficients, convert to Q12 and measure again                   */
-        silk_bwexpander_32(a32_QA1, 65536 - (2 << i));
+        silk_bwexpander_32(a32_qa1, 65536 - (2 << _i));
 
-        for (a_Q12, &a32_QA1) in a_Q12.iter_mut().zip(a32_QA1.iter()) {
-            *a_Q12 = silk_rshift_round(a32_QA1, QA + 1 - 12) as i16; /* QA+1 -> Q12 */
+        for (a_q12, &a32_qa1) in a_q12.iter_mut().zip(a32_qa1.iter()) {
+            *a_q12 = silk_rshift_round(a32_qa1, QA + 1 - 12) as i16; /* QA+1 -> Q12 */
         }
 
-        i += 1;
+        _i += 1;
     }
 }

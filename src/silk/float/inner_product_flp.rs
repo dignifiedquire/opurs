@@ -1,6 +1,6 @@
 //! Floating-point inner product.
 //!
-//! Upstream C: `silk/float/inner_product_FLP.c`
+//! Upstream c: `silk/float/inner_product_FLP.c`
 
 use nalgebra::constraint::{DimEq, ShapeConstraint};
 use nalgebra::{Dim, Matrix, RawStorage, U1};
@@ -8,7 +8,7 @@ use nalgebra::{Dim, Matrix, RawStorage, U1};
 ///
 /// Inner product of two silk_float arrays, with result as double.
 /// When the `simd` feature is enabled, dispatches to AVX2/NEON on supported platforms.
-/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
+/// Upstream c: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 #[cfg(feature = "simd")]
 pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: crate::arch::Arch) -> f64 {
     crate::silk::simd::silk_inner_product_flp(data1, data2, arch)
@@ -16,7 +16,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: crate::arch::A
 
 ///
 /// Inner product of two silk_float arrays, with result as double (scalar-only build).
-/// Upstream C: silk/float/SigProc_FLP.h:silk_inner_product_FLP
+/// Upstream c: silk/float/SigProc_FLP.h:silk_inner_product_FLP
 #[cfg(not(feature = "simd"))]
 pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], _arch: crate::arch::Arch) -> f64 {
     silk_inner_product_flp_scalar(data1, data2)
@@ -33,7 +33,7 @@ pub fn silk_inner_product_flp_scalar(data1: &[f32], data2: &[f32]) -> f64 {
 
 // Based on nalgebra's [`Matrix::dot`], but with the result as a `f64`.
 /// Inner product, but operating on nalgebra's [`VectorView`]s
-pub fn silk_inner_product2_FLP<D1, D2, S1, S2>(
+pub fn silk_inner_product2_flp<D1, D2, S1, S2>(
     lhs: &Matrix<f32, D1, U1, S1>,
     rhs: &Matrix<f32, D2, U1, S2>,
 ) -> f64
@@ -65,7 +65,7 @@ where
     let mut acc7;
 
     for j in 0..lhs.ncols() {
-        let mut i = 0;
+        let mut _i = 0;
 
         acc0 = 0.0;
         acc1 = 0.0;
@@ -76,16 +76,16 @@ where
         acc6 = 0.0;
         acc7 = 0.0;
 
-        while lhs.nrows() - i >= 8 {
-            acc0 += lhs[(i, j)] as f64 * rhs[(i, j)] as f64;
-            acc1 += lhs[(i + 1, j)] as f64 * rhs[(i + 1, j)] as f64;
-            acc2 += lhs[(i + 2, j)] as f64 * rhs[(i + 2, j)] as f64;
-            acc3 += lhs[(i + 3, j)] as f64 * rhs[(i + 3, j)] as f64;
-            acc4 += lhs[(i + 4, j)] as f64 * rhs[(i + 4, j)] as f64;
-            acc5 += lhs[(i + 5, j)] as f64 * rhs[(i + 5, j)] as f64;
-            acc6 += lhs[(i + 6, j)] as f64 * rhs[(i + 6, j)] as f64;
-            acc7 += lhs[(i + 7, j)] as f64 * rhs[(i + 7, j)] as f64;
-            i += 8;
+        while lhs.nrows() - _i >= 8 {
+            acc0 += lhs[(_i, j)] as f64 * rhs[(_i, j)] as f64;
+            acc1 += lhs[(_i + 1, j)] as f64 * rhs[(_i + 1, j)] as f64;
+            acc2 += lhs[(_i + 2, j)] as f64 * rhs[(_i + 2, j)] as f64;
+            acc3 += lhs[(_i + 3, j)] as f64 * rhs[(_i + 3, j)] as f64;
+            acc4 += lhs[(_i + 4, j)] as f64 * rhs[(_i + 4, j)] as f64;
+            acc5 += lhs[(_i + 5, j)] as f64 * rhs[(_i + 5, j)] as f64;
+            acc6 += lhs[(_i + 6, j)] as f64 * rhs[(_i + 6, j)] as f64;
+            acc7 += lhs[(_i + 7, j)] as f64 * rhs[(_i + 7, j)] as f64;
+            _i += 8;
         }
 
         res += acc0 + acc4;
@@ -93,7 +93,7 @@ where
         res += acc2 + acc6;
         res += acc3 + acc7;
 
-        for k in i..lhs.nrows() {
+        for k in _i..lhs.nrows() {
             res += lhs[(k, j)] as f64 * rhs[(k, j)] as f64;
         }
     }

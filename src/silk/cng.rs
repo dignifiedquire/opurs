@@ -1,6 +1,6 @@
 //! Comfort noise generation.
 //!
-//! Upstream C: `silk/CNG.c`
+//! Upstream c: `silk/CNG.c`
 
 use crate::silk::define::{
     CNG_BUF_MASK_MAX, CNG_GAIN_SMTH_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16, CNG_NLSF_SMTH_Q16,
@@ -17,245 +17,248 @@ use crate::silk::structs::{silk_CNG_struct, silk_decoder_control, silk_decoder_s
 /// Generates excitation for CNG LPC synthesis
 ///
 /// ```text
-/// exc_Q14[]       O     CNG excitation signal Q10
-/// exc_buf_Q14[]   I     Random samples buffer Q10
+/// exc_q14[]       O     CNG excitation signal Q10
+/// exc_buf_q14[]   I     Random samples buffer Q10
 /// length          I     Length
-/// rand_seed       I/O   Seed to random index generator
+/// rand_seed       I/O   seed to random index generator
 /// ```
 #[inline]
-/// Upstream C: silk/CNG.c:silk_CNG_exc
-fn silk_cng_exc(exc_Q14: &mut [i32], exc_buf_Q14: &[i32], rand_seed: &mut i32) {
+/// Upstream c: silk/CNG.c:silk_CNG_exc
+fn silk_cng_exc(exc_q14: &mut [i32], exc_buf_q14: &[i32], rand_seed: &mut i32) {
     let mut exc_mask = CNG_BUF_MASK_MAX;
-    while exc_mask > exc_Q14.len() as i32 {
+    while exc_mask > exc_q14.len() as i32 {
         exc_mask >>= 1;
     }
 
     let mut seed = *rand_seed;
-    let mut i = 0;
-    while i < exc_Q14.len() {
+    let mut _i = 0;
+    while _i < exc_q14.len() {
         seed = silk_rand(seed);
         let idx = (seed >> 24) & exc_mask;
         debug_assert!(idx >= 0);
         debug_assert!(idx <= CNG_BUF_MASK_MAX);
-        exc_Q14[i] = exc_buf_Q14[idx as usize];
-        i += 1;
+        exc_q14[_i] = exc_buf_q14[idx as usize];
+        _i += 1;
     }
     *rand_seed = seed;
 }
 
-/// Upstream C: silk/CNG.c:silk_CNG_Reset
-pub fn silk_cng_reset(psDec: &mut silk_decoder_state) {
-    let NLSF_step_Q15 = i16::MAX as i32 / (psDec.LPC_order as i32 + 1);
-    let mut NLSF_acc_Q15 = 0;
-    for i in 0..psDec.LPC_order {
-        NLSF_acc_Q15 += NLSF_step_Q15;
-        psDec.sCNG.CNG_smth_NLSF_Q15[i] = NLSF_acc_Q15 as i16;
+/// Upstream c: silk/CNG.c:silk_CNG_Reset
+pub fn silk_cng_reset(ps_dec: &mut silk_decoder_state) {
+    let nlsf_step_q15 = i16::MAX as i32 / (ps_dec.lpc_order as i32 + 1);
+    let mut nlsf_acc_q15 = 0;
+    for _i in 0..ps_dec.lpc_order {
+        nlsf_acc_q15 += nlsf_step_q15;
+        ps_dec.s_cng.cng_smth_nlsf_q15[_i] = nlsf_acc_q15 as i16;
     }
-    psDec.sCNG.CNG_smth_Gain_Q16 = 0;
-    psDec.sCNG.rand_seed = 3176576;
+    ps_dec.s_cng.cng_smth_gain_q16 = 0;
+    ps_dec.s_cng.rand_seed = 3176576;
 }
 
 /// Updates CNG estimate, and applies the CNG when packet was lost
 ///
 /// ```text
-/// psDec         I/O   Decoder state
-/// psDecCtrl     I/O   Decoder control
+/// ps_dec         I/O   Decoder state
+/// ps_dec_ctrl     I/O   Decoder control
 /// frame[]       I/O   Signal
 /// length        I     Length of residual
 /// ```
 #[inline]
-/// Upstream C: silk/CNG.c:silk_CNG
+/// Upstream c: silk/CNG.c:silk_CNG
 pub fn silk_cng(
-    psDec: &mut silk_decoder_state,
-    psDecCtrl: &mut silk_decoder_control,
+    ps_dec: &mut silk_decoder_state,
+    ps_dec_ctrl: &mut silk_decoder_control,
     frame: &mut [i16],
 ) {
-    if psDec.fs_kHz != psDec.sCNG.fs_kHz {
+    if ps_dec.fs_k_hz != ps_dec.s_cng.fs_k_hz {
         /* Reset state */
-        silk_cng_reset(psDec);
+        silk_cng_reset(ps_dec);
 
-        psDec.sCNG.fs_kHz = psDec.fs_kHz;
+        ps_dec.s_cng.fs_k_hz = ps_dec.fs_k_hz;
     }
-    let psCNG: &mut silk_CNG_struct = &mut psDec.sCNG;
-    if psDec.lossCnt == 0 && psDec.prevSignalType == TYPE_NO_VOICE_ACTIVITY {
+    let ps_cng: &mut silk_CNG_struct = &mut ps_dec.s_cng;
+    if ps_dec.loss_cnt == 0 && ps_dec.prev_signal_type == TYPE_NO_VOICE_ACTIVITY {
         /* Update CNG parameters */
 
         /* Smoothing of LSF's  */
-        for i in 0..psDec.LPC_order {
-            psCNG.CNG_smth_NLSF_Q15[i] += silk_smulwb(
-                psDec.prevNLSF_Q15[i] as i32 - psCNG.CNG_smth_NLSF_Q15[i] as i32,
+        for _i in 0..ps_dec.lpc_order {
+            ps_cng.cng_smth_nlsf_q15[_i] += silk_smulwb(
+                ps_dec.prev_nlsf_q15[_i] as i32 - ps_cng.cng_smth_nlsf_q15[_i] as i32,
                 CNG_NLSF_SMTH_Q16,
             ) as i16;
         }
         /* Find the subframe with the highest gain */
-        let mut max_Gain_Q16 = 0;
+        let mut max_gain_q16 = 0;
         let mut subfr = 0;
 
-        for i in 0..psDec.nb_subfr {
-            if psDecCtrl.Gains_Q16[i] > max_Gain_Q16 {
-                max_Gain_Q16 = psDecCtrl.Gains_Q16[i];
-                subfr = i;
+        for _i in 0..ps_dec.nb_subfr {
+            if ps_dec_ctrl.gains_q16[_i] > max_gain_q16 {
+                max_gain_q16 = ps_dec_ctrl.gains_q16[_i];
+                subfr = _i;
             }
         }
         /* Update CNG excitation buffer with excitation from this subframe */
-        psCNG.CNG_exc_buf_Q14.copy_within(
-            0..(psDec.nb_subfr - 1) * psDec.subfr_length,
-            psDec.subfr_length,
+        ps_cng.cng_exc_buf_q14.copy_within(
+            0..(ps_dec.nb_subfr - 1) * ps_dec.subfr_length,
+            ps_dec.subfr_length,
         );
-        psCNG.CNG_exc_buf_Q14[..psDec.subfr_length]
-            .copy_from_slice(&psDec.exc_Q14[subfr * psDec.subfr_length..][..psDec.subfr_length]);
+        ps_cng.cng_exc_buf_q14[..ps_dec.subfr_length]
+            .copy_from_slice(&ps_dec.exc_q14[subfr * ps_dec.subfr_length..][..ps_dec.subfr_length]);
 
         /* Smooth gains */
-        for i in 0..psDec.nb_subfr {
-            psCNG.CNG_smth_Gain_Q16 += silk_smulwb(
-                psDecCtrl.Gains_Q16[i] - psCNG.CNG_smth_Gain_Q16,
+        for _i in 0..ps_dec.nb_subfr {
+            ps_cng.cng_smth_gain_q16 += silk_smulwb(
+                ps_dec_ctrl.gains_q16[_i] - ps_cng.cng_smth_gain_q16,
                 CNG_GAIN_SMTH_Q16,
             );
-            if silk_smulww(psCNG.CNG_smth_Gain_Q16, CNG_GAIN_SMTH_THRESHOLD_Q16)
-                > psDecCtrl.Gains_Q16[i]
+            if silk_smulww(ps_cng.cng_smth_gain_q16, CNG_GAIN_SMTH_THRESHOLD_Q16)
+                > ps_dec_ctrl.gains_q16[_i]
             {
-                psCNG.CNG_smth_Gain_Q16 = psDecCtrl.Gains_Q16[i];
+                ps_cng.cng_smth_gain_q16 = ps_dec_ctrl.gains_q16[_i];
             }
         }
     }
 
     /* Add CNG when packet is lost or during DTX */
-    if psDec.lossCnt != 0 {
+    if ps_dec.loss_cnt != 0 {
         // Max: frame_length(320) + MAX_LPC_ORDER(16) = 336
-        let mut CNG_sig_Q14 = [0i32; MAX_FRAME_LENGTH + MAX_LPC_ORDER];
+        let mut cng_sig_q14 = [0i32; MAX_FRAME_LENGTH + MAX_LPC_ORDER];
 
         /* Generate CNG excitation */
-        let mut gain_Q16 = silk_smulww(psDec.sPLC.randScale_Q14 as i32, psDec.sPLC.prevGain_Q16[1]);
-        if gain_Q16 >= (1 << 21) || psCNG.CNG_smth_Gain_Q16 > (1 << 23) {
-            gain_Q16 = silk_smultt(gain_Q16, gain_Q16);
-            gain_Q16 =
-                silk_smultt(psCNG.CNG_smth_Gain_Q16, psCNG.CNG_smth_Gain_Q16) - (gain_Q16 << 5);
-            gain_Q16 = silk_sqrt_approx(gain_Q16) << 16;
+        let mut gain_q16 = silk_smulww(
+            ps_dec.s_plc.rand_scale_q14 as i32,
+            ps_dec.s_plc.prev_gain_q16[1],
+        );
+        if gain_q16 >= (1 << 21) || ps_cng.cng_smth_gain_q16 > (1 << 23) {
+            gain_q16 = silk_smultt(gain_q16, gain_q16);
+            gain_q16 =
+                silk_smultt(ps_cng.cng_smth_gain_q16, ps_cng.cng_smth_gain_q16) - (gain_q16 << 5);
+            gain_q16 = silk_sqrt_approx(gain_q16) << 16;
         } else {
-            gain_Q16 = silk_smulww(gain_Q16, gain_Q16);
-            gain_Q16 =
-                silk_smulww(psCNG.CNG_smth_Gain_Q16, psCNG.CNG_smth_Gain_Q16) - (gain_Q16 << 5);
-            gain_Q16 = silk_sqrt_approx(gain_Q16) << 8;
+            gain_q16 = silk_smulww(gain_q16, gain_q16);
+            gain_q16 =
+                silk_smulww(ps_cng.cng_smth_gain_q16, ps_cng.cng_smth_gain_q16) - (gain_q16 << 5);
+            gain_q16 = silk_sqrt_approx(gain_q16) << 8;
         }
-        let gain_Q10 = gain_Q16 >> 6;
+        let gain_q10 = gain_q16 >> 6;
         silk_cng_exc(
-            &mut CNG_sig_Q14[MAX_LPC_ORDER..MAX_LPC_ORDER + frame.len()],
-            &psCNG.CNG_exc_buf_Q14[..frame.len()],
-            &mut psCNG.rand_seed,
+            &mut cng_sig_q14[MAX_LPC_ORDER..MAX_LPC_ORDER + frame.len()],
+            &ps_cng.cng_exc_buf_q14[..frame.len()],
+            &mut ps_cng.rand_seed,
         );
 
-        let mut A_Q12: [i16; MAX_LPC_ORDER] = [0; 16];
+        let mut a_q12: [i16; MAX_LPC_ORDER] = [0; 16];
 
-        /* Convert CNG NLSF to filter representation */
+        /* Convert CNG nlsf to filter representation */
         silk_nlsf2a(
-            &mut A_Q12[..psDec.LPC_order],
-            &psCNG.CNG_smth_NLSF_Q15[..psDec.LPC_order],
-            psDec.arch,
+            &mut a_q12[..ps_dec.lpc_order],
+            &ps_cng.cng_smth_nlsf_q15[..ps_dec.lpc_order],
+            ps_dec.arch,
         );
 
         /* Generate CNG signal, by synthesis filtering */
-        CNG_sig_Q14[..MAX_LPC_ORDER].copy_from_slice(&psCNG.CNG_synth_state);
-        debug_assert!(psDec.LPC_order == 10 || psDec.LPC_order == 16);
-        for i in 0..frame.len() {
+        cng_sig_q14[..MAX_LPC_ORDER].copy_from_slice(&ps_cng.cng_synth_state);
+        debug_assert!(ps_dec.lpc_order == 10 || ps_dec.lpc_order == 16);
+        for _i in 0..frame.len() {
             /* Avoids introducing a bias because silk_smlawb() always rounds to -inf */
-            let mut LPC_pred_Q10 = psDec.LPC_order as i32 >> 1;
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 1],
-                A_Q12[0] as i32,
+            let mut lpc_pred_q10 = ps_dec.lpc_order as i32 >> 1;
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 1],
+                a_q12[0] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 2],
-                A_Q12[1] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 2],
+                a_q12[1] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 3],
-                A_Q12[2] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 3],
+                a_q12[2] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 4],
-                A_Q12[3] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 4],
+                a_q12[3] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 5],
-                A_Q12[4] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 5],
+                a_q12[4] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 6],
-                A_Q12[5] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 6],
+                a_q12[5] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 7],
-                A_Q12[6] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 7],
+                a_q12[6] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 8],
-                A_Q12[7] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 8],
+                a_q12[7] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 9],
-                A_Q12[8] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 9],
+                a_q12[8] as i32,
             );
-            LPC_pred_Q10 = silk_smlawb(
-                LPC_pred_Q10,
-                CNG_sig_Q14[MAX_LPC_ORDER + i - 10],
-                A_Q12[9] as i32,
+            lpc_pred_q10 = silk_smlawb(
+                lpc_pred_q10,
+                cng_sig_q14[MAX_LPC_ORDER + _i - 10],
+                a_q12[9] as i32,
             );
-            if psDec.LPC_order == 16 {
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 11],
-                    A_Q12[10] as i32,
+            if ps_dec.lpc_order == 16 {
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 11],
+                    a_q12[10] as i32,
                 );
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 12],
-                    A_Q12[11] as i32,
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 12],
+                    a_q12[11] as i32,
                 );
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 13],
-                    A_Q12[12] as i32,
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 13],
+                    a_q12[12] as i32,
                 );
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 14],
-                    A_Q12[13] as i32,
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 14],
+                    a_q12[13] as i32,
                 );
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 15],
-                    A_Q12[14] as i32,
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 15],
+                    a_q12[14] as i32,
                 );
-                LPC_pred_Q10 = silk_smlawb(
-                    LPC_pred_Q10,
-                    CNG_sig_Q14[MAX_LPC_ORDER + i - 16],
-                    A_Q12[15] as i32,
+                lpc_pred_q10 = silk_smlawb(
+                    lpc_pred_q10,
+                    cng_sig_q14[MAX_LPC_ORDER + _i - 16],
+                    a_q12[15] as i32,
                 );
             }
 
             /* Update states */
-            CNG_sig_Q14[MAX_LPC_ORDER + i] =
-                CNG_sig_Q14[MAX_LPC_ORDER + i].saturating_add(silk_lshift_sat32(LPC_pred_Q10, 4));
+            cng_sig_q14[MAX_LPC_ORDER + _i] =
+                cng_sig_q14[MAX_LPC_ORDER + _i].saturating_add(silk_lshift_sat32(lpc_pred_q10, 4));
 
             /* Scale with Gain and add to input signal */
-            frame[i] = frame[i].saturating_add(silk_sat16(silk_rshift_round(
-                silk_smulww(CNG_sig_Q14[MAX_LPC_ORDER + i], gain_Q10),
+            frame[_i] = frame[_i].saturating_add(silk_sat16(silk_rshift_round(
+                silk_smulww(cng_sig_q14[MAX_LPC_ORDER + _i], gain_q10),
                 8,
             )) as i16);
         }
-        psCNG
-            .CNG_synth_state
-            .copy_from_slice(&CNG_sig_Q14[frame.len()..][..MAX_LPC_ORDER]);
+        ps_cng
+            .cng_synth_state
+            .copy_from_slice(&cng_sig_q14[frame.len()..][..MAX_LPC_ORDER]);
     } else {
-        psCNG.CNG_synth_state[..psDec.LPC_order].fill(0);
+        ps_cng.cng_synth_state[..ps_dec.lpc_order].fill(0);
     };
 }

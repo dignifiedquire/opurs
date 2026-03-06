@@ -1,6 +1,6 @@
 //! LSF cosine approximation table.
 //!
-//! Upstream C: `silk/table_LSF_cos.c`
+//! Upstream c: `silk/table_LSF_cos.c`
 
 pub const SILK_LSFCOSTAB_FIX_Q12: [i16; 129] = [
     8192, 8190, 8182, 8170, 8152, 8130, 8104, 8072, 8034, 7994, 7946, 7896, 7840, 7778, 7714, 7644,

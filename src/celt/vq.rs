@@ -53,53 +53,53 @@ fn qext_hash_f32(x: &[f32]) -> u64 {
 /// Dispatch wrapper for `op_pvq_search`.
 #[cfg(feature = "simd")]
 #[inline]
-fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
-    super::simd::op_pvq_search(X, iy, K, N, arch)
+fn op_pvq_search(x: &mut [f32], iy: &mut [i32], k: i32, n: i32, arch: Arch) -> f32 {
+    super::simd::op_pvq_search(x, iy, k, n, arch)
 }
 
 /// Dispatch wrapper for `op_pvq_search` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-fn op_pvq_search(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, arch: Arch) -> f32 {
-    op_pvq_search_c(X, iy, K, N, arch)
+fn op_pvq_search(x: &mut [f32], iy: &mut [i32], k: i32, n: i32, arch: Arch) -> f32 {
+    op_pvq_search_c(x, iy, k, n, arch)
 }
 
 /// Upstream C: celt/vq.c:exp_rotation1
 #[inline]
-fn exp_rotation1(X: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
+fn exp_rotation1(x: &mut [f32], len: i32, stride: i32, c: f32, s: f32) {
     let ms: f32 = -s;
     // Forward pass
     let fwd_end = len - stride;
     if fwd_end > 0 {
         for i in 0..fwd_end as usize {
-            let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
-            X[i] = c * x1 + ms * x2;
+            let x1 = x[i];
+            let x2 = x[i + stride as usize];
+            x[i + stride as usize] = c * x2 + s * x1;
+            x[i] = c * x1 + ms * x2;
         }
     }
     // Backward pass
     let bwd_end = len - 2 * stride - 1;
     if bwd_end >= 0 {
         for i in (0..=bwd_end as usize).rev() {
-            let x1 = X[i];
-            let x2 = X[i + stride as usize];
-            X[i + stride as usize] = c * x2 + s * x1;
-            X[i] = c * x1 + ms * x2;
+            let x1 = x[i];
+            let x2 = x[i + stride as usize];
+            x[i + stride as usize] = c * x2 + s * x1;
+            x[i] = c * x1 + ms * x2;
         }
     }
 }
 
 /// Upstream C: celt/vq.c:exp_rotation
 #[inline]
-pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, spread: i32) {
+pub fn exp_rotation(x: &mut [f32], mut len: i32, dir: i32, stride: i32, k: i32, spread: i32) {
     const SPREAD_FACTOR: [i32; 3] = [15, 10, 5];
     let mut stride2: i32 = 0;
-    if 2 * K >= len || spread == SPREAD_NONE {
+    if 2 * k >= len || spread == SPREAD_NONE {
         return;
     }
     let factor = SPREAD_FACTOR[(spread - 1) as usize];
-    let gain: f32 = 1.0f32 * len as f32 / (len + factor * K) as f32;
+    let gain: f32 = 1.0f32 * len as f32 / (len + factor * k) as f32;
     let theta: f32 = 0.5f32 * (gain * gain);
     let c = celt_cos_norm(theta);
     let s = celt_cos_norm(1.0f32 - theta);
@@ -112,7 +112,7 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
     len = celt_udiv(len as u32, stride as u32) as i32;
     for i in 0..stride {
         let off = (i * len) as usize;
-        let sub = &mut X[off..off + len as usize];
+        let sub = &mut x[off..off + len as usize];
         if dir < 0 {
             if stride2 != 0 {
                 exp_rotation1(sub, len, stride2, s, c);
@@ -129,24 +129,24 @@ pub fn exp_rotation(X: &mut [f32], mut len: i32, dir: i32, stride: i32, K: i32, 
 
 /// Upstream C: celt/vq.c:normalise_residual
 #[inline]
-fn normalise_residual(iy: &[i32], X: &mut [f32], N: i32, Ryy: f32, gain: f32) {
-    let g = celt_rsqrt_norm(Ryy) * gain;
-    for i in 0..N as usize {
-        X[i] = g * iy[i] as f32;
+fn normalise_residual(iy: &[i32], x: &mut [f32], n: i32, ryy: f32, gain: f32) {
+    let g = celt_rsqrt_norm(ryy) * gain;
+    for i in 0..n as usize {
+        x[i] = g * iy[i] as f32;
     }
 }
 
 /// Upstream C: celt/vq.c:extract_collapse_mask
-fn extract_collapse_mask(iy: &[i32], N: i32, B: i32) -> u32 {
-    if B <= 1 {
+fn extract_collapse_mask(iy: &[i32], n: i32, b: i32) -> u32 {
+    if b <= 1 {
         return 1;
     }
-    let N0 = celt_udiv(N as u32, B as u32) as i32;
+    let n0 = celt_udiv(n as u32, b as u32) as i32;
     let mut collapse_mask: u32 = 0;
-    for i in 0..B {
+    for i in 0..b {
         let mut tmp: u32 = 0;
-        for j in 0..N0 {
-            tmp |= iy[(i * N0 + j) as usize] as u32;
+        for j in 0..n0 {
+            tmp |= iy[(i * n0 + j) as usize] as u32;
         }
         collapse_mask |= ((tmp != 0) as u32) << i;
     }
@@ -154,81 +154,81 @@ fn extract_collapse_mask(iy: &[i32], N: i32, B: i32) -> u32 {
 }
 
 /// Upstream C: celt/vq.c:op_pvq_search_c
-pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arch) -> f32 {
+pub fn op_pvq_search_c(x: &mut [f32], iy: &mut [i32], k: i32, n: i32, _arch: Arch) -> f32 {
     let mut sum: f32 = 0.0;
     let mut xy: f32;
     let mut yy: f32;
-    let N = N as usize;
+    let n = n as usize;
     // Max CELT band size is 176; use stack buffers.
-    debug_assert!(N <= 176);
+    debug_assert!(n <= 176);
     let mut y = [0.0f32; 176];
     let mut signx = [0i32; 176];
     // Pre-slice to hoist bounds checks out of the hot loops.
-    let X = &mut X[..N];
-    let iy = &mut iy[..N];
+    let x = &mut x[..n];
+    let iy = &mut iy[..n];
 
-    for j in 0..N {
-        signx[j] = (X[j] < 0.0) as i32;
-        X[j] = X[j].abs();
+    for j in 0..n {
+        signx[j] = (x[j] < 0.0) as i32;
+        x[j] = x[j].abs();
         iy[j] = 0;
         y[j] = 0.0;
     }
     yy = 0.0;
     xy = 0.0;
-    let mut pulsesLeft = K;
-    if K > (N >> 1) as i32 {
-        for xj in X.iter() {
+    let mut pulses_left = k;
+    if k > (n >> 1) as i32 {
+        for xj in x.iter() {
             sum += xj;
         }
         if !(sum > EPSILON && sum < 64.0) {
-            X[0] = 1.0;
-            for xj in X[1..].iter_mut() {
+            x[0] = 1.0;
+            for xj in x[1..].iter_mut() {
                 *xj = 0.0;
             }
             sum = 1.0;
         }
-        let rcp: f32 = (K as f32 + 0.8f32) * (1.0f32 / sum);
-        for j in 0..N {
-            iy[j] = (rcp * X[j]).floor() as i32;
+        let rcp: f32 = (k as f32 + 0.8f32) * (1.0f32 / sum);
+        for j in 0..n {
+            iy[j] = (rcp * x[j]).floor() as i32;
             y[j] = iy[j] as f32;
             yy += y[j] * y[j];
-            xy += X[j] * y[j];
+            xy += x[j] * y[j];
             y[j] *= 2.0;
-            pulsesLeft -= iy[j];
+            pulses_left -= iy[j];
         }
     }
-    if pulsesLeft > N as i32 + 3 {
-        let tmp: f32 = pulsesLeft as f32;
+    if pulses_left > n as i32 + 3 {
+        let tmp: f32 = pulses_left as f32;
         yy += tmp * tmp;
         yy += tmp * y[0];
-        iy[0] += pulsesLeft;
-        pulsesLeft = 0;
+        iy[0] += pulses_left;
+        pulses_left = 0;
     }
-    for _i in 0..pulsesLeft {
+    for _i in 0..pulses_left {
         let mut best_id: usize = 0;
         let mut best_num: f32;
         let mut best_den: f32;
         yy += 1.0;
-        let Rxy = xy + X[0];
-        let Ryy = yy + y[0];
-        best_den = Ryy;
-        best_num = Rxy * Rxy;
-        for j in 1..N {
-            let Rxy = xy + X[j];
-            let Ryy = yy + y[j];
-            let Rxy2 = Rxy * Rxy;
-            if best_den * Rxy2 > Ryy * best_num {
-                best_den = Ryy;
-                best_num = Rxy2;
+        let rxy = xy + x[0];
+        let ryy = yy + y[0];
+        best_den = ryy;
+        best_num = rxy * rxy;
+        for j in 1..n {
+            let rxy = xy + x[j];
+            let ryy = yy + y[j];
+            let rxy2 = rxy * rxy;
+            if best_den * rxy2 > ryy * best_num {
+                best_den = ryy;
+                best_num = rxy2;
                 best_id = j;
             }
         }
-        xy += X[best_id];
+        xy += x[best_id];
         yy += y[best_id];
         y[best_id] += 2.0;
         iy[best_id] += 1;
     }
-    for j in 0..N {
+    for j in 0..n {
         iy[j] = (iy[j] ^ -signx[j]) + signx[j];
     }
     yy
@@ -238,7 +238,7 @@ pub fn op_pvq_search_c(X: &mut [f32], iy: &mut [i32], K: i32, N: i32, _arch: Arc
 // QEXT PVQ extensions: upsampled search, refinement, cubic quantization
 // ---------------------------------------------------------------------------
 
-/// Optimized PVQ search for N=2 with upsampling.
+/// Optimized PVQ search for n=2 with upsampling.
 ///
 /// Upstream C: celt/vq.c:op_pvq_search_N2
 #[cfg(feature = "qext")]
@@ -282,20 +282,20 @@ fn op_pvq_search_n2(
 /// Upstream C: celt/vq.c:op_pvq_refine
 #[cfg(feature = "qext")]
 fn op_pvq_refine(
-    Xn: &[f32],
+    xn: &[f32],
     iy: &mut [i32],
     iy0: &[i32],
-    K: i32,
+    k: i32,
     up: i32,
     margin: i32,
-    N: i32,
+    n: i32,
 ) -> bool {
     let same = std::ptr::eq(iy.as_ptr(), iy0.as_ptr());
-    let mut rounding = vec![0.0f32; N as usize];
+    let mut rounding = vec![0.0f32; n as usize];
     let mut iysum: i32 = 0;
 
-    for ((&x_n, iy_i), rounding_i) in Xn.iter().zip(iy.iter_mut()).zip(rounding.iter_mut()) {
-        let tmp = (K as f32 * 256.0) * x_n; // MULT32_32_Q31(SHL32(K,8), Xn[i]) → K*256*Xn in float
+    for ((&x_n, iy_i), rounding_i) in xn.iter().zip(iy.iter_mut()).zip(rounding.iter_mut()) {
+        let tmp = (k as f32 * 256.0) * x_n; // MULT32_32_Q31(SHL32(k,8), xn[i]) → k*256*xn in float
         *iy_i = (0.5 + tmp).floor() as i32;
         *rounding_i = tmp - (*iy_i as f32 * 128.0); // tmp - SHL32(iy[i], 7)
     }
@@ -305,11 +305,11 @@ fn op_pvq_refine(
         }
     }
     iysum += iy.iter().sum::<i32>();
-    if (iysum - K).abs() > 32 {
+    if (iysum - k).abs() > 32 {
         return true; // failed
     }
-    let dir: i32 = if iysum < K { 1 } else { -1 };
-    while iysum != K {
+    let dir: i32 = if iysum < k { 1 } else { -1 };
+    while iysum != k {
         let mut roundval: f32 = -1000000.0 * dir as f32;
         let mut roundpos: usize = 0;
         for (i, &rounding_i) in rounding.iter().enumerate() {
@@ -328,46 +328,47 @@ fn op_pvq_refine(
     false // success
 }
 
-/// General N-dimensional PVQ search with upsampling.
+/// General n-dimensional PVQ search with upsampling.
 ///
 /// Upstream C: celt/vq.c:op_pvq_search_extra
 #[cfg(feature = "qext")]
 fn op_pvq_search_extra(
-    X: &[f32],
+    x: &[f32],
     iy: &mut [i32],
     up_iy: &mut [i32],
-    K: i32,
+    k: i32,
     up: i32,
     refine: &mut [i32],
-    N: i32,
+    n: i32,
 ) -> f32 {
     let mut failed = false;
-    let n = N as usize;
+    let n_i32 = n;
+    let n_usize = n_i32 as usize;
 
-    let sum: f32 = X.iter().take(n).map(|x| x.abs()).sum();
-    let mut Xn = vec![0.0f32; n];
+    let sum: f32 = x.iter().take(n_usize).map(|x| x.abs()).sum();
+    let mut xn = vec![0.0f32; n_usize];
     if sum < EPSILON {
         failed = true;
     } else {
         let rcp_sum = 1.0f32 / sum;
-        for (x_n, x_i) in Xn.iter_mut().zip(X.iter()) {
+        for (x_n, x_i) in xn.iter_mut().zip(x.iter()) {
             *x_n = x_i.abs() * rcp_sum;
         }
     }
     // First pass: refine base quantization
     let iy0_copy: Vec<i32> = iy.to_vec();
-    failed = failed || op_pvq_refine(&Xn, iy, &iy0_copy, K, 1, K + 1, N);
+    failed = failed || op_pvq_refine(&xn, iy, &iy0_copy, k, 1, k + 1, n_i32);
     // Second pass: refine upsampled quantization constrained by base
     let iy_copy: Vec<i32> = iy.to_vec();
-    failed = failed || op_pvq_refine(&Xn, up_iy, &iy_copy, up * K, up, up, N);
+    failed = failed || op_pvq_refine(&xn, up_iy, &iy_copy, up * k, up, up, n_i32);
     if failed {
-        iy[0] = K;
+        iy[0] = k;
         iy[1..].fill(0);
-        up_iy[0] = up * K;
+        up_iy[0] = up * k;
         up_iy[1..].fill(0);
     }
     let mut yy: f64 = 0.0;
-    for (((&x_i, iy_i), up_iy_i), refine_i) in X
+    for (((&x_i, iy_i), up_iy_i), refine_i) in x
         .iter()
         .zip(iy.iter_mut())
         .zip(up_iy.iter_mut())
@@ -424,24 +425,24 @@ fn ec_dec_refine(dec: &mut EcDec, up: i32, extra_bits: i32, use_entropy: bool) -
 ///
 /// Upstream C: celt/vq.c:cubic_synthesis
 #[cfg(feature = "qext")]
-fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign: bool, gain: f32) {
-    let n = N as usize;
+fn cubic_synthesis(x: &mut [f32], iy: &[i32], n: i32, k: i32, face: usize, sign: bool, gain: f32) {
+    let n = n as usize;
     #[cfg(feature = "qext")]
     let trace = qext_trace_enabled_vq();
-    for (x_i, &iy_i) in X.iter_mut().zip(iy.iter()).take(n) {
-        *x_i = (1 + 2 * iy_i) as f32 - K as f32;
+    for (x_i, &iy_i) in x.iter_mut().zip(iy.iter()).take(n) {
+        *x_i = (1 + 2 * iy_i) as f32 - k as f32;
     }
-    X[face] = if sign { -(K as f32) } else { K as f32 };
-    let sum: f32 = X.iter().take(n).map(|x| x * x).sum();
+    x[face] = if sign { -(k as f32) } else { k as f32 };
+    let sum: f32 = x.iter().take(n).map(|x| x * x).sum();
     // Match upstream float path semantics: C computes `1.f/sqrt(sum)` with `sqrt`
     // operating in double precision before rounding back to float.
     let mag = (1.0f64 / (sum as f64).sqrt()) as f32;
     #[cfg(feature = "qext")]
     if trace {
         eprintln!(
-            "[rust cubic] synth pre N={} K={} face={} sign={} sum={:.9} mag={:.9} iyh={:016x}",
-            N,
-            K,
+            "[rust cubic] synth pre n={} k={} face={} sign={} sum={:.9} mag={:.9} iyh={:016x}",
+            n,
+            k,
             face,
             if sign { 1 } else { 0 },
             sum,
@@ -449,20 +450,20 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
             qext_hash_i32(&iy[..n]),
         );
     }
-    for x_i in X.iter_mut().take(n) {
+    for x_i in x.iter_mut().take(n) {
         *x_i *= mag * gain;
     }
     #[cfg(feature = "qext")]
     if trace {
         eprintln!(
-            "[rust cubic] synth post N={} K={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9}",
-            N,
-            K,
-            qext_hash_f32(&X[..n]),
-            X[0],
-            if N > 1 { X[1] } else { 0.0 },
-            if N > 2 { X[2] } else { 0.0 },
-            if N > 3 { X[3] } else { 0.0 },
+            "[rust cubic] synth post n={} k={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9}",
+            n,
+            k,
+            qext_hash_f32(&x[..n]),
+            x[0],
+            if n > 1 { x[1] } else { 0.0 },
+            if n > 2 { x[2] } else { 0.0 },
+            if n > 3 { x[3] } else { 0.0 },
         );
     }
 }
@@ -472,73 +473,75 @@ fn cubic_synthesis(X: &mut [f32], iy: &[i32], N: i32, K: i32, face: usize, sign:
 /// Upstream C: celt/vq.c:cubic_quant
 #[cfg(feature = "qext")]
 pub fn cubic_quant(
-    X: &mut [f32],
-    N: i32,
+    x: &mut [f32],
+    n: i32,
     res: i32,
-    B: i32,
+    b: i32,
     enc: &mut EcEnc,
     gain: f32,
     resynth: i32,
 ) -> u32 {
-    let n = N as usize;
-    let mut K = 1 << res;
-    // Using odd K on transients to avoid adding pre-echo
-    if B != 1 {
-        K = 1.max(K - 1);
+    let n_i32 = n;
+    let n_usize = n_i32 as usize;
+    let mut k = 1 << res;
+    // Using odd k on transients to avoid adding pre-echo
+    if b != 1 {
+        k = 1.max(k - 1);
     }
-    if K == 1 {
+    if k == 1 {
         if resynth != 0 {
-            X[..n].fill(0.0);
+            x[..n_usize].fill(0.0);
         }
         return 0;
     }
     let mut face: usize = 0;
     let mut faceval: f32 = -1.0;
-    for (i, &x_i) in X.iter().enumerate().take(n) {
+    for (i, &x_i) in x.iter().enumerate().take(n_usize) {
         if x_i.abs() > faceval {
             faceval = x_i.abs();
             face = i;
         }
     }
-    let sign = X[face] < 0.0;
-    ec_enc_uint(enc, face as u32, N as u32);
+    let sign = x[face] < 0.0;
+    ec_enc_uint(enc, face as u32, n_i32 as u32);
     ec_enc_bits(enc, sign as u32, 1);
-    let norm = 0.5 * K as f32 / (faceval + EPSILON);
-    let mut iy = vec![0i32; n];
-    for (iy_i, &x_i) in iy.iter_mut().zip(X.iter()).take(n) {
-        *iy_i = (K - 1).min(((x_i + faceval) * norm).floor() as i32);
+    let norm = 0.5 * k as f32 / (faceval + EPSILON);
+    let mut iy = vec![0i32; n_usize];
+    for (iy_i, &x_i) in iy.iter_mut().zip(x.iter()).take(n_usize) {
+        *iy_i = (k - 1).min(((x_i + faceval) * norm).floor() as i32);
     }
-    for (i, &iy_i) in iy.iter().enumerate().take(n) {
+    for (i, &iy_i) in iy.iter().enumerate().take(n_usize) {
         if i != face {
             ec_enc_bits(enc, iy_i as u32, res as u32);
         }
     }
     if resynth != 0 {
-        cubic_synthesis(X, &iy, N, K, face, sign, gain);
+        cubic_synthesis(x, &iy, n_i32, k, face, sign, gain);
     }
-    (1u32 << B) - 1
+    (1u32 << b) - 1
 }
 
 /// Decode cubic quantization for a band.
 ///
 /// Upstream C: celt/vq.c:cubic_unquant
 #[cfg(feature = "qext")]
-pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut EcDec, gain: f32) -> u32 {
-    let n = N as usize;
-    let mut K = 1 << res;
+pub fn cubic_unquant(x: &mut [f32], n: i32, res: i32, b: i32, dec: &mut EcDec, gain: f32) -> u32 {
+    let n_i32 = n;
+    let n_usize = n_i32 as usize;
+    let mut k = 1 << res;
     #[cfg(feature = "qext")]
     let trace = qext_trace_enabled_vq();
-    if B != 1 {
-        K = 1.max(K - 1);
+    if b != 1 {
+        k = 1.max(k - 1);
     }
-    if K == 1 {
-        X[..n].fill(0.0);
+    if k == 1 {
+        x[..n_usize].fill(0.0);
         return 0;
     }
-    let face = ec_dec_uint(dec, N as u32) as usize;
+    let face = ec_dec_uint(dec, n_i32 as u32) as usize;
     let sign = ec_dec_bits(dec, 1) != 0;
-    let mut iy = vec![0i32; n];
-    for (i, iy_i) in iy.iter_mut().enumerate().take(n) {
+    let mut iy = vec![0i32; n_usize];
+    for (i, iy_i) in iy.iter_mut().enumerate().take(n_usize) {
         if i != face {
             *iy_i = ec_dec_bits(dec, res as u32) as i32;
         }
@@ -547,41 +550,41 @@ pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut EcDec, g
     #[cfg(feature = "qext")]
     if trace {
         eprintln!(
-            "[rust cubic] unq pre N={} res={} B={} K={} tell={} face={} sign={} iyh={:016x}",
-            N,
+            "[rust cubic] unq pre n={} res={} b={} k={} tell={} face={} sign={} iyh={:016x}",
+            n,
             res,
-            B,
-            K,
+            b,
+            k,
             ec_tell(dec),
             face,
             if sign { 1 } else { 0 },
-            qext_hash_i32(&iy[..n]),
+            qext_hash_i32(&iy[..n_usize]),
         );
     }
-    cubic_synthesis(X, &iy, N, K, face, sign, gain);
+    cubic_synthesis(x, &iy, n_i32, k, face, sign, gain);
     #[cfg(feature = "qext")]
     if trace {
         eprintln!(
-            "[rust cubic] unq post N={} res={} B={} K={} tell={} xh={:016x}",
-            N,
+            "[rust cubic] unq post n={} res={} b={} k={} tell={} xh={:016x}",
+            n,
             res,
-            B,
-            K,
+            b,
+            k,
             ec_tell(dec),
-            qext_hash_f32(&X[..n]),
+            qext_hash_f32(&x[..n_usize]),
         );
     }
-    (1u32 << B) - 1
+    (1u32 << b) - 1
 }
 
 /// Upstream C: celt/vq.c:alg_quant
 #[allow(clippy::too_many_arguments)]
 pub fn alg_quant(
-    X: &mut [f32],
-    N: i32,
-    K: i32,
+    x: &mut [f32],
+    n: i32,
+    k: i32,
     spread: i32,
-    B: i32,
+    b: i32,
     enc: &mut EcEnc,
     gain: f32,
     resynth: i32,
@@ -589,12 +592,12 @@ pub fn alg_quant(
     #[cfg(feature = "qext")] ext_enc: &mut EcEnc,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
-    debug_assert!(K > 0);
-    debug_assert!(N > 1);
-    // Max CELT band size is 176, N+3 <= 179; use stack buffer.
-    debug_assert!((N as usize + 3) <= 180);
+    debug_assert!(k > 0);
+    debug_assert!(n > 1);
+    // Max CELT band size is 176, n+3 <= 179; use stack buffer.
+    debug_assert!((n as usize + 3) <= 180);
     let mut iy = [0i32; 180];
-    exp_rotation(X, N, 1, B, K, spread);
+    exp_rotation(x, n, 1, b, k, spread);
 
     #[cfg(feature = "qext")]
     let collapse_mask;
@@ -603,57 +606,57 @@ pub fn alg_quant(
 
     #[cfg(feature = "qext")]
     {
-        if N == 2 && extra_bits >= 2 {
+        if n == 2 && extra_bits >= 2 {
             let mut up_iy = [0i32; 2];
             let mut refine = 0i32;
             let up = (1 << extra_bits) - 1;
-            let yy = op_pvq_search_n2(X, &mut iy, &mut up_iy, K, up, &mut refine);
-            collapse_mask = extract_collapse_mask(&up_iy, N, B);
-            encode_pulses(&iy[..N as usize], K, enc);
+            let yy = op_pvq_search_n2(x, &mut iy, &mut up_iy, k, up, &mut refine);
+            collapse_mask = extract_collapse_mask(&up_iy, n, b);
+            encode_pulses(&iy[..n as usize], k, enc);
             ec_enc_uint(ext_enc, (refine + (up - 1) / 2) as u32, up as u32);
             if resynth != 0 {
-                normalise_residual(&up_iy, X, N, yy, gain);
-                exp_rotation(X, N, -1, B, K, spread);
+                normalise_residual(&up_iy, x, n, yy, gain);
+                exp_rotation(x, n, -1, b, k, spread);
             }
         } else if extra_bits >= 2 {
-            let n = N as usize;
-            let mut up_iy = vec![0i32; n];
-            let mut refine = vec![0i32; n];
+            let n_usize = n as usize;
+            let mut up_iy = vec![0i32; n_usize];
+            let mut refine = vec![0i32; n_usize];
             let up = (1 << extra_bits) - 1;
-            let yy = op_pvq_search_extra(X, &mut iy, &mut up_iy, K, up, &mut refine, N);
-            collapse_mask = extract_collapse_mask(&up_iy, N, B);
-            encode_pulses(&iy[..N as usize], K, enc);
+            let yy = op_pvq_search_extra(x, &mut iy, &mut up_iy, k, up, &mut refine, n);
+            collapse_mask = extract_collapse_mask(&up_iy, n, b);
+            encode_pulses(&iy[..n as usize], k, enc);
             let use_entropy =
-                (ext_enc.storage as i32 * 8 - ec_tell(ext_enc)) > (N - 1) * (extra_bits + 3) + 1;
-            for &refine_i in refine.iter().take((N - 1) as usize) {
+                (ext_enc.storage as i32 * 8 - ec_tell(ext_enc)) > (n - 1) * (extra_bits + 3) + 1;
+            for &refine_i in refine.iter().take(n_usize - 1) {
                 ec_enc_refine(ext_enc, refine_i, up, extra_bits, use_entropy);
             }
-            if iy[(N - 1) as usize] == 0 {
-                ec_enc_bits(ext_enc, (up_iy[(N - 1) as usize] < 0) as u32, 1);
+            if iy[n_usize - 1] == 0 {
+                ec_enc_bits(ext_enc, (up_iy[n_usize - 1] < 0) as u32, 1);
             }
             if resynth != 0 {
-                normalise_residual(&up_iy, X, N, yy, gain);
-                exp_rotation(X, N, -1, B, K, spread);
+                normalise_residual(&up_iy, x, n, yy, gain);
+                exp_rotation(x, n, -1, b, k, spread);
             }
         } else {
-            let yy = op_pvq_search(X, &mut iy, K, N, arch);
-            collapse_mask = extract_collapse_mask(&iy, N, B);
-            encode_pulses(&iy[..N as usize], K, enc);
+            let yy = op_pvq_search(x, &mut iy, k, n, arch);
+            collapse_mask = extract_collapse_mask(&iy, n, b);
+            encode_pulses(&iy[..n as usize], k, enc);
             if resynth != 0 {
-                normalise_residual(&iy, X, N, yy, gain);
-                exp_rotation(X, N, -1, B, K, spread);
+                normalise_residual(&iy, x, n, yy, gain);
+                exp_rotation(x, n, -1, b, k, spread);
             }
         }
     }
 
     #[cfg(not(feature = "qext"))]
     {
-        let yy = op_pvq_search(X, &mut iy, K, N, arch);
-        collapse_mask = extract_collapse_mask(&iy, N, B);
-        encode_pulses(&iy[..N as usize], K, enc);
+        let yy = op_pvq_search(x, &mut iy, k, n, arch);
+        collapse_mask = extract_collapse_mask(&iy, n, b);
+        encode_pulses(&iy[..n as usize], k, enc);
         if resynth != 0 {
-            normalise_residual(&iy, X, N, yy, gain);
-            exp_rotation(X, N, -1, B, K, spread);
+            normalise_residual(&iy, x, n, yy, gain);
+            exp_rotation(x, n, -1, b, k, spread);
         }
     }
 
@@ -664,29 +667,29 @@ pub fn alg_quant(
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn alg_unquant(
-    X: &mut [f32],
-    N: i32,
-    K: i32,
+    x: &mut [f32],
+    n: i32,
+    k: i32,
     spread: i32,
-    B: i32,
+    b: i32,
     dec: &mut EcDec,
     gain: f32,
     #[cfg(feature = "qext")] ext_dec: &mut EcDec,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
-    debug_assert!(K > 0);
-    debug_assert!(N > 1);
+    debug_assert!(k > 0);
+    debug_assert!(n > 1);
     let mut iy = [0i32; 176];
     #[cfg(feature = "qext")]
-    let mut Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
+    let mut ryy = decode_pulses(&mut iy[..n as usize], k, dec);
     #[cfg(not(feature = "qext"))]
-    let Ryy = decode_pulses(&mut iy[..N as usize], K, dec);
+    let ryy = decode_pulses(&mut iy[..n as usize], k, dec);
     #[cfg(feature = "qext")]
     let mut yy_shift: i32 = 0;
 
     #[cfg(feature = "qext")]
     {
-        if N == 2 && extra_bits >= 2 {
+        if n == 2 && extra_bits >= 2 {
             yy_shift = 0.max(extra_bits - 7);
             let up = (1 << extra_bits) - 1;
             let refine = ec_dec_uint(ext_dec, up as u32) as i32 - (up - 1) / 2;
@@ -706,36 +709,36 @@ pub fn alg_unquant(
                 iy[0] -= refine;
                 iy[1] -= refine * if iy[0] > 0 { 1 } else { -1 };
             }
-            Ryy = iy[0] as f32 * iy[0] as f32 + iy[1] as f32 * iy[1] as f32;
+            ryy = iy[0] as f32 * iy[0] as f32 + iy[1] as f32 * iy[1] as f32;
         } else if extra_bits >= 2 {
-            let n = N as usize;
+            let n_usize = n as usize;
             yy_shift = 0.max(extra_bits - 7);
             let up = (1 << extra_bits) - 1;
             let use_entropy =
-                (ext_dec.storage as i32 * 8 - ec_tell(ext_dec)) > (N - 1) * (extra_bits + 3) + 1;
-            let mut refine = vec![0i32; n];
-            for refine_i in refine.iter_mut().take((N - 1) as usize) {
+                (ext_dec.storage as i32 * 8 - ec_tell(ext_dec)) > (n - 1) * (extra_bits + 3) + 1;
+            let mut refine = vec![0i32; n_usize];
+            for refine_i in refine.iter_mut().take(n_usize - 1) {
                 *refine_i = ec_dec_refine(ext_dec, up, extra_bits, use_entropy);
             }
-            let sign = if iy[(N - 1) as usize] == 0 {
+            let sign = if iy[n_usize - 1] == 0 {
                 ec_dec_bits(ext_dec, 1) != 0
             } else {
-                iy[(N - 1) as usize] < 0
+                iy[n_usize - 1] < 0
             };
-            for (iy_i, &refine_i) in iy.iter_mut().zip(refine.iter()).take((N - 1) as usize) {
+            for (iy_i, &refine_i) in iy.iter_mut().zip(refine.iter()).take(n_usize - 1) {
                 *iy_i = *iy_i * up + refine_i;
             }
-            iy[(N - 1) as usize] = up * K;
-            let tail_abs_sum: i32 = iy.iter().take((N - 1) as usize).map(|v| v.abs()).sum();
-            iy[(N - 1) as usize] -= tail_abs_sum;
+            iy[n_usize - 1] = up * k;
+            let tail_abs_sum: i32 = iy.iter().take(n_usize - 1).map(|v| v.abs()).sum();
+            iy[n_usize - 1] -= tail_abs_sum;
             if sign {
-                iy[(N - 1) as usize] = -iy[(N - 1) as usize];
+                iy[n_usize - 1] = -iy[n_usize - 1];
             }
             let mut yy64: f32 = 0.0;
-            for iy_i in iy.iter().take(n) {
+            for iy_i in iy.iter().take(n_usize) {
                 yy64 += *iy_i as f32 * *iy_i as f32;
             }
-            Ryy = yy64;
+            ryy = yy64;
         }
     }
 
@@ -744,55 +747,55 @@ pub fn alg_unquant(
     #[cfg(feature = "qext")]
     if vq_trace {
         eprintln!(
-            "[rust vq] pre N={} K={} B={} extra={} tell={} iyh={:016x} ryy={:.8} gain={:.9} iy0={} iy1={} iy2={} iy3={}",
-            N,
-            K,
-            B,
+            "[rust vq] pre n={} k={} b={} extra={} tell={} iyh={:016x} ryy={:.8} gain={:.9} iy0={} iy1={} iy2={} iy3={}",
+            n,
+            k,
+            b,
             extra_bits,
             ec_tell(dec),
-            qext_hash_i32(&iy[..N as usize]),
-            Ryy,
+            qext_hash_i32(&iy[..n as usize]),
+            ryy,
             gain,
             iy[0],
-            if N > 1 { iy[1] } else { 0 },
-            if N > 2 { iy[2] } else { 0 },
-            if N > 3 { iy[3] } else { 0 }
+            if n > 1 { iy[1] } else { 0 },
+            if n > 2 { iy[2] } else { 0 },
+            if n > 3 { iy[3] } else { 0 }
         );
     }
 
     #[cfg(feature = "qext")]
     let _ = yy_shift; // used by fixed-point only
-    normalise_residual(&iy, X, N, Ryy, gain);
+    normalise_residual(&iy, x, n, ryy, gain);
     #[cfg(feature = "qext")]
     if vq_trace {
         eprintln!(
-            "[rust vq] norm N={} K={} B={} extra={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9} b0={:08x} b1={:08x} b2={:08x} b3={:08x}",
-            N,
-            K,
-            B,
+            "[rust vq] norm n={} k={} b={} extra={} xh={:016x} x0={:.9} x1={:.9} x2={:.9} x3={:.9} b0={:08x} b1={:08x} b2={:08x} b3={:08x}",
+            n,
+            k,
+            b,
             extra_bits,
-            qext_hash_f32(&X[..N as usize]),
-            X[0],
-            if N > 1 { X[1] } else { 0.0 },
-            if N > 2 { X[2] } else { 0.0 },
-            if N > 3 { X[3] } else { 0.0 },
-            X[0].to_bits(),
-            if N > 1 { X[1].to_bits() } else { 0 },
-            if N > 2 { X[2].to_bits() } else { 0 },
-            if N > 3 { X[3].to_bits() } else { 0 }
+            qext_hash_f32(&x[..n as usize]),
+            x[0],
+            if n > 1 { x[1] } else { 0.0 },
+            if n > 2 { x[2] } else { 0.0 },
+            if n > 3 { x[3] } else { 0.0 },
+            x[0].to_bits(),
+            if n > 1 { x[1].to_bits() } else { 0 },
+            if n > 2 { x[2].to_bits() } else { 0 },
+            if n > 3 { x[3].to_bits() } else { 0 }
         );
     }
-    exp_rotation(X, N, -1, B, K, spread);
-    let cm = extract_collapse_mask(&iy, N, B);
+    exp_rotation(x, n, -1, b, k, spread);
+    let cm = extract_collapse_mask(&iy, n, b);
     #[cfg(feature = "qext")]
     if vq_trace {
         eprintln!(
-            "[rust vq] post N={} K={} B={} extra={} xh={:016x} cm={}",
-            N,
-            K,
-            B,
+            "[rust vq] post n={} k={} b={} extra={} xh={:016x} cm={}",
+            n,
+            k,
+            b,
             extra_bits,
-            qext_hash_f32(&X[..N as usize]),
+            qext_hash_f32(&x[..n as usize]),
             cm
         );
     }
@@ -801,10 +804,10 @@ pub fn alg_unquant(
 
 /// Upstream C: celt/vq.c:renormalise_vector
 #[inline]
-pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
-    let E = EPSILON + celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
-    let g = celt_rsqrt_norm(E) * gain;
-    for xi in X[..N as usize].iter_mut() {
+pub fn renormalise_vector(x: &mut [f32], n: i32, gain: f32, _arch: Arch) {
+    let energy = EPSILON + celt_inner_prod(&x[..n as usize], &x[..n as usize], n as usize, _arch);
+    let g = celt_rsqrt_norm(energy) * gain;
+    for xi in x[..n as usize].iter_mut() {
         *xi *= g;
     }
 }
@@ -814,21 +817,21 @@ pub fn renormalise_vector(X: &mut [f32], N: i32, gain: f32, _arch: Arch) {
 /// Callers that need Q14 should right-shift by 16.
 /// Upstream C: celt/vq.c:stereo_itheta
 #[inline(never)]
-pub fn stereo_itheta(X: &[f32], Y: &[f32], stereo: i32, N: i32, _arch: Arch) -> i32 {
-    let mut Emid: f32 = 0.0;
-    let mut Eside: f32 = 0.0;
+pub fn stereo_itheta(x: &[f32], y: &[f32], stereo: i32, n: i32, _arch: Arch) -> i32 {
+    let mut emid: f32 = 0.0;
+    let mut eside: f32 = 0.0;
     if stereo != 0 {
-        for i in 0..N as usize {
-            let m = X[i] + Y[i];
-            let s = X[i] - Y[i];
-            Emid += m * m;
-            Eside += s * s;
+        for i in 0..n as usize {
+            let m = x[i] + y[i];
+            let s = x[i] - y[i];
+            emid += m * m;
+            eside += s * s;
         }
     } else {
-        Emid += celt_inner_prod(&X[..N as usize], &X[..N as usize], N as usize, _arch);
-        Eside += celt_inner_prod(&Y[..N as usize], &Y[..N as usize], N as usize, _arch);
+        emid += celt_inner_prod(&x[..n as usize], &x[..n as usize], n as usize, _arch);
+        eside += celt_inner_prod(&y[..n as usize], &y[..n as usize], n as usize, _arch);
     }
-    let mid = celt_sqrt(Emid);
-    let side = celt_sqrt(Eside);
+    let mid = celt_sqrt(emid);
+    let side = celt_sqrt(eside);
     (0.5f32 + 65536.0 * 16384.0 * celt_atan2p_norm(side, mid)).floor() as i32
 }

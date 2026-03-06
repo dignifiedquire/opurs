@@ -1,6 +1,6 @@
 //! Band energy quantization.
 //!
-//! Upstream C: `celt/quant_bands.c`
+//! Upstream c: `celt/quant_bands.c`
 
 use crate::celt::entcode::{ec_tell, ec_tell_frac};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, EcDec};
@@ -107,45 +107,45 @@ const E_PROB_MODEL: [[[u8; 42]; 2]; 4] = [
 
 const SMALL_ENERGY_ICDF: [u8; 3] = [2, 1, 0];
 
-/// Upstream C: celt/quant_bands.c:loss_distortion
+/// Upstream c: celt/quant_bands.c:loss_distortion
 fn loss_distortion(
-    eBands: &[f32],
-    oldEBands: &[f32],
+    e_bands: &[f32],
+    old_ebands: &[f32],
     start: i32,
     end: i32,
     len: i32,
-    C: i32,
+    channels: i32,
 ) -> f32 {
     let mut dist: f32 = 0.0;
-    let mut c = 0;
+    let mut ch = 0;
     loop {
         for i in start..end {
-            let d = eBands[(i + c * len) as usize] - oldEBands[(i + c * len) as usize];
+            let d = e_bands[(i + ch * len) as usize] - old_ebands[(i + ch * len) as usize];
             dist += d * d;
         }
-        c += 1;
-        if c >= C {
+        ch += 1;
+        if ch >= channels {
             break;
         }
     }
     dist.min(200.0)
 }
 
-/// Upstream C: celt/quant_bands.c:quant_coarse_energy_impl
+/// Upstream c: celt/quant_bands.c:quant_coarse_energy_impl
 #[allow(clippy::too_many_arguments)]
 fn quant_coarse_energy_impl(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    eBands: &[f32],
-    oldEBands: &mut [f32],
+    e_bands: &[f32],
+    old_ebands: &mut [f32],
     budget: i32,
     mut tell: i32,
     prob_model: &[u8],
     error: &mut [f32],
     enc: &mut EcEnc,
-    C: i32,
-    LM: i32,
+    channels: i32,
+    lm: i32,
     intra: i32,
     max_decay: f32,
     lfe: i32,
@@ -161,18 +161,18 @@ fn quant_coarse_energy_impl(
         coef = 0.0;
         beta = BETA_INTRA;
     } else {
-        beta = BETA_COEF[LM as usize];
-        coef = PRED_COEF[LM as usize];
+        beta = BETA_COEF[lm as usize];
+        coef = PRED_COEF[lm as usize];
     }
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     for i in start..end {
-        let mut c = 0;
+        let mut ch = 0;
         loop {
-            let x = eBands[(i + c * nbEBands) as usize];
-            let oldE = (-9.0f32).max(oldEBands[(i + c * nbEBands) as usize]);
-            let f = x - coef * oldE - prev[c as usize];
+            let x = e_bands[(i + ch * nb_ebands) as usize];
+            let old_e = (-9.0f32).max(old_ebands[(i + ch * nb_ebands) as usize]);
+            let f = x - coef * old_e - prev[ch as usize];
             let mut qi = (0.5f32 + f).floor() as i32;
-            let decay_bound = (-28.0f32).max(oldEBands[(i + c * nbEBands) as usize]) - max_decay;
+            let decay_bound = (-28.0f32).max(old_ebands[(i + ch * nb_ebands) as usize]) - max_decay;
             if qi < 0 && x < decay_bound {
                 qi += (decay_bound - x) as i32;
                 if qi > 0 {
@@ -181,7 +181,7 @@ fn quant_coarse_energy_impl(
             }
             let qi0 = qi;
             tell = ec_tell(enc);
-            let bits_left = budget - tell - 3 * C * (end - i);
+            let bits_left = budget - tell - 3 * channels * (end - i);
             if i != start && bits_left < 30 {
                 if bits_left < 24 {
                     qi = 1.min(qi);
@@ -210,14 +210,14 @@ fn quant_coarse_energy_impl(
             } else {
                 qi = -1;
             }
-            error[(i + c * nbEBands) as usize] = f - qi as f32;
+            error[(i + ch * nb_ebands) as usize] = f - qi as f32;
             badness += (qi0 - qi).abs();
             let q = qi as f32;
-            let tmp = coef * oldE + prev[c as usize] + q;
-            oldEBands[(i + c * nbEBands) as usize] = tmp;
-            prev[c as usize] = prev[c as usize] + q - beta * q;
-            c += 1;
-            if c >= C {
+            let tmp = coef * old_e + prev[ch as usize] + q;
+            old_ebands[(i + ch * nb_ebands) as usize] = tmp;
+            prev[ch as usize] = prev[ch as usize] + q - beta * q;
+            ch += 1;
+            if ch >= channels {
                 break;
             }
         }
@@ -229,38 +229,38 @@ fn quant_coarse_energy_impl(
     }
 }
 
-/// Upstream C: celt/quant_bands.c:quant_coarse_energy
+/// Upstream c: celt/quant_bands.c:quant_coarse_energy
 #[allow(clippy::too_many_arguments)]
 pub fn quant_coarse_energy(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    effEnd: i32,
-    eBands: &[f32],
-    oldEBands: &mut [f32],
+    eff_end: i32,
+    e_bands: &[f32],
+    old_ebands: &mut [f32],
     budget: u32,
     error: &mut [f32],
     enc: &mut EcEnc,
-    C: i32,
-    LM: i32,
-    nbAvailableBytes: i32,
+    c: i32,
+    lm: i32,
+    nb_available_bytes: i32,
     force_intra: i32,
-    delayedIntra: &mut f32,
+    delayed_intra: &mut f32,
     mut two_pass: i32,
     loss_rate: i32,
     lfe: i32,
 ) {
     let mut intra: i32;
     let mut badness1: i32 = 0;
-    let nbEBands = m.nbEBands as i32;
-    let band_size = (C * nbEBands) as usize;
+    let nb_ebands = m.nb_ebands as i32;
+    let band_size = (c * nb_ebands) as usize;
 
     intra = (force_intra != 0
         || two_pass == 0
-            && *delayedIntra > (2 * C * (end - start)) as f32
-            && nbAvailableBytes > (end - start) * C) as i32;
-    let intra_bias = (budget as f32 * *delayedIntra * loss_rate as f32 / (C * 512) as f32) as i32;
-    let new_distortion = loss_distortion(eBands, oldEBands, start, effEnd, nbEBands, C);
+            && *delayed_intra > (2 * c * (end - start)) as f32
+            && nb_available_bytes > (end - start) * c) as i32;
+    let intra_bias = (budget as f32 * *delayed_intra * loss_rate as f32 / (c * 512) as f32) as i32;
+    let new_distortion = loss_distortion(e_bands, old_ebands, start, eff_end, nb_ebands, c);
     let tell = ec_tell(enc) as u32;
     if tell.wrapping_add(3) > budget {
         intra = 0;
@@ -268,33 +268,33 @@ pub fn quant_coarse_energy(
     }
     let mut max_decay: f32 = 16.0f32;
     if end - start > 10 {
-        max_decay = max_decay.min(0.125f32 * nbAvailableBytes as f32);
+        max_decay = max_decay.min(0.125f32 * nb_available_bytes as f32);
     }
     if lfe != 0 {
         max_decay = 3.0f32;
     }
     let enc_start_state = enc.save();
-    // band_size = C * nbEBands; max is 2 * 21 = 42; use stack buffers.
+    // band_size = c * nb_ebands; max is 2 * 21 = 42; use stack buffers.
     const MAX_BAND_SIZE: usize = 48;
     debug_assert!(band_size <= MAX_BAND_SIZE);
-    let mut oldEBands_intra = [0.0f32; MAX_BAND_SIZE];
+    let mut old_ebands_intra = [0.0f32; MAX_BAND_SIZE];
     let mut error_intra = [0.0f32; MAX_BAND_SIZE];
-    oldEBands_intra[..band_size].copy_from_slice(&oldEBands[..band_size]);
+    old_ebands_intra[..band_size].copy_from_slice(&old_ebands[..band_size]);
 
     if two_pass != 0 || intra != 0 {
         badness1 = quant_coarse_energy_impl(
             m,
             start,
             end,
-            eBands,
-            &mut oldEBands_intra,
+            e_bands,
+            &mut old_ebands_intra,
             budget as i32,
             tell as i32,
-            &E_PROB_MODEL[LM as usize][1],
+            &E_PROB_MODEL[lm as usize][1],
             &mut error_intra,
             enc,
-            C,
-            LM,
+            c,
+            lm,
             1,
             max_decay,
             lfe,
@@ -322,15 +322,15 @@ pub fn quant_coarse_energy(
             m,
             start,
             end,
-            eBands,
-            oldEBands,
+            e_bands,
+            old_ebands,
             budget as i32,
             tell as i32,
-            &E_PROB_MODEL[LM as usize][intra as usize],
+            &E_PROB_MODEL[lm as usize][intra as usize],
             error,
             enc,
-            C,
-            LM,
+            c,
+            lm,
             0,
             max_decay,
             lfe,
@@ -342,52 +342,52 @@ pub fn quant_coarse_energy(
             enc.restore(enc_intra_state);
             enc.buf[nstart_bytes..nintra_bytes]
                 .copy_from_slice(&intra_bits[..nintra_bytes - nstart_bytes]);
-            oldEBands[..band_size].copy_from_slice(&oldEBands_intra[..band_size]);
+            old_ebands[..band_size].copy_from_slice(&old_ebands_intra[..band_size]);
             error[..band_size].copy_from_slice(&error_intra[..band_size]);
             intra = 1;
         }
     } else {
-        oldEBands[..band_size].copy_from_slice(&oldEBands_intra[..band_size]);
+        old_ebands[..band_size].copy_from_slice(&old_ebands_intra[..band_size]);
         error[..band_size].copy_from_slice(&error_intra[..band_size]);
     }
     if intra != 0 {
-        *delayedIntra = new_distortion;
+        *delayed_intra = new_distortion;
     } else {
-        *delayedIntra =
-            PRED_COEF[LM as usize] * PRED_COEF[LM as usize] * *delayedIntra + new_distortion;
+        *delayed_intra =
+            PRED_COEF[lm as usize] * PRED_COEF[lm as usize] * *delayed_intra + new_distortion;
     };
 }
 
-/// Upstream C: celt/quant_bands.c:quant_fine_energy
+/// Upstream c: celt/quant_bands.c:quant_fine_energy
 #[allow(clippy::too_many_arguments)]
 pub fn quant_fine_energy(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    oldEBands: &mut [f32],
+    old_ebands: &mut [f32],
     error: &mut [f32],
     prev_quant: Option<&[i32]>,
     extra_quant: &[i32],
     enc: &mut EcEnc,
-    C: i32,
+    channels: i32,
 ) {
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     for i in start..end {
         let extra_bits = extra_quant[i as usize];
         if !(1..=14).contains(&extra_bits) {
             continue;
         }
         let extra = 1i32 << extra_bits;
-        if ec_tell(enc) + C * extra_bits > enc.storage as i32 * 8 {
+        if ec_tell(enc) + channels * extra_bits > enc.storage as i32 * 8 {
             continue;
         }
         let prev = prev_quant.map_or(0, |pq| pq[i as usize]);
         if !(0..=14).contains(&prev) {
             continue;
         }
-        let mut c = 0;
+        let mut ch = 0;
         loop {
-            let mut q2 = ((error[(i + c * nbEBands) as usize] * (1 << prev) as f32 + 0.5f32)
+            let mut q2 = ((error[(i + ch * nb_ebands) as usize] * (1 << prev) as f32 + 0.5f32)
                 * extra as f32)
                 .floor() as i32;
             if q2 > extra - 1 {
@@ -401,39 +401,39 @@ pub fn quant_fine_energy(
                 (q2 as f32 + 0.5f32) * ((1) << (14 - extra_bits)) as f32 * (1.0f32 / 16384.0)
                     - 0.5f32;
             offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
-            oldEBands[(i + c * nbEBands) as usize] += offset;
-            error[(i + c * nbEBands) as usize] -= offset;
-            c += 1;
-            if c >= C {
+            old_ebands[(i + ch * nb_ebands) as usize] += offset;
+            error[(i + ch * nb_ebands) as usize] -= offset;
+            ch += 1;
+            if ch >= channels {
                 break;
             }
         }
     }
 }
 
-/// Upstream C: celt/quant_bands.c:quant_energy_finalise
+/// Upstream c: celt/quant_bands.c:quant_energy_finalise
 #[allow(clippy::too_many_arguments)]
 pub fn quant_energy_finalise(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    oldEBands: &mut [f32],
+    old_ebands: &mut [f32],
     error: &mut [f32],
     fine_quant: &[i32],
     fine_priority: &[i32],
     mut bits_left: i32,
     enc: &mut EcEnc,
-    C: i32,
+    channels: i32,
 ) {
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     let mut prio = 0;
     while prio < 2 {
         let mut i = start;
-        while i < end && bits_left >= C {
+        while i < end && bits_left >= channels {
             if !(fine_quant[i as usize] >= MAX_FINE_BITS || fine_priority[i as usize] != prio) {
-                let mut c = 0;
+                let mut ch = 0;
                 loop {
-                    let q2 = if error[(i + c * nbEBands) as usize] < 0.0 {
+                    let q2 = if error[(i + ch * nb_ebands) as usize] < 0.0 {
                         0
                     } else {
                         1
@@ -442,11 +442,11 @@ pub fn quant_energy_finalise(
                     let offset = (q2 as f32 - 0.5f32)
                         * ((1) << (14 - fine_quant[i as usize] - 1)) as f32
                         * (1.0f32 / 16384.0);
-                    oldEBands[(i + c * nbEBands) as usize] += offset;
-                    error[(i + c * nbEBands) as usize] -= offset;
+                    old_ebands[(i + ch * nb_ebands) as usize] += offset;
+                    error[(i + ch * nb_ebands) as usize] -= offset;
                     bits_left -= 1;
-                    c += 1;
-                    if c >= C {
+                    ch += 1;
+                    if ch >= channels {
                         break;
                     }
                 }
@@ -457,34 +457,34 @@ pub fn quant_energy_finalise(
     }
 }
 
-/// Upstream C: celt/quant_bands.c:unquant_coarse_energy
+/// Upstream c: celt/quant_bands.c:unquant_coarse_energy
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn unquant_coarse_energy(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    oldEBands: &mut [f32],
+    old_ebands: &mut [f32],
     intra: i32,
     dec: &mut EcDec,
-    C: i32,
-    LM: i32,
+    channels: i32,
+    lm: i32,
 ) {
-    let prob_model = &E_PROB_MODEL[LM as usize][intra as usize];
+    let prob_model = &E_PROB_MODEL[lm as usize][intra as usize];
     let mut prev: [f32; 2] = [0.0, 0.0];
     let coef: f32;
     let beta: f32;
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     if intra != 0 {
         coef = 0.0;
         beta = BETA_INTRA;
     } else {
-        beta = BETA_COEF[LM as usize];
-        coef = PRED_COEF[LM as usize];
+        beta = BETA_COEF[lm as usize];
+        coef = PRED_COEF[lm as usize];
     }
     let budget = dec.storage.wrapping_mul(8) as i32;
     for i in start..end {
-        let mut c = 0;
+        let mut ch = 0;
         loop {
             let qi: i32;
             let tell = ec_tell(dec);
@@ -504,87 +504,87 @@ pub fn unquant_coarse_energy(
                 qi = -1;
             }
             let q = qi as f32;
-            oldEBands[(i + c * nbEBands) as usize] =
-                (-9.0f32).max(oldEBands[(i + c * nbEBands) as usize]);
-            let tmp = coef * oldEBands[(i + c * nbEBands) as usize] + prev[c as usize] + q;
-            oldEBands[(i + c * nbEBands) as usize] = tmp;
-            prev[c as usize] = prev[c as usize] + q - beta * q;
-            c += 1;
-            if c >= C {
+            old_ebands[(i + ch * nb_ebands) as usize] =
+                (-9.0f32).max(old_ebands[(i + ch * nb_ebands) as usize]);
+            let tmp = coef * old_ebands[(i + ch * nb_ebands) as usize] + prev[ch as usize] + q;
+            old_ebands[(i + ch * nb_ebands) as usize] = tmp;
+            prev[ch as usize] = prev[ch as usize] + q - beta * q;
+            ch += 1;
+            if ch >= channels {
                 break;
             }
         }
     }
 }
 
-/// Upstream C: celt/quant_bands.c:unquant_fine_energy
+/// Upstream c: celt/quant_bands.c:unquant_fine_energy
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn unquant_fine_energy(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    oldEBands: &mut [f32],
+    old_ebands: &mut [f32],
     prev_quant: Option<&[i32]>,
     extra_quant: &[i32],
     dec: &mut EcDec,
-    C: i32,
+    channels: i32,
 ) {
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     for i in start..end {
         let extra = extra_quant[i as usize];
         if extra_quant[i as usize] <= 0 {
             continue;
         }
-        if ec_tell(dec) + C * extra_quant[i as usize] > dec.storage as i32 * 8 {
+        if ec_tell(dec) + channels * extra_quant[i as usize] > dec.storage as i32 * 8 {
             continue;
         }
         let prev = prev_quant.map_or(0, |pq| pq[i as usize]);
-        let mut c = 0;
+        let mut ch = 0;
         loop {
             let q2 = ec_dec_bits(dec, extra as u32) as i32;
             let mut offset =
                 (q2 as f32 + 0.5f32) * ((1) << (14 - extra)) as f32 * (1.0f32 / 16384.0) - 0.5f32;
             offset *= (1 << (14 - prev)) as f32 * (1.0f32 / 16384.0);
-            oldEBands[(i + c * nbEBands) as usize] += offset;
-            c += 1;
-            if c >= C {
+            old_ebands[(i + ch * nb_ebands) as usize] += offset;
+            ch += 1;
+            if ch >= channels {
                 break;
             }
         }
     }
 }
 
-/// Upstream C: celt/quant_bands.c:unquant_energy_finalise
+/// Upstream c: celt/quant_bands.c:unquant_energy_finalise
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub fn unquant_energy_finalise(
     m: &OpusCustomMode,
     start: i32,
     end: i32,
-    oldEBands: &mut [f32],
+    old_ebands: &mut [f32],
     fine_quant: &[i32],
     fine_priority: &[i32],
     mut bits_left: i32,
     dec: &mut EcDec,
-    C: i32,
+    channels: i32,
 ) {
-    let nbEBands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     let mut prio = 0;
     while prio < 2 {
         let mut i = start;
-        while i < end && bits_left >= C {
+        while i < end && bits_left >= channels {
             if !(fine_quant[i as usize] >= MAX_FINE_BITS || fine_priority[i as usize] != prio) {
-                let mut c = 0;
+                let mut ch = 0;
                 loop {
                     let q2 = ec_dec_bits(dec, 1) as i32;
                     let offset = (q2 as f32 - 0.5f32)
                         * ((1) << (14 - fine_quant[i as usize] - 1)) as f32
                         * (1.0f32 / 16384.0);
-                    oldEBands[(i + c * nbEBands) as usize] += offset;
+                    old_ebands[(i + ch * nb_ebands) as usize] += offset;
                     bits_left -= 1;
-                    c += 1;
-                    if c >= C {
+                    ch += 1;
+                    if ch >= channels {
                         break;
                     }
                 }
@@ -595,7 +595,7 @@ pub fn unquant_energy_finalise(
     }
 }
 
-/// Upstream C: celt/quant_bands.c:amp2Log2
+/// Upstream c: celt/quant_bands.c:amp2Log2
 pub fn amp2_log2(
     m: &OpusCustomMode,
     eff_end: i32,
@@ -604,7 +604,7 @@ pub fn amp2_log2(
     band_log_e: &mut [f32],
     channels: i32,
 ) {
-    let nb_ebands = m.nbEBands as i32;
+    let nb_ebands = m.nb_ebands as i32;
     let mut c = 0;
     loop {
         for i in 0..eff_end {

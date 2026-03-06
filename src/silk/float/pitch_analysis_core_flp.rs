@@ -1,6 +1,6 @@
 //! Floating-point pitch analysis core.
 //!
-//! Upstream C: `silk/float/pitch_analysis_core_FLP.c`
+//! Upstream c: `silk/float/pitch_analysis_core_FLP.c`
 
 use crate::arch::Arch;
 
@@ -23,36 +23,36 @@ use crate::silk::resampler::{silk_resampler_down2, silk_resampler_down2_3};
 use crate::silk::sigproc_fix::{silk_max_int, silk_min_int};
 use arrayref::array_mut_ref;
 
-/// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_pitch_analysis_core_FLP
+/// Upstream c: silk/float/pitch_analysis_core_FLP.c:silk_pitch_analysis_core_FLP
 #[allow(clippy::too_many_arguments)]
 pub fn silk_pitch_analysis_core_flp(
     frame: &[f32],
     pitch_out: &mut [i32],
-    lagIndex: &mut i16,
-    contourIndex: &mut i8,
-    LTPCorr: &mut f32,
-    mut prevLag: i32,
+    lag_index: &mut i16,
+    contour_index: &mut i8,
+    ltpcorr: &mut f32,
+    mut prev_lag: i32,
     search_thres1: f32,
     search_thres2: f32,
-    Fs_kHz: i32,
+    fs_k_hz: i32,
     complexity: i32,
     nb_subfr: i32,
     arch: Arch,
 ) -> i32 {
-    let mut i: i32;
+    let mut _i: i32;
     let mut k: i32;
     let mut d: i32;
     let mut j: i32;
-    let mut frame_8kHz: [f32; 320] = [0.; 320];
-    let mut frame_4kHz: [f32; 160] = [0.; 160];
-    let mut frame_8_FIX: [i16; 320] = [0; 320];
-    let mut frame_4_FIX: [i16; 160] = [0; 160];
+    let mut frame_8k_hz: [f32; 320] = [0.; 320];
+    let mut frame_4k_hz: [f32; 160] = [0.; 160];
+    let mut frame_8_fix: [i16; 320] = [0; 320];
+    let mut frame_4_fix: [i16; 160] = [0; 160];
     let mut filt_state: [i32; 6] = [0; 6];
 
     let contour_bias: f32;
-    let mut C: [[f32; 149]; 4] = [[0.; 149]; 4];
+    let mut c: [[f32; 149]; 4] = [[0.; 149]; 4];
     let mut xcorr: [f32; 65] = [0.; 65];
-    let mut CC: [f32; 11] = [0.; 11];
+    let mut cc: [f32; 11] = [0.; 11];
     let mut cross_corr: f64;
     let mut normalizer: f64;
     let mut energy: f64;
@@ -62,79 +62,79 @@ pub fn silk_pitch_analysis_core_flp(
     let mut length_d_srch: i32;
     let mut length_d_comp: i32;
 
-    let mut CCmax: f32;
-    let mut CCmax_b: f32;
-    let mut CCmax_new_b: f32;
-    let mut CCmax_new: f32;
-    let mut CBimax: i32;
-    let mut CBimax_new: i32;
+    let mut ccmax: f32;
+    let mut ccmax_b: f32;
+    let mut ccmax_new_b: f32;
+    let mut ccmax_new: f32;
+    let mut cbimax: i32;
+    let mut cbimax_new: i32;
     let mut lag: i32;
     let start_lag: i32;
     let end_lag: i32;
     let mut lag_new: i32;
     let mut cbk_size: i32;
     let mut lag_log2: f32;
-    let prevLag_log2: f32;
+    let prev_lag_log2: f32;
     let mut delta_lag_log2_sqr: f32;
     let mut energies_st3: [[[f32; 5]; 34]; 4] = [[[0.; 5]; 34]; 4];
     let mut cross_corr_st3: [[[f32; 5]; 34]; 4] = [[[0.; 5]; 34]; 4];
     let mut lag_counter: i32;
 
     let mut nb_cbk_search: i32;
-    let Lag_CB: &[i8];
-    debug_assert!(Fs_kHz == 8 || Fs_kHz == 12 || Fs_kHz == 16);
+    let lag_cb: &[i8];
+    debug_assert!(fs_k_hz == 8 || fs_k_hz == 12 || fs_k_hz == 16);
     debug_assert!(complexity >= 0);
     debug_assert!(complexity <= 2);
-    let frame_length: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * Fs_kHz;
-    let frame_length_4kHz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 4;
-    let frame_length_8kHz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 8;
-    let sf_length: i32 = PE_SUBFR_LENGTH_MS * Fs_kHz;
-    let sf_length_4kHz: i32 = PE_SUBFR_LENGTH_MS * 4;
-    let sf_length_8kHz: i32 = PE_SUBFR_LENGTH_MS * 8;
-    let min_lag: i32 = PE_MIN_LAG_MS * Fs_kHz;
-    let min_lag_4kHz: i32 = PE_MIN_LAG_MS * 4;
-    let min_lag_8kHz: i32 = PE_MIN_LAG_MS * 8;
-    let max_lag: i32 = PE_MAX_LAG_MS * Fs_kHz - 1;
-    let max_lag_4kHz: i32 = PE_MAX_LAG_MS * 4;
-    let max_lag_8kHz: i32 = PE_MAX_LAG_MS * 8 - 1;
-    if Fs_kHz == 16 {
-        let mut frame_16_FIX: [i16; 640] = [0; 640];
+    let frame_length: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * fs_k_hz;
+    let frame_length_4k_hz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 4;
+    let frame_length_8k_hz: i32 = (PE_LTP_MEM_LENGTH_MS + nb_subfr * PE_SUBFR_LENGTH_MS) * 8;
+    let sf_length: i32 = PE_SUBFR_LENGTH_MS * fs_k_hz;
+    let sf_length_4k_hz: i32 = PE_SUBFR_LENGTH_MS * 4;
+    let sf_length_8k_hz: i32 = PE_SUBFR_LENGTH_MS * 8;
+    let min_lag: i32 = PE_MIN_LAG_MS * fs_k_hz;
+    let min_lag_4k_hz: i32 = PE_MIN_LAG_MS * 4;
+    let min_lag_8k_hz: i32 = PE_MIN_LAG_MS * 8;
+    let max_lag: i32 = PE_MAX_LAG_MS * fs_k_hz - 1;
+    let max_lag_4k_hz: i32 = PE_MAX_LAG_MS * 4;
+    let max_lag_8k_hz: i32 = PE_MAX_LAG_MS * 8 - 1;
+    if fs_k_hz == 16 {
+        let mut frame_16_fix: [i16; 640] = [0; 640];
         silk_float2short_array(
-            &mut frame_16_FIX[..frame_length as usize],
+            &mut frame_16_fix[..frame_length as usize],
             &frame[..frame_length as usize],
         );
         let filt_state = array_mut_ref![filt_state, 0, 2];
         filt_state.fill(0);
         silk_resampler_down2(
             filt_state,
-            &mut frame_8_FIX[..frame_length_8kHz as usize],
-            &frame_16_FIX[..frame_length as usize],
+            &mut frame_8_fix[..frame_length_8k_hz as usize],
+            &frame_16_fix[..frame_length as usize],
         );
         silk_short2float_array(
-            &mut frame_8kHz[..frame_length_8kHz as usize],
-            &frame_8_FIX[..frame_length_8kHz as usize],
+            &mut frame_8k_hz[..frame_length_8k_hz as usize],
+            &frame_8_fix[..frame_length_8k_hz as usize],
         );
-    } else if Fs_kHz == 12 {
-        let mut frame_12_FIX: [i16; 480] = [0; 480];
+    } else if fs_k_hz == 12 {
+        let mut frame_12_fix: [i16; 480] = [0; 480];
         silk_float2short_array(
-            &mut frame_12_FIX[..frame_length as usize],
+            &mut frame_12_fix[..frame_length as usize],
             &frame[..frame_length as usize],
         );
         filt_state.fill(0);
         silk_resampler_down2_3(
             &mut filt_state,
-            &mut frame_8_FIX[..frame_length_8kHz as usize],
-            &frame_12_FIX[..frame_length as usize],
+            &mut frame_8_fix[..frame_length_8k_hz as usize],
+            &frame_12_fix[..frame_length as usize],
         );
         silk_short2float_array(
-            &mut frame_8kHz[..frame_length_8kHz as usize],
-            &frame_8_FIX[..frame_length_8kHz as usize],
+            &mut frame_8k_hz[..frame_length_8k_hz as usize],
+            &frame_8_fix[..frame_length_8k_hz as usize],
         );
     } else {
-        debug_assert!(Fs_kHz == 8);
+        debug_assert!(fs_k_hz == 8);
         silk_float2short_array(
-            &mut frame_8_FIX[..frame_length_8kHz as usize],
-            &frame[..frame_length_8kHz as usize],
+            &mut frame_8_fix[..frame_length_8k_hz as usize],
+            &frame[..frame_length_8k_hz as usize],
         );
     }
     {
@@ -142,198 +142,199 @@ pub fn silk_pitch_analysis_core_flp(
         filt_state.fill(0);
         silk_resampler_down2(
             filt_state,
-            &mut frame_4_FIX[..frame_length_4kHz as usize],
-            &frame_8_FIX[..frame_length_8kHz as usize],
+            &mut frame_4_fix[..frame_length_4k_hz as usize],
+            &frame_8_fix[..frame_length_8k_hz as usize],
         );
     }
     silk_short2float_array(
-        &mut frame_4kHz[..frame_length_4kHz as usize],
-        &frame_4_FIX[..frame_length_4kHz as usize],
+        &mut frame_4k_hz[..frame_length_4k_hz as usize],
+        &frame_4_fix[..frame_length_4k_hz as usize],
     );
-    i = frame_length_4kHz - 1;
-    while i > 0 {
-        frame_4kHz[i as usize] = (if frame_4kHz[i as usize] as i32 as f32
-            + frame_4kHz[(i - 1) as usize]
+    _i = frame_length_4k_hz - 1;
+    while _i > 0 {
+        frame_4k_hz[_i as usize] = (if frame_4k_hz[_i as usize] as i32 as f32
+            + frame_4k_hz[(_i - 1) as usize]
             > SILK_INT16_MAX as f32
         {
             SILK_INT16_MAX as f32
-        } else if frame_4kHz[i as usize] as i32 as f32 + frame_4kHz[(i - 1) as usize]
+        } else if frame_4k_hz[_i as usize] as i32 as f32 + frame_4k_hz[(_i - 1) as usize]
             < SILK_INT16_MIN as f32
         {
             SILK_INT16_MIN as f32
         } else {
-            frame_4kHz[i as usize] as i32 as f32 + frame_4kHz[(i - 1) as usize]
+            frame_4k_hz[_i as usize] as i32 as f32 + frame_4k_hz[(_i - 1) as usize]
         }) as i16 as f32;
-        i -= 1;
+        _i -= 1;
     }
-    // C is already zero-initialized above
-    // target_off tracks position in frame_4kHz
-    let mut target_off: usize = ((sf_length_4kHz as u32) << 2) as usize;
+    // c is already zero-initialized above
+    // target_off tracks position in frame_4k_hz
+    let mut target_off: usize = ((sf_length_4k_hz as u32) << 2) as usize;
     k = 0;
     while k < nb_subfr >> 1 {
-        debug_assert!(target_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
-        let basis_off = target_off - min_lag_4kHz as usize;
-        debug_assert!(basis_off + sf_length_8kHz as usize <= frame_length_4kHz as usize);
+        debug_assert!(target_off + sf_length_8k_hz as usize <= frame_length_4k_hz as usize);
+        let basis_off = target_off - min_lag_4k_hz as usize;
+        debug_assert!(basis_off + sf_length_8k_hz as usize <= frame_length_4k_hz as usize);
         {
-            let xcorr_len = (max_lag_4kHz - min_lag_4kHz + 1) as usize;
+            let xcorr_len = (max_lag_4k_hz - min_lag_4k_hz + 1) as usize;
             celt_pitch_xcorr(
-                &frame_4kHz[target_off..target_off + sf_length_8kHz as usize],
-                &frame_4kHz[target_off - max_lag_4kHz as usize
-                    ..target_off - max_lag_4kHz as usize + sf_length_8kHz as usize + xcorr_len],
+                &frame_4k_hz[target_off..target_off + sf_length_8k_hz as usize],
+                &frame_4k_hz[target_off - max_lag_4k_hz as usize
+                    ..target_off - max_lag_4k_hz as usize + sf_length_8k_hz as usize + xcorr_len],
                 &mut xcorr[..xcorr_len],
-                sf_length_8kHz as usize,
+                sf_length_8k_hz as usize,
                 arch,
             );
         }
-        cross_corr = xcorr[(max_lag_4kHz - min_lag_4kHz) as usize] as f64;
-        normalizer = silk_energy_flp(&frame_4kHz[target_off..target_off + sf_length_8kHz as usize])
-            + silk_energy_flp(&frame_4kHz[basis_off..basis_off + sf_length_8kHz as usize])
-            + (sf_length_8kHz as f32 * 4000.0f32) as f64;
-        C[0][min_lag_4kHz as usize] += (2_f64 * cross_corr / normalizer) as f32;
+        cross_corr = xcorr[(max_lag_4k_hz - min_lag_4k_hz) as usize] as f64;
+        normalizer =
+            silk_energy_flp(&frame_4k_hz[target_off..target_off + sf_length_8k_hz as usize])
+                + silk_energy_flp(&frame_4k_hz[basis_off..basis_off + sf_length_8k_hz as usize])
+                + (sf_length_8k_hz as f32 * 4000.0f32) as f64;
+        c[0][min_lag_4k_hz as usize] += (2_f64 * cross_corr / normalizer) as f32;
         // basis_off_d starts at basis_off and decrements
         let mut basis_off_d = basis_off;
-        d = min_lag_4kHz + 1;
-        while d <= max_lag_4kHz {
+        d = min_lag_4k_hz + 1;
+        while d <= max_lag_4k_hz {
             basis_off_d -= 1;
-            cross_corr = xcorr[(max_lag_4kHz - d) as usize] as f64;
-            normalizer += frame_4kHz[basis_off_d] as f64 * frame_4kHz[basis_off_d] as f64
-                - frame_4kHz[basis_off_d + sf_length_8kHz as usize] as f64
-                    * frame_4kHz[basis_off_d + sf_length_8kHz as usize] as f64;
-            C[0][d as usize] += (2_f64 * cross_corr / normalizer) as f32;
+            cross_corr = xcorr[(max_lag_4k_hz - d) as usize] as f64;
+            normalizer += frame_4k_hz[basis_off_d] as f64 * frame_4k_hz[basis_off_d] as f64
+                - frame_4k_hz[basis_off_d + sf_length_8k_hz as usize] as f64
+                    * frame_4k_hz[basis_off_d + sf_length_8k_hz as usize] as f64;
+            c[0][d as usize] += (2_f64 * cross_corr / normalizer) as f32;
             d += 1;
         }
-        target_off += sf_length_8kHz as usize;
+        target_off += sf_length_8k_hz as usize;
         k += 1;
     }
-    i = max_lag_4kHz;
-    while i >= min_lag_4kHz {
-        C[0_usize][i as usize] -= C[0_usize][i as usize] * i as f32 / 4096.0f32;
-        i -= 1;
+    _i = max_lag_4k_hz;
+    while _i >= min_lag_4k_hz {
+        c[0_usize][_i as usize] -= c[0_usize][_i as usize] * _i as f32 / 4096.0f32;
+        _i -= 1;
     }
     length_d_srch = 4 + 2 * complexity;
     debug_assert!(3 * length_d_srch <= 24);
     silk_insertion_sort_decreasing_flp(
-        &mut C[0][min_lag_4kHz as usize..],
+        &mut c[0][min_lag_4k_hz as usize..],
         &mut d_srch,
-        max_lag_4kHz - min_lag_4kHz + 1,
+        max_lag_4k_hz - min_lag_4k_hz + 1,
         length_d_srch,
     );
-    let Cmax: f32 = C[0][min_lag_4kHz as usize];
-    if Cmax < 0.2f32 {
+    let cmax: f32 = c[0][min_lag_4k_hz as usize];
+    if cmax < 0.2f32 {
         pitch_out[..nb_subfr as usize].fill(0);
-        *LTPCorr = 0.0f32;
-        *lagIndex = 0;
-        *contourIndex = 0;
+        *ltpcorr = 0.0f32;
+        *lag_index = 0;
+        *contour_index = 0;
         return 1;
     }
-    let threshold: f32 = search_thres1 * Cmax;
-    i = 0;
-    while i < length_d_srch {
-        if C[0_usize][(min_lag_4kHz + i) as usize] > threshold {
-            d_srch[i as usize] = (((d_srch[i as usize] + min_lag_4kHz) as u32) << 1) as i32;
-            i += 1;
+    let threshold: f32 = search_thres1 * cmax;
+    _i = 0;
+    while _i < length_d_srch {
+        if c[0_usize][(min_lag_4k_hz + _i) as usize] > threshold {
+            d_srch[_i as usize] = (((d_srch[_i as usize] + min_lag_4k_hz) as u32) << 1) as i32;
+            _i += 1;
         } else {
-            length_d_srch = i;
+            length_d_srch = _i;
             break;
         }
     }
     debug_assert!(length_d_srch > 0);
-    i = min_lag_8kHz - 5;
-    while i < max_lag_8kHz + 5 {
-        d_comp[i as usize] = 0;
-        i += 1;
+    _i = min_lag_8k_hz - 5;
+    while _i < max_lag_8k_hz + 5 {
+        d_comp[_i as usize] = 0;
+        _i += 1;
     }
-    i = 0;
-    while i < length_d_srch {
-        d_comp[d_srch[i as usize] as usize] = 1;
-        i += 1;
+    _i = 0;
+    while _i < length_d_srch {
+        d_comp[d_srch[_i as usize] as usize] = 1;
+        _i += 1;
     }
-    i = max_lag_8kHz + 3;
-    while i >= min_lag_8kHz {
-        d_comp[i as usize] = (d_comp[i as usize] as i32
-            + (d_comp[(i - 1) as usize] as i32 + d_comp[(i - 2) as usize] as i32))
+    _i = max_lag_8k_hz + 3;
+    while _i >= min_lag_8k_hz {
+        d_comp[_i as usize] = (d_comp[_i as usize] as i32
+            + (d_comp[(_i - 1) as usize] as i32 + d_comp[(_i - 2) as usize] as i32))
             as i16;
-        i -= 1;
+        _i -= 1;
     }
     length_d_srch = 0;
-    i = min_lag_8kHz;
-    while i < max_lag_8kHz + 1 {
-        if d_comp[(i + 1) as usize] as i32 > 0 {
-            d_srch[length_d_srch as usize] = i;
+    _i = min_lag_8k_hz;
+    while _i < max_lag_8k_hz + 1 {
+        if d_comp[(_i + 1) as usize] as i32 > 0 {
+            d_srch[length_d_srch as usize] = _i;
             length_d_srch += 1;
         }
-        i += 1;
+        _i += 1;
     }
-    i = max_lag_8kHz + 3;
-    while i >= min_lag_8kHz {
-        d_comp[i as usize] = (d_comp[i as usize] as i32
-            + (d_comp[(i - 1) as usize] as i32
-                + d_comp[(i - 2) as usize] as i32
-                + d_comp[(i - 3) as usize] as i32)) as i16;
-        i -= 1;
+    _i = max_lag_8k_hz + 3;
+    while _i >= min_lag_8k_hz {
+        d_comp[_i as usize] = (d_comp[_i as usize] as i32
+            + (d_comp[(_i - 1) as usize] as i32
+                + d_comp[(_i - 2) as usize] as i32
+                + d_comp[(_i - 3) as usize] as i32)) as i16;
+        _i -= 1;
     }
     length_d_comp = 0;
-    i = min_lag_8kHz;
-    while i < max_lag_8kHz + 4 {
-        if d_comp[i as usize] as i32 > 0 {
-            d_comp[length_d_comp as usize] = (i - 2) as i16;
+    _i = min_lag_8k_hz;
+    while _i < max_lag_8k_hz + 4 {
+        if d_comp[_i as usize] as i32 > 0 {
+            d_comp[length_d_comp as usize] = (_i - 2) as i16;
             length_d_comp += 1;
         }
-        i += 1;
+        _i += 1;
     }
-    C = [[0.; 149]; 4];
-    // For stage 2, use frame_8kHz (or frame directly if 8kHz)
-    let frame_8: &[f32] = if Fs_kHz == 8 { frame } else { &frame_8kHz };
+    c = [[0.; 149]; 4];
+    // For stage 2, use frame_8k_hz (or frame directly if 8kHz)
+    let frame_8: &[f32] = if fs_k_hz == 8 { frame } else { &frame_8k_hz };
     target_off = (PE_LTP_MEM_LENGTH_MS * 8) as usize;
     k = 0;
     while k < nb_subfr {
         energy_tmp =
-            silk_energy_flp(&frame_8[target_off..target_off + sf_length_8kHz as usize]) + 1.0f64;
+            silk_energy_flp(&frame_8[target_off..target_off + sf_length_8k_hz as usize]) + 1.0f64;
         j = 0;
         while j < length_d_comp {
             d = d_comp[j as usize] as i32;
             let basis_off = target_off - d as usize;
             cross_corr = silk_inner_product_flp(
-                &frame_8[basis_off..basis_off + sf_length_8kHz as usize],
-                &frame_8[target_off..target_off + sf_length_8kHz as usize],
+                &frame_8[basis_off..basis_off + sf_length_8k_hz as usize],
+                &frame_8[target_off..target_off + sf_length_8k_hz as usize],
                 arch,
             );
             if cross_corr > 0.0f32 as f64 {
-                energy = silk_energy_flp(&frame_8[basis_off..basis_off + sf_length_8kHz as usize]);
-                C[k as usize][d as usize] = (2_f64 * cross_corr / (energy + energy_tmp)) as f32;
+                energy = silk_energy_flp(&frame_8[basis_off..basis_off + sf_length_8k_hz as usize]);
+                c[k as usize][d as usize] = (2_f64 * cross_corr / (energy + energy_tmp)) as f32;
             } else {
-                C[k as usize][d as usize] = 0.0f32;
+                c[k as usize][d as usize] = 0.0f32;
             }
             j += 1;
         }
-        target_off += sf_length_8kHz as usize;
+        target_off += sf_length_8k_hz as usize;
         k += 1;
     }
-    CCmax = 0.0f32;
-    CCmax_b = -1000.0f32;
-    CBimax = 0;
+    ccmax = 0.0f32;
+    ccmax_b = -1000.0f32;
+    cbimax = 0;
     lag = -1;
-    if prevLag > 0 {
-        if Fs_kHz == 12 {
-            prevLag = ((prevLag as u32) << 1) as i32 / 3;
-        } else if Fs_kHz == 16 {
-            prevLag >>= 1;
+    if prev_lag > 0 {
+        if fs_k_hz == 12 {
+            prev_lag = ((prev_lag as u32) << 1) as i32 / 3;
+        } else if fs_k_hz == 16 {
+            prev_lag >>= 1;
         }
-        prevLag_log2 = silk_log2(prevLag as f32 as f64);
+        prev_lag_log2 = silk_log2(prev_lag as f32 as f64);
     } else {
-        prevLag_log2 = 0 as f32;
+        prev_lag_log2 = 0 as f32;
     }
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
         cbk_size = PE_NB_CBKS_STAGE2_EXT as i32;
-        Lag_CB = &SILK_CB_LAGS_STAGE2;
-        if Fs_kHz == 8 && complexity > SILK_PE_MIN_COMPLEX {
+        lag_cb = &SILK_CB_LAGS_STAGE2;
+        if fs_k_hz == 8 && complexity > SILK_PE_MIN_COMPLEX {
             nb_cbk_search = PE_NB_CBKS_STAGE2_EXT as i32;
         } else {
             nb_cbk_search = PE_NB_CBKS_STAGE2;
         }
     } else {
         cbk_size = PE_NB_CBKS_STAGE2_10MS as i32;
-        Lag_CB = &SILK_CB_LAGS_STAGE2_10_MS;
+        lag_cb = &SILK_CB_LAGS_STAGE2_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE2_10MS as i32;
     }
     k = 0;
@@ -341,51 +342,51 @@ pub fn silk_pitch_analysis_core_flp(
         d = d_srch[k as usize];
         j = 0;
         while j < nb_cbk_search {
-            CC[j as usize] = 0.0f32;
-            i = 0;
-            while i < nb_subfr {
-                CC[j as usize] +=
-                    C[i as usize][(d + Lag_CB[(i * cbk_size + j) as usize] as i32) as usize];
-                i += 1;
+            cc[j as usize] = 0.0f32;
+            _i = 0;
+            while _i < nb_subfr {
+                cc[j as usize] +=
+                    c[_i as usize][(d + lag_cb[(_i * cbk_size + j) as usize] as i32) as usize];
+                _i += 1;
             }
             j += 1;
         }
-        CCmax_new = -1000.0f32;
-        CBimax_new = 0;
-        i = 0;
-        while i < nb_cbk_search {
-            if CC[i as usize] > CCmax_new {
-                CCmax_new = CC[i as usize];
-                CBimax_new = i;
+        ccmax_new = -1000.0f32;
+        cbimax_new = 0;
+        _i = 0;
+        while _i < nb_cbk_search {
+            if cc[_i as usize] > ccmax_new {
+                ccmax_new = cc[_i as usize];
+                cbimax_new = _i;
             }
-            i += 1;
+            _i += 1;
         }
         lag_log2 = silk_log2(d as f32 as f64);
-        CCmax_new_b = CCmax_new - PE_SHORTLAG_BIAS * nb_subfr as f32 * lag_log2;
-        if prevLag > 0 {
-            delta_lag_log2_sqr = lag_log2 - prevLag_log2;
+        ccmax_new_b = ccmax_new - PE_SHORTLAG_BIAS * nb_subfr as f32 * lag_log2;
+        if prev_lag > 0 {
+            delta_lag_log2_sqr = lag_log2 - prev_lag_log2;
             delta_lag_log2_sqr *= delta_lag_log2_sqr;
-            CCmax_new_b -= PE_PREVLAG_BIAS * nb_subfr as f32 * (*LTPCorr) * delta_lag_log2_sqr
+            ccmax_new_b -= PE_PREVLAG_BIAS * nb_subfr as f32 * (*ltpcorr) * delta_lag_log2_sqr
                 / (delta_lag_log2_sqr + 0.5f32);
         }
-        if CCmax_new_b > CCmax_b && CCmax_new > nb_subfr as f32 * search_thres2 {
-            CCmax_b = CCmax_new_b;
-            CCmax = CCmax_new;
+        if ccmax_new_b > ccmax_b && ccmax_new > nb_subfr as f32 * search_thres2 {
+            ccmax_b = ccmax_new_b;
+            ccmax = ccmax_new;
             lag = d;
-            CBimax = CBimax_new;
+            cbimax = cbimax_new;
         }
         k += 1;
     }
     if lag == -1 {
         pitch_out[..nb_subfr as usize].fill(0);
-        *LTPCorr = 0.0f32;
-        *lagIndex = 0;
-        *contourIndex = 0;
+        *ltpcorr = 0.0f32;
+        *lag_index = 0;
+        *contour_index = 0;
         return 1;
     }
-    *LTPCorr = CCmax / nb_subfr as f32;
-    if Fs_kHz > 8 {
-        if Fs_kHz == 12 {
+    *ltpcorr = ccmax / nb_subfr as f32;
+    if fs_k_hz > 8 {
+        if fs_k_hz == 12 {
             lag = ((lag as i16 as i32 * 3) >> 1) + ((lag as i16 as i32 * 3) & 1);
         } else {
             lag = ((lag as u32) << 1) as i32;
@@ -408,8 +409,8 @@ pub fn silk_pitch_analysis_core_flp(
         start_lag = silk_max_int(lag - 2, min_lag);
         end_lag = silk_min_int(lag + 2, max_lag);
         lag_new = lag;
-        CBimax = 0;
-        CCmax = -1000.0f32;
+        cbimax = 0;
+        ccmax = -1000.0f32;
         silk_p_ana_calc_corr_st3(
             &mut cross_corr_st3,
             frame,
@@ -429,17 +430,17 @@ pub fn silk_pitch_analysis_core_flp(
         );
         lag_counter = 0;
         contour_bias = PE_FLATCONTOUR_BIAS / lag as f32;
-        let Lag_CB: &[i8];
+        let lag_cb: &[i8];
         if nb_subfr == PE_MAX_NB_SUBFR as i32 {
             nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
             cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
-            Lag_CB = &SILK_CB_LAGS_STAGE3;
+            lag_cb = &SILK_CB_LAGS_STAGE3;
         } else {
             nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
             cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
-            Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
+            lag_cb = &SILK_CB_LAGS_STAGE3_10_MS;
         }
-        let target_st3 = (PE_LTP_MEM_LENGTH_MS * Fs_kHz) as usize;
+        let target_st3 = (PE_LTP_MEM_LENGTH_MS * fs_k_hz) as usize;
         energy_tmp =
             silk_energy_flp(&frame[target_st3..target_st3 + (nb_subfr * sf_length) as usize])
                 + 1.0f64;
@@ -457,15 +458,15 @@ pub fn silk_pitch_analysis_core_flp(
                     k += 1;
                 }
                 if cross_corr > 0.0f64 {
-                    CCmax_new = (2_f64 * cross_corr / energy) as f32;
-                    CCmax_new *= 1.0f32 - contour_bias * j as f32;
+                    ccmax_new = (2_f64 * cross_corr / energy) as f32;
+                    ccmax_new *= 1.0f32 - contour_bias * j as f32;
                 } else {
-                    CCmax_new = 0.0f32;
+                    ccmax_new = 0.0f32;
                 }
-                if CCmax_new > CCmax && d + SILK_CB_LAGS_STAGE3[j as usize] as i32 <= max_lag {
-                    CCmax = CCmax_new;
+                if ccmax_new > ccmax && d + SILK_CB_LAGS_STAGE3[j as usize] as i32 <= max_lag {
+                    ccmax = ccmax_new;
                     lag_new = d;
-                    CBimax = j;
+                    cbimax = j;
                 }
                 j += 1;
             }
@@ -474,17 +475,17 @@ pub fn silk_pitch_analysis_core_flp(
         }
         k = 0;
         while k < nb_subfr {
-            pitch_out[k as usize] = lag_new + Lag_CB[(k * cbk_size + CBimax) as usize] as i32;
-            pitch_out[k as usize] = if min_lag > 18 * Fs_kHz {
+            pitch_out[k as usize] = lag_new + lag_cb[(k * cbk_size + cbimax) as usize] as i32;
+            pitch_out[k as usize] = if min_lag > 18 * fs_k_hz {
                 if pitch_out[k as usize] > min_lag {
                     min_lag
-                } else if pitch_out[k as usize] < 18 * Fs_kHz {
-                    18 * Fs_kHz
+                } else if pitch_out[k as usize] < 18 * fs_k_hz {
+                    18 * fs_k_hz
                 } else {
                     pitch_out[k as usize]
                 }
-            } else if pitch_out[k as usize] > 18 * Fs_kHz {
-                18 * Fs_kHz
+            } else if pitch_out[k as usize] > 18 * fs_k_hz {
+                18 * fs_k_hz
             } else if pitch_out[k as usize] < min_lag {
                 min_lag
             } else {
@@ -492,15 +493,15 @@ pub fn silk_pitch_analysis_core_flp(
             };
             k += 1;
         }
-        *lagIndex = (lag_new - min_lag) as i16;
-        *contourIndex = CBimax as i8;
+        *lag_index = (lag_new - min_lag) as i16;
+        *contour_index = cbimax as i8;
     } else {
         k = 0;
         while k < nb_subfr {
-            pitch_out[k as usize] = lag + Lag_CB[(k * cbk_size + CBimax) as usize] as i32;
-            pitch_out[k as usize] = if min_lag_8kHz > 18 * 8 {
-                if pitch_out[k as usize] > min_lag_8kHz {
-                    min_lag_8kHz
+            pitch_out[k as usize] = lag + lag_cb[(k * cbk_size + cbimax) as usize] as i32;
+            pitch_out[k as usize] = if min_lag_8k_hz > 18 * 8 {
+                if pitch_out[k as usize] > min_lag_8k_hz {
+                    min_lag_8k_hz
                 } else if pitch_out[k as usize] < 18 * 8 {
                     18 * 8
                 } else {
@@ -508,20 +509,20 @@ pub fn silk_pitch_analysis_core_flp(
                 }
             } else if pitch_out[k as usize] > 18 * 8 {
                 18 * 8
-            } else if pitch_out[k as usize] < min_lag_8kHz {
-                min_lag_8kHz
+            } else if pitch_out[k as usize] < min_lag_8k_hz {
+                min_lag_8k_hz
             } else {
                 pitch_out[k as usize]
             };
             k += 1;
         }
-        *lagIndex = (lag - min_lag_8kHz) as i16;
-        *contourIndex = CBimax as i8;
+        *lag_index = (lag - min_lag_8k_hz) as i16;
+        *contour_index = cbimax as i8;
     }
-    debug_assert!(*lagIndex as i32 >= 0);
+    debug_assert!(*lag_index as i32 >= 0);
     0
 }
-/// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_corr_st3
+/// Upstream c: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_corr_st3
 fn silk_p_ana_calc_corr_st3(
     cross_corr_st3: &mut [[[f32; 5]; 34]; 4],
     frame: &[f32],
@@ -531,7 +532,7 @@ fn silk_p_ana_calc_corr_st3(
     complexity: i32,
     _arch: Arch,
 ) {
-    let mut i: i32;
+    let mut _i: i32;
     let mut j: i32;
     let mut k: i32;
     let mut lag_counter: i32;
@@ -543,19 +544,19 @@ fn silk_p_ana_calc_corr_st3(
     let cbk_size: i32;
     let mut scratch_mem: [f32; 22] = [0.; 22];
     let mut xcorr: [f32; 22] = [0.; 22];
-    let Lag_range: &[[i8; 2]];
-    let Lag_CB: &[i8];
+    let lag_range: &[[i8; 2]];
+    let lag_cb: &[i8];
     debug_assert!(complexity >= 0);
     debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
-        Lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
-        Lag_CB = &SILK_CB_LAGS_STAGE3;
+        lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
+        lag_cb = &SILK_CB_LAGS_STAGE3;
         nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
         debug_assert!(nb_subfr == 4 >> 1);
-        Lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
-        Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
+        lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
+        lag_cb = &SILK_CB_LAGS_STAGE3_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
         cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
     }
@@ -563,8 +564,8 @@ fn silk_p_ana_calc_corr_st3(
     k = 0;
     while k < nb_subfr {
         lag_counter = 0;
-        lag_low = Lag_range[k as usize][0] as i32;
-        lag_high = Lag_range[k as usize][1] as i32;
+        lag_low = lag_range[k as usize][0] as i32;
+        lag_high = lag_range[k as usize][1] as i32;
         {
             let xcorr_len = (lag_high - lag_low + 1) as usize;
             let basis_start = target_off - start_lag as usize - lag_high as usize;
@@ -582,23 +583,23 @@ fn silk_p_ana_calc_corr_st3(
             lag_counter += 1;
             j += 1;
         }
-        delta = Lag_range[k as usize][0] as i32;
-        i = 0;
-        while i < nb_cbk_search {
-            idx = Lag_CB[(k * cbk_size + i) as usize] as i32 - delta;
+        delta = lag_range[k as usize][0] as i32;
+        _i = 0;
+        while _i < nb_cbk_search {
+            idx = lag_cb[(k * cbk_size + _i) as usize] as i32 - delta;
             j = 0;
             while j < PE_NB_STAGE3_LAGS {
-                cross_corr_st3[k as usize][i as usize][j as usize] =
+                cross_corr_st3[k as usize][_i as usize][j as usize] =
                     scratch_mem[(idx + j) as usize];
                 j += 1;
             }
-            i += 1;
+            _i += 1;
         }
         target_off += sf_length as usize;
         k += 1;
     }
 }
-/// Upstream C: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_energy_st3
+/// Upstream c: silk/float/pitch_analysis_core_FLP.c:silk_P_Ana_calc_energy_st3
 fn silk_p_ana_calc_energy_st3(
     energies_st3: &mut [[[f32; 5]; 34]; 4],
     frame: &[f32],
@@ -609,7 +610,7 @@ fn silk_p_ana_calc_energy_st3(
 ) {
     let mut energy: f64;
     let mut k: i32;
-    let mut i: i32;
+    let mut _i: i32;
     let mut j: i32;
     let mut lag_counter: i32;
     let nb_cbk_search: i32;
@@ -618,19 +619,19 @@ fn silk_p_ana_calc_energy_st3(
     let cbk_size: i32;
     let mut lag_diff: i32;
     let mut scratch_mem: [f32; 22] = [0.; 22];
-    let Lag_range: &[[i8; 2]];
-    let Lag_CB: &[i8];
+    let lag_range: &[[i8; 2]];
+    let lag_cb: &[i8];
     debug_assert!(complexity >= 0);
     debug_assert!(complexity <= 2);
     if nb_subfr == PE_MAX_NB_SUBFR as i32 {
-        Lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
-        Lag_CB = &SILK_CB_LAGS_STAGE3;
+        lag_range = &SILK_LAG_RANGE_STAGE3[complexity as usize];
+        lag_cb = &SILK_CB_LAGS_STAGE3;
         nb_cbk_search = SILK_NB_CBK_SEARCHS_STAGE3[complexity as usize] as i32;
         cbk_size = PE_NB_CBKS_STAGE3_MAX as i32;
     } else {
         debug_assert!(nb_subfr == 4 >> 1);
-        Lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
-        Lag_CB = &SILK_CB_LAGS_STAGE3_10_MS;
+        lag_range = &SILK_LAG_RANGE_STAGE3_10_MS;
+        lag_cb = &SILK_CB_LAGS_STAGE3_10_MS;
         nb_cbk_search = PE_NB_CBKS_STAGE3_10MS as i32;
         cbk_size = PE_NB_CBKS_STAGE3_10MS as i32;
     }
@@ -638,32 +639,32 @@ fn silk_p_ana_calc_energy_st3(
     k = 0;
     while k < nb_subfr {
         lag_counter = 0;
-        let basis_off = target_off - (start_lag + Lag_range[k as usize][0] as i32) as usize;
+        let basis_off = target_off - (start_lag + lag_range[k as usize][0] as i32) as usize;
         energy = silk_energy_flp(&frame[basis_off..basis_off + sf_length as usize]) + 1e-3f64;
         scratch_mem[lag_counter as usize] = energy as f32;
         lag_counter += 1;
-        lag_diff = Lag_range[k as usize][1] as i32 - Lag_range[k as usize][0] as i32 + 1;
-        i = 1;
-        while i < lag_diff {
-            // basis_ptr.offset(sf_length - i) => frame[basis_off + sf_length - i]
-            // basis_ptr.offset(-i) => frame[basis_off - i]
-            energy -= frame[basis_off + (sf_length - i) as usize] as f64
-                * frame[basis_off + (sf_length - i) as usize] as f64;
-            energy += frame[basis_off - i as usize] as f64 * frame[basis_off - i as usize] as f64;
+        lag_diff = lag_range[k as usize][1] as i32 - lag_range[k as usize][0] as i32 + 1;
+        _i = 1;
+        while _i < lag_diff {
+            // basis_ptr.offset(sf_length - _i) => frame[basis_off + sf_length - _i]
+            // basis_ptr.offset(-_i) => frame[basis_off - _i]
+            energy -= frame[basis_off + (sf_length - _i) as usize] as f64
+                * frame[basis_off + (sf_length - _i) as usize] as f64;
+            energy += frame[basis_off - _i as usize] as f64 * frame[basis_off - _i as usize] as f64;
             scratch_mem[lag_counter as usize] = energy as f32;
             lag_counter += 1;
-            i += 1;
+            _i += 1;
         }
-        delta = Lag_range[k as usize][0] as i32;
-        i = 0;
-        while i < nb_cbk_search {
-            idx = Lag_CB[(k * cbk_size + i) as usize] as i32 - delta;
+        delta = lag_range[k as usize][0] as i32;
+        _i = 0;
+        while _i < nb_cbk_search {
+            idx = lag_cb[(k * cbk_size + _i) as usize] as i32 - delta;
             j = 0;
             while j < PE_NB_STAGE3_LAGS {
-                energies_st3[k as usize][i as usize][j as usize] = scratch_mem[(idx + j) as usize];
+                energies_st3[k as usize][_i as usize][j as usize] = scratch_mem[(idx + j) as usize];
                 j += 1;
             }
-            i += 1;
+            _i += 1;
         }
         target_off += sf_length as usize;
         k += 1;

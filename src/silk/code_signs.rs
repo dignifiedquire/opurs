@@ -1,6 +1,6 @@
 //! Pulse sign coding.
 //!
-//! Upstream C: `silk/code_signs.c`
+//! Upstream c: `silk/code_signs.c`
 
 use crate::celt::entdec::{ec_dec_icdf, EcDec};
 use crate::celt::entenc::{ec_enc_icdf, EcEnc};
@@ -22,24 +22,24 @@ fn silk_dec_map(a: i32) -> i16 {
 /// Encodes signs of excitation
 ///
 /// ```text
-/// psRangeEnc                          I/O   Compressor data structure
+/// ps_range_enc                          I/O   Compressor data structure
 /// pulses[]                            I     pulse signal
 /// length                              I     length of input
-/// signalType                          I     Signal type
-/// quantOffsetType                     I     Quantization offset type
+/// signal_type                          I     Signal type
+/// quant_offset_type                     I     Quantization offset type
 /// sum_pulses[ MAX_NB_SHELL_BLOCKS ]   I     Sum of absolute pulses per block
 /// ```
-/// Upstream C: silk/code_signs.c:silk_encode_signs
+/// Upstream c: silk/code_signs.c:silk_encode_signs
 pub fn silk_encode_signs(
-    psRangeEnc: &mut EcEnc,
+    ps_range_enc: &mut EcEnc,
     pulses: &[i8],
-    signalType: i32,
-    quantOffsetType: i32,
+    signal_type: i32,
+    quant_offset_type: i32,
     sum_pulses: &[i32],
 ) {
     assert_eq!(pulses.len(), sum_pulses.len() * SHELL_CODEC_FRAME_LENGTH);
 
-    let icdf_ix = 7 * (quantOffsetType + (signalType << 1)) as usize;
+    let icdf_ix = 7 * (quant_offset_type + (signal_type << 1)) as usize;
     let icdf_ptr = &SILK_SIGN_ICDF[icdf_ix..];
 
     for (&p, q_ptr) in std::iter::zip(sum_pulses, pulses.chunks(SHELL_CODEC_FRAME_LENGTH)) {
@@ -47,7 +47,7 @@ pub fn silk_encode_signs(
             let icdf = [icdf_ptr[std::cmp::min(p & 0x1f, 6) as usize], 0];
             for &q_ptr in q_ptr {
                 if q_ptr != 0 {
-                    ec_enc_icdf(psRangeEnc, silk_enc_map(q_ptr), &icdf, 8)
+                    ec_enc_icdf(ps_range_enc, silk_enc_map(q_ptr), &icdf, 8)
                 }
             }
         }
@@ -58,25 +58,25 @@ pub fn silk_encode_signs(
 /// Decodes signs of excitation
 ///
 /// ```text
-/// psRangeDec                          I/O   Compressor data structure
+/// ps_range_dec                          I/O   Compressor data structure
 /// pulses[]                            I/O   pulse signal
 /// length                              I     length of input
-/// signalType                          I     Signal type
-/// quantOffsetType                     I     Quantization offset type
+/// signal_type                          I     Signal type
+/// quant_offset_type                     I     Quantization offset type
 /// sum_pulses[ MAX_NB_SHELL_BLOCKS ]   I     Sum of absolute pulses per block
 /// ```
-/// Upstream C: silk/code_signs.c:silk_decode_signs
+/// Upstream c: silk/code_signs.c:silk_decode_signs
 #[inline]
 pub fn silk_decode_signs(
-    psRangeDec: &mut EcDec,
+    ps_range_dec: &mut EcDec,
     pulses: &mut [i16],
-    signalType: i32,
-    quantOffsetType: i32,
+    signal_type: i32,
+    quant_offset_type: i32,
     sum_pulses: &[i32],
 ) {
     assert_eq!(pulses.len(), sum_pulses.len() * SHELL_CODEC_FRAME_LENGTH);
 
-    let icdf_ix = 7 * (quantOffsetType + (signalType << 1)) as usize;
+    let icdf_ix = 7 * (quant_offset_type + (signal_type << 1)) as usize;
     let icdf_ptr = &SILK_SIGN_ICDF[icdf_ix..];
 
     for (&p, q_ptr) in std::iter::zip(sum_pulses, pulses.chunks_mut(SHELL_CODEC_FRAME_LENGTH)) {
@@ -84,7 +84,7 @@ pub fn silk_decode_signs(
             let icdf = [icdf_ptr[std::cmp::min(p & 0x1f, 6) as usize], 0];
             for q_ptr in q_ptr[..SHELL_CODEC_FRAME_LENGTH].iter_mut() {
                 if *q_ptr > 0 {
-                    *q_ptr *= silk_dec_map(ec_dec_icdf(psRangeDec, &icdf, 8));
+                    *q_ptr *= silk_dec_map(ec_dec_icdf(ps_range_dec, &icdf, 8));
                 }
             }
         }

@@ -1,6 +1,6 @@
 //! LPC analysis filter.
 //!
-//! Upstream C: `silk/LPC_analysis_filter.c`
+//! Upstream c: `silk/LPC_analysis_filter.c`
 
 use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 
@@ -14,36 +14,36 @@ use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 /// ```text
 /// out   O   Output signal
 /// in    I   Input signal
-/// B     I   MA prediction coefficients, Q12 [order]
+/// b     I   MA prediction coefficients, Q12 [Order]
 /// len   I   Signal length
-/// d     I   Filter order
+/// d     I   Filter Order
 /// ```
-/// Upstream C: silk/LPC_analysis_filter.c:silk_LPC_analysis_filter
+/// Upstream c: silk/LPC_analysis_filter.c:silk_LPC_analysis_filter
 #[inline]
-pub fn silk_lpc_analysis_filter(out: &mut [i16], input: &[i16], B: &[i16]) {
+pub fn silk_lpc_analysis_filter(out: &mut [i16], input: &[i16], b: &[i16]) {
     let len = input.len();
-    let d = B.len();
+    let d = b.len();
 
     assert!(d >= 6);
     assert_eq!(d % 2, 0);
     assert!(d <= len);
     assert_eq!(out.len(), len);
 
-    for i in 0..(len - d) {
-        let mut out32_Q12 = 0i32;
+    for _i in 0..(len - d) {
+        let mut out32_q12 = 0i32;
         /* Allowing wrap around so that two wraps can cancel each other. The rare
         cases where the result wraps around can only be triggered by invalid streams*/
         for j in 0..d {
-            out32_Q12 = out32_Q12.wrapping_add(input[i + d - 1 - j] as i32 * B[j] as i32);
+            out32_q12 = out32_q12.wrapping_add(input[_i + d - 1 - j] as i32 * b[j] as i32);
         }
         /* Subtract prediction */
-        out32_Q12 = ((input[i + d] as i32) << 12).wrapping_sub(out32_Q12);
+        out32_q12 = ((input[_i + d] as i32) << 12).wrapping_sub(out32_q12);
 
         /* Scale to Q0 */
-        let out32 = silk_rshift_round(out32_Q12, 12);
+        let out32 = silk_rshift_round(out32_q12, 12);
 
         /* Saturate output */
-        out[i + d] = silk_sat16(out32) as i16;
+        out[_i + d] = silk_sat16(out32) as i16;
     }
 
     /* Set first d output samples to zero */

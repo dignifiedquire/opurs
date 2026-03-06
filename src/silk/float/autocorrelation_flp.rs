@@ -1,6 +1,6 @@
 //! Floating-point autocorrelation.
 //!
-//! Upstream C: `silk/float/autocorrelation_FLP.c`
+//! Upstream c: `silk/float/autocorrelation_FLP.c`
 
 use crate::arch::Arch;
 use crate::silk::float::inner_product_flp::silk_inner_product_flp;
@@ -14,7 +14,7 @@ use crate::silk::float::inner_product_flp::silk_inner_product_flp;
 /// inputDataSize    I  length of input
 /// correlationCount I  number of correlation taps to compute
 /// ```
-/// Upstream C: silk/float/autocorrelation_FLP.c:silk_autocorrelation_FLP
+/// Upstream c: silk/float/autocorrelation_FLP.c:silk_autocorrelation_FLP
 pub fn silk_autocorrelation_flp(results: &mut [f32], input: &[f32], arch: Arch) {
     let results = if results.len() > input.len() {
         &mut results[0..input.len()]
@@ -22,8 +22,8 @@ pub fn silk_autocorrelation_flp(results: &mut [f32], input: &[f32], arch: Arch) 
         results
     };
 
-    for (i, y) in (0..).zip(results.iter_mut()) {
-        let tail = &input[i..];
+    for (_i, y) in (0..).zip(results.iter_mut()) {
+        let tail = &input[_i..];
         let head = &input[..tail.len()];
         *y = silk_inner_product_flp(head, tail, arch) as f32;
     }

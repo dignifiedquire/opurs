@@ -1,9 +1,6 @@
 //! SILK codec — speech-optimized audio coding.
 //!
-//! Upstream C: `silk/`
-
-#![allow(non_camel_case_types)] // Transitional: remaining C-style identifiers are being migrated to Rust naming.
-#![allow(non_snake_case)] // Transitional: remaining C-style identifiers are being migrated to Rust naming.
+//! Upstream c: `silk/`
 
 #[cfg(feature = "simd")]
 pub mod simd;

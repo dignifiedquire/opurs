@@ -1,16 +1,16 @@
 //! Floating-point bandwidth expansion.
 //!
-//! Upstream C: `silk/float/bwexpander_FLP.c`
+//! Upstream c: `silk/float/bwexpander_FLP.c`
 
-/// Upstream C: silk/float/bwexpander_FLP.c:silk_bwexpander_FLP
+/// Upstream c: silk/float/bwexpander_FLP.c:silk_bwexpander_FLP
 pub fn silk_bwexpander_flp(ar: &mut [f32], d: i32, chirp: f32) {
-    let mut i: i32;
+    let mut _i: i32;
     let mut cfac: f32 = chirp;
-    i = 0;
-    while i < d - 1 {
-        ar[i as usize] *= cfac;
+    _i = 0;
+    while _i < d - 1 {
+        ar[_i as usize] *= cfac;
         cfac *= chirp;
-        i += 1;
+        _i += 1;
     }
     ar[(d - 1) as usize] *= cfac;
 }

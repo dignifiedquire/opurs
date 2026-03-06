@@ -1,10 +1,10 @@
 //! Macro equivalents for fixed-point arithmetic.
 //!
-//! Upstream C: `silk/macros.h`
+//! Upstream c: `silk/macros.h`
 
 pub const EC_CLZ0: i32 = 32;
 
-/// Upstream C: silk/macros.h:silk_CLZ32
+/// Upstream c: silk/macros.h:silk_CLZ32
 #[inline]
 pub fn silk_clz32(in32: i32) -> i32 {
     if in32 != 0 {
@@ -16,7 +16,7 @@ pub fn silk_clz32(in32: i32) -> i32 {
 
 ///
 /// (a32 * (opus_int32)((opus_int16)(b32))) >> 16 output have to be 32bit int
-/// Upstream C: silk/macros.h:silk_SMULWB
+/// Upstream c: silk/macros.h:silk_SMULWB
 #[inline]
 pub fn silk_smulwb(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i16 as i64) >> 16) as i32
@@ -24,7 +24,7 @@ pub fn silk_smulwb(a32: i32, b32: i32) -> i32 {
 
 ///
 /// a32 + (b32 * (opus_int32)((opus_int16)(c32))) >> 16 output have to be 32bit int
-/// Upstream C: silk/macros.h:silk_SMLAWB
+/// Upstream c: silk/macros.h:silk_SMLAWB
 #[inline]
 pub fn silk_smlawb(a32: i32, b32: i32, c32: i32) -> i32 {
     (a32 as i64 + ((b32 as i64 * c32 as i16 as i64) >> 16)) as i32
@@ -32,7 +32,7 @@ pub fn silk_smlawb(a32: i32, b32: i32, c32: i32) -> i32 {
 
 ///
 /// (opus_int32)((opus_int16)(a3))) * (opus_int32)((opus_int16)(b32)) output have to be 32bit int
-/// Upstream C: silk/macros.h:silk_SMULBB
+/// Upstream c: silk/macros.h:silk_SMULBB
 #[inline]
 pub fn silk_smulbb(a32: i32, b32: i32) -> i32 {
     a32 as i16 as i32 * b32 as i16 as i32
@@ -40,7 +40,7 @@ pub fn silk_smulbb(a32: i32, b32: i32) -> i32 {
 
 ///
 /// a32 + (b32 * (opus_int32)((opus_int16)(c32))) >> 16 output have to be 32bit int
-/// Upstream C: silk/macros.h:silk_SMULWW
+/// Upstream c: silk/macros.h:silk_SMULWW
 #[inline]
 pub fn silk_smulww(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i64) >> 16) as i32

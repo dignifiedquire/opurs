@@ -1,6 +1,6 @@
 //! NLSF codebook tables for wideband.
 //!
-//! Upstream C: `silk/tables_NLSF_CB_WB.c`
+//! Upstream c: `silk/tables_NLSF_CB_WB.c`
 
 use crate::silk::structs::silk_NLSF_CB_struct;
 
@@ -103,16 +103,16 @@ const SILK_NLSF_PRED_WB_Q8: [u8; 30] = [
 const SILK_NLSF_DELTA_MIN_WB_Q15: [i16; 17] =
     [100, 3, 40, 3, 3, 3, 5, 14, 14, 10, 11, 3, 8, 9, 7, 3, 347];
 pub const SILK_NLSF_CB_WB: silk_NLSF_CB_struct = silk_NLSF_CB_struct {
-    nVectors: 32,
+    n_vectors: 32,
     order: 16,
-    quantStepSize_Q16: (0.15f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16,
-    invQuantStepSize_Q6: (1.0f64 / 0.15f64 * ((1) << 6) as f64 + 0.5f64) as i32 as i16,
-    CB1_NLSF_Q8: &SILK_NLSF_CB1_WB_Q8,
-    CB1_Wght_Q9: &SILK_NLSF_CB1_WB_WGHT_Q9,
-    CB1_iCDF: &SILK_NLSF_CB1_ICDF_WB,
-    pred_Q8: &SILK_NLSF_PRED_WB_Q8,
+    quant_step_size_q16: (0.15f64 * ((1) << 16) as f64 + 0.5f64) as i32 as i16,
+    inv_quant_step_size_q6: (1.0f64 / 0.15f64 * ((1) << 6) as f64 + 0.5f64) as i32 as i16,
+    cb1_nlsf_q8: &SILK_NLSF_CB1_WB_Q8,
+    cb1_wght_q9: &SILK_NLSF_CB1_WB_WGHT_Q9,
+    cb1_i_cdf: &SILK_NLSF_CB1_ICDF_WB,
+    pred_q8: &SILK_NLSF_PRED_WB_Q8,
     ec_sel: &SILK_NLSF_CB2_SELECT_WB,
-    ec_iCDF: &SILK_NLSF_CB2_ICDF_WB,
-    ec_Rates_Q5: &SILK_NLSF_CB2_BITS_WB_Q5,
-    deltaMin_Q15: &SILK_NLSF_DELTA_MIN_WB_Q15,
+    ec_i_cdf: &SILK_NLSF_CB2_ICDF_WB,
+    ec_rates_q5: &SILK_NLSF_CB2_BITS_WB_Q5,
+    delta_min_q15: &SILK_NLSF_DELTA_MIN_WB_Q15,
 };

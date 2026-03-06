@@ -1,6 +1,6 @@
 //! Shared SILK scalar typedef-style constants.
 //!
-//! Upstream C: `silk/typedef.h`
+//! Upstream c: `silk/typedef.h`
 
 pub const SILK_INT16_MAX: i32 = i16::MAX as i32;
 pub const SILK_INT16_MIN: i32 = i16::MIN as i32;

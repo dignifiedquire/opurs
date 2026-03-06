@@ -5,18 +5,18 @@
 /// Upstream C: celt/modes.h:OpusCustomMode
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OpusCustomMode {
-    pub(crate) Fs: i32,
+    pub(crate) fs: i32,
     pub overlap: usize,
-    pub(crate) nbEBands: usize,
-    pub(crate) effEBands: i32,
+    pub(crate) nb_ebands: usize,
+    pub(crate) eff_ebands: i32,
     pub(crate) preemph: [f32; 4],
-    pub(crate) eBands: &'static [i16],
-    pub(crate) maxLM: i32,
-    pub(crate) nbShortMdcts: i32,
-    pub shortMdctSize: i32,
-    pub(crate) nbAllocVectors: i32,
-    pub(crate) allocVectors: &'static [u8],
-    pub(crate) logN: &'static [i16],
+    pub(crate) e_bands: &'static [i16],
+    pub(crate) max_lm: i32,
+    pub(crate) nb_short_mdcts: i32,
+    pub short_mdct_size: i32,
+    pub(crate) nb_alloc_vectors: i32,
+    pub(crate) alloc_vectors: &'static [u8],
+    pub(crate) log_n: &'static [i16],
     pub window: &'static [f32],
     pub mdct: MdctLookup<'static>,
     pub(crate) cache: PulseCache,
@@ -71,14 +71,14 @@ const BAND_ALLOCATION: [u8; 231] = [
 
 /// Upstream C: celt/modes.c:opus_custom_mode_create
 pub fn opus_custom_mode_create(
-    Fs: i32,
+    fs: i32,
     frame_size: i32,
     error: Option<&mut i32>,
 ) -> Option<&'static OpusCustomMode> {
     // TODO: maybe return Result instead of error code?
     for mode in STATIC_MODE_LIST {
         for j in 0..4 {
-            if Fs == mode.Fs && frame_size << j == mode.shortMdctSize * mode.nbShortMdcts {
+            if fs == mode.fs && frame_size << j == mode.short_mdct_size * mode.nb_short_mdcts {
                 if let Some(error) = error {
                     *error = OPUS_OK;
                 }
@@ -94,31 +94,31 @@ pub fn opus_custom_mode_create(
 
 /// Build a temporary QEXT mode from the base mode.
 ///
-/// Selects the appropriate eBands/logN tables based on frame size,
-/// sets nbEBands/effEBands to NB_QEXT_BANDS, and copies the
+/// Selects the appropriate e_bands/log_n tables based on frame size,
+/// sets nb_ebands/eff_ebands to NB_QEXT_BANDS, and copies the
 /// pre-computed pulse cache from the base mode's qext_cache.
 ///
 /// Upstream C: celt/modes.c:compute_qext_mode
 #[cfg(feature = "qext")]
 pub fn compute_qext_mode(m: &OpusCustomMode) -> OpusCustomMode {
     let mut qext = *m;
-    if m.shortMdctSize * 48000 == 120 * m.Fs {
-        qext.eBands = &QEXT_EBANDS_240;
-        qext.logN = &QEXT_LOGN_240;
-    } else if m.shortMdctSize * 48000 == 90 * m.Fs {
-        qext.eBands = &QEXT_EBANDS_180;
-        qext.logN = &QEXT_LOGN_180;
+    if m.short_mdct_size * 48000 == 120 * m.fs {
+        qext.e_bands = &QEXT_EBANDS_240;
+        qext.log_n = &QEXT_LOGN_240;
+    } else if m.short_mdct_size * 48000 == 90 * m.fs {
+        qext.e_bands = &QEXT_EBANDS_180;
+        qext.log_n = &QEXT_LOGN_180;
     } else {
-        panic!("compute_qext_mode: unsupported shortMdctSize/Fs combination");
+        panic!("compute_qext_mode: unsupported short_mdct_size/fs combination");
     }
-    qext.nbEBands = NB_QEXT_BANDS;
-    qext.effEBands = NB_QEXT_BANDS as i32;
-    // Trim effEBands if last eBand exceeds shortMdctSize
-    while qext.eBands[qext.effEBands as usize] > qext.shortMdctSize as i16 {
-        qext.effEBands -= 1;
+    qext.nb_ebands = NB_QEXT_BANDS;
+    qext.eff_ebands = NB_QEXT_BANDS as i32;
+    // Trim eff_ebands if last eBand exceeds short_mdct_size
+    while qext.e_bands[qext.eff_ebands as usize] > qext.short_mdct_size as i16 {
+        qext.eff_ebands -= 1;
     }
-    qext.nbAllocVectors = 0;
-    qext.allocVectors = &[];
+    qext.nb_alloc_vectors = 0;
+    qext.alloc_vectors = &[];
     qext.cache = m.qext_cache;
     qext
 }

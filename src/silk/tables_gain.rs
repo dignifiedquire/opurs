@@ -1,6 +1,6 @@
 //! Gain quantization tables.
 //!
-//! Upstream C: `silk/tables_gain.c`
+//! Upstream c: `silk/tables_gain.c`
 
 pub const SILK_GAIN_ICDF: [[u8; 8]; 3] = [
     [224, 112, 44, 15, 3, 2, 1, 0],

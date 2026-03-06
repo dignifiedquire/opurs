@@ -1,15 +1,20 @@
 //! Aligned inner product computation.
 //!
-//! Upstream C: `silk/inner_prod_aligned.c`
+//! Upstream c: `silk/inner_prod_aligned.c`
 
-/// Upstream C: silk/inner_prod_aligned.c:silk_inner_prod_aligned_scale
-pub fn silk_inner_prod_aligned_scale(inVec1: &[i16], inVec2: &[i16], scale: i32, len: i32) -> i32 {
-    let mut i: i32;
+/// Upstream c: silk/inner_prod_aligned.c:silk_inner_prod_aligned_scale
+pub fn silk_inner_prod_aligned_scale(
+    in_vec1: &[i16],
+    in_vec2: &[i16],
+    scale: i32,
+    len: i32,
+) -> i32 {
+    let mut _i: i32;
     let mut sum: i32 = 0;
-    i = 0;
-    while i < len {
-        sum += (inVec1[i as usize] as i32 * inVec2[i as usize] as i32) >> scale;
-        i += 1;
+    _i = 0;
+    while _i < len {
+        sum += (in_vec1[_i as usize] as i32 * in_vec2[_i as usize] as i32) >> scale;
+        _i += 1;
     }
     sum
 }

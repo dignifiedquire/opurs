@@ -1,6 +1,6 @@
 //! SILK floating-point processing variants.
 //!
-//! Upstream C: `silk/float/`
+//! Upstream c: `silk/float/`
 
 pub mod apply_sine_window_flp;
 pub mod autocorrelation_flp;

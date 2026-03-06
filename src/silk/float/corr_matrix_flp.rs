@@ -1,87 +1,87 @@
 //! Floating-point correlation matrix computation.
 //!
-//! Upstream C: `silk/float/corrMatrix_FLP.c`
+//! Upstream c: `silk/float/corrMatrix_FLP.c`
 
-use crate::silk::float::inner_product_flp::silk_inner_product2_FLP;
+use crate::silk::float::inner_product_flp::silk_inner_product2_flp;
 use crate::util::nalgebra::MatrixViewRMut;
 use nalgebra::{Dim, DimAdd, DimDiff, DimSub, DimSum, VectorView, U1};
 
 // Correlation matrix computations for LS estimate.
 
 ///
-/// Calculates correlation vector X'*t
+/// Calculates correlation vector x'*t
 ///
 /// ```text
-/// x       I    x vector [L+order-1] used to create X
-/// t       I    Target vector [L]
-/// L       I    Length of vectors
-/// Order   I    Max lag for correlation
-/// Xt      O    X'*t correlation vector [order]
+/// x       _i    x vector [L+Order-1] used to create x
+/// t       _i    Target vector [L]
+/// L       _i    Length of vectors
+/// Order   _i    Max lag for correlation
+/// xt      O    x'*t correlation vector [Order]
 /// ```
-/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrVector_FLP
-pub fn silk_corrVector_FLP<L, Order>(
-    x: &VectorView<f32, DimDiff<DimSum<L, Order>, U1>>,
-    t: &VectorView<f32, L>,
+/// Upstream c: silk/float/corrMatrix_FLP.c:silk_corr_vector_flp
+pub fn silk_corr_vector_flp<Len, OrderDim>(
+    x: &VectorView<f32, DimDiff<DimSum<Len, OrderDim>, U1>>,
+    t: &VectorView<f32, Len>,
     // accept a row vector because it's more convenient
-    Xt: &mut MatrixViewRMut<f32, U1, Order>,
+    xt: &mut MatrixViewRMut<f32, U1, OrderDim>,
 ) where
-    L: Dim,
-    Order: Dim,
-    L: DimAdd<Order>,
-    <L as DimAdd<Order>>::Output: DimSub<U1>,
+    Len: Dim,
+    OrderDim: Dim,
+    Len: DimAdd<OrderDim>,
+    <Len as DimAdd<OrderDim>>::Output: DimSub<U1>,
 {
     let (x_len, _) = x.shape_generic();
-    let (L, _) = t.shape_generic();
-    let (_, Order) = Xt.shape_generic();
-    assert_eq!(x_len.value(), L.add(Order).sub(U1).value());
+    let (len, _) = t.shape_generic();
+    let (_, order_dim) = xt.shape_generic();
+    assert_eq!(x_len.value(), len.add(order_dim).sub(U1).value());
 
-    for lag in 0..Order.value() {
-        let ptr1 = x.generic_view::<L, U1>((Order.value() - 1 - lag, 0), (L, U1));
-        Xt[lag] = silk_inner_product2_FLP(&ptr1, t) as f32;
+    for lag in 0..order_dim.value() {
+        let ptr1 = x.generic_view::<Len, U1>((order_dim.value() - 1 - lag, 0), (len, U1));
+        xt[lag] = silk_inner_product2_flp(&ptr1, t) as f32;
     }
 }
 
 ///
-/// Calculates correlation matrix X'*X
+/// Calculates correlation matrix x'*x
 ///
 /// ```text
-/// x       I   x vector [ L+order-1 ] used to create X
-/// L       I   Length of vectors
-/// Order   I   Max lag for correlation
-/// XX      O   X'*X correlation matrix [order x order]
+/// x       _i   x vector [ L+Order-1 ] used to create x
+/// L       _i   Length of vectors
+/// Order   _i   Max lag for correlation
+/// xx      O   x'*x correlation matrix [Order x Order]
 /// ```
-/// Upstream C: silk/float/corrMatrix_FLP.c:silk_corrMatrix_FLP
-pub fn silk_corrMatrix_FLP<Dx, L, Order>(
+/// Upstream c: silk/float/corrMatrix_FLP.c:silk_corr_matrix_flp
+pub fn silk_corr_matrix_flp<Dx, Len, OrderDim>(
     x: &VectorView<f32, Dx>,
-    L: L,
-    XX: &mut MatrixViewRMut<f32, Order, Order, Order, U1>,
+    len: Len,
+    xx: &mut MatrixViewRMut<f32, OrderDim, OrderDim, OrderDim, U1>,
 ) where
     Dx: Dim,
-    L: Dim,
-    Order: Dim,
+    Len: Dim,
+    OrderDim: Dim,
 {
-    let (Order, _) = XX.shape_generic();
-    assert_eq!(x.shape().0, L.value() + Order.value() - 1);
+    let (order_dim, _) = xx.shape_generic();
+    assert_eq!(x.shape().0, len.value() + order_dim.value() - 1);
 
-    let window_at = |lag: usize| x.generic_view((Order.value() - 1 - lag, 0), (L, U1));
-    let hvalue_at = |lag: usize| x[Order.value() - 1 - lag];
-    let tvalue_at = |lag: usize| x[Order.value() + L.value() - 1 - lag];
+    let window_at = |lag: usize| x.generic_view((order_dim.value() - 1 - lag, 0), (len, U1));
+    let hvalue_at = |lag: usize| x[order_dim.value() - 1 - lag];
+    let tvalue_at = |lag: usize| x[order_dim.value() + len.value() - 1 - lag];
 
-    let Order = Order.value();
+    let order = order_dim.value();
 
     // calculate the diagonal by using a sliding window
-    for lag in 0..Order {
+    for lag in 0..order {
         // use a sliding window
-        let mut energy = silk_inner_product2_FLP(&window_at(0), &window_at(lag));
-        XX[(lag, 0)] = energy as f32;
-        XX[(0, lag)] = energy as f32;
+        let mut energy = silk_inner_product2_flp(&window_at(0), &window_at(lag));
+        xx[(lag, 0)] = energy as f32;
+        xx[(0, lag)] = energy as f32;
 
-        for j in 1..(Order - lag) {
+        for j in 1..(order - lag) {
             energy +=
-                // yes, this is how it's done in the C impl: the sliding window diff is calculated as an f32
+                // yes, this is how it's done in the c impl: the sliding window diff is calculated as an f32
                 (hvalue_at(j) * hvalue_at(lag + j) - tvalue_at(j) * tvalue_at(lag + j)) as f64;
-            XX[(lag + j, j)] = energy as f32;
-            XX[(j, lag + j)] = energy as f32;
+            xx[(lag + j, j)] = energy as f32;
+            xx[(j, lag + j)] = energy as f32;
         }
     }
 }

@@ -1,18 +1,18 @@
 //! SILK decoder API.
 //!
-//! Upstream C: `silk/dec_API.c`
+//! Upstream c: `silk/dec_API.c`
 
 use crate::arch::Arch;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_DecControlStruct {
-    pub nChannelsAPI: usize,
-    pub nChannelsInternal: i32,
-    pub API_sampleRate: i32,
-    pub internalSampleRate: i32,
-    pub payloadSize_ms: i32,
-    pub prevPitchLag: i32,
+    pub n_channels_api: usize,
+    pub n_channels_internal: i32,
+    pub api_sample_rate: i32,
+    pub internal_sample_rate: i32,
+    pub payload_size_ms: i32,
+    pub prev_pitch_lag: i32,
     /// Whether Deep PLC is enabled (complexity >= 5)
     pub enable_deep_plc: bool,
     /// OSCE enhancement method (0=none, 1=LACE, 2=NoLACE)
@@ -57,9 +57,9 @@ use crate::silk::tables_other::SILK_LBRR_FLAGS_ICDF_PTR;
 #[repr(C)]
 pub struct silk_decoder {
     pub channel_state: [silk_decoder_state; 2],
-    pub sStereo: stereo_dec_state,
-    pub nChannelsAPI: i32,
-    pub nChannelsInternal: i32,
+    pub s_stereo: stereo_dec_state,
+    pub n_channels_api: i32,
+    pub n_channels_internal: i32,
     pub prev_decode_only_middle: bool,
     #[cfg(feature = "osce")]
     pub osce_model: crate::dnn::osce::OSCEModel,
@@ -67,9 +67,9 @@ pub struct silk_decoder {
 pub fn silk_init_decoder() -> silk_decoder {
     silk_decoder {
         channel_state: [silk_decoder_state_new(), silk_decoder_state_new()],
-        sStereo: stereo_dec_state::default(),
-        nChannelsAPI: 0,
-        nChannelsInternal: 0,
+        s_stereo: stereo_dec_state::default(),
+        n_channels_api: 0,
+        n_channels_internal: 0,
         prev_decode_only_middle: false,
         #[cfg(feature = "osce")]
         osce_model: crate::dnn::osce::OSCEModel::default(),
@@ -78,145 +78,145 @@ pub fn silk_init_decoder() -> silk_decoder {
 
 /// Reset decoder state without full reinitialization.
 ///
-/// Upstream C: silk/dec_API.c:silk_ResetDecoder
+/// Upstream c: silk/dec_API.c:silk_ResetDecoder
 pub fn silk_reset_decoder(dec: &mut silk_decoder) {
     for ch in dec.channel_state.iter_mut() {
         let _ = silk_reset_decoder_state(ch);
     }
-    dec.sStereo = stereo_dec_state::default();
+    dec.s_stereo = stereo_dec_state::default();
     dec.prev_decode_only_middle = false;
 }
 
-/// Upstream C: silk/dec_API.c:silk_Decode
+/// Upstream c: silk/dec_API.c:silk_Decode
 #[allow(clippy::too_many_arguments)]
 pub fn silk_decode(
-    decState: &mut silk_decoder,
-    decControl: &mut silk_DecControlStruct,
-    lostFlag: i32,
-    newPacketFlag: i32,
-    psRangeDec: &mut EcDec,
-    samplesOut: &mut [f32],
-    nSamplesOut: &mut i32,
+    dec_state: &mut silk_decoder,
+    dec_control: &mut silk_DecControlStruct,
+    lost_flag: i32,
+    new_packet_flag: i32,
+    ps_range_dec: &mut EcDec,
+    samples_out: &mut [f32],
+    n_samples_out: &mut i32,
     #[cfg(feature = "deep-plc")] mut lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     arch: Arch,
 ) -> i32 {
-    let mut i: i32;
+    let mut _i: i32;
     let mut n: i32;
     let mut decode_only_middle: bool = false;
     let mut ret: i32 = SILK_NO_ERROR;
-    let mut nSamplesOutDec: i32 = 0;
-    let mut LBRR_symbol: i32;
-    let mut MS_pred_Q13: [i32; 2] = [0, 0];
-    let psDec = decState;
-    let channel_state = &mut psDec.channel_state;
+    let mut n_samples_out_dec: i32 = 0;
+    let mut lbrr_symbol: i32;
+    let mut ms_pred_q13: [i32; 2] = [0, 0];
+    let ps_dec = dec_state;
+    let channel_state = &mut ps_dec.channel_state;
 
-    debug_assert!(decControl.nChannelsInternal == 1 || decControl.nChannelsInternal == 2);
-    if newPacketFlag != 0 {
+    debug_assert!(dec_control.n_channels_internal == 1 || dec_control.n_channels_internal == 2);
+    if new_packet_flag != 0 {
         n = 0;
-        while n < decControl.nChannelsInternal {
-            channel_state[n as usize].nFramesDecoded = 0;
+        while n < dec_control.n_channels_internal {
+            channel_state[n as usize].n_frames_decoded = 0;
             n += 1;
         }
     }
-    if decControl.nChannelsInternal > psDec.nChannelsInternal {
+    if dec_control.n_channels_internal > ps_dec.n_channels_internal {
         ret += silk_init_decoder_state(&mut channel_state[1]);
     }
-    let stereo_to_mono: i32 = (decControl.nChannelsInternal == 1
-        && psDec.nChannelsInternal == 2
-        && decControl.internalSampleRate == 1000 * (channel_state[0]).fs_kHz)
+    let stereo_to_mono: i32 = (dec_control.n_channels_internal == 1
+        && ps_dec.n_channels_internal == 2
+        && dec_control.internal_sample_rate == 1000 * (channel_state[0]).fs_k_hz)
         as i32;
-    if (channel_state[0]).nFramesDecoded == 0 {
+    if (channel_state[0]).n_frames_decoded == 0 {
         n = 0;
-        while n < decControl.nChannelsInternal {
-            if decControl.payloadSize_ms == 0 || decControl.payloadSize_ms == 10 {
-                channel_state[n as usize].nFramesPerPacket = 1;
+        while n < dec_control.n_channels_internal {
+            if dec_control.payload_size_ms == 0 || dec_control.payload_size_ms == 10 {
+                channel_state[n as usize].n_frames_per_packet = 1;
                 channel_state[n as usize].nb_subfr = 2;
-            } else if decControl.payloadSize_ms == 20 {
-                channel_state[n as usize].nFramesPerPacket = 1;
+            } else if dec_control.payload_size_ms == 20 {
+                channel_state[n as usize].n_frames_per_packet = 1;
                 channel_state[n as usize].nb_subfr = 4;
-            } else if decControl.payloadSize_ms == 40 {
-                channel_state[n as usize].nFramesPerPacket = 2;
+            } else if dec_control.payload_size_ms == 40 {
+                channel_state[n as usize].n_frames_per_packet = 2;
                 channel_state[n as usize].nb_subfr = 4;
-            } else if decControl.payloadSize_ms == 60 {
-                channel_state[n as usize].nFramesPerPacket = 3;
+            } else if dec_control.payload_size_ms == 60 {
+                channel_state[n as usize].n_frames_per_packet = 3;
                 channel_state[n as usize].nb_subfr = 4;
             } else {
                 return SILK_DEC_INVALID_FRAME_SIZE;
             }
-            let fs_kHz_dec: i32 = (decControl.internalSampleRate >> 10) + 1;
-            if fs_kHz_dec != 8 && fs_kHz_dec != 12 && fs_kHz_dec != 16 {
+            let fs_k_hz_dec: i32 = (dec_control.internal_sample_rate >> 10) + 1;
+            if fs_k_hz_dec != 8 && fs_k_hz_dec != 12 && fs_k_hz_dec != 16 {
                 return SILK_DEC_INVALID_SAMPLING_FREQUENCY;
             }
             ret += silk_decoder_set_fs(
                 &mut channel_state[n as usize],
-                fs_kHz_dec,
-                decControl.API_sampleRate,
+                fs_k_hz_dec,
+                dec_control.api_sample_rate,
             );
             n += 1;
         }
     }
-    if decControl.nChannelsAPI == 2
-        && decControl.nChannelsInternal == 2
-        && (psDec.nChannelsAPI == 1 || psDec.nChannelsInternal == 1)
+    if dec_control.n_channels_api == 2
+        && dec_control.n_channels_internal == 2
+        && (ps_dec.n_channels_api == 1 || ps_dec.n_channels_internal == 1)
     {
-        psDec.sStereo.pred_prev_Q13.fill(0);
-        psDec.sStereo.sSide.fill(0);
+        ps_dec.s_stereo.pred_prev_q13.fill(0);
+        ps_dec.s_stereo.s_side.fill(0);
         channel_state[1].resampler_state = channel_state[0].resampler_state;
     }
-    psDec.nChannelsAPI = decControl.nChannelsAPI as i32;
-    psDec.nChannelsInternal = decControl.nChannelsInternal;
-    if decControl.API_sampleRate > MAX_API_FS_KHZ * 1000 || decControl.API_sampleRate < 8000 {
+    ps_dec.n_channels_api = dec_control.n_channels_api as i32;
+    ps_dec.n_channels_internal = dec_control.n_channels_internal;
+    if dec_control.api_sample_rate > MAX_API_FS_KHZ * 1000 || dec_control.api_sample_rate < 8000 {
         ret = SILK_DEC_INVALID_SAMPLING_FREQUENCY;
         return ret;
     }
-    if lostFlag != FLAG_PACKET_LOST && (channel_state[0]).nFramesDecoded == 0 {
+    if lost_flag != FLAG_PACKET_LOST && (channel_state[0]).n_frames_decoded == 0 {
         n = 0;
-        while n < decControl.nChannelsInternal {
-            i = 0;
-            while i < channel_state[n as usize].nFramesPerPacket {
-                channel_state[n as usize].VAD_flags[i as usize] = ec_dec_bit_logp(psRangeDec, 1);
-                i += 1;
+        while n < dec_control.n_channels_internal {
+            _i = 0;
+            while _i < channel_state[n as usize].n_frames_per_packet {
+                channel_state[n as usize].vad_flags[_i as usize] = ec_dec_bit_logp(ps_range_dec, 1);
+                _i += 1;
             }
-            channel_state[n as usize].LBRR_flag = ec_dec_bit_logp(psRangeDec, 1);
+            channel_state[n as usize].lbrr_flag = ec_dec_bit_logp(ps_range_dec, 1);
             n += 1;
         }
         n = 0;
-        while n < decControl.nChannelsInternal {
-            channel_state[n as usize].LBRR_flags.fill(0);
-            if channel_state[n as usize].LBRR_flag != 0 {
-                if channel_state[n as usize].nFramesPerPacket == 1 {
-                    channel_state[n as usize].LBRR_flags[0] = 1;
+        while n < dec_control.n_channels_internal {
+            channel_state[n as usize].lbrr_flags.fill(0);
+            if channel_state[n as usize].lbrr_flag != 0 {
+                if channel_state[n as usize].n_frames_per_packet == 1 {
+                    channel_state[n as usize].lbrr_flags[0] = 1;
                 } else {
-                    LBRR_symbol = ec_dec_icdf(
-                        psRangeDec,
+                    lbrr_symbol = ec_dec_icdf(
+                        ps_range_dec,
                         SILK_LBRR_FLAGS_ICDF_PTR
-                            [(channel_state[n as usize].nFramesPerPacket - 2) as usize],
+                            [(channel_state[n as usize].n_frames_per_packet - 2) as usize],
                         8,
                     ) + 1;
-                    i = 0;
-                    while i < channel_state[n as usize].nFramesPerPacket {
-                        channel_state[n as usize].LBRR_flags[i as usize] = LBRR_symbol >> i & 1;
-                        i += 1;
+                    _i = 0;
+                    while _i < channel_state[n as usize].n_frames_per_packet {
+                        channel_state[n as usize].lbrr_flags[_i as usize] = lbrr_symbol >> _i & 1;
+                        _i += 1;
                     }
                 }
             }
             n += 1;
         }
-        if lostFlag == FLAG_DECODE_NORMAL {
-            i = 0;
-            while i < channel_state[0].nFramesPerPacket {
+        if lost_flag == FLAG_DECODE_NORMAL {
+            _i = 0;
+            while _i < channel_state[0].n_frames_per_packet {
                 n = 0;
-                while n < decControl.nChannelsInternal {
-                    if channel_state[n as usize].LBRR_flags[i as usize] != 0 {
+                while n < dec_control.n_channels_internal {
+                    if channel_state[n as usize].lbrr_flags[_i as usize] != 0 {
                         let mut pulses: [i16; 320] = [0; 320];
-                        if decControl.nChannelsInternal == 2 && n == 0 {
-                            silk_stereo_decode_pred(psRangeDec, &mut MS_pred_Q13);
-                            if channel_state[1].LBRR_flags[i as usize] == 0 {
-                                silk_stereo_decode_mid_only(psRangeDec, &mut decode_only_middle);
+                        if dec_control.n_channels_internal == 2 && n == 0 {
+                            silk_stereo_decode_pred(ps_range_dec, &mut ms_pred_q13);
+                            if channel_state[1].lbrr_flags[_i as usize] == 0 {
+                                silk_stereo_decode_mid_only(ps_range_dec, &mut decode_only_middle);
                             }
                         }
-                        let condCoding: i32 = if i > 0
-                            && channel_state[n as usize].LBRR_flags[(i - 1) as usize] != 0
+                        let cond_coding: i32 = if _i > 0
+                            && channel_state[n as usize].lbrr_flags[(_i - 1) as usize] != 0
                         {
                             CODE_CONDITIONALLY
                         } else {
@@ -224,10 +224,10 @@ pub fn silk_decode(
                         };
                         silk_decode_indices(
                             &mut channel_state[n as usize],
-                            psRangeDec,
-                            i,
+                            ps_range_dec,
+                            _i,
                             1,
-                            condCoding,
+                            cond_coding,
                         );
 
                         let frame_length = channel_state[n as usize].frame_length;
@@ -239,47 +239,48 @@ pub fn silk_decode(
                         let frame_buffer_length = shell_frames * SHELL_CODEC_FRAME_LENGTH;
 
                         silk_decode_pulses(
-                            psRangeDec,
+                            ps_range_dec,
                             &mut pulses[..frame_buffer_length],
-                            channel_state[n as usize].indices.signalType as i32,
-                            channel_state[n as usize].indices.quantOffsetType as i32,
+                            channel_state[n as usize].indices.signal_type as i32,
+                            channel_state[n as usize].indices.quant_offset_type as i32,
                         );
                     }
                     n += 1;
                 }
-                i += 1;
+                _i += 1;
             }
         }
     }
-    if decControl.nChannelsInternal == 2 {
-        if lostFlag == FLAG_DECODE_NORMAL
-            || lostFlag == FLAG_DECODE_LBRR
-                && channel_state[0].LBRR_flags[channel_state[0].nFramesDecoded as usize] == 1
+    if dec_control.n_channels_internal == 2 {
+        if lost_flag == FLAG_DECODE_NORMAL
+            || lost_flag == FLAG_DECODE_LBRR
+                && channel_state[0].lbrr_flags[channel_state[0].n_frames_decoded as usize] == 1
         {
-            silk_stereo_decode_pred(psRangeDec, &mut MS_pred_Q13);
-            if lostFlag == FLAG_DECODE_NORMAL
-                && channel_state[1].VAD_flags[channel_state[0].nFramesDecoded as usize] == 0
-                || lostFlag == FLAG_DECODE_LBRR
-                    && channel_state[1].LBRR_flags[channel_state[0].nFramesDecoded as usize] == 0
+            silk_stereo_decode_pred(ps_range_dec, &mut ms_pred_q13);
+            if lost_flag == FLAG_DECODE_NORMAL
+                && channel_state[1].vad_flags[channel_state[0].n_frames_decoded as usize] == 0
+                || lost_flag == FLAG_DECODE_LBRR
+                    && channel_state[1].lbrr_flags[channel_state[0].n_frames_decoded as usize] == 0
             {
-                silk_stereo_decode_mid_only(psRangeDec, &mut decode_only_middle);
+                silk_stereo_decode_mid_only(ps_range_dec, &mut decode_only_middle);
             } else {
                 decode_only_middle = false;
             }
         } else {
             n = 0;
             while n < 2 {
-                MS_pred_Q13[n as usize] = psDec.sStereo.pred_prev_Q13[n as usize] as i32;
+                ms_pred_q13[n as usize] = ps_dec.s_stereo.pred_prev_q13[n as usize] as i32;
                 n += 1;
             }
         }
     }
-    if decControl.nChannelsInternal == 2 && !decode_only_middle && psDec.prev_decode_only_middle {
-        channel_state[1].outBuf.fill(0);
-        channel_state[1].sLPC_Q14_buf.fill(0);
-        channel_state[1].lagPrev = 100;
-        channel_state[1].LastGainIndex = 10;
-        channel_state[1].prevSignalType = TYPE_NO_VOICE_ACTIVITY;
+    if dec_control.n_channels_internal == 2 && !decode_only_middle && ps_dec.prev_decode_only_middle
+    {
+        channel_state[1].out_buf.fill(0);
+        channel_state[1].s_lpc_q14_buf.fill(0);
+        channel_state[1].lag_prev = 100;
+        channel_state[1].last_gain_index = 10;
+        channel_state[1].prev_signal_type = TYPE_NO_VOICE_ACTIVITY;
         channel_state[1].first_frame_after_reset = 1;
     }
 
@@ -287,54 +288,54 @@ pub fn silk_decode(
     // The first 2 elements are stereo prediction state, decoded samples start at offset 2.
     let frame_len = channel_state[0].frame_length;
     let ch_buf_len = frame_len + 2;
-    let _nChannelsInt = decControl.nChannelsInternal;
+    let _n_channels_int = dec_control.n_channels_internal;
 
-    // Always allocate the temp storage (simplifies logic vs. the C "delay_stack_alloc" trick)
+    // Always allocate the temp storage (simplifies logic vs. the c "delay_stack_alloc" trick)
     // Max: 2 channels * (320 frame + 2 stereo state) = 644
-    let mut samplesOut1_tmp_storage = [0i16; 2 * (MAX_FRAME_LENGTH + 2)];
+    let mut samples_out1_tmp_storage = [0i16; 2 * (MAX_FRAME_LENGTH + 2)];
 
-    // Channel offsets into samplesOut1_tmp_storage
+    // Channel offsets into samples_out1_tmp_storage
     let ch0_off: usize = 0;
     let ch1_off: usize = ch_buf_len;
 
-    let has_side: i32 = if lostFlag == FLAG_DECODE_NORMAL {
+    let has_side: i32 = if lost_flag == FLAG_DECODE_NORMAL {
         (!decode_only_middle) as i32
     } else {
-        (!psDec.prev_decode_only_middle
-            || decControl.nChannelsInternal == 2
-                && lostFlag == FLAG_DECODE_LBRR
-                && channel_state[1].LBRR_flags[channel_state[1].nFramesDecoded as usize] == 1)
+        (!ps_dec.prev_decode_only_middle
+            || dec_control.n_channels_internal == 2
+                && lost_flag == FLAG_DECODE_LBRR
+                && channel_state[1].lbrr_flags[channel_state[1].n_frames_decoded as usize] == 1)
             as i32
     };
     n = 0;
-    while n < decControl.nChannelsInternal {
+    while n < dec_control.n_channels_internal {
         if n == 0 || has_side != 0 {
-            let condCoding_0: i32;
-            let FrameIndex: i32 = channel_state[0].nFramesDecoded - n;
-            if FrameIndex <= 0 {
-                condCoding_0 = CODE_INDEPENDENTLY;
-            } else if lostFlag == FLAG_DECODE_LBRR {
-                condCoding_0 =
-                    if channel_state[n as usize].LBRR_flags[(FrameIndex - 1) as usize] != 0 {
+            let cond_coding_0: i32;
+            let frame_index: i32 = channel_state[0].n_frames_decoded - n;
+            if frame_index <= 0 {
+                cond_coding_0 = CODE_INDEPENDENTLY;
+            } else if lost_flag == FLAG_DECODE_LBRR {
+                cond_coding_0 =
+                    if channel_state[n as usize].lbrr_flags[(frame_index - 1) as usize] != 0 {
                         CODE_CONDITIONALLY
                     } else {
                         CODE_INDEPENDENTLY
                     };
-            } else if n > 0 && psDec.prev_decode_only_middle {
-                condCoding_0 = CODE_INDEPENDENTLY_NO_LTP_SCALING;
+            } else if n > 0 && ps_dec.prev_decode_only_middle {
+                cond_coding_0 = CODE_INDEPENDENTLY_NO_LTP_SCALING;
             } else {
-                condCoding_0 = CODE_CONDITIONALLY;
+                cond_coding_0 = CODE_CONDITIONALLY;
             }
             let ch_off = if n == 0 { ch0_off } else { ch1_off };
-            let out_slice = &mut samplesOut1_tmp_storage[ch_off + 2..ch_off + 2 + frame_len];
+            let out_slice = &mut samples_out1_tmp_storage[ch_off + 2..ch_off + 2 + frame_len];
 
             // Reset OSCE state if method changed
             #[cfg(feature = "osce")]
             {
-                if channel_state[n as usize].osce.method != decControl.osce_method {
+                if channel_state[n as usize].osce.method != dec_control.osce_method {
                     crate::dnn::osce::osce_reset(
                         &mut channel_state[n as usize].osce,
-                        decControl.osce_method,
+                        dec_control.osce_method,
                     );
                 }
             }
@@ -345,68 +346,69 @@ pub fn silk_decode(
 
             let (err, n_out) = silk_decode_frame(
                 &mut channel_state[n as usize],
-                psRangeDec,
+                ps_range_dec,
                 out_slice,
-                lostFlag,
-                condCoding_0,
+                lost_flag,
+                cond_coding_0,
                 #[cfg(feature = "deep-plc")]
                 lpcnet_ch,
                 #[cfg(feature = "osce")]
-                &psDec.osce_model,
+                &ps_dec.osce_model,
                 arch,
             );
             ret += err;
-            nSamplesOutDec = n_out;
+            n_samples_out_dec = n_out;
         } else {
             let ch_off = if n == 0 { ch0_off } else { ch1_off };
-            samplesOut1_tmp_storage[ch_off + 2..ch_off + 2 + nSamplesOutDec as usize].fill(0);
+            samples_out1_tmp_storage[ch_off + 2..ch_off + 2 + n_samples_out_dec as usize].fill(0);
         }
-        channel_state[n as usize].nFramesDecoded += 1;
+        channel_state[n as usize].n_frames_decoded += 1;
         n += 1;
     }
 
-    if decControl.nChannelsAPI == 2 && decControl.nChannelsInternal == 2 {
-        let (ch0_slice, ch1_slice) = samplesOut1_tmp_storage.split_at_mut(ch1_off);
+    if dec_control.n_channels_api == 2 && dec_control.n_channels_internal == 2 {
+        let (ch0_slice, ch1_slice) = samples_out1_tmp_storage.split_at_mut(ch1_off);
         silk_stereo_ms_to_lr(
-            &mut psDec.sStereo,
-            &mut ch0_slice[ch0_off..ch0_off + nSamplesOutDec as usize + 2],
-            &mut ch1_slice[..nSamplesOutDec as usize + 2],
-            &MS_pred_Q13,
-            channel_state[0].fs_kHz as usize,
-            nSamplesOutDec,
+            &mut ps_dec.s_stereo,
+            &mut ch0_slice[ch0_off..ch0_off + n_samples_out_dec as usize + 2],
+            &mut ch1_slice[..n_samples_out_dec as usize + 2],
+            &ms_pred_q13,
+            channel_state[0].fs_k_hz as usize,
+            n_samples_out_dec,
         );
     } else {
-        // Copy sMid[0..2] to beginning of channel 0 buffer
-        samplesOut1_tmp_storage[ch0_off] = psDec.sStereo.sMid[0];
-        samplesOut1_tmp_storage[ch0_off + 1] = psDec.sStereo.sMid[1];
-        // Save last 2 samples back to sMid
-        psDec.sStereo.sMid[0] = samplesOut1_tmp_storage[ch0_off + nSamplesOutDec as usize];
-        psDec.sStereo.sMid[1] = samplesOut1_tmp_storage[ch0_off + nSamplesOutDec as usize + 1];
+        // Copy s_mid[0..2] to beginning of channel 0 buffer
+        samples_out1_tmp_storage[ch0_off] = ps_dec.s_stereo.s_mid[0];
+        samples_out1_tmp_storage[ch0_off + 1] = ps_dec.s_stereo.s_mid[1];
+        // Save last 2 samples back to s_mid
+        ps_dec.s_stereo.s_mid[0] = samples_out1_tmp_storage[ch0_off + n_samples_out_dec as usize];
+        ps_dec.s_stereo.s_mid[1] =
+            samples_out1_tmp_storage[ch0_off + n_samples_out_dec as usize + 1];
     }
 
-    *nSamplesOut =
-        nSamplesOutDec * decControl.API_sampleRate / (channel_state[0].fs_kHz as i16 as i32 * 1000);
+    *n_samples_out = n_samples_out_dec * dec_control.api_sample_rate
+        / (channel_state[0].fs_k_hz as i16 as i32 * 1000);
 
     // Max: API rate 48kHz, 20ms frame = 960 samples
-    let mut samplesOut2_tmp = [0i16; 960];
+    let mut samples_out2_tmp = [0i16; 960];
 
     #[cfg(feature = "osce")]
     let mut resamp_buffer = [0i16; 3 * MAX_FRAME_LENGTH];
 
     n = 0;
     while n
-        < (if (decControl.nChannelsAPI as i32) < decControl.nChannelsInternal {
-            decControl.nChannelsAPI as i32
+        < (if (dec_control.n_channels_api as i32) < dec_control.n_channels_internal {
+            dec_control.n_channels_api as i32
         } else {
-            decControl.nChannelsInternal
+            dec_control.n_channels_internal
         })
     {
         let ch_off = if n == 0 { ch0_off } else { ch1_off };
         let resample_input =
-            &samplesOut1_tmp_storage[ch_off + 1..ch_off + 1 + nSamplesOutDec as usize];
+            &samples_out1_tmp_storage[ch_off + 1..ch_off + 1 + n_samples_out_dec as usize];
 
-        // Always resample into temp buffer, then convert int16→float into samplesOut
-        let resample_out: &mut [i16] = &mut samplesOut2_tmp;
+        // Always resample into temp buffer, then convert int16→float into samples_out
+        let resample_out: &mut [i16] = &mut samples_out2_tmp;
 
         #[cfg(feature = "osce")]
         {
@@ -415,22 +417,22 @@ pub fn silk_decode(
                 OSCE_MODE_SILK_BBWE, OSCE_MODE_SILK_ONLY,
             };
 
-            if decControl.osce_extended_mode == OSCE_MODE_SILK_BBWE {
-                if decControl.prev_osce_extended_mode != OSCE_MODE_SILK_BBWE {
+            if dec_control.osce_extended_mode == OSCE_MODE_SILK_BBWE {
+                if dec_control.prev_osce_extended_mode != OSCE_MODE_SILK_BBWE {
                     osce_bwe_reset(&mut channel_state[n as usize].osce_bwe);
                 }
 
                 osce_bwe(
-                    &psDec.osce_model,
+                    &ps_dec.osce_model,
                     &mut channel_state[n as usize].osce_bwe,
                     resample_out,
                     resample_input,
-                    nSamplesOutDec as usize,
+                    n_samples_out_dec as usize,
                     arch,
                 );
 
-                if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_ONLY
-                    || decControl.prev_osce_extended_mode == OSCE_MODE_HYBRID
+                if dec_control.prev_osce_extended_mode == OSCE_MODE_SILK_ONLY
+                    || dec_control.prev_osce_extended_mode == OSCE_MODE_HYBRID
                 {
                     // Cross-fade with upsampled signal
                     silk_resampler(
@@ -446,16 +448,16 @@ pub fn silk_decode(
                     resample_out,
                     resample_input,
                 );
-                if decControl.prev_osce_extended_mode == OSCE_MODE_SILK_BBWE
-                    && decControl.internalSampleRate == 16000
+                if dec_control.prev_osce_extended_mode == OSCE_MODE_SILK_BBWE
+                    && dec_control.internal_sample_rate == 16000
                 {
                     // Fade out: run BWE into temp buffer and crossfade
                     osce_bwe(
-                        &psDec.osce_model,
+                        &ps_dec.osce_model,
                         &mut channel_state[n as usize].osce_bwe,
                         &mut resamp_buffer,
                         resample_input,
-                        nSamplesOutDec as usize,
+                        n_samples_out_dec as usize,
                         arch,
                     );
                     osce_bwe_cross_fade_10ms(resample_out, &resamp_buffer, 480);
@@ -473,18 +475,18 @@ pub fn silk_decode(
         }
 
         // Interleave if stereo output, or copy for mono; convert int16→float
-        if decControl.nChannelsAPI == 2 {
-            i = 0;
-            while i < *nSamplesOut {
-                samplesOut[(n + 2 * i) as usize] =
-                    samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
-                i += 1;
+        if dec_control.n_channels_api == 2 {
+            _i = 0;
+            while _i < *n_samples_out {
+                samples_out[(n + 2 * _i) as usize] =
+                    samples_out2_tmp[_i as usize] as f32 * (1.0 / 32768.0);
+                _i += 1;
             }
         } else {
-            i = 0;
-            while i < *nSamplesOut {
-                samplesOut[i as usize] = samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
-                i += 1;
+            _i = 0;
+            while _i < *n_samples_out {
+                samples_out[_i as usize] = samples_out2_tmp[_i as usize] as f32 * (1.0 / 32768.0);
+                _i += 1;
             }
         }
         n += 1;
@@ -492,50 +494,50 @@ pub fn silk_decode(
 
     #[cfg(feature = "osce")]
     {
-        decControl.prev_osce_extended_mode = decControl.osce_extended_mode;
+        dec_control.prev_osce_extended_mode = dec_control.osce_extended_mode;
     }
 
     // Create two channel output from mono stream
-    if decControl.nChannelsAPI == 2 && decControl.nChannelsInternal == 1 {
+    if dec_control.n_channels_api == 2 && dec_control.n_channels_internal == 1 {
         if stereo_to_mono != 0 {
             let resample_input =
-                &samplesOut1_tmp_storage[ch0_off + 1..ch0_off + 1 + nSamplesOutDec as usize];
+                &samples_out1_tmp_storage[ch0_off + 1..ch0_off + 1 + n_samples_out_dec as usize];
             ret += silk_resampler(
                 &mut channel_state[1].resampler_state,
-                &mut samplesOut2_tmp,
+                &mut samples_out2_tmp,
                 resample_input,
             );
-            i = 0;
-            while i < *nSamplesOut {
-                samplesOut[(1 + 2 * i) as usize] =
-                    samplesOut2_tmp[i as usize] as f32 * (1.0 / 32768.0);
-                i += 1;
+            _i = 0;
+            while _i < *n_samples_out {
+                samples_out[(1 + 2 * _i) as usize] =
+                    samples_out2_tmp[_i as usize] as f32 * (1.0 / 32768.0);
+                _i += 1;
             }
         } else {
-            i = 0;
-            while i < *nSamplesOut {
-                samplesOut[(1 + 2 * i) as usize] = samplesOut[(2 * i) as usize];
-                i += 1;
+            _i = 0;
+            while _i < *n_samples_out {
+                samples_out[(1 + 2 * _i) as usize] = samples_out[(2 * _i) as usize];
+                _i += 1;
             }
         }
     }
 
-    if channel_state[0].prevSignalType == TYPE_VOICED {
+    if channel_state[0].prev_signal_type == TYPE_VOICED {
         let mult_tab: [i32; 3] = [6, 4, 3];
-        decControl.prevPitchLag =
-            channel_state[0].lagPrev * mult_tab[((channel_state[0].fs_kHz - 8) >> 2) as usize];
+        dec_control.prev_pitch_lag =
+            channel_state[0].lag_prev * mult_tab[((channel_state[0].fs_k_hz - 8) >> 2) as usize];
     } else {
-        decControl.prevPitchLag = 0;
+        dec_control.prev_pitch_lag = 0;
     }
 
-    if lostFlag == FLAG_PACKET_LOST {
-        i = 0;
-        while i < psDec.nChannelsInternal {
-            psDec.channel_state[i as usize].LastGainIndex = 10;
-            i += 1;
+    if lost_flag == FLAG_PACKET_LOST {
+        _i = 0;
+        while _i < ps_dec.n_channels_internal {
+            ps_dec.channel_state[_i as usize].last_gain_index = 10;
+            _i += 1;
         }
     } else {
-        psDec.prev_decode_only_middle = decode_only_middle;
+        ps_dec.prev_decode_only_middle = decode_only_middle;
     }
     ret
 }
@@ -548,12 +550,12 @@ mod tests {
 
     fn baseline_control() -> silk_DecControlStruct {
         silk_DecControlStruct {
-            nChannelsAPI: 1,
-            nChannelsInternal: 1,
-            API_sampleRate: 16_000,
-            internalSampleRate: 16_000,
-            payloadSize_ms: 20,
-            prevPitchLag: 0,
+            n_channels_api: 1,
+            n_channels_internal: 1,
+            api_sample_rate: 16_000,
+            internal_sample_rate: 16_000,
+            payload_size_ms: 20,
+            prev_pitch_lag: 0,
             enable_deep_plc: false,
             #[cfg(feature = "osce")]
             osce_method: 0,
@@ -608,7 +610,7 @@ mod tests {
         let mut dec = silk_init_decoder();
         let mut ctrl = baseline_control();
         let mut out = [0.0f32; 960];
-        ctrl.payloadSize_ms = 15;
+        ctrl.payload_size_ms = 15;
         let ret = decode_once(&mut dec, &mut ctrl, &mut out);
         assert_eq!(ret, SILK_DEC_INVALID_FRAME_SIZE);
     }
@@ -618,7 +620,7 @@ mod tests {
         let mut dec = silk_init_decoder();
         let mut ctrl = baseline_control();
         let mut out = [0.0f32; 960];
-        ctrl.internalSampleRate = 44_100;
+        ctrl.internal_sample_rate = 44_100;
         let ret = decode_once(&mut dec, &mut ctrl, &mut out);
         assert_eq!(ret, SILK_DEC_INVALID_SAMPLING_FREQUENCY);
     }

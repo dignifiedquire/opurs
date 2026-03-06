@@ -57,7 +57,7 @@ impl TestRng {
 }
 
 // ---------------------------------------------------------------------------
-// Seed management
+// seed management
 // ---------------------------------------------------------------------------
 
 /// Get test seed from `TEST_SEED` environment variable, or generate a random

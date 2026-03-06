@@ -195,21 +195,21 @@ impl OpusEncoder {
         if ret != 0 {
             return Err(OPUS_INTERNAL_ERROR);
         }
-        silk_mode.nChannelsAPI = channels;
-        silk_mode.nChannelsInternal = channels;
-        silk_mode.API_sampleRate = fs;
-        silk_mode.maxInternalSampleRate = 16000;
-        silk_mode.minInternalSampleRate = 8000;
-        silk_mode.desiredInternalSampleRate = 16000;
-        silk_mode.payloadSize_ms = 20;
-        silk_mode.bitRate = 25000;
-        silk_mode.packetLossPercentage = 0;
+        silk_mode.n_channels_api = channels;
+        silk_mode.n_channels_internal = channels;
+        silk_mode.api_sample_rate = fs;
+        silk_mode.max_internal_sample_rate = 16000;
+        silk_mode.min_internal_sample_rate = 8000;
+        silk_mode.desired_internal_sample_rate = 16000;
+        silk_mode.payload_size_ms = 20;
+        silk_mode.bit_rate = 25000;
+        silk_mode.packet_loss_percentage = 0;
         silk_mode.complexity = 9;
-        silk_mode.useInBandFEC = 0;
-        silk_mode.useDRED = 0;
-        silk_mode.useDTX = 0;
-        silk_mode.useCBR = 0;
-        silk_mode.reducedDependency = 0;
+        silk_mode.use_in_band_fec = 0;
+        silk_mode.use_dred = 0;
+        silk_mode.use_dtx = 0;
+        silk_mode.use_cbr = 0;
+        silk_mode.reduced_dependency = 0;
 
         // Build CELT encoder state
         let mut celt_enc = OpusCustomEncoder::new(fs, channels, arch)?;
@@ -442,14 +442,14 @@ impl OpusEncoder {
             Some(b) => {
                 let v: i32 = b.into();
                 match b {
-                    Bandwidth::Narrowband => self.silk_mode.maxInternalSampleRate = 8000,
-                    Bandwidth::Mediumband => self.silk_mode.maxInternalSampleRate = 12000,
-                    _ => self.silk_mode.maxInternalSampleRate = 16000,
+                    Bandwidth::Narrowband => self.silk_mode.max_internal_sample_rate = 8000,
+                    Bandwidth::Mediumband => self.silk_mode.max_internal_sample_rate = 12000,
+                    _ => self.silk_mode.max_internal_sample_rate = 16000,
                 }
                 v
             }
             None => {
-                self.silk_mode.maxInternalSampleRate = 16000;
+                self.silk_mode.max_internal_sample_rate = 16000;
                 OPUS_AUTO
             }
         };
@@ -505,9 +505,9 @@ impl OpusEncoder {
     pub fn set_max_bandwidth(&mut self, bw: Bandwidth) {
         self.max_bandwidth = bw.into();
         match bw {
-            Bandwidth::Narrowband => self.silk_mode.maxInternalSampleRate = 8000,
-            Bandwidth::Mediumband => self.silk_mode.maxInternalSampleRate = 12000,
-            _ => self.silk_mode.maxInternalSampleRate = 16000,
+            Bandwidth::Narrowband => self.silk_mode.max_internal_sample_rate = 8000,
+            Bandwidth::Mediumband => self.silk_mode.max_internal_sample_rate = 12000,
+            _ => self.silk_mode.max_internal_sample_rate = 16000,
         }
     }
 
@@ -519,7 +519,7 @@ impl OpusEncoder {
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_vbr(&mut self, enabled: bool) {
         self.use_vbr = enabled as i32;
-        self.silk_mode.useCBR = (!enabled) as i32;
+        self.silk_mode.use_cbr = (!enabled) as i32;
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
@@ -568,7 +568,7 @@ impl OpusEncoder {
             return Err(OPUS_BAD_ARG);
         }
         self.fec_config = value;
-        self.silk_mode.useInBandFEC = (value != 0) as i32;
+        self.silk_mode.use_in_band_fec = (value != 0) as i32;
         Ok(())
     }
 
@@ -582,14 +582,14 @@ impl OpusEncoder {
         if !(0..=100).contains(&pct) {
             return Err(OPUS_BAD_ARG);
         }
-        self.silk_mode.packetLossPercentage = pct;
+        self.silk_mode.packet_loss_percentage = pct;
         self.celt_enc.loss_rate = pct;
         Ok(())
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn packet_loss_perc(&self) -> i32 {
-        self.silk_mode.packetLossPercentage
+        self.silk_mode.packet_loss_percentage
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
@@ -628,12 +628,12 @@ impl OpusEncoder {
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn set_prediction_disabled(&mut self, disabled: bool) {
-        self.silk_mode.reducedDependency = disabled as i32;
+        self.silk_mode.reduced_dependency = disabled as i32;
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn prediction_disabled(&self) -> bool {
-        self.silk_mode.reducedDependency != 0
+        self.silk_mode.reduced_dependency != 0
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
@@ -703,16 +703,16 @@ impl OpusEncoder {
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn in_dtx(&self) -> bool {
-        if self.silk_mode.useDTX != 0
+        if self.silk_mode.use_dtx != 0
             && (self.prev_mode == MODE_SILK_ONLY || self.prev_mode == MODE_HYBRID)
         {
             let silk_enc = &self.silk_enc;
-            if silk_enc.state_Fxx[0].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX {
+            if silk_enc.state_fxx[0].s_cmn.no_speech_counter < NB_SPEECH_FRAMES_BEFORE_DTX {
                 return false;
             }
-            if self.silk_mode.nChannelsInternal == 2
+            if self.silk_mode.n_channels_internal == 2
                 && silk_enc.prev_decode_only_middle == 0
-                && silk_enc.state_Fxx[1].sCmn.noSpeechCounter < NB_SPEECH_FRAMES_BEFORE_DTX
+                && silk_enc.state_fxx[1].s_cmn.no_speech_counter < NB_SPEECH_FRAMES_BEFORE_DTX
             {
                 return false;
             }
@@ -733,7 +733,7 @@ impl OpusEncoder {
             return Err(OPUS_BAD_ARG);
         }
         self.dred_duration = value;
-        self.silk_mode.useDRED = if value != 0 { 1 } else { 0 };
+        self.silk_mode.use_dred = if value != 0 { 1 } else { 0 };
         Ok(())
     }
 
@@ -1527,7 +1527,7 @@ fn encode_multiframe_packet(
     st.multiframe_fixed_celt_to_silk = celt_to_silk;
     st.multiframe_frame_redundancy = 0;
     st.multiframe_frame_to_celt = 0;
-    let bak_to_mono = st.silk_mode.toMono;
+    let bak_to_mono = st.silk_mode.to_mono;
     if bak_to_mono != 0 {
         st.force_channels = 1;
     } else {
@@ -1551,7 +1551,7 @@ fn encode_multiframe_packet(
             return OPUS_INTERNAL_ERROR;
         }
 
-        st.silk_mode.toMono = 0;
+        st.silk_mode.to_mono = 0;
         st.nonfinal_frame = (i < nb_frames - 1) as i32;
         let frame_to_celt = (to_celt != 0 && i == nb_frames - 1) as i32;
         let frame_redundancy =
@@ -1623,7 +1623,7 @@ fn encode_multiframe_packet(
     // Discard configs that were forced locally for the purpose of repacketization
     st.user_forced_mode = bak_mode;
     st.user_bandwidth = bak_bandwidth;
-    st.silk_mode.toMono = bak_to_mono;
+    st.silk_mode.to_mono = bak_to_mono;
     st.multiframe_fixed_bitrate_bps = bak_fixed_bitrate_bps;
     st.multiframe_fixed_bitrate_valid = bak_fixed_bitrate_valid;
     st.multiframe_fixed_mode = bak_fixed_mode;
@@ -1739,14 +1739,14 @@ fn compute_dred_bitrate(st: &mut OpusEncoder, bitrate_bps: i32, frame_size: i32)
     let bitrate_offset: i32;
     let mut dred_frac: f32;
 
-    if st.silk_mode.useInBandFEC != 0 {
-        dred_frac = (0.7f32).min(3.0 * st.silk_mode.packetLossPercentage as f32 / 100.0);
+    if st.silk_mode.use_in_band_fec != 0 {
+        dred_frac = (0.7f32).min(3.0 * st.silk_mode.packet_loss_percentage as f32 / 100.0);
         bitrate_offset = 20000;
     } else {
-        if st.silk_mode.packetLossPercentage > 5 {
-            dred_frac = (0.8f32).min(0.55 + st.silk_mode.packetLossPercentage as f32 / 100.0);
+        if st.silk_mode.packet_loss_percentage > 5 {
+            dred_frac = (0.8f32).min(0.55 + st.silk_mode.packet_loss_percentage as f32 / 100.0);
         } else {
-            dred_frac = 12.0 * st.silk_mode.packetLossPercentage as f32 / 100.0;
+            dred_frac = 12.0 * st.silk_mode.packet_loss_percentage as f32 / 100.0;
         }
         bitrate_offset = 12000;
     }
@@ -1899,31 +1899,31 @@ fn encode_low_bitrate_frame(
 #[inline(never)]
 fn init_silk_after_celt(st: &mut OpusEncoder) {
     let mut dummy: silk_EncControlStruct = silk_EncControlStruct {
-        nChannelsAPI: 0,
-        nChannelsInternal: 0,
-        API_sampleRate: 0,
-        maxInternalSampleRate: 0,
-        minInternalSampleRate: 0,
-        desiredInternalSampleRate: 0,
-        payloadSize_ms: 0,
-        bitRate: 0,
-        packetLossPercentage: 0,
+        n_channels_api: 0,
+        n_channels_internal: 0,
+        api_sample_rate: 0,
+        max_internal_sample_rate: 0,
+        min_internal_sample_rate: 0,
+        desired_internal_sample_rate: 0,
+        payload_size_ms: 0,
+        bit_rate: 0,
+        packet_loss_percentage: 0,
         complexity: 0,
-        useInBandFEC: 0,
-        useDRED: 0,
-        LBRR_coded: 0,
-        useDTX: 0,
-        useCBR: 0,
-        maxBits: 0,
-        toMono: 0,
-        opusCanSwitch: 0,
-        reducedDependency: 0,
-        internalSampleRate: 0,
-        allowBandwidthSwitch: 0,
-        inWBmodeWithoutVariableLP: 0,
-        stereoWidth_Q14: 0,
-        switchReady: 0,
-        signalType: 0,
+        use_in_band_fec: 0,
+        use_dred: 0,
+        lbrr_coded: 0,
+        use_dtx: 0,
+        use_cbr: 0,
+        max_bits: 0,
+        to_mono: 0,
+        opus_can_switch: 0,
+        reduced_dependency: 0,
+        internal_sample_rate: 0,
+        allow_bandwidth_switch: 0,
+        in_wbmode_without_variable_lp: 0,
+        stereo_width_q14: 0,
+        switch_ready: 0,
+        signal_type: 0,
         offset: 0,
     };
     silk_init_encoder_api(&mut st.silk_enc, st.arch, &mut dummy);
@@ -2288,7 +2288,7 @@ pub fn opus_encode_native(
             st.use_vbr,
             0,
             st.silk_mode.complexity,
-            st.silk_mode.packetLossPercentage,
+            st.silk_mode.packet_loss_percentage,
         );
         if st.signal_type == OPUS_SIGNAL_VOICE {
             voice_est = 127;
@@ -2326,9 +2326,9 @@ pub fn opus_encode_native(
             st.use_vbr,
             0,
             st.silk_mode.complexity,
-            st.silk_mode.packetLossPercentage,
+            st.silk_mode.packet_loss_percentage,
         );
-        st.silk_mode.useDTX =
+        st.silk_mode.use_dtx =
             (st.use_dtx != 0 && !(analysis_info.valid != 0 || is_silence != 0)) as i32;
         if st.application == OPUS_APPLICATION_RESTRICTED_SILK {
             st.mode = MODE_SILK_ONLY;
@@ -2358,13 +2358,13 @@ pub fn opus_encode_native(
             } else {
                 MODE_SILK_ONLY
             };
-            if st.silk_mode.useInBandFEC != 0
-                && st.silk_mode.packetLossPercentage > (128 - voice_est) >> 4
+            if st.silk_mode.use_in_band_fec != 0
+                && st.silk_mode.packet_loss_percentage > (128 - voice_est) >> 4
                 && (st.fec_config != 2 || voice_est > 25)
             {
                 st.mode = MODE_SILK_ONLY;
             }
-            if st.silk_mode.useDTX != 0 && voice_est > 100 {
+            if st.silk_mode.use_dtx != 0 && voice_est > 100 {
                 st.mode = MODE_SILK_ONLY;
             }
             if max_data_bytes
@@ -2411,14 +2411,14 @@ pub fn opus_encode_native(
     if !multiframe_fixed {
         if st.stream_channels == 1
             && st.prev_channels == 2
-            && st.silk_mode.toMono == 0
+            && st.silk_mode.to_mono == 0
             && st.mode != MODE_CELT_ONLY
             && st.prev_mode != MODE_CELT_ONLY
         {
-            st.silk_mode.toMono = 1;
+            st.silk_mode.to_mono = 1;
             st.stream_channels = 2;
         } else {
-            st.silk_mode.toMono = 0;
+            st.silk_mode.to_mono = 0;
         }
     }
     equiv_rate = compute_equiv_rate(
@@ -2428,14 +2428,14 @@ pub fn opus_encode_native(
         st.use_vbr,
         st.mode,
         st.silk_mode.complexity,
-        st.silk_mode.packetLossPercentage,
+        st.silk_mode.packet_loss_percentage,
     );
     if !multiframe_fixed && st.mode != MODE_CELT_ONLY && st.prev_mode == MODE_CELT_ONLY {
         init_silk_after_celt(st);
         prefill = 1;
     }
     if !multiframe_fixed
-        && (st.mode == MODE_CELT_ONLY || st.first != 0 || st.silk_mode.allowBandwidthSwitch != 0)
+        && (st.mode == MODE_CELT_ONLY || st.first != 0 || st.silk_mode.allow_bandwidth_switch != 0)
     {
         let voice_bandwidth_thresholds: &[i32];
         let music_bandwidth_thresholds: &[i32];
@@ -2485,7 +2485,7 @@ pub fn opus_encode_native(
         st.bandwidth = st.auto_bandwidth;
         if st.first == 0
             && st.mode != MODE_CELT_ONLY
-            && st.silk_mode.inWBmodeWithoutVariableLP == 0
+            && st.silk_mode.in_wbmode_without_variable_lp == 0
             && st.bandwidth > OPUS_BANDWIDTH_WIDEBAND
         {
             st.bandwidth = OPUS_BANDWIDTH_WIDEBAND;
@@ -2541,10 +2541,10 @@ pub fn opus_encode_native(
         };
     }
     if !multiframe_fixed {
-        st.silk_mode.LBRR_coded = decide_fec(
-            st.silk_mode.useInBandFEC,
-            st.silk_mode.packetLossPercentage,
-            st.silk_mode.LBRR_coded,
+        st.silk_mode.lbrr_coded = decide_fec(
+            st.silk_mode.use_in_band_fec,
+            st.silk_mode.packet_loss_percentage,
+            st.silk_mode.lbrr_coded,
             st.mode,
             &mut st.bandwidth,
             equiv_rate,
@@ -2692,7 +2692,7 @@ pub fn opus_encode_native(
     let hp_freq_smth1: i32 = if st.mode == MODE_CELT_ONLY {
         ((silk_lin2log(VARIABLE_HP_MIN_CUTOFF_HZ) as u32) << 8) as i32
     } else {
-        st.silk_enc.state_Fxx[0].sCmn.variable_HP_smth1_Q15
+        st.silk_enc.state_fxx[0].s_cmn.variable_hp_smth1_q15
     };
     st.variable_hp_smth2_q15 = (st.variable_hp_smth2_q15 as i64
         + (((hp_freq_smth1 - st.variable_hp_smth2_q15) as i64
@@ -2783,20 +2783,20 @@ pub fn opus_encode_native(
         let mut pcm_silk: Vec<f32> = ::std::vec::from_elem(0.0, vla_0);
         let total_bit_rate: i32 = bits_to_bitrate(bits_target, st.fs, frame_size);
         if st.mode == MODE_HYBRID {
-            st.silk_mode.bitRate = compute_silk_rate_for_hybrid(
+            st.silk_mode.bit_rate = compute_silk_rate_for_hybrid(
                 total_bit_rate,
                 curr_bandwidth,
                 (st.fs == 50 * frame_size) as i32,
                 st.use_vbr,
-                st.silk_mode.LBRR_coded,
+                st.silk_mode.lbrr_coded,
                 st.stream_channels,
             );
             if st.energy_masking_len == 0 {
-                celt_rate = total_bit_rate - st.silk_mode.bitRate;
+                celt_rate = total_bit_rate - st.silk_mode.bit_rate;
                 hb_gain = Q15ONE - celt_exp2(-celt_rate as f32 * (1.0f32 / 1024f32));
             }
         } else {
-            st.silk_mode.bitRate = total_bit_rate;
+            st.silk_mode.bit_rate = total_bit_rate;
         }
         if st.energy_masking_len > 0 && st.use_vbr != 0 && st.lfe == 0 {
             let mut mask_sum: f32 = 0 as f32;
@@ -2838,41 +2838,41 @@ pub fn opus_encode_native(
             masking_depth = mask_sum / end as f32 * st.channels as f32;
             masking_depth += 0.2f32;
             rate_offset = (srate as f32 * masking_depth) as i32;
-            rate_offset = if rate_offset > -(2) * st.silk_mode.bitRate / 3 {
+            rate_offset = if rate_offset > -(2) * st.silk_mode.bit_rate / 3 {
                 rate_offset
             } else {
-                -(2) * st.silk_mode.bitRate / 3
+                -(2) * st.silk_mode.bit_rate / 3
             };
             if st.bandwidth == OPUS_BANDWIDTH_SUPERWIDEBAND
                 || st.bandwidth == OPUS_BANDWIDTH_FULLBAND
             {
-                st.silk_mode.bitRate += 3 * rate_offset / 5;
+                st.silk_mode.bit_rate += 3 * rate_offset / 5;
             } else {
-                st.silk_mode.bitRate += rate_offset;
+                st.silk_mode.bit_rate += rate_offset;
             }
         }
-        st.silk_mode.payloadSize_ms = 1000 * frame_size / st.fs;
-        st.silk_mode.nChannelsAPI = st.channels;
-        st.silk_mode.nChannelsInternal = st.stream_channels;
+        st.silk_mode.payload_size_ms = 1000 * frame_size / st.fs;
+        st.silk_mode.n_channels_api = st.channels;
+        st.silk_mode.n_channels_internal = st.stream_channels;
         if curr_bandwidth == OPUS_BANDWIDTH_NARROWBAND {
-            st.silk_mode.desiredInternalSampleRate = 8000;
+            st.silk_mode.desired_internal_sample_rate = 8000;
         } else if curr_bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
-            st.silk_mode.desiredInternalSampleRate = 12000;
+            st.silk_mode.desired_internal_sample_rate = 12000;
         } else {
             debug_assert!(st.mode == 1001 || curr_bandwidth == 1103);
-            st.silk_mode.desiredInternalSampleRate = 16000;
+            st.silk_mode.desired_internal_sample_rate = 16000;
         }
         if st.mode == MODE_HYBRID {
-            st.silk_mode.minInternalSampleRate = 16000;
+            st.silk_mode.min_internal_sample_rate = 16000;
         } else {
-            st.silk_mode.minInternalSampleRate = 8000;
+            st.silk_mode.min_internal_sample_rate = 8000;
         }
-        st.silk_mode.maxInternalSampleRate = 16000;
+        st.silk_mode.max_internal_sample_rate = 16000;
         // At 96 kHz, force SILK to 16 kHz since we don't have 8/12 kHz resamplers for 96 kHz.
         #[cfg(feature = "qext")]
         if st.fs == 96000 {
-            st.silk_mode.maxInternalSampleRate = 16000;
-            st.silk_mode.desiredInternalSampleRate = 16000;
+            st.silk_mode.max_internal_sample_rate = 16000;
+            st.silk_mode.desired_internal_sample_rate = 16000;
         }
         if st.mode == MODE_SILK_ONLY {
             let mut effective_max_rate: i32 = max_rate;
@@ -2880,33 +2880,33 @@ pub fn opus_encode_native(
                 effective_max_rate = effective_max_rate * 2 / 3;
             }
             if effective_max_rate < 8000 {
-                st.silk_mode.maxInternalSampleRate = 12000;
-                st.silk_mode.desiredInternalSampleRate =
-                    if (12000) < st.silk_mode.desiredInternalSampleRate {
+                st.silk_mode.max_internal_sample_rate = 12000;
+                st.silk_mode.desired_internal_sample_rate =
+                    if (12000) < st.silk_mode.desired_internal_sample_rate {
                         12000
                     } else {
-                        st.silk_mode.desiredInternalSampleRate
+                        st.silk_mode.desired_internal_sample_rate
                     };
             }
             if effective_max_rate < 7000 {
-                st.silk_mode.maxInternalSampleRate = 8000;
-                st.silk_mode.desiredInternalSampleRate =
-                    if (8000) < st.silk_mode.desiredInternalSampleRate {
+                st.silk_mode.max_internal_sample_rate = 8000;
+                st.silk_mode.desired_internal_sample_rate =
+                    if (8000) < st.silk_mode.desired_internal_sample_rate {
                         8000
                     } else {
-                        st.silk_mode.desiredInternalSampleRate
+                        st.silk_mode.desired_internal_sample_rate
                     };
             }
         }
-        st.silk_mode.useCBR = (st.use_vbr == 0) as i32;
-        st.silk_mode.maxBits = (max_data_bytes - 1) * 8;
+        st.silk_mode.use_cbr = (st.use_vbr == 0) as i32;
+        st.silk_mode.max_bits = (max_data_bytes - 1) * 8;
         if redundancy != 0 && redundancy_bytes >= 2 {
-            st.silk_mode.maxBits -= redundancy_bytes * 8 + 1;
+            st.silk_mode.max_bits -= redundancy_bytes * 8 + 1;
             if st.mode == MODE_HYBRID {
-                st.silk_mode.maxBits -= 20;
+                st.silk_mode.max_bits -= 20;
             }
         }
-        if st.silk_mode.useCBR != 0 {
+        if st.silk_mode.use_cbr != 0 {
             #[cfg(feature = "dred")]
             let switch_silk_to_vbr = st.mode == MODE_HYBRID || dred_bitrate_bps > 0;
             #[cfg(not(feature = "dred"))]
@@ -2915,20 +2915,20 @@ pub fn opus_encode_native(
                 // When we have non-SILK data to encode, switch SILK to VBR with cap.
                 // Any variations will be absorbed by CELT and/or DRED.
                 let other_bits =
-                    0.max(st.silk_mode.maxBits - st.silk_mode.bitRate * frame_size / st.fs);
-                st.silk_mode.maxBits = 0.max(st.silk_mode.maxBits - other_bits * 3 / 4);
-                st.silk_mode.useCBR = 0;
+                    0.max(st.silk_mode.max_bits - st.silk_mode.bit_rate * frame_size / st.fs);
+                st.silk_mode.max_bits = 0.max(st.silk_mode.max_bits - other_bits * 3 / 4);
+                st.silk_mode.use_cbr = 0;
             }
         } else if st.mode == MODE_HYBRID {
             let max_bit_rate: i32 = compute_silk_rate_for_hybrid(
-                st.silk_mode.maxBits * st.fs / frame_size,
+                st.silk_mode.max_bits * st.fs / frame_size,
                 curr_bandwidth,
                 (st.fs == 50 * frame_size) as i32,
                 st.use_vbr,
-                st.silk_mode.LBRR_coded,
+                st.silk_mode.lbrr_coded,
                 st.stream_channels,
             );
-            st.silk_mode.maxBits = bitrate_to_bits(max_bit_rate, st.fs, frame_size);
+            st.silk_mode.max_bits = bitrate_to_bits(max_bit_rate, st.fs, frame_size);
         }
         if prefill != 0 {
             let mut zero: i32 = 0;
@@ -2965,7 +2965,7 @@ pub fn opus_encode_native(
                 prefill,
                 activity,
             );
-            st.silk_mode.opusCanSwitch = 0;
+            st.silk_mode.opus_can_switch = 0;
         }
         i = 0;
         while i < frame_size * st.channels {
@@ -2986,21 +2986,21 @@ pub fn opus_encode_native(
             return OPUS_INTERNAL_ERROR;
         }
         if st.mode == MODE_SILK_ONLY {
-            if st.silk_mode.internalSampleRate == 8000 {
+            if st.silk_mode.internal_sample_rate == 8000 {
                 curr_bandwidth = OPUS_BANDWIDTH_NARROWBAND;
-            } else if st.silk_mode.internalSampleRate == 12000 {
+            } else if st.silk_mode.internal_sample_rate == 12000 {
                 curr_bandwidth = OPUS_BANDWIDTH_MEDIUMBAND;
-            } else if st.silk_mode.internalSampleRate == 16000 {
+            } else if st.silk_mode.internal_sample_rate == 16000 {
                 curr_bandwidth = OPUS_BANDWIDTH_WIDEBAND;
             }
         } else {
-            debug_assert!(st.silk_mode.internalSampleRate == 16000)
+            debug_assert!(st.silk_mode.internal_sample_rate == 16000)
         };
-        st.silk_mode.opusCanSwitch =
-            (st.silk_mode.switchReady != 0 && st.nonfinal_frame == 0) as i32;
+        st.silk_mode.opus_can_switch =
+            (st.silk_mode.switch_ready != 0 && st.nonfinal_frame == 0) as i32;
 
         if activity == VAD_NO_DECISION {
-            activity = (st.silk_mode.signalType != TYPE_NO_VOICE_ACTIVITY) as i32;
+            activity = (st.silk_mode.signal_type != TYPE_NO_VOICE_ACTIVITY) as i32;
             #[cfg(feature = "dred")]
             for i in 0..(frame_size * 400 / st.fs) as usize {
                 st.activity_mem[i] = activity as u8;
@@ -3016,7 +3016,7 @@ pub fn opus_encode_native(
             );
             return 1;
         }
-        if st.silk_mode.opusCanSwitch != 0 {
+        if st.silk_mode.opus_can_switch != 0 {
             redundancy_bytes = compute_redundancy_bytes(
                 max_data_bytes,
                 st.bitrate_bps,
@@ -3050,7 +3050,7 @@ pub fn opus_encode_native(
     if st.mode != MODE_SILK_ONLY {
         let mut celt_pred: f32 = 2_f32;
         st.celt_enc.vbr = 0;
-        if st.silk_mode.reducedDependency != 0 {
+        if st.silk_mode.reduced_dependency != 0 {
             celt_pred = 0 as f32;
         }
         let celt_pred_i = celt_pred as i32;
@@ -3058,7 +3058,7 @@ pub fn opus_encode_native(
         st.celt_enc.force_intra = (celt_pred_i == 0) as i32;
         if st.mode == MODE_HYBRID {
             if st.use_vbr != 0 {
-                st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bitRate;
+                st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bit_rate;
                 st.celt_enc.constrained_vbr = 0;
             }
         } else if st.use_vbr != 0 {
@@ -3108,21 +3108,21 @@ pub fn opus_encode_native(
     st.prev_hb_gain = hb_gain;
     if st.mode != MODE_HYBRID || st.stream_channels == 1 {
         if equiv_rate > 32000 {
-            st.silk_mode.stereoWidth_Q14 = 16384;
+            st.silk_mode.stereo_width_q14 = 16384;
         } else if equiv_rate < 16000 {
-            st.silk_mode.stereoWidth_Q14 = 0;
+            st.silk_mode.stereo_width_q14 = 0;
         } else {
-            st.silk_mode.stereoWidth_Q14 =
+            st.silk_mode.stereo_width_q14 =
                 16384 - 2048 * (32000 - equiv_rate) / (equiv_rate - 14000);
         }
     }
     if st.energy_masking_len == 0
         && st.channels == 2
         && ((st.hybrid_stereo_width_q14 as i32) < (1) << 14
-            || st.silk_mode.stereoWidth_Q14 < (1) << 14)
+            || st.silk_mode.stereo_width_q14 < (1) << 14)
     {
         let g1 = st.hybrid_stereo_width_q14 as f32 * (1.0f32 / 16384_f32);
-        let g2 = st.silk_mode.stereoWidth_Q14 as f32 * (1.0f32 / 16384_f32);
+        let g2 = st.silk_mode.stereo_width_q14 as f32 * (1.0f32 / 16384_f32);
         apply_stereo_fade(
             &mut pcm_buf,
             g1,
@@ -3132,7 +3132,7 @@ pub fn opus_encode_native(
             st.channels,
             st.fs,
         );
-        st.hybrid_stereo_width_q14 = st.silk_mode.stereoWidth_Q14 as i16;
+        st.hybrid_stereo_width_q14 = st.silk_mode.stereo_width_q14 as i16;
     }
     if st.mode != MODE_CELT_ONLY
         && ec_tell(&enc) + 17 + 20 * (st.mode == MODE_HYBRID) as i32 <= 8 * (max_data_bytes - 1)
@@ -3207,10 +3207,10 @@ pub fn opus_encode_native(
     }
     if st.mode == MODE_HYBRID {
         let mut info: SILKInfo = SILKInfo {
-            signalType: 0,
+            signal_type: 0,
             offset: 0,
         };
-        info.signalType = st.silk_mode.signalType;
+        info.signal_type = st.silk_mode.signal_type;
         info.offset = st.silk_mode.offset;
         st.celt_enc.silk_info = info;
     }
@@ -3260,7 +3260,7 @@ pub fn opus_encode_native(
         }
         if ec_tell(&enc) <= 8 * nb_compr_bytes {
             if redundancy != 0 && celt_to_silk != 0 && st.mode == MODE_HYBRID && st.use_vbr != 0 {
-                st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bitRate;
+                st.celt_enc.bitrate = st.bitrate_bps - st.silk_mode.bit_rate;
             }
             st.celt_enc.vbr = st.use_vbr;
             // When using DRED CBR, make the CELT part VBR and have DRED pick up the slack.
@@ -3270,7 +3270,7 @@ pub fn opus_encode_native(
                 st.celt_enc.vbr = 1;
                 st.celt_enc.constrained_vbr = 0;
                 if st.mode == MODE_HYBRID {
-                    celt_bitrate -= st.silk_mode.bitRate;
+                    celt_bitrate -= st.silk_mode.bit_rate;
                 }
                 st.celt_enc.bitrate = celt_bitrate;
             }
@@ -3367,7 +3367,7 @@ pub fn opus_encode_native(
     st.prev_channels = st.stream_channels;
     st.prev_framesize = frame_size;
     st.first = 0;
-    if st.use_dtx != 0 && st.silk_mode.useDTX == 0 {
+    if st.use_dtx != 0 && st.silk_mode.use_dtx == 0 {
         if decide_dtx_mode(
             activity,
             &mut st.nb_no_activity_ms_q1,
@@ -3650,10 +3650,10 @@ mod tests {
     fn set_bandwidth_auto_resets_silk_internal_rate_to_16k() {
         let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
         enc.set_max_bandwidth(Bandwidth::Narrowband);
-        assert_eq!(enc.silk_mode.maxInternalSampleRate, 8000);
+        assert_eq!(enc.silk_mode.max_internal_sample_rate, 8000);
 
         enc.set_bandwidth(None);
-        assert_eq!(enc.silk_mode.maxInternalSampleRate, 16000);
+        assert_eq!(enc.silk_mode.max_internal_sample_rate, 16000);
     }
 
     #[test]

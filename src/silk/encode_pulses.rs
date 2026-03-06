@@ -1,6 +1,6 @@
 //! Excitation pulse encoding.
 //!
-//! Upstream C: `silk/encode_pulses.c`
+//! Upstream c: `silk/encode_pulses.c`
 
 use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::code_signs::silk_encode_signs;
@@ -13,7 +13,7 @@ use crate::silk::tables_pulses_per_block::{
 };
 use itertools::izip;
 
-/// Upstream C: silk/encode_pulses.c:combine_and_check
+/// Upstream c: silk/encode_pulses.c:combine_and_check
 #[inline]
 fn combine_and_check(pulses_comb: &mut [i32], max_pulses: u8) -> Option<&mut [i32]> {
     let len = pulses_comb.len() / 2;
@@ -31,11 +31,11 @@ fn combine_and_check(pulses_comb: &mut [i32], max_pulses: u8) -> Option<&mut [i3
 
 ///
 /// Encode quantization indices of excitation
-/// Upstream C: silk/encode_pulses.c:silk_encode_pulses
+/// Upstream c: silk/encode_pulses.c:silk_encode_pulses
 pub fn silk_encode_pulses(
-    psRangeEnc: &mut EcEnc,
-    signalType: i32,
-    quantOffsetType: i32,
+    ps_range_enc: &mut EcEnc,
+    signal_type: i32,
+    quant_offset_type: i32,
     pulses_buffer: &mut [i8],
     frame_length: usize,
 ) {
@@ -84,14 +84,14 @@ pub fn silk_encode_pulses(
     const MAX_ITER: usize = 20;
     debug_assert!(iter <= MAX_ITER);
     let mut sum_pulses = [0i32; MAX_ITER];
-    let mut nRshifts = [0i32; MAX_ITER];
+    let mut n_rshifts = [0i32; MAX_ITER];
 
-    for (abs_pulses_ptr, nRshifts, sum_pulses) in izip!(
+    for (abs_pulses_ptr, n_rshifts, sum_pulses) in izip!(
         abs_pulses[..padded_frame_length].chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH),
-        nRshifts[..iter].iter_mut(),
+        n_rshifts[..iter].iter_mut(),
         sum_pulses[..iter].iter_mut()
     ) {
-        *nRshifts = 0;
+        *n_rshifts = 0;
         loop {
             let mut pulses_comb: [i32; SHELL_CODEC_FRAME_LENGTH] = [0; 16];
 
@@ -108,7 +108,7 @@ pub fn silk_encode_pulses(
                 .and_then(|pulses_comb| combine_and_check(pulses_comb, SILK_MAX_PULSES_TABLE[3]))
             else {
                 /* We need to downscale the quantization signal */
-                *nRshifts += 1;
+                *n_rshifts += 1;
 
                 for v in abs_pulses_ptr.iter_mut() {
                     *v >>= 1;
@@ -131,57 +131,57 @@ pub fn silk_encode_pulses(
     /**************/
     /* find rate level that leads to fewest bits for coding of pulses per block info */
 
-    let RateLevelIndex = {
-        let mut RateLevelIndex = 0;
-        let mut minSumBits_Q5 = i32::MAX;
+    let rate_level_index = {
+        let mut rate_level_index = 0;
+        let mut min_sum_bits_q5 = i32::MAX;
 
-        for (k, (nBits_ptr, sumBits_Q5)) in izip!(
+        for (k, (n_bits_ptr, sum_bits_q5)) in izip!(
             SILK_PULSES_PER_BLOCK_BITS_Q5.iter(),
-            SILK_RATE_LEVELS_BITS_Q5[(signalType >> 1) as usize]
+            SILK_RATE_LEVELS_BITS_Q5[(signal_type >> 1) as usize]
         )
         .enumerate()
         {
-            let mut sumBits_Q5 = sumBits_Q5 as i32;
+            let mut sum_bits_q5 = sum_bits_q5 as i32;
 
-            for (&nRshifts, &sum_pulses) in
-                izip!(nRshifts[..iter].iter(), sum_pulses[..iter].iter())
+            for (&n_rshifts, &sum_pulses) in
+                izip!(n_rshifts[..iter].iter(), sum_pulses[..iter].iter())
             {
-                sumBits_Q5 += nBits_ptr[if nRshifts > 0 {
+                sum_bits_q5 += n_bits_ptr[if n_rshifts > 0 {
                     SILK_MAX_PULSES + 1
                 } else {
                     sum_pulses as usize
                 }] as i32;
             }
 
-            if sumBits_Q5 < minSumBits_Q5 {
-                minSumBits_Q5 = sumBits_Q5;
-                RateLevelIndex = k;
+            if sum_bits_q5 < min_sum_bits_q5 {
+                min_sum_bits_q5 = sum_bits_q5;
+                rate_level_index = k;
             }
         }
 
-        RateLevelIndex
+        rate_level_index
     };
 
     ec_enc_icdf(
-        psRangeEnc,
-        RateLevelIndex as i32,
-        &SILK_RATE_LEVELS_ICDF[(signalType >> 1) as usize],
+        ps_range_enc,
+        rate_level_index as i32,
+        &SILK_RATE_LEVELS_ICDF[(signal_type >> 1) as usize],
         8,
     );
 
     /***************************************************/
     /* Sum-Weighted-Pulses Encoding                    */
     /***************************************************/
-    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[RateLevelIndex];
-    for (&sum_pulse, &nRshifts) in izip!(&sum_pulses[..iter], &nRshifts[..iter]) {
-        if nRshifts == 0 {
-            ec_enc_icdf(psRangeEnc, sum_pulse, cdf_ptr, 8);
+    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[rate_level_index];
+    for (&sum_pulse, &n_rshifts) in izip!(&sum_pulses[..iter], &n_rshifts[..iter]) {
+        if n_rshifts == 0 {
+            ec_enc_icdf(ps_range_enc, sum_pulse, cdf_ptr, 8);
         } else {
-            ec_enc_icdf(psRangeEnc, SILK_MAX_PULSES as i32 + 1, cdf_ptr, 8);
+            ec_enc_icdf(ps_range_enc, SILK_MAX_PULSES as i32 + 1, cdf_ptr, 8);
 
-            for _ in 0..nRshifts - 1 {
+            for _ in 0..n_rshifts - 1 {
                 ec_enc_icdf(
-                    psRangeEnc,
+                    ps_range_enc,
                     SILK_MAX_PULSES as i32 + 1,
                     &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1],
                     8,
@@ -189,7 +189,7 @@ pub fn silk_encode_pulses(
             }
 
             ec_enc_icdf(
-                psRangeEnc,
+                ps_range_enc,
                 sum_pulse,
                 &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1],
                 8,
@@ -205,29 +205,29 @@ pub fn silk_encode_pulses(
         abs_pulses[..padded_frame_length].chunks_exact(SHELL_CODEC_FRAME_LENGTH)
     ) {
         if sum_pulses > 0 {
-            silk_shell_encoder(psRangeEnc, abs_pulses_frame);
+            silk_shell_encoder(ps_range_enc, abs_pulses_frame);
         }
     }
 
     /****************/
     /* LSB Encoding */
     /****************/
-    for (pulse_frame, &nRshifts) in izip!(
+    for (pulse_frame, &n_rshifts) in izip!(
         pulses_frame.chunks_exact(SHELL_CODEC_FRAME_LENGTH),
-        &nRshifts[..iter]
+        &n_rshifts[..iter]
     ) {
-        if nRshifts > 0 {
-            let nLS = nRshifts - 1;
+        if n_rshifts > 0 {
+            let n_ls = n_rshifts - 1;
 
             for &q in pulse_frame {
                 let abs_q = (q as i32).abs();
 
-                for j in (1..=nLS).rev() {
+                for j in (1..=n_ls).rev() {
                     let bit = abs_q >> j & 1;
-                    ec_enc_icdf(psRangeEnc, bit, &SILK_LSB_ICDF, 8);
+                    ec_enc_icdf(ps_range_enc, bit, &SILK_LSB_ICDF, 8);
                 }
                 let bit = abs_q & 1;
-                ec_enc_icdf(psRangeEnc, bit, &SILK_LSB_ICDF, 8);
+                ec_enc_icdf(ps_range_enc, bit, &SILK_LSB_ICDF, 8);
             }
         }
     }
@@ -236,10 +236,10 @@ pub fn silk_encode_pulses(
     /* Encode signs */
     /****************/
     silk_encode_signs(
-        psRangeEnc,
+        ps_range_enc,
         pulses_frame,
-        signalType,
-        quantOffsetType,
+        signal_type,
+        quant_offset_type,
         &sum_pulses[..iter],
     );
 }

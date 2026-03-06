@@ -1,6 +1,6 @@
 //! NLSF processing and interpolation.
 //!
-//! Upstream C: `silk/process_NLSFs.c`
+//! Upstream c: `silk/process_NLSFs.c`
 
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::nlsf2a::silk_nlsf2a;
@@ -8,89 +8,90 @@ use crate::silk::nlsf_encode::silk_nlsf_encode;
 use crate::silk::nlsf_vq_weights_laroia::silk_nlsf_vq_weights_laroia;
 use crate::silk::structs::silk_encoder_state;
 
-/// Upstream C: silk/process_NLSFs.c:silk_process_NLSFs
+/// Upstream c: silk/process_NLSFs.c:silk_process_NLSFs
 pub fn silk_process_nlsfs(
-    psEncC: &mut silk_encoder_state,
-    PredCoef_Q12: &mut [[i16; 16]; 2],
-    pNLSF_Q15: &mut [i16],
-    prev_NLSFq_Q15: &[i16],
+    ps_enc_c: &mut silk_encoder_state,
+    pred_coef_q12: &mut [[i16; 16]; 2],
+    p_nlsf_q15: &mut [i16],
+    prev_nlsfq_q15: &[i16],
 ) {
-    let mut i: i32;
+    let mut _i: i32;
 
-    let mut NLSF_mu_Q20: i32;
-    let i_sqr_Q15: i16;
-    let mut pNLSF0_temp_Q15: [i16; 16] = [0; 16];
-    let mut pNLSFW_QW: [i16; 16] = [0; 16];
-    let mut pNLSFW0_temp_QW: [i16; 16] = [0; 16];
+    let mut nlsf_mu_q20: i32;
+    let i_sqr_q15: i16;
+    let mut p_nlsf0_temp_q15: [i16; 16] = [0; 16];
+    let mut p_nlsfw_qw: [i16; 16] = [0; 16];
+    let mut p_nlsfw0_temp_qw: [i16; 16] = [0; 16];
     assert!(
-        psEncC.useInterpolatedNLSFs == 1 || psEncC.indices.NLSFInterpCoef_Q2 as i32 == (1) << 2
+        ps_enc_c.use_interpolated_nlsfs == 1
+            || ps_enc_c.indices.nlsfinterp_coef_q2 as i32 == (1) << 2
     );
-    NLSF_mu_Q20 = ((0.003f64 * ((1) << 20) as f64 + 0.5f64) as i32 as i64
+    nlsf_mu_q20 = ((0.003f64 * ((1) << 20) as f64 + 0.5f64) as i32 as i64
         + (((-0.001f64 * ((1) << 28) as f64 + 0.5f64) as i32 as i64
-            * psEncC.speech_activity_Q8 as i16 as i64)
+            * ps_enc_c.speech_activity_q8 as i16 as i64)
             >> 16)) as i32;
-    if psEncC.nb_subfr == 2 {
-        NLSF_mu_Q20 = NLSF_mu_Q20 + (NLSF_mu_Q20 >> 1);
+    if ps_enc_c.nb_subfr == 2 {
+        nlsf_mu_q20 = nlsf_mu_q20 + (nlsf_mu_q20 >> 1);
     }
-    assert!(NLSF_mu_Q20 > 0);
+    assert!(nlsf_mu_q20 > 0);
     silk_nlsf_vq_weights_laroia(
-        &mut pNLSFW_QW[..psEncC.predictLPCOrder as usize],
-        &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
+        &mut p_nlsfw_qw[..ps_enc_c.predict_lpcorder as usize],
+        &p_nlsf_q15[..ps_enc_c.predict_lpcorder as usize],
     );
-    let doInterpolate: i32 =
-        (psEncC.useInterpolatedNLSFs == 1 && (psEncC.indices.NLSFInterpCoef_Q2 as i32) < 4) as i32;
-    if doInterpolate != 0 {
+    let do_interpolate: i32 = (ps_enc_c.use_interpolated_nlsfs == 1
+        && (ps_enc_c.indices.nlsfinterp_coef_q2 as i32) < 4) as i32;
+    if do_interpolate != 0 {
         silk_interpolate(
-            &mut pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
-            &prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
-            &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
-            psEncC.indices.NLSFInterpCoef_Q2 as i32,
+            &mut p_nlsf0_temp_q15[..ps_enc_c.predict_lpcorder as usize],
+            &prev_nlsfq_q15[..ps_enc_c.predict_lpcorder as usize],
+            &p_nlsf_q15[..ps_enc_c.predict_lpcorder as usize],
+            ps_enc_c.indices.nlsfinterp_coef_q2 as i32,
         );
         silk_nlsf_vq_weights_laroia(
-            &mut pNLSFW0_temp_QW[..psEncC.predictLPCOrder as usize],
-            &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
+            &mut p_nlsfw0_temp_qw[..ps_enc_c.predict_lpcorder as usize],
+            &p_nlsf0_temp_q15[..ps_enc_c.predict_lpcorder as usize],
         );
-        i_sqr_Q15 = (((psEncC.indices.NLSFInterpCoef_Q2 as i16 as i32
-            * psEncC.indices.NLSFInterpCoef_Q2 as i16 as i32) as u32)
+        i_sqr_q15 = (((ps_enc_c.indices.nlsfinterp_coef_q2 as i16 as i32
+            * ps_enc_c.indices.nlsfinterp_coef_q2 as i16 as i32) as u32)
             << 11) as i32 as i16;
-        i = 0;
-        while i < psEncC.predictLPCOrder {
-            pNLSFW_QW[i as usize] = ((pNLSFW_QW[i as usize] as i32 >> 1)
-                + ((pNLSFW0_temp_QW[i as usize] as i32 * i_sqr_Q15 as i32) >> 16))
+        _i = 0;
+        while _i < ps_enc_c.predict_lpcorder {
+            p_nlsfw_qw[_i as usize] = ((p_nlsfw_qw[_i as usize] as i32 >> 1)
+                + ((p_nlsfw0_temp_qw[_i as usize] as i32 * i_sqr_q15 as i32) >> 16))
                 as i16;
-            i += 1;
+            _i += 1;
         }
     }
     silk_nlsf_encode(
-        &mut psEncC.indices.NLSFIndices,
-        pNLSF_Q15,
-        psEncC.psNLSF_CB,
-        &pNLSFW_QW,
-        NLSF_mu_Q20,
-        psEncC.NLSF_MSVQ_Survivors,
-        psEncC.indices.signalType as i32,
+        &mut ps_enc_c.indices.nlsfindices,
+        p_nlsf_q15,
+        ps_enc_c.ps_nlsf_cb,
+        &p_nlsfw_qw,
+        nlsf_mu_q20,
+        ps_enc_c.nlsf_msvq_survivors,
+        ps_enc_c.indices.signal_type as i32,
     );
     silk_nlsf2a(
-        &mut PredCoef_Q12[1][..psEncC.predictLPCOrder as usize],
-        &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
-        psEncC.arch,
+        &mut pred_coef_q12[1][..ps_enc_c.predict_lpcorder as usize],
+        &p_nlsf_q15[..ps_enc_c.predict_lpcorder as usize],
+        ps_enc_c.arch,
     );
-    if doInterpolate != 0 {
+    if do_interpolate != 0 {
         silk_interpolate(
-            &mut pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
-            &prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
-            &pNLSF_Q15[..psEncC.predictLPCOrder as usize],
-            psEncC.indices.NLSFInterpCoef_Q2 as i32,
+            &mut p_nlsf0_temp_q15[..ps_enc_c.predict_lpcorder as usize],
+            &prev_nlsfq_q15[..ps_enc_c.predict_lpcorder as usize],
+            &p_nlsf_q15[..ps_enc_c.predict_lpcorder as usize],
+            ps_enc_c.indices.nlsfinterp_coef_q2 as i32,
         );
         silk_nlsf2a(
-            &mut PredCoef_Q12[0][..psEncC.predictLPCOrder as usize],
-            &pNLSF0_temp_Q15[..psEncC.predictLPCOrder as usize],
-            psEncC.arch,
+            &mut pred_coef_q12[0][..ps_enc_c.predict_lpcorder as usize],
+            &p_nlsf0_temp_q15[..ps_enc_c.predict_lpcorder as usize],
+            ps_enc_c.arch,
         );
     } else {
-        assert!(psEncC.predictLPCOrder <= 16);
-        let order = psEncC.predictLPCOrder as usize;
-        let [ref mut dst, ref src] = *PredCoef_Q12;
+        assert!(ps_enc_c.predict_lpcorder <= 16);
+        let order = ps_enc_c.predict_lpcorder as usize;
+        let [ref mut dst, ref src] = *pred_coef_q12;
         dst[..order].copy_from_slice(&src[..order]);
     };
 }

@@ -1,6 +1,6 @@
 //! Resampler filter coefficient tables.
 //!
-//! Upstream C: `silk/resampler_rom.c`, `silk/resampler_rom.h`
+//! Upstream c: `silk/resampler_rom.c`, `silk/resampler_rom.h`
 
 pub const RESAMPLER_DOWN_ORDER_FIR2: usize = 36;
 pub const RESAMPLER_DOWN_ORDER_FIR1: usize = 24;
@@ -16,8 +16,8 @@ pub const SILK_RESAMPLER_UP2_HQ_0: [i16; 3] = [1746, 14986, (39083 - 65536) as i
 pub const SILK_RESAMPLER_UP2_HQ_1: [i16; 3] = [6854, 25769, (55542 - 65536) as i16];
 
 /* Matlab code for the notch filter coefficients: */
-/* B = [1, 0.147, 1];  A = [1, 0.107, 0.89]; G = 0.93; freqz(G * B, A, 2^14, 16e3); axis([0, 8000, -10, 1]) */
-/* fprintf('\t%6d, %6d, %6d, %6d\n', round(B(2)*2^16), round(-A(2)*2^16), round((1-A(3))*2^16), round(G*2^15)) */
+/* b = [1, 0.147, 1];  a = [1, 0.107, 0.89]; G = 0.93; freqz(G * b, a, 2^14, 16e3); axis([0, 8000, -10, 1]) */
+/* fprintf('\t%6d, %6d, %6d, %6d\n', round(b(2)*2^16), round(-a(2)*2^16), round((1-a(3))*2^16), round(G*2^15)) */
 /* const opus_int16 silk_resampler_up2_hq_notch[ 4 ] = { 9634,  -7012,   7209,  30474 }; */
 
 /* Tables with IIR and FIR coefficients for fractional downsamplers (123 Words) */

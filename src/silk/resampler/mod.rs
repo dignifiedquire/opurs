@@ -1,6 +1,6 @@
 //! Audio resampler.
 //!
-//! Upstream C: `silk/resampler.c`
+//! Upstream c: `silk/resampler.c`
 
 #![forbid(unsafe_code)]
 
@@ -13,8 +13,8 @@ mod up2_hq;
 mod down2;
 mod down2_3;
 
-use down_fir::{silk_resampler_private_down_FIR, ResamplerDownFirParams, ResamplerDownFirState};
-use iir_fir::{silk_resampler_private_IIR_FIR, ResamplerIirFirState};
+use down_fir::{silk_resampler_private_down_fir, ResamplerDownFirParams, ResamplerDownFirState};
+use iir_fir::{silk_resampler_private_iir_fir, ResamplerIirFirState};
 use rom::{
     RESAMPLER_DOWN_ORDER_FIR0, RESAMPLER_DOWN_ORDER_FIR1, RESAMPLER_DOWN_ORDER_FIR2,
     SILK_RESAMPLER_1_2_COEFS, SILK_RESAMPLER_1_3_COEFS, SILK_RESAMPLER_1_4_COEFS,
@@ -39,14 +39,14 @@ pub(crate) const RESAMPLER_MAX_BATCH_SIZE_IN: usize =
  *                                 Fs_out (kHz)
  *                        8      12     16     24     48
  *
- *               8        C      UF     U      UF     UF
- *              12        AF     C      UF     U      UF
- * Fs_in (kHz)  16        D      AF     C      UF     UF
- *              24        AF     D      AF     C      U
- *              48        AF     AF     AF     D      C
+ *               8        c      UF     U      UF     UF
+ *              12        AF     c      UF     U      UF
+ * Fs_in (kHz)  16        d      AF     c      UF     UF
+ *              24        AF     d      AF     c      U
+ *              48        AF     AF     AF     d      c
  *
- * C   -> Copy (no resampling)
- * D   -> Allpass-based 2x downsampling
+ * c   -> Copy (no resampling)
+ * d   -> Allpass-based 2x downsampling
  * U   -> Allpass-based 2x upsampling
  * UF  -> Allpass-based 2x upsampling followed by FIR interpolation
  * AF  -> AR2 filter followed by FIR interpolation
@@ -143,32 +143,32 @@ enum ResamplerMode {
     DownFir(ResamplerDownFirParams, ResamplerDownFirState),
 }
 
-/// Upstream C: silk/resampler.c:silk_resampler_init
+/// Upstream c: silk/resampler.c:silk_resampler_init
 pub fn silk_resampler_init(
     s: &mut ResamplerState,
-    Fs_Hz_in: i32,
-    Fs_Hz_out: i32,
-    forEnc: i32,
+    fs_hz_in: i32,
+    fs_hz_out: i32,
+    for_enc: i32,
 ) -> i32 {
     *s = ResamplerState::default();
 
-    let inputDelay = if forEnc != 0 {
+    let input_delay = if for_enc != 0 {
         #[cfg(feature = "qext")]
-        let input_valid = matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
+        let input_valid = matches!(fs_hz_in, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
         #[cfg(not(feature = "qext"))]
-        let input_valid = matches!(Fs_Hz_in, 8000 | 12000 | 16000 | 24000 | 48000);
-        if !input_valid || !matches!(Fs_Hz_out, 8000 | 12000 | 16000) {
+        let input_valid = matches!(fs_hz_in, 8000 | 12000 | 16000 | 24000 | 48000);
+        if !input_valid || !matches!(fs_hz_out, 8000 | 12000 | 16000) {
             debug_assert!(false, "libopus: assert(0) called");
             return SILK_RESAMPLER_INVALID;
         }
-        let in_id = match rate_id(Fs_Hz_in) {
+        let in_id = match rate_id(fs_hz_in) {
             Some(v) => v,
             None => {
                 debug_assert!(false, "libopus: assert(0) called");
                 return SILK_RESAMPLER_INVALID;
             }
         };
-        let out_id = match rate_id(Fs_Hz_out) {
+        let out_id = match rate_id(fs_hz_out) {
             Some(v) => v,
             None => {
                 debug_assert!(false, "libopus: assert(0) called");
@@ -178,21 +178,21 @@ pub fn silk_resampler_init(
         DELAY_MATRIX_ENC[in_id][out_id] as i32
     } else {
         #[cfg(feature = "qext")]
-        let output_valid = matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
+        let output_valid = matches!(fs_hz_out, 8000 | 12000 | 16000 | 24000 | 48000 | 96000);
         #[cfg(not(feature = "qext"))]
-        let output_valid = matches!(Fs_Hz_out, 8000 | 12000 | 16000 | 24000 | 48000);
-        if !matches!(Fs_Hz_in, 8000 | 12000 | 16000) || !output_valid {
+        let output_valid = matches!(fs_hz_out, 8000 | 12000 | 16000 | 24000 | 48000);
+        if !matches!(fs_hz_in, 8000 | 12000 | 16000) || !output_valid {
             debug_assert!(false, "libopus: assert(0) called");
             return SILK_RESAMPLER_INVALID;
         }
-        let in_id = match rate_id(Fs_Hz_in) {
+        let in_id = match rate_id(fs_hz_in) {
             Some(v) => v,
             None => {
                 debug_assert!(false, "libopus: assert(0) called");
                 return SILK_RESAMPLER_INVALID;
             }
         };
-        let out_id = match rate_id(Fs_Hz_out) {
+        let out_id = match rate_id(fs_hz_out) {
             Some(v) => v,
             None => {
                 debug_assert!(false, "libopus: assert(0) called");
@@ -202,16 +202,16 @@ pub fn silk_resampler_init(
         DELAY_MATRIX_DEC[in_id][out_id] as i32
     };
 
-    let Fs_in_kHz = Fs_Hz_in / 1000;
-    let Fs_out_kHz = Fs_Hz_out / 1000;
-    let batchSize = Fs_in_kHz * RESAMPLER_MAX_BATCH_SIZE_MS;
+    let fs_in_k_hz = fs_hz_in / 1000;
+    let fs_out_k_hz = fs_hz_out / 1000;
+    let batch_size = fs_in_k_hz * RESAMPLER_MAX_BATCH_SIZE_MS;
 
     let mut up2x = 0;
-    let mode = match Fs_Hz_out.cmp(&Fs_Hz_in) {
+    let mode = match fs_hz_out.cmp(&fs_hz_in) {
         Ordering::Greater => {
             // Upsample
             // Fs_out : Fs_in = 2 : 1
-            if Fs_Hz_out == Fs_Hz_in * 2 {
+            if fs_hz_out == fs_hz_in * 2 {
                 // Special case: directly use 2x upsampler
                 ResamplerMode::Up2Hq(ResamplerUp2HqState::default())
             } else {
@@ -222,42 +222,42 @@ pub fn silk_resampler_init(
         }
         Ordering::Less => {
             // downsample
-            let params = if Fs_Hz_out * 4 == Fs_Hz_in * 3 {
+            let params = if fs_hz_out * 4 == fs_hz_in * 3 {
                 // Fs_out : Fs_in = 3 : 4
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR0,
                     fir_fracs: 3,
                     coefs: &SILK_RESAMPLER_3_4_COEFS,
                 }
-            } else if Fs_Hz_out * 3 == Fs_Hz_in * 2 {
+            } else if fs_hz_out * 3 == fs_hz_in * 2 {
                 // Fs_out : Fs_in = 2 : 3
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR0,
                     fir_fracs: 2,
                     coefs: &SILK_RESAMPLER_2_3_COEFS,
                 }
-            } else if Fs_Hz_out * 2 == Fs_Hz_in {
+            } else if fs_hz_out * 2 == fs_hz_in {
                 // Fs_out : Fs_in = 1 : 2
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR1,
                     fir_fracs: 1,
                     coefs: &SILK_RESAMPLER_1_2_COEFS,
                 }
-            } else if Fs_Hz_out * 3 == Fs_Hz_in {
+            } else if fs_hz_out * 3 == fs_hz_in {
                 // Fs_out : Fs_in = 1 : 3
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
                     fir_fracs: 1,
                     coefs: &SILK_RESAMPLER_1_3_COEFS,
                 }
-            } else if Fs_Hz_out * 4 == Fs_Hz_in {
+            } else if fs_hz_out * 4 == fs_hz_in {
                 // Fs_out : Fs_in = 1 : 4
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
                     fir_fracs: 1,
                     coefs: &SILK_RESAMPLER_1_4_COEFS,
                 }
-            } else if Fs_Hz_out * 6 == Fs_Hz_in {
+            } else if fs_hz_out * 6 == fs_hz_in {
                 // Fs_out : Fs_in = 1 : 6
                 ResamplerDownFirParams {
                     fir_order: RESAMPLER_DOWN_ORDER_FIR2,
@@ -275,21 +275,21 @@ pub fn silk_resampler_init(
     };
 
     /* Ratio of input/output samples */
-    let mut invRatio_Q16 =
-        (((((Fs_Hz_in as u32) << (14 + up2x)) as i32 / Fs_Hz_out) as u32) << 2) as i32;
+    let mut inv_ratio_q16 =
+        (((((fs_hz_in as u32) << (14 + up2x)) as i32 / fs_hz_out) as u32) << 2) as i32;
     /* Make sure the ratio is rounded up */
-    while (((invRatio_Q16 as i64 * Fs_Hz_out as i64) >> 16) as i32)
-        < ((Fs_Hz_in as u32) << up2x) as i32
+    while (((inv_ratio_q16 as i64 * fs_hz_out as i64) >> 16) as i32)
+        < ((fs_hz_in as u32) << up2x) as i32
     {
-        invRatio_Q16 += 1;
+        inv_ratio_q16 += 1;
     }
 
     let params = ResamplerParams {
-        batch_size: batchSize as usize,
-        inv_ratio_q16: invRatio_Q16,
-        fs_in_khz: Fs_in_kHz as usize,
-        fs_out_khz: Fs_out_kHz as usize,
-        input_delay: inputDelay as usize,
+        batch_size: batch_size as usize,
+        inv_ratio_q16,
+        fs_in_khz: fs_in_k_hz as usize,
+        fs_out_khz: fs_out_k_hz as usize,
+        input_delay: input_delay as usize,
     };
 
     *s = ResamplerState {
@@ -302,38 +302,38 @@ pub fn silk_resampler_init(
 
 /* Resampler: convert from one sampling rate to another */
 /* Input and output sampling rate are at most 48000 Hz (96 kHz with QEXT). */
-/// Upstream C: silk/resampler.c:silk_resampler
+/// Upstream c: silk/resampler.c:silk_resampler
 #[inline]
-pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> i32 {
+pub fn silk_resampler(s: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> i32 {
     /* Need at least 1 ms of input data */
-    debug_assert!(in_0.len() >= S.params.fs_in_khz);
+    debug_assert!(in_0.len() >= s.params.fs_in_khz);
     /* Delay can't exceed the 1 ms of buffering */
-    debug_assert!(S.params.input_delay <= S.params.fs_in_khz);
+    debug_assert!(s.params.input_delay <= s.params.fs_in_khz);
 
-    let nSamples = S.params.fs_in_khz - S.params.input_delay;
+    let n_samples = s.params.fs_in_khz - s.params.input_delay;
 
     /* Copy to delay buffer */
-    S.delay_buf[S.params.input_delay..][..nSamples].copy_from_slice(&in_0[..nSamples]);
+    s.delay_buf[s.params.input_delay..][..n_samples].copy_from_slice(&in_0[..n_samples]);
 
-    let delay_in = &S.delay_buf[..S.params.fs_in_khz];
-    let rest_in = &in_0[nSamples..][..in_0.len() - S.params.fs_in_khz];
-    let (delay_out, rest_out) = out.split_at_mut(S.params.fs_out_khz);
+    let delay_in = &s.delay_buf[..s.params.fs_in_khz];
+    let rest_in = &in_0[n_samples..][..in_0.len() - s.params.fs_in_khz];
+    let (delay_out, rest_out) = out.split_at_mut(s.params.fs_out_khz);
 
     // ensure we have exactly the right amount of space in the out buffer
-    let rest_out = &mut rest_out[..rest_in.len() * S.params.fs_out_khz / S.params.fs_in_khz];
+    let rest_out = &mut rest_out[..rest_in.len() * s.params.fs_out_khz / s.params.fs_in_khz];
 
-    match &mut S.mode {
+    match &mut s.mode {
         ResamplerMode::Up2Hq(state) => {
             silk_resampler_private_up2_hq(state, delay_out, delay_in);
             silk_resampler_private_up2_hq(state, rest_out, rest_in);
         }
         ResamplerMode::IirFir(state) => {
-            silk_resampler_private_IIR_FIR(&S.params, state, delay_out, delay_in);
-            silk_resampler_private_IIR_FIR(&S.params, state, rest_out, rest_in);
+            silk_resampler_private_iir_fir(&s.params, state, delay_out, delay_in);
+            silk_resampler_private_iir_fir(&s.params, state, rest_out, rest_in);
         }
         ResamplerMode::DownFir(ref params, state) => {
-            silk_resampler_private_down_FIR(&S.params, params, state, delay_out, delay_in);
-            silk_resampler_private_down_FIR(&S.params, params, state, rest_out, rest_in);
+            silk_resampler_private_down_fir(&s.params, params, state, delay_out, delay_in);
+            silk_resampler_private_down_fir(&s.params, params, state, rest_out, rest_in);
         }
         ResamplerMode::Copy => {
             delay_out.copy_from_slice(delay_in);
@@ -342,7 +342,7 @@ pub fn silk_resampler(S: &mut ResamplerState, out: &mut [i16], in_0: &[i16]) -> 
     }
 
     /* Copy to delay buffer */
-    S.delay_buf[..S.params.input_delay].copy_from_slice(&in_0[in_0.len() - S.params.input_delay..]);
+    s.delay_buf[..s.params.input_delay].copy_from_slice(&in_0[in_0.len() - s.params.input_delay..]);
 
     0
 }

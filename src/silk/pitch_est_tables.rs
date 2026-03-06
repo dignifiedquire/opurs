@@ -1,6 +1,6 @@
 //! Pitch estimation tables.
 //!
-//! Upstream C: `silk/pitch_est_tables.c`
+//! Upstream c: `silk/pitch_est_tables.c`
 
 pub const PE_NB_CBKS_STAGE3_MIN: i32 = 16;
 pub const PE_NB_CBKS_STAGE3_MID: i32 = 24;

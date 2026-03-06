@@ -1,6 +1,6 @@
 //! Excitation pulse decoding.
 //!
-//! Upstream C: `silk/decode_pulses.c`
+//! Upstream c: `silk/decode_pulses.c`
 
 use crate::celt::entdec::{ec_dec_icdf, EcDec};
 use crate::silk::code_signs::silk_decode_signs;
@@ -16,26 +16,26 @@ use itertools::izip;
 /// NB: when operating on 10ms frame size @ 12 kHz, the `pulses` should be larger than the frame size (to make it contain a whole amount of shell frames)
 ///
 /// ```text
-/// psRangeDec        I/O   Compressor data structure
+/// ps_range_dec        _i/O   Compressor data structure
 /// pulses[]          O     Excitation signal
-/// signalType        I     Sigtype
-/// quantOffsetType   I     quantOffsetType
-/// frame_length      I     Frame length
+/// signal_type        _i     Sigtype
+/// quant_offset_type   _i     quant_offset_type
+/// frame_length      _i     Frame length
 /// ```
-/// Upstream C: silk/decode_pulses.c:silk_decode_pulses
+/// Upstream c: silk/decode_pulses.c:silk_decode_pulses
 #[inline]
 pub fn silk_decode_pulses(
-    psRangeDec: &mut EcDec,
+    ps_range_dec: &mut EcDec,
     pulses: &mut [i16],
-    signalType: i32,
-    quantOffsetType: i32,
+    signal_type: i32,
+    quant_offset_type: i32,
 ) {
     /*********************/
     /* Decode rate level */
     /*********************/
-    let RateLevelIndex = ec_dec_icdf(
-        psRangeDec,
-        &(SILK_RATE_LEVELS_ICDF[(signalType >> 1) as usize]),
+    let rate_level_index = ec_dec_icdf(
+        ps_range_dec,
+        &(SILK_RATE_LEVELS_ICDF[(signal_type >> 1) as usize]),
         8,
     );
     let frame_length = pulses.len();
@@ -46,30 +46,30 @@ pub fn silk_decode_pulses(
     }
 
     let mut sum_pulses: [i32; 20] = [0; 20];
-    let mut nLshifts: [i32; 20] = [0; 20];
+    let mut n_lshifts: [i32; 20] = [0; 20];
 
     let sum_pulses = &mut sum_pulses[..iter];
-    let nLshifts = &mut nLshifts[..iter];
+    let n_lshifts = &mut n_lshifts[..iter];
 
     /***************************************************/
     /* Sum-Weighted-Pulses Decoding                    */
     /***************************************************/
-    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[RateLevelIndex as usize];
-    for (out_nLshifts, out_sum_pulse) in izip!(nLshifts.iter_mut(), sum_pulses.iter_mut()) {
-        let mut nLshifts = 0;
-        let mut sum_pulses = ec_dec_icdf(psRangeDec, cdf_ptr, 8);
+    let cdf_ptr = &SILK_PULSES_PER_BLOCK_ICDF[rate_level_index as usize];
+    for (out_n_lshifts, out_sum_pulse) in izip!(n_lshifts.iter_mut(), sum_pulses.iter_mut()) {
+        let mut n_lshifts = 0;
+        let mut sum_pulses = ec_dec_icdf(ps_range_dec, cdf_ptr, 8);
         /* LSB indication */
         while sum_pulses == SILK_MAX_PULSES as i32 + 1 {
-            nLshifts += 1;
+            n_lshifts += 1;
             /* When we've already got 10 LSBs, we shift the table to not allow (SILK_MAX_PULSES + 1) */
             sum_pulses = ec_dec_icdf(
-                psRangeDec,
-                &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1][(nLshifts == 10) as i32 as usize..],
+                ps_range_dec,
+                &SILK_PULSES_PER_BLOCK_ICDF[N_RATE_LEVELS - 1][(n_lshifts == 10) as i32 as usize..],
                 8,
             );
         }
 
-        *out_nLshifts = nLshifts;
+        *out_n_lshifts = n_lshifts;
         *out_sum_pulse = sum_pulses;
     }
 
@@ -82,7 +82,7 @@ pub fn silk_decode_pulses(
             pulses_buf.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
         ) {
             if sum_pulses > 0 {
-                silk_shell_decoder(pulses_frame, psRangeDec, sum_pulses);
+                silk_shell_decoder(pulses_frame, ps_range_dec, sum_pulses);
             } else {
                 pulses_frame.fill(0);
             }
@@ -91,25 +91,25 @@ pub fn silk_decode_pulses(
         /***************************************************/
         /* LSB Decoding                                    */
         /***************************************************/
-        for (&nLshifts, sum_pulses, pulses_frame) in izip!(
-            nLshifts.iter(),
+        for (&n_lshifts, sum_pulses, pulses_frame) in izip!(
+            n_lshifts.iter(),
             sum_pulses.iter_mut(),
             pulses_buf.chunks_exact_mut(SHELL_CODEC_FRAME_LENGTH)
         ) {
-            if nLshifts > 0 {
+            if n_lshifts > 0 {
                 for pulse in pulses_frame {
                     let mut abs_q = *pulse as i32;
 
-                    for _ in 0..nLshifts {
+                    for _ in 0..n_lshifts {
                         abs_q = ((abs_q as u32) << 1) as i32;
-                        abs_q += ec_dec_icdf(psRangeDec, &SILK_LSB_ICDF, 8);
+                        abs_q += ec_dec_icdf(ps_range_dec, &SILK_LSB_ICDF, 8);
                     }
 
                     *pulse = abs_q as i16;
                 }
 
                 /* Mark the number of pulses non-zero for sign decoding. */
-                *sum_pulses |= nLshifts << 5;
+                *sum_pulses |= n_lshifts << 5;
             }
         }
 
@@ -117,10 +117,10 @@ pub fn silk_decode_pulses(
         /* Decode and add signs to pulse signal */
         /****************************************/
         silk_decode_signs(
-            psRangeDec,
+            ps_range_dec,
             pulses_buf,
-            signalType,
-            quantOffsetType,
+            signal_type,
+            quant_offset_type,
             &sum_pulses[..iter],
         );
     };

@@ -1,6 +1,6 @@
 //! Floating-point LPC coefficient search.
 //!
-//! Upstream C: `silk/float/find_LPC_FLP.c`
+//! Upstream c: `silk/float/find_LPC_FLP.c`
 
 use crate::silk::define::MAX_NB_SUBFR;
 use crate::silk::float::burg_modified_flp::silk_burg_modified_flp;
@@ -11,12 +11,12 @@ use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::typedefs::SILK_FLOAT_MAX;
 
-/// Upstream C: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
+/// Upstream c: silk/float/find_LPC_FLP.c:silk_find_LPC_FLP
 pub fn silk_find_lpc_flp(
-    psEncC: &mut silk_encoder_state,
-    NLSF_Q15: &mut [i16],
+    ps_enc_c: &mut silk_encoder_state,
+    nlsf_q15: &mut [i16],
     x: &[f32],
-    minInvGain: f32,
+    min_inv_gain: f32,
 ) {
     let mut k: i32;
 
@@ -24,62 +24,67 @@ pub fn silk_find_lpc_flp(
     let mut res_nrg: f32;
     let mut res_nrg_2nd: f32;
     let mut res_nrg_interp: f32;
-    let mut NLSF0_Q15: [i16; 16] = [0; 16];
+    let mut nlsf0_q15: [i16; 16] = [0; 16];
     let mut a_tmp: [f32; 16] = [0.; 16];
-    let mut LPC_res: [f32; 384] = [0.; 384];
-    let subfr_length: i32 = psEncC.subfr_length as i32 + psEncC.predictLPCOrder;
-    psEncC.indices.NLSFInterpCoef_Q2 = 4;
+    let mut lpc_res: [f32; 384] = [0.; 384];
+    let subfr_length: i32 = ps_enc_c.subfr_length as i32 + ps_enc_c.predict_lpcorder;
+    ps_enc_c.indices.nlsfinterp_coef_q2 = 4;
     res_nrg = silk_burg_modified_flp(
         &mut a,
         x,
-        minInvGain,
+        min_inv_gain,
         subfr_length,
-        psEncC.nb_subfr as i32,
-        psEncC.predictLPCOrder,
-        psEncC.arch,
+        ps_enc_c.nb_subfr as i32,
+        ps_enc_c.predict_lpcorder,
+        ps_enc_c.arch,
     );
-    if psEncC.useInterpolatedNLSFs != 0
-        && psEncC.first_frame_after_reset == 0
-        && psEncC.nb_subfr == MAX_NB_SUBFR
+    if ps_enc_c.use_interpolated_nlsfs != 0
+        && ps_enc_c.first_frame_after_reset == 0
+        && ps_enc_c.nb_subfr == MAX_NB_SUBFR
     {
         let half_off = (MAX_NB_SUBFR as i32 / 2 * subfr_length) as usize;
         res_nrg -= silk_burg_modified_flp(
             &mut a_tmp,
             &x[half_off..],
-            minInvGain,
+            min_inv_gain,
             subfr_length,
             MAX_NB_SUBFR as i32 / 2,
-            psEncC.predictLPCOrder,
-            psEncC.arch,
+            ps_enc_c.predict_lpcorder,
+            ps_enc_c.arch,
         );
-        silk_a2nlsf_flp(NLSF_Q15, &a_tmp, psEncC.predictLPCOrder);
+        silk_a2nlsf_flp(nlsf_q15, &a_tmp, ps_enc_c.predict_lpcorder);
         res_nrg_2nd = SILK_FLOAT_MAX;
         k = 3;
         while k >= 0 {
             silk_interpolate(
-                &mut NLSF0_Q15[..psEncC.predictLPCOrder as usize],
-                &psEncC.prev_NLSFq_Q15[..psEncC.predictLPCOrder as usize],
-                &NLSF_Q15[..psEncC.predictLPCOrder as usize],
+                &mut nlsf0_q15[..ps_enc_c.predict_lpcorder as usize],
+                &ps_enc_c.prev_nlsfq_q15[..ps_enc_c.predict_lpcorder as usize],
+                &nlsf_q15[..ps_enc_c.predict_lpcorder as usize],
                 k,
             );
-            silk_nlsf2a_flp(&mut a_tmp, &NLSF0_Q15, psEncC.predictLPCOrder, psEncC.arch);
+            silk_nlsf2a_flp(
+                &mut a_tmp,
+                &nlsf0_q15,
+                ps_enc_c.predict_lpcorder,
+                ps_enc_c.arch,
+            );
             silk_lpc_analysis_filter_flp(
-                &mut LPC_res,
+                &mut lpc_res,
                 &a_tmp,
                 &x[..(2 * subfr_length) as usize],
                 2 * subfr_length,
-                psEncC.predictLPCOrder,
+                ps_enc_c.predict_lpcorder,
             );
             res_nrg_interp = (silk_energy_flp(
-                &LPC_res[psEncC.predictLPCOrder as usize..]
-                    [..(subfr_length - psEncC.predictLPCOrder) as usize],
+                &lpc_res[ps_enc_c.predict_lpcorder as usize..]
+                    [..(subfr_length - ps_enc_c.predict_lpcorder) as usize],
             ) + silk_energy_flp(
-                &LPC_res[(psEncC.predictLPCOrder + subfr_length) as usize..]
-                    [..(subfr_length - psEncC.predictLPCOrder) as usize],
+                &lpc_res[(ps_enc_c.predict_lpcorder + subfr_length) as usize..]
+                    [..(subfr_length - ps_enc_c.predict_lpcorder) as usize],
             )) as f32;
             if res_nrg_interp < res_nrg {
                 res_nrg = res_nrg_interp;
-                psEncC.indices.NLSFInterpCoef_Q2 = k as i8;
+                ps_enc_c.indices.nlsfinterp_coef_q2 = k as i8;
             } else if res_nrg_interp > res_nrg_2nd {
                 break;
             }
@@ -87,13 +92,13 @@ pub fn silk_find_lpc_flp(
             k -= 1;
         }
     }
-    if psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4 {
-        silk_a2nlsf_flp(NLSF_Q15, &a, psEncC.predictLPCOrder);
+    if ps_enc_c.indices.nlsfinterp_coef_q2 as i32 == 4 {
+        silk_a2nlsf_flp(nlsf_q15, &a, ps_enc_c.predict_lpcorder);
     }
     debug_assert!(
-        psEncC.indices.NLSFInterpCoef_Q2 as i32 == 4
-            || psEncC.useInterpolatedNLSFs != 0
-                && psEncC.first_frame_after_reset == 0
-                && psEncC.nb_subfr == 4
+        ps_enc_c.indices.nlsfinterp_coef_q2 as i32 == 4
+            || ps_enc_c.use_interpolated_nlsfs != 0
+                && ps_enc_c.first_frame_after_reset == 0
+                && ps_enc_c.nb_subfr == 4
     );
 }

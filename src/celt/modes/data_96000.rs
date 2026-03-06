@@ -30,22 +30,22 @@ pub const QEXT_PACKET_SIZE_CAP: i32 = 3825;
 /// Upstream C: celt/modes.h:NB_QEXT_BANDS
 pub const NB_QEXT_BANDS: usize = 14;
 
-/// QEXT eBands for shortMdctSize=240 (20ms @ 96kHz or 40ms @ 48kHz).
+/// QEXT e_bands for short_mdct_size=240 (20ms @ 96kHz or 40ms @ 48kHz).
 /// 14 bands covering 20-48 kHz, each ~2 kHz wide.
 pub static QEXT_EBANDS_240: [i16; NB_QEXT_BANDS + 1] = [
     100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240,
 ];
 
-/// QEXT logN for shortMdctSize=240.
+/// QEXT log_n for short_mdct_size=240.
 pub static QEXT_LOGN_240: [i16; NB_QEXT_BANDS] =
     [27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27];
 
-/// QEXT eBands for shortMdctSize=180 (15ms @ 96kHz or 30ms @ 48kHz).
+/// QEXT e_bands for short_mdct_size=180 (15ms @ 96kHz or 30ms @ 48kHz).
 pub static QEXT_EBANDS_180: [i16; NB_QEXT_BANDS + 1] = [
     74, 82, 90, 98, 106, 114, 122, 130, 138, 146, 154, 162, 168, 174, 180,
 ];
 
-/// QEXT logN for shortMdctSize=180 (15 entries; last unused when effEBands==14).
+/// QEXT log_n for short_mdct_size=180 (15 entries; last unused when eff_ebands==14).
 pub static QEXT_LOGN_180: [i16; 15] = [24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 21, 21, 21];
 
 #[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
@@ -1524,18 +1524,18 @@ pub static MDCT_TWIDDLES1920: [&[f32]; 4] = [
 ];
 
 pub(crate) static MODE96000_1920_240: OpusCustomMode = OpusCustomMode {
-    Fs: 96000,
+    fs: 96000,
     overlap: 240,
-    nbEBands: 21,
-    effEBands: 21,
+    nb_ebands: 21,
+    eff_ebands: 21,
     preemph: [0.92300415, 0.22000122, 1.5128347, 0.66101074],
-    eBands: &EBAND5MS,
-    maxLM: 3,
-    nbShortMdcts: 8,
-    shortMdctSize: 240,
-    nbAllocVectors: 11,
-    allocVectors: &BAND_ALLOCATION,
-    logN: &LOG_N400,
+    e_bands: &EBAND5MS,
+    max_lm: 3,
+    nb_short_mdcts: 8,
+    short_mdct_size: 240,
+    nb_alloc_vectors: 11,
+    alloc_vectors: &BAND_ALLOCATION,
+    log_n: &LOG_N400,
     window: &WINDOW240,
     mdct: MdctLookup {
         n: 3840,

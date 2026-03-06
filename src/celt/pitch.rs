@@ -216,35 +216,35 @@ pub fn celt_inner_prod_scalar(x: &[f32], y: &[f32], n: usize) -> f32 {
 /// Returns `[best_pitch_0, best_pitch_1]`.
 /// Upstream C: celt/pitch.c:find_best_pitch
 fn find_best_pitch(xcorr: &[f32], y: &[f32], len: usize, max_pitch: usize) -> [i32; 2] {
-    let mut Syy: f32 = 1.0;
+    let mut syy: f32 = 1.0;
     let mut best_num: [f32; 2] = [-1.0, -1.0];
     let mut best_den: [f32; 2] = [0.0, 0.0];
     let mut best_pitch: [i32; 2] = [0, 1];
     for yj in &y[..len] {
-        Syy += yj * yj;
+        syy += yj * yj;
     }
     for i in 0..max_pitch {
         if xcorr[i] > 0.0 {
             let xcorr16 = xcorr[i] * 1e-12f32;
             let num = xcorr16 * xcorr16;
-            if num * best_den[1] > best_num[1] * Syy {
-                if num * best_den[0] > best_num[0] * Syy {
+            if num * best_den[1] > best_num[1] * syy {
+                if num * best_den[0] > best_num[0] * syy {
                     best_num[1] = best_num[0];
                     best_den[1] = best_den[0];
                     best_pitch[1] = best_pitch[0];
                     best_num[0] = num;
-                    best_den[0] = Syy;
+                    best_den[0] = syy;
                     best_pitch[0] = i as i32;
                 } else {
                     best_num[1] = num;
-                    best_den[1] = Syy;
+                    best_den[1] = syy;
                     best_pitch[1] = i as i32;
                 }
             }
         }
-        // C: Syy += A - B, i.e. Syy + (A - B), not (Syy + A) - B.
-        Syy += y[i + len] * y[i + len] - y[i] * y[i];
-        Syy = celt_max32(1.0f32, Syy);
+        // C: syy += A - B, i.e. syy + (A - B), not (syy + A) - B.
+        syy += y[i + len] * y[i + len] - y[i] * y[i];
+        syy = celt_max32(1.0f32, syy);
     }
     best_pitch
 }
@@ -285,8 +285,8 @@ fn celt_fir5(x: &mut [f32], num: &[f32; 5]) {
 /// `x_lp` receives the downsampled output of length `len`.
 /// Upstream C: celt/pitch.c:pitch_downsample
 pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usize, arch: Arch) {
-    let C = x.len();
-    debug_assert!(C == 1 || C == 2);
+    let channels = x.len();
+    debug_assert!(channels == 1 || channels == 2);
     debug_assert!(factor >= 2 && factor.is_multiple_of(2));
     debug_assert!(x[0].len() >= len * factor);
     debug_assert!(x_lp.len() >= len);
@@ -305,7 +305,7 @@ pub fn pitch_downsample(x: &[&[f32]], x_lp: &mut [f32], len: usize, factor: usiz
     }
     x_lp[0] = 0.25f32 * x[0][offset] + 0.5f32 * x[0][0];
 
-    if C == 2 {
+    if channels == 2 {
         for i in 1..len {
             x_lp[i] += 0.25f32 * x[1][factor * i - offset]
                 + 0.25f32 * x[1][factor * i + offset]
@@ -456,13 +456,13 @@ pub fn remove_doubling(
     x: &[f32],
     mut maxperiod: i32,
     mut minperiod: i32,
-    mut N: i32,
-    T0_: &mut i32,
+    mut n: i32,
+    t0: &mut i32,
     mut prev_period: i32,
     prev_gain: f32,
     arch: Arch,
 ) -> f32 {
-    let mut T: i32;
+    let mut t: i32;
 
     let mut g: f32;
 
@@ -477,22 +477,22 @@ pub fn remove_doubling(
     let minperiod0: i32 = minperiod;
     maxperiod /= 2;
     minperiod /= 2;
-    *T0_ /= 2;
+    *t0 /= 2;
     prev_period /= 2;
-    N /= 2;
+    n /= 2;
     // x_off is the offset into the buffer (equivalent to x += maxperiod in C)
     let x_off = maxperiod as usize;
-    if *T0_ >= maxperiod {
-        *T0_ = maxperiod - 1;
+    if *t0 >= maxperiod {
+        *t0 = maxperiod - 1;
     }
-    let T0: i32 = *T0_;
-    T = T0;
+    let t0_val: i32 = *t0;
+    t = t0_val;
     let mut yy_lookup: Vec<f32> = vec![0.0; (maxperiod + 1) as usize];
     let (xx_val, xy_val) = dual_inner_prod(
         &x[x_off..],
         &x[x_off..],
-        &x[x_off - T0 as usize..],
-        N as usize,
+        &x[x_off - t0_val as usize..],
+        n as usize,
         arch,
     );
     let xx: f32 = xx_val;
@@ -502,58 +502,58 @@ pub fn remove_doubling(
     for i in 1..=maxperiod as usize {
         // Match C left-associative evaluation: (yy + add) - sub.
         yy += x[x_off - i] * x[x_off - i];
-        yy -= x[x_off + N as usize - i] * x[x_off + N as usize - i];
+        yy -= x[x_off + n as usize - i] * x[x_off + n as usize - i];
         yy_lookup[i] = celt_max32(0.0f32, yy);
     }
-    yy = yy_lookup[T0 as usize];
+    yy = yy_lookup[t0_val as usize];
     best_xy = xy;
     best_yy = yy;
     let g0: f32 = compute_pitch_gain(xy, xx, yy);
     g = g0;
     for k in 2..=15 {
-        let T1 = celt_udiv((2 * T0 + k) as u32, (2 * k) as u32) as i32;
-        if T1 < minperiod {
+        let t1 = celt_udiv((2 * t0_val + k) as u32, (2 * k) as u32) as i32;
+        if t1 < minperiod {
             break;
         }
-        let T1b;
+        let t1b;
         if k == 2 {
-            if T1 + T0 > maxperiod {
-                T1b = T0;
+            if t1 + t0_val > maxperiod {
+                t1b = t0_val;
             } else {
-                T1b = T0 + T1;
+                t1b = t0_val + t1;
             }
         } else {
-            T1b = celt_udiv(
-                (2 * SECOND_CHECK[k as usize] * T0 + k) as u32,
+            t1b = celt_udiv(
+                (2 * SECOND_CHECK[k as usize] * t0_val + k) as u32,
                 (2 * k) as u32,
             ) as i32;
         }
         let (xy_new, xy2_new) = dual_inner_prod(
             &x[x_off..],
-            &x[x_off - T1 as usize..],
-            &x[x_off - T1b as usize..],
-            N as usize,
+            &x[x_off - t1 as usize..],
+            &x[x_off - t1b as usize..],
+            n as usize,
             arch,
         );
         xy = 0.5f32 * (xy_new + xy2_new);
-        yy = 0.5f32 * (yy_lookup[T1 as usize] + yy_lookup[T1b as usize]);
+        yy = 0.5f32 * (yy_lookup[t1 as usize] + yy_lookup[t1b as usize]);
         let g1 = compute_pitch_gain(xy, xx, yy);
         let mut cont: f32 = 0.0;
-        if (T1 - prev_period).abs() <= 1 {
+        if (t1 - prev_period).abs() <= 1 {
             cont = prev_gain;
-        } else if (T1 - prev_period).abs() <= 2 && 5 * k * k < T0 {
+        } else if (t1 - prev_period).abs() <= 2 && 5 * k * k < t0_val {
             cont = 0.5f32 * prev_gain;
         }
         let mut thresh = celt_max32(0.3f32, 0.7f32 * g0 - cont);
-        if T1 < 3 * minperiod {
+        if t1 < 3 * minperiod {
             thresh = celt_max32(0.4f32, 0.85f32 * g0 - cont);
-        } else if T1 < 2 * minperiod {
+        } else if t1 < 2 * minperiod {
             thresh = celt_max32(0.5f32, 0.9f32 * g0 - cont);
         }
         if g1 > thresh {
             best_xy = xy;
             best_yy = yy;
-            T = T1;
+            t = t1;
             g = g1;
         }
     }
@@ -566,8 +566,8 @@ pub fn remove_doubling(
     for k in 0..3i32 {
         xcorr[k as usize] = celt_inner_prod(
             &x[x_off..],
-            &x[x_off - (T + k - 1) as usize..],
-            N as usize,
+            &x[x_off - (t + k - 1) as usize..],
+            n as usize,
             arch,
         );
     }
@@ -581,9 +581,9 @@ pub fn remove_doubling(
     if pg > g {
         pg = g;
     }
-    *T0_ = 2 * T + offset;
-    if *T0_ < minperiod0 {
-        *T0_ = minperiod0;
+    *t0 = 2 * t + offset;
+    if *t0 < minperiod0 {
+        *t0 = minperiod0;
     }
     pg
 }

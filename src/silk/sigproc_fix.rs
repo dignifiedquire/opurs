@@ -1,16 +1,16 @@
 //! Fixed-point signal processing constants and utilities.
 //!
-//! Upstream C: `silk/SigProc_FIX.h`
+//! Upstream c: `silk/SigProc_FIX.h`
 
-/// max order of the LPC analysis in schur() and k2a()
+/// max Order of the LPC analysis in schur() and k2a()
 pub const SILK_MAX_ORDER_LPC: usize = 24;
 
 ///
 /// Rotate a32 right by 'rot' bits. Negative rot values result in rotating left. Output is 32bit int.
 ///
-/// Note: contemporary compilers recognize the C expression below and
+/// Note: contemporary compilers recognize the c expression below and
 /// compile it into a 'ror' instruction if available. No need for OPUS_INLINE ASM!
-/// Upstream C: silk/SigProc_FIX.h:silk_ROR32
+/// Upstream c: silk/SigProc_FIX.h:silk_ROR32
 #[inline]
 pub fn silk_ror32(a32: i32, rot: i32) -> i32 {
     let x: u32 = a32 as u32;
@@ -25,13 +25,13 @@ pub fn silk_ror32(a32: i32, rot: i32) -> i32 {
     }
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_SMULTT
+/// Upstream c: silk/SigProc_FIX.h:silk_SMULTT
 #[inline]
 pub fn silk_smultt(a32: i32, b32: i32) -> i32 {
     (a32 >> 16) * (b32 >> 16)
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_SAT16
+/// Upstream c: silk/SigProc_FIX.h:silk_SAT16
 #[inline]
 pub fn silk_sat16(a: i32) -> i32 {
     if a > i16::MAX as i32 {
@@ -45,13 +45,13 @@ pub fn silk_sat16(a: i32) -> i32 {
 
 ///
 /// saturates before shifting
-/// Upstream C: silk/SigProc_FIX.h:silk_LSHIFT_SAT32
+/// Upstream c: silk/SigProc_FIX.h:silk_LSHIFT_SAT32
 #[inline]
 pub fn silk_lshift_sat32(a: i32, shift: i32) -> i32 {
     silk_limit(a, i32::MIN >> shift, i32::MAX >> shift) << shift
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_RSHIFT_ROUND
+/// Upstream c: silk/SigProc_FIX.h:silk_RSHIFT_ROUND
 #[inline]
 pub fn silk_rshift_round(a: i32, shift: i32) -> i32 {
     if shift == 1 {
@@ -61,7 +61,7 @@ pub fn silk_rshift_round(a: i32, shift: i32) -> i32 {
     }
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_RSHIFT_ROUND64
+/// Upstream c: silk/SigProc_FIX.h:silk_RSHIFT_ROUND64
 #[inline]
 pub fn silk_rshift_round64(a: i64, shift: i32) -> i64 {
     if shift == 1 {
@@ -73,41 +73,41 @@ pub fn silk_rshift_round64(a: i64, shift: i32) -> i64 {
 
 /// Macro to convert floating-point constants to fixed-point
 macro_rules! SILK_FIX_CONST {
-    ($C:expr, $Q:expr) => {
-        (($C as f64) * (1i64 << ($Q as i32)) as f64 + 0.5f64) as i32
+    ($c:expr, $Q:expr) => {
+        (($c as f64) * (1i64 << ($Q as i32)) as f64 + 0.5f64) as i32
     };
 }
 pub(crate) use SILK_FIX_CONST;
 
-/// Upstream C: silk/SigProc_FIX.h:silk_min_int
+/// Upstream c: silk/SigProc_FIX.h:silk_min_int
 #[inline]
 pub fn silk_min_int(a: i32, b: i32) -> i32 {
     a.min(b)
 }
-/// Upstream C: silk/SigProc_FIX.h:silk_max_int
+/// Upstream c: silk/SigProc_FIX.h:silk_max_int
 #[inline]
 pub fn silk_max_int(a: i32, b: i32) -> i32 {
     a.max(b)
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_max_16
+/// Upstream c: silk/SigProc_FIX.h:silk_max_16
 #[inline]
 pub fn silk_max_16(a: i16, b: i16) -> i16 {
     a.max(b)
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_min_32
+/// Upstream c: silk/SigProc_FIX.h:silk_min_32
 #[inline]
 pub fn silk_min_32(a: i32, b: i32) -> i32 {
     a.min(b)
 }
-/// Upstream C: silk/SigProc_FIX.h:silk_max_32
+/// Upstream c: silk/SigProc_FIX.h:silk_max_32
 #[inline]
 pub fn silk_max_32(a: i32, b: i32) -> i32 {
     a.max(b)
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_LIMIT
+/// Upstream c: silk/SigProc_FIX.h:silk_LIMIT
 #[inline]
 pub fn silk_limit<T: Ord>(a: T, limit1: T, limit2: T) -> T {
     if limit1 > limit2 {
@@ -136,14 +136,14 @@ pub const RAND_INCREMENT: i32 = 907633515;
 /// Make sure to store the result as the seed for the next call (also in between
 /// frames), otherwise the result won't be random at all. When only using some of the
 /// bits, take the most significant bits by right-shifting.
-/// Upstream C: silk/SigProc_FIX.h:silk_RAND
+/// Upstream c: silk/SigProc_FIX.h:silk_RAND
 #[inline]
 pub fn silk_rand(seed: i32) -> i32 {
     seed.wrapping_mul(RAND_MULTIPLIER)
         .wrapping_add(RAND_INCREMENT)
 }
 
-/// Upstream C: silk/SigProc_FIX.h:silk_SMMUL
+/// Upstream c: silk/SigProc_FIX.h:silk_SMMUL
 #[inline]
 pub fn silk_smmul(a32: i32, b32: i32) -> i32 {
     ((a32 as i64 * b32 as i64) >> 32) as i32

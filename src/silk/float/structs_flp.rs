@@ -1,68 +1,68 @@
 //! Floating-point SILK data structures.
 //!
-//! Upstream C: `silk/float/structs_FLP.h`
+//! Upstream c: `silk/float/structs_FLP.h`
 
 use crate::silk::structs::{silk_encoder_state, stereo_enc_state};
 
 #[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_encoder {
-    pub state_Fxx: [silk_encoder_state_FLP; 2],
-    pub sStereo: stereo_enc_state,
-    pub nBitsUsedLBRR: i32,
-    pub nBitsExceeded: i32,
-    pub nChannelsAPI: i32,
-    pub nChannelsInternal: i32,
-    pub nPrevChannelsInternal: i32,
-    pub timeSinceSwitchAllowed_ms: i32,
-    pub allowBandwidthSwitch: i32,
+    pub state_fxx: [silk_encoder_state_FLP; 2],
+    pub s_stereo: stereo_enc_state,
+    pub n_bits_used_lbrr: i32,
+    pub n_bits_exceeded: i32,
+    pub n_channels_api: i32,
+    pub n_channels_internal: i32,
+    pub n_prev_channels_internal: i32,
+    pub time_since_switch_allowed_ms: i32,
+    pub allow_bandwidth_switch: i32,
     pub prev_decode_only_middle: i32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_encoder_state_FLP {
-    pub sCmn: silk_encoder_state,
-    pub sShape: silk_shape_state_FLP,
+    pub s_cmn: silk_encoder_state,
+    pub s_shape: silk_shape_state_FLP,
     pub x_buf: [f32; 720],
-    pub LTPCorr: f32,
+    pub ltpcorr: f32,
 }
 
 impl Default for silk_encoder_state_FLP {
     fn default() -> Self {
         Self {
-            sCmn: Default::default(),
-            sShape: Default::default(),
+            s_cmn: Default::default(),
+            s_shape: Default::default(),
             x_buf: [0.0; 720],
-            LTPCorr: 0.0,
+            ltpcorr: 0.0,
         }
     }
 }
 #[derive(Copy, Clone, Default)]
 #[repr(C)]
 pub struct silk_shape_state_FLP {
-    pub LastGainIndex: i8,
-    pub HarmShapeGain_smth: f32,
-    pub Tilt_smth: f32,
+    pub last_gain_index: i8,
+    pub harm_shape_gain_smth: f32,
+    pub tilt_smth: f32,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct silk_encoder_control_FLP {
-    pub Gains: [f32; 4],
-    pub PredCoef: [[f32; 16]; 2],
-    pub LTPCoef: [f32; 20],
-    pub LTP_scale: f32,
-    pub pitchL: [i32; 4],
-    pub AR: [f32; 96],
-    pub LF_MA_shp: [f32; 4],
-    pub LF_AR_shp: [f32; 4],
-    pub Tilt: [f32; 4],
-    pub HarmShapeGain: [f32; 4],
-    pub Lambda: f32,
+    pub gains: [f32; 4],
+    pub pred_coef: [[f32; 16]; 2],
+    pub ltp_coef: [f32; 20],
+    pub ltp_scale: f32,
+    pub pitch_l: [i32; 4],
+    pub ar: [f32; 96],
+    pub lf_ma_shp: [f32; 4],
+    pub lf_ar_shp: [f32; 4],
+    pub tilt: [f32; 4],
+    pub harm_shape_gain: [f32; 4],
+    pub lambda: f32,
     pub input_quality: f32,
     pub coding_quality: f32,
-    pub predGain: f32,
-    pub LTPredCodGain: f32,
-    pub ResNrg: [f32; 4],
-    pub GainsUnq_Q16: [i32; 4],
-    pub lastGainIndexPrev: i8,
+    pub pred_gain: f32,
+    pub lt_pred_cod_gain: f32,
+    pub res_nrg: [f32; 4],
+    pub gains_unq_q16: [i32; 4],
+    pub last_gain_index_prev: i8,
 }

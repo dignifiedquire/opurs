@@ -1,6 +1,6 @@
 //! Pitch lag decoding.
 //!
-//! Upstream C: `silk/decode_pitch.c`
+//! Upstream c: `silk/decode_pitch.c`
 
 use crate::silk::pitch_est_tables::{
     PE_MAX_LAG_MS, PE_MAX_NB_SUBFR, PE_MAX_NB_SUBFR_OVER_2, PE_MIN_LAG_MS, PE_NB_CBKS_STAGE2_10MS,
@@ -13,17 +13,17 @@ use crate::silk::sigproc_fix::silk_limit;
 /// Pitch analyzer function
 ///
 /// ```text
-/// lagIndex       I
-/// contourIndex   O
+/// lag_index       I
+/// contour_index   O
 /// pitch_lags[]   O   4 pitch values
-/// Fs_kHz         I   sampling frequency (kHz)
+/// fs_k_hz         I   sampling frequency (kHz)
 /// nb_subfr       I   number of sub frames
 /// ```
-/// Upstream C: silk/decode_pitch.c:silk_decode_pitch
-pub fn silk_decode_pitch(lagIndex: i16, contourIndex: i8, pitch_lags: &mut [i32], Fs_kHz: i32) {
+/// Upstream c: silk/decode_pitch.c:silk_decode_pitch
+pub fn silk_decode_pitch(lag_index: i16, contour_index: i8, pitch_lags: &mut [i32], fs_k_hz: i32) {
     let nb_subfr = pitch_lags.len();
 
-    let (lag_cb_flat, ncols): (&[i8], usize) = if Fs_kHz == 8 {
+    let (lag_cb_flat, ncols): (&[i8], usize) = if fs_k_hz == 8 {
         if nb_subfr == PE_MAX_NB_SUBFR {
             (&SILK_CB_LAGS_STAGE2, PE_NB_CBKS_STAGE2_EXT)
         } else {
@@ -37,13 +37,13 @@ pub fn silk_decode_pitch(lagIndex: i16, contourIndex: i8, pitch_lags: &mut [i32]
         (&SILK_CB_LAGS_STAGE3_10_MS, PE_NB_CBKS_STAGE3_10MS)
     };
 
-    let min_lag = PE_MIN_LAG_MS * Fs_kHz as i16 as i32;
-    let max_lag = PE_MAX_LAG_MS * Fs_kHz as i16 as i32;
-    let lag = min_lag + lagIndex as i32;
+    let min_lag = PE_MIN_LAG_MS * fs_k_hz as i16 as i32;
+    let max_lag = PE_MAX_LAG_MS * fs_k_hz as i16 as i32;
+    let lag = min_lag + lag_index as i32;
 
     for (k, out_lag) in pitch_lags.iter_mut().enumerate() {
         let lag_cb_row = &lag_cb_flat[k * ncols..][..ncols];
-        let lag = lag + lag_cb_row[contourIndex as usize] as i32;
+        let lag = lag + lag_cb_row[contour_index as usize] as i32;
         *out_lag = silk_limit(lag, min_lag, max_lag);
     }
 }

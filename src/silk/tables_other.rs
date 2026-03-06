@@ -1,6 +1,6 @@
 //! Miscellaneous tables.
 //!
-//! Upstream C: `silk/tables_other.c`
+//! Upstream c: `silk/tables_other.c`
 
 use crate::silk::define::{
     OFFSET_UVH_Q10, OFFSET_UVL_Q10, OFFSET_VH_Q10, OFFSET_VL_Q10, TRANSITION_INT_NUM,

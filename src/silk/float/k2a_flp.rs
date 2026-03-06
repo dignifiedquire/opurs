@@ -1,9 +1,9 @@
 //! Floating-point reflection coefficients to LPC conversion.
 //!
-//! Upstream C: `silk/float/k2a_FLP.c`
+//! Upstream c: `silk/float/k2a_FLP.c`
 
-/// Upstream C: silk/float/k2a_FLP.c:silk_k2a_FLP
-pub fn silk_k2a_flp(A: &mut [f32], rc: &[f32], order: i32) {
+/// Upstream c: silk/float/k2a_FLP.c:silk_k2a_FLP
+pub fn silk_k2a_flp(a: &mut [f32], rc: &[f32], order: i32) {
     let mut k: i32;
     let mut n: i32;
     let mut rck: f32;
@@ -14,13 +14,13 @@ pub fn silk_k2a_flp(A: &mut [f32], rc: &[f32], order: i32) {
         rck = rc[k as usize];
         n = 0;
         while n < (k + 1) >> 1 {
-            tmp1 = A[n as usize];
-            tmp2 = A[(k - n - 1) as usize];
-            A[n as usize] = tmp1 + tmp2 * rck;
-            A[(k - n - 1) as usize] = tmp2 + tmp1 * rck;
+            tmp1 = a[n as usize];
+            tmp2 = a[(k - n - 1) as usize];
+            a[n as usize] = tmp1 + tmp2 * rck;
+            a[(k - n - 1) as usize] = tmp2 + tmp1 * rck;
             n += 1;
         }
-        A[k as usize] = -rck;
+        a[k as usize] = -rck;
         k += 1;
     }
 }

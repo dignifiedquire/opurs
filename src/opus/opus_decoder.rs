@@ -86,12 +86,12 @@ impl OpusDecoder {
             channels: channels as i32,
             fs,
             dec_control: silk_DecControlStruct {
-                nChannelsAPI: channels,
-                nChannelsInternal: 0,
-                API_sampleRate: fs,
-                internalSampleRate: 0,
-                payloadSize_ms: 0,
-                prevPitchLag: 0,
+                n_channels_api: channels,
+                n_channels_internal: 0,
+                api_sample_rate: fs,
+                internal_sample_rate: 0,
+                payload_size_ms: 0,
+                prev_pitch_lag: 0,
                 enable_deep_plc: false,
                 #[cfg(feature = "osce")]
                 osce_method: 0,
@@ -304,7 +304,7 @@ impl OpusDecoder {
         if self.prev_mode == MODE_CELT_ONLY {
             self.celt_dec.postfilter_period
         } else {
-            self.dec_control.prevPitchLag
+            self.dec_control.prev_pitch_lag
         }
     }
 
@@ -445,25 +445,25 @@ fn validate_opus_decoder(st: &OpusDecoder) {
             || st.fs == 8000
             || cfg!(feature = "qext") && st.fs == 96000
     );
-    debug_assert!(st.dec_control.API_sampleRate == st.fs);
+    debug_assert!(st.dec_control.api_sample_rate == st.fs);
     debug_assert!(
-        st.dec_control.internalSampleRate == 0
-            || st.dec_control.internalSampleRate == 16000
-            || st.dec_control.internalSampleRate == 12000
-            || st.dec_control.internalSampleRate == 8000
+        st.dec_control.internal_sample_rate == 0
+            || st.dec_control.internal_sample_rate == 16000
+            || st.dec_control.internal_sample_rate == 12000
+            || st.dec_control.internal_sample_rate == 8000
     );
-    debug_assert!(st.dec_control.nChannelsAPI == st.channels as usize);
+    debug_assert!(st.dec_control.n_channels_api == st.channels as usize);
     debug_assert!(
-        st.dec_control.nChannelsInternal == 0
-            || st.dec_control.nChannelsInternal == 1
-            || st.dec_control.nChannelsInternal == 2
+        st.dec_control.n_channels_internal == 0
+            || st.dec_control.n_channels_internal == 1
+            || st.dec_control.n_channels_internal == 2
     );
     debug_assert!(
-        st.dec_control.payloadSize_ms == 0
-            || st.dec_control.payloadSize_ms == 10
-            || st.dec_control.payloadSize_ms == 20
-            || st.dec_control.payloadSize_ms == 40
-            || st.dec_control.payloadSize_ms == 60
+        st.dec_control.payload_size_ms == 0
+            || st.dec_control.payload_size_ms == 10
+            || st.dec_control.payload_size_ms == 20
+            || st.dec_control.payload_size_ms == 40
+            || st.dec_control.payload_size_ms == 60
     );
     debug_assert!(st.stream_channels == 1 || st.stream_channels == 2);
 }
@@ -692,26 +692,26 @@ fn opus_decode_frame(
         if st.prev_mode == MODE_CELT_ONLY {
             silk_reset_decoder(&mut st.silk_dec);
         }
-        st.dec_control.payloadSize_ms = if 10 > 1000 * audiosize / st.fs {
+        st.dec_control.payload_size_ms = if 10 > 1000 * audiosize / st.fs {
             10
         } else {
             1000 * audiosize / st.fs
         };
         if data.is_some() {
-            st.dec_control.nChannelsInternal = st.stream_channels;
+            st.dec_control.n_channels_internal = st.stream_channels;
             if mode == MODE_SILK_ONLY {
                 if bandwidth == OPUS_BANDWIDTH_NARROWBAND {
-                    st.dec_control.internalSampleRate = 8000;
+                    st.dec_control.internal_sample_rate = 8000;
                 } else if bandwidth == OPUS_BANDWIDTH_MEDIUMBAND {
-                    st.dec_control.internalSampleRate = 12000;
+                    st.dec_control.internal_sample_rate = 12000;
                 } else if bandwidth == OPUS_BANDWIDTH_WIDEBAND {
-                    st.dec_control.internalSampleRate = 16000;
+                    st.dec_control.internal_sample_rate = 16000;
                 } else {
-                    st.dec_control.internalSampleRate = 16000;
+                    st.dec_control.internal_sample_rate = 16000;
                     debug_assert!(false, "libopus: assert(0) called");
                 }
             } else {
-                st.dec_control.internalSampleRate = 16000;
+                st.dec_control.internal_sample_rate = 16000;
             }
         }
         // Set DNN control parameters based on complexity
@@ -730,7 +730,7 @@ fn opus_decode_frame(
             if st.complexity >= 4
                 && st.dec_control.enable_osce_bwe
                 && st.fs == 48000
-                && st.dec_control.internalSampleRate == 16000
+                && st.dec_control.internal_sample_rate == 16000
                 && (mode == MODE_SILK_ONLY || data.is_none())
             {
                 // Request WB -> FB signal extension

@@ -553,7 +553,7 @@ fn compute_conv2d_c(
     let mut in_buf = vec![0.0f32; MAX_CONV2D_INPUTS];
 
     // Copy history from mem, then current input
-    let hist_size = (conv.ktime - 1) * time_stride;
+    let hist_size = conv.ktime.saturating_sub(1) * time_stride;
     in_buf[..hist_size].copy_from_slice(&mem[..hist_size]);
     in_buf[hist_size..hist_size + time_stride].copy_from_slice(&input[..time_stride]);
     // Shift memory

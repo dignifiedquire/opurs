@@ -1,6 +1,6 @@
 //! SNR-based bitrate control.
 //!
-//! Upstream C: `silk/control_SNR.c`
+//! Upstream c: `silk/control_SNR.c`
 
 use crate::silk::structs::silk_encoder_state;
 
@@ -43,26 +43,26 @@ const SILK_TARGETRATE_WB_21: [u8; 191] = [
 ///
 /// Control SNR of residual quantizer
 ///
-/// psEncC         I/O  Pointer to Silk encoder state
-/// TargetRate_bps I    Target max bitrate (bps)
-/// Upstream C: silk/control_SNR.c:silk_control_SNR
-pub fn silk_control_snr(psEncC: &mut silk_encoder_state, mut TargetRate_bps: i32) {
-    psEncC.TargetRate_bps = TargetRate_bps;
-    if psEncC.nb_subfr == 2 {
-        TargetRate_bps -= 2000 + psEncC.fs_kHz / 16;
+/// ps_enc_c         I/O  Pointer to Silk encoder state
+/// target_rate_bps I    Target max bitrate (bps)
+/// Upstream c: silk/control_SNR.c:silk_control_SNR
+pub fn silk_control_snr(ps_enc_c: &mut silk_encoder_state, mut target_rate_bps: i32) {
+    ps_enc_c.target_rate_bps = target_rate_bps;
+    if ps_enc_c.nb_subfr == 2 {
+        target_rate_bps -= 2000 + ps_enc_c.fs_k_hz / 16;
     }
-    let snr_table: &[u8] = if psEncC.fs_kHz == 8 {
+    let snr_table: &[u8] = if ps_enc_c.fs_k_hz == 8 {
         &SILK_TARGETRATE_NB_21
-    } else if psEncC.fs_kHz == 12 {
+    } else if ps_enc_c.fs_k_hz == 12 {
         &SILK_TARGETRATE_MB_21
     } else {
         &SILK_TARGETRATE_WB_21
     };
-    let id = (TargetRate_bps + 200) / 400;
+    let id = (target_rate_bps + 200) / 400;
     let id = (id - 10).min(snr_table.len() as i32 - 1);
     if id <= 0 {
-        psEncC.SNR_dB_Q7 = 0;
+        ps_enc_c.snr_d_b_q7 = 0;
     } else {
-        psEncC.SNR_dB_Q7 = snr_table[id as usize] as i32 * 21;
+        ps_enc_c.snr_d_b_q7 = snr_table[id as usize] as i32 * 21;
     }
 }

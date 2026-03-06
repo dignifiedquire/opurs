@@ -34,7 +34,7 @@ fn qext_encode_96k_stereo_does_not_panic() {
         bitrate: 128_000,
         options: EncoderOptions {
             framesize: FrameSize::Ms20,
-            complexity: opurs::tools::demo::Complexity::C10,
+            complexity: opurs::tools::demo::complexity::C10,
             qext: true,
             ..Default::default()
         },
@@ -62,7 +62,7 @@ fn qext_decode_96k_stereo_matches_upstream_when_available() {
         bitrate: 128_000,
         options: EncoderOptions {
             framesize: FrameSize::Ms20,
-            complexity: opurs::tools::demo::Complexity::C10,
+            complexity: opurs::tools::demo::complexity::C10,
             qext: true,
             ..Default::default()
         },

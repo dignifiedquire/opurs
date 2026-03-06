@@ -20,6 +20,7 @@ mod input;
 pub use self::backend::OpusBackend;
 use self::backend::{OpusBackendTrait, RustLibopusBackend, UpstreamLibopusBackend};
 
+pub use input::Complexity as complexity;
 pub use input::{
     parse_multistream_mapping, Application, Bandwidth, Channels, CommonOptions, Complexity,
     DecodeArgs, DnnOptions, EncodeArgs, EncoderOptions, FrameSize, MultistreamDecodeArgs,

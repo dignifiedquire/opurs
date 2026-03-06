@@ -1,6 +1,6 @@
-//! NLSF codebook encoding.
+//! nlsf codebook encoding.
 //!
-//! Upstream C: `silk/NLSF_encode.c`
+//! Upstream c: `silk/NLSF_encode.c`
 
 use crate::silk::define::MAX_LPC_ORDER;
 use crate::silk::inlines::silk_div32_varq;
@@ -13,115 +13,117 @@ use crate::silk::nlsf_vq::silk_nlsf_vq;
 use crate::silk::sort::silk_insertion_sort_increasing;
 use crate::silk::structs::silk_NLSF_CB_struct;
 
-/// Upstream C: silk/NLSF_encode.c:silk_NLSF_encode
+/// Upstream c: silk/NLSF_encode.c:silk_NLSF_encode
 pub fn silk_nlsf_encode(
-    NLSFIndices: &mut [i8],
-    pNLSF_Q15: &mut [i16],
-    psNLSF_CB: &silk_NLSF_CB_struct,
-    pW_Q2: &[i16],
-    NLSF_mu_Q20: i32,
-    nSurvivors: i32,
-    signalType: i32,
+    nlsfindices: &mut [i8],
+    p_nlsf_q15: &mut [i16],
+    ps_nlsf_cb: &silk_NLSF_CB_struct,
+    p_w_q2: &[i16],
+    nlsf_mu_q20: i32,
+    n_survivors: i32,
+    signal_type: i32,
 ) -> i32 {
-    let mut i: i32;
+    let mut _i: i32;
     let mut s: i32;
     let mut ind1: i32;
-    let mut bestIndex: i32 = 0;
-    let mut prob_Q8: i32;
+    let mut best_index: i32 = 0;
+    let mut prob_q8: i32;
     let mut bits_q7: i32;
-    let mut W_tmp_Q9: i32;
+    let mut w_tmp_q9: i32;
 
-    let mut res_Q10: [i16; 16] = [0; 16];
-    let mut NLSF_tmp_Q15: [i16; 16] = [0; 16];
-    let mut W_adj_Q5: [i16; 16] = [0; 16];
-    let mut pred_Q8: [u8; 16] = [0; 16];
+    let mut res_q10: [i16; 16] = [0; 16];
+    let mut nlsf_tmp_q15: [i16; 16] = [0; 16];
+    let mut w_adj_q5: [i16; 16] = [0; 16];
+    let mut pred_q8: [u8; 16] = [0; 16];
     let mut ec_ix: [i16; 16] = [0; 16];
-    let order = psNLSF_CB.order as usize;
-    assert!((0..=2).contains(&signalType));
-    silk_nlsf_stabilize(&mut pNLSF_Q15[..order], psNLSF_CB.deltaMin_Q15);
-    let vla = psNLSF_CB.nVectors as usize;
-    // nVectors max: 32; nSurvivors max: 16
+    let order = ps_nlsf_cb.order as usize;
+    assert!((0..=2).contains(&signal_type));
+    silk_nlsf_stabilize(&mut p_nlsf_q15[..order], ps_nlsf_cb.delta_min_q15);
+    let vla = ps_nlsf_cb.n_vectors as usize;
+    // n_vectors max: 32; n_survivors max: 16
     const MAX_VECTORS: usize = 32;
     const MAX_SURVIVORS: usize = 16;
     debug_assert!(vla <= MAX_VECTORS);
-    debug_assert!(nSurvivors as usize <= MAX_SURVIVORS);
-    let mut err_Q24 = [0i32; MAX_VECTORS];
+    debug_assert!(n_survivors as usize <= MAX_SURVIVORS);
+    let mut err_q24 = [0i32; MAX_VECTORS];
     silk_nlsf_vq(
-        &mut err_Q24,
-        &pNLSF_Q15[..order],
-        psNLSF_CB.CB1_NLSF_Q8,
-        psNLSF_CB.CB1_Wght_Q9,
-        psNLSF_CB.nVectors as usize,
+        &mut err_q24,
+        &p_nlsf_q15[..order],
+        ps_nlsf_cb.cb1_nlsf_q8,
+        ps_nlsf_cb.cb1_wght_q9,
+        ps_nlsf_cb.n_vectors as usize,
         order,
     );
-    let mut tempIndices1 = [0i32; MAX_SURVIVORS];
+    let mut temp_indices1 = [0i32; MAX_SURVIVORS];
     silk_insertion_sort_increasing(
-        &mut err_Q24,
-        &mut tempIndices1,
-        psNLSF_CB.nVectors as i32,
-        nSurvivors,
+        &mut err_q24,
+        &mut temp_indices1,
+        ps_nlsf_cb.n_vectors as i32,
+        n_survivors,
     );
-    let mut RD_Q25 = [0i32; MAX_SURVIVORS];
-    let mut tempIndices2 = [0i8; MAX_SURVIVORS * MAX_LPC_ORDER];
+    let mut rd_q25 = [0i32; MAX_SURVIVORS];
+    let mut temp_indices2 = [0i8; MAX_SURVIVORS * MAX_LPC_ORDER];
     s = 0;
-    while s < nSurvivors {
-        ind1 = tempIndices1[s as usize];
-        let pCB_element = &psNLSF_CB.CB1_NLSF_Q8[(ind1 * psNLSF_CB.order as i32) as usize..];
-        let pCB_Wght_Q9 = &psNLSF_CB.CB1_Wght_Q9[(ind1 * psNLSF_CB.order as i32) as usize..];
-        i = 0;
-        while i < psNLSF_CB.order as i32 {
-            NLSF_tmp_Q15[i as usize] = ((pCB_element[i as usize] as i16 as u16 as i32) << 7) as i16;
-            W_tmp_Q9 = pCB_Wght_Q9[i as usize] as i32;
-            res_Q10[i as usize] = (((pNLSF_Q15[i as usize] as i32 - NLSF_tmp_Q15[i as usize] as i32)
-                as i16 as i32
-                * W_tmp_Q9 as i16 as i32)
+    while s < n_survivors {
+        ind1 = temp_indices1[s as usize];
+        let p_cb_element = &ps_nlsf_cb.cb1_nlsf_q8[(ind1 * ps_nlsf_cb.order as i32) as usize..];
+        let p_cb_wght_q9 = &ps_nlsf_cb.cb1_wght_q9[(ind1 * ps_nlsf_cb.order as i32) as usize..];
+        _i = 0;
+        while _i < ps_nlsf_cb.order as i32 {
+            nlsf_tmp_q15[_i as usize] =
+                ((p_cb_element[_i as usize] as i16 as u16 as i32) << 7) as i16;
+            w_tmp_q9 = p_cb_wght_q9[_i as usize] as i32;
+            res_q10[_i as usize] = (((p_nlsf_q15[_i as usize] as i32
+                - nlsf_tmp_q15[_i as usize] as i32) as i16
+                as i32
+                * w_tmp_q9 as i16 as i32)
                 >> 14) as i16;
-            W_adj_Q5[i as usize] = silk_div32_varq(
-                pW_Q2[i as usize] as i32,
-                W_tmp_Q9 as i16 as i32 * W_tmp_Q9 as i16 as i32,
+            w_adj_q5[_i as usize] = silk_div32_varq(
+                p_w_q2[_i as usize] as i32,
+                w_tmp_q9 as i16 as i32 * w_tmp_q9 as i16 as i32,
                 21,
             ) as i16;
-            i += 1;
+            _i += 1;
         }
-        silk_nlsf_unpack(&mut ec_ix, &mut pred_Q8, psNLSF_CB, ind1);
+        silk_nlsf_unpack(&mut ec_ix, &mut pred_q8, ps_nlsf_cb, ind1);
         let idx_start = (s * MAX_LPC_ORDER as i32) as usize;
-        RD_Q25[s as usize] = silk_nlsf_del_dec_quant(
-            &mut tempIndices2[idx_start..idx_start + MAX_LPC_ORDER],
-            &res_Q10,
-            &W_adj_Q5,
-            &pred_Q8,
+        rd_q25[s as usize] = silk_nlsf_del_dec_quant(
+            &mut temp_indices2[idx_start..idx_start + MAX_LPC_ORDER],
+            &res_q10,
+            &w_adj_q5,
+            &pred_q8,
             &ec_ix,
-            psNLSF_CB.ec_Rates_Q5,
-            psNLSF_CB.quantStepSize_Q16 as i32,
-            psNLSF_CB.invQuantStepSize_Q6,
-            NLSF_mu_Q20,
-            psNLSF_CB.order,
+            ps_nlsf_cb.ec_rates_q5,
+            ps_nlsf_cb.quant_step_size_q16 as i32,
+            ps_nlsf_cb.inv_quant_step_size_q6,
+            nlsf_mu_q20,
+            ps_nlsf_cb.order,
         );
-        let iCDF_ptr =
-            &(psNLSF_CB.CB1_iCDF)[((signalType >> 1) * psNLSF_CB.nVectors as i32) as usize..];
+        let i_cdf_ptr =
+            &(ps_nlsf_cb.cb1_i_cdf)[((signal_type >> 1) * ps_nlsf_cb.n_vectors as i32) as usize..];
         if ind1 == 0 {
-            prob_Q8 = 256 - iCDF_ptr[ind1 as usize] as i32;
+            prob_q8 = 256 - i_cdf_ptr[ind1 as usize] as i32;
         } else {
-            prob_Q8 = iCDF_ptr[(ind1 - 1) as usize] as i32 - iCDF_ptr[ind1 as usize] as i32;
+            prob_q8 = i_cdf_ptr[(ind1 - 1) as usize] as i32 - i_cdf_ptr[ind1 as usize] as i32;
         }
-        bits_q7 = ((8) << 7) - silk_lin2log(prob_Q8);
-        RD_Q25[s as usize] += bits_q7 as i16 as i32 * (NLSF_mu_Q20 >> 2) as i16 as i32;
+        bits_q7 = ((8) << 7) - silk_lin2log(prob_q8);
+        rd_q25[s as usize] += bits_q7 as i16 as i32 * (nlsf_mu_q20 >> 2) as i16 as i32;
         s += 1;
     }
     silk_insertion_sort_increasing(
-        &mut RD_Q25,
-        std::slice::from_mut(&mut bestIndex),
-        nSurvivors,
+        &mut rd_q25,
+        std::slice::from_mut(&mut best_index),
+        n_survivors,
         1,
     );
-    NLSFIndices[0] = tempIndices1[bestIndex as usize] as i8;
-    let best_start = (bestIndex * 16) as usize;
-    NLSFIndices[1..1 + order].copy_from_slice(&tempIndices2[best_start..best_start + order]);
+    nlsfindices[0] = temp_indices1[best_index as usize] as i8;
+    let best_start = (best_index * 16) as usize;
+    nlsfindices[1..1 + order].copy_from_slice(&temp_indices2[best_start..best_start + order]);
     silk_nlsf_decode(
-        &mut pNLSF_Q15[..order],
-        &NLSFIndices[..order + 1],
-        psNLSF_CB,
+        &mut p_nlsf_q15[..order],
+        &nlsfindices[..order + 1],
+        ps_nlsf_cb,
     );
-    let ret: i32 = RD_Q25[0];
+    let ret: i32 = rd_q25[0];
     ret
 }

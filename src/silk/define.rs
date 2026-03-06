@@ -1,6 +1,6 @@
 //! SILK codec configuration constants.
 //!
-//! Upstream C: `silk/define.h`
+//! Upstream c: `silk/define.h`
 
 pub const TYPE_NO_VOICE_ACTIVITY: i32 = 0;
 pub const MAX_LPC_ORDER: usize = 16;

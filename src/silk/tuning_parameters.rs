@@ -1,6 +1,6 @@
 //! Encoder tuning parameters.
 //!
-//! Upstream C: `silk/tuning_parameters.h`
+//! Upstream c: `silk/tuning_parameters.h`
 
 /// Decay time for bitreservoir
 pub const BITRESERVOIR_DECAY_TIME_MS: i32 = 500;
@@ -81,7 +81,7 @@ pub const LOW_QUALITY_LOW_FREQ_SHAPING_DECR: f32 = 0.5f32;
 /// subframe smoothing coefficient for HarmBoost, HarmShapeGain, Tilt (lower -> more smoothing)
 pub const SUBFR_SMTH_COEF: f32 = 0.4f32;
 
-// parameters defining the R/D tradeoff in the residual quantizer
+// parameters defining the R/d tradeoff in the residual quantizer
 pub const LAMBDA_OFFSET: f32 = 1.2f32;
 pub const LAMBDA_SPEECH_ACT: f32 = -0.2f32;
 pub const LAMBDA_DELAYED_DECISIONS: f32 = -0.05f32;

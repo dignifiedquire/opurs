@@ -88,7 +88,7 @@ struct EncodeCliArgs {
     #[arg(long, default_value_t = 1024)]
     max_payload: usize,
 
-    /// Complexity (0-10)
+    /// complexity (0-10)
     #[arg(long, default_value = "10")]
     complexity: Complexity,
 
@@ -262,7 +262,7 @@ struct MultistreamEncodeCliArgs {
     #[arg(long, default_value_t = 1024)]
     max_payload: usize,
 
-    /// Complexity (0-10)
+    /// complexity (0-10)
     #[arg(long, default_value = "10")]
     complexity: Complexity,
 

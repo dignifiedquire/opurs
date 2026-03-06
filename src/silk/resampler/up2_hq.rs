@@ -1,6 +1,6 @@
 //! High-quality 2x upsampler.
 //!
-//! Upstream C: `silk/resampler_private_up2_HQ.c`
+//! Upstream c: `silk/resampler_private_up2_HQ.c`
 
 use super::rom::{SILK_RESAMPLER_UP2_HQ_0, SILK_RESAMPLER_UP2_HQ_1};
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
@@ -10,9 +10,9 @@ pub struct ResamplerUp2HqState {
     iir_state: [i32; 6],
 }
 
-/// Upstream C: silk/resampler_private_up2_HQ.c:silk_resampler_private_up2_HQ
+/// Upstream c: silk/resampler_private_up2_HQ.c:silk_resampler_private_up2_HQ
 /* Upsample by a factor 2, high quality */
-/* Uses 2nd order allpass filters for the 2x upsampling, followed by a      */
+/* Uses 2nd Order allpass filters for the 2x upsampling, followed by a      */
 /* notch filter just above Nyquist.                                         */
 pub fn silk_resampler_private_up2_hq(
     state: &mut ResamplerUp2HqState,

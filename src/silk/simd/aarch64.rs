@@ -53,14 +53,14 @@ pub unsafe fn silk_noise_shape_quantizer_short_prediction_neon(
         let buf = vld1q_s32(buf32.as_ptr().add(base));
 
         // Sign-extend 4 x i16 to 4 x i32, then reverse order so that
-        // buf[base+i] pairs with coef16[coef_base + 3 - i] (matching the
+        // buf[base+_i] pairs with coef16[coef_base + 3 - _i] (matching the
         // scalar code where buf32[b-1-j] pairs with coef16[j]).
         let c16 = vld1_s16(coef16.as_ptr().add(coef_base));
         let coef_fwd = vmovl_s16(c16);
         // Reverse 4 x i32: vrev64q reverses within 64-bit halves, then swap halves
         let coef = vextq_s32(vrev64q_s32(coef_fwd), vrev64q_s32(coef_fwd), 2);
 
-        // We need (buf[i] * coef[i]) >> 16 for each element
+        // We need (buf[_i] * coef[_i]) >> 16 for each element
         // Use widening multiply: i32 * i32 -> i64, then >> 16
         let prod_lo = vmull_s32(vget_low_s32(buf), vget_low_s32(coef));
         let prod_hi = vmull_s32(vget_high_s32(buf), vget_high_s32(coef));
@@ -83,18 +83,18 @@ pub unsafe fn silk_noise_shape_quantizer_short_prediction_neon(
 }
 
 /// NEON implementation of `silk_nsq_noise_shape_feedback_loop`.
-/// Port of `silk/arm/NSQ_neon.c:silk_NSQ_noise_shape_feedback_loop_neon`.
+/// Port of `silk/arm/NSQ_neon.c:silk_nsq_noise_shape_feedback_loop_neon`.
 ///
 /// Only handles order == 8 with NEON. Other orders fall through to scalar.
-/// NOTE: This is intentionally NOT bit-exact with the scalar C version. As
-/// the C code comments: "we do not drop the lower 16 bits of each multiply,
+/// NOTE: This is intentionally NOT bit-exact with the scalar c version. As
+/// the c code comments: "we do not drop the lower 16 bits of each multiply,
 /// but wait until the end to truncate precision". This is encoder-only and
 /// does not affect decoder output.
 ///
 /// # Safety
 /// Requires aarch64 NEON (always available on aarch64).
 #[target_feature(enable = "neon")]
-pub unsafe fn silk_NSQ_noise_shape_feedback_loop_neon(
+pub unsafe fn silk_nsq_noise_shape_feedback_loop_neon(
     data0: i32,
     data1: &mut [i32],
     coef: &[i16],
@@ -150,12 +150,12 @@ pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
     let n = data1.len().min(data2.len());
     let mut acc1 = vdupq_n_f64(0.0);
     let mut acc2 = vdupq_n_f64(0.0);
-    let mut i = 0usize;
+    let mut _i = 0usize;
 
     // Main loop: 4 f32s per iteration → 2 pairs of f64s
-    while i + 3 < n {
-        let x = vld1q_f32(data1.as_ptr().add(i));
-        let y = vld1q_f32(data2.as_ptr().add(i));
+    while _i + 3 < n {
+        let x = vld1q_f32(data1.as_ptr().add(_i));
+        let y = vld1q_f32(data2.as_ptr().add(_i));
 
         // Low 2 elements: f32 → f64
         let x_lo = vcvt_f64_f32(vget_low_f32(x));
@@ -167,7 +167,7 @@ pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
         let y_hi = vcvt_f64_f32(vget_high_f32(y));
         acc2 = vfmaq_f64(acc2, x_hi, y_hi);
 
-        i += 4;
+        _i += 4;
     }
 
     // Combine accumulators and horizontal sum
@@ -175,9 +175,9 @@ pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
     let mut result = vgetq_lane_f64(acc1, 0) + vgetq_lane_f64(acc1, 1);
 
     // Scalar tail for remaining 0-3 elements
-    while i < n {
-        result += *data1.get_unchecked(i) as f64 * *data2.get_unchecked(i) as f64;
-        i += 1;
+    while _i < n {
+        result += *data1.get_unchecked(_i) as f64 * *data2.get_unchecked(_i) as f64;
+        _i += 1;
     }
 
     result
@@ -186,12 +186,12 @@ pub unsafe fn silk_inner_product_flp_neon(data1: &[f32], data2: &[f32]) -> f64 {
 const QA: i32 = 24;
 const A_LIMIT: i32 = SILK_FIX_CONST!(0.99975, QA);
 
-fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
-    silk_rshift_round64(a32 as i64 * b32 as i64, Q) as i32
+fn mul32_frac_q(a32: i32, b32: i32, q: i32) -> i32 {
+    silk_rshift_round64(a32 as i64 * b32 as i64, q) as i32
 }
 
 /// NEON-accelerated inner function for LPC inverse prediction gain.
-/// Port of `silk/arm/LPC_inv_pred_gain_neon_intr.c:LPC_inverse_pred_gain_QA_neon`.
+/// Port of `silk/arm/LPC_inv_pred_gain_neon_intr.c:lpc_inverse_pred_gain_qa_neon`.
 ///
 /// The NEON version processes 4 AR coefficients at a time and uses a clever
 /// overflow detection scheme based on narrowing shifts.
@@ -199,49 +199,49 @@ fn mul32_frac_q(a32: i32, b32: i32, Q: i32) -> i32 {
 /// # Safety
 /// Requires aarch64 NEON (always available on aarch64).
 #[target_feature(enable = "neon")]
-unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], order: usize) -> i32 {
+unsafe fn lpc_inverse_pred_gain_qa_neon(a_qa: &mut [i32; SILK_MAX_ORDER_LPC], order: usize) -> i32 {
     let mut max_s32x4 = vdupq_n_s32(i32::MIN);
     let mut min_s32x4 = vdupq_n_s32(i32::MAX);
-    let mut invGain_Q30 = SILK_FIX_CONST!(1.0, 30);
+    let mut inv_gain_q30 = SILK_FIX_CONST!(1.0, 30);
 
     let mut k = order - 1;
     while k > 0 {
         // Check for stability
-        if A_QA[k] > A_LIMIT || A_QA[k] < -A_LIMIT {
+        if a_qa[k] > A_LIMIT || a_qa[k] < -A_LIMIT {
             return 0;
         }
 
         // Set RC equal to negated AR coef
-        let rc_Q31 = -(A_QA[k] << (31 - QA));
+        let rc_q31 = -(a_qa[k] << (31 - QA));
 
-        // rc_mult1_Q30 range: [ 1 : 2^30 ]
-        let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
-        debug_assert!(rc_mult1_Q30 > (1 << 15));
-        debug_assert!(rc_mult1_Q30 <= (1 << 30));
+        // rc_mult1_q30 range: [ 1 : 2^30 ]
+        let rc_mult1_q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_q31, rc_q31);
+        debug_assert!(rc_mult1_q30 > (1 << 15));
+        debug_assert!(rc_mult1_q30 <= (1 << 30));
 
         // Update inverse gain
-        invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
-        debug_assert!(invGain_Q30 >= 0);
-        debug_assert!(invGain_Q30 <= (1 << 30));
-        if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
+        inv_gain_q30 = silk_smmul(inv_gain_q30, rc_mult1_q30) << 2;
+        debug_assert!(inv_gain_q30 >= 0);
+        debug_assert!(inv_gain_q30 <= (1 << 30));
+        if inv_gain_q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
             return 0;
         }
 
         // rc_mult2 range: [ 2^30 : SILK_INT32_MAX ]
-        let mult2Q = 32 - silk_clz32(rc_mult1_Q30.abs());
-        let rc_mult2 = silk_inverse32_varq(rc_mult1_Q30, mult2Q + 30);
+        let mult2_q = 32 - silk_clz32(rc_mult1_q30.abs());
+        let rc_mult2 = silk_inverse32_varq(rc_mult1_q30, mult2_q + 30);
 
         // NEON: Update AR coefficients 4 at a time
-        let rc_Q31_s32x2 = vdup_n_s32(rc_Q31);
-        let mult2Q_s64x2 = vdupq_n_s64(-(mult2Q as i64));
+        let rc_q31_s32x2 = vdup_n_s32(rc_q31);
+        let mult2_q_s64x2 = vdupq_n_s64(-(mult2_q as i64));
         let rc_mult2_s32x2 = vdup_n_s32(rc_mult2);
 
         let half = (k + 1) >> 1;
         let mut n = 0usize;
         while n + 4 <= half {
             // Load forward and backward elements
-            let tmp1_s32x4 = vld1q_s32(A_QA.as_ptr().add(n));
-            let tmp2_raw = vld1q_s32(A_QA.as_ptr().add(k - n - 4));
+            let tmp1_s32x4 = vld1q_s32(a_qa.as_ptr().add(n));
+            let tmp2_raw = vld1q_s32(a_qa.as_ptr().add(k - n - 4));
             // Reverse tmp2: vrev64q reverses within 64-bit halves, then swap halves
             let tmp2_s32x4 = vcombine_s32(
                 vget_high_s32(vrev64q_s32(tmp2_raw)),
@@ -249,22 +249,22 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             );
 
             // vqrdmulhq_lane_s32: saturating rounding doubling multiply high
-            // Equivalent to mul32_frac_q(x, rc_Q31, 31)
-            let t0_s32x4 = vqrdmulhq_lane_s32::<0>(tmp2_s32x4, rc_Q31_s32x2);
-            let t1_s32x4 = vqrdmulhq_lane_s32::<0>(tmp1_s32x4, rc_Q31_s32x2);
-            let t_QA0_s32x4 = vqsubq_s32(tmp1_s32x4, t0_s32x4);
-            let t_QA1_s32x4 = vqsubq_s32(tmp2_s32x4, t1_s32x4);
+            // Equivalent to mul32_frac_q(x, rc_q31, 31)
+            let t0_s32x4 = vqrdmulhq_lane_s32::<0>(tmp2_s32x4, rc_q31_s32x2);
+            let t1_s32x4 = vqrdmulhq_lane_s32::<0>(tmp1_s32x4, rc_q31_s32x2);
+            let t_qa0_s32x4 = vqsubq_s32(tmp1_s32x4, t0_s32x4);
+            let t_qa1_s32x4 = vqsubq_s32(tmp2_s32x4, t1_s32x4);
 
             // Widening multiply and variable shift right (rounding)
-            let t0_s64x2 = vmull_s32(vget_low_s32(t_QA0_s32x4), rc_mult2_s32x2);
-            let t1_s64x2 = vmull_s32(vget_high_s32(t_QA0_s32x4), rc_mult2_s32x2);
-            let t2_s64x2 = vmull_s32(vget_low_s32(t_QA1_s32x4), rc_mult2_s32x2);
-            let t3_s64x2 = vmull_s32(vget_high_s32(t_QA1_s32x4), rc_mult2_s32x2);
+            let t0_s64x2 = vmull_s32(vget_low_s32(t_qa0_s32x4), rc_mult2_s32x2);
+            let t1_s64x2 = vmull_s32(vget_high_s32(t_qa0_s32x4), rc_mult2_s32x2);
+            let t2_s64x2 = vmull_s32(vget_low_s32(t_qa1_s32x4), rc_mult2_s32x2);
+            let t3_s64x2 = vmull_s32(vget_high_s32(t_qa1_s32x4), rc_mult2_s32x2);
 
-            let t0_s64x2 = vrshlq_s64(t0_s64x2, mult2Q_s64x2);
-            let t1_s64x2 = vrshlq_s64(t1_s64x2, mult2Q_s64x2);
-            let t2_s64x2 = vrshlq_s64(t2_s64x2, mult2Q_s64x2);
-            let t3_s64x2 = vrshlq_s64(t3_s64x2, mult2Q_s64x2);
+            let t0_s64x2 = vrshlq_s64(t0_s64x2, mult2_q_s64x2);
+            let t1_s64x2 = vrshlq_s64(t1_s64x2, mult2_q_s64x2);
+            let t2_s64x2 = vrshlq_s64(t2_s64x2, mult2_q_s64x2);
+            let t3_s64x2 = vrshlq_s64(t3_s64x2, mult2_q_s64x2);
 
             // Narrow to i32 for result
             let r0_s32x4 = vcombine_s32(vmovn_s64(t0_s64x2), vmovn_s64(t1_s64x2));
@@ -282,39 +282,39 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
             // Store results: r1 reversed back
             let r1_rev = vrev64q_s32(r1_s32x4);
             let r1_final = vcombine_s32(vget_high_s32(r1_rev), vget_low_s32(r1_rev));
-            vst1q_s32(A_QA.as_mut_ptr().add(n), r0_s32x4);
-            vst1q_s32(A_QA.as_mut_ptr().add(k - n - 4), r1_final);
+            vst1q_s32(a_qa.as_mut_ptr().add(n), r0_s32x4);
+            vst1q_s32(a_qa.as_mut_ptr().add(k - n - 4), r1_final);
 
             n += 4;
         }
 
         // Scalar tail for remaining elements
         while n < half {
-            let tmp1 = A_QA[n];
-            let tmp2 = A_QA[k - n - 1];
+            let tmp1 = a_qa[n];
+            let tmp2 = a_qa[k - n - 1];
             let tmp64 = silk_rshift_round64(
-                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_Q31, 31)) as i64 * rc_mult2 as i64,
-                mult2Q,
+                tmp1.saturating_sub(mul32_frac_q(tmp2, rc_q31, 31)) as i64 * rc_mult2 as i64,
+                mult2_q,
             );
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
                 return 0;
             }
-            A_QA[n] = tmp64 as i32;
+            a_qa[n] = tmp64 as i32;
             let tmp64 = silk_rshift_round64(
-                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_Q31, 31)) as i64 * rc_mult2 as i64,
-                mult2Q,
+                tmp2.saturating_sub(mul32_frac_q(tmp1, rc_q31, 31)) as i64 * rc_mult2 as i64,
+                mult2_q,
             );
             if tmp64 > i32::MAX as i64 || tmp64 < i32::MIN as i64 {
                 return 0;
             }
-            A_QA[k - n - 1] = tmp64 as i32;
+            a_qa[k - n - 1] = tmp64 as i32;
             n += 1;
         }
         k -= 1;
     }
 
     // Check for stability
-    if A_QA[0] > A_LIMIT || A_QA[0] < -A_LIMIT {
+    if a_qa[0] > A_LIMIT || a_qa[0] < -A_LIMIT {
         return 0;
     }
 
@@ -336,24 +336,24 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
     }
 
     // Set RC equal to negated AR coef
-    let rc_Q31 = -(A_QA[0] << (31 - QA));
+    let rc_q31 = -(a_qa[0] << (31 - QA));
 
     // Range: [ 1 : 2^30 ]
-    let rc_mult1_Q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_Q31, rc_Q31);
+    let rc_mult1_q30 = SILK_FIX_CONST!(1, 30) - silk_smmul(rc_q31, rc_q31);
 
     // Update inverse gain
-    invGain_Q30 = silk_smmul(invGain_Q30, rc_mult1_Q30) << 2;
-    debug_assert!(invGain_Q30 >= 0);
-    debug_assert!(invGain_Q30 <= (1 << 30));
-    if invGain_Q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
+    inv_gain_q30 = silk_smmul(inv_gain_q30, rc_mult1_q30) << 2;
+    debug_assert!(inv_gain_q30 >= 0);
+    debug_assert!(inv_gain_q30 <= (1 << 30));
+    if inv_gain_q30 < SILK_FIX_CONST!(1.0 / MAX_PREDICTION_POWER_GAIN, 30) {
         0
     } else {
-        invGain_Q30
+        inv_gain_q30
     }
 }
 
 /// NEON implementation of `silk_lpc_inverse_pred_gain`.
-/// Port of `silk/arm/LPC_inv_pred_gain_neon_intr.c:silk_LPC_inverse_pred_gain_neon`.
+/// Port of `silk/arm/LPC_inv_pred_gain_neon_intr.c:silk_lpc_inverse_pred_gain_neon`.
 ///
 /// Uses NEON widening shifts for Q12→QA conversion and NEON pairwise adds
 /// for DC response accumulation.
@@ -361,31 +361,31 @@ unsafe fn LPC_inverse_pred_gain_QA_neon(A_QA: &mut [i32; SILK_MAX_ORDER_LPC], or
 /// # Safety
 /// Requires aarch64 NEON (always available on aarch64).
 #[target_feature(enable = "neon")]
-pub unsafe fn silk_LPC_inverse_pred_gain_neon(A_Q12: &[i16]) -> i32 {
-    let order = A_Q12.len();
+pub unsafe fn silk_lpc_inverse_pred_gain_neon(a_q12: &[i16]) -> i32 {
+    let order = a_q12.len();
 
     if SILK_MAX_ORDER_LPC != 24 || (order & 1) != 0 {
-        return crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c(A_Q12);
+        return crate::silk::lpc_inv_pred_gain::silk_lpc_inverse_pred_gain_c(a_q12);
     }
 
-    let mut Atmp_QA = [0i32; SILK_MAX_ORDER_LPC];
+    let mut atmp_qa = [0i32; SILK_MAX_ORDER_LPC];
 
-    // Use NEON to widen A_Q12 from i16 to i32 and shift left by (QA - 12) = 12
-    // Also compute DC response (sum of all A_Q12)
+    // Use NEON to widen a_q12 from i16 to i32 and shift left by (QA - 12) = 12
+    // Also compute DC response (sum of all a_q12)
     let groups_of_8 = order / 8;
     let leftover = order & 7;
     let mut dc_acc = vdupq_n_s32(0);
 
     for g in 0..groups_of_8 {
         let off = g * 8;
-        let t = vld1q_s16(A_Q12.as_ptr().add(off));
+        let t = vld1q_s16(a_q12.as_ptr().add(off));
         dc_acc = vpadalq_s16(dc_acc, t);
         vst1q_s32(
-            Atmp_QA.as_mut_ptr().add(off),
+            atmp_qa.as_mut_ptr().add(off),
             vshll_n_s16::<12>(vget_low_s16(t)),
         );
         vst1q_s32(
-            Atmp_QA.as_mut_ptr().add(off + 4),
+            atmp_qa.as_mut_ptr().add(off + 4),
             vshll_n_s16::<12>(vget_high_s16(t)),
         );
     }
@@ -393,24 +393,24 @@ pub unsafe fn silk_LPC_inverse_pred_gain_neon(A_Q12: &[i16]) -> i32 {
     // Horizontal sum of dc_acc
     let dc_pair = vpadd_s32(vget_low_s32(dc_acc), vget_high_s32(dc_acc));
     let dc_s64 = vpaddl_s32(dc_pair);
-    let mut DC_resp = vget_lane_s32::<0>(vreinterpret_s32_s64(dc_s64));
+    let mut dc_resp = vget_lane_s32::<0>(vreinterpret_s32_s64(dc_s64));
 
     // Handle leftover elements scalar
     let base = groups_of_8 * 8;
-    for i in 0..leftover {
-        DC_resp += A_Q12[base + i] as i32;
-        Atmp_QA[base + i] = (A_Q12[base + i] as i32) << (QA - 12);
+    for _i in 0..leftover {
+        dc_resp += a_q12[base + _i] as i32;
+        atmp_qa[base + _i] = (a_q12[base + _i] as i32) << (QA - 12);
     }
 
-    if DC_resp >= 4096 {
+    if dc_resp >= 4096 {
         0
     } else {
-        LPC_inverse_pred_gain_QA_neon(&mut Atmp_QA, order)
+        lpc_inverse_pred_gain_qa_neon(&mut atmp_qa, order)
     }
 }
 
 // ---------------------------------------------------------------------------
-// NEON NSQ del_dec — Structure-of-Arrays (SoA) delayed decision quantizer
+// NEON nsq del_dec — Structure-of-Arrays (SoA) delayed decision quantizer
 // Port of silk/arm/NSQ_del_dec_neon_intr.c
 // ---------------------------------------------------------------------------
 
@@ -422,18 +422,18 @@ const NEON_MAX_DEL_DEC_STATES: usize = 4;
 #[derive(Clone)]
 #[repr(C, align(16))]
 struct NeonDelDecStates {
-    sLPC_Q14: [[i32; NEON_MAX_DEL_DEC_STATES]; MAX_SUB_FRAME_LENGTH + NSQ_LPC_BUF_LENGTH],
-    RandState: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
-    Q_Q10: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
-    Xq_Q14: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
-    Pred_Q15: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
-    Shape_Q14: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
-    sAR2_Q14: [[i32; NEON_MAX_DEL_DEC_STATES]; MAX_SHAPE_LPC_ORDER as usize],
-    LF_AR_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    Diff_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    Seed: [i32; NEON_MAX_DEL_DEC_STATES],
-    SeedInit: [i32; NEON_MAX_DEL_DEC_STATES],
-    RD_Q10: [i32; NEON_MAX_DEL_DEC_STATES],
+    s_lpc_q14: [[i32; NEON_MAX_DEL_DEC_STATES]; MAX_SUB_FRAME_LENGTH + NSQ_LPC_BUF_LENGTH],
+    rand_state: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
+    q_q10: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
+    xq_q14: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
+    pred_q15: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
+    shape_q14: [[i32; NEON_MAX_DEL_DEC_STATES]; DECISION_DELAY as usize],
+    s_ar2_q14: [[i32; NEON_MAX_DEL_DEC_STATES]; MAX_SHAPE_LPC_ORDER as usize],
+    lf_ar_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    diff_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    seed: [i32; NEON_MAX_DEL_DEC_STATES],
+    seed_init: [i32; NEON_MAX_DEL_DEC_STATES],
+    rd_q10: [i32; NEON_MAX_DEL_DEC_STATES],
 }
 
 impl NeonDelDecStates {
@@ -454,13 +454,13 @@ impl NeonDelDecStates {
 #[derive(Copy, Clone, Default)]
 #[repr(C, align(16))]
 struct NeonSampleState {
-    Q_Q10: [i32; NEON_MAX_DEL_DEC_STATES],
-    RD_Q10: [i32; NEON_MAX_DEL_DEC_STATES],
-    xq_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    LF_AR_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    Diff_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    sLTP_shp_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
-    LPC_exc_Q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    q_q10: [i32; NEON_MAX_DEL_DEC_STATES],
+    rd_q10: [i32; NEON_MAX_DEL_DEC_STATES],
+    xq_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    lf_ar_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    diff_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    s_ltp_shp_q14: [i32; NEON_MAX_DEL_DEC_STATES],
+    lpc_exc_q14: [i32; NEON_MAX_DEL_DEC_STATES],
 }
 
 /// Helper: saturating round-shift for xq output: silk_rshift_round + silk_sat16
@@ -541,13 +541,13 @@ unsafe fn neon_short_prediction_create_arch_coef(
 #[inline]
 unsafe fn neon_short_prediction_local(
     buf32: *const [i32; NEON_MAX_DEL_DEC_STATES],
-    a_Q12_arch: &[i32; MAX_LPC_ORDER],
+    a_q12_arch: &[i32; MAX_LPC_ORDER],
     order: i32,
 ) -> int32x4_t {
-    let a0 = vld1q_s32(a_Q12_arch.as_ptr());
-    let a1 = vld1q_s32(a_Q12_arch.as_ptr().add(4));
-    let a2 = vld1q_s32(a_Q12_arch.as_ptr().add(8));
-    let a3 = vld1q_s32(a_Q12_arch.as_ptr().add(12));
+    let a0 = vld1q_s32(a_q12_arch.as_ptr());
+    let a1 = vld1q_s32(a_q12_arch.as_ptr().add(4));
+    let a2 = vld1q_s32(a_q12_arch.as_ptr().add(8));
+    let a3 = vld1q_s32(a_q12_arch.as_ptr().add(12));
 
     let mut pred = vdupq_n_s32(order >> 1);
 
@@ -641,18 +641,18 @@ unsafe fn neon_smulww_8(a: *mut i32, b: int32x2_t) {
     vst1q_s32(a.add(4), o1);
 }
 
-/// SMULWW loop: compute o[i] = silk_smulww(a[i], b) using NEON.
+/// SMULWW loop: compute o[_i] = silk_smulww(a[_i], b) using NEON.
 #[target_feature(enable = "neon")]
 unsafe fn neon_smulww_loop(a: *const i16, b: i32, o: *mut i32, count: i32) {
     let b_v = vdup_n_s32(b);
-    let mut i = 0i32;
-    while i < count - 7 {
-        neon_smulwb_8(a.offset(i as isize), b_v, o.offset(i as isize));
-        i += 8;
+    let mut _i = 0i32;
+    while _i < count - 7 {
+        neon_smulwb_8(a.offset(_i as isize), b_v, o.offset(_i as isize));
+        _i += 8;
     }
-    while i < count {
-        *o.offset(i as isize) = silk_smulww(*a.offset(i as isize) as i32, b);
-        i += 1;
+    while _i < count {
+        *o.offset(_i as isize) = silk_smulww(*a.offset(_i as isize) as i32, b);
+        _i += 1;
     }
 }
 
@@ -674,28 +674,28 @@ unsafe fn neon_copy_winner_kernel(
     xq_off: usize,
     nsq: &mut silk_nsq_state,
 ) {
-    // Load Q_Q10 from winner state
-    t0 = vld1q_lane_s32::<0>(&dd.Q_Q10[last_idx][winner], t0);
-    t0 = vld1q_lane_s32::<1>(&dd.Q_Q10[last_idx - 1][winner], t0);
-    t0 = vld1q_lane_s32::<2>(&dd.Q_Q10[last_idx - 2][winner], t0);
-    t0 = vld1q_lane_s32::<3>(&dd.Q_Q10[last_idx - 3][winner], t0);
-    t1 = vld1q_lane_s32::<0>(&dd.Q_Q10[last_idx - 4][winner], t1);
-    t1 = vld1q_lane_s32::<1>(&dd.Q_Q10[last_idx - 5][winner], t1);
-    t1 = vld1q_lane_s32::<2>(&dd.Q_Q10[last_idx - 6][winner], t1);
-    t1 = vld1q_lane_s32::<3>(&dd.Q_Q10[last_idx - 7][winner], t1);
+    // Load q_q10 from winner state
+    t0 = vld1q_lane_s32::<0>(&dd.q_q10[last_idx][winner], t0);
+    t0 = vld1q_lane_s32::<1>(&dd.q_q10[last_idx - 1][winner], t0);
+    t0 = vld1q_lane_s32::<2>(&dd.q_q10[last_idx - 2][winner], t0);
+    t0 = vld1q_lane_s32::<3>(&dd.q_q10[last_idx - 3][winner], t0);
+    t1 = vld1q_lane_s32::<0>(&dd.q_q10[last_idx - 4][winner], t1);
+    t1 = vld1q_lane_s32::<1>(&dd.q_q10[last_idx - 5][winner], t1);
+    t1 = vld1q_lane_s32::<2>(&dd.q_q10[last_idx - 6][winner], t1);
+    t1 = vld1q_lane_s32::<3>(&dd.q_q10[last_idx - 7][winner], t1);
     let t_s16x8 = vcombine_s16(vrshrn_n_s32::<10>(t0), vrshrn_n_s32::<10>(t1));
     let dst = (p_off as isize + offset as isize) as usize;
     vst1_s8(pulses.as_mut_ptr().add(dst), vmovn_s16(t_s16x8));
 
-    // Load Xq_Q14, apply gain and shift
-    t0 = vld1q_lane_s32::<0>(&dd.Xq_Q14[last_idx][winner], t0);
-    t0 = vld1q_lane_s32::<1>(&dd.Xq_Q14[last_idx - 1][winner], t0);
-    t0 = vld1q_lane_s32::<2>(&dd.Xq_Q14[last_idx - 2][winner], t0);
-    t0 = vld1q_lane_s32::<3>(&dd.Xq_Q14[last_idx - 3][winner], t0);
-    t1 = vld1q_lane_s32::<0>(&dd.Xq_Q14[last_idx - 4][winner], t1);
-    t1 = vld1q_lane_s32::<1>(&dd.Xq_Q14[last_idx - 5][winner], t1);
-    t1 = vld1q_lane_s32::<2>(&dd.Xq_Q14[last_idx - 6][winner], t1);
-    t1 = vld1q_lane_s32::<3>(&dd.Xq_Q14[last_idx - 7][winner], t1);
+    // Load xq_q14, apply gain and shift
+    t0 = vld1q_lane_s32::<0>(&dd.xq_q14[last_idx][winner], t0);
+    t0 = vld1q_lane_s32::<1>(&dd.xq_q14[last_idx - 1][winner], t0);
+    t0 = vld1q_lane_s32::<2>(&dd.xq_q14[last_idx - 2][winner], t0);
+    t0 = vld1q_lane_s32::<3>(&dd.xq_q14[last_idx - 3][winner], t0);
+    t1 = vld1q_lane_s32::<0>(&dd.xq_q14[last_idx - 4][winner], t1);
+    t1 = vld1q_lane_s32::<1>(&dd.xq_q14[last_idx - 5][winner], t1);
+    t1 = vld1q_lane_s32::<2>(&dd.xq_q14[last_idx - 6][winner], t1);
+    t1 = vld1q_lane_s32::<3>(&dd.xq_q14[last_idx - 7][winner], t1);
     let mut o0 = vqdmulhq_lane_s32::<0>(t0, gain_lo);
     let mut o1 = vqdmulhq_lane_s32::<0>(t1, gain_lo);
     o0 = vmlaq_lane_s32::<0>(o0, t0, gain_hi);
@@ -706,18 +706,18 @@ unsafe fn neon_copy_winner_kernel(
     vst1_s16(nsq.xq.as_mut_ptr().add(xdst), vqmovn_s32(o0));
     vst1_s16(nsq.xq.as_mut_ptr().add(xdst + 4), vqmovn_s32(o1));
 
-    // Load Shape_Q14
-    t0 = vld1q_lane_s32::<0>(&dd.Shape_Q14[last_idx][winner], t0);
-    t0 = vld1q_lane_s32::<1>(&dd.Shape_Q14[last_idx - 1][winner], t0);
-    t0 = vld1q_lane_s32::<2>(&dd.Shape_Q14[last_idx - 2][winner], t0);
-    t0 = vld1q_lane_s32::<3>(&dd.Shape_Q14[last_idx - 3][winner], t0);
-    t1 = vld1q_lane_s32::<0>(&dd.Shape_Q14[last_idx - 4][winner], t1);
-    t1 = vld1q_lane_s32::<1>(&dd.Shape_Q14[last_idx - 5][winner], t1);
-    t1 = vld1q_lane_s32::<2>(&dd.Shape_Q14[last_idx - 6][winner], t1);
-    t1 = vld1q_lane_s32::<3>(&dd.Shape_Q14[last_idx - 7][winner], t1);
-    let shp_base = (nsq.sLTP_shp_buf_idx + offset) as usize;
-    vst1q_s32(nsq.sLTP_shp_Q14.as_mut_ptr().add(shp_base), t0);
-    vst1q_s32(nsq.sLTP_shp_Q14.as_mut_ptr().add(shp_base + 4), t1);
+    // Load shape_q14
+    t0 = vld1q_lane_s32::<0>(&dd.shape_q14[last_idx][winner], t0);
+    t0 = vld1q_lane_s32::<1>(&dd.shape_q14[last_idx - 1][winner], t0);
+    t0 = vld1q_lane_s32::<2>(&dd.shape_q14[last_idx - 2][winner], t0);
+    t0 = vld1q_lane_s32::<3>(&dd.shape_q14[last_idx - 3][winner], t0);
+    t1 = vld1q_lane_s32::<0>(&dd.shape_q14[last_idx - 4][winner], t1);
+    t1 = vld1q_lane_s32::<1>(&dd.shape_q14[last_idx - 5][winner], t1);
+    t1 = vld1q_lane_s32::<2>(&dd.shape_q14[last_idx - 6][winner], t1);
+    t1 = vld1q_lane_s32::<3>(&dd.shape_q14[last_idx - 7][winner], t1);
+    let shp_base = (nsq.s_ltp_shp_buf_idx + offset) as usize;
+    vst1q_s32(nsq.s_ltp_shp_q14.as_mut_ptr().add(shp_base), t0);
+    vst1q_s32(nsq.s_ltp_shp_q14.as_mut_ptr().add(shp_base + 4), t1);
 }
 
 /// Copy winner state outputs using the vectorized kernel plus scalar tail.
@@ -749,12 +749,12 @@ unsafe fn neon_copy_winner_state(
         last_idx -= DECISION_DELAY as usize;
     }
 
-    let mut i = 0i32;
+    let mut _i = 0i32;
     // First vectorized loop
-    while i < (decision_delay - 7) && last_idx >= 7 {
+    while _i < (decision_delay - 7) && last_idx >= 7 {
         neon_copy_winner_kernel(
             dd,
-            i - decision_delay,
+            _i - decision_delay,
             last_idx,
             winner,
             gain_lo,
@@ -767,19 +767,19 @@ unsafe fn neon_copy_winner_state(
             xq_off,
             nsq,
         );
-        i += 8;
+        _i += 8;
         last_idx = last_idx.wrapping_sub(8);
     }
     // Scalar tail for wrap-around
-    while i < decision_delay && last_idx < DECISION_DELAY as usize {
-        let pidx = (p_off as isize + (i - decision_delay) as isize) as usize;
-        pulses[pidx] = (((dd.Q_Q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
-        let xq_val = (dd.Xq_Q14[last_idx][winner] as i64 * gain as i64) >> 16;
-        let xidx = (xq_off as isize + (i - decision_delay) as isize) as usize;
+    while _i < decision_delay && last_idx < DECISION_DELAY as usize {
+        let pidx = (p_off as isize + (_i - decision_delay) as isize) as usize;
+        pulses[pidx] = (((dd.q_q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
+        let xq_val = (dd.xq_q14[last_idx][winner] as i64 * gain as i64) >> 16;
+        let xidx = (xq_off as isize + (_i - decision_delay) as isize) as usize;
         nsq.xq[xidx] = neon_rshift_round_sat16(xq_val as i32, shift);
-        nsq.sLTP_shp_Q14[(nsq.sLTP_shp_buf_idx - decision_delay + i) as usize] =
-            dd.Shape_Q14[last_idx][winner];
-        i += 1;
+        nsq.s_ltp_shp_q14[(nsq.s_ltp_shp_buf_idx - decision_delay + _i) as usize] =
+            dd.shape_q14[last_idx][winner];
+        _i += 1;
         if last_idx == 0 {
             break;
         }
@@ -787,12 +787,12 @@ unsafe fn neon_copy_winner_state(
     }
 
     // After wrap-around
-    if i < decision_delay {
+    if _i < decision_delay {
         last_idx = last_idx.wrapping_add(DECISION_DELAY as usize);
-        while i < (decision_delay - 7) {
+        while _i < (decision_delay - 7) {
             neon_copy_winner_kernel(
                 dd,
-                i - decision_delay,
+                _i - decision_delay,
                 last_idx,
                 winner,
                 gain_lo,
@@ -805,18 +805,18 @@ unsafe fn neon_copy_winner_state(
                 xq_off,
                 nsq,
             );
-            i += 8;
+            _i += 8;
             last_idx -= 8;
         }
-        while i < decision_delay {
-            let pidx = (p_off as isize + (i - decision_delay) as isize) as usize;
-            pulses[pidx] = (((dd.Q_Q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
-            let xq_val = (dd.Xq_Q14[last_idx][winner] as i64 * gain as i64) >> 16;
-            let xidx = (xq_off as isize + (i - decision_delay) as isize) as usize;
+        while _i < decision_delay {
+            let pidx = (p_off as isize + (_i - decision_delay) as isize) as usize;
+            pulses[pidx] = (((dd.q_q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
+            let xq_val = (dd.xq_q14[last_idx][winner] as i64 * gain as i64) >> 16;
+            let xidx = (xq_off as isize + (_i - decision_delay) as isize) as usize;
             nsq.xq[xidx] = neon_rshift_round_sat16(xq_val as i32, shift);
-            nsq.sLTP_shp_Q14[(nsq.sLTP_shp_buf_idx - decision_delay + i) as usize] =
-                dd.Shape_Q14[last_idx][winner];
-            i += 1;
+            nsq.s_ltp_shp_q14[(nsq.s_ltp_shp_buf_idx - decision_delay + _i) as usize] =
+                dd.shape_q14[last_idx][winner];
+            _i += 1;
             last_idx -= 1;
         }
     }
@@ -830,77 +830,77 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
     nsq: &mut silk_nsq_state,
     dd: &mut NeonDelDecStates,
     signal_type: i32,
-    x_Q10: &[i32],
+    x_q10: &[i32],
     pulses: &mut [i8],
     p_off: usize,
     xq_off: usize,
-    sLTP_Q15: &mut [i32],
-    delayed_gain_Q10: &mut [i32; DECISION_DELAY as usize],
-    a_Q12: &[i16],
-    b_Q14: &[i16],
-    AR_shp_Q13: &[i16],
+    s_ltp_q15: &mut [i32],
+    delayed_gain_q10: &mut [i32; DECISION_DELAY as usize],
+    a_q12: &[i16],
+    b_q14: &[i16],
+    ar_shp_q13: &[i16],
     lag: i32,
     harm_shape_packed: i32,
-    tilt_Q14: i32,
-    lf_shp_Q14: i32,
-    gain_Q16: i32,
-    lambda_Q10: i32,
-    offset_Q10: i32,
+    tilt_q14: i32,
+    lf_shp_q14: i32,
+    gain_q16: i32,
+    lambda_q10: i32,
+    offset_q10: i32,
     length: i32,
     subfr: i32,
     shaping_order: i32,
     predict_order: i32,
-    warping_Q16: i32,
+    warping_q16: i32,
     n_states: i32,
     smpl_buf_idx: &mut i32,
     decision_delay: i32,
 ) {
-    let warping_v = vdup_n_s32(((warping_Q16 as u32) << 16) as i32 >> 1);
-    let lf_shp_Q29 = ((lf_shp_Q14 as u32) << 16) as i32 >> 1;
-    let mut ar_shp_Q28 = [0i32; MAX_SHAPE_LPC_ORDER as usize];
+    let warping_v = vdup_n_s32(((warping_q16 as u32) << 16) as i32 >> 1);
+    let lf_shp_q29 = ((lf_shp_q14 as u32) << 16) as i32 >> 1;
+    let mut ar_shp_q28 = [0i32; MAX_SHAPE_LPC_ORDER as usize];
     let rand_mul = vdupq_n_u32(RAND_MULTIPLIER as u32);
     let rand_inc = vdupq_n_u32(RAND_INCREMENT as u32);
 
     let mut ss = [NeonSampleState::default(); 2];
 
-    let mut shp_lag_idx = (nsq.sLTP_shp_buf_idx - lag + HARM_SHAPE_FIR_TAPS / 2) as usize;
-    let mut pred_lag_idx = (nsq.sLTP_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;
-    let gain_Q10 = gain_Q16 >> 6;
+    let mut shp_lag_idx = (nsq.s_ltp_shp_buf_idx - lag + HARM_SHAPE_FIR_TAPS / 2) as usize;
+    let mut pred_lag_idx = (nsq.s_ltp_buf_idx - lag + LTP_ORDER as i32 / 2) as usize;
+    let gain_q10 = gain_q16 >> 6;
 
-    // Pre-shift AR_shp_Q13 to Q28
+    // Pre-shift ar_shp_q13 to Q28
     {
         let mut j = 0i32;
         while j < MAX_SHAPE_LPC_ORDER - 7 {
-            let t = vld1q_s16(AR_shp_Q13.as_ptr().add(j as usize));
+            let t = vld1q_s16(ar_shp_q13.as_ptr().add(j as usize));
             vst1q_s32(
-                ar_shp_Q28.as_mut_ptr().add(j as usize),
+                ar_shp_q28.as_mut_ptr().add(j as usize),
                 vshll_n_s16::<15>(vget_low_s16(t)),
             );
             vst1q_s32(
-                ar_shp_Q28.as_mut_ptr().add(j as usize + 4),
+                ar_shp_q28.as_mut_ptr().add(j as usize + 4),
                 vshll_n_s16::<15>(vget_high_s16(t)),
             );
             j += 8;
         }
         while j < MAX_SHAPE_LPC_ORDER {
-            ar_shp_Q28[j as usize] = (AR_shp_Q13[j as usize] as i32) << 15;
+            ar_shp_q28[j as usize] = (ar_shp_q13[j as usize] as i32) << 15;
             j += 1;
         }
     }
 
-    let mut a_Q12_arch = [0i32; MAX_LPC_ORDER];
-    neon_short_prediction_create_arch_coef(&mut a_Q12_arch, a_Q12, predict_order);
+    let mut a_q12_arch = [0i32; MAX_LPC_ORDER];
+    neon_short_prediction_create_arch_coef(&mut a_q12_arch, a_q12, predict_order);
 
-    for (i, &x_q10_i) in x_Q10.iter().take(length as usize).enumerate() {
+    for (_i, &x_q10_i) in x_q10.iter().take(length as usize).enumerate() {
         // Long-term prediction (shared)
         let ltp_pred;
         if signal_type == TYPE_VOICED {
             let mut p = 2i32;
-            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx], b_Q14[0] as i32);
-            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 1], b_Q14[1] as i32);
-            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 2], b_Q14[2] as i32);
-            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 3], b_Q14[3] as i32);
-            p = silk_smlawb(p, sLTP_Q15[pred_lag_idx - 4], b_Q14[4] as i32);
+            p = silk_smlawb(p, s_ltp_q15[pred_lag_idx], b_q14[0] as i32);
+            p = silk_smlawb(p, s_ltp_q15[pred_lag_idx - 1], b_q14[1] as i32);
+            p = silk_smlawb(p, s_ltp_q15[pred_lag_idx - 2], b_q14[2] as i32);
+            p = silk_smlawb(p, s_ltp_q15[pred_lag_idx - 3], b_q14[3] as i32);
+            p = silk_smlawb(p, s_ltp_q15[pred_lag_idx - 4], b_q14[4] as i32);
             ltp_pred = ((p as u32) << 1) as i32;
             pred_lag_idx += 1;
         } else {
@@ -910,10 +910,11 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         // Harmonic noise shaping (shared)
         let n_ltp;
         if lag > 0 {
-            let sum = nsq.sLTP_shp_Q14[shp_lag_idx].wrapping_add(nsq.sLTP_shp_Q14[shp_lag_idx - 2]);
+            let sum =
+                nsq.s_ltp_shp_q14[shp_lag_idx].wrapping_add(nsq.s_ltp_shp_q14[shp_lag_idx - 2]);
             let mut v = silk_smulwb(sum, harm_shape_packed);
             v = (v as i64
-                + ((nsq.sLTP_shp_Q14[shp_lag_idx - 1] as i64 * (harm_shape_packed as i64 >> 16))
+                + ((nsq.s_ltp_shp_q14[shp_lag_idx - 1] as i64 * (harm_shape_packed as i64 >> 16))
                     >> 16)) as i32;
             n_ltp = ltp_pred - ((v as u32) << 2) as i32;
             shp_lag_idx += 1;
@@ -922,27 +923,27 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         }
 
         // PRNG
-        let mut seed_v = vld1q_s32(dd.Seed.as_ptr());
+        let mut seed_v = vld1q_s32(dd.seed.as_ptr());
         seed_v =
             vreinterpretq_s32_u32(vmlaq_u32(rand_inc, vreinterpretq_u32_s32(seed_v), rand_mul));
-        vst1q_s32(dd.Seed.as_mut_ptr(), seed_v);
+        vst1q_s32(dd.seed.as_mut_ptr(), seed_v);
 
         // Short-term prediction (NEON)
-        let buf_ptr = dd.sLPC_Q14[NSQ_LPC_BUF_LENGTH - 16 + i..].as_ptr();
-        let mut lpc_v = neon_short_prediction_local(buf_ptr, &a_Q12_arch, predict_order);
+        let buf_ptr = dd.s_lpc_q14[NSQ_LPC_BUF_LENGTH - 16 + _i..].as_ptr();
+        let mut lpc_v = neon_short_prediction_local(buf_ptr, &a_q12_arch, predict_order);
         lpc_v = vshlq_n_s32::<4>(lpc_v);
 
         // Noise shape feedback
         let mut tmp2_v = neon_smlawb_lane0(
-            vld1q_s32(dd.Diff_Q14.as_ptr()),
-            vld1q_s32(dd.sAR2_Q14[0].as_ptr()),
+            vld1q_s32(dd.diff_q14.as_ptr()),
+            vld1q_s32(dd.s_ar2_q14[0].as_ptr()),
             warping_v,
         );
-        let mut tmp1_v = vsubq_s32(vld1q_s32(dd.sAR2_Q14[1].as_ptr()), tmp2_v);
-        tmp1_v = neon_smlawb_lane0(vld1q_s32(dd.sAR2_Q14[0].as_ptr()), tmp1_v, warping_v);
-        vst1q_s32(dd.sAR2_Q14[0].as_mut_ptr(), tmp2_v);
+        let mut tmp1_v = vsubq_s32(vld1q_s32(dd.s_ar2_q14[1].as_ptr()), tmp2_v);
+        tmp1_v = neon_smlawb_lane0(vld1q_s32(dd.s_ar2_q14[0].as_ptr()), tmp1_v, warping_v);
+        vst1q_s32(dd.s_ar2_q14[0].as_mut_ptr(), tmp2_v);
 
-        let mut ar_v2 = vld1_s32(ar_shp_Q28.as_ptr());
+        let mut ar_v2 = vld1_s32(ar_shp_q28.as_ptr());
         let mut n_ar_v = vaddq_s32(
             vdupq_n_s32(shaping_order >> 1),
             vqdmulhq_lane_s32::<0>(tmp2_v, ar_v2),
@@ -950,29 +951,29 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
 
         let mut j = 2i32;
         while j < shaping_order {
-            tmp2_v = vsubq_s32(vld1q_s32(dd.sAR2_Q14[j as usize].as_ptr()), tmp1_v);
+            tmp2_v = vsubq_s32(vld1q_s32(dd.s_ar2_q14[j as usize].as_ptr()), tmp1_v);
             tmp2_v = neon_smlawb_lane0(
-                vld1q_s32(dd.sAR2_Q14[(j - 1) as usize].as_ptr()),
+                vld1q_s32(dd.s_ar2_q14[(j - 1) as usize].as_ptr()),
                 tmp2_v,
                 warping_v,
             );
-            vst1q_s32(dd.sAR2_Q14[(j - 1) as usize].as_mut_ptr(), tmp1_v);
+            vst1q_s32(dd.s_ar2_q14[(j - 1) as usize].as_mut_ptr(), tmp1_v);
             n_ar_v = vaddq_s32(n_ar_v, vqdmulhq_lane_s32::<1>(tmp1_v, ar_v2));
 
-            tmp1_v = vsubq_s32(vld1q_s32(dd.sAR2_Q14[(j + 1) as usize].as_ptr()), tmp2_v);
+            tmp1_v = vsubq_s32(vld1q_s32(dd.s_ar2_q14[(j + 1) as usize].as_ptr()), tmp2_v);
             tmp1_v = neon_smlawb_lane0(
-                vld1q_s32(dd.sAR2_Q14[j as usize].as_ptr()),
+                vld1q_s32(dd.s_ar2_q14[j as usize].as_ptr()),
                 tmp1_v,
                 warping_v,
             );
-            vst1q_s32(dd.sAR2_Q14[j as usize].as_mut_ptr(), tmp2_v);
-            ar_v2 = vld1_s32(ar_shp_Q28.as_ptr().add(j as usize));
+            vst1q_s32(dd.s_ar2_q14[j as usize].as_mut_ptr(), tmp2_v);
+            ar_v2 = vld1_s32(ar_shp_q28.as_ptr().add(j as usize));
             n_ar_v = vaddq_s32(n_ar_v, vqdmulhq_lane_s32::<0>(tmp2_v, ar_v2));
 
             j += 2;
         }
         vst1q_s32(
-            dd.sAR2_Q14[(shaping_order - 1) as usize].as_mut_ptr(),
+            dd.s_ar2_q14[(shaping_order - 1) as usize].as_mut_ptr(),
             tmp1_v,
         );
         n_ar_v = vaddq_s32(n_ar_v, vqdmulhq_lane_s32::<1>(tmp1_v, ar_v2));
@@ -980,26 +981,26 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         n_ar_v = vaddq_s32(
             n_ar_v,
             vqdmulhq_n_s32(
-                vld1q_s32(dd.LF_AR_Q14.as_ptr()),
-                ((tilt_Q14 as u32) << 16) as i32 >> 1,
+                vld1q_s32(dd.lf_ar_q14.as_ptr()),
+                ((tilt_q14 as u32) << 16) as i32 >> 1,
             ),
         );
         n_ar_v = vshlq_n_s32::<2>(n_ar_v); // Q12 -> Q14
 
         let mut n_lf_v = vqdmulhq_n_s32(
-            vld1q_s32(dd.Shape_Q14[*smpl_buf_idx as usize].as_ptr()),
-            lf_shp_Q29,
+            vld1q_s32(dd.shape_q14[*smpl_buf_idx as usize].as_ptr()),
+            lf_shp_q29,
         );
         n_lf_v = vaddq_s32(
             n_lf_v,
             vqdmulhq_n_s32(
-                vld1q_s32(dd.LF_AR_Q14.as_ptr()),
-                ((lf_shp_Q14 >> 16) as u32 as i32) << 15,
+                vld1q_s32(dd.lf_ar_q14.as_ptr()),
+                ((lf_shp_q14 >> 16) as u32 as i32) << 15,
             ),
         );
         n_lf_v = vshlq_n_s32::<2>(n_lf_v); // Q12 -> Q14
 
-        // Residual: r = x[i] - (LTP + LPC - n_AR - n_LF)
+        // Residual: r = x[_i] - (LTP + LPC - n_AR - n_LF)
         let mut r_v = vaddq_s32(n_ar_v, n_lf_v);
         let pred_sum = vaddq_s32(vdupq_n_s32(n_ltp), lpc_v);
         r_v = vsubq_s32(pred_sum, r_v);
@@ -1017,51 +1018,51 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         // Quantization
         let (q_best, q_second);
         {
-            let mut q1_s16 = vsub_s16(r_s16, vdup_n_s16(offset_Q10 as i16));
-            let mut q1_Q0 = vshr_n_s16::<10>(q1_s16);
+            let mut q1_s16 = vsub_s16(r_s16, vdup_n_s16(offset_q10 as i16));
+            let mut q1_q0 = vshr_n_s16::<10>(q1_s16);
 
-            if lambda_Q10 > 2048 {
-                let rdo_off = (lambda_Q10 / 2 - 512) as i16;
+            if lambda_q10 > 2048 {
+                let rdo_off = (lambda_q10 / 2 - 512) as i16;
                 let gt = vcgt_s16(q1_s16, vdup_n_s16(rdo_off));
                 let lt = vclt_s16(q1_s16, vdup_n_s16(-rdo_off));
                 let mut soff = vbsl_s16(gt, vdup_n_s16(-rdo_off), vdup_n_s16(0));
                 soff = vbsl_s16(lt, vdup_n_s16(rdo_off), soff);
-                q1_Q0 = vreinterpret_s16_u16(vclt_s16(q1_s16, vdup_n_s16(0)));
-                q1_Q0 = vbsl_s16(vorr_u16(gt, lt), vadd_s16(q1_s16, soff), q1_Q0);
-                q1_Q0 = vshr_n_s16::<10>(q1_Q0);
+                q1_q0 = vreinterpret_s16_u16(vclt_s16(q1_s16, vdup_n_s16(0)));
+                q1_q0 = vbsl_s16(vorr_u16(gt, lt), vadd_s16(q1_s16, soff), q1_q0);
+                q1_q0 = vshr_n_s16::<10>(q1_q0);
             }
 
-            let eq0 = vceq_s16(q1_Q0, vdup_n_s16(0));
-            let eq_m1 = vceq_s16(q1_Q0, vdup_n_s16(-1));
-            let lt_m1 = vclt_s16(q1_Q0, vdup_n_s16(-1));
+            let eq0 = vceq_s16(q1_q0, vdup_n_s16(0));
+            let eq_m1 = vceq_s16(q1_q0, vdup_n_s16(-1));
+            let lt_m1 = vclt_s16(q1_q0, vdup_n_s16(-1));
 
-            q1_s16 = vshl_n_s16::<10>(q1_Q0);
+            q1_s16 = vshl_n_s16::<10>(q1_q0);
             let mut ts = vand_s16(
-                vreinterpret_s16_u16(vcge_s16(q1_Q0, vdup_n_s16(0))),
-                vdup_n_s16((offset_Q10 - QUANT_LEVEL_ADJUST_Q10) as i16),
+                vreinterpret_s16_u16(vcge_s16(q1_q0, vdup_n_s16(0))),
+                vdup_n_s16((offset_q10 - QUANT_LEVEL_ADJUST_Q10) as i16),
             );
             let mut t1s = vadd_s16(q1_s16, ts);
             ts = vbsl_s16(
                 lt_m1,
-                vdup_n_s16((offset_Q10 + QUANT_LEVEL_ADJUST_Q10) as i16),
+                vdup_n_s16((offset_q10 + QUANT_LEVEL_ADJUST_Q10) as i16),
                 vdup_n_s16(0),
             );
             q1_s16 = vadd_s16(q1_s16, ts);
             q1_s16 = vbsl_s16(lt_m1, q1_s16, t1s);
-            q1_s16 = vbsl_s16(eq0, vdup_n_s16(offset_Q10 as i16), q1_s16);
+            q1_s16 = vbsl_s16(eq0, vdup_n_s16(offset_q10 as i16), q1_s16);
             q1_s16 = vbsl_s16(
                 eq_m1,
-                vdup_n_s16((offset_Q10 - (1024 - QUANT_LEVEL_ADJUST_Q10)) as i16),
+                vdup_n_s16((offset_q10 - (1024 - QUANT_LEVEL_ADJUST_Q10)) as i16),
                 q1_s16,
             );
 
             let mut q2_s16 = vadd_s16(q1_s16, vdup_n_s16(1024));
             q2_s16 = vbsl_s16(
                 eq0,
-                vdup_n_s16((offset_Q10 + 1024 - QUANT_LEVEL_ADJUST_Q10) as i16),
+                vdup_n_s16((offset_q10 + 1024 - QUANT_LEVEL_ADJUST_Q10) as i16),
                 q2_s16,
             );
-            q2_s16 = vbsl_s16(eq_m1, vdup_n_s16(offset_Q10 as i16), q2_s16);
+            q2_s16 = vbsl_s16(eq_m1, vdup_n_s16(offset_q10 as i16), q2_s16);
 
             // Rate terms
             t1s = q1_s16;
@@ -1069,8 +1070,8 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             t1s = vbsl_s16(vorr_u16(eq_m1, lt_m1), vneg_s16(t1s), t1s);
             t2s = vbsl_s16(lt_m1, vneg_s16(t2s), t2s);
 
-            let mut rd1 = vmull_s16(t1s, vdup_n_s16(lambda_Q10 as i16));
-            let mut rd2 = vmull_s16(t2s, vdup_n_s16(lambda_Q10 as i16));
+            let mut rd1 = vmull_s16(t1s, vdup_n_s16(lambda_q10 as i16));
+            let mut rd2 = vmull_s16(t2s, vdup_n_s16(lambda_q10 as i16));
 
             let rr1 = vsub_s16(r_s16, q1_s16);
             rd1 = vmlal_s16(rd1, rr1, rr1);
@@ -1080,19 +1081,19 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             rd2 = vmlal_s16(rd2, rr2, rr2);
             rd2 = vshrq_n_s32::<10>(rd2);
 
-            let rd_v = vld1q_s32(dd.RD_Q10.as_ptr());
+            let rd_v = vld1q_s32(dd.rd_q10.as_ptr());
             let best_rd = vaddq_s32(rd_v, vminq_s32(rd1, rd2));
             let second_rd = vaddq_s32(rd_v, vmaxq_s32(rd1, rd2));
-            vst1q_s32(ss[0].RD_Q10.as_mut_ptr(), best_rd);
-            vst1q_s32(ss[1].RD_Q10.as_mut_ptr(), second_rd);
+            vst1q_s32(ss[0].rd_q10.as_mut_ptr(), best_rd);
+            vst1q_s32(ss[1].rd_q10.as_mut_ptr(), second_rd);
 
             let cmp = vcltq_s32(rd1, rd2);
             let q1w = vmovl_s16(q1_s16);
             let q2w = vmovl_s16(q2_s16);
             q_best = vbslq_s32(cmp, q1w, q2w);
             q_second = vbslq_s32(cmp, q2w, q1w);
-            vst1q_s32(ss[0].Q_Q10.as_mut_ptr(), q_best);
-            vst1q_s32(ss[1].Q_Q10.as_mut_ptr(), q_second);
+            vst1q_s32(ss[0].q_q10.as_mut_ptr(), q_best);
+            vst1q_s32(ss[1].q_q10.as_mut_ptr(), q_second);
         }
 
         // Update states for best (sample 0)
@@ -1101,12 +1102,12 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             let lpc_exc = vaddq_s32(exc, vdupq_n_s32(ltp_pred));
             let xq_v = vaddq_s32(lpc_exc, lpc_v);
             let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_q10_i)));
-            vst1q_s32(ss[0].Diff_Q14.as_mut_ptr(), diff);
+            vst1q_s32(ss[0].diff_q14.as_mut_ptr(), diff);
             let slf = vsubq_s32(diff, n_ar_v);
-            vst1q_s32(ss[0].sLTP_shp_Q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));
-            vst1q_s32(ss[0].LF_AR_Q14.as_mut_ptr(), slf);
-            vst1q_s32(ss[0].LPC_exc_Q14.as_mut_ptr(), lpc_exc);
-            vst1q_s32(ss[0].xq_Q14.as_mut_ptr(), xq_v);
+            vst1q_s32(ss[0].s_ltp_shp_q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));
+            vst1q_s32(ss[0].lf_ar_q14.as_mut_ptr(), slf);
+            vst1q_s32(ss[0].lpc_exc_q14.as_mut_ptr(), lpc_exc);
+            vst1q_s32(ss[0].xq_q14.as_mut_ptr(), xq_v);
         }
         // Update states for second-best (sample 1)
         {
@@ -1114,12 +1115,12 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
             let lpc_exc = vaddq_s32(exc, vdupq_n_s32(ltp_pred));
             let xq_v = vaddq_s32(lpc_exc, lpc_v);
             let diff = vsubq_s32(xq_v, vshlq_n_s32::<4>(vdupq_n_s32(x_q10_i)));
-            vst1q_s32(ss[1].Diff_Q14.as_mut_ptr(), diff);
+            vst1q_s32(ss[1].diff_q14.as_mut_ptr(), diff);
             let slf = vsubq_s32(diff, n_ar_v);
-            vst1q_s32(ss[1].sLTP_shp_Q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));
-            vst1q_s32(ss[1].LF_AR_Q14.as_mut_ptr(), slf);
-            vst1q_s32(ss[1].LPC_exc_Q14.as_mut_ptr(), lpc_exc);
-            vst1q_s32(ss[1].xq_Q14.as_mut_ptr(), xq_v);
+            vst1q_s32(ss[1].s_ltp_shp_q14.as_mut_ptr(), vsubq_s32(slf, n_lf_v));
+            vst1q_s32(ss[1].lf_ar_q14.as_mut_ptr(), slf);
+            vst1q_s32(ss[1].lpc_exc_q14.as_mut_ptr(), lpc_exc);
+            vst1q_s32(ss[1].xq_q14.as_mut_ptr(), xq_v);
         }
 
         *smpl_buf_idx = if *smpl_buf_idx != 0 {
@@ -1136,11 +1137,11 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         }
 
         // Find winner
-        let mut rd_min = ss[0].RD_Q10[0];
+        let mut rd_min = ss[0].rd_q10[0];
         let mut winner = 0usize;
         for k in 1..n_states as usize {
-            if ss[0].RD_Q10[k] < rd_min {
-                rd_min = ss[0].RD_Q10[k];
+            if ss[0].rd_q10[k] < rd_min {
+                rd_min = ss[0].rd_q10[k];
                 winner = k;
             }
         }
@@ -1148,126 +1149,127 @@ unsafe fn neon_noise_shape_quantizer_del_dec(
         // Clear unused states
         if (n_states as usize) < NEON_MAX_DEL_DEC_STATES {
             for k in n_states as usize..NEON_MAX_DEL_DEC_STATES {
-                ss[0].RD_Q10[k] = 0;
-                ss[1].RD_Q10[k] = 0;
+                ss[0].rd_q10[k] = 0;
+                ss[1].rd_q10[k] = 0;
             }
         }
 
         // Increase RD of expired states
-        let winner_rand = dd.RandState[last_idx][winner];
+        let winner_rand = dd.rand_state[last_idx][winner];
         {
             let t = vmvnq_u32(vceqq_s32(
-                vld1q_s32(dd.RandState[last_idx].as_ptr()),
+                vld1q_s32(dd.rand_state[last_idx].as_ptr()),
                 vdupq_n_s32(winner_rand),
             ));
             let penalty = vshrq_n_u32::<5>(t);
-            let mut s0r = vld1q_s32(ss[0].RD_Q10.as_ptr());
-            let mut s1r = vld1q_s32(ss[1].RD_Q10.as_ptr());
+            let mut s0r = vld1q_s32(ss[0].rd_q10.as_ptr());
+            let mut s1r = vld1q_s32(ss[1].rd_q10.as_ptr());
             s0r = vaddq_s32(s0r, vreinterpretq_s32_u32(penalty));
             s1r = vaddq_s32(s1r, vreinterpretq_s32_u32(penalty));
-            vst1q_s32(ss[0].RD_Q10.as_mut_ptr(), s0r);
-            vst1q_s32(ss[1].RD_Q10.as_mut_ptr(), s1r);
+            vst1q_s32(ss[0].rd_q10.as_mut_ptr(), s0r);
+            vst1q_s32(ss[1].rd_q10.as_mut_ptr(), s1r);
 
-            let mut rd_max = ss[0].RD_Q10[0];
-            let mut rd_min2 = ss[1].RD_Q10[0];
+            let mut rd_max = ss[0].rd_q10[0];
+            let mut rd_min2 = ss[1].rd_q10[0];
             let mut max_ind = 0usize;
             let mut min_ind = 0usize;
             for k in 1..n_states as usize {
-                if ss[0].RD_Q10[k] > rd_max {
-                    rd_max = ss[0].RD_Q10[k];
+                if ss[0].rd_q10[k] > rd_max {
+                    rd_max = ss[0].rd_q10[k];
                     max_ind = k;
                 }
-                if ss[1].RD_Q10[k] < rd_min2 {
-                    rd_min2 = ss[1].RD_Q10[k];
+                if ss[1].rd_q10[k] < rd_min2 {
+                    rd_min2 = ss[1].rd_q10[k];
                     min_ind = k;
                 }
             }
 
             if rd_min2 < rd_max {
-                for jj in (i + 1)..(i + NSQ_LPC_BUF_LENGTH) {
-                    dd.sLPC_Q14[jj][max_ind] = dd.sLPC_Q14[jj][min_ind];
+                for jj in (_i + 1)..(_i + NSQ_LPC_BUF_LENGTH) {
+                    dd.s_lpc_q14[jj][max_ind] = dd.s_lpc_q14[jj][min_ind];
                 }
                 for slot in 0..DECISION_DELAY as usize {
-                    dd.RandState[slot][max_ind] = dd.RandState[slot][min_ind];
-                    dd.Q_Q10[slot][max_ind] = dd.Q_Q10[slot][min_ind];
-                    dd.Xq_Q14[slot][max_ind] = dd.Xq_Q14[slot][min_ind];
-                    dd.Pred_Q15[slot][max_ind] = dd.Pred_Q15[slot][min_ind];
-                    dd.Shape_Q14[slot][max_ind] = dd.Shape_Q14[slot][min_ind];
+                    dd.rand_state[slot][max_ind] = dd.rand_state[slot][min_ind];
+                    dd.q_q10[slot][max_ind] = dd.q_q10[slot][min_ind];
+                    dd.xq_q14[slot][max_ind] = dd.xq_q14[slot][min_ind];
+                    dd.pred_q15[slot][max_ind] = dd.pred_q15[slot][min_ind];
+                    dd.shape_q14[slot][max_ind] = dd.shape_q14[slot][min_ind];
                 }
                 for slot in 0..MAX_SHAPE_LPC_ORDER as usize {
-                    dd.sAR2_Q14[slot][max_ind] = dd.sAR2_Q14[slot][min_ind];
+                    dd.s_ar2_q14[slot][max_ind] = dd.s_ar2_q14[slot][min_ind];
                 }
-                dd.LF_AR_Q14[max_ind] = dd.LF_AR_Q14[min_ind];
-                dd.Diff_Q14[max_ind] = dd.Diff_Q14[min_ind];
-                dd.Seed[max_ind] = dd.Seed[min_ind];
-                dd.SeedInit[max_ind] = dd.SeedInit[min_ind];
-                dd.RD_Q10[max_ind] = dd.RD_Q10[min_ind];
+                dd.lf_ar_q14[max_ind] = dd.lf_ar_q14[min_ind];
+                dd.diff_q14[max_ind] = dd.diff_q14[min_ind];
+                dd.seed[max_ind] = dd.seed[min_ind];
+                dd.seed_init[max_ind] = dd.seed_init[min_ind];
+                dd.rd_q10[max_ind] = dd.rd_q10[min_ind];
 
-                ss[0].Q_Q10[max_ind] = ss[1].Q_Q10[min_ind];
-                ss[0].RD_Q10[max_ind] = ss[1].RD_Q10[min_ind];
-                ss[0].xq_Q14[max_ind] = ss[1].xq_Q14[min_ind];
-                ss[0].LF_AR_Q14[max_ind] = ss[1].LF_AR_Q14[min_ind];
-                ss[0].Diff_Q14[max_ind] = ss[1].Diff_Q14[min_ind];
-                ss[0].sLTP_shp_Q14[max_ind] = ss[1].sLTP_shp_Q14[min_ind];
-                ss[0].LPC_exc_Q14[max_ind] = ss[1].LPC_exc_Q14[min_ind];
+                ss[0].q_q10[max_ind] = ss[1].q_q10[min_ind];
+                ss[0].rd_q10[max_ind] = ss[1].rd_q10[min_ind];
+                ss[0].xq_q14[max_ind] = ss[1].xq_q14[min_ind];
+                ss[0].lf_ar_q14[max_ind] = ss[1].lf_ar_q14[min_ind];
+                ss[0].diff_q14[max_ind] = ss[1].diff_q14[min_ind];
+                ss[0].s_ltp_shp_q14[max_ind] = ss[1].s_ltp_shp_q14[min_ind];
+                ss[0].lpc_exc_q14[max_ind] = ss[1].lpc_exc_q14[min_ind];
             }
         }
 
         // Write delayed samples
-        if subfr > 0 || i as i32 >= decision_delay {
-            let oidx = (p_off as isize + i as isize - decision_delay as isize) as usize;
-            pulses[oidx] = (((dd.Q_Q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
+        if subfr > 0 || _i as i32 >= decision_delay {
+            let oidx = (p_off as isize + _i as isize - decision_delay as isize) as usize;
+            pulses[oidx] = (((dd.q_q10[last_idx][winner] >> 9) + 1) >> 1) as i8;
             let xq_val =
-                (dd.Xq_Q14[last_idx][winner] as i64 * delayed_gain_Q10[last_idx] as i64) >> 16;
-            let xidx = (xq_off as isize + i as isize - decision_delay as isize) as usize;
+                (dd.xq_q14[last_idx][winner] as i64 * delayed_gain_q10[last_idx] as i64) >> 16;
+            let xidx = (xq_off as isize + _i as isize - decision_delay as isize) as usize;
             nsq.xq[xidx] = neon_rshift_round_sat16(xq_val as i32, 8);
-            nsq.sLTP_shp_Q14[(nsq.sLTP_shp_buf_idx - decision_delay) as usize] =
-                dd.Shape_Q14[last_idx][winner];
-            sLTP_Q15[(nsq.sLTP_buf_idx - decision_delay) as usize] = dd.Pred_Q15[last_idx][winner];
+            nsq.s_ltp_shp_q14[(nsq.s_ltp_shp_buf_idx - decision_delay) as usize] =
+                dd.shape_q14[last_idx][winner];
+            s_ltp_q15[(nsq.s_ltp_buf_idx - decision_delay) as usize] =
+                dd.pred_q15[last_idx][winner];
         }
-        nsq.sLTP_shp_buf_idx += 1;
-        nsq.sLTP_buf_idx += 1;
+        nsq.s_ltp_shp_buf_idx += 1;
+        nsq.s_ltp_buf_idx += 1;
 
         // Update all states with best candidate
         vst1q_s32(
-            dd.LF_AR_Q14.as_mut_ptr(),
-            vld1q_s32(ss[0].LF_AR_Q14.as_ptr()),
+            dd.lf_ar_q14.as_mut_ptr(),
+            vld1q_s32(ss[0].lf_ar_q14.as_ptr()),
         );
-        vst1q_s32(dd.Diff_Q14.as_mut_ptr(), vld1q_s32(ss[0].Diff_Q14.as_ptr()));
+        vst1q_s32(dd.diff_q14.as_mut_ptr(), vld1q_s32(ss[0].diff_q14.as_ptr()));
         vst1q_s32(
-            dd.sLPC_Q14[NSQ_LPC_BUF_LENGTH + i].as_mut_ptr(),
-            vld1q_s32(ss[0].xq_Q14.as_ptr()),
-        );
-        vst1q_s32(
-            dd.Xq_Q14[*smpl_buf_idx as usize].as_mut_ptr(),
-            vld1q_s32(ss[0].xq_Q14.as_ptr()),
-        );
-        let q_v = vld1q_s32(ss[0].Q_Q10.as_ptr());
-        vst1q_s32(dd.Q_Q10[*smpl_buf_idx as usize].as_mut_ptr(), q_v);
-        vst1q_s32(
-            dd.Pred_Q15[*smpl_buf_idx as usize].as_mut_ptr(),
-            vshlq_n_s32::<1>(vld1q_s32(ss[0].LPC_exc_Q14.as_ptr())),
+            dd.s_lpc_q14[NSQ_LPC_BUF_LENGTH + _i].as_mut_ptr(),
+            vld1q_s32(ss[0].xq_q14.as_ptr()),
         );
         vst1q_s32(
-            dd.Shape_Q14[*smpl_buf_idx as usize].as_mut_ptr(),
-            vld1q_s32(ss[0].sLTP_shp_Q14.as_ptr()),
+            dd.xq_q14[*smpl_buf_idx as usize].as_mut_ptr(),
+            vld1q_s32(ss[0].xq_q14.as_ptr()),
+        );
+        let q_v = vld1q_s32(ss[0].q_q10.as_ptr());
+        vst1q_s32(dd.q_q10[*smpl_buf_idx as usize].as_mut_ptr(), q_v);
+        vst1q_s32(
+            dd.pred_q15[*smpl_buf_idx as usize].as_mut_ptr(),
+            vshlq_n_s32::<1>(vld1q_s32(ss[0].lpc_exc_q14.as_ptr())),
+        );
+        vst1q_s32(
+            dd.shape_q14[*smpl_buf_idx as usize].as_mut_ptr(),
+            vld1q_s32(ss[0].s_ltp_shp_q14.as_ptr()),
         );
 
         let q_rounded = vrshrq_n_s32::<10>(q_v);
         let seed_upd = vreinterpretq_s32_u32(vaddq_u32(
-            vreinterpretq_u32_s32(vld1q_s32(dd.Seed.as_ptr())),
+            vreinterpretq_u32_s32(vld1q_s32(dd.seed.as_ptr())),
             vreinterpretq_u32_s32(q_rounded),
         ));
-        vst1q_s32(dd.Seed.as_mut_ptr(), seed_upd);
-        vst1q_s32(dd.RandState[*smpl_buf_idx as usize].as_mut_ptr(), seed_upd);
-        vst1q_s32(dd.RD_Q10.as_mut_ptr(), vld1q_s32(ss[0].RD_Q10.as_ptr()));
-        delayed_gain_Q10[*smpl_buf_idx as usize] = gain_Q10;
+        vst1q_s32(dd.seed.as_mut_ptr(), seed_upd);
+        vst1q_s32(dd.rand_state[*smpl_buf_idx as usize].as_mut_ptr(), seed_upd);
+        vst1q_s32(dd.rd_q10.as_mut_ptr(), vld1q_s32(ss[0].rd_q10.as_ptr()));
+        delayed_gain_q10[*smpl_buf_idx as usize] = gain_q10;
     }
 
     // Copy LPC state for next subframe
     std::ptr::copy(
-        dd.sLPC_Q14[length as usize..].as_ptr(),
-        dd.sLPC_Q14.as_mut_ptr(),
+        dd.s_lpc_q14[length as usize..].as_ptr(),
+        dd.s_lpc_q14.as_mut_ptr(),
         NSQ_LPC_BUF_LENGTH,
     );
 }
@@ -1280,201 +1282,201 @@ unsafe fn neon_scale_states(
     nsq: &mut silk_nsq_state,
     dd: &mut NeonDelDecStates,
     x16: &[i16],
-    x_sc_Q10: &mut [i32],
-    sLTP: &[i16],
-    sLTP_Q15: &mut [i32],
+    x_sc_q10: &mut [i32],
+    s_ltp: &[i16],
+    s_ltp_q15: &mut [i32],
     subfr: i32,
-    ltp_scale_Q14: i32,
-    gains_Q16: &[i32],
-    pitchL: &[i32],
+    ltp_scale_q14: i32,
+    gains_q16: &[i32],
+    pitch_l: &[i32],
     signal_type: i32,
     decision_delay: i32,
 ) {
-    let lag = pitchL[subfr as usize];
-    let mut inv_gain_Q31 = silk_inverse32_varq(gains_Q16[subfr as usize].max(1), 47);
+    let lag = pitch_l[subfr as usize];
+    let mut inv_gain_q31 = silk_inverse32_varq(gains_q16[subfr as usize].max(1), 47);
 
-    let inv_gain_Q26 = ((inv_gain_Q31 >> 4) + 1) >> 1;
+    let inv_gain_q26 = ((inv_gain_q31 >> 4) + 1) >> 1;
     neon_smulww_loop(
         x16.as_ptr(),
-        inv_gain_Q26,
-        x_sc_Q10.as_mut_ptr(),
+        inv_gain_q26,
+        x_sc_q10.as_mut_ptr(),
         cfg.subfr_length as i32,
     );
 
     if nsq.rewhite_flag != 0 {
         if subfr == 0 {
-            inv_gain_Q31 = ((silk_smulwb(inv_gain_Q31, ltp_scale_Q14) as u32) << 2) as i32;
+            inv_gain_q31 = ((silk_smulwb(inv_gain_q31, ltp_scale_q14) as u32) << 2) as i32;
         }
-        let start = (nsq.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
+        let start = (nsq.s_ltp_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
         let count = lag + LTP_ORDER as i32 / 2;
         neon_smulww_loop(
-            sLTP.as_ptr().add(start),
-            inv_gain_Q31,
-            sLTP_Q15.as_mut_ptr().add(start),
+            s_ltp.as_ptr().add(start),
+            inv_gain_q31,
+            s_ltp_q15.as_mut_ptr().add(start),
             count,
         );
     }
 
-    if gains_Q16[subfr as usize] != nsq.prev_gain_Q16 {
-        let gain_adj = silk_div32_varq(nsq.prev_gain_Q16, gains_Q16[subfr as usize], 16);
+    if gains_q16[subfr as usize] != nsq.prev_gain_q16 {
+        let gain_adj = silk_div32_varq(nsq.prev_gain_q16, gains_q16[subfr as usize], 16);
 
         if (-65536..65536).contains(&gain_adj) {
             let gv = vdup_n_s32((gain_adj as u32 as i32) << 15);
 
-            let shp_start = (nsq.sLTP_shp_buf_idx - cfg.ltp_mem_length as i32) as usize;
-            let shp_end = nsq.sLTP_shp_buf_idx as usize;
+            let shp_start = (nsq.s_ltp_shp_buf_idx - cfg.ltp_mem_length as i32) as usize;
+            let shp_end = nsq.s_ltp_shp_buf_idx as usize;
             let mut ii = shp_start;
             while ii + 7 < shp_end {
-                neon_smulww_small_8(nsq.sLTP_shp_Q14.as_mut_ptr().add(ii), gv);
+                neon_smulww_small_8(nsq.s_ltp_shp_q14.as_mut_ptr().add(ii), gv);
                 ii += 8;
             }
             while ii < shp_end {
-                nsq.sLTP_shp_Q14[ii] = silk_smulww(gain_adj, nsq.sLTP_shp_Q14[ii]);
+                nsq.s_ltp_shp_q14[ii] = silk_smulww(gain_adj, nsq.s_ltp_shp_q14[ii]);
                 ii += 1;
             }
 
             if signal_type == TYPE_VOICED && nsq.rewhite_flag == 0 {
-                let ps = (nsq.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
-                let pe = (nsq.sLTP_buf_idx - decision_delay) as usize;
+                let ps = (nsq.s_ltp_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
+                let pe = (nsq.s_ltp_buf_idx - decision_delay) as usize;
                 let mut ii = ps;
                 while ii + 7 < pe {
-                    neon_smulww_small_8(sLTP_Q15.as_mut_ptr().add(ii), gv);
+                    neon_smulww_small_8(s_ltp_q15.as_mut_ptr().add(ii), gv);
                     ii += 8;
                 }
                 while ii < pe {
-                    sLTP_Q15[ii] = silk_smulww(gain_adj, sLTP_Q15[ii]);
+                    s_ltp_q15[ii] = silk_smulww(gain_adj, s_ltp_q15[ii]);
                     ii += 1;
                 }
             }
 
-            neon_smulww_small_4(dd.LF_AR_Q14.as_mut_ptr(), gv);
-            neon_smulww_small_4(dd.Diff_Q14.as_mut_ptr(), gv);
+            neon_smulww_small_4(dd.lf_ar_q14.as_mut_ptr(), gv);
+            neon_smulww_small_4(dd.diff_q14.as_mut_ptr(), gv);
             for ii in 0..NSQ_LPC_BUF_LENGTH {
-                neon_smulww_small_4(dd.sLPC_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_small_4(dd.s_lpc_q14[ii].as_mut_ptr(), gv);
             }
             for ii in 0..MAX_SHAPE_LPC_ORDER as usize {
-                neon_smulww_small_4(dd.sAR2_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_small_4(dd.s_ar2_q14[ii].as_mut_ptr(), gv);
             }
             for ii in 0..DECISION_DELAY as usize {
-                neon_smulww_small_4(dd.Pred_Q15[ii].as_mut_ptr(), gv);
-                neon_smulww_small_4(dd.Shape_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_small_4(dd.pred_q15[ii].as_mut_ptr(), gv);
+                neon_smulww_small_4(dd.shape_q14[ii].as_mut_ptr(), gv);
             }
         } else {
             let mut gv = vdup_n_s32(((gain_adj & 0x0000FFFF) as u32 as i32) << 15);
             gv = vset_lane_s32::<1>(gain_adj >> 16, gv);
 
-            let shp_start = (nsq.sLTP_shp_buf_idx - cfg.ltp_mem_length as i32) as usize;
-            let shp_end = nsq.sLTP_shp_buf_idx as usize;
+            let shp_start = (nsq.s_ltp_shp_buf_idx - cfg.ltp_mem_length as i32) as usize;
+            let shp_end = nsq.s_ltp_shp_buf_idx as usize;
             let mut ii = shp_start;
             while ii + 7 < shp_end {
-                neon_smulww_8(nsq.sLTP_shp_Q14.as_mut_ptr().add(ii), gv);
+                neon_smulww_8(nsq.s_ltp_shp_q14.as_mut_ptr().add(ii), gv);
                 ii += 8;
             }
             while ii < shp_end {
-                nsq.sLTP_shp_Q14[ii] = silk_smulww(gain_adj, nsq.sLTP_shp_Q14[ii]);
+                nsq.s_ltp_shp_q14[ii] = silk_smulww(gain_adj, nsq.s_ltp_shp_q14[ii]);
                 ii += 1;
             }
 
             if signal_type == TYPE_VOICED && nsq.rewhite_flag == 0 {
-                let ps = (nsq.sLTP_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
-                let pe = (nsq.sLTP_buf_idx - decision_delay) as usize;
+                let ps = (nsq.s_ltp_buf_idx - lag - LTP_ORDER as i32 / 2) as usize;
+                let pe = (nsq.s_ltp_buf_idx - decision_delay) as usize;
                 let mut ii = ps;
                 while ii + 7 < pe {
-                    neon_smulww_8(sLTP_Q15.as_mut_ptr().add(ii), gv);
+                    neon_smulww_8(s_ltp_q15.as_mut_ptr().add(ii), gv);
                     ii += 8;
                 }
                 while ii < pe {
-                    sLTP_Q15[ii] = silk_smulww(gain_adj, sLTP_Q15[ii]);
+                    s_ltp_q15[ii] = silk_smulww(gain_adj, s_ltp_q15[ii]);
                     ii += 1;
                 }
             }
 
-            neon_smulww_4(dd.LF_AR_Q14.as_mut_ptr(), gv);
-            neon_smulww_4(dd.Diff_Q14.as_mut_ptr(), gv);
+            neon_smulww_4(dd.lf_ar_q14.as_mut_ptr(), gv);
+            neon_smulww_4(dd.diff_q14.as_mut_ptr(), gv);
             for ii in 0..NSQ_LPC_BUF_LENGTH {
-                neon_smulww_4(dd.sLPC_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_4(dd.s_lpc_q14[ii].as_mut_ptr(), gv);
             }
             for ii in 0..MAX_SHAPE_LPC_ORDER as usize {
-                neon_smulww_4(dd.sAR2_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_4(dd.s_ar2_q14[ii].as_mut_ptr(), gv);
             }
             for ii in 0..DECISION_DELAY as usize {
-                neon_smulww_4(dd.Pred_Q15[ii].as_mut_ptr(), gv);
-                neon_smulww_4(dd.Shape_Q14[ii].as_mut_ptr(), gv);
+                neon_smulww_4(dd.pred_q15[ii].as_mut_ptr(), gv);
+                neon_smulww_4(dd.shape_q14[ii].as_mut_ptr(), gv);
             }
         }
 
-        nsq.prev_gain_Q16 = gains_Q16[subfr as usize];
+        nsq.prev_gain_q16 = gains_q16[subfr as usize];
     }
 }
 
-/// NEON NSQ del_dec: complete outer function replacing `silk_nsq_del_dec_c`
-/// when 2 < nStatesDelayedDecision <= 4 on aarch64.
+/// NEON nsq del_dec: complete outer function replacing `silk_nsq_del_dec_c`
+/// when 2 < n_states_delayed_decision <= 4 on aarch64.
 ///
 /// # Safety
 /// Requires aarch64 NEON (always available on aarch64).
 #[target_feature(enable = "neon")]
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn silk_nsq_del_dec_neon(
-    psEncC: &NsqConfig,
+    ps_enc_c: &NsqConfig,
     nsq: &mut silk_nsq_state,
-    psIndices: &mut SideInfoIndices,
+    ps_indices: &mut SideInfoIndices,
     x16: &[i16],
     pulses: &mut [i8],
-    PredCoef_Q12: &[i16],
-    LTPCoef_Q14: &[i16],
-    AR_Q13: &[i16],
-    HarmShapeGain_Q14: &[i32],
-    Tilt_Q14: &[i32],
-    LF_shp_Q14: &[i32],
-    Gains_Q16: &[i32],
-    pitchL: &[i32],
-    Lambda_Q10: i32,
-    LTP_scale_Q14: i32,
+    pred_coef_q12: &[i16],
+    ltpcoef_q14: &[i16],
+    ar_q13: &[i16],
+    harm_shape_gain_q14: &[i32],
+    tilt_q14: &[i32],
+    lf_shp_q14: &[i32],
+    gains_q16: &[i32],
+    pitch_l: &[i32],
+    lambda_q10: i32,
+    ltp_scale_q14: i32,
 ) {
-    let ltp_mem_len = psEncC.ltp_mem_length;
-    let frame_len = psEncC.frame_length;
-    let subfr_len = psEncC.subfr_length;
-    let n_states = psEncC.nStatesDelayedDecision;
+    let ltp_mem_len = ps_enc_c.ltp_mem_length;
+    let frame_len = ps_enc_c.frame_length;
+    let subfr_len = ps_enc_c.subfr_length;
+    let n_states = ps_enc_c.n_states_delayed_decision;
 
-    let mut lag = nsq.lagPrev;
-    debug_assert!(nsq.prev_gain_Q16 != 0);
+    let mut lag = nsq.lag_prev;
+    debug_assert!(nsq.prev_gain_q16 != 0);
 
     let mut dd = NeonDelDecStates::new_zeroed();
 
     for k in 0..n_states as usize {
-        dd.Seed[k] = (k as i32 + psIndices.Seed as i32) & 3;
-        dd.SeedInit[k] = dd.Seed[k];
+        dd.seed[k] = (k as i32 + ps_indices.seed as i32) & 3;
+        dd.seed_init[k] = dd.seed[k];
     }
     vst1q_s32(
-        dd.LF_AR_Q14.as_mut_ptr(),
-        vld1q_dup_s32(&nsq.sLF_AR_shp_Q14),
+        dd.lf_ar_q14.as_mut_ptr(),
+        vld1q_dup_s32(&nsq.s_lf_ar_shp_q14),
     );
-    vst1q_s32(dd.Diff_Q14.as_mut_ptr(), vld1q_dup_s32(&nsq.sDiff_shp_Q14));
+    vst1q_s32(dd.diff_q14.as_mut_ptr(), vld1q_dup_s32(&nsq.s_diff_shp_q14));
     vst1q_s32(
-        dd.Shape_Q14[0].as_mut_ptr(),
-        vld1q_dup_s32(&nsq.sLTP_shp_Q14[ltp_mem_len - 1]),
+        dd.shape_q14[0].as_mut_ptr(),
+        vld1q_dup_s32(&nsq.s_ltp_shp_q14[ltp_mem_len - 1]),
     );
     for ii in 0..NSQ_LPC_BUF_LENGTH {
         vst1q_s32(
-            dd.sLPC_Q14[ii].as_mut_ptr(),
-            vld1q_dup_s32(&nsq.sLPC_Q14[ii]),
+            dd.s_lpc_q14[ii].as_mut_ptr(),
+            vld1q_dup_s32(&nsq.s_lpc_q14[ii]),
         );
     }
-    for ii in 0..nsq.sAR2_Q14.len() {
+    for ii in 0..nsq.s_ar2_q14.len() {
         vst1q_s32(
-            dd.sAR2_Q14[ii].as_mut_ptr(),
-            vld1q_dup_s32(&nsq.sAR2_Q14[ii]),
+            dd.s_ar2_q14[ii].as_mut_ptr(),
+            vld1q_dup_s32(&nsq.s_ar2_q14[ii]),
         );
     }
 
-    let offset_Q10 = SILK_QUANTIZATION_OFFSETS_Q10[(psIndices.signalType as i32 >> 1) as usize]
-        [psIndices.quantOffsetType as usize] as i32;
+    let offset_q10 = SILK_QUANTIZATION_OFFSETS_Q10[(ps_indices.signal_type as i32 >> 1) as usize]
+        [ps_indices.quant_offset_type as usize] as i32;
     let mut smpl_buf_idx = 0i32;
 
     let mut ddly = silk_min_int(DECISION_DELAY, subfr_len as i32);
-    if psIndices.signalType as i32 == TYPE_VOICED {
-        let mut pitch_min = pitchL[0];
-        for p in pitchL.iter().take(psEncC.nb_subfr).skip(1) {
+    if ps_indices.signal_type as i32 == TYPE_VOICED {
+        let mut pitch_min = pitch_l[0];
+        for p in pitch_l.iter().take(ps_enc_c.nb_subfr).skip(1) {
             pitch_min = silk_min_int(pitch_min, *p);
         }
         ddly = silk_min_int(ddly, pitch_min - LTP_ORDER as i32 / 2 - 1);
@@ -1482,60 +1484,60 @@ pub unsafe fn silk_nsq_del_dec_neon(
         ddly = silk_min_int(ddly, lag - LTP_ORDER as i32 / 2 - 1);
     }
 
-    let lsf_interp: i32 = if psIndices.NLSFInterpCoef_Q2 as i32 == 4 {
+    let lsf_interp: i32 = if ps_indices.nlsfinterp_coef_q2 as i32 == 4 {
         0
     } else {
         1
     };
 
-    let mut sLTP_Q15 = vec![0i32; ltp_mem_len + frame_len];
-    let mut sLTP = vec![0i16; ltp_mem_len + frame_len];
-    let mut x_sc_Q10 = vec![0i32; subfr_len];
-    let mut delayed_gain_Q10 = [0i32; DECISION_DELAY as usize];
+    let mut s_ltp_q15 = vec![0i32; ltp_mem_len + frame_len];
+    let mut s_ltp = vec![0i16; ltp_mem_len + frame_len];
+    let mut x_sc_q10 = vec![0i32; subfr_len];
+    let mut delayed_gain_q10 = [0i32; DECISION_DELAY as usize];
 
     let mut pxq_off = ltp_mem_len;
-    nsq.sLTP_shp_buf_idx = ltp_mem_len as i32;
-    nsq.sLTP_buf_idx = ltp_mem_len as i32;
+    nsq.s_ltp_shp_buf_idx = ltp_mem_len as i32;
+    nsq.s_ltp_buf_idx = ltp_mem_len as i32;
     let mut subfr_ctr = 0i32;
     let mut x16_off = 0usize;
     let mut pulses_off = 0usize;
 
-    for k in 0..psEncC.nb_subfr as i32 {
+    for k in 0..ps_enc_c.nb_subfr as i32 {
         let a_off = (((k >> 1) | (1 - lsf_interp)) * MAX_LPC_ORDER as i32) as usize;
-        let a_Q12 = &PredCoef_Q12[a_off..a_off + psEncC.predictLPCOrder as usize];
+        let a_q12 = &pred_coef_q12[a_off..a_off + ps_enc_c.predict_lpcorder as usize];
         let b_off = (k * LTP_ORDER as i32) as usize;
-        let b_Q14 = &LTPCoef_Q14[b_off..b_off + LTP_ORDER];
+        let b_q14 = &ltpcoef_q14[b_off..b_off + LTP_ORDER];
         let ar_off = (k * MAX_SHAPE_LPC_ORDER) as usize;
-        let ar_Q13 = &AR_Q13[ar_off..ar_off + psEncC.shapingLPCOrder as usize];
+        let ar_q13 = &ar_q13[ar_off..ar_off + ps_enc_c.shaping_lpcorder as usize];
 
-        debug_assert!(HarmShapeGain_Q14[k as usize] >= 0);
-        let mut hsp = HarmShapeGain_Q14[k as usize] >> 2;
-        hsp |= (((HarmShapeGain_Q14[k as usize] >> 1) as u32) << 16) as i32;
+        debug_assert!(harm_shape_gain_q14[k as usize] >= 0);
+        let mut hsp = harm_shape_gain_q14[k as usize] >> 2;
+        hsp |= (((harm_shape_gain_q14[k as usize] >> 1) as u32) << 16) as i32;
 
         nsq.rewhite_flag = 0;
-        if psIndices.signalType as i32 == TYPE_VOICED {
-            lag = pitchL[k as usize];
+        if ps_indices.signal_type as i32 == TYPE_VOICED {
+            lag = pitch_l[k as usize];
             if k & (3 - ((lsf_interp as u32) << 1) as i32) == 0 {
                 if k == 2 {
-                    let mut rd_min = dd.RD_Q10[0];
+                    let mut rd_min = dd.rd_q10[0];
                     let mut winner = 0usize;
                     for ii in 1..n_states as usize {
-                        if dd.RD_Q10[ii] < rd_min {
-                            rd_min = dd.RD_Q10[ii];
+                        if dd.rd_q10[ii] < rd_min {
+                            rd_min = dd.rd_q10[ii];
                             winner = ii;
                         }
                     }
-                    dd.RD_Q10[winner] -= SILK_INT32_MAX >> 4;
-                    let mut rv = vld1q_s32(dd.RD_Q10.as_ptr());
+                    dd.rd_q10[winner] -= SILK_INT32_MAX >> 4;
+                    let mut rv = vld1q_s32(dd.rd_q10.as_ptr());
                     rv = vaddq_s32(rv, vdupq_n_s32(SILK_INT32_MAX >> 4));
-                    vst1q_s32(dd.RD_Q10.as_mut_ptr(), rv);
+                    vst1q_s32(dd.rd_q10.as_mut_ptr(), rv);
 
                     neon_copy_winner_state(
                         &dd,
                         ddly,
                         smpl_buf_idx,
                         winner,
-                        Gains_Q16[1],
+                        gains_q16[1],
                         14,
                         pulses,
                         pulses_off,
@@ -1546,32 +1548,32 @@ pub unsafe fn silk_nsq_del_dec_neon(
                 }
 
                 let start_idx =
-                    ltp_mem_len as i32 - lag - psEncC.predictLPCOrder - LTP_ORDER as i32 / 2;
+                    ltp_mem_len as i32 - lag - ps_enc_c.predict_lpcorder - LTP_ORDER as i32 / 2;
                 debug_assert!(start_idx > 0);
                 silk_lpc_analysis_filter(
-                    &mut sLTP[start_idx as usize..ltp_mem_len],
+                    &mut s_ltp[start_idx as usize..ltp_mem_len],
                     &nsq.xq[(start_idx + k * subfr_len as i32) as usize..]
                         [..ltp_mem_len - start_idx as usize],
-                    a_Q12,
+                    a_q12,
                 );
-                nsq.sLTP_buf_idx = ltp_mem_len as i32;
+                nsq.s_ltp_buf_idx = ltp_mem_len as i32;
                 nsq.rewhite_flag = 1;
             }
         }
 
         neon_scale_states(
-            psEncC,
+            ps_enc_c,
             nsq,
             &mut dd,
             &x16[x16_off..x16_off + subfr_len],
-            &mut x_sc_Q10,
-            &sLTP,
-            &mut sLTP_Q15,
+            &mut x_sc_q10,
+            &s_ltp,
+            &mut s_ltp_q15,
             k,
-            LTP_scale_Q14,
-            Gains_Q16,
-            pitchL,
-            psIndices.signalType as i32,
+            ltp_scale_q14,
+            gains_q16,
+            pitch_l,
+            ps_indices.signal_type as i32,
             ddly,
         );
 
@@ -1581,28 +1583,28 @@ pub unsafe fn silk_nsq_del_dec_neon(
         neon_noise_shape_quantizer_del_dec(
             nsq,
             &mut dd,
-            psIndices.signalType as i32,
-            &x_sc_Q10,
+            ps_indices.signal_type as i32,
+            &x_sc_q10,
             pulses,
             pulses_off,
             pxq_off,
-            &mut sLTP_Q15,
-            &mut delayed_gain_Q10,
-            a_Q12,
-            b_Q14,
-            ar_Q13,
+            &mut s_ltp_q15,
+            &mut delayed_gain_q10,
+            a_q12,
+            b_q14,
+            ar_q13,
             lag,
             hsp,
-            Tilt_Q14[k as usize],
-            LF_shp_Q14[k as usize],
-            Gains_Q16[k as usize],
-            Lambda_Q10,
-            offset_Q10,
+            tilt_q14[k as usize],
+            lf_shp_q14[k as usize],
+            gains_q16[k as usize],
+            lambda_q10,
+            offset_q10,
             subfr_len as i32,
             fresh_subfr,
-            psEncC.shapingLPCOrder,
-            psEncC.predictLPCOrder,
-            psEncC.warping_Q16,
+            ps_enc_c.shaping_lpcorder,
+            ps_enc_c.predict_lpcorder,
+            ps_enc_c.warping_q16,
             n_states,
             &mut smpl_buf_idx,
             ddly,
@@ -1614,23 +1616,23 @@ pub unsafe fn silk_nsq_del_dec_neon(
     }
 
     // Find final winner
-    let mut rd_min = dd.RD_Q10[0];
+    let mut rd_min = dd.rd_q10[0];
     let mut winner = 0usize;
     for k in 1..n_states as usize {
-        if dd.RD_Q10[k] < rd_min {
-            rd_min = dd.RD_Q10[k];
+        if dd.rd_q10[k] < rd_min {
+            rd_min = dd.rd_q10[k];
             winner = k;
         }
     }
 
-    psIndices.Seed = dd.SeedInit[winner] as i8;
-    let gain_Q10 = Gains_Q16[psEncC.nb_subfr - 1] >> 6;
+    ps_indices.seed = dd.seed_init[winner] as i8;
+    let gain_q10 = gains_q16[ps_enc_c.nb_subfr - 1] >> 6;
     neon_copy_winner_state(
         &dd,
         ddly,
         smpl_buf_idx,
         winner,
-        gain_Q10,
+        gain_q10,
         8,
         pulses,
         pulses_off,
@@ -1642,39 +1644,39 @@ pub unsafe fn silk_nsq_del_dec_neon(
     let mut t_v = vdupq_n_s32(0);
     let mut ii = 0usize;
     while ii + 3 < NSQ_LPC_BUF_LENGTH {
-        t_v = vld1q_lane_s32::<0>(&dd.sLPC_Q14[ii][winner], t_v);
-        t_v = vld1q_lane_s32::<1>(&dd.sLPC_Q14[ii + 1][winner], t_v);
-        t_v = vld1q_lane_s32::<2>(&dd.sLPC_Q14[ii + 2][winner], t_v);
-        t_v = vld1q_lane_s32::<3>(&dd.sLPC_Q14[ii + 3][winner], t_v);
-        vst1q_s32(nsq.sLPC_Q14.as_mut_ptr().add(ii), t_v);
+        t_v = vld1q_lane_s32::<0>(&dd.s_lpc_q14[ii][winner], t_v);
+        t_v = vld1q_lane_s32::<1>(&dd.s_lpc_q14[ii + 1][winner], t_v);
+        t_v = vld1q_lane_s32::<2>(&dd.s_lpc_q14[ii + 2][winner], t_v);
+        t_v = vld1q_lane_s32::<3>(&dd.s_lpc_q14[ii + 3][winner], t_v);
+        vst1q_s32(nsq.s_lpc_q14.as_mut_ptr().add(ii), t_v);
         ii += 4;
     }
     while ii < NSQ_LPC_BUF_LENGTH {
-        nsq.sLPC_Q14[ii] = dd.sLPC_Q14[ii][winner];
+        nsq.s_lpc_q14[ii] = dd.s_lpc_q14[ii][winner];
         ii += 1;
     }
 
     // Copy winner's AR2 state
-    let sar2_len = nsq.sAR2_Q14.len();
+    let sar2_len = nsq.s_ar2_q14.len();
     ii = 0;
     while ii + 3 < sar2_len {
-        t_v = vld1q_lane_s32::<0>(&dd.sAR2_Q14[ii][winner], t_v);
-        t_v = vld1q_lane_s32::<1>(&dd.sAR2_Q14[ii + 1][winner], t_v);
-        t_v = vld1q_lane_s32::<2>(&dd.sAR2_Q14[ii + 2][winner], t_v);
-        t_v = vld1q_lane_s32::<3>(&dd.sAR2_Q14[ii + 3][winner], t_v);
-        vst1q_s32(nsq.sAR2_Q14.as_mut_ptr().add(ii), t_v);
+        t_v = vld1q_lane_s32::<0>(&dd.s_ar2_q14[ii][winner], t_v);
+        t_v = vld1q_lane_s32::<1>(&dd.s_ar2_q14[ii + 1][winner], t_v);
+        t_v = vld1q_lane_s32::<2>(&dd.s_ar2_q14[ii + 2][winner], t_v);
+        t_v = vld1q_lane_s32::<3>(&dd.s_ar2_q14[ii + 3][winner], t_v);
+        vst1q_s32(nsq.s_ar2_q14.as_mut_ptr().add(ii), t_v);
         ii += 4;
     }
     while ii < sar2_len {
-        nsq.sAR2_Q14[ii] = dd.sAR2_Q14[ii][winner];
+        nsq.s_ar2_q14[ii] = dd.s_ar2_q14[ii][winner];
         ii += 1;
     }
 
-    nsq.sLF_AR_shp_Q14 = dd.LF_AR_Q14[winner];
-    nsq.sDiff_shp_Q14 = dd.Diff_Q14[winner];
-    nsq.lagPrev = pitchL[psEncC.nb_subfr - 1];
+    nsq.s_lf_ar_shp_q14 = dd.lf_ar_q14[winner];
+    nsq.s_diff_shp_q14 = dd.diff_q14[winner];
+    nsq.lag_prev = pitch_l[ps_enc_c.nb_subfr - 1];
 
     nsq.xq.copy_within(frame_len..frame_len + ltp_mem_len, 0);
-    nsq.sLTP_shp_Q14
+    nsq.s_ltp_shp_q14
         .copy_within(frame_len..frame_len + ltp_mem_len, 0);
 }

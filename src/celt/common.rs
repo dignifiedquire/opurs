@@ -452,9 +452,9 @@ pub fn comb_filter_qext(
 
 /// Upstream C: celt/celt.c:init_caps
 pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], lm: i32, c: i32) {
-    for (i, cap_i) in cap.iter_mut().enumerate().take(m.nbEBands) {
-        let n = (m.eBands[i + 1] as i32 - m.eBands[i] as i32) << lm;
-        *cap_i = ((m.cache.caps[m.nbEBands * (2 * lm as usize + c as usize - 1) + i] as i32 + 64)
+    for (i, cap_i) in cap.iter_mut().enumerate().take(m.nb_ebands) {
+        let n = (m.e_bands[i + 1] as i32 - m.e_bands[i] as i32) << lm;
+        *cap_i = ((m.cache.caps[m.nb_ebands * (2 * lm as usize + c as usize - 1) + i] as i32 + 64)
             * c
             * n)
             >> 2;
