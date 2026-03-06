@@ -36,9 +36,9 @@ fn saturate_sig(x: f32) -> f32 {
 fn comb_filter_qext_inplace(
     buf: &mut [f32],
     start: usize,
-    T0: i32,
-    T1: i32,
-    N: i32,
+    t0: i32,
+    t1: i32,
+    n: i32,
     g0: f32,
     g1: f32,
     tapset0: i32,
@@ -47,7 +47,7 @@ fn comb_filter_qext_inplace(
     overlap: i32,
     arch: Arch,
 ) {
-    let n2 = (N / 2) as usize;
+    let n2 = (n / 2) as usize;
     let overlap2 = (overlap / 2) as usize;
     for s in 0..2usize {
         let mut new_window = vec![0.0f32; overlap2];
@@ -64,8 +64,8 @@ fn comb_filter_qext_inplace(
         comb_filter_inplace(
             &mut mem_buf,
             cf_start,
-            T0,
-            T1,
+            t0,
+            t1,
             n2 as i32,
             g0,
             g1,
@@ -105,18 +105,18 @@ pub fn comb_filter_const_c(
     y_start: usize,
     x: &[f32],
     x_start: usize,
-    T: i32,
-    N: i32,
+    t: i32,
+    n: i32,
     g10: f32,
     g11: f32,
     g12: f32,
 ) {
-    let t = T as usize;
+    let t = t as usize;
     let mut x4 = x[x_start - t - 2];
     let mut x3 = x[x_start - t - 1];
     let mut x2 = x[x_start - t];
     let mut x1 = x[x_start - t + 1];
-    for i in 0..N as usize {
+    for i in 0..n as usize {
         let x0 = x[x_start + i - t + 2];
         y[y_start + i] =
             saturate_sig(x[x_start + i] + g10 * x2 + g11 * (x1 + x3) + g12 * (x0 + x4));
@@ -140,9 +140,9 @@ pub fn comb_filter(
     y_start: usize,
     x: &[f32],
     x_start: usize,
-    mut T0: i32,
-    mut T1: i32,
-    N: i32,
+    mut t0: i32,
+    mut t1: i32,
+    n: i32,
     g0: f32,
     g1: f32,
     tapset0: i32,
@@ -154,43 +154,43 @@ pub fn comb_filter(
     #[cfg(feature = "qext")]
     if overlap == 240 {
         comb_filter_qext(
-            y, y_start, x, x_start, T0, T1, N, g0, g1, tapset0, tapset1, window, overlap, _arch,
+            y, y_start, x, x_start, t0, t1, n, g0, g1, tapset0, tapset1, window, overlap, _arch,
         );
         return;
     }
     if g0 == 0.0f32 && g1 == 0.0f32 {
-        y[y_start..y_start + N as usize].copy_from_slice(&x[x_start..x_start + N as usize]);
+        y[y_start..y_start + n as usize].copy_from_slice(&x[x_start..x_start + n as usize]);
         return;
     }
-    T0 = if T0 > 15 { T0 } else { 15 };
-    T1 = if T1 > 15 { T1 } else { 15 };
+    t0 = if t0 > 15 { t0 } else { 15 };
+    t1 = if t1 > 15 { t1 } else { 15 };
     let g00 = g0 * GAINS[tapset0 as usize][0];
     let g01 = g0 * GAINS[tapset0 as usize][1];
     let g02 = g0 * GAINS[tapset0 as usize][2];
     let g10 = g1 * GAINS[tapset1 as usize][0];
     let g11 = g1 * GAINS[tapset1 as usize][1];
     let g12 = g1 * GAINS[tapset1 as usize][2];
-    let mut x1 = x[x_start - T1 as usize + 1];
-    let mut x2 = x[x_start - T1 as usize];
-    let mut x3 = x[x_start - T1 as usize - 1];
-    let mut x4 = x[x_start - T1 as usize - 2];
-    if g0 == g1 && T0 == T1 && tapset0 == tapset1 {
+    let mut x1 = x[x_start - t1 as usize + 1];
+    let mut x2 = x[x_start - t1 as usize];
+    let mut x3 = x[x_start - t1 as usize - 1];
+    let mut x4 = x[x_start - t1 as usize - 2];
+    if g0 == g1 && t0 == t1 && tapset0 == tapset1 {
         overlap = 0;
     }
     let mut i = 0;
     while i < overlap {
         let iu = i as usize;
-        let x0 = x[x_start + iu - T1 as usize + 2];
+        let x0 = x[x_start + iu - t1 as usize + 2];
         let f = window[iu] * window[iu];
         y[y_start + iu] = saturate_sig(
             x[x_start + iu]
-                + (1.0f32 - f) * g00 * x[x_start + iu - T0 as usize]
+                + (1.0f32 - f) * g00 * x[x_start + iu - t0 as usize]
                 + (1.0f32 - f)
                     * g01
-                    * (x[x_start + iu - T0 as usize + 1] + x[x_start + iu - T0 as usize - 1])
+                    * (x[x_start + iu - t0 as usize + 1] + x[x_start + iu - t0 as usize - 1])
                 + (1.0f32 - f)
                     * g02
-                    * (x[x_start + iu - T0 as usize + 2] + x[x_start + iu - T0 as usize - 2])
+                    * (x[x_start + iu - t0 as usize + 2] + x[x_start + iu - t0 as usize - 2])
                 + f * g10 * x2
                 + f * g11 * (x1 + x3)
                 + f * g12 * (x0 + x4),
@@ -203,8 +203,8 @@ pub fn comb_filter(
     }
     if g1 == 0.0f32 {
         let ov = overlap as usize;
-        y[y_start + ov..y_start + N as usize]
-            .copy_from_slice(&x[x_start + ov..x_start + N as usize]);
+        y[y_start + ov..y_start + n as usize]
+            .copy_from_slice(&x[x_start + ov..x_start + n as usize]);
         return;
     }
     #[cfg(feature = "simd")]
@@ -214,8 +214,8 @@ pub fn comb_filter(
             y_start + i as usize,
             x,
             x_start + i as usize,
-            T1,
-            N - i,
+            t1,
+            n - i,
             g10,
             g11,
             g12,
@@ -229,15 +229,15 @@ pub fn comb_filter(
             y_start + i as usize,
             x,
             x_start + i as usize,
-            T1,
-            N - i,
+            t1,
+            n - i,
             g10,
             g11,
             g12,
         );
     }
     let tail_start = y_start + i as usize;
-    y[tail_start..y_start + N as usize]
+    y[tail_start..y_start + n as usize]
         .iter_mut()
         .for_each(|v| *v = saturate_sig(*v));
 }
@@ -252,9 +252,9 @@ pub fn comb_filter(
 pub fn comb_filter_inplace(
     buf: &mut [f32],
     start: usize,
-    mut T0: i32,
-    mut T1: i32,
-    N: i32,
+    mut t0: i32,
+    mut t1: i32,
+    n: i32,
     g0: f32,
     g1: f32,
     tapset0: i32,
@@ -266,7 +266,7 @@ pub fn comb_filter_inplace(
     #[cfg(feature = "qext")]
     if overlap == 240 {
         comb_filter_qext_inplace(
-            buf, start, T0, T1, N, g0, g1, tapset0, tapset1, window, overlap, _arch,
+            buf, start, t0, t1, n, g0, g1, tapset0, tapset1, window, overlap, _arch,
         );
         return;
     }
@@ -274,35 +274,35 @@ pub fn comb_filter_inplace(
         // In-place with no filtering: nothing to do
         return;
     }
-    T0 = if T0 > 15 { T0 } else { 15 };
-    T1 = if T1 > 15 { T1 } else { 15 };
+    t0 = if t0 > 15 { t0 } else { 15 };
+    t1 = if t1 > 15 { t1 } else { 15 };
     let g00 = g0 * GAINS[tapset0 as usize][0];
     let g01 = g0 * GAINS[tapset0 as usize][1];
     let g02 = g0 * GAINS[tapset0 as usize][2];
     let g10 = g1 * GAINS[tapset1 as usize][0];
     let g11 = g1 * GAINS[tapset1 as usize][1];
     let g12 = g1 * GAINS[tapset1 as usize][2];
-    let mut x1 = buf[start - T1 as usize + 1];
-    let mut x2 = buf[start - T1 as usize];
-    let mut x3 = buf[start - T1 as usize - 1];
-    let mut x4 = buf[start - T1 as usize - 2];
-    if g0 == g1 && T0 == T1 && tapset0 == tapset1 {
+    let mut x1 = buf[start - t1 as usize + 1];
+    let mut x2 = buf[start - t1 as usize];
+    let mut x3 = buf[start - t1 as usize - 1];
+    let mut x4 = buf[start - t1 as usize - 2];
+    if g0 == g1 && t0 == t1 && tapset0 == tapset1 {
         overlap = 0;
     }
     let mut i: usize = 0;
     while i < overlap as usize {
-        let x0 = buf[start + i - T1 as usize + 2];
+        let x0 = buf[start + i - t1 as usize + 2];
         let f = window[i] * window[i];
         // Since T >= 15, reads at [start + i - T] are always before writes at [start + i]
         buf[start + i] = saturate_sig(
             buf[start + i]
-                + (1.0f32 - f) * g00 * buf[start + i - T0 as usize]
+                + (1.0f32 - f) * g00 * buf[start + i - t0 as usize]
                 + (1.0f32 - f)
                     * g01
-                    * (buf[start + i - T0 as usize + 1] + buf[start + i - T0 as usize - 1])
+                    * (buf[start + i - t0 as usize + 1] + buf[start + i - t0 as usize - 1])
                 + (1.0f32 - f)
                     * g02
-                    * (buf[start + i - T0 as usize + 2] + buf[start + i - T0 as usize - 2])
+                    * (buf[start + i - t0 as usize + 2] + buf[start + i - t0 as usize - 2])
                 + f * g10 * x2
                 + f * g11 * (x1 + x3)
                 + f * g12 * (x0 + x4),
@@ -322,14 +322,14 @@ pub fn comb_filter_inplace(
     #[cfg(feature = "simd")]
     {
         let pos = start + i;
-        let remain = (N as usize) - i;
-        super::simd::comb_filter_const_inplace(buf, pos, T1, remain as i32, g10, g11, g12, _arch);
+        let remain = (n as usize) - i;
+        super::simd::comb_filter_const_inplace(buf, pos, t1, remain as i32, g10, g11, g12, _arch);
     }
     #[cfg(not(feature = "simd"))]
     {
-        let t = T1 as usize;
+        let t = t1 as usize;
         let pos = start + i;
-        let remain = (N as usize) - i;
+        let remain = (n as usize) - i;
         let mut xv4 = buf[pos - t - 2];
         let mut xv3 = buf[pos - t - 1];
         let mut xv2 = buf[pos - t];
@@ -344,7 +344,7 @@ pub fn comb_filter_inplace(
         }
     }
     let tail_start = start + i;
-    buf[tail_start..start + N as usize]
+    buf[tail_start..start + n as usize]
         .iter_mut()
         .for_each(|v| *v = saturate_sig(*v));
 }
@@ -363,9 +363,9 @@ pub fn comb_filter_qext(
     y_start: usize,
     x: &[f32],
     x_start: usize,
-    T0: i32,
-    T1: i32,
-    N: i32,
+    t0: i32,
+    t1: i32,
+    n: i32,
     g0: f32,
     g1: f32,
     tapset0: i32,
@@ -374,7 +374,7 @@ pub fn comb_filter_qext(
     overlap: i32,
     arch: Arch,
 ) {
-    let N2 = (N / 2) as usize;
+    let n2 = (n / 2) as usize;
     let overlap2 = (overlap / 2) as usize;
 
     // Process even (s=0) and odd (s=1) samples independently.
@@ -385,7 +385,7 @@ pub fn comb_filter_qext(
         }
 
         // Build deinterleaved memory buffer: mem_buf[0..COMBFILTER_MAXPERIOD + N2]
-        let mem_len = COMBFILTER_MAXPERIOD as usize + N2;
+        let mem_len = COMBFILTER_MAXPERIOD as usize + n2;
         let mut mem_buf = vec![0.0f32; mem_len];
         for (i, mem) in mem_buf.iter_mut().enumerate() {
             // x[x_start + 2*i + s - 2*COMBFILTER_MAXPERIOD]
@@ -405,9 +405,9 @@ pub fn comb_filter_qext(
             comb_filter_inplace(
                 &mut mem_buf,
                 cf_start,
-                T0,
-                T1,
-                N2 as i32,
+                t0,
+                t1,
+                n2 as i32,
                 g0,
                 g1,
                 tapset0,
@@ -417,13 +417,13 @@ pub fn comb_filter_qext(
                 arch,
             );
             // Write back interleaved
-            for i in 0..N2 {
+            for i in 0..n2 {
                 y[y_start + 2 * i + s] = mem_buf[cf_start + i];
             }
         } else {
             // Separate output: deinterleave y into buf, apply filter, reinterleave
-            let mut buf = vec![0.0f32; N2];
-            for i in 0..N2 {
+            let mut buf = vec![0.0f32; n2];
+            for i in 0..n2 {
                 buf[i] = y[y_start + 2 * i + s];
             }
             let cf_start = COMBFILTER_MAXPERIOD as usize;
@@ -432,9 +432,9 @@ pub fn comb_filter_qext(
                 0,
                 &mem_buf,
                 cf_start,
-                T0,
-                T1,
-                N2 as i32,
+                t0,
+                t1,
+                n2 as i32,
                 g0,
                 g1,
                 tapset0,
@@ -443,7 +443,7 @@ pub fn comb_filter_qext(
                 overlap2 as i32,
                 arch,
             );
-            for i in 0..N2 {
+            for i in 0..n2 {
                 y[y_start + 2 * i + s] = buf[i];
             }
         }
@@ -451,12 +451,12 @@ pub fn comb_filter_qext(
 }
 
 /// Upstream C: celt/celt.c:init_caps
-pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], LM: i32, C: i32) {
+pub fn init_caps(m: &OpusCustomMode, cap: &mut [i32], lm: i32, c: i32) {
     for (i, cap_i) in cap.iter_mut().enumerate().take(m.nbEBands) {
-        let N = (m.eBands[i + 1] as i32 - m.eBands[i] as i32) << LM;
-        *cap_i = ((m.cache.caps[m.nbEBands * (2 * LM as usize + C as usize - 1) + i] as i32 + 64)
-            * C
-            * N)
+        let n = (m.eBands[i + 1] as i32 - m.eBands[i] as i32) << lm;
+        *cap_i = ((m.cache.caps[m.nbEBands * (2 * lm as usize + c as usize - 1) + i] as i32 + 64)
+            * c
+            * n)
             >> 2;
     }
 }
