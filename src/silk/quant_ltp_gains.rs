@@ -94,7 +94,7 @@ pub fn silk_quant_ltp_gains(
                         cb_gain_q7: &cbk_gain_ptr_q7[..cbk_size as usize],
                         cl_q5: &cl_ptr_q5[..cbk_size as usize],
                         subfr_len,
-                        max_gain_q7: max_gain_q7,
+                        max_gain_q7,
                         l: cbk_size,
                     });
                     temp_idx[j as usize] = vq.ind;

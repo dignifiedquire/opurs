@@ -293,17 +293,17 @@ pub unsafe fn dual_inner_prod_sse(x: &[f32], y01: &[f32], y02: &[f32], n: usize)
 /// # Safety
 /// Requires SSE2 support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse2")]
-pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32) -> f32 {
-    let n = N as usize;
+pub unsafe fn op_pvq_search_sse2(x_in: &mut [f32], iy: &mut [i32], k: i32, n_i32: i32) -> f32 {
+    let n = n_i32 as usize;
     // Pad to N+3 for safe SIMD overread + sentinel values.
-    let mut X = vec![0.0f32; n + 3];
+    let mut x = vec![0.0f32; n + 3];
     let mut y = vec![0.0f32; n + 3];
     let mut signy = vec![0.0f32; n + 3];
 
-    X[..n].copy_from_slice(&_X[..n]);
-    X[n] = 0.0;
-    X[n + 1] = 0.0;
-    X[n + 2] = 0.0;
+    x[..n].copy_from_slice(&x_in[..n]);
+    x[n] = 0.0;
+    x[n + 1] = 0.0;
+    x[n + 2] = 0.0;
 
     let signmask = _mm_set_ps1(-0.0f32);
     let fours = _mm_set_epi32(4, 4, 4, 4);
@@ -312,14 +312,14 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
     let mut sums = _mm_setzero_ps();
     let mut j = 0usize;
     while j < n {
-        let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+        let x4 = _mm_loadu_ps(x.as_ptr().add(j));
         let s4 = _mm_cmplt_ps(x4, _mm_setzero_ps());
         // Get rid of the sign
         let x4 = _mm_andnot_ps(signmask, x4);
         sums = _mm_add_ps(sums, x4);
         _mm_storeu_ps(y.as_mut_ptr().add(j), _mm_setzero_ps());
         _mm_storeu_si128(iy.as_mut_ptr().add(j) as *mut __m128i, _mm_setzero_si128());
-        _mm_storeu_ps(X.as_mut_ptr().add(j), x4);
+        _mm_storeu_ps(x.as_mut_ptr().add(j), x4);
         _mm_storeu_ps(signy.as_mut_ptr().add(j), s4);
         j += 4;
     }
@@ -330,29 +330,29 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
 
     let mut xy: f32 = 0.0;
     let mut yy: f32 = 0.0;
-    let mut pulsesLeft = K;
+    let mut pulses_left = k;
 
     // Pre-search by projecting on the pyramid
-    if K > (N >> 1) {
+    if k > (n_i32 >> 1) {
         let mut sum = _mm_cvtss_f32(sums);
         let epsilon = 1e-15f32;
         if !(sum > epsilon && sum < 64.0) {
-            X[0] = 1.0;
-            for xj in X[1..n].iter_mut() {
+            x[0] = 1.0;
+            for xj in x[1..n].iter_mut() {
                 *xj = 0.0;
             }
             sums = _mm_set_ps1(1.0);
             sum = 1.0;
             let _ = sum;
         }
-        let rcp4 = _mm_mul_ps(_mm_set_ps1((K as f32) + 0.8), _mm_rcp_ps(sums));
+        let rcp4 = _mm_mul_ps(_mm_set_ps1((k as f32) + 0.8), _mm_rcp_ps(sums));
         let mut xy4 = _mm_setzero_ps();
         let mut yy4 = _mm_setzero_ps();
         let mut pulses_sum = _mm_setzero_si128();
 
         j = 0;
         while j < n {
-            let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+            let x4 = _mm_loadu_ps(x.as_ptr().add(j));
             let rx4 = _mm_mul_ps(x4, rcp4);
             let iy4 = _mm_cvttps_epi32(rx4);
             pulses_sum = _mm_add_epi32(pulses_sum, iy4);
@@ -368,7 +368,7 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
         // Horizontal sum of pulses
         pulses_sum = _mm_add_epi32(pulses_sum, _mm_shuffle_epi32(pulses_sum, 0x4E));
         pulses_sum = _mm_add_epi32(pulses_sum, _mm_shuffle_epi32(pulses_sum, 0xB1));
-        pulsesLeft -= _mm_cvtsi128_si32(pulses_sum);
+        pulses_left -= _mm_cvtsi128_si32(pulses_sum);
 
         // Horizontal sum of xy
         xy4 = _mm_add_ps(xy4, _mm_shuffle_ps(xy4, xy4, 0x4E));
@@ -382,24 +382,24 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
     }
 
     // Sentinel values prevent SIMD overread from affecting results
-    X[n] = -100.0;
-    X[n + 1] = -100.0;
-    X[n + 2] = -100.0;
+    x[n] = -100.0;
+    x[n + 1] = -100.0;
+    x[n + 2] = -100.0;
     y[n] = 100.0;
     y[n + 1] = 100.0;
     y[n + 2] = 100.0;
 
     // Fill first bin with excess pulses (should never happen, but safety)
-    if pulsesLeft > N + 3 {
-        let tmp = pulsesLeft as f32;
+    if pulses_left > n_i32 + 3 {
+        let tmp = pulses_left as f32;
         yy += tmp * tmp;
         yy += tmp * y[0];
-        iy[0] += pulsesLeft;
-        pulsesLeft = 0;
+        iy[0] += pulses_left;
+        pulses_left = 0;
     }
 
     // Greedy per-pulse search
-    for _i in 0..pulsesLeft {
+    for _i in 0..pulses_left {
         yy += 1.0;
         let xy4 = _mm_load1_ps(&xy);
         let yy4 = _mm_load1_ps(&yy);
@@ -409,7 +409,7 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
 
         j = 0;
         while j < n {
-            let x4 = _mm_loadu_ps(X.as_ptr().add(j));
+            let x4 = _mm_loadu_ps(x.as_ptr().add(j));
             let y4 = _mm_loadu_ps(y.as_ptr().add(j));
             let x4 = _mm_add_ps(x4, xy4);
             let y4 = _mm_add_ps(y4, yy4);
@@ -435,7 +435,7 @@ pub unsafe fn op_pvq_search_sse2(_X: &mut [f32], iy: &mut [i32], K: i32, N: i32)
         pos = _mm_max_epi16(pos, _mm_shufflelo_epi16(pos, 0x4E));
         let best_id = _mm_cvtsi128_si32(pos) as usize;
 
-        xy += X[best_id];
+        xy += x[best_id];
         yy += y[best_id];
         y[best_id] += 2.0;
         iy[best_id] += 1;
@@ -470,14 +470,14 @@ pub unsafe fn comb_filter_const_sse(
     y_start: usize,
     x: &[f32],
     x_start: usize,
-    T: i32,
-    N: i32,
+    t_i32: i32,
+    n_i32: i32,
     g10: f32,
     g11: f32,
     g12: f32,
 ) {
-    let t = T as usize;
-    let n = N as usize;
+    let t = t_i32 as usize;
+    let n = n_i32 as usize;
     let g10v = _mm_set1_ps(g10);
     let g11v = _mm_set1_ps(g11);
     let g12v = _mm_set1_ps(g12);
@@ -521,16 +521,16 @@ pub unsafe fn comb_filter_const_sse(
 pub unsafe fn comb_filter_const_inplace_sse(
     buf: &mut [f32],
     start: usize,
-    T: i32,
-    N: i32,
+    t_i32: i32,
+    n_i32: i32,
     g10: f32,
     g11: f32,
     g12: f32,
 ) {
-    debug_assert!(T >= 15);
+    debug_assert!(t_i32 >= 15);
 
-    let t = T as usize;
-    let n = N as usize;
+    let t = t_i32 as usize;
+    let n = n_i32 as usize;
     let g10v = _mm_set1_ps(g10);
     let g11v = _mm_set1_ps(g11);
     let g12v = _mm_set1_ps(g12);
