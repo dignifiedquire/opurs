@@ -2321,10 +2321,12 @@ pub fn quant_all_bands<'a>(
         let norm_band_out_off = (M * eBands[i as usize] as i32 - norm_offset) as usize;
 
         // When scratch comes from X_ tail (decode-only mode), split X_ at decode_scratch_off
-        // to get non-overlapping x_band and scratch. band_start + n <= decode_scratch_off
-        // holds because have_scratch is only true when i < effEBands.
+        // to get non-overlapping x_band and scratch when the current band is fully below the
+        // scratch boundary. For the last effective band, C aliases lowband_scratch with X.
+        // In Rust, use a dedicated scratch buffer in that case to avoid out-of-bounds slicing.
         let need_x_scratch = have_scratch && !use_alloc_scratch;
-        let (x_band_src, mut x_scratch_src) = if need_x_scratch {
+        let can_use_x_tail_scratch = need_x_scratch && band_start + n <= decode_scratch_off;
+        let (x_band_src, mut x_scratch_src) = if can_use_x_tail_scratch {
             let (coded, scratch) = X_.split_at_mut(decode_scratch_off);
             (coded, Some(scratch))
         } else {
@@ -2334,14 +2336,92 @@ pub fn quant_all_bands<'a>(
         let scratch: Option<&mut [f32]> = if have_scratch {
             if use_alloc_scratch {
                 Some(&mut _lowband_scratch)
+            } else if let Some(scratch_tail) = x_scratch_src.as_mut() {
+                Some(&mut scratch_tail[..n])
             } else {
-                Some(&mut x_scratch_src.as_mut().unwrap()[..n])
+                Some(&mut _lowband_scratch[..n])
             }
         } else {
             None
         };
 
-        if dual_stereo != 0 {
+        if use_norm_xy {
+            // Beyond effEBands: use norm buffer as dummy X/Y, no lowband/scratch needed.
+            #[cfg(feature = "qext")]
+            {
+                ctx.ext_b = 0;
+            }
+            if has_y {
+                if dual_stereo != 0 {
+                    // C aliases X and Y to norm in this path; run both channel calls on the same
+                    // dummy band to preserve ordering without out-of-range X_/Y_ access.
+                    let dummy = &mut _norm[..n];
+                    x_cm = quant_band(
+                        &mut ctx,
+                        dummy,
+                        N,
+                        b / 2,
+                        B,
+                        None,
+                        LM,
+                        None,
+                        Q15ONE,
+                        None,
+                        x_cm as i32,
+                        ec,
+                    );
+                    y_cm = quant_band(
+                        &mut ctx,
+                        dummy,
+                        N,
+                        b / 2,
+                        B,
+                        None,
+                        LM,
+                        None,
+                        Q15ONE,
+                        None,
+                        y_cm as i32,
+                        ec,
+                    );
+                } else {
+                    let (dummy_x, dummy_rest) = _norm.split_at_mut(n);
+                    let dummy_y = &mut dummy_rest[..n];
+                    x_cm = quant_band_stereo(
+                        &mut ctx,
+                        dummy_x,
+                        dummy_y,
+                        N,
+                        b,
+                        B,
+                        None,
+                        LM,
+                        None,
+                        None,
+                        (x_cm | y_cm) as i32,
+                        ec,
+                    );
+                    y_cm = x_cm;
+                }
+            } else {
+                let dummy = &mut _norm[..n];
+                x_cm = quant_band(
+                    &mut ctx,
+                    dummy,
+                    N,
+                    b,
+                    B,
+                    None,
+                    LM,
+                    None,
+                    Q15ONE,
+                    None,
+                    (x_cm | y_cm) as i32,
+                    ec,
+                );
+                y_cm = x_cm;
+            }
+        } else if dual_stereo != 0 {
             let (norm1, norm2) = _norm.split_at_mut(norm_size);
             // Copy lowband data to a temp buffer so we can give lowband_out a &mut into _norm.
             // The lowband read range [effective_lowband..effective_lowband+N] may overlap with
@@ -2393,8 +2473,10 @@ pub fn quant_all_bands<'a>(
             let scratch2: Option<&mut [f32]> = if have_scratch {
                 if use_alloc_scratch {
                     Some(&mut _lowband_scratch)
+                } else if let Some(scratch_tail) = x_scratch_src.as_mut() {
+                    Some(&mut scratch_tail[..n])
                 } else {
-                    Some(&mut x_scratch_src.as_mut().unwrap()[..n])
+                    Some(&mut _lowband_scratch[..n])
                 }
             } else {
                 None
@@ -2422,47 +2504,6 @@ pub fn quant_all_bands<'a>(
                 y_cm as i32,
                 ec,
             );
-        } else if use_norm_xy {
-            // Beyond effEBands: use norm buffer as dummy X/Y, no lowband/scratch needed.
-            #[cfg(feature = "qext")]
-            {
-                ctx.ext_b = 0;
-            }
-            if has_y {
-                let (dummy_x, dummy_rest) = _norm.split_at_mut(n);
-                let dummy_y = &mut dummy_rest[..n];
-                x_cm = quant_band_stereo(
-                    &mut ctx,
-                    dummy_x,
-                    dummy_y,
-                    N,
-                    b,
-                    B,
-                    None,
-                    LM,
-                    None,
-                    None,
-                    (x_cm | y_cm) as i32,
-                    ec,
-                );
-            } else {
-                let dummy = &mut _norm[..n];
-                x_cm = quant_band(
-                    &mut ctx,
-                    dummy,
-                    N,
-                    b,
-                    B,
-                    None,
-                    LM,
-                    None,
-                    Q15ONE,
-                    None,
-                    (x_cm | y_cm) as i32,
-                    ec,
-                );
-            }
-            y_cm = x_cm;
         } else {
             // Copy lowband data to a temp buffer so lowband_out can borrow _norm mutably.
             // The lowband read range may overlap with the lowband_out write range.
@@ -2590,8 +2631,10 @@ pub fn quant_all_bands<'a>(
                     let scratch2: Option<&mut [f32]> = if have_scratch {
                         if use_alloc_scratch {
                             Some(&mut _lowband_scratch)
+                        } else if let Some(scratch_tail) = x_scratch_src.as_mut() {
+                            Some(&mut scratch_tail[..n])
                         } else {
-                            Some(&mut x_scratch_src.as_mut().unwrap()[..n])
+                            Some(&mut _lowband_scratch[..n])
                         }
                     } else {
                         None
