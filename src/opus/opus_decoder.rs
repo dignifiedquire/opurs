@@ -1125,7 +1125,6 @@ fn stage_dred_features_for_decode(
 /// Core decode path shared by the typed decode entry points.
 ///
 /// Upstream C: src/opus_decoder.c:opus_decode_native
-#[allow(clippy::too_many_arguments)]
 pub fn opus_decode_native(
     st: &mut OpusDecoder,
     data: &[u8],

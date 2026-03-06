@@ -99,7 +99,6 @@ pub fn resampling_factor(rate: i32) -> i32 {
 /// `x` must contain at least `T+2` samples before `x_start` for lookback.
 /// Upstream C: celt/celt.c:comb_filter_const_c
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_const_c(
     y: &mut [f32],
     y_start: usize,

@@ -722,7 +722,6 @@ unsafe fn neon_copy_winner_kernel(
 
 /// Copy winner state outputs using the vectorized kernel plus scalar tail.
 #[target_feature(enable = "neon")]
-#[allow(clippy::too_many_arguments)]
 unsafe fn neon_copy_winner_state(
     dd: &NeonDelDecStates,
     decision_delay: i32,

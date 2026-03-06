@@ -128,7 +128,6 @@ impl DREDEnc {
 /// Direct-form II transposed filter.
 ///
 /// Upstream C: dnn/dred_encoder.c:filter_df2t
-#[allow(clippy::too_many_arguments)]
 fn filter_df2t(
     input: &[f32],
     output: &mut [f32],
@@ -435,7 +434,6 @@ pub fn dred_compute_latents(
 /// Encode latents using Laplace coding.
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_encode_latents
-#[allow(clippy::too_many_arguments)]
 fn dred_encode_latents(
     ec: &mut EcEnc,
     x: &[f32],
@@ -489,7 +487,6 @@ fn dred_voice_active(activity_mem: &[u8], offset: usize) -> bool {
 /// Returns number of bytes written, or 0 if DRED should not be sent.
 ///
 /// Upstream C: dnn/dred_encoder.c:dred_encode_silk_frame
-#[allow(clippy::too_many_arguments)]
 pub fn dred_encode_silk_frame(
     enc: &mut DREDEnc,
     buf: &mut [u8],

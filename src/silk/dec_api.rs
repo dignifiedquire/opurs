@@ -88,7 +88,6 @@ pub fn silk_reset_decoder(dec: &mut silk_decoder) {
 }
 
 /// Upstream c: silk/dec_API.c:silk_Decode
-#[allow(clippy::too_many_arguments)]
 pub fn silk_decode(
     dec_state: &mut silk_decoder,
     dec_control: &mut silk_DecControlStruct,

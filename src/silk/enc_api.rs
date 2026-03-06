@@ -107,7 +107,6 @@ fn silk_query_encoder(ps_enc: &silk_encoder, enc_status: &mut silk_EncControlStr
     SILK_NO_ERROR
 }
 /// Upstream c: silk/enc_API.c:silk_Encode
-#[allow(clippy::too_many_arguments)]
 pub fn silk_encode_api(
     ps_enc: &mut silk_encoder,
     enc_control: &mut silk_EncControlStruct,

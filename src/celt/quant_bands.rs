@@ -359,7 +359,6 @@ pub fn quant_coarse_energy(
 }
 
 /// Upstream c: celt/quant_bands.c:quant_fine_energy
-#[allow(clippy::too_many_arguments)]
 pub fn quant_fine_energy(
     m: &OpusCustomMode,
     start: i32,
@@ -412,7 +411,6 @@ pub fn quant_fine_energy(
 }
 
 /// Upstream c: celt/quant_bands.c:quant_energy_finalise
-#[allow(clippy::too_many_arguments)]
 pub fn quant_energy_finalise(
     m: &OpusCustomMode,
     start: i32,
@@ -459,7 +457,6 @@ pub fn quant_energy_finalise(
 
 /// Upstream c: celt/quant_bands.c:unquant_coarse_energy
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn unquant_coarse_energy(
     m: &OpusCustomMode,
     start: i32,
@@ -519,7 +516,6 @@ pub fn unquant_coarse_energy(
 
 /// Upstream c: celt/quant_bands.c:unquant_fine_energy
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn unquant_fine_energy(
     m: &OpusCustomMode,
     start: i32,
@@ -557,7 +553,6 @@ pub fn unquant_fine_energy(
 
 /// Upstream c: celt/quant_bands.c:unquant_energy_finalise
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn unquant_energy_finalise(
     m: &OpusCustomMode,
     start: i32,

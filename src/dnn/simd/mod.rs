@@ -136,7 +136,6 @@ pub fn cgemv8x4(
 
 /// SIMD-accelerated sparse int8 matrix-vector multiply (8x4 block sparse).
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn sparse_cgemv8x4(
     out: &mut [f32],
     w: &[i8],

@@ -96,7 +96,6 @@ pub fn celt_pitch_xcorr(x: &[f32], y: &[f32], xcorr: &mut [f32], len: usize, arc
 /// SIMD-accelerated constant-coefficient comb filter.
 /// Dispatches to SSE on x86, with scalar fallback.
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_const(
     y: &mut [f32],
     y_start: usize,
@@ -121,7 +120,6 @@ pub fn comb_filter_const(
 /// SIMD-accelerated constant-coefficient in-place comb filter.
 /// Dispatches to SSE on x86, with scalar fallback.
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_const_inplace(
     buf: &mut [f32],
     start: usize,

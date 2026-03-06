@@ -2046,7 +2046,6 @@ pub fn lace_feature_net(
 /// Process one 20ms LACE frame.
 ///
 /// Upstream C: dnn/osce.c:lace_process_20ms_frame
-#[allow(clippy::too_many_arguments)]
 pub fn lace_process_20ms_frame(
     lace: &LACE,
     state: &mut LACEState,
@@ -2269,7 +2268,6 @@ fn nolace_feature_net(
 /// Process one 20ms NoLACE frame.
 ///
 /// Upstream C: dnn/osce.c:nolace_process_20ms_frame
-#[allow(clippy::too_many_arguments)]
 pub fn nolace_process_20ms_frame(
     nolace: &NoLACE,
     state: &mut NoLACEState,

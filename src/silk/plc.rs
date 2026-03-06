@@ -165,7 +165,6 @@ fn silk_plc_update(ps_dec: &mut silk_decoder_state, ps_dec_ctrl: &mut silk_decod
 
 /// Upstream c: silk/PLC.c:silk_PLC_energy
 #[inline]
-#[allow(clippy::too_many_arguments)]
 fn silk_plc_energy(
     energy1: &mut i32,
     shift1: &mut i32,

@@ -464,7 +464,6 @@ pub unsafe fn op_pvq_search_sse2(x_in: &mut [f32], iy: &mut [i32], k: i32, n_i32
 /// # Safety
 /// Requires SSE support (checked by caller via cpufeatures).
 #[target_feature(enable = "sse")]
-#[allow(clippy::too_many_arguments)]
 pub unsafe fn comb_filter_const_sse(
     y: &mut [f32],
     y_start: usize,
@@ -588,7 +587,6 @@ pub fn celt_pitch_xcorr_avx2_dispatch(x: &[f32], y: &[f32], xcorr: &mut [f32], l
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
 pub fn comb_filter_const_sse_dispatch(
     y: &mut [f32],
     y_start: usize,

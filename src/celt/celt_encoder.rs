@@ -519,7 +519,6 @@ mod tests {
 }
 
 /// Upstream C: celt/celt_encoder.c:transient_analysis
-#[allow(clippy::too_many_arguments)]
 fn transient_analysis(
     in_0: &[f32],
     len: i32,
@@ -775,7 +774,6 @@ fn patch_transient_decision(
     (mean_diff > 1.0f32) as i32
 }
 /// Upstream C: celt/celt_encoder.c:compute_mdcts
-#[allow(clippy::too_many_arguments)]
 fn compute_mdcts(
     mode: &OpusCustomMode,
     short_blocks: i32,
@@ -856,7 +854,6 @@ fn compute_mdcts(
     }
 }
 /// Upstream C: celt/celt_encoder.c:celt_preemphasis
-#[allow(clippy::too_many_arguments)]
 fn celt_preemphasis(
     pcmp: &[f32],
     inp: &mut [f32],
@@ -2413,7 +2410,6 @@ fn compute_vbr(
     };
     target
 }
-#[allow(clippy::too_many_arguments)]
 pub fn celt_encode_with_ec<'b>(
     st: &mut OpusCustomEncoder,
     pcm: &[f32],

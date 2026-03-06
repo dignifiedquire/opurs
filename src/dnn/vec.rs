@@ -252,7 +252,6 @@ pub fn cgemv8x4(
 /// Dispatch wrapper for `sparse_cgemv8x4`.
 #[cfg(feature = "simd")]
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn sparse_cgemv8x4(
     out: &mut [f32],
     w: &[i8],
@@ -269,7 +268,6 @@ pub fn sparse_cgemv8x4(
 /// Dispatch wrapper for `sparse_cgemv8x4` (scalar-only build).
 #[cfg(not(feature = "simd"))]
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn sparse_cgemv8x4(
     out: &mut [f32],
     w: &[i8],

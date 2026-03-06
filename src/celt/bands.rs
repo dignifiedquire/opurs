@@ -300,7 +300,6 @@ pub fn normalise_bands(
 
 /// Upstream C: celt/bands.c:denormalise_bands
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn denormalise_bands(
     m: &OpusCustomMode,
     x: &[f32],
@@ -1070,7 +1069,6 @@ fn quant_band_n1(
 
 /// Upstream C: celt/bands.c:quant_partition
 #[inline]
-#[allow(clippy::too_many_arguments)]
 fn quant_partition(
     ctx: &mut BandCtx<'_, '_>,
     x: &mut [f32],
@@ -1439,7 +1437,6 @@ fn quant_partition(
 /// Uses cubic quantization instead of PVQ.
 /// Upstream C: celt/bands.c:cubic_quant_partition
 #[cfg(feature = "qext")]
-#[allow(clippy::too_many_arguments)]
 fn cubic_quant_partition(
     ctx: &mut BandCtx<'_, '_>,
     x: &mut [f32],

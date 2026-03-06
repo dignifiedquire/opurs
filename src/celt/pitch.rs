@@ -451,7 +451,6 @@ const SECOND_CHECK: [i32; 16] = [0, 0, 3, 2, 3, 2, 5, 2, 3, 2, 3, 2, 5, 2, 3, 2]
 /// `T0` is the initial pitch period (modified in place).
 /// Returns the pitch gain.
 /// Upstream C: celt/pitch.c:remove_doubling
-#[allow(clippy::too_many_arguments)]
 pub fn remove_doubling(
     x: &[f32],
     mut maxperiod: i32,

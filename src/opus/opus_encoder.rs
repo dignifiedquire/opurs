@@ -887,7 +887,6 @@ fn silk_biquad_float(
     }
 }
 /// Upstream C: src/opus_encoder.c:hp_cutoff
-#[allow(clippy::too_many_arguments)]
 fn hp_cutoff(
     in_0: &[f32],
     cutoff_hz: i32,
@@ -977,7 +976,6 @@ fn dc_reject(
     };
 }
 /// Upstream C: src/opus_encoder.c:stereo_fade
-#[allow(clippy::too_many_arguments)]
 fn stereo_fade(
     in_0: &[f32],
     out: &mut [f32],
@@ -1016,7 +1014,6 @@ fn stereo_fade(
     }
 }
 /// Upstream C: src/opus_encoder.c:gain_fade
-#[allow(clippy::too_many_arguments)]
 fn gain_fade(
     in_0: &[f32],
     out: &mut [f32],

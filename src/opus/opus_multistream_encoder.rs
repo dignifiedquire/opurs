@@ -175,7 +175,6 @@ impl OpusMSEncoder {
     /// selection, then initializes this encoder instance.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_init
-    #[allow(clippy::too_many_arguments)]
     pub fn init_surround(
         &mut self,
         sample_rate: i32,

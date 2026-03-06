@@ -665,7 +665,6 @@ pub fn alg_quant(
 
 /// Upstream C: celt/vq.c:alg_unquant
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn alg_unquant(
     x: &mut [f32],
     n: i32,

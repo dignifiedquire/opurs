@@ -280,7 +280,6 @@ impl OpusRepacketizer {
     /// Like `out_range_impl` but also embeds extension data into the packet padding.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_out_range_impl
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn out_range_impl_ext(
         &mut self,
         begin: i32,
