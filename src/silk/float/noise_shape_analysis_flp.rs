@@ -4,7 +4,7 @@
 
 use crate::celt::mathops::celt_sqrt;
 use crate::silk::define::{MAX_SHAPE_LPC_ORDER, MIN_QGAIN_DB, TYPE_VOICED, USE_HARM_SHAPING};
-use crate::silk::float::structs_FLP::{
+use crate::silk::float::structs_flp::{
     silk_encoder_control_FLP, silk_encoder_state_FLP, silk_shape_state_FLP,
 };
 use crate::silk::tuning_parameters::{
@@ -14,14 +14,14 @@ use crate::silk::tuning_parameters::{
     LOW_QUALITY_LOW_FREQ_SHAPING_DECR, SHAPE_WHITE_NOISE_FRACTION, SUBFR_SMTH_COEF,
 };
 
-use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_flp;
-use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_flp;
-use crate::silk::float::bwexpander_FLP::silk_bwexpander_flp;
-use crate::silk::float::energy_FLP::silk_energy_flp;
-use crate::silk::float::k2a_FLP::silk_k2a_flp;
-use crate::silk::float::schur_FLP::silk_schur_flp;
-use crate::silk::float::warped_autocorrelation_FLP::silk_warped_autocorrelation_flp;
-use crate::silk::float::SigProc_FLP::{silk_log2, silk_sigmoid};
+use crate::silk::float::apply_sine_window_flp::silk_apply_sine_window_flp;
+use crate::silk::float::autocorrelation_flp::silk_autocorrelation_flp;
+use crate::silk::float::bwexpander_flp::silk_bwexpander_flp;
+use crate::silk::float::energy_flp::silk_energy_flp;
+use crate::silk::float::k2a_flp::silk_k2a_flp;
+use crate::silk::float::schur_flp::silk_schur_flp;
+use crate::silk::float::sigproc_flp::{silk_log2, silk_sigmoid};
+use crate::silk::float::warped_autocorrelation_flp::silk_warped_autocorrelation_flp;
 use crate::silk::mathops::silk_exp2;
 
 /// Upstream C: silk/float/noise_shape_analysis_FLP.c:warped_gain

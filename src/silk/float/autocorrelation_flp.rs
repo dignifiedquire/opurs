@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/autocorrelation_FLP.c`
 
 use crate::arch::Arch;
-use crate::silk::float::inner_product_FLP::silk_inner_product_flp;
+use crate::silk::float::inner_product_flp::silk_inner_product_flp;
 
 ///
 /// Compute autocorrelation

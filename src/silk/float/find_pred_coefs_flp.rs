@@ -6,14 +6,14 @@ use crate::silk::define::{
     LTP_ORDER, MAX_LPC_ORDER, MAX_NB_SUBFR, MAX_PREDICTION_POWER_GAIN,
     MAX_PREDICTION_POWER_GAIN_AFTER_RESET, TYPE_VOICED,
 };
-use crate::silk::float::find_LPC_FLP::silk_find_lpc_flp;
-use crate::silk::float::find_LTP_FLP::silk_find_LTP_FLP;
-use crate::silk::float::residual_energy_FLP::silk_residual_energy_flp;
-use crate::silk::float::scale_copy_vector_FLP::silk_scale_copy_vector_flp;
-use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
-use crate::silk::float::wrappers_FLP::{silk_process_nlsfs_flp, silk_quant_ltp_gains_flp};
-use crate::silk::float::LTP_analysis_filter_FLP::silk_ltp_analysis_filter_flp;
-use crate::silk::float::LTP_scale_ctrl_FLP::silk_ltp_scale_ctrl_flp;
+use crate::silk::float::find_lpc_flp::silk_find_lpc_flp;
+use crate::silk::float::find_ltp_flp::silk_find_LTP_FLP;
+use crate::silk::float::ltp_analysis_filter_flp::silk_ltp_analysis_filter_flp;
+use crate::silk::float::ltp_scale_ctrl_flp::silk_ltp_scale_ctrl_flp;
+use crate::silk::float::residual_energy_flp::silk_residual_energy_flp;
+use crate::silk::float::scale_copy_vector_flp::silk_scale_copy_vector_flp;
+use crate::silk::float::structs_flp::{silk_encoder_control_FLP, silk_encoder_state_FLP};
+use crate::silk::float::wrappers_flp::{silk_process_nlsfs_flp, silk_quant_ltp_gains_flp};
 use crate::silk::mathops::silk_exp2;
 use crate::util::nalgebra::make_viewr_mut_generic;
 use nalgebra::{Const, Dyn, VectorView};

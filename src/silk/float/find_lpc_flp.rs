@@ -3,10 +3,10 @@
 //! Upstream C: `silk/float/find_LPC_FLP.c`
 
 use crate::silk::define::MAX_NB_SUBFR;
-use crate::silk::float::burg_modified_FLP::silk_burg_modified_flp;
-use crate::silk::float::energy_FLP::silk_energy_flp;
-use crate::silk::float::wrappers_FLP::{silk_a2nlsf_flp, silk_nlsf2a_flp};
-use crate::silk::float::LPC_analysis_filter_FLP::silk_lpc_analysis_filter_flp;
+use crate::silk::float::burg_modified_flp::silk_burg_modified_flp;
+use crate::silk::float::energy_flp::silk_energy_flp;
+use crate::silk::float::lpc_analysis_filter_flp::silk_lpc_analysis_filter_flp;
+use crate::silk::float::wrappers_flp::{silk_a2nlsf_flp, silk_nlsf2a_flp};
 use crate::silk::interpolate::silk_interpolate;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::typedefs::SILK_FLOAT_MAX;

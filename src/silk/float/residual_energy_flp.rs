@@ -3,8 +3,8 @@
 //! Upstream C: `silk/float/residual_energy_FLP.c`
 
 use crate::silk::define::MAX_NB_SUBFR;
-use crate::silk::float::energy_FLP::silk_energy_flp;
-use crate::silk::float::LPC_analysis_filter_FLP::silk_lpc_analysis_filter_flp;
+use crate::silk::float::energy_flp::silk_energy_flp;
+use crate::silk::float::lpc_analysis_filter_flp::silk_lpc_analysis_filter_flp;
 
 const MAX_ITERATIONS_RESIDUAL_NRG: usize = 10;
 const REGULARIZATION_FACTOR: f32 = 1e-8;

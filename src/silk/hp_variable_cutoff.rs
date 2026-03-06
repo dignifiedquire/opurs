@@ -5,7 +5,7 @@
 use crate::silk::lin2log::silk_lin2log;
 
 use crate::silk::define::TYPE_VOICED;
-use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
+use crate::silk::float::structs_flp::silk_encoder_state_FLP;
 use crate::silk::structs::silk_encoder_state;
 use crate::silk::tuning_parameters::{
     VARIABLE_HP_MAX_CUTOFF_HZ, VARIABLE_HP_MAX_DELTA_FREQ, VARIABLE_HP_MIN_CUTOFF_HZ,

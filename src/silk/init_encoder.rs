@@ -3,7 +3,7 @@
 //! Upstream C: `silk/init_encoder.c`
 
 use crate::arch::Arch;
-use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
+use crate::silk::float::structs_flp::silk_encoder_state_FLP;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::tuning_parameters::VARIABLE_HP_MIN_CUTOFF_HZ;
 use crate::silk::vad::silk_vad_init;

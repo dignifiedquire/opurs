@@ -37,7 +37,7 @@ use crate::silk::define::{
 };
 use crate::silk::enc_api::silk_EncControlStruct;
 use crate::silk::enc_api::{silk_encode_api, silk_init_encoder_api};
-use crate::silk::float::structs_FLP::silk_encoder;
+use crate::silk::float::structs_flp::silk_encoder;
 use crate::silk::lin2log::silk_lin2log;
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::tuning_parameters::{VARIABLE_HP_MIN_CUTOFF_HZ, VARIABLE_HP_SMTH_COEF2};

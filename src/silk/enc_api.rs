@@ -47,8 +47,8 @@ use crate::silk::define::{
 };
 use crate::silk::encode_indices::silk_encode_indices;
 use crate::silk::encode_pulses::silk_encode_pulses;
-use crate::silk::float::encode_frame_FLP::{silk_encode_do_vad_flp, silk_encode_frame_flp};
-use crate::silk::float::structs_FLP::{silk_encoder, silk_shape_state_FLP};
+use crate::silk::float::encode_frame_flp::{silk_encode_do_vad_flp, silk_encode_frame_flp};
+use crate::silk::float::structs_flp::{silk_encoder, silk_shape_state_FLP};
 use crate::silk::init_encoder::silk_init_encoder;
 use crate::silk::resampler::silk_resampler;
 

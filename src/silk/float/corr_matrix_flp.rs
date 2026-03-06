@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/float/corrMatrix_FLP.c`
 
-use crate::silk::float::inner_product_FLP::silk_inner_product2_FLP;
+use crate::silk::float::inner_product_flp::silk_inner_product2_FLP;
 use crate::util::nalgebra::MatrixViewRMut;
 use nalgebra::{Dim, DimAdd, DimDiff, DimSub, DimSum, VectorView, U1};
 

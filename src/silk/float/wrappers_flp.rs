@@ -7,8 +7,8 @@ use crate::silk::a2nlsf::silk_a2nlsf;
 use crate::silk::nlsf2a::silk_nlsf2a;
 
 use crate::silk::define::{LTP_ORDER, MAX_SHAPE_LPC_ORDER, TYPE_VOICED};
-use crate::silk::float::structs_FLP::silk_encoder_control_FLP;
-use crate::silk::float::SigProc_FLP::silk_float2int;
+use crate::silk::float::sigproc_flp::silk_float2int;
+use crate::silk::float::structs_flp::silk_encoder_control_FLP;
 use crate::silk::nsq::silk_nsq;
 use crate::silk::nsq_del_dec::silk_nsq_del_dec;
 use crate::silk::process_nlsfs::silk_process_nlsfs;

@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/float/find_LTP_FLP.c`
 
-use crate::silk::float::corrMatrix_FLP::{silk_corrMatrix_FLP, silk_corrVector_FLP};
-use crate::silk::float::energy_FLP::silk_energy_flp;
+use crate::silk::float::corr_matrix_flp::{silk_corrMatrix_FLP, silk_corrVector_FLP};
+use crate::silk::float::energy_flp::silk_energy_flp;
 use crate::silk::tuning_parameters::LTP_CORR_INV_MAX;
 use crate::util::nalgebra::MatrixViewRMut;
 use nalgebra::{Const, Dim, DimMul, DimProd, Dyn, VectorView};

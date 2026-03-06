@@ -9,8 +9,8 @@ use crate::silk::define::{
 };
 use crate::silk::enc_api::silk_EncControlStruct;
 use crate::silk::errors::{SILK_ENC_PACKET_SIZE_NOT_SUPPORTED, SILK_NO_ERROR};
-use crate::silk::float::structs_FLP::silk_encoder_state_FLP;
-use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_short2float_array};
+use crate::silk::float::sigproc_flp::{silk_float2short_array, silk_short2float_array};
+use crate::silk::float::structs_flp::silk_encoder_state_FLP;
 use crate::silk::pitch_est_tables::{
     SILK_PE_MAX_COMPLEX, SILK_PE_MID_COMPLEX, SILK_PE_MIN_COMPLEX,
 };

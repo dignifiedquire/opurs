@@ -4,14 +4,14 @@
 
 use crate::arch::Arch;
 use crate::silk::define::{TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, TYPE_VOICED};
-use crate::silk::float::apply_sine_window_FLP::silk_apply_sine_window_flp;
-use crate::silk::float::autocorrelation_FLP::silk_autocorrelation_flp;
-use crate::silk::float::bwexpander_FLP::silk_bwexpander_flp;
-use crate::silk::float::k2a_FLP::silk_k2a_flp;
-use crate::silk::float::pitch_analysis_core_FLP::silk_pitch_analysis_core_flp;
-use crate::silk::float::schur_FLP::silk_schur_flp;
-use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
-use crate::silk::float::LPC_analysis_filter_FLP::silk_lpc_analysis_filter_flp;
+use crate::silk::float::apply_sine_window_flp::silk_apply_sine_window_flp;
+use crate::silk::float::autocorrelation_flp::silk_autocorrelation_flp;
+use crate::silk::float::bwexpander_flp::silk_bwexpander_flp;
+use crate::silk::float::k2a_flp::silk_k2a_flp;
+use crate::silk::float::lpc_analysis_filter_flp::silk_lpc_analysis_filter_flp;
+use crate::silk::float::pitch_analysis_core_flp::silk_pitch_analysis_core_flp;
+use crate::silk::float::schur_flp::silk_schur_flp;
+use crate::silk::float::structs_flp::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::tuning_parameters::{
     FIND_PITCH_BANDWIDTH_EXPANSION, FIND_PITCH_WHITE_NOISE_FRACTION,
 };

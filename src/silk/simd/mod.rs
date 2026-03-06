@@ -61,7 +61,7 @@ pub fn silk_inner_product_flp(data1: &[f32], data2: &[f32], arch: Arch) -> f64 {
     }
 
     let _ = arch;
-    super::float::inner_product_FLP::silk_inner_product_flp_scalar(data1, data2)
+    super::float::inner_product_flp::silk_inner_product_flp_scalar(data1, data2)
 }
 
 /// SIMD-accelerated VAD energy accumulation: sum of (X\[i\] >> 3)^2.

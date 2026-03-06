@@ -3,7 +3,7 @@
 //! Upstream C: `silk/float/LTP_scale_ctrl_FLP.c`
 
 use crate::silk::define::CODE_INDEPENDENTLY;
-use crate::silk::float::structs_FLP::{silk_encoder_control_FLP, silk_encoder_state_FLP};
+use crate::silk::float::structs_flp::{silk_encoder_control_FLP, silk_encoder_state_FLP};
 use crate::silk::log2lin::silk_log2lin;
 use crate::silk::macros::silk_smulbb;
 use crate::silk::tables_other::SILK_LTPSCALES_TABLE_Q14;

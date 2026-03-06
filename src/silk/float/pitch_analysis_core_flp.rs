@@ -7,10 +7,10 @@ use crate::arch::Arch;
 use crate::silk::typedefs::{SILK_INT16_MAX, SILK_INT16_MIN};
 
 use crate::celt::pitch::celt_pitch_xcorr;
-use crate::silk::float::energy_FLP::silk_energy_flp;
-use crate::silk::float::inner_product_FLP::silk_inner_product_flp;
-use crate::silk::float::sort_FLP::silk_insertion_sort_decreasing_flp;
-use crate::silk::float::SigProc_FLP::{silk_float2short_array, silk_log2, silk_short2float_array};
+use crate::silk::float::energy_flp::silk_energy_flp;
+use crate::silk::float::inner_product_flp::silk_inner_product_flp;
+use crate::silk::float::sigproc_flp::{silk_float2short_array, silk_log2, silk_short2float_array};
+use crate::silk::float::sort_flp::silk_insertion_sort_decreasing_flp;
 use crate::silk::pitch_est_tables::{
     PE_FLATCONTOUR_BIAS, PE_LTP_MEM_LENGTH_MS, PE_MAX_LAG_MS, PE_MAX_NB_SUBFR, PE_MIN_LAG_MS,
     PE_NB_CBKS_STAGE2, PE_NB_CBKS_STAGE2_10MS, PE_NB_CBKS_STAGE2_EXT, PE_NB_CBKS_STAGE3_10MS,
