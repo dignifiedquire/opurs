@@ -100,7 +100,9 @@ pub use crate::opus::opus_private;
 
 // Public API types
 pub use crate::opus::mapping_matrix::MappingMatrix;
-pub use enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
+pub use enums::{
+    Application, Bandwidth, Bitrate, ChannelCount, Channels, FrameSize, SampleRate, Signal,
+};
 pub use error::{ErrorCode, Result as OpusResult};
 
 // =====

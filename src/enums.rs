@@ -243,6 +243,107 @@ impl From<FrameSize> for i32 {
     }
 }
 
+/// Audio sample rate for the Opus codec.
+///
+/// All standard Opus sample rates are supported. The 96 kHz rate is only
+/// available when the `qext` feature is enabled.
+///
+/// See: <https://opus-codec.org/docs/opus_api-1.3.1/group__opus__encoder.html>
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SampleRate {
+    /// 8000 Hz (narrowband telephony).
+    Hz8000,
+    /// 12000 Hz (mediumband).
+    Hz12000,
+    /// 16000 Hz (wideband telephony).
+    Hz16000,
+    /// 24000 Hz.
+    Hz24000,
+    /// 48000 Hz (full audio, default).
+    Hz48000,
+    /// 96000 Hz (QEXT extended range; requires `qext` feature).
+    #[cfg(feature = "qext")]
+    Hz96000,
+}
+
+impl TryFrom<i32> for SampleRate {
+    type Error = ErrorCode;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            8000 => Ok(SampleRate::Hz8000),
+            12000 => Ok(SampleRate::Hz12000),
+            16000 => Ok(SampleRate::Hz16000),
+            24000 => Ok(SampleRate::Hz24000),
+            48000 => Ok(SampleRate::Hz48000),
+            #[cfg(feature = "qext")]
+            96000 => Ok(SampleRate::Hz96000),
+            _ => Err(ErrorCode::BadArg),
+        }
+    }
+}
+
+impl From<SampleRate> for i32 {
+    fn from(value: SampleRate) -> Self {
+        match value {
+            SampleRate::Hz8000 => 8000,
+            SampleRate::Hz12000 => 12000,
+            SampleRate::Hz16000 => 16000,
+            SampleRate::Hz24000 => 24000,
+            SampleRate::Hz48000 => 48000,
+            #[cfg(feature = "qext")]
+            SampleRate::Hz96000 => 96000,
+        }
+    }
+}
+
+/// A validated channel count (1..=255).
+///
+/// For mono/stereo, use [`Channels::Mono`] / [`Channels::Stereo`] and convert
+/// via `.into()`. For multistream/projection with more than 2 channels, use
+/// [`ChannelCount::try_new`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct ChannelCount(u8);
+
+impl ChannelCount {
+    /// Create a validated channel count.
+    ///
+    /// Returns `Err(ErrorCode::BadArg)` if `n` is not in `1..=255`.
+    pub fn try_new(n: i32) -> Result<Self, ErrorCode> {
+        if (1..=255).contains(&n) {
+            Ok(ChannelCount(n as u8))
+        } else {
+            Err(ErrorCode::BadArg)
+        }
+    }
+
+    /// Return the channel count as an `i32`.
+    pub fn get(self) -> i32 {
+        self.0 as i32
+    }
+}
+
+impl From<Channels> for ChannelCount {
+    fn from(ch: Channels) -> Self {
+        match ch {
+            Channels::Mono => ChannelCount(1),
+            Channels::Stereo => ChannelCount(2),
+        }
+    }
+}
+
+impl From<ChannelCount> for i32 {
+    fn from(value: ChannelCount) -> Self {
+        value.0 as i32
+    }
+}
+
+impl From<ChannelCount> for usize {
+    fn from(value: ChannelCount) -> Self {
+        value.0 as usize
+    }
+}
+
 /// Bitrate configuration for the Opus encoder.
 ///
 /// `Auto` lets the encoder select a bitrate based on the configuration.
@@ -393,6 +494,48 @@ mod tests {
     }
 
     #[test]
+    fn sample_rate_roundtrip() {
+        let pairs = [
+            (SampleRate::Hz8000, 8000),
+            (SampleRate::Hz12000, 12000),
+            (SampleRate::Hz16000, 16000),
+            (SampleRate::Hz24000, 24000),
+            (SampleRate::Hz48000, 48000),
+        ];
+        for (variant, raw) in pairs {
+            assert_eq!(SampleRate::try_from(raw).unwrap(), variant);
+            assert_eq!(i32::from(variant), raw);
+        }
+    }
+
+    #[test]
+    fn sample_rate_rejects_invalid() {
+        assert!(SampleRate::try_from(0).is_err());
+        assert!(SampleRate::try_from(44100).is_err());
+        assert!(SampleRate::try_from(-1).is_err());
+    }
+
+    #[test]
+    fn channel_count_valid() {
+        assert_eq!(ChannelCount::try_new(1).unwrap().get(), 1);
+        assert_eq!(ChannelCount::try_new(2).unwrap().get(), 2);
+        assert_eq!(ChannelCount::try_new(255).unwrap().get(), 255);
+    }
+
+    #[test]
+    fn channel_count_rejects_invalid() {
+        assert!(ChannelCount::try_new(0).is_err());
+        assert!(ChannelCount::try_new(256).is_err());
+        assert!(ChannelCount::try_new(-1).is_err());
+    }
+
+    #[test]
+    fn channel_count_from_channels() {
+        assert_eq!(ChannelCount::from(Channels::Mono).get(), 1);
+        assert_eq!(ChannelCount::from(Channels::Stereo).get(), 2);
+    }
+
+    #[test]
     fn enums_are_copy() {
         fn assert_copy<T: Copy>() {}
         assert_copy::<Application>();
@@ -401,5 +544,7 @@ mod tests {
         assert_copy::<Signal>();
         assert_copy::<FrameSize>();
         assert_copy::<Bitrate>();
+        assert_copy::<SampleRate>();
+        assert_copy::<ChannelCount>();
     }
 }
