@@ -48,8 +48,12 @@ fn generate_pcm(num_frames: usize, channels: usize) -> Vec<i16> {
 
 /// Pre-encode audio using Rust encoder to produce packets for decode benchmarks.
 fn pre_encode_rust(pcm: &[i16], channels: i32, bitrate: i32) -> Vec<Vec<u8>> {
-    let mut encoder =
-        opurs::OpusEncoder::new(SAMPLE_RATE, channels, opurs::OPUS_APPLICATION_AUDIO).unwrap();
+    let mut encoder = opurs::OpusEncoder::new(
+        opurs::SampleRate::Hz48000,
+        opurs::Channels::try_from(channels).unwrap(),
+        opurs::Application::Audio,
+    )
+    .unwrap();
     encoder.set_bitrate(opurs::Bitrate::Bits(bitrate));
     encoder.set_complexity(10).unwrap();
 
@@ -79,9 +83,12 @@ fn bench_encode_comparison(c: &mut Criterion) {
 
         // Rust encoder (with SIMD dispatch)
         group.bench_with_input(BenchmarkId::new("rust", &label), &bitrate, |b, &bitrate| {
-            let mut encoder =
-                opurs::OpusEncoder::new(SAMPLE_RATE, channels, opurs::OPUS_APPLICATION_AUDIO)
-                    .unwrap();
+            let mut encoder = opurs::OpusEncoder::new(
+                opurs::SampleRate::Hz48000,
+                opurs::Channels::try_from(channels).unwrap(),
+                opurs::Application::Audio,
+            )
+            .unwrap();
             encoder.set_bitrate(opurs::Bitrate::Bits(bitrate));
             encoder.set_complexity(10).unwrap();
             let mut output = vec![0u8; 1500];
@@ -145,7 +152,11 @@ fn bench_decode_comparison(c: &mut Criterion) {
 
         // Rust decoder
         group.bench_with_input(BenchmarkId::new("rust", &label), &packets, |b, packets| {
-            let mut decoder = opurs::OpusDecoder::new(SAMPLE_RATE, channels as usize).unwrap();
+            let mut decoder = opurs::OpusDecoder::new(
+                opurs::SampleRate::Hz48000,
+                opurs::Channels::try_from(channels).unwrap(),
+            )
+            .unwrap();
             let mut out_pcm = vec![0i16; FRAME_SIZE_20MS * channels as usize];
 
             b.iter(|| {
@@ -204,9 +215,12 @@ fn bench_encode_mono_comparison(c: &mut Criterion) {
 
         // Rust encoder
         group.bench_with_input(BenchmarkId::new("rust", &label), &bitrate, |b, &bitrate| {
-            let mut encoder =
-                opurs::OpusEncoder::new(SAMPLE_RATE, channels, opurs::OPUS_APPLICATION_VOIP)
-                    .unwrap();
+            let mut encoder = opurs::OpusEncoder::new(
+                opurs::SampleRate::Hz48000,
+                opurs::Channels::try_from(channels).unwrap(),
+                opurs::Application::Voip,
+            )
+            .unwrap();
             encoder.set_bitrate(opurs::Bitrate::Bits(bitrate));
             encoder.set_complexity(10).unwrap();
             let mut output = vec![0u8; 1500];

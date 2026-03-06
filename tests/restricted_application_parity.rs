@@ -6,9 +6,9 @@ use libopus_sys::{
     OpusEncoder as COpusEncoder,
 };
 use opurs::{
-    Application, OpusEncoder, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_CELT,
-    OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP, OPUS_BAD_ARG,
-    OPUS_GET_BITRATE_REQUEST, OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BITRATE_REQUEST,
+    Application, Channels, OpusEncoder, SampleRate, OPUS_APPLICATION_AUDIO,
+    OPUS_APPLICATION_RESTRICTED_CELT, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
+    OPUS_BAD_ARG, OPUS_GET_BITRATE_REQUEST, OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BITRATE_REQUEST,
 };
 use opurs::{Bitrate, OPUS_AUTO, OPUS_BITRATE_MAX};
 
@@ -73,8 +73,12 @@ impl Drop for CEncoder {
 
 #[test]
 fn restricted_silk_sub_10ms_encode_matches_c() {
-    let mut rust_enc =
-        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_SILK).expect("rust create");
+    let mut rust_enc = OpusEncoder::new(
+        SampleRate::Hz48000,
+        Channels::Mono,
+        Application::RestrictedSilk,
+    )
+    .expect("rust create");
     let mut c_enc = CEncoder::new(OPUS_APPLICATION_RESTRICTED_SILK);
 
     let pcm_5ms = vec![0i16; 240];
@@ -93,7 +97,8 @@ fn restricted_silk_sub_10ms_encode_matches_c() {
 
 #[test]
 fn set_application_restricted_modes_match_c() {
-    let mut rust_enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_VOIP).expect("rust create");
+    let mut rust_enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Voip)
+        .expect("rust create");
     let mut c_enc = CEncoder::new(OPUS_APPLICATION_VOIP);
 
     for restricted in [
@@ -113,8 +118,12 @@ fn set_application_restricted_modes_match_c() {
         assert_eq!(rust_ret, OPUS_BAD_ARG, "restricted app should be rejected");
     }
 
-    let mut rust_restricted =
-        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_SILK).expect("rust create");
+    let mut rust_restricted = OpusEncoder::new(
+        SampleRate::Hz48000,
+        Channels::Mono,
+        Application::RestrictedSilk,
+    )
+    .expect("rust create");
     let mut c_restricted = CEncoder::new(OPUS_APPLICATION_RESTRICTED_SILK);
 
     let rust_ret = match rust_restricted.set_application(Application::Audio) {
@@ -134,7 +143,8 @@ fn set_application_restricted_modes_match_c() {
 
 #[test]
 fn bitrate_ctl_semantics_match_c() {
-    let mut rust_enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_AUDIO).expect("rust create");
+    let mut rust_enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio)
+        .expect("rust create");
     let mut c_enc = CEncoder::new(OPUS_APPLICATION_AUDIO);
 
     fn set_and_compare(rust_enc: &mut OpusEncoder, c_enc: &mut CEncoder, input: Bitrate) -> i32 {
@@ -186,8 +196,12 @@ fn bitrate_ctl_semantics_match_c() {
 
 #[test]
 fn lfe_ctl_semantics_match_c() {
-    let mut rust_enc =
-        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_CELT).expect("rust create");
+    let mut rust_enc = OpusEncoder::new(
+        SampleRate::Hz48000,
+        Channels::Mono,
+        Application::RestrictedCelt,
+    )
+    .expect("rust create");
     let mut c_enc = CEncoder::new(OPUS_APPLICATION_RESTRICTED_CELT);
     let pcm = vec![0i16; 960];
     let mut rust_packet = vec![0u8; 1276];
@@ -220,8 +234,12 @@ fn lfe_ctl_semantics_match_c() {
 
 #[test]
 fn energy_mask_ctl_semantics_match_c() {
-    let mut rust_enc =
-        OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_CELT).expect("rust create");
+    let mut rust_enc = OpusEncoder::new(
+        SampleRate::Hz48000,
+        Channels::Mono,
+        Application::RestrictedCelt,
+    )
+    .expect("rust create");
     let mut c_enc = CEncoder::new(OPUS_APPLICATION_RESTRICTED_CELT);
     let pcm = vec![0i16; 960];
     let mut rust_packet = vec![0u8; 1276];

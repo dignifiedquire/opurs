@@ -2,7 +2,8 @@
 //!
 //! Upstream C: `src/opus_encoder.c`
 
-use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, SampleRate, Signal};
+use crate::error::ErrorCode;
 use crate::opus::repacketizer::FrameSource;
 
 const Q15ONE: f32 = 1.0;
@@ -170,30 +171,21 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_init
-    pub fn new(fs: i32, channels: i32, application: i32) -> Result<OpusEncoder, i32> {
-        let valid_fs = fs == 48000
-            || fs == 24000
-            || fs == 16000
-            || fs == 12000
-            || fs == 8000
-            || cfg!(feature = "qext") && fs == 96000;
-        if !valid_fs
-            || channels != 1 && channels != 2
-            || application != OPUS_APPLICATION_VOIP
-                && application != OPUS_APPLICATION_AUDIO
-                && application != OPUS_APPLICATION_RESTRICTED_LOWDELAY
-                && application != OPUS_APPLICATION_RESTRICTED_SILK
-                && application != OPUS_APPLICATION_RESTRICTED_CELT
-        {
-            return Err(OPUS_BAD_ARG);
-        }
+    pub fn new(
+        sample_rate: SampleRate,
+        channels: Channels,
+        application: Application,
+    ) -> Result<OpusEncoder, ErrorCode> {
+        let fs: i32 = sample_rate.into();
+        let channels: i32 = channels.into();
+        let application: i32 = application.into();
         let arch = opus_select_arch();
         // Build silk encoder state
         let mut silk_enc = silk_encoder::default();
         let mut silk_mode = silk_EncControlStruct::default();
         let ret = silk_init_encoder_api(&mut silk_enc, arch, &mut silk_mode);
         if ret != 0 {
-            return Err(OPUS_INTERNAL_ERROR);
+            return Err(ErrorCode::InternalError);
         }
         silk_mode.n_channels_api = channels;
         silk_mode.n_channels_internal = channels;
@@ -212,7 +204,7 @@ impl OpusEncoder {
         silk_mode.reduced_dependency = 0;
 
         // Build CELT encoder state
-        let mut celt_enc = OpusCustomEncoder::new(fs, channels, arch)?;
+        let mut celt_enc = OpusCustomEncoder::new(fs, channels, arch).map_err(ErrorCode::from)?;
         celt_enc.signalling = 0;
         celt_enc.complexity = silk_mode.complexity;
 
@@ -3630,22 +3622,34 @@ mod tests {
 
     #[test]
     fn restricted_applications_set_expected_buffer_and_lookahead() {
-        let enc_silk = OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_SILK).unwrap();
+        let enc_silk = OpusEncoder::new(
+            SampleRate::Hz48000,
+            Channels::Stereo,
+            Application::RestrictedSilk,
+        )
+        .unwrap();
         assert_eq!(enc_silk.encoder_buffer, 0);
         assert_eq!(enc_silk.lookahead(), 48000 / 400 + 48000 / 250);
 
-        let enc_celt = OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_CELT).unwrap();
+        let enc_celt = OpusEncoder::new(
+            SampleRate::Hz48000,
+            Channels::Stereo,
+            Application::RestrictedCelt,
+        )
+        .unwrap();
         assert_eq!(enc_celt.encoder_buffer, 0);
         assert_eq!(enc_celt.lookahead(), 48000 / 400);
 
-        let enc_audio = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        let enc_audio =
+            OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Audio).unwrap();
         assert_eq!(enc_audio.encoder_buffer, 48000 / 100);
         assert_eq!(enc_audio.lookahead(), 48000 / 400 + 48000 / 250);
     }
 
     #[test]
     fn set_bandwidth_auto_resets_silk_internal_rate_to_16k() {
-        let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        let mut enc =
+            OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Audio).unwrap();
         enc.set_max_bandwidth(Bandwidth::Narrowband);
         assert_eq!(enc.silk_mode.max_internal_sample_rate, 8000);
 
@@ -3655,7 +3659,8 @@ mod tests {
 
     #[test]
     fn set_application_rejects_restricted_modes_and_restricted_instances() {
-        let mut enc = OpusEncoder::new(48000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        let mut enc =
+            OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Audio).unwrap();
         assert_eq!(
             enc.set_application(Application::RestrictedSilk),
             Err(OPUS_BAD_ARG)
@@ -3665,8 +3670,12 @@ mod tests {
             Err(OPUS_BAD_ARG)
         );
 
-        let mut enc_restricted =
-            OpusEncoder::new(48000, 2, OPUS_APPLICATION_RESTRICTED_SILK).unwrap();
+        let mut enc_restricted = OpusEncoder::new(
+            SampleRate::Hz48000,
+            Channels::Stereo,
+            Application::RestrictedSilk,
+        )
+        .unwrap();
         assert_eq!(
             enc_restricted.set_application(Application::Audio),
             Err(OPUS_BAD_ARG)
@@ -3676,7 +3685,8 @@ mod tests {
     #[cfg(feature = "dred")]
     #[test]
     fn dred_encoder_init_tracks_encoder_rate_and_channels() {
-        let enc = OpusEncoder::new(24000, 2, OPUS_APPLICATION_AUDIO).unwrap();
+        let enc =
+            OpusEncoder::new(SampleRate::Hz24000, Channels::Stereo, Application::Audio).unwrap();
         assert_eq!(enc.dred_encoder.fs, 24000);
         assert_eq!(enc.dred_encoder.channels, 2);
     }
@@ -3684,7 +3694,8 @@ mod tests {
     #[cfg(all(feature = "dred", feature = "builtin-weights"))]
     #[test]
     fn dred_encoder_init_auto_loads_builtin_model() {
-        let enc = OpusEncoder::new(48000, 1, OPUS_APPLICATION_AUDIO).unwrap();
+        let enc =
+            OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio).unwrap();
         assert!(enc.dred_encoder.loaded);
     }
 }

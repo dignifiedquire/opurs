@@ -5,8 +5,8 @@ extern crate opurs;
 
 use libopus_sys::{opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy};
 use opurs::{
-    Bitrate, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_SET_BITRATE_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
+    Application, Bitrate, Channels, SampleRate, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+    OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
 };
 
 fn first_diff_frame(prediction_disabled: bool) -> Option<(usize, usize, usize)> {
@@ -26,9 +26,12 @@ fn first_diff_frame(prediction_disabled: bool) -> Option<(usize, usize, usize)> 
         pcm.push(i16::from_le_bytes([ch[0], ch[1]]));
     }
 
-    let mut rust_enc =
-        opurs::OpusEncoder::new(sample_rate, channels, OPUS_APPLICATION_RESTRICTED_LOWDELAY)
-            .expect("rust encoder create");
+    let mut rust_enc = opurs::OpusEncoder::new(
+        SampleRate::try_from(sample_rate).unwrap(),
+        Channels::try_from(channels).unwrap(),
+        Application::LowDelay,
+    )
+    .expect("rust encoder create");
     rust_enc.set_bitrate(Bitrate::Bits(bitrate));
     rust_enc.set_complexity(complexity).unwrap();
     rust_enc.set_prediction_disabled(prediction_disabled);

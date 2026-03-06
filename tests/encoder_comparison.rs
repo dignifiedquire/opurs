@@ -9,7 +9,10 @@
 extern crate opurs;
 
 use libopus_sys::{opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy};
-use opurs::{OPUS_APPLICATION_AUDIO, OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST};
+use opurs::{
+    Application, Channels, SampleRate, OPUS_APPLICATION_AUDIO, OPUS_SET_BITRATE_REQUEST,
+    OPUS_SET_COMPLEXITY_REQUEST,
+};
 
 /// Simple deterministic PRNG for audio generation
 struct Rng(u64);
@@ -39,8 +42,12 @@ fn compare_encoder_frame_by_frame() {
     let num_frames = 500;
 
     // Create Rust encoder
-    let mut rust_enc = opurs::OpusEncoder::new(sample_rate, channels, OPUS_APPLICATION_AUDIO)
-        .expect("Rust encoder create failed");
+    let mut rust_enc = opurs::OpusEncoder::new(
+        SampleRate::try_from(sample_rate).unwrap(),
+        Channels::try_from(channels).unwrap(),
+        Application::Audio,
+    )
+    .expect("Rust encoder create failed");
     rust_enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
     let _ = rust_enc.set_complexity(complexity);
 
@@ -122,8 +129,12 @@ fn compare_encoder_low_bitrate() {
     let complexity: i32 = 10;
     let num_frames = 200;
 
-    let mut rust_enc = opurs::OpusEncoder::new(sample_rate, channels, OPUS_APPLICATION_AUDIO)
-        .expect("Rust encoder create failed");
+    let mut rust_enc = opurs::OpusEncoder::new(
+        SampleRate::try_from(sample_rate).unwrap(),
+        Channels::try_from(channels).unwrap(),
+        Application::Audio,
+    )
+    .expect("Rust encoder create failed");
     rust_enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
     let _ = rust_enc.set_complexity(complexity);
 

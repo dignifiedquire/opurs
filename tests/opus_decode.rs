@@ -8,7 +8,7 @@
 
 mod test_common;
 
-use opurs::{opus_packet_get_nb_channels, opus_pcm_soft_clip, OpusDecoder};
+use opurs::{opus_packet_get_nb_channels, opus_pcm_soft_clip, Channels, OpusDecoder, SampleRate};
 use test_common::{debruijn2, TestRng};
 
 /// Sample rates used by the decoder tests (matching upstream fsv[]).
@@ -43,8 +43,11 @@ fn create_test_decoders() -> (Vec<OpusDecoder>, OpusDecoder) {
     for t in 0..NUM_DECODERS {
         let fs = SAMPLE_RATES[t >> 1];
         let c = (t as i32 & 1) + 1;
-        let dec = OpusDecoder::new(fs, c as usize)
-            .unwrap_or_else(|err| panic!("OpusDecoder::new({fs}, {c}) failed: err={err}"));
+        let dec = OpusDecoder::new(
+            SampleRate::try_from(fs).unwrap(),
+            Channels::try_from(c).unwrap(),
+        )
+        .unwrap_or_else(|err| panic!("OpusDecoder::new({fs}, {c}) failed: err={err}"));
 
         // Clone decoder, use clone (original dropped at end of iteration)
         let copy = dec.clone();
@@ -53,7 +56,7 @@ fn create_test_decoders() -> (Vec<OpusDecoder>, OpusDecoder) {
     }
 
     // Backup decoder (mono, for FEC/PLC tests)
-    let decbak = OpusDecoder::new(48000, 1).unwrap();
+    let decbak = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).unwrap();
 
     (decoders, decbak)
 }

@@ -5,10 +5,10 @@ use libopus_sys::{
     OPUS_APPLICATION_AUDIO,
 };
 use opurs::{
-    OpusProjectionDecoder, OpusProjectionEncoder, OPUS_BAD_ARG, OPUS_GET_BANDWIDTH_REQUEST,
-    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_GAIN_REQUEST, OPUS_GET_LAST_PACKET_DURATION_REQUEST,
-    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_SAMPLE_RATE_REQUEST,
-    OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST, OPUS_OK,
+    Application, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate, OPUS_BAD_ARG,
+    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_GAIN_REQUEST,
+    OPUS_GET_LAST_PACKET_DURATION_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST, OPUS_OK,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
     OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
@@ -117,7 +117,7 @@ fn projection_decoder_create_parity_with_c() {
     let bad_matrix = vec![0u8; 2];
 
     for matrix in [&good_matrix, &bad_matrix] {
-        let rust = OpusProjectionDecoder::new(48000, 2, 1, 1, matrix);
+        let rust = OpusProjectionDecoder::new(SampleRate::Hz48000, 2, 1, 1, matrix);
 
         let mut c_error = 0i32;
         let c_ptr = unsafe {
@@ -142,7 +142,7 @@ fn projection_decoder_create_parity_with_c() {
             "projection decoder create parity mismatch"
         );
         if let Err(err) = rust {
-            assert_eq!(err, OPUS_BAD_ARG);
+            assert_eq!(err, opurs::ErrorCode::BadArg);
             assert_eq!(c_error, OPUS_BAD_ARG);
         }
     }
@@ -187,7 +187,7 @@ fn projection_decoder_decode_parity_with_c() {
     assert!(packet_len > 0, "c encode failed: {packet_len}");
 
     let matrix = identity_demixing_matrix_le(2);
-    let mut rust_dec = OpusProjectionDecoder::new(48000, 2, 1, 1, &matrix).unwrap();
+    let mut rust_dec = OpusProjectionDecoder::new(SampleRate::Hz48000, 2, 1, 1, &matrix).unwrap();
     let mut c_error = 0i32;
     let c_dec = unsafe {
         opus_projection_decoder_create(
@@ -305,7 +305,8 @@ fn projection_decoder_higher_order_parity_with_c() {
         unsafe { opus_projection_encoder_destroy(c_enc) };
 
         let mut rust_dec =
-            OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix).unwrap();
+            OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+                .unwrap();
 
         let mut c_error = 0i32;
         let c_dec = unsafe {
@@ -422,8 +423,9 @@ fn projection_decoder_ctl_value_parity_with_c() {
     unsafe { opus_projection_encoder_destroy(c_enc) };
     assert!(packet_len > 0, "c projection encode failed: {packet_len}");
 
-    let mut rust = OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix)
-        .expect("rust projection decoder create");
+    let mut rust =
+        OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+            .expect("rust projection decoder create");
     let mut c_error = 0i32;
     let c_ptr = unsafe {
         opus_projection_decoder_create(
@@ -545,7 +547,9 @@ fn projection_decoder_state_access_parity_with_c() {
     let matrix = projection_demixing_matrix_from_c_encoder(c_enc, channels);
     unsafe { opus_projection_encoder_destroy(c_enc) };
 
-    let mut rust = OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix).unwrap();
+    let mut rust =
+        OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+            .unwrap();
     let mut c_error = 0i32;
     let c_ptr = unsafe {
         opus_projection_decoder_create(
@@ -664,12 +668,12 @@ fn projection_creation_arguments_matrix_parity_with_c() {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
         let rust_enc = OpusProjectionEncoder::new(
-            48000,
+            SampleRate::Hz48000,
             channels,
             3,
             &mut rust_streams,
             &mut rust_coupled,
-            OPUS_APPLICATION_AUDIO as i32,
+            Application::Audio,
         );
 
         let mut c_streams = -1i32;
@@ -714,8 +718,13 @@ fn projection_creation_arguments_matrix_parity_with_c() {
             };
             assert_eq!(ret, 0);
 
-            let rust_dec =
-                OpusProjectionDecoder::new(48000, channels, c_streams, c_coupled, &matrix);
+            let rust_dec = OpusProjectionDecoder::new(
+                SampleRate::Hz48000,
+                channels,
+                c_streams,
+                c_coupled,
+                &matrix,
+            );
             let mut c_dec_error = 0i32;
             let c_dec = unsafe {
                 opus_projection_decoder_create(
@@ -823,8 +832,14 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                 "c projection encode failed (channels={channels}, frame_size={frame_size}): {packet_len}"
             );
 
-            let mut rust_dec =
-                OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix).unwrap();
+            let mut rust_dec = OpusProjectionDecoder::new(
+                SampleRate::Hz48000,
+                channels,
+                streams,
+                coupled,
+                &matrix,
+            )
+            .unwrap();
             let mut c_dec_error = 0i32;
             let c_dec = unsafe {
                 opus_projection_decoder_create(
@@ -989,7 +1004,8 @@ fn projection_plc_and_fec_parity_with_c() {
     unsafe { opus_projection_encoder_destroy(c_enc) };
 
     let mut rust_dec =
-        OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix).unwrap();
+        OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+            .unwrap();
     let mut c_dec_error = 0i32;
     let c_dec = unsafe {
         opus_projection_decoder_create(
@@ -1040,7 +1056,8 @@ fn projection_plc_and_fec_parity_with_c() {
     unsafe { opus_projection_decoder_destroy(c_dec) };
 
     let mut rust_fec_dec =
-        OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix).unwrap();
+        OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+            .unwrap();
     let mut c_dec_error = 0i32;
     let c_fec_dec = unsafe {
         opus_projection_decoder_create(

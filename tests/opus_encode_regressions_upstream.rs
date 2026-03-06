@@ -2,11 +2,9 @@
 //!
 //! Upstream C: `tests/opus_encode_regressions.c`
 
-#[cfg(not(feature = "qext"))]
-use opurs::OPUS_BAD_ARG;
 use opurs::{
-    Bandwidth, Bitrate, Channels, OpusEncoder, OpusMSEncoder, OpusProjectionEncoder, Signal,
-    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,
+    Application, Bandwidth, Bitrate, Channels, OpusEncoder, OpusMSEncoder, OpusProjectionEncoder,
+    SampleRate, Signal,
 };
 
 fn identity_mapping(channels: usize) -> Vec<u8> {
@@ -37,12 +35,12 @@ fn mostly_constant_pcm_i16(samples: usize, base: i16, seed: u32) -> Vec<i16> {
 fn regression_mscbr_encode_fail10() {
     let mapping = identity_mapping(255);
     let mut enc = OpusMSEncoder::new(
-        8_000,
+        SampleRate::Hz8000,
         255,
         254,
         1,
         &mapping,
-        OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+        Application::LowDelay,
     )
     .expect("multistream encoder create failed");
 
@@ -75,12 +73,12 @@ fn regression_mscbr_encode_fail10() {
 fn regression_mscbr_encode_fail() {
     let mapping = identity_mapping(192);
     let mut enc = OpusMSEncoder::new(
-        8_000,
+        SampleRate::Hz8000,
         192,
         189,
         3,
         &mapping,
-        OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+        Application::LowDelay,
     )
     .expect("multistream encoder create failed");
 
@@ -111,8 +109,8 @@ fn regression_mscbr_encode_fail() {
 /// Upstream C: tests/opus_encode_regressions.c:analysis_overflow
 #[test]
 fn regression_analysis_overflow() {
-    let mut enc =
-        OpusEncoder::new(16_000, 2, OPUS_APPLICATION_AUDIO).expect("encoder create failed");
+    let mut enc = OpusEncoder::new(SampleRate::Hz16000, Channels::Stereo, Application::Audio)
+        .expect("encoder create failed");
     enc.set_complexity(10).expect("set complexity failed");
 
     let pcm = vec![1e9f32; 320 * 2];
@@ -130,12 +128,12 @@ fn regression_projection_overflow2() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut enc = OpusProjectionEncoder::new(
-        12_000,
+        SampleRate::Hz12000,
         9,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+        Application::LowDelay,
     )
     .expect("projection encoder create failed");
 
@@ -157,12 +155,12 @@ fn regression_projection_overflow3() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut enc = OpusProjectionEncoder::new(
-        24_000,
+        SampleRate::Hz24000,
         4,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create failed");
 
@@ -188,7 +186,7 @@ fn regression_projection_overflow3() {
 #[cfg(feature = "qext")]
 #[test]
 fn regression_qext_stereo_overflow() {
-    let mut enc = OpusEncoder::new(96_000, 2, OPUS_APPLICATION_RESTRICTED_LOWDELAY)
+    let mut enc = OpusEncoder::new(SampleRate::Hz96000, Channels::Stereo, Application::LowDelay)
         .expect("encoder create failed");
 
     let pcm = vec![32767i16; 11_520 * 2];
@@ -204,8 +202,8 @@ fn regression_qext_stereo_overflow() {
 #[cfg(feature = "qext")]
 #[test]
 fn regression_qext_repacketize_fail() {
-    let mut enc =
-        OpusEncoder::new(16_000, 1, OPUS_APPLICATION_VOIP).expect("encoder create failed");
+    let mut enc = OpusEncoder::new(SampleRate::Hz16000, Channels::Mono, Application::Voip)
+        .expect("encoder create failed");
     enc.set_vbr(false);
     enc.set_qext(true);
     enc.set_bitrate(Bitrate::Max);
@@ -232,13 +230,13 @@ fn regression_celt_ec_internal_error() {
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 1];
     let mut enc = OpusMSEncoder::create_surround(
-        16_000,
+        SampleRate::Hz16000,
         1,
         1,
         &mut streams,
         &mut coupled_streams,
         &mut mapping,
-        OPUS_APPLICATION_VOIP,
+        Application::Voip,
     )
     .expect("surround encoder create failed");
 
@@ -319,13 +317,13 @@ fn regression_surround_analysis_uninit() {
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 3];
     let mut enc = OpusMSEncoder::create_surround(
-        24_000,
+        SampleRate::Hz24000,
         3,
         1,
         &mut streams,
         &mut coupled_streams,
         &mut mapping,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("surround encoder create failed");
 
@@ -378,21 +376,11 @@ fn regression_surround_analysis_uninit() {
 #[cfg(not(feature = "qext"))]
 #[test]
 fn regression_projection_overflow() {
-    let mut streams = 0i32;
-    let mut coupled_streams = 0i32;
-    let create = OpusProjectionEncoder::new(
-        96_000,
-        36,
-        3,
-        &mut streams,
-        &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+    // Without qext, 96000 Hz is not a valid SampleRate variant
+    assert!(
+        SampleRate::try_from(96000).is_err(),
+        "96000 Hz should be rejected without qext"
     );
-    let err = match create {
-        Ok(_) => panic!("projection encoder create should fail without qext"),
-        Err(err) => err,
-    };
-    assert_eq!(err, OPUS_BAD_ARG, "unexpected create error without qext");
 }
 
 /// Upstream C: tests/opus_encode_regressions.c:projection_overflow
@@ -402,12 +390,12 @@ fn regression_projection_overflow() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut enc = OpusProjectionEncoder::new(
-        96_000,
+        SampleRate::Hz96000,
         36,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create failed");
     enc.set_qext(true);
@@ -428,12 +416,12 @@ fn regression_projection_overflow4() {
     let mut streams = 0i32;
     let mut coupled_streams = 0i32;
     let mut enc = OpusProjectionEncoder::new(
-        96_000,
+        SampleRate::Hz96000,
         36,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create failed");
     enc.set_qext(true);
@@ -456,13 +444,13 @@ fn regression_qext_dred_combination() {
     let mut coupled_streams = 0i32;
     let mut mapping = vec![0u8; 5];
     let mut enc = OpusMSEncoder::create_surround(
-        16_000,
+        SampleRate::Hz16000,
         5,
         1,
         &mut streams,
         &mut coupled_streams,
         &mut mapping,
-        OPUS_APPLICATION_VOIP,
+        Application::Voip,
     )
     .expect("surround encoder create failed");
     let _ = enc.set_complexity(3);

@@ -5,7 +5,7 @@
 mod test_common;
 
 use opurs::{
-    Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
+    Application, Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate,
 };
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use test_common::TestRng;
@@ -183,12 +183,12 @@ fn projection_upstream_creation_arguments() {
         let mut coupled_streams = -1i32;
 
         let is_projection_valid = match OpusProjectionEncoder::new(
-            48000,
+            SampleRate::Hz48000,
             channels,
             3,
             &mut streams,
             &mut coupled_streams,
-            OPUS_APPLICATION_AUDIO,
+            Application::Audio,
         ) {
             Ok(enc) => {
                 let matrix_size = enc.demixing_matrix_size();
@@ -196,8 +196,14 @@ fn projection_upstream_creation_arguments() {
                 let mut matrix = vec![0u8; matrix_size as usize];
                 enc.copy_demixing_matrix(&mut matrix)
                     .expect("copy demixing matrix");
-                OpusProjectionDecoder::new(48000, channels, streams, coupled_streams, &matrix)
-                    .is_ok()
+                OpusProjectionDecoder::new(
+                    SampleRate::Hz48000,
+                    channels,
+                    streams,
+                    coupled_streams,
+                    &matrix,
+                )
+                .is_ok()
             }
             Err(_) => false,
         };
@@ -258,12 +264,12 @@ fn projection_upstream_encode_decode_pipeline() {
     let mut streams = -1i32;
     let mut coupled = -1i32;
     let mut enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         channels,
         3,
         &mut streams,
         &mut coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create");
 
@@ -276,8 +282,9 @@ fn projection_upstream_encode_decode_pipeline() {
     enc.copy_demixing_matrix(&mut matrix)
         .expect("copy demixing matrix");
 
-    let mut dec = OpusProjectionDecoder::new(48000, channels, streams, coupled, &matrix)
-        .expect("projection decoder create");
+    let mut dec =
+        OpusProjectionDecoder::new(SampleRate::Hz48000, channels, streams, coupled, &matrix)
+            .expect("projection decoder create");
 
     let mut rng = TestRng::new(0);
     let mut buffer_in = vec![0i16; BUFFER_SIZE * channels as usize];

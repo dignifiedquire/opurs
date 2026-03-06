@@ -24,7 +24,8 @@ fn main() {
         assert!(!dec.is_null());
         dec
     };
-    let mut rust_dec = opurs::OpusDecoder::new(48000, 2).unwrap();
+    let mut rust_dec =
+        opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Stereo).unwrap();
 
     let mut packet = vec![0u8; MAX_PACKET];
     let mut total_float_diffs: u64 = 0;
@@ -172,7 +173,8 @@ fn main() {
         assert!(!dec.is_null());
         dec
     };
-    let mut rust_dec2 = opurs::OpusDecoder::new(48000, 2).unwrap();
+    let mut rust_dec2 =
+        opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Stereo).unwrap();
     let mut cursor2 = Cursor::new(&data);
 
     let mut batch_int16_diffs: u64 = 0;

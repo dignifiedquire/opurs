@@ -11,8 +11,8 @@
 mod test_common;
 
 use opurs::{
-    opus_packet_pad, opus_packet_parse, opus_packet_unpad, Bandwidth, Bitrate, Channels, FrameSize,
-    OpusDecoder, OpusEncoder, Signal, OPUS_AUTO,
+    opus_packet_pad, opus_packet_parse, opus_packet_unpad, Application, Bandwidth, Bitrate,
+    Channels, FrameSize, OpusDecoder, OpusEncoder, SampleRate, Signal, OPUS_AUTO,
 };
 use test_common::{debruijn2, TestRng};
 
@@ -166,7 +166,8 @@ fn test_regression_ec_enc_shrink_assert() {
         arr
     };
 
-    let mut enc = OpusEncoder::new(48000, 1, 2049).unwrap();
+    let mut enc =
+        OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio).unwrap();
     enc.set_complexity(10).unwrap();
     enc.set_packet_loss_perc(6).unwrap();
     enc.set_bitrate(Bitrate::Bits(6000));
@@ -193,7 +194,8 @@ fn test_regression_ec_enc_shrink_assert() {
 fn test_regression_ec_enc_shrink_assert2() {
     let mut data = [0u8; 2000];
 
-    let mut enc = OpusEncoder::new(48000, 1, 2049).unwrap();
+    let mut enc =
+        OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio).unwrap();
     enc.set_complexity(6).unwrap();
     enc.set_signal(Some(Signal::Voice));
     enc.set_bandwidth(Some(Bandwidth::Fullband));
@@ -233,7 +235,7 @@ fn test_regression_silk_gain_assert() {
     pcm2[98] = 32767;
     pcm2[120] = 32767;
 
-    let mut enc = OpusEncoder::new(8000, 1, 2049).unwrap();
+    let mut enc = OpusEncoder::new(SampleRate::Hz8000, Channels::Mono, Application::Audio).unwrap();
     enc.set_complexity(3).unwrap();
     enc.set_max_bandwidth(Bandwidth::Narrowband);
     enc.set_bitrate(Bitrate::Bits(6000));
@@ -277,21 +279,21 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     let mut enc_final_range: u32;
     let mut dec_final_range: u32;
 
-    let enc = OpusEncoder::new(48000, 2, 2048).unwrap();
-    let mut dec = OpusDecoder::new(48000, 2).unwrap();
+    let enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Voip).unwrap();
+    let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Stereo).unwrap();
 
     // Create error decoders
     let mut dec_err: Vec<OpusDecoder> = vec![
         dec.clone(), // dec_err[0] = copy of dec
-        OpusDecoder::new(48000, 1).unwrap(),
-        OpusDecoder::new(24000, 2).unwrap(),
-        OpusDecoder::new(24000, 1).unwrap(),
-        OpusDecoder::new(16000, 2).unwrap(),
-        OpusDecoder::new(16000, 1).unwrap(),
-        OpusDecoder::new(12000, 2).unwrap(),
-        OpusDecoder::new(12000, 1).unwrap(),
-        OpusDecoder::new(8000, 2).unwrap(),
-        OpusDecoder::new(8000, 1).unwrap(),
+        OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).unwrap(),
+        OpusDecoder::new(SampleRate::Hz24000, Channels::Stereo).unwrap(),
+        OpusDecoder::new(SampleRate::Hz24000, Channels::Mono).unwrap(),
+        OpusDecoder::new(SampleRate::Hz16000, Channels::Stereo).unwrap(),
+        OpusDecoder::new(SampleRate::Hz16000, Channels::Mono).unwrap(),
+        OpusDecoder::new(SampleRate::Hz12000, Channels::Stereo).unwrap(),
+        OpusDecoder::new(SampleRate::Hz12000, Channels::Mono).unwrap(),
+        OpusDecoder::new(SampleRate::Hz8000, Channels::Stereo).unwrap(),
+        OpusDecoder::new(SampleRate::Hz8000, Channels::Mono).unwrap(),
     ];
 
     // Copy encoder and verify copy works
@@ -634,8 +636,17 @@ fn fuzz_encoder_settings(num_encoders: i32, num_setting_changes: i32, rng: &mut 
         let num_channels = pick!(channels);
         let application = pick!(applications);
 
-        let mut dec = OpusDecoder::new(sampling_rate, num_channels as usize).unwrap();
-        let mut enc = OpusEncoder::new(sampling_rate, num_channels, application).unwrap();
+        let mut dec = OpusDecoder::new(
+            SampleRate::try_from(sampling_rate).unwrap(),
+            Channels::try_from(num_channels).unwrap(),
+        )
+        .unwrap();
+        let mut enc = OpusEncoder::new(
+            SampleRate::try_from(sampling_rate).unwrap(),
+            Channels::try_from(num_channels).unwrap(),
+            Application::try_from(application).unwrap(),
+        )
+        .unwrap();
 
         for _ in 0..num_setting_changes {
             let bitrate = pick!(bitrates);

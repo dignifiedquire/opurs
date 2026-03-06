@@ -25,7 +25,12 @@ fn generate_pcm(len: usize, seed: u32) -> Vec<i16> {
 
 fn pre_encode_packets(bitrate: i32) -> Vec<Vec<u8>> {
     let pcm = generate_pcm(FRAME_SIZE * NUM_FRAMES, 42);
-    let mut enc = opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
+    let mut enc = opurs::OpusEncoder::new(
+        opurs::SampleRate::Hz48000,
+        opurs::Channels::Mono,
+        opurs::Application::Voip,
+    )
+    .unwrap();
     enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
     enc.set_complexity(10).unwrap();
 
@@ -52,8 +57,12 @@ fn bench_dred_encode(c: &mut Criterion) {
         for &dred_dur in &[8, 24, 48] {
             let label = format!("{}kbps_dred{}", bitrate / 1000, dred_dur);
             group.bench_function(BenchmarkId::new("mono", &label), |b| {
-                let mut enc =
-                    opurs::OpusEncoder::new(SAMPLE_RATE, 1, opurs::OPUS_APPLICATION_VOIP).unwrap();
+                let mut enc = opurs::OpusEncoder::new(
+                    opurs::SampleRate::Hz48000,
+                    opurs::Channels::Mono,
+                    opurs::Application::Voip,
+                )
+                .unwrap();
                 enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
                 enc.set_complexity(10).unwrap();
                 enc.set_packet_loss_perc(10).unwrap();
@@ -98,7 +107,9 @@ fn bench_osce_decode(c: &mut Criterion) {
             let label = format!("{}_c{}", bitrate_label, complexity);
             let packets = packets.to_vec();
             group.bench_function(BenchmarkId::new("mono", &label), |b| {
-                let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
+                let mut dec =
+                    opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Mono)
+                        .unwrap();
                 dec.set_complexity(complexity).unwrap();
                 #[cfg(feature = "builtin-weights")]
                 dec.load_dnn_weights().unwrap();
@@ -131,7 +142,9 @@ fn bench_deep_plc(c: &mut Criterion) {
             // Determine loss pattern: every Nth frame is lost
             let loss_every = 100 / loss_pct;
             group.bench_function(BenchmarkId::new("mono", &label), |b| {
-                let mut dec = opurs::OpusDecoder::new(SAMPLE_RATE, 1).unwrap();
+                let mut dec =
+                    opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Mono)
+                        .unwrap();
                 dec.set_complexity(complexity).unwrap();
                 #[cfg(feature = "builtin-weights")]
                 dec.load_dnn_weights().unwrap();
@@ -164,7 +177,12 @@ fn bench_qext_encode(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("qext_encode");
     group.bench_function("320kbps_stereo_96k", |b| {
-        let mut enc = opurs::OpusEncoder::new(96000, 2, opurs::OPUS_APPLICATION_AUDIO).unwrap();
+        let mut enc = opurs::OpusEncoder::new(
+            opurs::SampleRate::Hz96000,
+            opurs::Channels::Stereo,
+            opurs::Application::Audio,
+        )
+        .unwrap();
         enc.set_bitrate(opurs::Bitrate::Bits(320000));
         enc.set_complexity(10).unwrap();
         enc.set_qext(true);
@@ -187,7 +205,12 @@ fn bench_qext_decode(c: &mut Criterion) {
     let frame_size_96k: usize = 1920;
     let pcm = generate_pcm(frame_size_96k * 2 * NUM_FRAMES, 42);
 
-    let mut enc = opurs::OpusEncoder::new(96000, 2, opurs::OPUS_APPLICATION_AUDIO).unwrap();
+    let mut enc = opurs::OpusEncoder::new(
+        opurs::SampleRate::Hz96000,
+        opurs::Channels::Stereo,
+        opurs::Application::Audio,
+    )
+    .unwrap();
     enc.set_bitrate(opurs::Bitrate::Bits(320000));
     enc.set_complexity(10).unwrap();
     enc.set_qext(true);
@@ -203,7 +226,8 @@ fn bench_qext_decode(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("qext_decode");
     group.bench_function("320kbps_stereo_96k", |b| {
-        let mut dec = opurs::OpusDecoder::new(96000, 2).unwrap();
+        let mut dec =
+            opurs::OpusDecoder::new(opurs::SampleRate::Hz96000, opurs::Channels::Stereo).unwrap();
         let mut pcm_out = vec![0i16; frame_size_96k * 2];
         b.iter(|| {
             for pkt in &packets {

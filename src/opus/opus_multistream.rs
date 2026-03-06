@@ -3,6 +3,7 @@
 //! `src/opus_multistream_decoder.c`
 //! Upstream C: `src/opus_multistream.c`, `src/opus_multistream_encoder.c`,
 
+use crate::error::ErrorCode;
 use crate::opus::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,
     OPUS_BAD_ARG,
@@ -29,10 +30,10 @@ impl OpusMultistreamLayout {
         streams: i32,
         coupled_streams: i32,
         mapping: &[u8],
-    ) -> Result<Self, i32> {
+    ) -> Result<Self, ErrorCode> {
         if !is_valid_shape(channels, streams, coupled_streams) || mapping.len() != channels as usize
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         let layout = Self {
             nb_channels: channels as u8,
@@ -41,7 +42,7 @@ impl OpusMultistreamLayout {
             mapping: mapping.to_vec(),
         };
         if !layout.validate_layout() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         Ok(layout)
     }
@@ -141,7 +142,7 @@ impl OpusMultistreamConfig {
         sample_rate: i32,
         application: i32,
         layout: OpusMultistreamLayout,
-    ) -> Result<Self, i32> {
+    ) -> Result<Self, ErrorCode> {
         let valid_fs = sample_rate == 48000
             || sample_rate == 24000
             || sample_rate == 16000
@@ -152,7 +153,7 @@ impl OpusMultistreamConfig {
             || application == OPUS_APPLICATION_AUDIO
             || application == OPUS_APPLICATION_RESTRICTED_LOWDELAY;
         if !valid_fs || !valid_application {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         Ok(Self {
             sample_rate,
@@ -238,7 +239,7 @@ mod tests {
     #[test]
     fn validate_layout_rejects_mapping_out_of_range() {
         let layout = OpusMultistreamLayout::new(2, 1, 1, &[0, 2]);
-        assert_eq!(layout, Err(OPUS_BAD_ARG));
+        assert_eq!(layout, Err(ErrorCode::BadArg));
     }
 
     #[test]

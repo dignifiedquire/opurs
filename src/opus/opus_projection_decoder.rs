@@ -2,6 +2,8 @@
 //!
 //! Upstream C: `src/opus_projection_decoder.c`
 
+use crate::enums::SampleRate;
+use crate::error::ErrorCode;
 use crate::opus::mapping_matrix::MappingMatrix;
 use crate::opus::opus_decoder::OpusDecoder;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
@@ -48,26 +50,27 @@ impl OpusProjectionDecoder {
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_create
     pub fn new(
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
         demixing_matrix: &[u8],
-    ) -> Result<Self, i32> {
+    ) -> Result<Self, ErrorCode> {
         let input_channels = streams + coupled_streams;
         if channels <= 0 || input_channels <= 0 {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         let expected_matrix_size = (input_channels as i64)
             .checked_mul(channels as i64)
             .and_then(|v| v.checked_mul(2))
-            .ok_or(OPUS_BAD_ARG)? as usize;
+            .ok_or(ErrorCode::BadArg)? as usize;
         if demixing_matrix.len() != expected_matrix_size {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         let demixing_matrix =
-            MappingMatrix::from_bytes_le(channels, input_channels, 0, demixing_matrix)?;
+            MappingMatrix::from_bytes_le(channels, input_channels, 0, demixing_matrix)
+                .map_err(ErrorCode::from)?;
 
         // Decode to "input streams" channels first, then project to output channels.
         let mapping = (0..input_channels).map(|idx| idx as u8).collect::<Vec<_>>();
@@ -93,7 +96,7 @@ impl OpusProjectionDecoder {
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_init
     pub fn init(
         &mut self,
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
@@ -110,7 +113,7 @@ impl OpusProjectionDecoder {
                 *self = st;
                 OPUS_OK
             }
-            Err(err) => err,
+            Err(err) => err.into(),
         }
     }
 

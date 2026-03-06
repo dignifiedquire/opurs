@@ -2,7 +2,7 @@
 //!
 //! Upstream C: tests/test_opus_padding.c
 
-use opurs::{opus_get_version_string, OpusDecoder, OPUS_INVALID_PACKET};
+use opurs::{opus_get_version_string, Channels, OpusDecoder, SampleRate, OPUS_INVALID_PACKET};
 
 /// Test that a crafted large padding packet returns OPUS_INVALID_PACKET
 /// rather than causing a buffer overflow.
@@ -23,7 +23,8 @@ fn test_padding_overflow() {
 
     let mut out = vec![0i16; 5760 * 2];
 
-    let mut decoder = OpusDecoder::new(48000, 2).expect("Failed to create decoder");
+    let mut decoder =
+        OpusDecoder::new(SampleRate::Hz48000, Channels::Stereo).expect("Failed to create decoder");
 
     let result = decoder.decode(&packet, &mut out, 5760, false);
 

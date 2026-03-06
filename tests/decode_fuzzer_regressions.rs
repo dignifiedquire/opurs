@@ -1,5 +1,6 @@
 use opurs::{
-    opus_packet_get_bandwidth, opus_packet_get_nb_channels, OpusDecoder, OPUS_BANDWIDTH_NARROWBAND,
+    opus_packet_get_bandwidth, opus_packet_get_nb_channels, Channels, OpusDecoder, SampleRate,
+    OPUS_BANDWIDTH_NARROWBAND,
 };
 
 const MAX_FRAME_SAMP: i32 = 5760;
@@ -36,7 +37,15 @@ fn decode_fuzzer_crash_162fefed_does_not_panic() {
             return;
         }
 
-        let mut dec = match OpusDecoder::new(fs, channels as usize) {
+        let sample_rate = match SampleRate::try_from(fs) {
+            Ok(sr) => sr,
+            Err(_) => return,
+        };
+        let ch = match Channels::try_from(channels) {
+            Ok(ch) => ch,
+            Err(_) => return,
+        };
+        let mut dec = match OpusDecoder::new(sample_rate, ch) {
             Ok(dec) => dec,
             Err(_) => return,
         };

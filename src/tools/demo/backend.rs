@@ -125,7 +125,10 @@ pub(crate) trait OpusBackendTrait {
 }
 
 mod rust_backend {
-    use crate::{Bitrate, OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder};
+    use crate::{
+        Application, Bitrate, Channels, OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder,
+        SampleRate,
+    };
     #[cfg(feature = "dred")]
     use crate::{OpusDRED, OpusDREDDecoder};
 
@@ -146,7 +149,12 @@ mod rust_backend {
             channels: i32,
             application: i32,
         ) -> Result<Box<OpusEncoder>, i32> {
-            OpusEncoder::new(fs, channels, application).map(Box::new)
+            let sample_rate = SampleRate::try_from(fs).map_err(i32::from)?;
+            let channels = Channels::try_from(channels).map_err(i32::from)?;
+            let application = Application::try_from(application).map_err(i32::from)?;
+            OpusEncoder::new(sample_rate, channels, application)
+                .map(Box::new)
+                .map_err(|e| e.into())
         }
 
         fn enc_set_bitrate(st: &mut Box<OpusEncoder>, val: i32) {
@@ -248,7 +256,11 @@ mod rust_backend {
         fn opus_encoder_destroy(_st: Box<OpusEncoder>) {}
 
         fn opus_decoder_create(fs: i32, channels: i32) -> Result<Box<OpusDecoder>, i32> {
-            OpusDecoder::new(fs, channels as usize).map(Box::new)
+            let sample_rate = SampleRate::try_from(fs).map_err(i32::from)?;
+            let channels = Channels::try_from(channels).map_err(i32::from)?;
+            OpusDecoder::new(sample_rate, channels)
+                .map(Box::new)
+                .map_err(|e| e.into())
         }
 
         fn opus_decode24(
@@ -388,8 +400,18 @@ mod rust_backend {
             mapping: &[u8],
             application: i32,
         ) -> Result<Self::MSEncoder, i32> {
-            OpusMSEncoder::new(fs, channels, streams, coupled_streams, mapping, application)
-                .map(Box::new)
+            let sample_rate = SampleRate::try_from(fs).map_err(i32::from)?;
+            let application = Application::try_from(application).map_err(i32::from)?;
+            OpusMSEncoder::new(
+                sample_rate,
+                channels,
+                streams,
+                coupled_streams,
+                mapping,
+                application,
+            )
+            .map(Box::new)
+            .map_err(|e| e.into())
         }
 
         fn ms_enc_set_bitrate(st: &mut Self::MSEncoder, val: i32) {
@@ -477,7 +499,10 @@ mod rust_backend {
             coupled_streams: i32,
             mapping: &[u8],
         ) -> Result<Self::MSDecoder, i32> {
-            OpusMSDecoder::new(fs, channels, streams, coupled_streams, mapping).map(Box::new)
+            let sample_rate = SampleRate::try_from(fs).map_err(i32::from)?;
+            OpusMSDecoder::new(sample_rate, channels, streams, coupled_streams, mapping)
+                .map(Box::new)
+                .map_err(|e| e.into())
         }
 
         fn opus_multistream_decode(

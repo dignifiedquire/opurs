@@ -4,7 +4,9 @@ use opurs::internals::{
     opus_packet_extensions_parse_ext, opus_packet_pad_impl, opus_packet_parse_impl,
     OpusExtensionData,
 };
-use opurs::{OpusEncoder, OpusRepacketizer, OPUS_APPLICATION_AUDIO, OPUS_BAD_ARG, OPUS_OK};
+use opurs::{
+    Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG, OPUS_OK,
+};
 
 #[cfg(feature = "tools")]
 #[repr(C)]
@@ -47,7 +49,8 @@ unsafe extern "C" {
 }
 
 fn encode_mono_packet(seed: i16) -> Vec<u8> {
-    let mut enc = OpusEncoder::new(48000, 1, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let mut enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio)
+        .expect("encoder create");
     let pcm: Vec<i16> = (0..960).map(|i| i as i16 ^ seed).collect();
     let mut out = vec![0u8; 1500];
     let len = enc.encode(&pcm, &mut out);

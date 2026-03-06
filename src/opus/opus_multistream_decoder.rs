@@ -3,6 +3,8 @@
 //! Upstream C: `src/opus_multistream_decoder.c`
 
 use crate::celt::float_cast::{float2int, float2int16};
+use crate::enums::{Channels, SampleRate};
+use crate::error::ErrorCode;
 use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples, OpusDecoder};
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
@@ -46,24 +48,29 @@ impl OpusMSDecoder {
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_create
     pub fn new(
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
         mapping: &[u8],
-    ) -> Result<Self, i32> {
+    ) -> Result<Self, ErrorCode> {
         let layout = OpusMultistreamLayout::new(channels, streams, coupled_streams, mapping)?;
         if !layout.validate_for_decoder() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
+        let fs: i32 = sample_rate.into();
         let mut decoders = Vec::with_capacity(streams as usize);
         for stream in 0..streams {
-            let stream_channels = if stream < coupled_streams { 2 } else { 1 };
-            decoders.push(OpusDecoder::new(sample_rate, stream_channels as usize)?);
+            let stream_channels = if stream < coupled_streams {
+                Channels::Stereo
+            } else {
+                Channels::Mono
+            };
+            decoders.push(OpusDecoder::new(sample_rate, stream_channels)?);
         }
         Ok(Self {
-            sample_rate,
+            sample_rate: fs,
             layout,
             decoders,
         })
@@ -74,7 +81,7 @@ impl OpusMSDecoder {
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_init
     pub fn init(
         &mut self,
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
@@ -85,7 +92,7 @@ impl OpusMSDecoder {
                 *self = st;
                 OPUS_OK
             }
-            Err(err) => err,
+            Err(err) => err.into(),
         }
     }
 

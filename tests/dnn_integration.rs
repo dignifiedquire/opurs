@@ -306,7 +306,12 @@ mod osce_tests {
 #[cfg(feature = "dred")]
 #[test]
 fn encoder_load_dnn_weights() {
-    let mut enc = opurs::OpusEncoder::new(48000, 1, opurs::OPUS_APPLICATION_AUDIO).unwrap();
+    let mut enc = opurs::OpusEncoder::new(
+        opurs::SampleRate::Hz48000,
+        opurs::Channels::Mono,
+        opurs::Application::Audio,
+    )
+    .unwrap();
     assert!(
         enc.load_dnn_weights().is_ok(),
         "Encoder DNN weight load failed"
@@ -315,7 +320,8 @@ fn encoder_load_dnn_weights() {
 
 #[test]
 fn decoder_load_dnn_weights() {
-    let mut dec = opurs::OpusDecoder::new(48000, 1).unwrap();
+    let mut dec =
+        opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Mono).unwrap();
     assert!(
         dec.load_dnn_weights().is_ok(),
         "Decoder DNN weight load failed"

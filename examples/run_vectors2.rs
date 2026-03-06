@@ -17,7 +17,8 @@ use opurs::tools::demo::{
 };
 use opurs::tools::{opus_compare, CompareParams};
 use opurs::{
-    Bitrate as OpusBitrate, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
+    Application as OpusApplication, Bitrate as OpusBitrate, OpusProjectionDecoder,
+    OpusProjectionEncoder, SampleRate as OpusSampleRate, OPUS_APPLICATION_AUDIO,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
     OPUS_SET_BITRATE_REQUEST,
 };
@@ -2520,12 +2521,13 @@ fn run_test(
                 let mut rust_streams = -1i32;
                 let mut rust_coupled = -1i32;
                 let mut rust_enc = match OpusProjectionEncoder::new(
-                    usize::from(projection_case.sample_rate) as i32,
+                    OpusSampleRate::try_from(usize::from(projection_case.sample_rate) as i32)
+                        .unwrap(),
                     projection_case.channels,
                     3,
                     &mut rust_streams,
                     &mut rust_coupled,
-                    OPUS_APPLICATION_AUDIO,
+                    OpusApplication::Audio,
                 ) {
                     Ok(enc) => enc,
                     Err(err) => {
@@ -2580,7 +2582,8 @@ fn run_test(
                 }
 
                 let mut rust_dec_upstream = match OpusProjectionDecoder::new(
-                    usize::from(projection_case.sample_rate) as i32,
+                    OpusSampleRate::try_from(usize::from(projection_case.sample_rate) as i32)
+                        .unwrap(),
                     projection_case.channels,
                     c_streams,
                     c_coupled,
@@ -2594,7 +2597,8 @@ fn run_test(
                     }
                 };
                 let mut rust_dec_rust = match OpusProjectionDecoder::new(
-                    usize::from(projection_case.sample_rate) as i32,
+                    OpusSampleRate::try_from(usize::from(projection_case.sample_rate) as i32)
+                        .unwrap(),
                     projection_case.channels,
                     c_streams,
                     c_coupled,

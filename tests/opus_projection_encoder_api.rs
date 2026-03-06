@@ -1,13 +1,13 @@
 #![cfg(feature = "tools")]
 
 use opurs::{
-    Channels, OpusProjectionEncoder, Signal, OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP,
-    OPUS_AUTO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_GET_APPLICATION_REQUEST,
-    OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST,
-    OPUS_GET_INBAND_FEC_REQUEST, OPUS_GET_PACKET_LOSS_PERC_REQUEST,
-    OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_GET_PREDICTION_DISABLED_REQUEST,
-    OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST, OPUS_GET_VBR_REQUEST,
-    OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
+    Application, Channels, OpusProjectionEncoder, SampleRate, Signal, OPUS_APPLICATION_AUDIO,
+    OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL,
+    OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
+    OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
+    OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
+    OPUS_GET_PREDICTION_DISABLED_REQUEST, OPUS_GET_SIGNAL_REQUEST, OPUS_GET_VBR_CONSTRAINT_REQUEST,
+    OPUS_GET_VBR_REQUEST, OPUS_MULTISTREAM_GET_ENCODER_STATE_REQUEST, OPUS_OK,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
     OPUS_SET_APPLICATION_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DTX_REQUEST,
     OPUS_SET_FORCE_CHANNELS_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
@@ -94,12 +94,12 @@ fn projection_encoder_create_and_matrix_parity_with_c() {
         let mut rust_streams = -1i32;
         let mut rust_coupled = -1i32;
         let rust_enc = OpusProjectionEncoder::new(
-            48000,
+            SampleRate::Hz48000,
             channels,
             3,
             &mut rust_streams,
             &mut rust_coupled,
-            OPUS_APPLICATION_AUDIO,
+            Application::Audio,
         )
         .expect("rust projection encoder create");
 
@@ -165,12 +165,12 @@ fn projection_encoder_foa_encode_smoke_against_c() {
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
     let mut rust_enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut rust_streams,
         &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust projection encoder create");
 
@@ -227,12 +227,12 @@ fn projection_encoder_init_reinit_parity_with_c() {
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
     let mut rust_enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut rust_streams,
         &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust projection encoder create");
 
@@ -268,12 +268,12 @@ fn projection_encoder_init_reinit_parity_with_c() {
     let mut rust_streams_re = -1i32;
     let mut rust_coupled_re = -1i32;
     let rust_ret = rust_enc.init(
-        48000,
+        SampleRate::Hz48000,
         9,
         3,
         &mut rust_streams_re,
         &mut rust_coupled_re,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     );
 
     let mut c_streams_re = -1i32;
@@ -350,12 +350,12 @@ fn projection_encoder_format_encode_smoke_against_c() {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
             let mut rust_enc = OpusProjectionEncoder::new(
-                48000,
+                SampleRate::Hz48000,
                 channels,
                 3,
                 &mut rust_streams,
                 &mut rust_coupled,
-                OPUS_APPLICATION_AUDIO,
+                Application::Audio,
             )
             .expect("rust create");
 
@@ -399,12 +399,12 @@ fn projection_encoder_format_encode_smoke_against_c() {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
             let mut rust_enc = OpusProjectionEncoder::new(
-                48000,
+                SampleRate::Hz48000,
                 channels,
                 3,
                 &mut rust_streams,
                 &mut rust_coupled,
-                OPUS_APPLICATION_AUDIO,
+                Application::Audio,
             )
             .expect("rust create");
 
@@ -451,12 +451,12 @@ fn projection_encoder_format_encode_smoke_against_c() {
             let mut rust_streams = -1i32;
             let mut rust_coupled = -1i32;
             let mut rust_enc = OpusProjectionEncoder::new(
-                48000,
+                SampleRate::Hz48000,
                 channels,
                 3,
                 &mut rust_streams,
                 &mut rust_coupled,
-                OPUS_APPLICATION_AUDIO,
+                Application::Audio,
             )
             .expect("rust create");
 
@@ -511,12 +511,12 @@ fn projection_encoder_error_code_parity_with_c() {
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
     let mut rust_enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         channels,
         3,
         &mut rust_streams,
         &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust create");
 
@@ -620,12 +620,12 @@ fn projection_encoder_ctl_value_parity_with_c() {
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
     let mut rust = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut rust_streams,
         &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust create");
 
@@ -749,12 +749,12 @@ fn projection_encoder_state_access_parity_with_c() {
     let mut rust_streams = -1i32;
     let mut rust_coupled = -1i32;
     let mut rust = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut rust_streams,
         &mut rust_coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust create");
 

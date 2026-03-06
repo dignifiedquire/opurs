@@ -74,7 +74,15 @@ fuzz_target!(|data: &[u8]| {
     let fs = SAMP_FREQS[bw_idx as usize];
     let channels = opus_packet_get_nb_channels(toc);
 
-    let mut dec = match OpusDecoder::new(fs, channels as usize) {
+    let sample_rate = match opurs::SampleRate::try_from(fs) {
+        Ok(sr) => sr,
+        Err(_) => return,
+    };
+    let ch = match opurs::Channels::try_from(channels) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let mut dec = match OpusDecoder::new(sample_rate, ch) {
         Ok(d) => d,
         Err(_) => return,
     };

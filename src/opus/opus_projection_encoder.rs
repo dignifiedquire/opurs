@@ -3,7 +3,8 @@
 //! Upstream C: `src/opus_projection_encoder.c`
 
 use crate::enums::Application;
-use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::enums::{Bandwidth, Bitrate, Channels, FrameSize, SampleRate, Signal};
+use crate::error::ErrorCode;
 use crate::opus::analysis::DownmixInput;
 use crate::opus::mapping_matrix::MappingMatrix;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
@@ -92,34 +93,37 @@ impl OpusProjectionEncoder {
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_ambisonics_encoder_create
     pub fn new(
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         mapping_family: i32,
         streams: &mut i32,
         coupled_streams: &mut i32,
-        application: i32,
-    ) -> Result<Self, i32> {
-        let (s, c, order_plus_one) = get_streams_from_channels(channels, mapping_family)?;
+        application: Application,
+    ) -> Result<Self, ErrorCode> {
+        let (s, c, order_plus_one) =
+            get_streams_from_channels(channels, mapping_family).map_err(ErrorCode::from)?;
         *streams = s;
         *coupled_streams = c;
 
         let Some((mixing_matrix_def, demixing_matrix_def)) =
             projection_matrices_for_order_plus_one(order_plus_one)
         else {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         };
         let mixing_matrix = MappingMatrix::new(
             mixing_matrix_def.rows,
             mixing_matrix_def.cols,
             mixing_matrix_def.gain,
             mixing_matrix_def.data,
-        )?;
+        )
+        .map_err(ErrorCode::from)?;
         let demixing_matrix = MappingMatrix::new(
             demixing_matrix_def.rows,
             demixing_matrix_def.cols,
             demixing_matrix_def.gain,
             demixing_matrix_def.data,
-        )?;
+        )
+        .map_err(ErrorCode::from)?;
 
         let input_channels = s + c;
         if input_channels > mixing_matrix.rows() as i32
@@ -127,11 +131,9 @@ impl OpusProjectionEncoder {
             || channels > demixing_matrix.rows() as i32
             || input_channels > demixing_matrix.cols() as i32
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
-        let app = Application::try_from(application).map_err(|_| OPUS_BAD_ARG)?;
-        let _ = app; // validation only
         let mapping = (0..channels).map(|idx| idx as u8).collect::<Vec<_>>();
         let encoder = OpusMSEncoder::new(sample_rate, channels, s, c, &mapping, application)?;
 
@@ -150,12 +152,12 @@ impl OpusProjectionEncoder {
     /// Upstream C: include/opus_projection.h:opus_projection_ambisonics_encoder_init
     pub fn init(
         &mut self,
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         mapping_family: i32,
         streams: &mut i32,
         coupled_streams: &mut i32,
-        application: i32,
+        application: Application,
     ) -> i32 {
         match Self::new(
             sample_rate,
@@ -169,7 +171,7 @@ impl OpusProjectionEncoder {
                 *self = st;
                 OPUS_OK
             }
-            Err(err) => err,
+            Err(err) => err.into(),
         }
     }
 

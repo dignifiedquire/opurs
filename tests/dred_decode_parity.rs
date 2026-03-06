@@ -4,7 +4,9 @@
 
 use std::ptr;
 
-use opurs::{opus_decoder_dred_decode_float, OpusDecoder, OpusEncoder, OPUS_APPLICATION_AUDIO};
+use opurs::{
+    opus_decoder_dred_decode_float, Application, Channels, OpusDecoder, OpusEncoder, SampleRate,
+};
 
 fn max_abs_diff(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
@@ -15,7 +17,8 @@ fn max_abs_diff(a: &[f32], b: &[f32]) -> f32 {
 
 #[test]
 fn dred_decode_float_stage0_matches_c_null_dred_path() {
-    let mut enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_AUDIO).expect("rust encoder");
+    let mut enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio)
+        .expect("rust encoder");
     let input: Vec<i16> = (0..960)
         .map(|i| (((i * 73 + 19) % 32768) as i16).wrapping_sub(16384))
         .collect();
@@ -24,7 +27,7 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
     assert!(packet_len > 0, "encode failed: {packet_len}");
     let packet_len = packet_len as usize;
 
-    let mut rust_dec = OpusDecoder::new(48_000, 1).expect("rust decoder");
+    let mut rust_dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("rust decoder");
 
     let mut c_err = 0i32;
     let c_dec = unsafe { libopus_sys::opus_decoder_create(48_000, 1, &mut c_err) };

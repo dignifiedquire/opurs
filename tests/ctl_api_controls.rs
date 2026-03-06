@@ -9,17 +9,15 @@ use opurs::internals::{
     OpusExtensionData,
 };
 #[cfg(feature = "qext")]
+use opurs::OPUS_APPLICATION_AUDIO;
+#[cfg(feature = "qext")]
 use opurs::{opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad};
+use opurs::{
+    Application, Channels, OpusDecoder, OpusMSDecoder, OpusProjectionDecoder,
+    OpusProjectionEncoder, SampleRate,
+};
 #[cfg(any(feature = "qext", feature = "osce"))]
 use opurs::{Bitrate, OpusEncoder, OpusMSEncoder};
-use opurs::{
-    OpusDecoder, OpusMSDecoder, OpusProjectionDecoder, OpusProjectionEncoder,
-    OPUS_APPLICATION_AUDIO,
-};
-#[cfg(feature = "osce")]
-use opurs::{
-    OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
-};
 #[cfg(all(feature = "tools", feature = "qext"))]
 use opurs::{
     OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_IGNORE_EXTENSIONS_REQUEST, OPUS_GET_QEXT_REQUEST,
@@ -322,7 +320,7 @@ fn decode_qext_header_c(payload: &[u8]) -> (i32, i32, i32, i32, i32, u32) {
 
 #[cfg(feature = "qext")]
 fn decode_single_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
-    let mut dec = OpusDecoder::new(SAMPLE_RATE_96K, 2).expect("decoder create");
+    let mut dec = OpusDecoder::new(SampleRate::Hz96000, Channels::Stereo).expect("decoder create");
     dec.set_ignore_extensions(ignore_extensions);
 
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
@@ -367,7 +365,8 @@ fn decode_single(packet: &[u8], ignore_extensions: bool) -> (Vec<i16>, u32) {
 
 #[cfg(feature = "qext")]
 fn decode_ms_raw(packet: &[u8], ignore_extensions: bool) -> (i32, Vec<i16>, u32) {
-    let mut dec = OpusMSDecoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1]).expect("ms decoder create");
+    let mut dec =
+        OpusMSDecoder::new(SampleRate::Hz96000, 2, 1, 1, &[0, 1]).expect("ms decoder create");
     dec.set_ignore_extensions(ignore_extensions);
 
     let mut pcm = vec![0i16; FRAME_SIZE_20MS_96K as usize * 2];
@@ -421,12 +420,12 @@ fn make_projection_codec_pair() -> (OpusProjectionEncoder, i32, i32, Vec<u8>) {
     let mut streams = 0;
     let mut coupled_streams = 0;
     let enc = OpusProjectionEncoder::new(
-        SAMPLE_RATE_96K,
+        SampleRate::Hz96000,
         4,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create");
 
@@ -437,7 +436,7 @@ fn make_projection_codec_pair() -> (OpusProjectionEncoder, i32, i32, Vec<u8>) {
     (enc, streams, coupled_streams, demixing)
 }
 
-fn make_projection_decoder_for(sample_rate: i32) -> OpusProjectionDecoder {
+fn make_projection_decoder_for(sample_rate: SampleRate) -> OpusProjectionDecoder {
     let mut streams = 0;
     let mut coupled_streams = 0;
     let enc = OpusProjectionEncoder::new(
@@ -446,7 +445,7 @@ fn make_projection_decoder_for(sample_rate: i32) -> OpusProjectionDecoder {
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create");
     let mut demixing = vec![0u8; enc.demixing_matrix_size() as usize];
@@ -484,7 +483,7 @@ fn decode_projection_raw(
     ignore_extensions: bool,
 ) -> (i32, Vec<i16>, u32) {
     let mut dec =
-        OpusProjectionDecoder::new(SAMPLE_RATE_96K, 4, streams, coupled_streams, demixing)
+        OpusProjectionDecoder::new(SampleRate::Hz96000, 4, streams, coupled_streams, demixing)
             .expect("projection decoder create");
     dec.set_ignore_extensions(ignore_extensions);
 
@@ -712,8 +711,8 @@ fn build_projection_packet_with_forced_qext(
 #[cfg(all(feature = "tools", feature = "qext"))]
 #[test]
 fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
-    let mut rust_enc =
-        OpusEncoder::new(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let mut rust_enc = OpusEncoder::new(SampleRate::Hz96000, Channels::Stereo, Application::Audio)
+        .expect("encoder create");
     let mut c_err = 0i32;
     let c_enc =
         unsafe { c_opus_encoder_create(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO, &mut c_err) };
@@ -731,7 +730,8 @@ fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
     }
     unsafe { c_opus_encoder_destroy(c_enc) };
 
-    let mut rust_dec = OpusDecoder::new(SAMPLE_RATE_96K, 2).expect("decoder create");
+    let mut rust_dec =
+        OpusDecoder::new(SampleRate::Hz96000, Channels::Stereo).expect("decoder create");
     let c_dec = unsafe { c_opus_decoder_create(SAMPLE_RATE_96K, 2, &mut c_err) };
     assert!(!c_dec.is_null(), "c decoder create failed: {c_err}");
 
@@ -758,7 +758,7 @@ fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
 
     let mapping = [0u8, 1u8];
     let mut rust_ms_enc =
-        OpusMSEncoder::new(SAMPLE_RATE_96K, 2, 1, 1, &mapping, OPUS_APPLICATION_AUDIO)
+        OpusMSEncoder::new(SampleRate::Hz96000, 2, 1, 1, &mapping, Application::Audio)
             .expect("ms encoder create");
     let c_ms_enc = unsafe {
         c_opus_multistream_encoder_create(
@@ -793,8 +793,8 @@ fn qext_and_ignore_extensions_ctl_get_path_matches_c() {
 #[test]
 fn decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
     for seed in 1..=40u32 {
-        let mut enc =
-            OpusEncoder::new(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO).expect("encoder create");
+        let mut enc = OpusEncoder::new(SampleRate::Hz96000, Channels::Stereo, Application::Audio)
+            .expect("encoder create");
         enc.set_bitrate(Bitrate::Bits(128_000));
         enc.set_complexity(10).expect("set complexity");
         enc.set_qext(true);
@@ -903,7 +903,7 @@ rust_qext_hdr={rust_hdr:?}, c_qext_hdr={c_hdr:?}",
 #[test]
 fn ms_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
     for seed in 1..=40u32 {
-        let mut enc = OpusMSEncoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO)
+        let mut enc = OpusMSEncoder::new(SampleRate::Hz96000, 2, 1, 1, &[0, 1], Application::Audio)
             .expect("ms encoder create");
         enc.set_bitrate(Bitrate::Bits(128_000));
         enc.set_complexity(10).expect("set complexity");
@@ -1028,8 +1028,8 @@ fn projection_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_pa
 #[test]
 fn malformed_qext_extensions_fallback_matches_ignore_extensions_decode() {
     for seed in 1..=80u32 {
-        let mut enc =
-            OpusEncoder::new(SAMPLE_RATE_96K, 2, OPUS_APPLICATION_AUDIO).expect("encoder create");
+        let mut enc = OpusEncoder::new(SampleRate::Hz96000, Channels::Stereo, Application::Audio)
+            .expect("encoder create");
         enc.set_bitrate(Bitrate::Bits(128_000));
         enc.set_complexity(10).expect("set complexity");
         enc.set_qext(true);
@@ -1156,7 +1156,7 @@ rust_rng_ignore={rng_ignore}, c_rng_ignore={c_rng_ignore}",
 #[test]
 fn malformed_qext_extensions_multistream_decode_path_is_deterministic() {
     for seed in 1..=80u32 {
-        let mut enc = OpusMSEncoder::new(SAMPLE_RATE_96K, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO)
+        let mut enc = OpusMSEncoder::new(SampleRate::Hz96000, 2, 1, 1, &[0, 1], Application::Audio)
             .expect("ms encoder create");
         enc.set_bitrate(Bitrate::Bits(128_000));
         enc.set_complexity(10).expect("set complexity");
@@ -1408,7 +1408,7 @@ fn mono_pcm_20ms_48k(seed: u32) -> Vec<i16> {
 
 #[cfg(feature = "osce")]
 fn decode_single_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u32) {
-    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder create");
     dec.set_complexity(10).expect("set complexity");
     dec.set_osce_bwe(enable_osce_bwe);
     let mut pcm = vec![0i16; 960];
@@ -1418,7 +1418,8 @@ fn decode_single_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u
 
 #[cfg(feature = "osce")]
 fn decode_ms_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u32) {
-    let mut dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let mut dec =
+        OpusMSDecoder::new(SampleRate::Hz48000, 1, 1, 0, &[0]).expect("ms decoder create");
     dec.set_complexity(10).expect("set complexity");
     dec.set_osce_bwe(enable_osce_bwe);
     let mut pcm = vec![0i16; 960];
@@ -1429,14 +1430,15 @@ fn decode_ms_osce(packet: &[u8], enable_osce_bwe: bool) -> (i32, Vec<i16>, u32) 
 #[cfg(feature = "osce")]
 #[test]
 fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
-    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder create");
     assert!(!dec.osce_bwe());
     dec.set_osce_bwe(true);
     assert!(dec.osce_bwe());
     dec.set_osce_bwe(false);
     assert!(!dec.osce_bwe());
 
-    let mut ms_dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let mut ms_dec =
+        OpusMSDecoder::new(SampleRate::Hz48000, 1, 1, 0, &[0]).expect("ms decoder create");
     assert!(!ms_dec.osce_bwe());
     ms_dec.set_osce_bwe(true);
     assert!(ms_dec.osce_bwe());
@@ -1446,19 +1448,20 @@ fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
     let mut streams = 0;
     let mut coupled_streams = 0;
     let enc = OpusProjectionEncoder::new(
-        48_000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_RESTRICTED_LOWDELAY,
+        Application::LowDelay,
     )
     .expect("projection encoder create");
     let mut demixing = vec![0u8; enc.demixing_matrix_size() as usize];
     enc.copy_demixing_matrix(&mut demixing)
         .expect("copy demixing matrix");
-    let mut proj_dec = OpusProjectionDecoder::new(48_000, 4, streams, coupled_streams, &demixing)
-        .expect("projection decoder create");
+    let mut proj_dec =
+        OpusProjectionDecoder::new(SampleRate::Hz48000, 4, streams, coupled_streams, &demixing)
+            .expect("projection decoder create");
     assert!(!proj_dec.osce_bwe());
     proj_dec.set_osce_bwe(true);
     assert!(proj_dec.osce_bwe());
@@ -1469,7 +1472,8 @@ fn osce_bwe_controls_roundtrip_on_all_decoder_types() {
 #[cfg(all(feature = "osce", feature = "tools-dnn"))]
 #[test]
 fn osce_bwe_ctl_get_path_matches_c() {
-    let mut rust_dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut rust_dec =
+        OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder create");
     let mut c_err = 0i32;
     let c_dec = unsafe { c_opus_decoder_create(48_000, 1, &mut c_err) };
     assert!(!c_dec.is_null(), "c decoder create failed: {c_err}");
@@ -1495,8 +1499,12 @@ fn osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets() {
     for seed in 1..=80u32 {
         let pcm = mono_pcm_20ms_48k(seed);
 
-        let mut enc =
-            OpusEncoder::new(48_000, 1, OPUS_APPLICATION_RESTRICTED_SILK).expect("encoder create");
+        let mut enc = OpusEncoder::new(
+            SampleRate::Hz48000,
+            Channels::Mono,
+            Application::RestrictedSilk,
+        )
+        .expect("encoder create");
         enc.set_bitrate(Bitrate::Bits(20_000));
         enc.set_complexity(10).expect("set complexity");
         let mut packet = vec![0u8; 2000];
@@ -1532,7 +1540,7 @@ fn osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets() {
             "osce toggle should not affect entropy final range"
         );
 
-        let mut ms_enc = OpusMSEncoder::new(48_000, 1, 1, 0, &[0], OPUS_APPLICATION_VOIP)
+        let mut ms_enc = OpusMSEncoder::new(SampleRate::Hz48000, 1, 1, 0, &[0], Application::Voip)
             .expect("ms encoder create");
         ms_enc.set_bitrate(Bitrate::Bits(8_000));
         ms_enc.set_complexity(10).expect("set complexity");
@@ -1560,19 +1568,20 @@ fn osce_bwe_runtime_decode_path_changes_output_for_silk_only_packets() {
 
 #[test]
 fn ignore_extensions_is_preserved_across_reset_on_all_decoder_types() {
-    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder create");
     let before_dec = !dec.ignore_extensions();
     dec.set_ignore_extensions(before_dec);
     dec.reset();
     assert_eq!(dec.ignore_extensions(), before_dec);
 
-    let mut ms_dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let mut ms_dec =
+        OpusMSDecoder::new(SampleRate::Hz48000, 1, 1, 0, &[0]).expect("ms decoder create");
     let before_ms = !ms_dec.ignore_extensions();
     ms_dec.set_ignore_extensions(before_ms);
     ms_dec.reset();
     assert_eq!(ms_dec.ignore_extensions(), before_ms);
 
-    let mut proj_dec = make_projection_decoder_for(48_000);
+    let mut proj_dec = make_projection_decoder_for(SampleRate::Hz48000);
     let before_proj = !proj_dec.ignore_extensions();
     proj_dec.set_ignore_extensions(before_proj);
     proj_dec.reset();
@@ -1582,13 +1591,14 @@ fn ignore_extensions_is_preserved_across_reset_on_all_decoder_types() {
 #[cfg(feature = "qext")]
 #[test]
 fn qext_is_preserved_across_reset_on_all_encoder_types() {
-    let mut enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let mut enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio)
+        .expect("encoder create");
     let before_enc = !enc.qext();
     enc.set_qext(before_enc);
     enc.reset();
     assert_eq!(enc.qext(), before_enc);
 
-    let mut ms_enc = OpusMSEncoder::new(48_000, 1, 1, 0, &[0], OPUS_APPLICATION_AUDIO)
+    let mut ms_enc = OpusMSEncoder::new(SampleRate::Hz48000, 1, 1, 0, &[0], Application::Audio)
         .expect("ms encoder create");
     let before_ms = !ms_enc.qext();
     ms_enc.set_qext(before_ms);
@@ -1598,23 +1608,23 @@ fn qext_is_preserved_across_reset_on_all_encoder_types() {
     let mut streams = 0;
     let mut coupled_streams = 0;
     let mut proj_enc = OpusProjectionEncoder::new(
-        48_000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create");
     let mut default_streams = 0;
     let mut default_coupled_streams = 0;
     let default_proj_enc = OpusProjectionEncoder::new(
-        48_000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut default_streams,
         &mut default_coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("projection encoder create");
     let before_proj = !default_proj_enc.qext();
@@ -1626,19 +1636,20 @@ fn qext_is_preserved_across_reset_on_all_encoder_types() {
 #[cfg(feature = "osce")]
 #[test]
 fn osce_bwe_is_preserved_across_reset_on_all_decoder_types() {
-    let mut dec = OpusDecoder::new(48_000, 1).expect("decoder create");
+    let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder create");
     let before_dec = !dec.osce_bwe();
     dec.set_osce_bwe(before_dec);
     dec.reset();
     assert_eq!(dec.osce_bwe(), before_dec);
 
-    let mut ms_dec = OpusMSDecoder::new(48_000, 1, 1, 0, &[0]).expect("ms decoder create");
+    let mut ms_dec =
+        OpusMSDecoder::new(SampleRate::Hz48000, 1, 1, 0, &[0]).expect("ms decoder create");
     let before_ms = !ms_dec.osce_bwe();
     ms_dec.set_osce_bwe(before_ms);
     ms_dec.reset();
     assert_eq!(ms_dec.osce_bwe(), before_ms);
 
-    let mut proj_dec = make_projection_decoder_for(48_000);
+    let mut proj_dec = make_projection_decoder_for(SampleRate::Hz48000);
     let before_proj = !proj_dec.osce_bwe();
     proj_dec.set_osce_bwe(before_proj);
     proj_dec.reset();

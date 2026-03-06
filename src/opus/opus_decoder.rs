@@ -9,6 +9,8 @@ use crate::celt::entdec::EcDec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
 use crate::celt::float_cast::{celt_float2int16, float2int};
 use crate::celt::mathops::celt_exp2;
+use crate::enums::{Channels, SampleRate};
+use crate::error::ErrorCode;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BUFFER_TOO_SMALL,
@@ -69,24 +71,17 @@ impl OpusDecoder {
         self.channels
     }
     /// Upstream C: src/opus_decoder.c:opus_decoder_init
-    pub fn new(fs: i32, channels: usize) -> Result<OpusDecoder, i32> {
-        let valid_fs = fs == 48000
-            || fs == 24000
-            || fs == 16000
-            || fs == 12000
-            || fs == 8000
-            || cfg!(feature = "qext") && fs == 96000;
-        if !valid_fs || channels != 1 && channels != 2 {
-            return Err(OPUS_BAD_ARG);
-        }
+    pub fn new(sample_rate: SampleRate, channels: Channels) -> Result<OpusDecoder, ErrorCode> {
+        let fs: i32 = sample_rate.into();
+        let channels: i32 = channels.into();
 
         let mut st = OpusDecoder {
-            celt_dec: celt_decoder_init(fs, channels)?,
+            celt_dec: celt_decoder_init(fs, channels as usize).map_err(ErrorCode::from)?,
             silk_dec: silk_init_decoder(),
-            channels: channels as i32,
+            channels,
             fs,
             dec_control: silk_DecControlStruct {
-                n_channels_api: channels,
+                n_channels_api: channels as usize,
                 n_channels_internal: 0,
                 api_sample_rate: fs,
                 internal_sample_rate: 0,
@@ -106,7 +101,7 @@ impl OpusDecoder {
             complexity: 0,
             #[cfg(feature = "deep-plc")]
             lpcnet: crate::dnn::lpcnet::LPCNetPLCState::new(),
-            stream_channels: channels as i32,
+            stream_channels: channels,
             bandwidth: 0,
             mode: 0,
             prev_mode: 0,
@@ -1833,7 +1828,7 @@ mod tests {
 
     #[test]
     fn stage_dred_features_blend_zero_queues_expected_frames() {
-        let mut dec = OpusDecoder::new(48_000, 1).expect("decoder");
+        let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder");
         dec.lpcnet.blend = 0;
 
         let mut dred = OpusDRED::new();
@@ -1855,7 +1850,7 @@ mod tests {
 
     #[test]
     fn stage_dred_features_non_processed_noop() {
-        let mut dec = OpusDecoder::new(48_000, 1).expect("decoder");
+        let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder");
         dec.lpcnet.fec_fill_pos = 2;
         dec.lpcnet.fec_skip = 7;
 

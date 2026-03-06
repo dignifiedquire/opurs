@@ -9,8 +9,8 @@ use opurs::internals::{
     OpusExtensionData,
 };
 use opurs::{
-    OpusEncoder, OpusRepacketizer, OPUS_APPLICATION_AUDIO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL,
-    OPUS_INVALID_PACKET, OPUS_OK,
+    Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG,
+    OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK,
 };
 
 fn ext(id: i32, frame: i32, data: &[u8]) -> OpusExtensionData {
@@ -61,7 +61,8 @@ fn next_u32(state: &mut u32) -> u32 {
 }
 
 fn encode_mono_packet(seed: i16) -> Vec<u8> {
-    let mut enc = OpusEncoder::new(48_000, 1, OPUS_APPLICATION_AUDIO).expect("encoder create");
+    let mut enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Audio)
+        .expect("encoder create");
     let pcm: Vec<i16> = (0..960).map(|i| i as i16 ^ seed).collect();
     let mut out = vec![0u8; 1500];
     let len = enc.encode(&pcm, &mut out);

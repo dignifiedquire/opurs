@@ -1,16 +1,16 @@
-use opurs::{OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO, OPUS_BAD_ARG};
+use opurs::{Application, ErrorCode, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate};
 
 #[test]
 fn projection_encoder_foa_create_smoke() {
     let mut streams = 0i32;
     let mut coupled = 0i32;
     let enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut streams,
         &mut coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     );
     assert!(enc.is_ok());
     assert_eq!(streams, 2);
@@ -22,12 +22,12 @@ fn projection_encoder_soa_create_smoke() {
     let mut streams = 0i32;
     let mut coupled = 0i32;
     let enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         9,
         3,
         &mut streams,
         &mut coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     );
     assert!(enc.is_ok());
     assert_eq!(streams, 5);
@@ -39,16 +39,16 @@ fn projection_encoder_unsupported_order_returns_bad_arg() {
     let mut streams = 0i32;
     let mut coupled = 0i32;
     let err = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         49,
         3,
         &mut streams,
         &mut coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .err()
     .expect("order beyond available matrices should fail");
-    assert_eq!(err, OPUS_BAD_ARG);
+    assert_eq!(err, ErrorCode::BadArg);
 }
 
 #[test]
@@ -56,18 +56,19 @@ fn projection_encoder_roundtrip_with_projection_decoder() {
     let mut streams = 0i32;
     let mut coupled = 0i32;
     let mut enc = OpusProjectionEncoder::new(
-        48000,
+        SampleRate::Hz48000,
         4,
         3,
         &mut streams,
         &mut coupled,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .unwrap();
 
     let mut demix = vec![0u8; enc.demixing_matrix_size() as usize];
     enc.copy_demixing_matrix(&mut demix).unwrap();
-    let mut dec = OpusProjectionDecoder::new(48000, 4, streams, coupled, &demix).unwrap();
+    let mut dec =
+        OpusProjectionDecoder::new(SampleRate::Hz48000, 4, streams, coupled, &demix).unwrap();
 
     let frame_size = 960usize;
     let mut pcm_i16 = vec![0i16; frame_size * 4];

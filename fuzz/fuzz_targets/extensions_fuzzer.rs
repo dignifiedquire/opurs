@@ -58,7 +58,7 @@ fuzz_target!(|data: &[u8]| {
 
     for candidate in [&packet[..], &unpadded[..]] {
         for ignore_extensions in [false, true] {
-            if let Ok(mut dec) = OpusDecoder::new(96_000, 2) {
+            if let Ok(mut dec) = OpusDecoder::new(opurs::SampleRate::Hz96000, opurs::Channels::Stereo) {
                 dec.set_ignore_extensions(ignore_extensions);
                 let mut pcm = vec![0i16; MAX_DECODE_FRAME_SIZE as usize * 2];
                 let _ = dec.decode(candidate, &mut pcm, MAX_DECODE_FRAME_SIZE, false);

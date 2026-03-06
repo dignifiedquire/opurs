@@ -75,12 +75,12 @@ fn gen_pcm(layout: LayoutCase, frame_size: usize, frames: usize) -> Vec<i16> {
 
 fn create_rust_encoder(layout: LayoutCase, bitrate: i32) -> opurs::OpusMSEncoder {
     let mut enc = opurs::OpusMSEncoder::new(
-        SAMPLE_RATE,
+        opurs::SampleRate::Hz48000,
         layout.channels,
         layout.streams,
         layout.coupled_streams,
         layout.mapping,
-        opurs::OPUS_APPLICATION_AUDIO,
+        opurs::Application::Audio,
     )
     .expect("rust ms encoder create");
     enc.set_bitrate(opurs::Bitrate::Bits(bitrate));
@@ -111,7 +111,7 @@ fn create_c_encoder(layout: LayoutCase, bitrate: i32) -> *mut libopus_sys::OpusM
 
 fn create_rust_decoder(layout: LayoutCase) -> opurs::OpusMSDecoder {
     opurs::OpusMSDecoder::new(
-        SAMPLE_RATE,
+        opurs::SampleRate::Hz48000,
         layout.channels,
         layout.streams,
         layout.coupled_streams,

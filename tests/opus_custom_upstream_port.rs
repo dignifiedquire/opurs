@@ -8,9 +8,8 @@ mod test_common;
 
 use opurs::arch::opus_select_arch;
 use opurs::{
-    Application, Bitrate, OpusCustomDecoder, OpusCustomEncoder, OpusDecoder, OpusEncoder,
-    OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
-    OPUS_INVALID_PACKET,
+    Application, Bitrate, Channels, OpusCustomDecoder, OpusCustomEncoder, OpusDecoder, OpusEncoder,
+    SampleRate, OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
 };
 use std::f64::consts::PI;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -370,8 +369,12 @@ fn custom_upstream_mixed_api_matrix() {
             ))
         } else {
             RustEncoder::Opus(Box::new(
-                OpusEncoder::new(sample_rate, ch, OPUS_APPLICATION_RESTRICTED_LOWDELAY)
-                    .unwrap_or_else(|e| panic!("opus encoder create failed: {e}")),
+                OpusEncoder::new(
+                    SampleRate::try_from(sample_rate).unwrap(),
+                    Channels::try_from(ch).unwrap(),
+                    Application::LowDelay,
+                )
+                .unwrap_or_else(|e| panic!("opus encoder create failed: {e}")),
             ))
         };
 
@@ -382,8 +385,11 @@ fn custom_upstream_mixed_api_matrix() {
             ))
         } else {
             RustDecoder::Opus(Box::new(
-                OpusDecoder::new(sample_rate, ch as usize)
-                    .unwrap_or_else(|e| panic!("opus decoder create failed: {e}")),
+                OpusDecoder::new(
+                    SampleRate::try_from(sample_rate).unwrap(),
+                    Channels::try_from(ch).unwrap(),
+                )
+                .unwrap_or_else(|e| panic!("opus decoder create failed: {e}")),
             ))
         };
 

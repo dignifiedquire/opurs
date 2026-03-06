@@ -4,37 +4,39 @@ use opurs::{
     opus_packet_get_bandwidth, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
     opus_packet_get_samples_per_frame, opus_packet_pad, opus_packet_parse, opus_packet_unpad,
     Application, Bandwidth, Bitrate, Channels, FrameSize, OpusDecoder, OpusEncoder,
-    OpusRepacketizer, Signal, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
+    OpusRepacketizer, SampleRate, Signal, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
 };
 
 const OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
 
 #[test]
 fn test_opus_decoder_create_init() {
-    // Invalid channel counts with valid sample rates
-    for c in [0usize, 3, 4] {
-        for fs in [8000, 12000, 16000, 24000, 48000] {
-            assert!(
-                OpusDecoder::new(fs, c).is_err(),
-                "OpusDecoder::new({fs}, {c}) should fail"
-            );
-        }
+    // Invalid channel counts should fail to convert to Channels
+    for c in [0i32, 3, 4] {
+        assert!(
+            Channels::try_from(c).is_err(),
+            "Channels::try_from({c}) should fail"
+        );
     }
-    // Valid channel counts with invalid sample rates
-    for c in [1usize, 2] {
-        for fs in [-8000, 0, 1, 100, 2147483647, -2147483647 - 1] {
-            assert!(
-                OpusDecoder::new(fs, c).is_err(),
-                "OpusDecoder::new({fs}, {c}) should fail"
-            );
-        }
+    // Invalid sample rates should fail to convert to SampleRate
+    for fs in [-8000i32, 0, 1, 100, 2147483647, -2147483647 - 1] {
+        assert!(
+            SampleRate::try_from(fs).is_err(),
+            "SampleRate::try_from({fs}) should fail"
+        );
     }
     // Valid cases should succeed
-    for c in [1usize, 2] {
-        for fs in [8000, 12000, 16000, 24000, 48000] {
+    for c in [Channels::Mono, Channels::Stereo] {
+        for fs in [
+            SampleRate::Hz8000,
+            SampleRate::Hz12000,
+            SampleRate::Hz16000,
+            SampleRate::Hz24000,
+            SampleRate::Hz48000,
+        ] {
             assert!(
                 OpusDecoder::new(fs, c).is_ok(),
-                "OpusDecoder::new({fs}, {c}) should succeed"
+                "OpusDecoder::new({fs:?}, {c:?}) should succeed"
             );
         }
     }
@@ -47,7 +49,8 @@ fn test_dec_api() {
     let mut sbuf = vec![0i16; 1920];
     let mut cfgs = 0;
 
-    let mut dec = OpusDecoder::new(48000, 2).expect("failed to create decoder");
+    let mut dec =
+        OpusDecoder::new(SampleRate::Hz48000, Channels::Stereo).expect("failed to create decoder");
 
     let dec_final_range = dec.final_range();
     let _ = dec_final_range; // just verify it doesn't panic
@@ -1066,48 +1069,40 @@ fn test_enc_api_inner() {
     println!("\n  Encoder basic API tests");
     println!("  ---------------------------------------------------");
 
-    // Test OpusEncoder::new() error paths for invalid channel/sample-rate combos
-    for c in 0..4 {
-        for i in -7..=96000 {
-            let valid_rate = i == 8000
-                || i == 12000
-                || i == 16000
-                || i == 24000
-                || i == 48000
-                || cfg!(feature = "qext") && i == 96000;
-            if !(valid_rate && (c == 1 || c == 2)) {
-                let fs = match i {
-                    -5 => -8000,
-                    -6 => 2147483647,
-                    -7 => -2147483647 - 1,
-                    _ => i,
-                };
-                assert!(
-                    OpusEncoder::new(fs, c, 2048).is_err(),
-                    "OpusEncoder::new({fs}, {c}, 2048) should fail"
-                );
-                cfgs += 1;
-            }
-        }
+    // Test that invalid sample rates and channels are rejected by TryFrom
+    for c in [0i32, 3, 4] {
+        assert!(
+            Channels::try_from(c).is_err(),
+            "Channels::try_from({c}) should fail"
+        );
+        cfgs += 1;
+    }
+    for fs in [-8000i32, 0, 1, 100, 2147483647, -2147483647 - 1] {
+        assert!(
+            SampleRate::try_from(fs).is_err(),
+            "SampleRate::try_from({fs}) should fail"
+        );
+        cfgs += 1;
     }
 
     // Invalid application code
     assert!(
-        OpusEncoder::new(48000, 2, -1000).is_err(),
-        "OpusEncoder::new(48000, 2, -1000) should fail"
+        Application::try_from(-1000i32).is_err(),
+        "Application::try_from(-1000) should fail"
     );
     cfgs += 1;
 
     // Valid creation with VOIP application
     {
-        let _enc = OpusEncoder::new(48000, 2, 2048).expect("failed to create encoder with VOIP");
+        let _enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Voip)
+            .expect("failed to create encoder with VOIP");
         cfgs += 1;
     }
 
     // Valid creation with LOW_DELAY application, check lookahead
     {
-        let enc =
-            OpusEncoder::new(48000, 2, 2051).expect("failed to create encoder with LOW_DELAY");
+        let enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::LowDelay)
+            .expect("failed to create encoder with LOW_DELAY");
         let i = enc.lookahead();
         assert!(
             (0..=32766).contains(&i),
@@ -1118,7 +1113,8 @@ fn test_enc_api_inner() {
 
     // Valid creation with AUDIO application, check lookahead
     {
-        let enc = OpusEncoder::new(48000, 2, 2049).expect("failed to create encoder with AUDIO");
+        let enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Audio)
+            .expect("failed to create encoder with AUDIO");
         let i = enc.lookahead();
         assert!(
             (0..=32766).contains(&i),
@@ -1128,7 +1124,8 @@ fn test_enc_api_inner() {
     }
 
     // Main encoder for the remaining tests
-    let mut enc = OpusEncoder::new(48000, 2, 2048).expect("failed to create encoder with VOIP");
+    let mut enc = OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Voip)
+        .expect("failed to create encoder with VOIP");
     cfgs += 1;
     println!("    opus_encoder_create() ........................ OK.");
     println!("    opus_encoder_init() .......................... OK.");

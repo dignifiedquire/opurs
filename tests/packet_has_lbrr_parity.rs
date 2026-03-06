@@ -1,6 +1,6 @@
 #![cfg(feature = "tools")]
 
-use opurs::{Application, Bitrate, OpusDecoder, OpusEncoder};
+use opurs::{Application, Bitrate, Channels, OpusDecoder, OpusEncoder, SampleRate};
 
 fn c_has_lbrr(packet: &[u8]) -> i32 {
     unsafe { libopus_sys::opus_packet_has_lbrr(packet.as_ptr(), packet.len() as i32) }
@@ -28,7 +28,8 @@ fn packet_has_lbrr_matches_c_for_fixed_packets() {
 
 #[test]
 fn packet_has_lbrr_matches_c_on_real_encoded_packets_and_finds_lbrr() {
-    let mut enc = OpusEncoder::new(48_000, 1, i32::from(Application::Voip)).expect("encoder");
+    let mut enc =
+        OpusEncoder::new(SampleRate::Hz48000, Channels::Mono, Application::Voip).expect("encoder");
     enc.set_inband_fec(1).expect("set inband fec");
     enc.set_packet_loss_perc(40).expect("set packet loss");
     enc.set_bitrate(Bitrate::Bits(32_000));

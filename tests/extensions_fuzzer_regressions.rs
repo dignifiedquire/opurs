@@ -3,7 +3,7 @@ use opurs::internals::{
     opus_packet_extensions_generate, opus_packet_extensions_parse,
     opus_packet_extensions_parse_ext,
 };
-use opurs::{opus_packet_unpad, OpusDecoder};
+use opurs::{opus_packet_unpad, Channels, OpusDecoder, SampleRate};
 
 const MAX_FRAMES: usize = 48;
 const MAX_EXTENSIONS: i32 = 256;
@@ -51,7 +51,10 @@ fn extensions_fuzzer_crash_i_zict_ea_does_not_panic() {
 
         for candidate in [&packet[..], &unpadded[..]] {
             for ignore_extensions in [false, true] {
-                if let Ok(mut dec) = OpusDecoder::new(96_000, 2) {
+                let Ok(sr) = SampleRate::try_from(96_000) else {
+                    continue;
+                };
+                if let Ok(mut dec) = OpusDecoder::new(sr, Channels::Stereo) {
                     dec.set_ignore_extensions(ignore_extensions);
                     let mut pcm = vec![0i16; MAX_DECODE_FRAME_SIZE as usize * 2];
                     let _ = dec.decode(candidate, &mut pcm, MAX_DECODE_FRAME_SIZE, false);

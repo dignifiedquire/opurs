@@ -1,5 +1,5 @@
 use opurs::{
-    OpusMSDecoder, OpusMSEncoder, OpusProjectionDecoder, OPUS_APPLICATION_AUDIO, OPUS_BAD_ARG,
+    Application, ErrorCode, OpusMSDecoder, OpusMSEncoder, OpusProjectionDecoder, SampleRate,
 };
 
 fn identity_demixing_matrix_le(channels: i32) -> Vec<u8> {
@@ -19,18 +19,19 @@ fn identity_demixing_matrix_le(channels: i32) -> Vec<u8> {
 #[test]
 fn projection_decoder_create_rejects_wrong_matrix_size() {
     let matrix = vec![0u8; 2];
-    let err = OpusProjectionDecoder::new(48000, 2, 1, 1, &matrix)
+    let err = OpusProjectionDecoder::new(SampleRate::Hz48000, 2, 1, 1, &matrix)
         .err()
         .expect("create should fail on bad matrix size");
-    assert_eq!(err, OPUS_BAD_ARG);
+    assert_eq!(err, ErrorCode::BadArg);
 }
 
 #[test]
 fn projection_decoder_identity_matrix_matches_expected_fixed_point_mix() {
-    let mut enc = OpusMSEncoder::new(48000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
+    let mut enc =
+        OpusMSEncoder::new(SampleRate::Hz48000, 2, 1, 1, &[0, 1], Application::Audio).unwrap();
     let matrix = identity_demixing_matrix_le(2);
-    let mut proj_dec = OpusProjectionDecoder::new(48000, 2, 1, 1, &matrix).unwrap();
-    let mut ms_dec = OpusMSDecoder::new(48000, 2, 1, 1, &[0, 1]).unwrap();
+    let mut proj_dec = OpusProjectionDecoder::new(SampleRate::Hz48000, 2, 1, 1, &matrix).unwrap();
+    let mut ms_dec = OpusMSDecoder::new(SampleRate::Hz48000, 2, 1, 1, &[0, 1]).unwrap();
 
     let frame_size = 960usize;
     let mut pcm = vec![0i16; frame_size * 2];
@@ -63,9 +64,10 @@ fn projection_decoder_identity_matrix_matches_expected_fixed_point_mix() {
 
 #[test]
 fn projection_decoder_identity_smoke_float_and_24bit() {
-    let mut enc = OpusMSEncoder::new(48000, 2, 1, 1, &[0, 1], OPUS_APPLICATION_AUDIO).unwrap();
+    let mut enc =
+        OpusMSEncoder::new(SampleRate::Hz48000, 2, 1, 1, &[0, 1], Application::Audio).unwrap();
     let matrix = identity_demixing_matrix_le(2);
-    let mut proj_dec = OpusProjectionDecoder::new(48000, 2, 1, 1, &matrix).unwrap();
+    let mut proj_dec = OpusProjectionDecoder::new(SampleRate::Hz48000, 2, 1, 1, &matrix).unwrap();
 
     let frame_size = 960usize;
     let mut pcm = vec![0f32; frame_size * 2];

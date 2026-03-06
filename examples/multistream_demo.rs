@@ -1,9 +1,8 @@
 //! Minimal multistream encode/decode demo.
 
-use opurs::{OpusMSDecoder, OpusMSEncoder, OPUS_APPLICATION_AUDIO};
+use opurs::{Application, OpusMSDecoder, OpusMSEncoder, SampleRate};
 
 fn main() {
-    let sample_rate = 48_000;
     let frame_size = 960;
     // 3 channels encoded as 2 streams: one coupled stereo + one mono.
     let channels = 3;
@@ -12,16 +11,22 @@ fn main() {
     let mapping = [0u8, 1u8, 2u8];
 
     let mut enc = OpusMSEncoder::new(
-        sample_rate,
+        SampleRate::Hz48000,
         channels,
         streams,
         coupled_streams,
         &mapping,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("create multistream encoder");
-    let mut dec = OpusMSDecoder::new(sample_rate, channels, streams, coupled_streams, &mapping)
-        .expect("create multistream decoder");
+    let mut dec = OpusMSDecoder::new(
+        SampleRate::Hz48000,
+        channels,
+        streams,
+        coupled_streams,
+        &mapping,
+    )
+    .expect("create multistream decoder");
 
     let mut pcm = vec![0i16; frame_size as usize * channels as usize];
     for i in 0..frame_size as usize {

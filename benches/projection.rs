@@ -13,8 +13,8 @@ use libopus_sys::{
     opus_projection_encoder_destroy as c_opus_projection_encoder_destroy,
 };
 use opurs::{
-    Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, OPUS_APPLICATION_AUDIO,
-    OPUS_OK, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
+    Application, Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate,
+    OPUS_APPLICATION_AUDIO, OPUS_OK, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_SET_BITRATE_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST,
 };
@@ -58,12 +58,12 @@ fn create_rust_encoder(channels: i32, bitrate: i32) -> (opurs::OpusProjectionEnc
     let mut streams = -1i32;
     let mut coupled_streams = -1i32;
     let mut enc = OpusProjectionEncoder::new(
-        SAMPLE_RATE,
+        SampleRate::Hz48000,
         channels,
         MAPPING_FAMILY_AMBISONICS,
         &mut streams,
         &mut coupled_streams,
-        OPUS_APPLICATION_AUDIO,
+        Application::Audio,
     )
     .expect("rust projection encoder create");
     enc.set_bitrate(Bitrate::Bits(bitrate));
@@ -126,7 +126,7 @@ fn fetch_c_demixing_matrix(enc: *mut c_void) -> Vec<u8> {
 
 fn create_rust_decoder(prepared: &PreparedProjection) -> opurs::OpusProjectionDecoder {
     OpusProjectionDecoder::new(
-        SAMPLE_RATE,
+        SampleRate::Hz48000,
         prepared.channels,
         prepared.streams,
         prepared.coupled_streams,

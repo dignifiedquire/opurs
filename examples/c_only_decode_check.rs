@@ -86,8 +86,10 @@ fn main() {
 
     // Now also check: Rust decode_float with itself
     let mut cursor2 = Cursor::new(&data);
-    let mut rust_dec1 = opurs::OpusDecoder::new(48000, 2).unwrap();
-    let mut rust_dec2 = opurs::OpusDecoder::new(48000, 2).unwrap();
+    let mut rust_dec1 =
+        opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Stereo).unwrap();
+    let mut rust_dec2 =
+        opurs::OpusDecoder::new(opurs::SampleRate::Hz48000, opurs::Channels::Stereo).unwrap();
     let mut rust_diffs: u64 = 0;
     let mut frame_idx2 = 0;
 

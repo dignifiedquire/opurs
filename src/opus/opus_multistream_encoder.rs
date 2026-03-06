@@ -2,7 +2,8 @@
 //!
 //! Upstream C: `src/opus_multistream_encoder.c`
 
-use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, Signal};
+use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, SampleRate, Signal};
+use crate::error::ErrorCode;
 use crate::opus::analysis::DownmixInput;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
 use crate::opus::opus_encoder::{frame_size_select, opus_encode_native, OpusEncoder};
@@ -115,22 +116,27 @@ impl OpusMSEncoder {
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_create
     pub fn new(
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
         mapping: &[u8],
-        application: i32,
-    ) -> Result<Self, i32> {
+        application: Application,
+    ) -> Result<Self, ErrorCode> {
         let layout = OpusMultistreamLayout::new(channels, streams, coupled_streams, mapping)?;
         if !layout.validate_for_encoder() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
-        let config = OpusMultistreamConfig::new(sample_rate, application, layout.clone())?;
+        let config =
+            OpusMultistreamConfig::new(sample_rate.into(), application.into(), layout.clone())?;
 
         let mut encoders = Vec::with_capacity(streams as usize);
         for stream in 0..streams {
-            let stream_channels = if stream < coupled_streams { 2 } else { 1 };
+            let stream_channels = if stream < coupled_streams {
+                Channels::Stereo
+            } else {
+                Channels::Mono
+            };
             encoders.push(OpusEncoder::new(sample_rate, stream_channels, application)?);
         }
 
@@ -146,12 +152,12 @@ impl OpusMSEncoder {
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_init
     pub fn init(
         &mut self,
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         streams: i32,
         coupled_streams: i32,
         mapping: &[u8],
-        application: i32,
+        application: Application,
     ) -> i32 {
         match Self::new(
             sample_rate,
@@ -165,7 +171,7 @@ impl OpusMSEncoder {
                 *self = st;
                 OPUS_OK
             }
-            Err(err) => err,
+            Err(err) => err.into(),
         }
     }
 
@@ -177,13 +183,13 @@ impl OpusMSEncoder {
     /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_init
     pub fn init_surround(
         &mut self,
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         mapping_family: i32,
         streams: &mut i32,
         coupled_streams: &mut i32,
         mapping: &mut [u8],
-        application: i32,
+        application: Application,
     ) -> i32 {
         if let Err(err) =
             surround_layout(channels, mapping_family, streams, coupled_streams, mapping)
@@ -204,15 +210,16 @@ impl OpusMSEncoder {
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_create
     pub fn create_surround(
-        sample_rate: i32,
+        sample_rate: SampleRate,
         channels: i32,
         mapping_family: i32,
         streams: &mut i32,
         coupled_streams: &mut i32,
         mapping: &mut [u8],
-        application: i32,
-    ) -> Result<Self, i32> {
-        surround_layout(channels, mapping_family, streams, coupled_streams, mapping)?;
+        application: Application,
+    ) -> Result<Self, ErrorCode> {
+        surround_layout(channels, mapping_family, streams, coupled_streams, mapping)
+            .map_err(ErrorCode::from)?;
         OpusMSEncoder::new(
             sample_rate,
             channels,
