@@ -1,6 +1,6 @@
 //! Mid/side to left/right conversion.
 //!
-//! Upstream C: `silk/stereo_ms_to_lr.c`
+//! Upstream C: `silk/stereo_MS_to_LR.c`
 
 use crate::silk::define::STEREO_INTERP_LEN_MS;
 
@@ -19,7 +19,7 @@ use crate::silk::sigproc_fix::{silk_rshift_round, silk_sat16};
 /// fs_kHz         I     Samples rate (kHz)
 /// frame_length   I     Number of samples
 /// ```
-/// Upstream C: silk/stereo_ms_to_lr.c:silk_stereo_MS_to_LR
+/// Upstream C: silk/stereo_MS_to_LR.c:silk_stereo_MS_to_LR
 pub fn silk_stereo_ms_to_lr(
     state: &mut stereo_dec_state,
     x1: &mut [i16],

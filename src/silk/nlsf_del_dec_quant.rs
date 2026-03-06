@@ -81,21 +81,7 @@ pub fn silk_nlsf_del_dec_quant(
                 (pred_coef_Q8[i as usize] as i16 as i32 * prev_out_Q10[j as usize] as i32) >> 8;
             res_Q10 = in_Q10 - pred_Q10;
             ind_tmp = (inv_quant_step_size_Q6 as i32 * res_Q10 as i16 as i32) >> 16;
-            ind_tmp = if -(10) > 10 - 1 {
-                if ind_tmp > -(10) {
-                    -(10)
-                } else if ind_tmp < 10 - 1 {
-                    10 - 1
-                } else {
-                    ind_tmp
-                }
-            } else if ind_tmp > 10 - 1 {
-                10 - 1
-            } else if ind_tmp < -(10) {
-                -(10)
-            } else {
-                ind_tmp
-            };
+            ind_tmp = ind_tmp.clamp(-(10), 10 - 1);
             ind[j as usize][i as usize] = ind_tmp as i8;
             out0_Q10 = out0_Q10_table[(ind_tmp + NLSF_QUANT_MAX_AMPLITUDE_EXT) as usize] as i16;
             out1_Q10 = out1_Q10_table[(ind_tmp + NLSF_QUANT_MAX_AMPLITUDE_EXT) as usize] as i16;

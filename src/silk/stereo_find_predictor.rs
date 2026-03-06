@@ -35,21 +35,7 @@ pub fn silk_stereo_find_predictor(
     let corr: i32 =
         silk_inner_prod_aligned_scale(&x[..length as usize], &y[..length as usize], scale, length);
     pred_Q13 = silk_div32_varq(corr, nrgx, 13);
-    pred_Q13 = if -((1) << 14) > (1) << 14 {
-        if pred_Q13 > -((1) << 14) {
-            -((1) << 14)
-        } else if pred_Q13 < (1) << 14 {
-            (1) << 14
-        } else {
-            pred_Q13
-        }
-    } else if pred_Q13 > (1) << 14 {
-        (1) << 14
-    } else if pred_Q13 < -((1) << 14) {
-        -((1) << 14)
-    } else {
-        pred_Q13
-    };
+    pred_Q13 = pred_Q13.clamp(-((1) << 14), (1) << 14);
     let pred2_Q10: i32 = ((pred_Q13 as i64 * pred_Q13 as i16 as i64) >> 16) as i32;
     smooth_coef_Q16 = silk_max_int(
         smooth_coef_Q16,

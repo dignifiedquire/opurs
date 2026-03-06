@@ -570,21 +570,7 @@ fn silk_noise_shape_quantizer(
         if NSQ.rand_seed < 0 {
             r_Q10 = -r_Q10;
         }
-        r_Q10 = if -((31) << 10) > (30) << 10 {
-            if r_Q10 > -((31) << 10) {
-                -((31) << 10)
-            } else if r_Q10 < (30) << 10 {
-                (30) << 10
-            } else {
-                r_Q10
-            }
-        } else if r_Q10 > (30) << 10 {
-            (30) << 10
-        } else if r_Q10 < -((31) << 10) {
-            -((31) << 10)
-        } else {
-            r_Q10
-        };
+        r_Q10 = r_Q10.clamp(-((31) << 10), (30) << 10);
 
         // Quantize
         q1_Q10 = r_Q10 - offset_Q10;

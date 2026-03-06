@@ -1,6 +1,6 @@
 //! NLSF codebook tables for wideband.
 //!
-//! Upstream C: `silk/tables_nlsf_cb_wb.c`
+//! Upstream C: `silk/tables_NLSF_CB_WB.c`
 
 use crate::silk::structs::silk_NLSF_CB_struct;
 

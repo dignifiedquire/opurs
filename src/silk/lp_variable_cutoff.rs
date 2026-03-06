@@ -102,21 +102,7 @@ pub fn silk_lp_variable_cutoff(psLP: &mut silk_LP_state, frame: &mut [i16]) {
         let mut A_Q28: [i32; TRANSITION_NA] = [0; TRANSITION_NA];
 
         silk_lp_interpolate_filter_taps(&mut B_Q28, &mut A_Q28, ind as usize, fac_Q16);
-        psLP.transition_frame_no = if 0 > 5120 / (5 * 4) {
-            if psLP.transition_frame_no + psLP.mode > 0 {
-                0
-            } else if psLP.transition_frame_no + psLP.mode < 5120 / (5 * 4) {
-                5120 / (5 * 4)
-            } else {
-                psLP.transition_frame_no + psLP.mode
-            }
-        } else if psLP.transition_frame_no + psLP.mode > 5120 / (5 * 4) {
-            5120 / (5 * 4)
-        } else if psLP.transition_frame_no + psLP.mode < 0 {
-            0
-        } else {
-            psLP.transition_frame_no + psLP.mode
-        };
+        psLP.transition_frame_no = (psLP.transition_frame_no + psLP.mode).clamp(0, 5120 / (5 * 4));
         silk_biquad_alt_stride1(&B_Q28, &A_Q28, &mut psLP.In_LP_State, frame);
     }
 }

@@ -117,13 +117,8 @@ pub fn silk_nlsf_stabilize(NLSF_Q15: &mut [i16], NDeltaMin_Q15: &[i16]) {
         while i < L {
             NLSF_Q15[i] = silk_max_int(
                 NLSF_Q15[i] as i32,
-                (if NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32 > SILK_INT16_MAX {
-                    SILK_INT16_MAX
-                } else if (NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32) < SILK_INT16_MIN {
-                    SILK_INT16_MIN
-                } else {
-                    NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32
-                }) as i16 as i32,
+                (NLSF_Q15[i - 1] as i32 + NDeltaMin_Q15[i] as i32)
+                    .clamp(SILK_INT16_MIN, SILK_INT16_MAX),
             ) as i16;
             i += 1;
         }

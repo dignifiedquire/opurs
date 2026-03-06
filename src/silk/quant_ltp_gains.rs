@@ -1,6 +1,6 @@
 //! LTP gain quantization.
 //!
-//! Upstream C: `silk/quant_ltp_gains.c`
+//! Upstream C: `silk/quant_LTP_gains.c`
 
 use crate::arch::Arch;
 
@@ -17,7 +17,7 @@ use crate::silk::typedefs::SILK_INT32_MAX;
 #[cfg(not(feature = "simd"))]
 use crate::silk::vq_wmat_ec::{silk_vq_wmat_ec_c, SilkVqWmatEcParams};
 
-/// Upstream C: silk/quant_ltp_gains.c:silk_quant_LTP_gains
+/// Upstream C: silk/quant_LTP_gains.c:silk_quant_LTP_gains
 #[allow(clippy::too_many_arguments)]
 pub fn silk_quant_ltp_gains(
     B_Q14: &mut [i16],
