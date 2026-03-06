@@ -3,7 +3,7 @@
 //! Upstream C: `celt/bands.c`
 
 use crate::arch::Arch;
-use crate::celt::entcode::{celt_sudiv, celt_udiv, ec_ctx, ec_tell_frac, BITRES};
+use crate::celt::entcode::{celt_sudiv, celt_udiv, ec_tell_frac, EcCtx, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_uint, ec_dec_update, ec_decode};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_uint, ec_encode};
 #[cfg(feature = "qext")]
@@ -60,7 +60,7 @@ struct band_ctx<'a, 'b> {
     disable_inv: i32,
     avoid_split_noise: i32,
     #[cfg(feature = "qext")]
-    ext_ec: &'b mut ec_ctx<'a>,
+    ext_ec: &'b mut EcCtx<'a>,
     #[cfg(feature = "qext")]
     extra_bits: i32,
     #[cfg(feature = "qext")]
@@ -713,7 +713,7 @@ fn compute_theta(
     LM: i32,
     stereo: i32,
     fill: &mut i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
 ) {
     let mut itheta: i32 = 0;
     #[cfg(feature = "qext")]
@@ -1012,7 +1012,7 @@ fn quant_band_n1(
     Y: Option<&mut [f32]>,
     mut _b: i32,
     lowband_out: Option<&mut [f32]>,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
 ) -> u32 {
     let encode = ctx.encode;
     let _stereo = if Y.is_some() { 1 } else { 0 };
@@ -1077,7 +1077,7 @@ fn quant_partition(
     mut LM: i32,
     gain: f32,
     mut fill: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
 ) -> u32 {
     #[cfg(feature = "qext")]
     let qp_trace = std::env::var_os("OPURS_QEXT_TRACE").is_some() && ctx.encode == 0 && ctx.i == 20;
@@ -1420,7 +1420,7 @@ fn cubic_quant_partition(
     mut N: i32,
     mut b: i32,
     B: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
     mut LM: i32,
     gain: f32,
     resynth: i32,
@@ -1510,7 +1510,7 @@ fn quant_band(
     gain: f32,
     lowband_scratch: Option<&mut [f32]>,
     mut fill: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
 ) -> u32 {
     let N0 = N;
     let mut N_B = N;
@@ -1667,7 +1667,7 @@ fn quant_band_stereo(
     lowband_out: Option<&mut [f32]>,
     lowband_scratch: Option<&mut [f32]>,
     mut fill: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
 ) -> u32 {
     let mut cm: u32;
     let mut mbits: i32;
@@ -2056,14 +2056,14 @@ pub fn quant_all_bands<'a>(
     tf_res: &mut [i32],
     total_bits: i32,
     mut balance: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
     LM: i32,
     codedBands: i32,
     seed: &mut u32,
     complexity: i32,
     arch: Arch,
     disable_inv: i32,
-    #[cfg(feature = "qext")] ext_ec: &mut ec_ctx<'a>,
+    #[cfg(feature = "qext")] ext_ec: &mut EcCtx<'a>,
     #[cfg(feature = "qext")] extra_pulses: &[i32],
     #[cfg(feature = "qext")] ext_total_bits: i32,
     #[cfg(feature = "qext")] cap: &[i32],

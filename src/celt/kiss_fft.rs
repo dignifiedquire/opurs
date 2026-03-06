@@ -6,24 +6,24 @@
 
 use num_traits::Zero;
 /// Upstream C: celt/kiss_fft.h:kiss_fft_cpx
-pub type kiss_fft_cpx = num_complex::Complex32;
+pub type KissFftCpx = num_complex::Complex32;
 /// Upstream C: celt/kiss_fft.h:kiss_twiddle_cpx
-pub type kiss_twiddle_cpx = num_complex::Complex32;
+pub type KissTwiddleCpx = num_complex::Complex32;
 
 /// Upstream C: celt/kiss_fft.h:kiss_fft_state
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct kiss_fft_state<'a> {
+pub struct KissFftState<'a> {
     pub nfft: usize,
     pub scale: f32,
     pub shift: i32,
     pub factors: [(i32, i32); 8],
     pub bitrev: &'a [i16],
-    pub twiddles: &'a [kiss_twiddle_cpx],
+    pub twiddles: &'a [KissTwiddleCpx],
 }
 
 /// Upstream C: celt/kiss_fft.c:kf_bfly2
 #[inline]
-fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
+fn kf_bfly2(Fout: &mut [KissFftCpx], m: i32, N: i32) {
     let tw: f32 = std::f32::consts::FRAC_1_SQRT_2;
     /* We know that m==4 here because the radix-2 is just after a radix-4 */
     debug_assert_eq!(m, 4);
@@ -35,18 +35,18 @@ fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
         Fout2[0] = Fout[0] - t;
         Fout[0] += t;
 
-        let t = kiss_fft_cpx::new(
+        let t = KissFftCpx::new(
             (Fout2[1].re + Fout2[1].im) * tw,
             (Fout2[1].im - Fout2[1].re) * tw,
         );
         Fout2[1] = Fout[1] - t;
         Fout[1] += t;
 
-        let t = kiss_fft_cpx::new(Fout2[2].im, -Fout2[2].re);
+        let t = KissFftCpx::new(Fout2[2].im, -Fout2[2].re);
         Fout2[2] = Fout[2] - t;
         Fout[2] += t;
 
-        let t = kiss_fft_cpx::new(
+        let t = KissFftCpx::new(
             (Fout2[3].im - Fout2[3].re) * tw,
             -(Fout2[3].im + Fout2[3].re) * tw,
         );
@@ -56,14 +56,7 @@ fn kf_bfly2(Fout: &mut [kiss_fft_cpx], m: i32, N: i32) {
 }
 /// Upstream C: celt/kiss_fft.c:kf_bfly4
 #[inline]
-fn kf_bfly4(
-    Fout: &mut [kiss_fft_cpx],
-    fstride: usize,
-    st: &kiss_fft_state,
-    m: i32,
-    N: i32,
-    mm: i32,
-) {
+fn kf_bfly4(Fout: &mut [KissFftCpx], fstride: usize, st: &KissFftState, m: i32, N: i32, mm: i32) {
     if m == 1 {
         /* Degenerate case where all the twiddles are 1. */
         debug_assert_eq!(Fout.len(), N as usize * 4);
@@ -81,7 +74,7 @@ fn kf_bfly4(
             chunk[3].im = scratch0.im + scratch1.re;
         }
     } else {
-        let mut scratch: [kiss_fft_cpx; 6] = [kiss_fft_cpx::zero(); 6];
+        let mut scratch: [KissFftCpx; 6] = [KissFftCpx::zero(); 6];
         let m = m as usize;
         let m2 = 2 * m;
         let m3 = 3 * m;
@@ -112,17 +105,10 @@ fn kf_bfly4(
 }
 /// Upstream C: celt/kiss_fft.c:kf_bfly3
 #[inline]
-fn kf_bfly3(
-    Fout: &mut [kiss_fft_cpx],
-    fstride: usize,
-    st: &kiss_fft_state,
-    m: i32,
-    N: i32,
-    mm: i32,
-) {
+fn kf_bfly3(Fout: &mut [KissFftCpx], fstride: usize, st: &KissFftState, m: i32, N: i32, mm: i32) {
     let m = m as usize;
     let m2 = 2 * m;
-    let mut scratch: [kiss_fft_cpx; 5] = [kiss_fft_cpx::zero(); 5];
+    let mut scratch: [KissFftCpx; 5] = [KissFftCpx::zero(); 5];
     let epi3 = st.twiddles[fstride * m];
     let tw = st.twiddles;
     for i in 0..N {
@@ -151,15 +137,8 @@ fn kf_bfly3(
 }
 /// Upstream C: celt/kiss_fft.c:kf_bfly5
 #[inline]
-fn kf_bfly5(
-    Fout: &mut [kiss_fft_cpx],
-    fstride: usize,
-    st: &kiss_fft_state,
-    m: i32,
-    N: i32,
-    mm: i32,
-) {
-    let mut scratch: [kiss_fft_cpx; 13] = [kiss_fft_cpx::zero(); 13];
+fn kf_bfly5(Fout: &mut [KissFftCpx], fstride: usize, st: &KissFftState, m: i32, N: i32, mm: i32) {
+    let mut scratch: [KissFftCpx; 13] = [KissFftCpx::zero(); 13];
     let ya = st.twiddles[fstride * m as usize];
     let yb = st.twiddles[fstride * m as usize * 2];
     let tw = st.twiddles;
@@ -208,7 +187,7 @@ fn kf_bfly5(
 
 /// Upstream C: celt/kiss_fft.c:opus_fft_impl
 #[inline]
-pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
+pub fn opus_fft_impl(st: &KissFftState, fout: &mut [KissFftCpx]) {
     debug_assert_eq!(st.nfft, fout.len());
     let shift = st.shift.max(0);
 
@@ -241,7 +220,7 @@ pub fn opus_fft_impl(st: &kiss_fft_state, fout: &mut [kiss_fft_cpx]) {
 
 /// Upstream C: celt/kiss_fft.c:opus_fft_c
 #[inline]
-pub fn opus_fft_c(st: &kiss_fft_state, fin: &[kiss_fft_cpx], fout: &mut [kiss_fft_cpx]) {
+pub fn opus_fft_c(st: &KissFftState, fin: &[KissFftCpx], fout: &mut [KissFftCpx]) {
     let scale: f32 = st.scale;
     debug_assert_eq!(fin.len(), st.nfft);
     debug_assert_eq!(fout.len(), st.nfft);

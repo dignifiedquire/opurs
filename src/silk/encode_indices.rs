@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/encode_indices.c`
 
-use crate::celt::entenc::{ec_enc, ec_enc_icdf};
+use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, MAX_NB_SUBFR, NLSF_QUANT_MAX_AMPLITUDE, TYPE_VOICED,
 };
@@ -20,7 +20,7 @@ use crate::silk::tables_pitch_lag::{SILK_PITCH_DELTA_ICDF, SILK_PITCH_LAG_ICDF};
 /// Upstream C: silk/encode_indices.c:silk_encode_indices
 pub fn silk_encode_indices(
     psEncC: &mut silk_encoder_state,
-    psRangeEnc: &mut ec_enc,
+    psRangeEnc: &mut EcEnc,
     FrameIndex: i32,
     encode_LBRR: i32,
     condCoding: i32,

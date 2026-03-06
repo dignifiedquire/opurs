@@ -5,7 +5,7 @@
 
 #![allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 
-use crate::celt::kiss_fft::{kiss_fft_state, kiss_twiddle_cpx};
+use crate::celt::kiss_fft::{KissFftState, KissTwiddleCpx};
 use num_complex::Complex32;
 
 /// Bit-reversal table for the 320-point FFT.
@@ -35,7 +35,7 @@ const FFT_BITREV: [i16; 320] = [
 /// Only the first 320 entries are used.
 ///
 /// Upstream C: dnn/lpcnet_tables.c:fft_twiddles
-const FFT_TWIDDLES: [kiss_twiddle_cpx; 480] = {
+const FFT_TWIDDLES: [KissTwiddleCpx; 480] = {
     let mut t = [Complex32 { re: 0.0, im: 0.0 }; 480];
     let src: [(f32, f32); 320] = [
         (1.00000000, -0.00000000),
@@ -376,8 +376,8 @@ const FFT_TWIDDLES: [kiss_twiddle_cpx; 480] = {
 /// Factors: 320 = 5 × 4 × 4 × 4
 ///
 /// Upstream C: dnn/lpcnet_tables.c:kfft
-pub fn kfft() -> kiss_fft_state<'static> {
-    kiss_fft_state {
+pub fn kfft() -> KissFftState<'static> {
+    KissFftState {
         nfft: 320,
         scale: 0.003125,
         shift: -1,

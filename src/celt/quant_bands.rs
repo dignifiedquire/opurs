@@ -3,8 +3,8 @@
 //! Upstream C: `celt/quant_bands.c`
 
 use crate::celt::entcode::{ec_tell, ec_tell_frac};
-use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf};
-use crate::celt::entenc::{ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_icdf};
+use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, EcDec};
+use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_bits, ec_enc_icdf, EcEnc};
 use crate::celt::laplace::{ec_laplace_decode, ec_laplace_encode};
 use crate::celt::mathops::celt_log2;
 use crate::celt::modes::OpusCustomMode;
@@ -143,7 +143,7 @@ fn quant_coarse_energy_impl(
     mut tell: i32,
     prob_model: &[u8],
     error: &mut [f32],
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     C: i32,
     LM: i32,
     intra: i32,
@@ -240,7 +240,7 @@ pub fn quant_coarse_energy(
     oldEBands: &mut [f32],
     budget: u32,
     error: &mut [f32],
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     C: i32,
     LM: i32,
     nbAvailableBytes: i32,
@@ -368,7 +368,7 @@ pub fn quant_fine_energy(
     error: &mut [f32],
     prev_quant: Option<&[i32]>,
     extra_quant: &[i32],
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;
@@ -422,7 +422,7 @@ pub fn quant_energy_finalise(
     fine_quant: &[i32],
     fine_priority: &[i32],
     mut bits_left: i32,
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;
@@ -466,7 +466,7 @@ pub fn unquant_coarse_energy(
     end: i32,
     oldEBands: &mut [f32],
     intra: i32,
-    dec: &mut ec_dec,
+    dec: &mut EcDec,
     C: i32,
     LM: i32,
 ) {
@@ -527,7 +527,7 @@ pub fn unquant_fine_energy(
     oldEBands: &mut [f32],
     prev_quant: Option<&[i32]>,
     extra_quant: &[i32],
-    dec: &mut ec_dec,
+    dec: &mut EcDec,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;
@@ -566,7 +566,7 @@ pub fn unquant_energy_finalise(
     fine_quant: &[i32],
     fine_priority: &[i32],
     mut bits_left: i32,
-    dec: &mut ec_dec,
+    dec: &mut EcDec,
     C: i32,
 ) {
     let nbEBands = m.nbEBands as i32;

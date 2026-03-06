@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/code_signs.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_icdf};
-use crate::celt::entenc::{ec_enc, ec_enc_icdf};
+use crate::celt::entdec::{ec_dec_icdf, EcDec};
+use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::define::SHELL_CODEC_FRAME_LENGTH;
 use crate::silk::tables_pulses_per_block::SILK_SIGN_ICDF;
 // shifting avoids if-statement
@@ -31,7 +31,7 @@ fn silk_dec_map(a: i32) -> i16 {
 /// ```
 /// Upstream C: silk/code_signs.c:silk_encode_signs
 pub fn silk_encode_signs(
-    psRangeEnc: &mut ec_enc,
+    psRangeEnc: &mut EcEnc,
     pulses: &[i8],
     signalType: i32,
     quantOffsetType: i32,
@@ -68,7 +68,7 @@ pub fn silk_encode_signs(
 /// Upstream C: silk/code_signs.c:silk_decode_signs
 #[inline]
 pub fn silk_decode_signs(
-    psRangeDec: &mut ec_dec,
+    psRangeDec: &mut EcDec,
     pulses: &mut [i16],
     signalType: i32,
     quantOffsetType: i32,

@@ -117,14 +117,14 @@ pub mod internals {
     pub use crate::celt::bands::{bitexact_cos, bitexact_log2tan, SPREAD_NORMAL};
 
     // -- CELT entropy coder --
-    pub use crate::celt::entcode::{ec_ctx, ec_get_error, ec_tell, ec_tell_frac};
+    pub use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, EcCtx};
     pub use crate::celt::entdec::{
-        ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint, ec_dec_update,
-        ec_decode, ec_decode_bin,
+        ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint, ec_dec_update,
+        ec_decode, ec_decode_bin, EcDec,
     };
     pub use crate::celt::entenc::{
-        ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init,
-        ec_enc_patch_initial_bits, ec_enc_shrink, ec_enc_uint, ec_encode, ec_encode_bin,
+        ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init,
+        ec_enc_patch_initial_bits, ec_enc_shrink, ec_enc_uint, ec_encode, ec_encode_bin, EcEnc,
     };
 
     // -- CELT laplace --
@@ -145,7 +145,7 @@ pub mod internals {
     pub use crate::celt::vq::op_pvq_search_c;
 
     // -- CELT FFT --
-    pub use crate::celt::kiss_fft::{kiss_fft_state, opus_fft_c, opus_fft_impl};
+    pub use crate::celt::kiss_fft::{opus_fft_c, opus_fft_impl, KissFftState};
 
     // -- CELT MDCT --
     pub use crate::celt::mdct::{mdct_backward, mdct_forward};

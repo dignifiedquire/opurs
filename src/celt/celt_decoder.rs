@@ -12,7 +12,7 @@ use crate::celt::common::{
 };
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entdec::{
-    ec_dec, ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint,
+    ec_dec_bit_logp, ec_dec_bits, ec_dec_icdf, ec_dec_init, ec_dec_uint, EcDec,
 };
 use crate::celt::float_cast::{celt_float2int16, float2int};
 use crate::celt::mathops::celt_sqrt;
@@ -923,14 +923,7 @@ fn celt_synthesis(
     }
 }
 /// Upstream C: celt/celt_decoder.c:tf_decode
-fn tf_decode(
-    start: i32,
-    end: i32,
-    isTransient: i32,
-    tf_res: &mut [i32],
-    LM: i32,
-    dec: &mut ec_dec,
-) {
+fn tf_decode(start: i32, end: i32, isTransient: i32, tf_res: &mut [i32], LM: i32, dec: &mut EcDec) {
     let mut curr: i32;
     let mut tf_select: i32;
     let mut tf_changed: i32;
@@ -1455,7 +1448,7 @@ pub fn celt_decode_with_ec(
     data: Option<&[u8]>,
     pcm: &mut [f32],
     mut frame_size: i32,
-    dec: Option<&mut ec_dec>,
+    dec: Option<&mut EcDec>,
     accum: i32,
     #[cfg(feature = "deep-plc")] lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,
     #[cfg(feature = "qext")] qext_payload: Option<&[u8]>,
@@ -1675,7 +1668,7 @@ fn celt_decode_body(
     st: &mut OpusCustomDecoder,
     pcm: &mut [f32],
     frame_size: i32,
-    dec: &mut ec_dec,
+    dec: &mut EcDec,
     accum: i32,
     C: i32,
     CC: i32,
@@ -1853,7 +1846,7 @@ fn celt_decode_body(
     #[cfg(feature = "qext")]
     let mut ext_dec_buf: Vec<u8>;
     #[cfg(feature = "qext")]
-    let mut ext_dec: ec_dec;
+    let mut ext_dec: EcDec;
     #[cfg(feature = "qext")]
     let qext_mode: Option<OpusCustomMode>;
     #[cfg(feature = "qext")]

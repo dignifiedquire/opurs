@@ -11,7 +11,7 @@ const VERY_SMALL: f32 = 1e-30;
 use crate::arch::{opus_select_arch, Arch};
 use crate::celt::celt_encoder::{celt_encode_with_ec, OpusCustomEncoder, SILKInfo};
 use crate::celt::entcode::ec_tell;
-use crate::celt::entenc::ec_enc;
+use crate::celt::entenc::EcEnc;
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_done, ec_enc_init, ec_enc_shrink, ec_enc_uint};
 use crate::celt::mathops::{celt_exp2, celt_maxabs16, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
@@ -2028,7 +2028,7 @@ fn encode_celt_to_silk_redundancy(
     pcm_buf: &[f32],
     redundancy_tmp: &mut [u8],
     redundancy_bytes: i32,
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     nb_compr_bytes: &mut i32,
     ret: i32,
     frame_size: i32,

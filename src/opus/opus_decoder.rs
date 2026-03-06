@@ -5,7 +5,7 @@
 use crate::arch::opus_select_arch;
 use crate::celt::celt_decoder::{celt_decode_with_ec, celt_decoder_init, OpusCustomDecoder};
 use crate::celt::entcode::ec_tell;
-use crate::celt::entdec::ec_dec;
+use crate::celt::entdec::EcDec;
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_init, ec_dec_uint};
 use crate::celt::float_cast::{celt_float2int16, float2int};
 use crate::celt::mathops::celt_exp2;
@@ -536,7 +536,7 @@ fn opus_decode_frame(
         }
         None => 0,
     };
-    let mut dec: ec_dec = ec_dec {
+    let mut dec: EcDec = EcDec {
         buf: &mut [],
         storage: 0,
         end_offs: 0,

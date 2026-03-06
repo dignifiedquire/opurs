@@ -12,7 +12,7 @@ use crate::dnn::freq::{forward_transform, NB_BANDS};
 use crate::dnn::nndsp::*;
 use crate::dnn::nnet::*;
 
-use crate::celt::kiss_fft::kiss_fft_cpx;
+use crate::celt::kiss_fft::KissFftCpx;
 use crate::silk::structs::{silk_decoder_control, silk_decoder_state};
 
 // ========== OSCE Config (osce_config.h) ==========
@@ -1669,7 +1669,7 @@ fn apply_filterbank(
 ///
 /// Upstream C: dnn/osce_features.c:mag_spec_320_onesided
 fn mag_spec_320_onesided(out: &mut [f32], input: &[f32]) {
-    let mut buffer = [kiss_fft_cpx { re: 0.0, im: 0.0 }; OSCE_SPEC_WINDOW_SIZE];
+    let mut buffer = [KissFftCpx { re: 0.0, im: 0.0 }; OSCE_SPEC_WINDOW_SIZE];
     forward_transform(&mut buffer, input);
     for k in 0..OSCE_SPEC_NUM_FREQS {
         // C: OSCE_SPEC_WINDOW_SIZE * sqrt(re*re + im*im) — entire expression in double
@@ -3326,7 +3326,7 @@ pub fn osce_bwe_calculate_features(
         }
 
         // DFT
-        let mut fft_buffer = [kiss_fft_cpx { re: 0.0, im: 0.0 }; OSCE_BWE_WINDOW_SIZE];
+        let mut fft_buffer = [KissFftCpx { re: 0.0, im: 0.0 }; OSCE_BWE_WINDOW_SIZE];
         forward_transform(&mut fft_buffer, &buffer);
 
         // Instantaneous frequency

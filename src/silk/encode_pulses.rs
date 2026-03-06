@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/encode_pulses.c`
 
-use crate::celt::entenc::{ec_enc, ec_enc_icdf};
+use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::code_signs::silk_encode_signs;
 use crate::silk::define::{N_RATE_LEVELS, SHELL_CODEC_FRAME_LENGTH, SILK_MAX_PULSES};
 use crate::silk::shell_coder::silk_shell_encoder;
@@ -33,7 +33,7 @@ fn combine_and_check(pulses_comb: &mut [i32], max_pulses: u8) -> Option<&mut [i3
 /// Encode quantization indices of excitation
 /// Upstream C: silk/encode_pulses.c:silk_encode_pulses
 pub fn silk_encode_pulses(
-    psRangeEnc: &mut ec_enc,
+    psRangeEnc: &mut EcEnc,
     signalType: i32,
     quantOffsetType: i32,
     pulses_buffer: &mut [i8],

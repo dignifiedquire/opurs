@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/stereo_decode_pred.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_icdf};
+use crate::celt::entdec::{ec_dec_icdf, EcDec};
 use crate::silk::define::STEREO_QUANT_SUB_STEPS;
 use crate::silk::macros::silk_smulwb;
 use crate::silk::sigproc_fix::SILK_FIX_CONST;
@@ -17,7 +17,7 @@ use crate::silk::tables_other::{
 /// psRangeDec    I/O   Compressor data structure
 /// pred_Q13[]    O     Predictors
 /// ```
-pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2]) {
+pub fn silk_stereo_decode_pred(psRangeDec: &mut EcDec, pred_Q13: &mut [i32; 2]) {
     let n = ec_dec_icdf(psRangeDec, &SILK_STEREO_PRED_JOINT_ICDF, 8) as usize;
 
     let mut ix: [[usize; 3]; 2] = [[0; 3]; 2];
@@ -56,7 +56,7 @@ pub fn silk_stereo_decode_pred(psRangeDec: &mut ec_dec, pred_Q13: &mut [i32; 2])
 /// psRangeDec        I/O   Compressor data structure
 /// decode_only_mid   O     Flag that only mid channel has been coded
 /// ```
-pub fn silk_stereo_decode_mid_only(psRangeDec: &mut ec_dec, decode_only_mid: &mut bool) {
+pub fn silk_stereo_decode_mid_only(psRangeDec: &mut EcDec, decode_only_mid: &mut bool) {
     /* Decode flag that only mid channel is coded */
     *decode_only_mid = ec_dec_icdf(psRangeDec, &SILK_STEREO_ONLY_CODE_MID_ICDF, 8) != 0;
 }

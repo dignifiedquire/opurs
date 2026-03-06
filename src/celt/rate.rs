@@ -4,7 +4,7 @@
 
 #[cfg(feature = "qext")]
 use crate::celt::entcode::ec_tell_frac;
-use crate::celt::entcode::{celt_udiv, ec_ctx, BITRES};
+use crate::celt::entcode::{celt_udiv, EcCtx, BITRES};
 use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_uint};
 use crate::celt::entenc::{ec_enc_bit_logp, ec_enc_uint};
 use crate::celt::modes::OpusCustomMode;
@@ -107,7 +107,7 @@ fn interp_bits2pulses(
     fine_priority: &mut [i32],
     C: i32,
     LM: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
     encode: i32,
     prev: i32,
     signalBandwidth: i32,
@@ -364,7 +364,7 @@ pub fn clt_compute_allocation(
     fine_priority: &mut [i32],
     C: i32,
     LM: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
     encode: i32,
     prev: i32,
     signalBandwidth: i32,
@@ -529,7 +529,7 @@ const LAST_OTHER: [u8; 4] = [120, 112, 70, 0];
 ///
 /// Upstream C: celt/rate.c:ec_enc_depth
 #[cfg(feature = "qext")]
-fn ec_enc_depth(enc: &mut ec_ctx, depth: i32, cap: i32, last: &mut i32) {
+fn ec_enc_depth(enc: &mut EcCtx, depth: i32, cap: i32, last: &mut i32) {
     let mut sym = 3;
     if depth == *last {
         sym = 2;
@@ -557,7 +557,7 @@ fn ec_enc_depth(enc: &mut ec_ctx, depth: i32, cap: i32, last: &mut i32) {
 ///
 /// Upstream C: celt/rate.c:ec_dec_depth
 #[cfg(feature = "qext")]
-fn ec_dec_depth(dec: &mut ec_ctx, cap: i32, last: &mut i32) -> i32 {
+fn ec_dec_depth(dec: &mut EcCtx, cap: i32, last: &mut i32) -> i32 {
     let sym;
     if *last == 0 {
         let s = ec_dec_icdf(dec, &LAST_ZERO, 7);
@@ -643,7 +643,7 @@ pub fn clt_compute_extra_allocation(
     extra_equant: &mut [i32],
     C: i32,
     LM: i32,
-    ec: &mut ec_ctx,
+    ec: &mut EcCtx,
     encode: i32,
     tone_freq: f32,
     toneishness: f32,

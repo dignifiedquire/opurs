@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `celt/cwrs.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_uint};
-use crate::celt::entenc::{ec_enc, ec_enc_uint};
+use crate::celt::entdec::{ec_dec_uint, EcDec};
+use crate::celt::entenc::{ec_enc_uint, EcEnc};
 
 /*Although derived separately, the pulse vector coding scheme is equivalent to
  a Pyramid Vector Quantizer \cite{Fis86}.
@@ -376,7 +376,7 @@ pub fn icwrs(n: usize, y: &[i32]) -> u32 {
 }
 
 /// Upstream C: celt/cwrs.c:encode_pulses
-pub fn encode_pulses(y: &[i32], k: i32, enc: &mut ec_enc) {
+pub fn encode_pulses(y: &[i32], k: i32, enc: &mut EcEnc) {
     let n = y.len();
     debug_assert!(k > 0);
     ec_enc_uint(enc, icwrs(n, y), pvq_v(n as u32, k as u32));
@@ -468,7 +468,7 @@ pub fn cwrsi(mut n: usize, mut k: i32, mut i: u32, y: &mut [i32]) -> f32 {
 }
 
 /// Upstream C: celt/cwrs.c:decode_pulses
-pub fn decode_pulses(y: &mut [i32], k: i32, dec: &mut ec_dec) -> f32 {
+pub fn decode_pulses(y: &mut [i32], k: i32, dec: &mut EcDec) -> f32 {
     let n = y.len();
     cwrsi(n, k, ec_dec_uint(dec, pvq_v(n as u32, k as u32)), y)
 }

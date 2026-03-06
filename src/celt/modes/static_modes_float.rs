@@ -91,13 +91,13 @@ pub static CACHE_CAPS50: [u8; 168] = [
 
 macro_rules! c {
     ($re:literal, $im:literal) => {
-        kiss_twiddle_cpx::new($re, $im)
+        KissTwiddleCpx::new($re, $im)
     };
 }
 
 #[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
 #[rustfmt::skip]
-pub static FFT_TWIDDLES48000_960: [kiss_twiddle_cpx; 480] = [
+pub static FFT_TWIDDLES48000_960: [KissTwiddleCpx; 480] = [
     c!(1.0000000, -0.0000000), c!(0.99991433, -0.013089596),
     c!(0.99965732, -0.026176948), c!(0.99922904, -0.039259816),
     c!(0.99862953, -0.052335956), c!(0.99785892, -0.065403129),
@@ -411,7 +411,7 @@ pub static FFT_BITREV60: [i16; 60] = [
     2, 14, 26, 38, 50, 6, 18, 30, 42, 54, 10, 22, 34, 46, 58,
     3, 15, 27, 39, 51, 7, 19, 31, 43, 55, 11, 23, 35, 47, 59,
 ];
-pub static FFT_STATE48000_960_0: kiss_fft_state = kiss_fft_state {
+pub static FFT_STATE48000_960_0: KissFftState = KissFftState {
     nfft: 480,
     scale: 0.0020833334,
     shift: -1,
@@ -428,7 +428,7 @@ pub static FFT_STATE48000_960_0: kiss_fft_state = kiss_fft_state {
     bitrev: &FFT_BITREV480,
     twiddles: &FFT_TWIDDLES48000_960,
 };
-pub static FFT_STATE48000_960_1: kiss_fft_state = kiss_fft_state {
+pub static FFT_STATE48000_960_1: KissFftState = KissFftState {
     nfft: 240,
     scale: 0.004166667,
     shift: 1,
@@ -445,7 +445,7 @@ pub static FFT_STATE48000_960_1: kiss_fft_state = kiss_fft_state {
     bitrev: &FFT_BITREV240,
     twiddles: &FFT_TWIDDLES48000_960,
 };
-pub static FFT_STATE48000_960_2: kiss_fft_state = kiss_fft_state {
+pub static FFT_STATE48000_960_2: KissFftState = KissFftState {
     nfft: 120,
     scale: 0.008333334,
     shift: 2,
@@ -462,7 +462,7 @@ pub static FFT_STATE48000_960_2: kiss_fft_state = kiss_fft_state {
     bitrev: &FFT_BITREV120,
     twiddles: &FFT_TWIDDLES48000_960,
 };
-pub static FFT_STATE48000_960_3: kiss_fft_state = kiss_fft_state {
+pub static FFT_STATE48000_960_3: KissFftState = KissFftState {
     nfft: 60,
     scale: 0.016666667,
     shift: 3,
@@ -894,6 +894,6 @@ pub(crate) static MODE48000_960_120: OpusCustomMode = OpusCustomMode {
 pub static STATIC_MODE_LIST: [&OpusCustomMode; 1] = [&MODE48000_960_120];
 
 use super::{BAND_ALLOCATION, EBAND5MS};
-use crate::celt::kiss_fft::{kiss_fft_state, kiss_twiddle_cpx};
+use crate::celt::kiss_fft::{KissFftState, KissTwiddleCpx};
 use crate::celt::mdct::MdctLookup;
 use crate::celt::modes::{OpusCustomMode, PulseCache};

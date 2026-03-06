@@ -2,14 +2,14 @@
 //!
 //! Upstream C: `silk/stereo_encode_pred.c`
 
-use crate::celt::entenc::{ec_enc, ec_enc_icdf};
+use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::tables_other::{
     SILK_STEREO_ONLY_CODE_MID_ICDF, SILK_STEREO_PRED_JOINT_ICDF, SILK_UNIFORM3_ICDF,
     SILK_UNIFORM5_ICDF,
 };
 
 /// Upstream C: silk/stereo_encode_pred.c:silk_stereo_encode_pred
-pub fn silk_stereo_encode_pred(psRangeEnc: &mut ec_enc, ix: &[[i8; 3]]) {
+pub fn silk_stereo_encode_pred(psRangeEnc: &mut EcEnc, ix: &[[i8; 3]]) {
     let mut n: i32;
     n = 5 * ix[0][2_usize] as i32 + ix[1][2_usize] as i32;
     debug_assert!(n < 25);
@@ -34,7 +34,7 @@ pub fn silk_stereo_encode_pred(psRangeEnc: &mut ec_enc, ix: &[[i8; 3]]) {
     }
 }
 /// Upstream C: silk/stereo_encode_pred.c:silk_stereo_encode_mid_only
-pub fn silk_stereo_encode_mid_only(psRangeEnc: &mut ec_enc, mid_only_flag: i8) {
+pub fn silk_stereo_encode_mid_only(psRangeEnc: &mut EcEnc, mid_only_flag: i8) {
     ec_enc_icdf(
         psRangeEnc,
         mid_only_flag as i32,

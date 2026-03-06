@@ -34,7 +34,7 @@ pub struct silk_EncControlStruct {
 }
 use crate::arch::Arch;
 use crate::celt::entcode::ec_tell;
-use crate::celt::entenc::{ec_enc, ec_enc_icdf, ec_enc_patch_initial_bits};
+use crate::celt::entenc::{ec_enc_icdf, ec_enc_patch_initial_bits, EcEnc};
 use crate::celt::float_cast::float2int16;
 use crate::silk::errors::{SILK_ENC_INPUT_INVALID_NO_OF_SAMPLES, SILK_NO_ERROR};
 
@@ -113,7 +113,7 @@ pub fn silk_encode_api(
     encControl: &mut silk_EncControlStruct,
     samplesIn: &[f32],
     nSamplesIn: i32,
-    mut psRangeEnc: Option<&mut ec_enc>,
+    mut psRangeEnc: Option<&mut EcEnc>,
     nBytesOut: &mut i32,
     prefillFlag: i32,
     activity: i32,

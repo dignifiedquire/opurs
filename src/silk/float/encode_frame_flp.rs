@@ -2,8 +2,8 @@
 //!
 //! Upstream C: `silk/float/encode_frame_FLP.c`
 
-use crate::celt::entcode::{ec_ctx_saved, ec_tell};
-use crate::celt::entenc::ec_enc;
+use crate::celt::entcode::{ec_tell, EcCtxSaved};
+use crate::celt::entenc::EcEnc;
 use crate::silk::define::{
     CODE_CONDITIONALLY, LA_SHAPE_MS, MAX_CONSECUTIVE_DTX, NB_SPEECH_FRAMES_BEFORE_DTX,
     N_LEVELS_QGAIN, TYPE_NO_VOICE_ACTIVITY, TYPE_UNVOICED, VAD_NO_ACTIVITY,
@@ -55,7 +55,7 @@ pub fn silk_encode_do_vad_flp(psEnc: &mut silk_encoder_state_FLP, activity: i32)
 pub fn silk_encode_frame_flp(
     psEnc: &mut silk_encoder_state_FLP,
     pnBytesOut: &mut i32,
-    mut psRangeEnc: Option<&mut ec_enc>,
+    mut psRangeEnc: Option<&mut EcEnc>,
     condCoding: i32,
     maxBits: i32,
     useCBR: i32,
@@ -87,8 +87,8 @@ pub fn silk_encode_frame_flp(
     let mut found_lower: i32;
     let ret: i32 = 0;
     let mut res_pitch: [f32; 672] = [0.; 672];
-    let sRangeEnc_copy: ec_ctx_saved;
-    let mut sRangeEnc_copy2 = ec_ctx_saved::default();
+    let sRangeEnc_copy: EcCtxSaved;
+    let mut sRangeEnc_copy2 = EcCtxSaved::default();
     let sNSQ_copy: silk_nsq_state;
     let mut sNSQ_copy2: silk_nsq_state = silk_nsq_state {
         xq: [0; 640],

@@ -7,7 +7,7 @@
 
 use super::burg::silk_burg_analysis;
 use super::lpcnet_tables::{kfft, DCT_TABLE, HALF_WINDOW};
-use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
+use crate::celt::kiss_fft::{opus_fft_c, KissFftCpx};
 
 // --- Constants ---
 
@@ -63,10 +63,10 @@ const COMPENSATION: [f32; NB_BANDS] = [
 /// Forward FFT: real input (WINDOW_SIZE) -> complex output (FREQ_SIZE).
 ///
 /// Upstream C: dnn/freq.c:forward_transform
-pub fn forward_transform(out: &mut [kiss_fft_cpx], input: &[f32]) {
+pub fn forward_transform(out: &mut [KissFftCpx], input: &[f32]) {
     let fft_state = kfft();
-    let mut x = vec![kiss_fft_cpx::default(); WINDOW_SIZE];
-    let mut y = vec![kiss_fft_cpx::default(); WINDOW_SIZE];
+    let mut x = vec![KissFftCpx::default(); WINDOW_SIZE];
+    let mut y = vec![KissFftCpx::default(); WINDOW_SIZE];
     for i in 0..WINDOW_SIZE {
         x[i].re = input[i];
         x[i].im = 0.0;
@@ -78,10 +78,10 @@ pub fn forward_transform(out: &mut [kiss_fft_cpx], input: &[f32]) {
 /// Inverse FFT: complex input (FREQ_SIZE) -> real output (WINDOW_SIZE).
 ///
 /// Upstream C: dnn/freq.c:inverse_transform
-pub fn inverse_transform(out: &mut [f32], input: &[kiss_fft_cpx]) {
+pub fn inverse_transform(out: &mut [f32], input: &[KissFftCpx]) {
     let fft_state = kfft();
-    let mut x = vec![kiss_fft_cpx::default(); WINDOW_SIZE];
-    let mut y = vec![kiss_fft_cpx::default(); WINDOW_SIZE];
+    let mut x = vec![KissFftCpx::default(); WINDOW_SIZE];
+    let mut y = vec![KissFftCpx::default(); WINDOW_SIZE];
     x[..FREQ_SIZE].copy_from_slice(&input[..FREQ_SIZE]);
     // Mirror conjugate for real-valued IFFT
     for i in FREQ_SIZE..WINDOW_SIZE {
@@ -101,7 +101,7 @@ pub fn inverse_transform(out: &mut [f32], input: &[kiss_fft_cpx]) {
 /// Compute band energy from FFT magnitudes using triangular overlap.
 ///
 /// Upstream C: dnn/freq.c:lpcn_compute_band_energy
-pub fn lpcn_compute_band_energy(band_e: &mut [f32], x: &[kiss_fft_cpx]) {
+pub fn lpcn_compute_band_energy(band_e: &mut [f32], x: &[KissFftCpx]) {
     let mut sum = [0.0f32; NB_BANDS];
     for i in 0..NB_BANDS - 1 {
         let band_size = (EBAND5MS[i + 1] - EBAND5MS[i]) * WINDOW_SIZE_5MS;
@@ -121,7 +121,7 @@ pub fn lpcn_compute_band_energy(band_e: &mut [f32], x: &[kiss_fft_cpx]) {
 /// Compute inverse band energy from FFT magnitudes.
 ///
 /// Upstream C: dnn/freq.c:compute_band_energy_inverse
-fn compute_band_energy_inverse(band_e: &mut [f32], x: &[kiss_fft_cpx]) {
+fn compute_band_energy_inverse(band_e: &mut [f32], x: &[KissFftCpx]) {
     let mut sum = [0.0f32; NB_BANDS];
     for i in 0..NB_BANDS - 1 {
         let band_size = (EBAND5MS[i + 1] - EBAND5MS[i]) * WINDOW_SIZE_5MS;
@@ -238,7 +238,7 @@ fn lpc_from_bands(lpc: &mut [f32], ex: &[f32]) -> f32 {
     let mut xr = [0.0f32; FREQ_SIZE];
     interp_band_gain(&mut xr, ex);
     xr[FREQ_SIZE - 1] = 0.0;
-    let mut x_auto_cpx = vec![kiss_fft_cpx::default(); FREQ_SIZE];
+    let mut x_auto_cpx = vec![KissFftCpx::default(); FREQ_SIZE];
     for i in 0..FREQ_SIZE {
         x_auto_cpx[i].re = xr[i];
         x_auto_cpx[i].im = 0.0;
@@ -328,7 +328,7 @@ fn compute_burg_cepstrum(pcm: &[f32], burg_cepstrum: &mut [f32], len: usize, ord
     }
 
     // FFT of LPC impulse response
-    let mut lpc_fft = vec![kiss_fft_cpx::default(); FREQ_SIZE];
+    let mut lpc_fft = vec![KissFftCpx::default(); FREQ_SIZE];
     forward_transform(&mut lpc_fft, &x);
 
     // Inverse band energy

@@ -9,13 +9,13 @@ use super::static_modes_float::{
     LOG_N400,
 };
 use super::{BAND_ALLOCATION, EBAND5MS};
-use crate::celt::kiss_fft::{kiss_fft_state, kiss_twiddle_cpx};
+use crate::celt::kiss_fft::{KissFftState, KissTwiddleCpx};
 use crate::celt::mdct::MdctLookup;
 use crate::celt::modes::{OpusCustomMode, PulseCache};
 
 macro_rules! c {
     ($re:literal, $im:literal) => {
-        kiss_twiddle_cpx::new($re, $im)
+        KissTwiddleCpx::new($re, $im)
     };
 }
 /// Extension ID for QEXT in packet headers.
@@ -323,7 +323,7 @@ pub static QEXT_CACHE_CAPS50: [u8; 112] = [
 
 #[rustfmt::skip]
 #[allow(clippy::approx_constant, clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-pub static FFT_TWIDDLES96000_1920: [kiss_twiddle_cpx; 960] = [
+pub static FFT_TWIDDLES96000_1920: [KissTwiddleCpx; 960] = [
     c!(1.0000000, -0.0000000), c!(0.99997858, -0.0065449380), c!(0.99991433, -0.013089596),
     c!(0.99980724, -0.019633692), c!(0.99965732, -0.026176948), c!(0.99946459, -0.032719083),
     c!(0.99922904, -0.039259816), c!(0.99895068, -0.045798867), c!(0.99862953, -0.052335956),
@@ -715,7 +715,7 @@ pub static FFT_BITREV960: [i16; 960] = [
 ];
 
 #[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-static FFT_STATE96000_1920_0: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_0: KissFftState = KissFftState {
     nfft: 960,
     scale: 0.0010416667,
     shift: -1,
@@ -734,7 +734,7 @@ static FFT_STATE96000_1920_0: kiss_fft_state = kiss_fft_state {
 };
 
 #[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-static FFT_STATE96000_1920_1: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_1: KissFftState = KissFftState {
     nfft: 480,
     scale: 0.0020833334,
     shift: 1,
@@ -753,7 +753,7 @@ static FFT_STATE96000_1920_1: kiss_fft_state = kiss_fft_state {
 };
 
 #[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-static FFT_STATE96000_1920_2: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_2: KissFftState = KissFftState {
     nfft: 240,
     scale: 0.0041666669,
     shift: 2,
@@ -772,7 +772,7 @@ static FFT_STATE96000_1920_2: kiss_fft_state = kiss_fft_state {
 };
 
 #[allow(clippy::excessive_precision)] // Keep upstream numeric literals bit-exact.
-static FFT_STATE96000_1920_3: kiss_fft_state = kiss_fft_state {
+static FFT_STATE96000_1920_3: KissFftState = KissFftState {
     nfft: 120,
     scale: 0.0083333338,
     shift: 3,

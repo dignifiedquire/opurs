@@ -23,8 +23,8 @@ use crate::celt::common::{
 use crate::celt::common::{COMBFILTER_MAXPERIOD, COMBFILTER_MINPERIOD};
 use crate::celt::entcode::{ec_get_error, ec_tell, ec_tell_frac, BITRES};
 use crate::celt::entenc::{
-    ec_enc, ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
-    ec_enc_uint,
+    ec_enc_bit_logp, ec_enc_bits, ec_enc_done, ec_enc_icdf, ec_enc_init, ec_enc_shrink,
+    ec_enc_uint, EcEnc,
 };
 use crate::celt::mathops::{celt_exp2, celt_log2, celt_maxabs16, celt_sqrt};
 use crate::celt::mdct::mdct_forward;
@@ -1129,7 +1129,7 @@ fn tf_encode(
     tf_res: &mut [i32],
     LM: i32,
     mut tf_select: i32,
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
 ) {
     let mut curr: i32;
     let mut i: i32;
@@ -2409,7 +2409,7 @@ pub fn celt_encode_with_ec<'b>(
     mut frame_size: i32,
     compressed: &'b mut [u8],
     mut nbCompressedBytes: i32,
-    mut enc: Option<&mut ec_enc<'b>>,
+    mut enc: Option<&mut EcEnc<'b>>,
     #[cfg(feature = "qext")] qext_payload: Option<&mut [u8]>,
     #[cfg(feature = "qext")] qext_bytes: i32,
 ) -> i32 {
@@ -2417,7 +2417,7 @@ pub fn celt_encode_with_ec<'b>(
     let mut c: i32;
 
     let mut bits: i32;
-    let mut _enc: ec_enc = ec_enc {
+    let mut _enc: EcEnc = EcEnc {
         buf: &mut [],
         storage: 0,
         end_offs: 0,
@@ -3751,7 +3751,7 @@ pub fn celt_encode_with_ec<'b>(
 
             // Dummy encoder for the nested ext_enc arg of quant_all_bands
             let mut dummy_buf = [0u8; 4];
-            let mut dummy_enc = crate::celt::entcode::ec_ctx {
+            let mut dummy_enc = crate::celt::entcode::EcCtx {
                 buf: &mut dummy_buf,
                 storage: 4,
                 end_offs: 0,

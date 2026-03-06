@@ -4,10 +4,8 @@
 //! Upstream C: `dnn/dred_encoder.c`, `dnn/dred_encoder.h`
 
 use crate::arch::Arch;
-use crate::celt::entcode::{ec_ctx_saved, ec_tell};
-use crate::celt::entenc::{
-    ec_enc, ec_enc_done, ec_enc_init, ec_enc_shrink, ec_enc_uint, ec_encode,
-};
+use crate::celt::entcode::{ec_tell, EcCtxSaved};
+use crate::celt::entenc::{ec_enc_done, ec_enc_init, ec_enc_shrink, ec_enc_uint, ec_encode, EcEnc};
 use crate::celt::laplace::ec_laplace_encode_p0;
 use crate::dnn::lpcnet::{lpcnet_compute_single_frame_features_float, LPCNetEncState};
 use crate::dnn::nnet::*;
@@ -439,7 +437,7 @@ pub fn dred_compute_latents(
 /// Upstream C: dnn/dred_encoder.c:dred_encode_latents
 #[allow(clippy::too_many_arguments)]
 fn dred_encode_latents(
-    ec: &mut ec_enc,
+    ec: &mut EcEnc,
     x: &[f32],
     scale: &[u8],
     dzone: &[u8],
@@ -566,7 +564,7 @@ pub fn dred_encode_silk_frame(
         return 0;
     }
 
-    let mut ec_bak: ec_ctx_saved = ec_encoder.save();
+    let mut ec_bak: EcCtxSaved = ec_encoder.save();
     let mut prev_active = false;
     let mut dred_encoded = 0;
     let limit = (2 * max_chunks).min(enc.latents_buffer_fill - latent_offset - 1);

@@ -22,14 +22,14 @@ pub const EC_CODE_BOT: u32 = EC_CODE_TOP >> EC_SYM_BITS;
 pub const EC_CODE_EXTRA: i32 = (EC_CODE_BITS - 2) % EC_SYM_BITS + 1;
 
 /// Upstream C: celt/entcode.h:ec_window
-pub type ec_window = u32;
+pub type EcWindow = u32;
 
 /// Upstream C: celt/entcode.h:ec_ctx
-pub struct ec_ctx<'a> {
+pub struct EcCtx<'a> {
     pub buf: &'a mut [u8],
     pub storage: u32,
     pub end_offs: u32,
-    pub end_window: ec_window,
+    pub end_window: EcWindow,
     pub nend_bits: i32,
     pub nbits_total: i32,
     pub offs: u32,
@@ -42,10 +42,10 @@ pub struct ec_ctx<'a> {
 
 /// Upstream C: (no direct C equivalent — Rust-only save/restore helper)
 #[derive(Default, Copy, Clone)]
-pub struct ec_ctx_saved {
+pub struct EcCtxSaved {
     pub storage: u32,
     pub end_offs: u32,
-    pub end_window: ec_window,
+    pub end_window: EcWindow,
     pub nend_bits: i32,
     pub nbits_total: i32,
     pub offs: u32,
@@ -56,9 +56,9 @@ pub struct ec_ctx_saved {
     pub error: i32,
 }
 
-impl ec_ctx<'_> {
-    pub fn save(&self) -> ec_ctx_saved {
-        ec_ctx_saved {
+impl EcCtx<'_> {
+    pub fn save(&self) -> EcCtxSaved {
+        EcCtxSaved {
             storage: self.storage,
             end_offs: self.end_offs,
             end_window: self.end_window,
@@ -76,7 +76,7 @@ impl ec_ctx<'_> {
     /// NOTE: this function will summon dragons if you pass a `saved` value from a different `ec_ctx`.
     ///
     /// Also, you obviously don't want to pass a default `ec_ctx_saved` value.
-    pub fn restore(&mut self, saved: ec_ctx_saved) {
+    pub fn restore(&mut self, saved: EcCtxSaved) {
         self.storage = saved.storage;
         self.end_offs = saved.end_offs;
         self.end_window = saved.end_window;
@@ -94,19 +94,19 @@ impl ec_ctx<'_> {
 /// Upstream C: celt/entcode.h:EC_UINT_BITS
 pub const EC_UINT_BITS: i32 = 8;
 /// Upstream C: celt/entcode.h:EC_WINDOW_SIZE
-pub const EC_WINDOW_SIZE: i32 = ::core::mem::size_of::<ec_window>() as i32 * 8;
+pub const EC_WINDOW_SIZE: i32 = ::core::mem::size_of::<EcWindow>() as i32 * 8;
 /// Upstream C: celt/entcode.h:BITRES
 pub const BITRES: i32 = 3;
 
 /// Upstream C: celt/entcode.h:ec_get_error (macro in C)
 #[inline]
-pub fn ec_get_error(this: &ec_ctx) -> i32 {
+pub fn ec_get_error(this: &EcCtx) -> i32 {
     this.error
 }
 
 /// Upstream C: celt/entcode.h:ec_tell (macro in C)
 #[inline]
-pub fn ec_tell(this: &ec_ctx) -> i32 {
+pub fn ec_tell(this: &EcCtx) -> i32 {
     this.nbits_total - (EC_CLZ0 - this.rng.leading_zeros() as i32)
 }
 
@@ -123,7 +123,7 @@ pub fn celt_sudiv(n: i32, d: i32) -> i32 {
 }
 
 /// Upstream C: celt/entcode.c:ec_tell_frac
-pub fn ec_tell_frac(this: &ec_ctx) -> u32 {
+pub fn ec_tell_frac(this: &EcCtx) -> u32 {
     const CORRECTION: [u32; 8] = [35733, 38967, 42495, 46340, 50535, 55109, 60097, 65535];
 
     let mut l: i32;

@@ -6,8 +6,8 @@ use crate::arch::Arch;
 use crate::celt::bands::SPREAD_NONE;
 use crate::celt::cwrs::{decode_pulses, encode_pulses};
 use crate::celt::entcode::celt_udiv;
-use crate::celt::entdec::ec_dec;
-use crate::celt::entenc::ec_enc;
+use crate::celt::entdec::EcDec;
+use crate::celt::entenc::EcEnc;
 use crate::celt::mathops::{celt_atan2p_norm, celt_cos_norm, celt_rsqrt_norm, celt_sqrt};
 use crate::celt::pitch::celt_inner_prod;
 
@@ -387,7 +387,7 @@ fn op_pvq_search_extra(
 ///
 /// Upstream C: celt/vq.c:ec_enc_refine
 #[cfg(feature = "qext")]
-fn ec_enc_refine(enc: &mut ec_enc, refine: i32, up: i32, extra_bits: i32, use_entropy: bool) {
+fn ec_enc_refine(enc: &mut EcEnc, refine: i32, up: i32, extra_bits: i32, use_entropy: bool) {
     let large = refine.abs() > up / 2;
     ec_enc_bit_logp(enc, large as i32, if use_entropy { 3 } else { 1 });
     if large {
@@ -406,7 +406,7 @@ fn ec_enc_refine(enc: &mut ec_enc, refine: i32, up: i32, extra_bits: i32, use_en
 ///
 /// Upstream C: celt/vq.c:ec_dec_refine
 #[cfg(feature = "qext")]
-fn ec_dec_refine(dec: &mut ec_dec, up: i32, extra_bits: i32, use_entropy: bool) -> i32 {
+fn ec_dec_refine(dec: &mut EcDec, up: i32, extra_bits: i32, use_entropy: bool) -> i32 {
     let large = ec_dec_bit_logp(dec, if use_entropy { 3 } else { 1 });
     if large != 0 {
         let sign = ec_dec_bits(dec, 1);
@@ -476,7 +476,7 @@ pub fn cubic_quant(
     N: i32,
     res: i32,
     B: i32,
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     gain: f32,
     resynth: i32,
 ) -> u32 {
@@ -523,7 +523,7 @@ pub fn cubic_quant(
 ///
 /// Upstream C: celt/vq.c:cubic_unquant
 #[cfg(feature = "qext")]
-pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut ec_dec, gain: f32) -> u32 {
+pub fn cubic_unquant(X: &mut [f32], N: i32, res: i32, B: i32, dec: &mut EcDec, gain: f32) -> u32 {
     let n = N as usize;
     let mut K = 1 << res;
     #[cfg(feature = "qext")]
@@ -582,11 +582,11 @@ pub fn alg_quant(
     K: i32,
     spread: i32,
     B: i32,
-    enc: &mut ec_enc,
+    enc: &mut EcEnc,
     gain: f32,
     resynth: i32,
     arch: Arch,
-    #[cfg(feature = "qext")] ext_enc: &mut ec_enc,
+    #[cfg(feature = "qext")] ext_enc: &mut EcEnc,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
     debug_assert!(K > 0);
@@ -669,9 +669,9 @@ pub fn alg_unquant(
     K: i32,
     spread: i32,
     B: i32,
-    dec: &mut ec_dec,
+    dec: &mut EcDec,
     gain: f32,
-    #[cfg(feature = "qext")] ext_dec: &mut ec_dec,
+    #[cfg(feature = "qext")] ext_dec: &mut EcDec,
     #[cfg(feature = "qext")] extra_bits: i32,
 ) -> u32 {
     debug_assert!(K > 0);

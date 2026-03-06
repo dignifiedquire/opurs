@@ -31,7 +31,7 @@ pub struct silk_DecControlStruct {
 pub const FLAG_DECODE_NORMAL: i32 = 0;
 pub const FLAG_DECODE_LBRR: i32 = 2;
 pub const FLAG_PACKET_LOST: i32 = 1;
-use crate::celt::entdec::{ec_dec, ec_dec_bit_logp, ec_dec_icdf};
+use crate::celt::entdec::{ec_dec_bit_logp, ec_dec_icdf, EcDec};
 use crate::silk::decode_frame::silk_decode_frame;
 use crate::silk::decode_indices::silk_decode_indices;
 use crate::silk::decode_pulses::silk_decode_pulses;
@@ -94,7 +94,7 @@ pub fn silk_decode(
     decControl: &mut silk_DecControlStruct,
     lostFlag: i32,
     newPacketFlag: i32,
-    psRangeDec: &mut ec_dec,
+    psRangeDec: &mut EcDec,
     samplesOut: &mut [f32],
     nSamplesOut: &mut i32,
     #[cfg(feature = "deep-plc")] mut lpcnet: Option<&mut crate::dnn::lpcnet::LPCNetPLCState>,

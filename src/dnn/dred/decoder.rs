@@ -4,7 +4,7 @@
 
 use crate::arch::opus_select_arch;
 use crate::celt::entcode::ec_tell;
-use crate::celt::entdec::{ec_dec, ec_dec_init, ec_dec_uint, ec_dec_update, ec_decode};
+use crate::celt::entdec::{ec_dec_init, ec_dec_uint, ec_dec_update, ec_decode, EcDec};
 use crate::celt::laplace::ec_laplace_decode_p0;
 use crate::dnn::nnet::WeightArray;
 
@@ -101,7 +101,7 @@ impl OpusDREDDecoder {
 ///
 /// Upstream C: dnn/dred_decoder.c:dred_decode_latents
 fn dred_decode_latents(
-    ec: &mut ec_dec,
+    ec: &mut EcDec,
     x: &mut [f32],
     scale: &[u8],
     r: &[u8],

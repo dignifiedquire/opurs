@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/decode_indices.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_icdf};
+use crate::celt::entdec::{ec_dec_icdf, EcDec};
 use crate::silk::define::{
     CODE_CONDITIONALLY, CODE_INDEPENDENTLY, MAX_NB_SUBFR, NLSF_QUANT_MAX_AMPLITUDE, TYPE_VOICED,
 };
@@ -31,7 +31,7 @@ use crate::silk::tables_pitch_lag::{SILK_PITCH_DELTA_ICDF, SILK_PITCH_LAG_ICDF};
 #[inline]
 pub fn silk_decode_indices(
     psDec: &mut silk_decoder_state,
-    psRangeDec: &mut ec_dec,
+    psRangeDec: &mut EcDec,
     FrameIndex: i32,
     decode_LBRR: i32,
     condCoding: i32,

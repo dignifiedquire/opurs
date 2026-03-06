@@ -50,7 +50,7 @@ fn check_fft(input: &[Complex32], output: &[Complex32], nfft: usize, isinverse: 
 }
 
 /// Inline implementation of opus_ifft_c (conjugate → FFT → conjugate).
-fn opus_ifft_c(st: &opurs::internals::kiss_fft_state, fin: &[Complex32], fout: &mut [Complex32]) {
+fn opus_ifft_c(st: &opurs::internals::KissFftState, fin: &[Complex32], fout: &mut [Complex32]) {
     // Bit-reverse copy from input
     for (&x, &br) in fin.iter().zip(st.bitrev.iter()) {
         fout[br as usize] = x;

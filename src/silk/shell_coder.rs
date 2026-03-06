@@ -6,8 +6,8 @@
 
 //! shell coder; pulse-subframe length is hardcoded
 
-use crate::celt::entdec::{ec_dec, ec_dec_icdf};
-use crate::celt::entenc::{ec_enc, ec_enc_icdf};
+use crate::celt::entdec::{ec_dec_icdf, EcDec};
+use crate::celt::entenc::{ec_enc_icdf, EcEnc};
 use crate::silk::define::SHELL_CODEC_FRAME_LENGTH;
 use crate::silk::tables_pulses_per_block::{
     SILK_SHELL_CODE_TABLE0, SILK_SHELL_CODE_TABLE1, SILK_SHELL_CODE_TABLE2, SILK_SHELL_CODE_TABLE3,
@@ -26,7 +26,7 @@ fn combine_pulses(out: &mut [i32], in_: &[i32]) {
 
 /// Upstream C: silk/shell_coder.c:encode_split
 #[inline]
-fn encode_split(psRangeEnc: &mut ec_enc, p_child1: i32, p: i32, shell_table: &[u8]) {
+fn encode_split(psRangeEnc: &mut EcEnc, p_child1: i32, p: i32, shell_table: &[u8]) {
     if p > 0 {
         ec_enc_icdf(
             psRangeEnc,
@@ -39,7 +39,7 @@ fn encode_split(psRangeEnc: &mut ec_enc, p_child1: i32, p: i32, shell_table: &[u
 
 /// Upstream C: silk/shell_coder.c:decode_split
 #[inline]
-fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_table: &[u8]) {
+fn decode_split(p_child: &mut [i16], psRangeDec: &mut EcDec, p: i32, shell_table: &[u8]) {
     debug_assert_eq!(p_child.len(), 2);
 
     if p > 0 {
@@ -58,7 +58,7 @@ fn decode_split(p_child: &mut [i16], psRangeDec: &mut ec_dec, p: i32, shell_tabl
 ///
 /// Shell encoder, operates on one shell code frame of 16 pulses
 /// Upstream C: silk/shell_coder.c:silk_shell_encoder
-pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
+pub fn silk_shell_encoder(psRangeEnc: &mut EcEnc, pulses0: &[i32]) {
     let mut pulses1: [i32; 8] = [0; 8];
     let mut pulses2: [i32; 4] = [0; 4];
     let mut pulses3: [i32; 2] = [0; 2];
@@ -90,7 +90,7 @@ pub fn silk_shell_encoder(psRangeEnc: &mut ec_enc, pulses0: &[i32]) {
 
 /// Upstream C: silk/shell_coder.c:silk_shell_decoder
 #[inline]
-pub fn silk_shell_decoder(pulses0: &mut [i16], psRangeDec: &mut ec_dec, pulses4: i32) {
+pub fn silk_shell_decoder(pulses0: &mut [i16], psRangeDec: &mut EcDec, pulses4: i32) {
     debug_assert_eq!(pulses0.len(), SHELL_CODEC_FRAME_LENGTH);
     debug_assert_eq!(SHELL_CODEC_FRAME_LENGTH, 16);
 

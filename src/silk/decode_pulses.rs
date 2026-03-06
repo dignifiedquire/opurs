@@ -2,7 +2,7 @@
 //!
 //! Upstream C: `silk/decode_pulses.c`
 
-use crate::celt::entdec::{ec_dec, ec_dec_icdf};
+use crate::celt::entdec::{ec_dec_icdf, EcDec};
 use crate::silk::code_signs::silk_decode_signs;
 use crate::silk::define::{N_RATE_LEVELS, SHELL_CODEC_FRAME_LENGTH, SILK_MAX_PULSES};
 use crate::silk::shell_coder::silk_shell_decoder;
@@ -25,7 +25,7 @@ use itertools::izip;
 /// Upstream C: silk/decode_pulses.c:silk_decode_pulses
 #[inline]
 pub fn silk_decode_pulses(
-    psRangeDec: &mut ec_dec,
+    psRangeDec: &mut EcDec,
     pulses: &mut [i16],
     signalType: i32,
     quantOffsetType: i32,

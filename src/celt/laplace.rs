@@ -4,10 +4,10 @@
 
 #[cfg(feature = "dred")]
 use crate::celt::entdec::ec_dec_icdf16;
-use crate::celt::entdec::{ec_dec, ec_dec_update, ec_decode_bin};
+use crate::celt::entdec::{ec_dec_update, ec_decode_bin, EcDec};
 #[cfg(feature = "dred")]
 use crate::celt::entenc::ec_enc_icdf16;
-use crate::celt::entenc::{ec_enc, ec_encode_bin};
+use crate::celt::entenc::{ec_encode_bin, EcEnc};
 
 /// Upstream C: celt/laplace.c
 pub const LAPLACE_LOG_MINP: i32 = 0;
@@ -23,7 +23,7 @@ fn ec_laplace_get_freq1(fs0: u32, decay: i32) -> u32 {
 }
 
 /// Upstream C: celt/laplace.c:ec_laplace_encode
-pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: i32) {
+pub fn ec_laplace_encode(enc: &mut EcEnc, value: &mut i32, mut fs: u32, decay: i32) {
     let mut fl: u32;
     let mut val: i32 = *value;
     fl = 0;
@@ -71,7 +71,7 @@ pub fn ec_laplace_encode(enc: &mut ec_enc, value: &mut i32, mut fs: u32, decay: 
 }
 
 /// Upstream C: celt/laplace.c:ec_laplace_decode
-pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
+pub fn ec_laplace_decode(dec: &mut EcDec, mut fs: u32, decay: i32) -> i32 {
     let mut val: i32 = 0;
     let mut fl: u32;
 
@@ -121,7 +121,7 @@ pub fn ec_laplace_decode(dec: &mut ec_dec, mut fs: u32, decay: i32) -> i32 {
 
 /// Upstream C: celt/laplace.c:ec_laplace_encode_p0
 #[cfg(feature = "dred")]
-pub fn ec_laplace_encode_p0(enc: &mut ec_enc, value: i32, p0: u16, decay: u16) {
+pub fn ec_laplace_encode_p0(enc: &mut EcEnc, value: i32, p0: u16, decay: u16) {
     let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
     let s = if value == 0 {
         0
@@ -152,7 +152,7 @@ pub fn ec_laplace_encode_p0(enc: &mut ec_enc, value: i32, p0: u16, decay: u16) {
 
 /// Upstream C: celt/laplace.c:ec_laplace_decode_p0
 #[cfg(feature = "dred")]
-pub fn ec_laplace_decode_p0(dec: &mut ec_dec, p0: u16, decay: u16) -> i32 {
+pub fn ec_laplace_decode_p0(dec: &mut EcDec, p0: u16, decay: u16) -> i32 {
     let sign_icdf: [u16; 3] = [32768 - p0, (32768 - p0) / 2, 0];
     let mut s = ec_dec_icdf16(dec, &sign_icdf, 15);
     if s == 2 {

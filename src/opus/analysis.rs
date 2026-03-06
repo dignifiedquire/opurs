@@ -216,7 +216,7 @@ pub const NB_TBANDS: i32 = 18;
 const M_PI: f64 = std::f64::consts::PI;
 use crate::arch::{opus_select_arch, Arch};
 use crate::celt::float_cast::{float2int, CELT_SIG_SCALE};
-use crate::celt::kiss_fft::{kiss_fft_cpx, opus_fft_c};
+use crate::celt::kiss_fft::{opus_fft_c, KissFftCpx};
 use crate::celt::mathops::{celt_log10, celt_sqrt, fast_atan2f};
 use crate::celt::modes::OpusCustomMode;
 
@@ -1064,8 +1064,8 @@ fn tonality_analysis(
         tonal.write_pos -= DETECT_SIZE;
     }
     let is_silence: i32 = is_digital_silence(&tonal.inmem, 720, 1, lsb_depth);
-    let mut in_0: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
-    let mut out: [kiss_fft_cpx; 480] = [kiss_fft_cpx::zero(); 480];
+    let mut in_0: [KissFftCpx; 480] = [KissFftCpx::zero(); 480];
+    let mut out: [KissFftCpx; 480] = [KissFftCpx::zero(); 480];
     let mut tonality: [f32; 240] = [0.; 240];
     let mut noisiness: [f32; 240] = [0.; 240];
     i = 0;

@@ -3,7 +3,7 @@
 //! Upstream C: `silk/decode_frame.c`
 
 use crate::arch::Arch;
-use crate::celt::entdec::ec_dec;
+use crate::celt::entdec::EcDec;
 
 #[cfg(feature = "osce")]
 use crate::celt::entcode::ec_tell;
@@ -31,7 +31,7 @@ use crate::dnn::lpcnet::LPCNetPLCState;
 #[allow(clippy::too_many_arguments)]
 pub fn silk_decode_frame(
     psDec: &mut silk_decoder_state,
-    psRangeDec: &mut ec_dec,
+    psRangeDec: &mut EcDec,
     pOut: &mut [i16],
     lostFlag: i32,
     condCoding: i32,

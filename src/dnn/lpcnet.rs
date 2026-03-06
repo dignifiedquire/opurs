@@ -11,7 +11,7 @@ use super::nnet::*;
 use super::pitchdnn::*;
 use crate::arch::Arch;
 use crate::celt::celt_lpc::celt_fir_c;
-use crate::celt::kiss_fft::kiss_fft_cpx;
+use crate::celt::kiss_fft::KissFftCpx;
 use crate::celt::mathops::celt_log2;
 use crate::celt::pitch::{celt_inner_prod, celt_pitch_xcorr};
 
@@ -163,7 +163,7 @@ pub struct LPCNetEncState {
     pub pitchdnn: PitchDNNState,
     pub analysis_mem: Vec<f32>,
     pub mem_preemph: f32,
-    prev_if: Vec<kiss_fft_cpx>,
+    prev_if: Vec<KissFftCpx>,
     if_features: Vec<f32>,
     xcorr_features: Vec<f32>,
     pub dnn_pitch: f32,
@@ -189,7 +189,7 @@ impl LPCNetEncState {
             pitchdnn: PitchDNNState::new(),
             analysis_mem: vec![0.0; OVERLAP_SIZE],
             mem_preemph: 0.0,
-            prev_if: vec![kiss_fft_cpx::default(); PITCH_IF_MAX_FREQ],
+            prev_if: vec![KissFftCpx::default(); PITCH_IF_MAX_FREQ],
             if_features: vec![0.0; PITCH_IF_FEATURES],
             xcorr_features: vec![0.0; PITCH_MAX_PERIOD - PITCH_MIN_PERIOD],
             dnn_pitch: 0.0,
@@ -268,7 +268,7 @@ fn celt_log10(x: f32) -> f32 {
 /// Upstream C: dnn/lpcnet_enc.c:frame_analysis
 fn frame_analysis(
     st: &mut LPCNetEncState,
-    x_out: &mut [kiss_fft_cpx],
+    x_out: &mut [KissFftCpx],
     ex: &mut [f32],
     input: &[f32],
 ) {
@@ -290,7 +290,7 @@ pub fn compute_frame_features(st: &mut LPCNetEncState, input: &[f32], arch: Arch
     aligned_in[..TRAINING_OFFSET]
         .copy_from_slice(&st.analysis_mem[OVERLAP_SIZE - TRAINING_OFFSET..OVERLAP_SIZE]);
 
-    let mut x_fft = vec![kiss_fft_cpx::default(); FREQ_SIZE];
+    let mut x_fft = vec![KissFftCpx::default(); FREQ_SIZE];
     let mut ex = vec![0.0f32; NB_BANDS];
     frame_analysis(st, &mut x_fft, &mut ex, input);
 

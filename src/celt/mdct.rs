@@ -9,7 +9,7 @@
     unused_assignments
 )]
 
-use crate::celt::kiss_fft::{kiss_fft_state, opus_fft_impl};
+use crate::celt::kiss_fft::{opus_fft_impl, KissFftState};
 use num_complex::Complex;
 use num_traits::Zero as _;
 use std::ops::Neg as _;
@@ -19,7 +19,7 @@ use std::ops::Neg as _;
 pub struct MdctLookup<'a> {
     pub n: usize,
     pub maxshift: i32,
-    pub kfft: [&'a kiss_fft_state<'a>; 4],
+    pub kfft: [&'a KissFftState<'a>; 4],
     pub trig: &'a [&'a [f32]; 4],
 }
 
@@ -34,7 +34,7 @@ pub fn mdct_forward(
     shift: usize,
     output_stride: usize,
 ) {
-    let st: &kiss_fft_state = l.kfft[shift];
+    let st: &KissFftState = l.kfft[shift];
     let scale = st.scale;
     let trig = l.trig[shift];
     let n = l.n >> shift;
