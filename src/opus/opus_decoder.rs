@@ -179,10 +179,28 @@ impl OpusDecoder {
         frame_size: i32,
         decode_fec: bool,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decode(self, data, pcm, frame_size, decode_fec as i32);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let mut frame_size = frame_size;
+        if !data.is_empty() && !decode_fec {
+            let nb_samples = opus_packet_get_nb_samples_raw(data, self.fs);
+            if nb_samples > 0 {
+                frame_size = frame_size.min(nb_samples);
+            } else {
+                return Err(ErrorCode::InvalidPacket);
+            }
+        }
+        debug_assert!(self.channels == 1 || self.channels == 2);
+        let vla = (frame_size * self.channels) as usize;
+        let mut out: Vec<f32> = vec![0.0; vla];
+        let ret = opus_decode_native(
+            self, data, &mut out, frame_size, decode_fec as i32, false, None, 1, None, 0,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
+            celt_float2int16(&out, pcm, (ret * self.channels) as usize);
             Ok(ret as usize)
         }
     }
@@ -203,7 +221,12 @@ impl OpusDecoder {
         frame_size: i32,
         decode_fec: bool,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decode_float(self, data, pcm, frame_size, decode_fec as i32);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let ret = opus_decode_native(
+            self, data, pcm, frame_size, decode_fec as i32, false, None, 0, None, 0,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
@@ -221,10 +244,30 @@ impl OpusDecoder {
         frame_size: i32,
         decode_fec: bool,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decode24(self, data, pcm, frame_size, decode_fec as i32);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let mut frame_size = frame_size;
+        if !data.is_empty() && !decode_fec {
+            let nb_samples = opus_packet_get_nb_samples_raw(data, self.fs);
+            if nb_samples > 0 {
+                frame_size = frame_size.min(nb_samples);
+            } else {
+                return Err(ErrorCode::InvalidPacket);
+            }
+        }
+        debug_assert!(self.channels == 1 || self.channels == 2);
+        let vla = (frame_size * self.channels) as usize;
+        let mut out: Vec<f32> = vec![0.0; vla];
+        let ret = opus_decode_native(
+            self, data, &mut out, frame_size, decode_fec as i32, false, None, 0, None, 0,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
+            for i in 0..(ret * self.channels) as usize {
+                pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+            }
             Ok(ret as usize)
         }
     }
@@ -1394,88 +1437,6 @@ pub fn opus_decode_native(
     nb_samples as i32
 }
 
-/// Upstream C: src/opus_decoder.c:opus_decode
-pub fn opus_decode(
-    st: &mut OpusDecoder,
-    data: &[u8],
-    pcm: &mut [i16],
-    mut frame_size: i32,
-    decode_fec: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_packet_get_nb_samples_raw(data, st.fs);
-        if nb_samples > 0 {
-            frame_size = if frame_size < nb_samples {
-                frame_size
-            } else {
-                nb_samples
-            };
-        } else {
-            return OPUS_INVALID_PACKET;
-        }
-    }
-    debug_assert!(st.channels == 1 || st.channels == 2);
-    let vla = (frame_size * st.channels) as usize;
-    let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret = opus_decode_native(
-        st, data, &mut out, frame_size, decode_fec, false, None, 1, None, 0,
-    );
-    if ret > 0 {
-        celt_float2int16(&out, pcm, (ret * st.channels) as usize);
-    }
-    ret
-}
-/// Upstream C: src/opus_decoder.c:opus_decode_float
-pub fn opus_decode_float(
-    st: &mut OpusDecoder,
-    data: &[u8],
-    pcm: &mut [f32],
-    frame_size: i32,
-    decode_fec: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    opus_decode_native(
-        st, data, pcm, frame_size, decode_fec, false, None, 0, None, 0,
-    )
-}
-
-/// Upstream C: src/opus_decoder.c:opus_decode24
-pub fn opus_decode24(
-    st: &mut OpusDecoder,
-    data: &[u8],
-    pcm: &mut [i32],
-    mut frame_size: i32,
-    decode_fec: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_packet_get_nb_samples_raw(data, st.fs);
-        if nb_samples > 0 {
-            frame_size = frame_size.min(nb_samples);
-        } else {
-            return OPUS_INVALID_PACKET;
-        }
-    }
-    debug_assert!(st.channels == 1 || st.channels == 2);
-    let vla = (frame_size * st.channels) as usize;
-    let mut out: Vec<f32> = ::std::vec::from_elem(0., vla);
-    let ret = opus_decode_native(
-        st, data, &mut out, frame_size, decode_fec, false, None, 0, None, 0,
-    );
-    if ret > 0 {
-        for i in 0..(ret * st.channels) as usize {
-            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
-        }
-    }
-    ret
-}
 
 /// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode
 #[cfg(feature = "dred")]
