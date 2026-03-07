@@ -178,115 +178,145 @@ impl OpusProjectionEncoder {
     /// Encode one projection frame from interleaved `i16` PCM.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encode
-    pub fn encode(&mut self, pcm: &[i16], frame_size: i32, data: &mut [u8]) -> i32 {
+    pub fn encode(
+        &mut self,
+        pcm: &[i16],
+        frame_size: i32,
+        data: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let analysis_frame_size = frame_size;
         let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            if let Err(err) = self.mixing_matrix.multiply_channel_in_short(
-                pcm,
-                channels,
-                &mut mixed[row..],
-                row,
-                input_channels,
-                frame_size,
-            ) {
-                return err;
-            }
+            self.mixing_matrix
+                .multiply_channel_in_short(
+                    pcm,
+                    channels,
+                    &mut mixed[row..],
+                    row,
+                    input_channels,
+                    frame_size,
+                )
+                .map_err(ErrorCode::from)?;
         }
         let analysis_input = DownmixInput::Int(pcm);
-        self.encoder.encode_float_with_analysis(
+        let ret = self.encoder.encode_float_with_analysis(
             &mixed,
             analysis_frame_size,
             16,
             0,
             Some(&analysis_input),
             data,
-        )
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode one projection frame from interleaved `f32` PCM.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encode_float
-    pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, data: &mut [u8]) -> i32 {
+    pub fn encode_float(
+        &mut self,
+        pcm: &[f32],
+        frame_size: i32,
+        data: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let analysis_frame_size = frame_size;
         let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            if let Err(err) = self.mixing_matrix.multiply_channel_in_float(
-                pcm,
-                channels,
-                &mut mixed[row..],
-                row,
-                input_channels,
-                frame_size,
-            ) {
-                return err;
-            }
+            self.mixing_matrix
+                .multiply_channel_in_float(
+                    pcm,
+                    channels,
+                    &mut mixed[row..],
+                    row,
+                    input_channels,
+                    frame_size,
+                )
+                .map_err(ErrorCode::from)?;
         }
         let analysis_input = DownmixInput::Float(pcm);
-        self.encoder.encode_float_with_analysis(
+        let ret = self.encoder.encode_float_with_analysis(
             &mixed,
             analysis_frame_size,
             24,
             1,
             Some(&analysis_input),
             data,
-        )
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode one projection frame from interleaved 24-bit (`i32`) PCM.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encode24
-    pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, data: &mut [u8]) -> i32 {
+    pub fn encode24(
+        &mut self,
+        pcm: &[i32],
+        frame_size: i32,
+        data: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let analysis_frame_size = frame_size;
         let frame_size = analysis_frame_size as usize;
         let channels = self.channels as usize;
         if pcm.len() != frame_size * channels || data.is_empty() {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            if let Err(err) = self.mixing_matrix.multiply_channel_in_int24(
-                pcm,
-                channels,
-                &mut mixed[row..],
-                row,
-                input_channels,
-                frame_size,
-            ) {
-                return err;
-            }
+            self.mixing_matrix
+                .multiply_channel_in_int24(
+                    pcm,
+                    channels,
+                    &mut mixed[row..],
+                    row,
+                    input_channels,
+                    frame_size,
+                )
+                .map_err(ErrorCode::from)?;
         }
         let analysis_input = DownmixInput::Int24(pcm);
-        self.encoder.encode_float_with_analysis(
+        let ret = self.encoder.encode_float_with_analysis(
             &mixed,
             analysis_frame_size,
             24,
             0,
             Some(&analysis_input),
             data,
-        )
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Return demixing matrix global gain.

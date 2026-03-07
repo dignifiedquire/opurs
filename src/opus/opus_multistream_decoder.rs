@@ -142,24 +142,22 @@ impl OpusMSDecoder {
         pcm: &mut [i16],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
         if pcm.len() < effective_frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
-        let (stream_pcm_f32, decoded_samples) =
-            match self.decode_streams_native(data, effective_frame_size, decode_fec, 1) {
-                Ok(result) => result,
-                Err(err) => return err,
-            };
+        let (stream_pcm_f32, decoded_samples) = self
+            .decode_streams_native(data, effective_frame_size, decode_fec, 1)
+            .map_err(ErrorCode::from)?;
 
         map_output_i16(&self.layout, &stream_pcm_f32, pcm, decoded_samples);
-        decoded_samples as i32
+        Ok(decoded_samples)
     }
 
     /// Decode multistream packet into interleaved f32 PCM.
@@ -174,24 +172,22 @@ impl OpusMSDecoder {
         pcm: &mut [f32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
         if pcm.len() < effective_frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
-        let (stream_pcm, decoded_samples) =
-            match self.decode_streams_native(data, effective_frame_size, decode_fec, 0) {
-                Ok(result) => result,
-                Err(err) => return err,
-            };
+        let (stream_pcm, decoded_samples) = self
+            .decode_streams_native(data, effective_frame_size, decode_fec, 0)
+            .map_err(ErrorCode::from)?;
 
         map_output_f32(&self.layout, &stream_pcm, pcm, decoded_samples);
-        decoded_samples as i32
+        Ok(decoded_samples)
     }
 
     /// Decode multistream packet into 24-bit PCM (stored in i32).
@@ -206,21 +202,19 @@ impl OpusMSDecoder {
         pcm: &mut [i32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let effective_frame_size = frame_size.min(self.max_decode_frame_size());
         let channels = self.layout.channels() as usize;
         if pcm.len() < effective_frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
-        let (stream_pcm, decoded_samples) =
-            match self.decode_streams_native(data, effective_frame_size, decode_fec, 0) {
-                Ok(result) => result,
-                Err(err) => return err,
-            };
+        let (stream_pcm, decoded_samples) = self
+            .decode_streams_native(data, effective_frame_size, decode_fec, 0)
+            .map_err(ErrorCode::from)?;
 
         let mut stream_pcm_i32 = Vec::with_capacity(stream_pcm.len());
         for stream in stream_pcm {
@@ -232,7 +226,7 @@ impl OpusMSDecoder {
         }
 
         map_output_i32(&self.layout, &stream_pcm_i32, pcm, decoded_samples);
-        decoded_samples as i32
+        Ok(decoded_samples)
     }
 
     pub(crate) fn decode_streams_native(

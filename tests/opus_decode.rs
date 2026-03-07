@@ -8,8 +8,18 @@
 
 mod test_common;
 
-use opurs::{opus_packet_get_nb_channels, opus_pcm_soft_clip, Channels, OpusDecoder, SampleRate};
+use opurs::{
+    opus_packet_get_nb_channels, opus_pcm_soft_clip, Channels, ErrorCode, OpusDecoder, SampleRate,
+};
 use test_common::{debruijn2, TestRng};
+
+/// Convert a Result<usize, ErrorCode> to i32, matching the C API convention.
+fn res_to_i32(r: Result<usize, ErrorCode>) -> i32 {
+    match r {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    }
+}
 
 /// Sample rates used by the decoder tests (matching upstream fsv[]).
 const SAMPLE_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
@@ -93,7 +103,7 @@ fn test_decoder_initial_plc() {
             let fec_bool = fec != 0;
 
             // PLC with minimum frame size
-            let out_samples = dec.decode(&[], outbuf, 120 / factor, fec_bool);
+            let out_samples = res_to_i32(dec.decode(&[], outbuf, 120 / factor, fec_bool));
             assert_eq!(
                 out_samples,
                 120 / factor,
@@ -105,7 +115,7 @@ fn test_decoder_initial_plc() {
             assert_eq!(dur, 120 / factor, "dec[{t}] duration mismatch after PLC");
 
             // Non-multiple-of-2.5ms should fail
-            let out_samples = dec.decode(&[], outbuf, 120 / factor + 2, fec_bool);
+            let out_samples = res_to_i32(dec.decode(&[], outbuf, 120 / factor + 2, fec_bool));
             assert_eq!(
                 out_samples, -1,
                 "dec[{t}] non-2.5ms-multiple should fail, got {out_samples}"
@@ -119,7 +129,7 @@ fn test_decoder_initial_plc() {
             );
 
             // Empty packet slice
-            let out_samples = dec.decode(&packet[..0], outbuf, 120 / factor, fec_bool);
+            let out_samples = res_to_i32(dec.decode(&packet[..0], outbuf, 120 / factor, fec_bool));
             assert_eq!(
                 out_samples,
                 120 / factor,
@@ -129,14 +139,14 @@ fn test_decoder_initial_plc() {
 
             // Zero-length decode
             outbuf[0] = GUARD_VALUE;
-            let out_samples = dec.decode(&packet[..0], outbuf, 0, fec_bool);
+            let out_samples = res_to_i32(dec.decode(&packet[..0], outbuf, 0, fec_bool));
             assert!(
                 out_samples <= 0,
                 "dec[{t}] zero-length decode should return <= 0, got {out_samples}"
             );
 
             // Null output with zero length
-            let out_samples = dec.decode(&packet[..0], &mut [], 0, fec_bool);
+            let out_samples = res_to_i32(dec.decode(&packet[..0], &mut [], 0, fec_bool));
             assert!(
                 out_samples <= 0,
                 "dec[{t}] null output zero-length should return <= 0, got {out_samples}"
@@ -181,7 +191,7 @@ fn test_decoder_all_2byte_prefixes() {
 
         // Get expected sample counts
         for t in 0..NUM_DECODERS {
-            expected[t] = decoders[t].get_nb_samples(&packet[..1]);
+            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..1]));
             assert!(
                 expected[t] <= 2880,
                 "dec[{t}] mode {i}: nb_samples {} > 2880",
@@ -196,7 +206,8 @@ fn test_decoder_all_2byte_prefixes() {
 
             for t in 0..NUM_DECODERS {
                 let dec = &mut decoders[t];
-                let out_samples = dec.decode(&packet[..3], &mut outbuf, MAX_FRAME, false);
+                let out_samples =
+                    res_to_i32(dec.decode(&packet[..3], &mut outbuf, MAX_FRAME, false));
                 assert_eq!(
                     out_samples, expected[t],
                     "dec[{t}] mode {i} byte {j}: expected {}, got {out_samples}",
@@ -226,7 +237,7 @@ fn test_decoder_all_2byte_prefixes() {
 
             // 6 PLC frames at the expected size
             for _ in 0..6 {
-                let out_samples = dec.decode(&[], &mut outbuf, expected[t], false);
+                let out_samples = res_to_i32(dec.decode(&[], &mut outbuf, expected[t], false));
                 assert_eq!(
                     out_samples, expected[t],
                     "dec[{t}] PLC recovery: expected {}, got {out_samples}",
@@ -238,14 +249,15 @@ fn test_decoder_all_2byte_prefixes() {
 
             // Reset to minimum frame size if needed
             if expected[t] != 120 / factor {
-                let out_samples = dec.decode(&[], &mut outbuf, 120 / factor, false);
+                let out_samples = res_to_i32(dec.decode(&[], &mut outbuf, 120 / factor, false));
                 assert_eq!(out_samples, 120 / factor);
                 let dur = dec.last_packet_duration();
                 assert_eq!(dur, out_samples);
             }
 
             // Undersized buffer should fail
-            let out_samples = dec.decode(&packet[..2], &mut outbuf, expected[t] - 1, false);
+            let out_samples =
+                res_to_i32(dec.decode(&packet[..2], &mut outbuf, expected[t] - 1, false));
             assert!(
                 out_samples <= 0,
                 "dec[{t}] undersized buffer should fail, got {out_samples}"
@@ -304,7 +316,7 @@ fn test_decoder_fuzz() {
         packet[1] = (i >> 8) as u8;
         packet[2] = (i & 255) as u8;
         packet[3] = 255;
-        let out_samples = decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false);
+        let out_samples = res_to_i32(decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false));
         assert_eq!(
             out_samples,
             120 / factor,
@@ -334,7 +346,7 @@ fn test_decoder_fuzz() {
         packet[1] = (i >> 8) as u8;
         packet[2] = (i & 255) as u8;
         packet[3] = 255;
-        let out_samples = decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false);
+        let out_samples = res_to_i32(decoders[t].decode(&packet[..4], outbuf, MAX_FRAME, false));
         assert_eq!(
             out_samples,
             480 / factor,
@@ -357,7 +369,7 @@ fn test_decoder_fuzz() {
         packet[0] = (i << 2) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = decoders[t].get_nb_samples(&packet[..1]);
+            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..1]));
         }
 
         let mut j = 2 + skip;
@@ -367,8 +379,12 @@ fn test_decoder_fuzz() {
             }
             let mut dec_final_range2 = 0u32;
             for t in 0..NUM_DECODERS {
-                let out_samples =
-                    decoders[t].decode(&packet[..(j + 1) as usize], outbuf, MAX_FRAME, false);
+                let out_samples = res_to_i32(decoders[t].decode(
+                    &packet[..(j + 1) as usize],
+                    outbuf,
+                    MAX_FRAME,
+                    false,
+                ));
                 assert_eq!(
                     out_samples, expected[t],
                     "Random packets: dec[{t}] mode {i} len {j}: expected {}, got {out_samples}",
@@ -404,7 +420,7 @@ fn test_decoder_fuzz() {
         packet[0] = (modes[i] as i32 * 4) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = decoders[t].get_nb_samples(&packet[..plen as usize]);
+            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..plen as usize]));
         }
 
         for j in 0..plen {
@@ -413,7 +429,8 @@ fn test_decoder_fuzz() {
 
         // FEC test with backup decoder
         decbak = decoders[0].clone();
-        let out = decbak.decode(&packet[..(plen + 1) as usize], outbuf, expected[0], true);
+        let out =
+            res_to_i32(decbak.decode(&packet[..(plen + 1) as usize], outbuf, expected[0], true));
         assert_eq!(
             out, expected[0],
             "De Bruijn FEC decode: mode pair {i}: expected {}, got {out}",
@@ -422,18 +439,22 @@ fn test_decoder_fuzz() {
 
         // PLC with FEC=1
         decbak = decoders[0].clone();
-        let out = decbak.decode(&[], outbuf, MAX_FRAME, true);
+        let out = res_to_i32(decbak.decode(&[], outbuf, MAX_FRAME, true));
         assert!(out >= 20, "De Bruijn PLC fec=1: got {out}");
 
         // PLC with FEC=0
         decbak = decoders[0].clone();
-        let out = decbak.decode(&[], outbuf, MAX_FRAME, false);
+        let out = res_to_i32(decbak.decode(&[], outbuf, MAX_FRAME, false));
         assert!(out >= 20, "De Bruijn PLC fec=0: got {out}");
 
         // Normal decode on all decoders
         for t in 0..NUM_DECODERS {
-            let out_samples =
-                decoders[t].decode(&packet[..(plen + 1) as usize], outbuf, MAX_FRAME, false);
+            let out_samples = res_to_i32(decoders[t].decode(
+                &packet[..(plen + 1) as usize],
+                outbuf,
+                MAX_FRAME,
+                false,
+            ));
             assert_eq!(
                 out_samples, expected[t],
                 "De Bruijn decode: dec[{t}] mode pair {i}: expected {}, got {out_samples}",
@@ -461,14 +482,18 @@ fn test_decoder_fuzz() {
 
     for i in 0..4096 {
         packet[0] = (modes[i] as i32 * 4) as u8;
-        let expected = decoders[t].get_nb_samples(&packet[..plen as usize]);
+        let expected = res_to_i32(decoders[t].get_nb_samples(&packet[..plen as usize]));
 
         for _ in 0..10 {
             for j in 0..plen {
                 packet[(j + 1) as usize] = ((rng.next_u32() | rng.next_u32()) & 255) as u8;
             }
-            let out_samples =
-                decoders[t].decode(&packet[..(plen + 1) as usize], outbuf, MAX_FRAME, false);
+            let out_samples = res_to_i32(decoders[t].decode(
+                &packet[..(plen + 1) as usize],
+                outbuf,
+                MAX_FRAME,
+                false,
+            ));
             assert_eq!(
                 out_samples, expected,
                 "De Bruijn ×10: dec[{t}] mode pair {i}: expected {expected}, got {out_samples}"
@@ -490,7 +515,8 @@ fn test_decoder_fuzz() {
         for j in 1..tlen[i] {
             packet[j as usize] = (local_rng.next_u32() & 255) as u8;
         }
-        let out_samples = decoders[t].decode(&packet[..tlen[i] as usize], outbuf, MAX_FRAME, false);
+        let out_samples =
+            res_to_i32(decoders[t].decode(&packet[..tlen[i] as usize], outbuf, MAX_FRAME, false));
         assert_eq!(
             out_samples, tret[i],
             "Pre-selected packet {i}: dec[{t}] expected {}, got {out_samples}",

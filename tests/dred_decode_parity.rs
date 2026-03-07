@@ -23,9 +23,8 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
         .map(|i| (((i * 73 + 19) % 32768) as i16).wrapping_sub(16384))
         .collect();
     let mut packet = [0u8; 1500];
-    let packet_len = enc.encode(&input, &mut packet);
-    assert!(packet_len > 0, "encode failed: {packet_len}");
-    let packet_len = packet_len as usize;
+    let packet_len = enc.encode(&input, &mut packet).expect("encode failed");
+    assert!(packet_len > 0, "encode returned zero");
 
     let mut rust_dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("rust decoder");
 
@@ -35,7 +34,9 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
 
     let mut rust_ref = vec![0.0f32; 960];
     let mut c_ref = vec![0.0f32; 960];
-    let rust_ref_ret = rust_dec.decode_float(&packet[..packet_len], &mut rust_ref, 960, false);
+    let rust_ref_ret = rust_dec
+        .decode_float(&packet[..packet_len], &mut rust_ref, 960, false)
+        .unwrap();
     let c_ref_ret = unsafe {
         libopus_sys::opus_decode_float(
             c_dec,
@@ -46,7 +47,10 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
             0,
         )
     };
-    assert_eq!(rust_ref_ret, c_ref_ret, "reference decode return mismatch");
+    assert_eq!(
+        rust_ref_ret as i32, c_ref_ret,
+        "reference decode return mismatch"
+    );
 
     let dred = opurs::dnn::dred::decoder::OpusDRED::new();
     let mut rust_out = vec![0.0f32; 960];

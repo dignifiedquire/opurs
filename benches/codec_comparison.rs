@@ -62,9 +62,9 @@ fn pre_encode_rust(pcm: &[i16], channels: i32, bitrate: i32) -> Vec<Vec<u8>> {
     let mut output = vec![0u8; 1500];
 
     for frame in pcm.chunks_exact(frame_samples) {
-        let len = encoder.encode(frame, &mut output);
-        assert!(len > 0, "encode failed with {}", len);
-        packets.push(output[..len as usize].to_vec());
+        let len = encoder.encode(frame, &mut output).expect("encode failed");
+        assert!(len > 0, "encode returned zero");
+        packets.push(output[..len].to_vec());
     }
     packets
 }
@@ -94,9 +94,9 @@ fn bench_encode_comparison(c: &mut Criterion) {
             let mut output = vec![0u8; 1500];
 
             b.iter(|| {
-                let mut total_bytes = 0i32;
+                let mut total_bytes = 0usize;
                 for frame in pcm.chunks_exact(frame_samples) {
-                    total_bytes += encoder.encode(frame, &mut output);
+                    total_bytes += encoder.encode(frame, &mut output).unwrap();
                 }
                 black_box(total_bytes)
             })
@@ -160,10 +160,11 @@ fn bench_decode_comparison(c: &mut Criterion) {
             let mut out_pcm = vec![0i16; FRAME_SIZE_20MS * channels as usize];
 
             b.iter(|| {
-                let mut total_samples = 0i32;
+                let mut total_samples = 0usize;
                 for packet in packets {
-                    total_samples +=
-                        decoder.decode(packet, &mut out_pcm, FRAME_SIZE_20MS as i32, false);
+                    total_samples += decoder
+                        .decode(packet, &mut out_pcm, FRAME_SIZE_20MS as i32, false)
+                        .unwrap();
                 }
                 black_box(total_samples)
             })
@@ -226,9 +227,9 @@ fn bench_encode_mono_comparison(c: &mut Criterion) {
             let mut output = vec![0u8; 1500];
 
             b.iter(|| {
-                let mut total_bytes = 0i32;
+                let mut total_bytes = 0usize;
                 for frame in pcm.chunks_exact(frame_samples) {
-                    total_bytes += encoder.encode(frame, &mut output);
+                    total_bytes += encoder.encode(frame, &mut output).unwrap();
                 }
                 black_box(total_bytes)
             })

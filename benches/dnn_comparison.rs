@@ -83,8 +83,10 @@ fn pre_encode_packets(bitrate: i32) -> Vec<Vec<u8>> {
     for frame in 0..NUM_FRAMES {
         let start = frame * FRAME_SIZE;
         let end = start + FRAME_SIZE;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
+        let len = enc
+            .encode(&pcm[start..end], &mut output)
+            .expect("encode failed");
+        packets.push(output[..len].to_vec());
     }
     packets
 }
@@ -123,7 +125,7 @@ fn bench_dred_encode_cmp(c: &mut Criterion) {
                         for frame in 0..NUM_FRAMES {
                             let start = frame * FRAME_SIZE;
                             let end = start + FRAME_SIZE;
-                            let len = enc.encode(&pcm[start..end], &mut output);
+                            let len = enc.encode(&pcm[start..end], &mut output).unwrap();
                             black_box(len);
                         }
                     })
@@ -207,7 +209,7 @@ fn bench_osce_decode_cmp(c: &mut Criterion) {
                     b.iter(|| {
                         for pkt in &packets {
                             let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                            black_box(n);
+                            let _ = black_box(n);
                         }
                     })
                 });
@@ -277,10 +279,10 @@ fn bench_deep_plc_cmp(c: &mut Criterion) {
                         for (i, pkt) in packets.iter().enumerate() {
                             if (i + 1) % loss_every == 0 {
                                 let n = dec.decode(&[], &mut pcm_out, FRAME_SIZE as i32, false);
-                                black_box(n);
+                                let _ = black_box(n);
                             } else {
                                 let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                                black_box(n);
+                                let _ = black_box(n);
                             }
                         }
                     })
@@ -364,7 +366,7 @@ fn bench_qext_encode_cmp(c: &mut Criterion) {
                 for frame in 0..NUM_FRAMES {
                     let start = frame * frame_size_96k * 2;
                     let end = start + frame_size_96k * 2;
-                    let len = enc.encode(&pcm[start..end], &mut output);
+                    let len = enc.encode(&pcm[start..end], &mut output).unwrap();
                     black_box(len);
                 }
             })
@@ -425,8 +427,10 @@ fn bench_qext_decode_cmp(c: &mut Criterion) {
     for frame in 0..NUM_FRAMES {
         let start = frame * frame_size_96k * 2;
         let end = start + frame_size_96k * 2;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
+        let len = enc
+            .encode(&pcm[start..end], &mut output)
+            .expect("encode failed");
+        packets.push(output[..len].to_vec());
     }
 
     // Pre-encode with C
@@ -468,7 +472,7 @@ fn bench_qext_decode_cmp(c: &mut Criterion) {
         b.iter(|| {
             for pkt in &packets {
                 let n = dec.decode(pkt, &mut pcm_out, frame_size_96k as i32, false);
-                black_box(n);
+                let _ = black_box(n);
             }
         })
     });

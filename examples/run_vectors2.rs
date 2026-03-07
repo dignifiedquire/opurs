@@ -2687,12 +2687,16 @@ fn run_test(
                     upstream_total_bytes += upstream_packet.len();
 
                     let mut rust_packet = vec![0u8; 4000];
-                    let rust_len = rust_enc.encode(frame, frame_size as i32, &mut rust_packet);
-                    if rust_len <= 0 {
-                        return TestResult::fail(format!(
-                            "Rust projection encode failed at packet {packet_idx}: {rust_len}"
-                        ));
-                    }
+                    let rust_len = match rust_enc.encode(frame, frame_size as i32, &mut rust_packet)
+                    {
+                        Ok(v) => v as i32,
+                        Err(e) => {
+                            return TestResult::fail(format!(
+                                "Rust projection encode failed at packet {packet_idx}: {:?}",
+                                e
+                            ));
+                        }
+                    };
                     rust_packet.truncate(rust_len as usize);
                     rust_total_bytes += rust_packet.len();
 
@@ -2727,12 +2731,15 @@ fn run_test(
                         )
                     };
                     let mut rust_out_upstream = vec![0i16; samples_per_packet];
-                    let rust_ret = rust_dec_upstream.decode(
+                    let rust_ret = match rust_dec_upstream.decode(
                         &upstream_packet,
                         &mut rust_out_upstream,
                         frame_size as i32,
                         false,
-                    );
+                    ) {
+                        Ok(v) => v as i32,
+                        Err(e) => i32::from(e),
+                    };
                     if c_ret <= 0 || rust_ret <= 0 || c_ret != rust_ret {
                         return TestResult::fail(format!(
                             "decode mismatch on upstream packet {packet_idx}: c={c_ret} rust={rust_ret}"
@@ -2766,12 +2773,15 @@ fn run_test(
                         )
                     };
                     let mut rust_out_rust = vec![0i16; samples_per_packet];
-                    let rust_ret = rust_dec_rust.decode(
+                    let rust_ret = match rust_dec_rust.decode(
                         &rust_packet,
                         &mut rust_out_rust,
                         frame_size as i32,
                         false,
-                    );
+                    ) {
+                        Ok(v) => v as i32,
+                        Err(e) => i32::from(e),
+                    };
                     if c_ret <= 0 || rust_ret <= 0 || c_ret != rust_ret {
                         return TestResult::fail(format!(
                             "decode mismatch on rust packet {packet_idx}: c={c_ret} rust={rust_ret}"

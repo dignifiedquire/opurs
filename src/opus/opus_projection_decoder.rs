@@ -6,7 +6,7 @@ use crate::enums::SampleRate;
 use crate::error::ErrorCode;
 use crate::opus::mapping_matrix::MappingMatrix;
 use crate::opus::opus_decoder::OpusDecoder;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
+use crate::opus::opus_defines::OPUS_OK;
 use crate::opus::opus_multistream_decoder::OpusMSDecoder;
 
 /// Projection Opus decoder state.
@@ -126,26 +126,22 @@ impl OpusProjectionDecoder {
         pcm: &mut [i16],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = frame_size as usize;
         let output_channels = self.channels as usize;
         let input_channels = self.input_channels() as usize;
         if pcm.len() < frame_size * output_channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
         // Match upstream short-decode behavior: decode native streams with soft clipping enabled.
-        let (stream_pcm, decoded) =
-            match self
-                .decoder
-                .decode_streams_native(data, frame_size as i32, decode_fec, 1)
-            {
-                Ok(v) => v,
-                Err(err) => return err,
-            };
+        let (stream_pcm, decoded) = self
+            .decoder
+            .decode_streams_native(data, frame_size as i32, decode_fec, 1)
+            .map_err(ErrorCode::from)?;
 
         let mut input_pcm = vec![0f32; decoded * input_channels];
         let coupled = self.coupled_streams as usize;
@@ -165,19 +161,19 @@ impl OpusProjectionDecoder {
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);
         for input_row in 0..input_channels {
-            if let Err(err) = self.demixing_matrix.multiply_channel_out_short(
-                &input_pcm[input_row..],
-                input_row,
-                input_channels,
-                output,
-                output_channels,
-                decoded,
-            ) {
-                return err;
-            }
+            self.demixing_matrix
+                .multiply_channel_out_short(
+                    &input_pcm[input_row..],
+                    input_row,
+                    input_channels,
+                    output,
+                    output_channels,
+                    decoded,
+                )
+                .map_err(ErrorCode::from)?;
         }
 
-        decoded as i32
+        Ok(decoded)
     }
 
     /// Decode a projection packet to interleaved `f32` PCM.
@@ -189,42 +185,38 @@ impl OpusProjectionDecoder {
         pcm: &mut [f32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = frame_size as usize;
         let output_channels = self.channels as usize;
         let input_channels = self.input_channels() as usize;
         if pcm.len() < frame_size * output_channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
         let mut input_pcm = vec![0f32; frame_size * input_channels];
         let decoded =
             self.decoder
-                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec);
-        if decoded <= 0 {
-            return decoded;
-        }
-        let decoded = decoded as usize;
+                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec)?;
 
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0.0);
         for input_row in 0..input_channels {
-            if let Err(err) = self.demixing_matrix.multiply_channel_out_float(
-                &input_pcm[input_row..],
-                input_row,
-                input_channels,
-                output,
-                output_channels,
-                decoded,
-            ) {
-                return err;
-            }
+            self.demixing_matrix
+                .multiply_channel_out_float(
+                    &input_pcm[input_row..],
+                    input_row,
+                    input_channels,
+                    output,
+                    output_channels,
+                    decoded,
+                )
+                .map_err(ErrorCode::from)?;
         }
 
-        decoded as i32
+        Ok(decoded)
     }
 
     /// Decode a projection packet to interleaved 24-bit (`i32`) PCM.
@@ -236,42 +228,38 @@ impl OpusProjectionDecoder {
         pcm: &mut [i32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = frame_size as usize;
         let output_channels = self.channels as usize;
         let input_channels = self.input_channels() as usize;
         if pcm.len() < frame_size * output_channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
         let mut input_pcm = vec![0f32; frame_size * input_channels];
         let decoded =
             self.decoder
-                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec);
-        if decoded <= 0 {
-            return decoded;
-        }
-        let decoded = decoded as usize;
+                .decode_float(data, &mut input_pcm, frame_size as i32, decode_fec)?;
 
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);
         for input_row in 0..input_channels {
-            if let Err(err) = self.demixing_matrix.multiply_channel_out_int24(
-                &input_pcm[input_row..],
-                input_row,
-                input_channels,
-                output,
-                output_channels,
-                decoded,
-            ) {
-                return err;
-            }
+            self.demixing_matrix
+                .multiply_channel_out_int24(
+                    &input_pcm[input_row..],
+                    input_row,
+                    input_channels,
+                    output,
+                    output_channels,
+                    decoded,
+                )
+                .map_err(ErrorCode::from)?;
         }
 
-        decoded as i32
+        Ok(decoded)
     }
 
     /// Set decode gain.

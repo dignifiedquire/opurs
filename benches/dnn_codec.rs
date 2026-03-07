@@ -39,8 +39,10 @@ fn pre_encode_packets(bitrate: i32) -> Vec<Vec<u8>> {
     for frame in 0..NUM_FRAMES {
         let start = frame * FRAME_SIZE;
         let end = start + FRAME_SIZE;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
+        let len = enc
+            .encode(&pcm[start..end], &mut output)
+            .expect("encode failed");
+        packets.push(output[..len].to_vec());
     }
     packets
 }
@@ -75,7 +77,7 @@ fn bench_dred_encode(c: &mut Criterion) {
                     for frame in 0..NUM_FRAMES {
                         let start = frame * FRAME_SIZE;
                         let end = start + FRAME_SIZE;
-                        let len = enc.encode(&pcm[start..end], &mut output);
+                        let len = enc.encode(&pcm[start..end], &mut output).unwrap();
                         black_box(len);
                     }
                 })
@@ -119,7 +121,7 @@ fn bench_osce_decode(c: &mut Criterion) {
                 b.iter(|| {
                     for pkt in &packets {
                         let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                        black_box(n);
+                        let _ = black_box(n);
                     }
                 })
             });
@@ -155,10 +157,10 @@ fn bench_deep_plc(c: &mut Criterion) {
                         if (i + 1) % loss_every == 0 {
                             // Simulate packet loss — empty data triggers PLC
                             let n = dec.decode(&[], &mut pcm_out, FRAME_SIZE as i32, false);
-                            black_box(n);
+                            let _ = black_box(n);
                         } else {
                             let n = dec.decode(pkt, &mut pcm_out, FRAME_SIZE as i32, false);
-                            black_box(n);
+                            let _ = black_box(n);
                         }
                     }
                 })
@@ -192,7 +194,7 @@ fn bench_qext_encode(c: &mut Criterion) {
             for frame in 0..NUM_FRAMES {
                 let start = frame * frame_size_96k * 2; // stereo
                 let end = start + frame_size_96k * 2;
-                let len = enc.encode(&pcm[start..end], &mut output);
+                let len = enc.encode(&pcm[start..end], &mut output).unwrap();
                 black_box(len);
             }
         })
@@ -220,8 +222,10 @@ fn bench_qext_decode(c: &mut Criterion) {
     for frame in 0..NUM_FRAMES {
         let start = frame * frame_size_96k * 2;
         let end = start + frame_size_96k * 2;
-        let len = enc.encode(&pcm[start..end], &mut output);
-        packets.push(output[..len as usize].to_vec());
+        let len = enc
+            .encode(&pcm[start..end], &mut output)
+            .expect("encode failed");
+        packets.push(output[..len].to_vec());
     }
 
     let mut group = c.benchmark_group("qext_decode");
@@ -232,7 +236,7 @@ fn bench_qext_decode(c: &mut Criterion) {
         b.iter(|| {
             for pkt in &packets {
                 let n = dec.decode(pkt, &mut pcm_out, frame_size_96k as i32, false);
-                black_box(n);
+                let _ = black_box(n);
             }
         })
     });

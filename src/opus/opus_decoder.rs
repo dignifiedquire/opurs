@@ -122,19 +122,17 @@ impl OpusDecoder {
     /// Check whether an Opus packet carries LBRR (in-band FEC) data.
     ///
     /// Returns:
-    /// - `1` if LBRR is present
-    /// - `0` if LBRR is not present
-    /// - a negative Opus error code on parse failure
+    /// Returns `Ok(true)` if LBRR is present, `Ok(false)` if not.
     ///
     /// Upstream C: src/opus_decoder.c:opus_packet_has_lbrr
-    pub fn packet_has_lbrr(packet: &[u8]) -> i32 {
+    pub fn packet_has_lbrr(packet: &[u8]) -> Result<bool, ErrorCode> {
         if packet.is_empty() {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
 
         let packet_mode = opus_packet_get_mode(packet);
         if packet_mode == MODE_CELT_ONLY {
-            return 0;
+            return Ok(false);
         }
 
         let packet_frame_size = opus_packet_get_samples_per_frame(packet[0], 48_000);
@@ -148,17 +146,21 @@ impl OpusDecoder {
         let mut size = [0i16; 48];
         let ret = opus_packet_parse(packet, None, Some(&mut frames), &mut size, None);
         if ret <= 0 {
-            return ret;
+            return if ret < 0 {
+                Err(ErrorCode::from(ret))
+            } else {
+                Ok(false)
+            };
         }
         if size[0] == 0 {
-            return 0;
+            return Ok(false);
         }
 
         let mut lbrr = ((packet[frames[0]] >> (7 - nb_frames)) & 0x1) as i32;
         if packet_stream_channels == 2 {
             lbrr |= ((packet[frames[0]] >> (6 - 2 * nb_frames)) & 0x1) as i32;
         }
-        lbrr
+        Ok(lbrr != 0)
     }
 
     /// Decode an Opus packet into interleaved `i16` PCM samples.
@@ -167,8 +169,7 @@ impl OpusDecoder {
     /// hold `frame_size * channels` samples. `frame_size` is the maximum
     /// number of samples per channel to decode.
     ///
-    /// Returns the number of decoded samples per channel on success, or a
-    /// negative Opus error code on failure.
+    /// Returns the number of decoded samples per channel on success.
     ///
     /// Upstream C: src/opus_decoder.c:opus_decode
     pub fn decode(
@@ -177,8 +178,13 @@ impl OpusDecoder {
         pcm: &mut [i16],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
-        opus_decode(self, data, pcm, frame_size, decode_fec as i32)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decode(self, data, pcm, frame_size, decode_fec as i32);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Decode an Opus packet into interleaved `f32` PCM samples.
@@ -187,8 +193,7 @@ impl OpusDecoder {
     /// hold `frame_size * channels` samples. `frame_size` is the maximum
     /// number of samples per channel to decode.
     ///
-    /// Returns the number of decoded samples per channel on success, or a
-    /// negative Opus error code on failure.
+    /// Returns the number of decoded samples per channel on success.
     ///
     /// Upstream C: src/opus_decoder.c:opus_decode_float
     pub fn decode_float(
@@ -197,8 +202,13 @@ impl OpusDecoder {
         pcm: &mut [f32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
-        opus_decode_float(self, data, pcm, frame_size, decode_fec as i32)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decode_float(self, data, pcm, frame_size, decode_fec as i32);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Decode an Opus packet into interleaved 24-bit PCM samples in `i32`.
@@ -210,8 +220,13 @@ impl OpusDecoder {
         pcm: &mut [i32],
         frame_size: i32,
         decode_fec: bool,
-    ) -> i32 {
-        opus_decode24(self, data, pcm, frame_size, decode_fec as i32)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decode24(self, data, pcm, frame_size, decode_fec as i32);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `i16`.
@@ -224,8 +239,13 @@ impl OpusDecoder {
         dred_offset: i32,
         pcm: &mut [i16],
         frame_size: i32,
-    ) -> i32 {
-        opus_decoder_dred_decode(self, dred, dred_offset, pcm, frame_size)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decoder_dred_decode(self, dred, dred_offset, pcm, frame_size);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `i32` (24-bit range).
@@ -238,8 +258,13 @@ impl OpusDecoder {
         dred_offset: i32,
         pcm: &mut [i32],
         frame_size: i32,
-    ) -> i32 {
-        opus_decoder_dred_decode24(self, dred, dred_offset, pcm, frame_size)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decoder_dred_decode24(self, dred, dred_offset, pcm, frame_size);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Decode PLC audio using a pre-parsed DRED state into interleaved `f32`.
@@ -252,15 +277,25 @@ impl OpusDecoder {
         dred_offset: i32,
         pcm: &mut [f32],
         frame_size: i32,
-    ) -> i32 {
-        opus_decoder_dred_decode_float(self, dred, dred_offset, pcm, frame_size)
+    ) -> Result<usize, ErrorCode> {
+        let ret = opus_decoder_dred_decode_float(self, dred, dred_offset, pcm, frame_size);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Return decoded sample count for a packet using the decoder sample rate.
     ///
     /// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
-    pub fn get_nb_samples(&self, packet: &[u8]) -> i32 {
-        opus_packet_get_nb_samples(packet, self.fs)
+    pub fn get_nb_samples(&self, packet: &[u8]) -> Result<usize, ErrorCode> {
+        let ret = opus_packet_get_nb_samples(packet, self.fs);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     // -- Type-safe CTL getters and setters --
@@ -1376,7 +1411,7 @@ pub fn opus_decode(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = st.get_nb_samples(data);
+        let nb_samples = opus_packet_get_nb_samples(data, st.fs);
         if nb_samples > 0 {
             frame_size = if frame_size < nb_samples {
                 frame_size
@@ -1426,7 +1461,7 @@ pub fn opus_decode24(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = st.get_nb_samples(data);
+        let nb_samples = opus_packet_get_nb_samples(data, st.fs);
         if nb_samples > 0 {
             frame_size = frame_size.min(nb_samples);
         } else {

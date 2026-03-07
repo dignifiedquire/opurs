@@ -111,12 +111,24 @@ fn test_encode(
     loop {
         let pcm_start = (samp_count * channels) as usize;
         let pcm_end = pcm_start + (frame_size * channels) as usize;
-        let len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
-        if !(0..=1500).contains(&len) {
-            eprintln!("opus_encode() returned {len}");
-            return -1;
-        }
-        let out_samples = dec.decode(&packet[..len as usize], &mut outbuf, 5760, false);
+        let len = match enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]) {
+            Ok(l) if l <= 1500 => l,
+            Ok(l) => {
+                eprintln!("opus_encode() returned {l}");
+                return -1;
+            }
+            Err(e) => {
+                eprintln!("opus_encode() returned error: {e:?}");
+                return -1;
+            }
+        };
+        let out_samples = match dec.decode(&packet[..len], &mut outbuf, 5760, false) {
+            Ok(s) => s as i32,
+            Err(e) => {
+                eprintln!("opus_decode() returned error: {e:?}");
+                return -1;
+            }
+        };
         if out_samples != frame_size {
             eprintln!("opus_decode() returned {out_samples}");
             return -1;
@@ -171,22 +183,37 @@ fn test_regression_ec_enc_shrink_assert() {
     enc.set_complexity(10).unwrap();
     enc.set_packet_loss_perc(6).unwrap();
     enc.set_bitrate(Bitrate::Bits(6000));
-    let data_len = enc.encode(&pcm1, &mut data);
-    assert!(data_len > 0, "ec_enc_shrink_assert: first encode failed");
+    let data_len = enc
+        .encode(&pcm1, &mut data)
+        .expect("ec_enc_shrink_assert: first encode failed");
+    assert!(
+        data_len > 0,
+        "ec_enc_shrink_assert: first encode returned zero"
+    );
 
     enc.set_signal(Some(Signal::Voice));
     enc.set_prediction_disabled(true);
     enc.set_bandwidth(Some(Bandwidth::Superwideband));
     enc.set_inband_fec(1).unwrap();
     enc.set_bitrate(Bitrate::Bits(15600));
-    let data_len = enc.encode(&pcm2, &mut data[..122]);
-    assert!(data_len > 0, "ec_enc_shrink_assert: second encode failed");
+    let data_len = enc
+        .encode(&pcm2, &mut data[..122])
+        .expect("ec_enc_shrink_assert: second encode failed");
+    assert!(
+        data_len > 0,
+        "ec_enc_shrink_assert: second encode returned zero"
+    );
 
     enc.set_signal(Some(Signal::Music));
     enc.set_bitrate(Bitrate::Bits(27000));
     let pcm3 = [0i16; 2880];
-    let data_len = enc.encode(&pcm3, &mut data[..122]);
-    assert!(data_len > 0, "ec_enc_shrink_assert: third encode failed");
+    let data_len = enc
+        .encode(&pcm3, &mut data[..122])
+        .expect("ec_enc_shrink_assert: third encode failed");
+    assert!(
+        data_len > 0,
+        "ec_enc_shrink_assert: third encode returned zero"
+    );
 }
 
 /// Upstream C: tests/opus_encode_regressions.c:ec_enc_shrink_assert2
@@ -203,8 +230,13 @@ fn test_regression_ec_enc_shrink_assert2() {
     enc.set_bitrate(Bitrate::Bits(27000));
 
     let pcm = [0i16; 960];
-    let data_len = enc.encode(&pcm, &mut data);
-    assert!(data_len > 0, "ec_enc_shrink_assert2: first encode failed");
+    let data_len = enc
+        .encode(&pcm, &mut data)
+        .expect("ec_enc_shrink_assert2: first encode failed");
+    assert!(
+        data_len > 0,
+        "ec_enc_shrink_assert2: first encode returned zero"
+    );
 
     enc.set_signal(Some(Signal::Music));
     let mut pcm_0 = [0i16; 480];
@@ -222,8 +254,13 @@ fn test_regression_ec_enc_shrink_assert2() {
     pcm_0[18] = -32768;
     pcm_0[19] = -32768;
 
-    let data_len = enc.encode(&pcm_0, &mut data[..19]);
-    assert!(data_len > 0, "ec_enc_shrink_assert2: second encode failed");
+    let data_len = enc
+        .encode(&pcm_0, &mut data[..19])
+        .expect("ec_enc_shrink_assert2: second encode failed");
+    assert!(
+        data_len > 0,
+        "ec_enc_shrink_assert2: second encode returned zero"
+    );
 }
 
 /// Upstream C: tests/opus_encode_regressions.c:silk_gain_assert
@@ -239,15 +276,22 @@ fn test_regression_silk_gain_assert() {
     enc.set_complexity(3).unwrap();
     enc.set_max_bandwidth(Bandwidth::Narrowband);
     enc.set_bitrate(Bitrate::Bits(6000));
-    let data_len = enc.encode(&pcm1, &mut data);
-    assert!(data_len > 0, "silk_gain_assert: first encode failed");
+    let data_len = enc
+        .encode(&pcm1, &mut data)
+        .expect("silk_gain_assert: first encode failed");
+    assert!(data_len > 0, "silk_gain_assert: first encode returned zero");
 
     enc.set_vbr(false);
     enc.set_complexity(0).unwrap();
     enc.set_max_bandwidth(Bandwidth::Mediumband);
     enc.set_bitrate(Bitrate::Bits(2867));
-    let data_len = enc.encode(&pcm2, &mut data);
-    assert!(data_len > 0, "silk_gain_assert: second encode failed");
+    let data_len = enc
+        .encode(&pcm2, &mut data)
+        .expect("silk_gain_assert: second encode failed");
+    assert!(
+        data_len > 0,
+        "silk_gain_assert: second encode returned zero"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -316,8 +360,8 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     enc.set_bandwidth(None);
     // -2 is an invalid force mode value; it should return Err(BAD_ARG)
     assert!(enc.set_force_mode(-2).is_err());
-    // Invalid frame size (500 samples) should return -1
-    assert_eq!(enc.encode(&inbuf[..500 * 2], &mut packet[..1500]), -1);
+    // Invalid frame size (500 samples) should return Err
+    assert!(enc.encode(&inbuf[..500 * 2], &mut packet[..1500]).is_err());
 
     // Main encode/decode loop across rate control modes and codec modes
     for rc in 0..3 {
@@ -406,7 +450,9 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
 
                 let pcm_start = (i << 1) as usize;
                 let pcm_end = pcm_start + (frame_size * 2) as usize; // 2 channels
-                let mut len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
+                let mut len = enc
+                    .encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500])
+                    .unwrap() as i32;
                 assert!((0..=1500).contains(&len), "opus_encode returned {len}");
                 enc_final_range = enc.final_range();
 
@@ -430,12 +476,14 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                     assert!(len >= 1, "opus_packet_unpad failed: {len}");
                 }
 
-                let out_samples = dec.decode(
-                    &packet[..len as usize],
-                    &mut outbuf[((i << 1) as usize)..],
-                    5760,
-                    false,
-                );
+                let out_samples = dec
+                    .decode(
+                        &packet[..len as usize],
+                        &mut outbuf[((i << 1) as usize)..],
+                        5760,
+                        false,
+                    )
+                    .unwrap() as i32;
                 assert_eq!(
                     out_samples, frame_size,
                     "decode mismatch: {out_samples} != {frame_size}"
@@ -447,21 +495,25 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
                 );
 
                 // LBRR decode
-                let out_samples = dec_err[0].decode(
-                    &packet[..len as usize],
-                    &mut out2buf,
-                    frame_size,
-                    rng.next_u32() & 3 != 0,
-                );
+                let out_samples = dec_err[0]
+                    .decode(
+                        &packet[..len as usize],
+                        &mut out2buf,
+                        frame_size,
+                        rng.next_u32() & 3 != 0,
+                    )
+                    .unwrap() as i32;
                 assert_eq!(out_samples, frame_size);
 
                 let l = if rng.next_u32() & 3 == 0 { 0 } else { len };
-                let out_samples = dec_err[1].decode(
-                    &packet[..l as usize],
-                    &mut out2buf,
-                    5760,
-                    rng.next_u32() & 7 != 0,
-                );
+                let out_samples = dec_err[1]
+                    .decode(
+                        &packet[..l as usize],
+                        &mut out2buf,
+                        5760,
+                        rng.next_u32() & 7 != 0,
+                    )
+                    .unwrap() as i32;
                 assert!(out_samples >= 120, "LBRR decode too short: {out_samples}");
 
                 i += frame_size;
@@ -511,17 +563,21 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         enc.set_bitrate(Bitrate::Bits(bitrate_bps));
         let pcm_start = (offset << 1) as usize;
         let pcm_end = pcm_start + (frame_size_1 * 2) as usize; // 2 channels
-        let mut len = enc.encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500]);
+        let mut len = enc
+            .encode(&inbuf[pcm_start..pcm_end], &mut packet[..1500])
+            .unwrap() as i32;
         assert!((0..=1500).contains(&len), "encode failed: {len}");
         count += 1;
         enc_final_range = enc.final_range();
 
-        let out_samples = dec.decode(
-            &packet[..len as usize],
-            &mut outbuf[((offset << 1) as usize)..],
-            5760,
-            false,
-        );
+        let out_samples = dec
+            .decode(
+                &packet[..len as usize],
+                &mut outbuf[((offset << 1) as usize)..],
+                5760,
+                false,
+            )
+            .unwrap() as i32;
         assert_eq!(out_samples, frame_size_1);
         dec_final_range = dec.final_range();
         assert_eq!(dec_final_range, enc_final_range);
@@ -550,7 +606,9 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
             j += 1;
         }
 
-        let out_samples = dec_err[0].decode(&packet[..len as usize], &mut out2buf, 5760, false);
+        let out_samples = dec_err[0]
+            .decode(&packet[..len as usize], &mut out2buf, 5760, false)
+            .unwrap() as i32;
         assert!(
             (0..=5760).contains(&out_samples),
             "err decode out of range: {out_samples}"
@@ -561,7 +619,9 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         dec_final_range = dec_err[0].final_range();
 
         let dec2 = rng.next_u32().wrapping_rem(9).wrapping_add(1) as usize;
-        let out_samples = dec_err[dec2].decode(&packet[..len as usize], &mut out2buf, 5760, false);
+        let out_samples = dec_err[dec2]
+            .decode(&packet[..len as usize], &mut out2buf, 5760, false)
+            .unwrap() as i32;
         assert!((0..=5760).contains(&out_samples));
         let dec_final_range2 = dec_err[dec2].final_range();
         if len > 0 {

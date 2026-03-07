@@ -206,12 +206,14 @@ fn projection_decoder_decode_parity_with_c() {
     );
 
     let mut rust_out = vec![0i16; frame_size * 2];
-    let rust_ret = rust_dec.decode(
-        &packet[..packet_len as usize],
-        &mut rust_out,
-        frame_size as i32,
-        false,
-    );
+    let rust_ret = rust_dec
+        .decode(
+            &packet[..packet_len as usize],
+            &mut rust_out,
+            frame_size as i32,
+            false,
+        )
+        .unwrap();
 
     let mut c_out = vec![0i16; frame_size * 2];
     let c_ret = unsafe {
@@ -226,7 +228,7 @@ fn projection_decoder_decode_parity_with_c() {
     };
     unsafe { opus_projection_decoder_destroy(c_dec) };
 
-    assert_eq!(rust_ret, c_ret, "projection decode return mismatch");
+    assert_eq!(rust_ret as i32, c_ret, "projection decode return mismatch");
     for (idx, (&a, &b)) in rust_out.iter().zip(c_out.iter()).enumerate() {
         assert_eq!(
             a, b,
@@ -326,12 +328,14 @@ fn projection_decoder_higher_order_parity_with_c() {
         );
 
         let mut rust_out = vec![0i16; frame_size * channels as usize];
-        let rust_ret = rust_dec.decode(
-            &packet[..packet_len as usize],
-            &mut rust_out,
-            frame_size as i32,
-            false,
-        );
+        let rust_ret = rust_dec
+            .decode(
+                &packet[..packet_len as usize],
+                &mut rust_out,
+                frame_size as i32,
+                false,
+            )
+            .unwrap();
 
         let mut c_out = vec![0i16; frame_size * channels as usize];
         let c_ret = unsafe {
@@ -347,7 +351,7 @@ fn projection_decoder_higher_order_parity_with_c() {
         unsafe { opus_projection_decoder_destroy(c_dec) };
 
         assert_eq!(
-            rust_ret, c_ret,
+            rust_ret as i32, c_ret,
             "decode return mismatch (channels={channels})"
         );
         for (idx, (&a, &b)) in rust_out.iter().zip(c_out.iter()).enumerate() {
@@ -454,13 +458,15 @@ fn projection_decoder_ctl_value_parity_with_c() {
     }
 
     let mut rust_out = vec![0i16; frame_size * channels as usize];
-    let rust_decoded = rust.decode(
-        &packet[..packet_len as usize],
-        &mut rust_out,
-        frame_size as i32,
-        false,
-    );
-    assert!(rust_decoded > 0, "rust decode failed: {rust_decoded}");
+    let rust_decoded = rust
+        .decode(
+            &packet[..packet_len as usize],
+            &mut rust_out,
+            frame_size as i32,
+            false,
+        )
+        .unwrap();
+    assert!(rust_decoded > 0, "rust decode returned zero");
 
     let mut c_out = vec![0i16; frame_size * channels as usize];
     let c_decoded = unsafe {
@@ -473,7 +479,7 @@ fn projection_decoder_ctl_value_parity_with_c() {
             0,
         )
     };
-    assert_eq!(rust_decoded, c_decoded);
+    assert_eq!(rust_decoded as i32, c_decoded);
 
     let mut c_complexity = 0i32;
     let mut c_gain = 0i32;
@@ -859,12 +865,14 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
 
             let mut rust_i16 = vec![0i16; frame_size * channels as usize];
             let mut c_i16 = vec![0i16; frame_size * channels as usize];
-            let rust_ret = rust_dec.decode(
-                &packet[..packet_len as usize],
-                &mut rust_i16,
-                frame_size as i32,
-                false,
-            );
+            let rust_ret = rust_dec
+                .decode(
+                    &packet[..packet_len as usize],
+                    &mut rust_i16,
+                    frame_size as i32,
+                    false,
+                )
+                .unwrap();
             let c_ret = unsafe {
                 opus_projection_decode(
                     c_dec,
@@ -875,19 +883,21 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                     0,
                 )
             };
-            assert_eq!(rust_ret, c_ret);
+            assert_eq!(rust_ret as i32, c_ret);
             for (idx, (&a, &b)) in rust_i16.iter().zip(c_i16.iter()).enumerate() {
                 assert_eq!(a, b, "decode i16 mismatch at index {idx}: rust={a} c={b}");
             }
 
             let mut rust_f32 = vec![0f32; frame_size * channels as usize];
             let mut c_f32 = vec![0f32; frame_size * channels as usize];
-            let rust_ret = rust_dec.decode_float(
-                &packet[..packet_len as usize],
-                &mut rust_f32,
-                frame_size as i32,
-                false,
-            );
+            let rust_ret = rust_dec
+                .decode_float(
+                    &packet[..packet_len as usize],
+                    &mut rust_f32,
+                    frame_size as i32,
+                    false,
+                )
+                .unwrap();
             let c_ret = unsafe {
                 opus_projection_decode_float(
                     c_dec,
@@ -898,7 +908,7 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                     0,
                 )
             };
-            assert_eq!(rust_ret, c_ret);
+            assert_eq!(rust_ret as i32, c_ret);
             for (idx, (&a, &b)) in rust_f32.iter().zip(c_f32.iter()).enumerate() {
                 assert_eq!(
                     a.to_bits(),
@@ -911,12 +921,14 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
 
             let mut rust_i24 = vec![0i32; frame_size * channels as usize];
             let mut c_i24 = vec![0i32; frame_size * channels as usize];
-            let rust_ret = rust_dec.decode24(
-                &packet[..packet_len as usize],
-                &mut rust_i24,
-                frame_size as i32,
-                false,
-            );
+            let rust_ret = rust_dec
+                .decode24(
+                    &packet[..packet_len as usize],
+                    &mut rust_i24,
+                    frame_size as i32,
+                    false,
+                )
+                .unwrap();
             let c_ret = unsafe {
                 opus_projection_decode24(
                     c_dec,
@@ -927,7 +939,7 @@ fn projection_decode_format_and_frame_matrix_parity_with_c() {
                     0,
                 )
             };
-            assert_eq!(rust_ret, c_ret);
+            assert_eq!(rust_ret as i32, c_ret);
             for (idx, (&a, &b)) in rust_i24.iter().zip(c_i24.iter()).enumerate() {
                 assert_eq!(a, b, "decode i24 mismatch at index {idx}: rust={a} c={b}");
             }
@@ -1025,12 +1037,14 @@ fn projection_plc_and_fec_parity_with_c() {
 
     let mut rust_tmp = vec![0i16; frame_size * channels as usize];
     let mut c_tmp = vec![0i16; frame_size * channels as usize];
-    let rust_ret = rust_dec.decode(
-        &packet0[..len0 as usize],
-        &mut rust_tmp,
-        frame_size as i32,
-        false,
-    );
+    let rust_ret = rust_dec
+        .decode(
+            &packet0[..len0 as usize],
+            &mut rust_tmp,
+            frame_size as i32,
+            false,
+        )
+        .unwrap();
     let c_ret = unsafe {
         opus_projection_decode(
             c_dec,
@@ -1041,14 +1055,14 @@ fn projection_plc_and_fec_parity_with_c() {
             0,
         )
     };
-    assert_eq!(rust_ret, c_ret);
+    assert_eq!(rust_ret as i32, c_ret);
 
     let mut rust_plc = vec![0i16; frame_size * channels as usize];
     let mut c_plc = vec![0i16; frame_size * channels as usize];
-    let rust_plc_ret = rust_dec.decode(&[], &mut rust_plc, 960, false);
+    let rust_plc_ret = rust_dec.decode(&[], &mut rust_plc, 960, false).unwrap();
     let c_plc_ret =
         unsafe { opus_projection_decode(c_dec, core::ptr::null(), 0, c_plc.as_mut_ptr(), 960, 0) };
-    assert_eq!(rust_plc_ret, c_plc_ret);
+    assert_eq!(rust_plc_ret as i32, c_plc_ret);
     for (idx, (&a, &b)) in rust_plc.iter().zip(c_plc.iter()).enumerate() {
         assert_eq!(a, b, "PLC decode mismatch at index {idx}: rust={a} c={b}");
     }
@@ -1077,12 +1091,14 @@ fn projection_plc_and_fec_parity_with_c() {
 
     let mut rust_fec = vec![0i16; frame_size * channels as usize];
     let mut c_fec = vec![0i16; frame_size * channels as usize];
-    let rust_fec_ret = rust_fec_dec.decode(
-        &packet1[..len1 as usize],
-        &mut rust_fec,
-        frame_size as i32,
-        true,
-    );
+    let rust_fec_ret = rust_fec_dec
+        .decode(
+            &packet1[..len1 as usize],
+            &mut rust_fec,
+            frame_size as i32,
+            true,
+        )
+        .unwrap();
     let c_fec_ret = unsafe {
         opus_projection_decode(
             c_fec_dec,
@@ -1093,7 +1109,7 @@ fn projection_plc_and_fec_parity_with_c() {
             1,
         )
     };
-    assert_eq!(rust_fec_ret, c_fec_ret);
+    assert_eq!(rust_fec_ret as i32, c_fec_ret);
     for (idx, (&a, &b)) in rust_fec.iter().zip(c_fec.iter()).enumerate() {
         assert_eq!(a, b, "FEC decode mismatch at index {idx}: rust={a} c={b}");
     }

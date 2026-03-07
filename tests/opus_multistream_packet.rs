@@ -26,9 +26,9 @@ fn encode_mono_packet(seed: i16) -> Vec<u8> {
         .expect("encoder create");
     let pcm: Vec<i16> = (0..960).map(|i| i as i16 ^ seed).collect();
     let mut out = vec![0u8; 1500];
-    let len = enc.encode(&pcm, &mut out);
+    let len = enc.encode(&pcm, &mut out).expect("encode failed");
     assert!(len > 0);
-    out.truncate(len as usize);
+    out.truncate(len);
     out
 }
 

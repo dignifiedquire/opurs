@@ -36,17 +36,16 @@ fn main() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = enc.encode(&pcm, frame_size, &mut packet);
-    assert!(packet_len > 0, "encode failed: {packet_len}");
+    let packet_len = enc
+        .encode(&pcm, frame_size, &mut packet)
+        .expect("encode failed");
+    assert!(packet_len > 0, "encode returned zero");
 
     let mut decoded = vec![0i16; frame_size as usize * channels as usize];
-    let decoded_samples = dec.decode(
-        &packet[..packet_len as usize],
-        &mut decoded,
-        frame_size,
-        false,
-    );
-    assert_eq!(decoded_samples, frame_size);
+    let decoded_samples = dec
+        .decode(&packet[..packet_len], &mut decoded, frame_size, false)
+        .unwrap();
+    assert_eq!(decoded_samples, frame_size as usize);
 
     println!(
         "encoded {} bytes, decoded {} samples/channel",

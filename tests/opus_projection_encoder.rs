@@ -84,21 +84,24 @@ fn projection_encoder_roundtrip_with_projection_decoder() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let len_i16 = enc.encode(&pcm_i16, frame_size as i32, &mut packet);
+    let len_i16 = enc
+        .encode(&pcm_i16, frame_size as i32, &mut packet)
+        .unwrap();
     assert!(len_i16 > 0);
 
     let mut out = vec![0i16; frame_size * 4];
-    let dec_i16 = dec.decode(
-        &packet[..len_i16 as usize],
-        &mut out,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(dec_i16, frame_size as i32);
+    let dec_i16 = dec
+        .decode(&packet[..len_i16], &mut out, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(dec_i16, frame_size);
     assert!(out.iter().any(|&x| x != 0));
 
-    let len_f32 = enc.encode_float(&pcm_f32, frame_size as i32, &mut packet);
+    let len_f32 = enc
+        .encode_float(&pcm_f32, frame_size as i32, &mut packet)
+        .unwrap();
     assert!(len_f32 > 0);
-    let len_i24 = enc.encode24(&pcm_i24, frame_size as i32, &mut packet);
+    let len_i24 = enc
+        .encode24(&pcm_i24, frame_size as i32, &mut packet)
+        .unwrap();
     assert!(len_i24 > 0);
 }

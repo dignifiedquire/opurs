@@ -218,7 +218,10 @@ mod rust_backend {
             frame_size: i32,
             data: &mut [u8],
         ) -> i32 {
-            st.encode(&pcm[..(frame_size as usize * st.channels() as usize)], data)
+            match st.encode(&pcm[..(frame_size as usize * st.channels() as usize)], data) {
+                Ok(n) => n as i32,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn enc_set_dred_duration(st: &mut Box<OpusEncoder>, val: i32) {
@@ -270,11 +273,18 @@ mod rust_backend {
             frame_size: i32,
             decode_fec: i32,
         ) -> i32 {
-            st.decode24(data, pcm, frame_size, decode_fec != 0)
+            match st.decode24(data, pcm, frame_size, decode_fec != 0) {
+                Ok(n) => n as i32,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn packet_has_lbrr(data: &[u8]) -> i32 {
-            OpusDecoder::packet_has_lbrr(data)
+            match OpusDecoder::packet_has_lbrr(data) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn dec_get_final_range(st: &mut Box<OpusDecoder>) -> u32 {
@@ -487,7 +497,10 @@ mod rust_backend {
             data: &mut [u8],
         ) -> i32 {
             let frame_samples = frame_size as usize * st.layout().channels() as usize;
-            st.encode(&pcm[..frame_samples], frame_size, data)
+            match st.encode(&pcm[..frame_samples], frame_size, data) {
+                Ok(n) => n as i32,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn opus_multistream_encoder_destroy(_st: Self::MSEncoder) {}
@@ -512,7 +525,10 @@ mod rust_backend {
             frame_size: i32,
             decode_fec: i32,
         ) -> i32 {
-            st.decode(data, pcm, frame_size, decode_fec != 0)
+            match st.decode(data, pcm, frame_size, decode_fec != 0) {
+                Ok(n) => n as i32,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn ms_dec_set_complexity(st: &mut Self::MSDecoder, val: i32) {

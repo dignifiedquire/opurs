@@ -147,9 +147,11 @@ fn pre_encode_rust(
     let mut packets = Vec::new();
     for frame in pcm.chunks_exact(frame_size * channels) {
         let mut out = vec![0u8; MAX_PACKET];
-        let len = enc.encode(frame, frame_size as i32, &mut out);
-        assert!(len > 0, "rust ms encode failed: {len}");
-        out.truncate(len as usize);
+        let len = enc
+            .encode(frame, frame_size as i32, &mut out)
+            .expect("rust ms encode failed");
+        assert!(len > 0, "rust ms encode returned zero");
+        out.truncate(len);
         packets.push(out);
     }
     packets
@@ -193,9 +195,9 @@ fn bench_multistream_encode_cmp(c: &mut Criterion) {
                     b.iter(|| {
                         let mut enc = create_rust_encoder(layout, bitrate);
                         let mut out = vec![0u8; MAX_PACKET];
-                        let mut total = 0i32;
+                        let mut total = 0usize;
                         for frame in pcm.chunks_exact(frame_size * channels) {
-                            total += enc.encode(frame, frame_size as i32, &mut out);
+                            total += enc.encode(frame, frame_size as i32, &mut out).unwrap();
                         }
                         black_box(total);
                     });
@@ -245,9 +247,11 @@ fn bench_multistream_decode_cmp(c: &mut Criterion) {
                     b.iter(|| {
                         let mut dec = create_rust_decoder(layout);
                         let mut out = vec![0i16; frame_size * channels];
-                        let mut total = 0i32;
+                        let mut total = 0usize;
                         for packet in &packets_rust {
-                            total += dec.decode(packet, &mut out, frame_size as i32, false);
+                            total += dec
+                                .decode(packet, &mut out, frame_size as i32, false)
+                                .unwrap();
                         }
                         black_box(total);
                     });

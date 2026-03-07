@@ -315,13 +315,17 @@ impl OpusEncoder {
     /// is one of the valid Opus frame sizes for the configured sample rate.
     /// `output` is the buffer for the encoded packet.
     ///
-    /// Returns the number of bytes written into `output` on success, or a
-    /// negative Opus error code on failure.
+    /// Returns the number of bytes written into `output` on success.
     ///
     /// Upstream C: src/opus_encoder.c:opus_encode
-    pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> i32 {
+    pub fn encode(&mut self, pcm: &[i16], output: &mut [u8]) -> Result<usize, ErrorCode> {
         let frame_size = pcm.len() as i32 / self.channels;
-        opus_encode(self, pcm, frame_size, output)
+        let ret = opus_encode(self, pcm, frame_size, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode an audio frame from interleaved `f32` PCM samples.
@@ -332,13 +336,17 @@ impl OpusEncoder {
     /// range are supported but will be clipped on decoding.
     /// `output` is the buffer for the encoded packet.
     ///
-    /// Returns the number of bytes written into `output` on success, or a
-    /// negative Opus error code on failure.
+    /// Returns the number of bytes written into `output` on success.
     ///
     /// Upstream C: src/opus_encoder.c:opus_encode_float
-    pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> i32 {
+    pub fn encode_float(&mut self, pcm: &[f32], output: &mut [u8]) -> Result<usize, ErrorCode> {
         let frame_size = pcm.len() as i32 / self.channels;
-        opus_encode_float(self, pcm, frame_size, output)
+        let ret = opus_encode_float(self, pcm, frame_size, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode an audio frame from interleaved 24-bit PCM samples in `i32`.
@@ -347,9 +355,14 @@ impl OpusEncoder {
     /// aligned in i32 as in upstream `opus_encode24` APIs).
     ///
     /// Upstream C: src/opus_encoder.c:opus_encode24
-    pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> i32 {
+    pub fn encode24(&mut self, pcm: &[i32], output: &mut [u8]) -> Result<usize, ErrorCode> {
         let frame_size = pcm.len() as i32 / self.channels;
-        opus_encode24(self, pcm, frame_size, output)
+        let ret = opus_encode24(self, pcm, frame_size, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     // -- Type-safe CTL getters and setters --
@@ -1584,7 +1597,7 @@ fn encode_multiframe_packet(
             dtx_count += 1;
         }
 
-        ret = rp.cat(&tmp_data[curr_pos..curr_pos + tmp_len as usize]);
+        ret = rp.cat_impl(&tmp_data[curr_pos..curr_pos + tmp_len as usize], false);
         offsets.push((curr_pos, curr_pos + tmp_len as usize));
         if ret < 0 {
             return OPUS_INTERNAL_ERROR;

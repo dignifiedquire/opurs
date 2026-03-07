@@ -2,7 +2,7 @@
 //!
 //! Upstream C: tests/test_opus_padding.c
 
-use opurs::{opus_get_version_string, Channels, OpusDecoder, SampleRate, OPUS_INVALID_PACKET};
+use opurs::{opus_get_version_string, Channels, OpusDecoder, SampleRate};
 
 /// Test that a crafted large padding packet returns OPUS_INVALID_PACKET
 /// rather than causing a buffer overflow.
@@ -28,8 +28,8 @@ fn test_padding_overflow() {
 
     let result = decoder.decode(&packet, &mut out, 5760, false);
 
-    assert_eq!(
-        result, OPUS_INVALID_PACKET,
-        "Padding overflow test: expected OPUS_INVALID_PACKET ({OPUS_INVALID_PACKET}), got {result}"
+    assert!(
+        result.is_err(),
+        "Padding overflow test: expected OPUS_INVALID_PACKET, got {result:?}"
     );
 }

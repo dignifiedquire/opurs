@@ -10,7 +10,7 @@ use opurs::internals::{
 };
 use opurs::{
     Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG,
-    OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET, OPUS_OK,
+    OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
 };
 
 fn ext(id: i32, frame: i32, data: &[u8]) -> OpusExtensionData {
@@ -65,9 +65,9 @@ fn encode_mono_packet(seed: i16) -> Vec<u8> {
         .expect("encoder create");
     let pcm: Vec<i16> = (0..960).map(|i| i as i16 ^ seed).collect();
     let mut out = vec![0u8; 1500];
-    let len = enc.encode(&pcm, &mut out);
-    assert!(len > 0, "encode failed: {len}");
-    out.truncate(len as usize);
+    let len = enc.encode(&pcm, &mut out).expect("encode failed");
+    assert!(len > 0, "encode returned zero");
+    out.truncate(len);
     out
 }
 
@@ -443,19 +443,19 @@ fn repacketizer_out_range_impl() {
     assert!(p2_len > 0, "pad third packet failed: {p2_len}");
 
     let mut rp = OpusRepacketizer::default();
-    assert_eq!(rp.cat(&p0_ext[..p0_len as usize]), OPUS_OK);
-    assert_eq!(rp.cat(&p1), OPUS_OK);
-    assert_eq!(rp.cat(&p2_ext[..p2_len as usize]), OPUS_OK);
+    rp.cat(&p0_ext[..p0_len as usize]).unwrap();
+    rp.cat(&p1).unwrap();
+    rp.cat(&p2_ext[..p2_len as usize]).unwrap();
 
     let mut packet_out = vec![0u8; 2048];
-    let out_len = rp.out_range(0, 3, &mut packet_out);
-    assert!(out_len > 0, "out_range failed: {out_len}");
+    let out_len = rp.out_range(0, 3, &mut packet_out).unwrap();
+    assert!(out_len > 0, "out_range returned zero");
 
     let mut sizes = [0i16; 48];
     let mut packet_offset = 0i32;
     let mut padding_len = 0i32;
     let frame_count = opus_packet_parse_impl(
-        &packet_out[..out_len as usize],
+        &packet_out[..out_len],
         false,
         None,
         None,

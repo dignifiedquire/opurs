@@ -57,8 +57,10 @@ fn main() {
 
         // Rust float decode
         let mut rust_float = vec![0.0f32; MAX_FRAME_SIZE * 2];
-        let rust_ret = rust_dec.decode_float(pkt, &mut rust_float, MAX_FRAME_SIZE as i32, false);
-        assert_eq!(c_ret, rust_ret);
+        let rust_ret = rust_dec
+            .decode_float(pkt, &mut rust_float, MAX_FRAME_SIZE as i32, false)
+            .unwrap();
+        assert_eq!(c_ret, rust_ret as i32);
 
         // C int16 decode (create fresh decoder for int16 if needed, or use separate decoders)
         // Actually, let's compare using the same float output converted to int16
@@ -201,8 +203,10 @@ fn main() {
 
         // Rust int16 decode
         let mut rust_i16 = vec![0i16; MAX_FRAME_SIZE * 2];
-        let rust_ret = rust_dec2.decode(pkt, &mut rust_i16, MAX_FRAME_SIZE as i32, false);
-        assert_eq!(c_ret, rust_ret);
+        let rust_ret = rust_dec2
+            .decode(pkt, &mut rust_i16, MAX_FRAME_SIZE as i32, false)
+            .unwrap();
+        assert_eq!(c_ret, rust_ret as i32);
 
         let n = c_ret as usize * 2;
         for i in 0..n {

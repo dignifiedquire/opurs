@@ -41,14 +41,18 @@ fn projection_decoder_identity_matrix_matches_expected_fixed_point_mix() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = enc.encode(&pcm, frame_size as i32, &mut packet);
+    let packet_len = enc.encode(&pcm, frame_size as i32, &mut packet).unwrap();
     assert!(packet_len > 0);
-    let packet = &packet[..packet_len as usize];
+    let packet = &packet[..packet_len];
 
     let mut proj_out = vec![0i16; frame_size * 2];
     let mut ms_out = vec![0i16; frame_size * 2];
-    let proj_ret = proj_dec.decode(packet, &mut proj_out, frame_size as i32, false);
-    let ms_ret = ms_dec.decode(packet, &mut ms_out, frame_size as i32, false);
+    let proj_ret = proj_dec
+        .decode(packet, &mut proj_out, frame_size as i32, false)
+        .unwrap();
+    let ms_ret = ms_dec
+        .decode(packet, &mut ms_out, frame_size as i32, false)
+        .unwrap();
     assert_eq!(proj_ret, ms_ret);
     for (idx, (&proj, &ms)) in proj_out.iter().zip(ms_out.iter()).enumerate() {
         // Matrix diagonal is 32767, so projection output follows
@@ -78,17 +82,23 @@ fn projection_decoder_identity_smoke_float_and_24bit() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = enc.encode_float(&pcm, frame_size as i32, &mut packet);
+    let packet_len = enc
+        .encode_float(&pcm, frame_size as i32, &mut packet)
+        .unwrap();
     assert!(packet_len > 0);
-    let packet = &packet[..packet_len as usize];
+    let packet = &packet[..packet_len];
 
     let mut out_f32 = vec![0f32; frame_size * 2];
-    let ret_f32 = proj_dec.decode_float(packet, &mut out_f32, frame_size as i32, false);
-    assert_eq!(ret_f32, frame_size as i32);
+    let ret_f32 = proj_dec
+        .decode_float(packet, &mut out_f32, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(ret_f32, frame_size);
     assert!(out_f32.iter().any(|&x| x != 0.0));
 
     let mut out_i32 = vec![0i32; frame_size * 2];
-    let ret_i32 = proj_dec.decode24(packet, &mut out_i32, frame_size as i32, false);
-    assert_eq!(ret_i32, frame_size as i32);
+    let ret_i32 = proj_dec
+        .decode24(packet, &mut out_i32, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(ret_i32, frame_size);
     assert!(out_i32.iter().any(|&x| x != 0));
 }

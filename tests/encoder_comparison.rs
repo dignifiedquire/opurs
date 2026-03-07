@@ -76,7 +76,7 @@ fn compare_encoder_frame_by_frame() {
         }
 
         // Encode with Rust
-        let rust_len = rust_enc.encode(&pcm, &mut rust_out) as usize;
+        let rust_len = rust_enc.encode(&pcm, &mut rust_out).unwrap();
 
         // Encode with C
         let c_len = unsafe {
@@ -159,7 +159,7 @@ fn compare_encoder_low_bitrate() {
             *s = rng.next_i16();
         }
 
-        let rust_len = rust_enc.encode(&pcm, &mut rust_out) as usize;
+        let rust_len = rust_enc.encode(&pcm, &mut rust_out).unwrap();
         let c_len = unsafe {
             opus_encode(
                 c_enc,

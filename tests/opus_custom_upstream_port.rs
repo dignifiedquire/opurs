@@ -170,12 +170,23 @@ fn encode_frame(
         (RustEncoder::Custom(st), SampleFormat::Float) => {
             st.encode_float(&input.f32_samples[lo..hi], packet)
         }
-        (RustEncoder::Opus(st), SampleFormat::I16) => st.encode(&input.i16_samples[lo..hi], packet),
+        (RustEncoder::Opus(st), SampleFormat::I16) => {
+            match st.encode(&input.i16_samples[lo..hi], packet) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
+        }
         (RustEncoder::Opus(st), SampleFormat::I24) => {
-            st.encode24(&input.i24_samples[lo..hi], packet)
+            match st.encode24(&input.i24_samples[lo..hi], packet) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
         (RustEncoder::Opus(st), SampleFormat::Float) => {
-            st.encode_float(&input.f32_samples[lo..hi], packet)
+            match st.encode_float(&input.f32_samples[lo..hi], packet) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
     }
 }
@@ -202,15 +213,24 @@ fn decode_frame(
         }
         (RustDecoder::Opus(st), SampleFormat::I16) => {
             let mut out = vec![0i16; frame_size as usize * channels];
-            st.decode(packet, &mut out, frame_size, false)
+            match st.decode(packet, &mut out, frame_size, false) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
         (RustDecoder::Opus(st), SampleFormat::I24) => {
             let mut out = vec![0i32; frame_size as usize * channels];
-            st.decode24(packet, &mut out, frame_size, false)
+            match st.decode24(packet, &mut out, frame_size, false) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
         (RustDecoder::Opus(st), SampleFormat::Float) => {
             let mut out = vec![0f32; frame_size as usize * channels];
-            st.decode_float(packet, &mut out, frame_size, false)
+            match st.decode_float(packet, &mut out, frame_size, false) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
     }
 }
@@ -228,7 +248,10 @@ fn decode_corrupt_i16(
         }
         RustDecoder::Opus(st) => {
             let mut out = vec![0i16; frame_size as usize * channels];
-            st.decode(packet, &mut out, frame_size, false)
+            match st.decode(packet, &mut out, frame_size, false) {
+                Ok(v) => v as i32,
+                Err(e) => i32::from(e),
+            }
         }
     }
 }

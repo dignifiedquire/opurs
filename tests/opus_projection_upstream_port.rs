@@ -291,18 +291,22 @@ fn projection_upstream_encode_decode_pipeline() {
     projection_generate_music(&mut buffer_in, BUFFER_SIZE, channels as usize, &mut rng);
 
     let mut packet = vec![0u8; MAX_DATA_BYTES];
-    let len = enc.encode(&buffer_in, BUFFER_SIZE as i32, &mut packet);
+    let len = enc
+        .encode(&buffer_in, BUFFER_SIZE as i32, &mut packet)
+        .expect("opus_projection_encode failed");
     assert!(
-        len > 0 && (len as usize) <= MAX_DATA_BYTES,
+        len > 0 && len <= MAX_DATA_BYTES,
         "opus_projection_encode returned {len}"
     );
 
     let mut buffer_out = vec![0i16; MAX_FRAME_SAMPLES * channels as usize];
-    let out_samples = dec.decode(
-        &packet[..len as usize],
-        &mut buffer_out,
-        MAX_FRAME_SAMPLES as i32,
-        false,
-    );
-    assert_eq!(out_samples, BUFFER_SIZE as i32);
+    let out_samples = dec
+        .decode(
+            &packet[..len],
+            &mut buffer_out,
+            MAX_FRAME_SAMPLES as i32,
+            false,
+        )
+        .unwrap();
+    assert_eq!(out_samples, BUFFER_SIZE);
 }

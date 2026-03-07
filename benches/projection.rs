@@ -167,9 +167,11 @@ fn pre_encode_rust(
     let mut packets = Vec::new();
     for frame in pcm.chunks_exact(frame_size * channels as usize) {
         let mut packet = vec![0u8; MAX_PACKET];
-        let len = enc.encode(frame, frame_size as i32, &mut packet);
-        assert!(len > 0, "rust projection encode failed: {len}");
-        packet.truncate(len as usize);
+        let len = enc
+            .encode(frame, frame_size as i32, &mut packet)
+            .expect("rust projection encode failed");
+        assert!(len > 0, "rust projection encode returned zero");
+        packet.truncate(len);
         packets.push(packet);
     }
     PreparedProjection {
@@ -226,9 +228,9 @@ fn bench_projection_encode_cmp(c: &mut Criterion) {
                     b.iter(|| {
                         let (mut enc, _, _) = create_rust_encoder(channels, bitrate);
                         let mut packet = vec![0u8; MAX_PACKET];
-                        let mut total = 0i32;
+                        let mut total = 0usize;
                         for frame in pcm.chunks_exact(frame_size * channels as usize) {
-                            let len = enc.encode(frame, frame_size as i32, &mut packet);
+                            let len = enc.encode(frame, frame_size as i32, &mut packet).unwrap();
                             total += len;
                         }
                         black_box(total);
@@ -278,9 +280,11 @@ fn bench_projection_decode_cmp(c: &mut Criterion) {
                     b.iter(|| {
                         let mut dec = create_rust_decoder(&prepared_rust);
                         let mut out = vec![0i16; frame_size * channels as usize];
-                        let mut total = 0i32;
+                        let mut total = 0usize;
                         for packet in &prepared_rust.packets {
-                            total += dec.decode(packet, &mut out, frame_size as i32, false);
+                            total += dec
+                                .decode(packet, &mut out, frame_size as i32, false)
+                                .unwrap();
                         }
                         black_box(total);
                     });

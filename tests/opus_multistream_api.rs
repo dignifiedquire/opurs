@@ -13,7 +13,7 @@ use libopus_sys::{
     opus_multistream_surround_encoder_init,
 };
 use opurs::{
-    Application, Bitrate, Channels, OpusMSDecoder, OpusMSEncoder, SampleRate, Signal,
+    Application, Bitrate, Channels, ErrorCode, OpusMSDecoder, OpusMSEncoder, SampleRate, Signal,
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
     OPUS_GET_APPLICATION_REQUEST, OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST,
     OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST,
@@ -31,6 +31,14 @@ use opurs::{
 };
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::sync::{Mutex, MutexGuard, OnceLock};
+
+/// Convert a Result<usize, ErrorCode> to i32, matching the C API convention.
+fn res_to_i32(r: Result<usize, ErrorCode>) -> i32 {
+    match r {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    }
+}
 
 fn test_guard() -> MutexGuard<'static, ()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -239,17 +247,16 @@ fn multistream_roundtrip_two_mono_streams() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = ms_enc.encode(&pcm, frame_size as i32, &mut packet);
-    assert!(packet_len > 0, "encode failed: {packet_len}");
+    let packet_len = ms_enc
+        .encode(&pcm, frame_size as i32, &mut packet)
+        .expect("encode failed");
+    assert!(packet_len > 0, "encode returned zero");
 
     let mut out = vec![0i16; frame_size * 2];
-    let decoded = ms_dec.decode(
-        &packet[..packet_len as usize],
-        &mut out,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(decoded, frame_size as i32);
+    let decoded = ms_dec
+        .decode(&packet[..packet_len], &mut out, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(decoded, frame_size);
     assert!(
         out.iter().any(|&x| x != 0),
         "decoded output should not be all zeros"
@@ -272,17 +279,16 @@ fn multistream_float_roundtrip_two_mono_streams() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let packet_len = ms_enc.encode_float(&pcm, frame_size as i32, &mut packet);
-    assert!(packet_len > 0, "encode_float failed: {packet_len}");
+    let packet_len = ms_enc
+        .encode_float(&pcm, frame_size as i32, &mut packet)
+        .expect("encode_float failed");
+    assert!(packet_len > 0, "encode_float returned zero");
 
     let mut out = vec![0f32; frame_size * 2];
-    let decoded = ms_dec.decode_float(
-        &packet[..packet_len as usize],
-        &mut out,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(decoded, frame_size as i32);
+    let decoded = ms_dec
+        .decode_float(&packet[..packet_len], &mut out, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(decoded, frame_size);
     assert!(
         out.iter().any(|&x| x != 0.0),
         "decoded output should not be all zeros"
@@ -294,7 +300,7 @@ fn multistream_decoder_packet_loss_parity_with_c() {
     let _guard = test_guard();
     let mut rust_dec = OpusMSDecoder::new(SampleRate::Hz48000, 2, 2, 0, &[0, 1]).unwrap();
     let mut rust_out = vec![0i16; 960 * 2];
-    let rust_ret = rust_dec.decode(&[], &mut rust_out, 960, false);
+    let rust_ret = res_to_i32(rust_dec.decode(&[], &mut rust_out, 960, false));
 
     let mut c_error = 0i32;
     let c_ptr = unsafe {
@@ -591,7 +597,7 @@ fn multistream_decode_invalid_packet_parity_with_c() {
     let mut rust_dec = OpusMSDecoder::new(SampleRate::Hz48000, 2, 2, 0, &[0, 1]).unwrap();
     let mut rust_out = vec![0i16; 960 * 2];
     let bad_packet = [0xffu8];
-    let rust_ret = rust_dec.decode(&bad_packet, &mut rust_out, 960, false);
+    let rust_ret = res_to_i32(rust_dec.decode(&bad_packet, &mut rust_out, 960, false));
 
     let mut c_error = 0i32;
     let c_ptr = unsafe {
@@ -633,29 +639,27 @@ fn multistream_wrapper_entrypoints_smoke() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let len_i16 = enc.encode(&pcm_i16, frame_size as i32, &mut packet);
+    let len_i16 = enc
+        .encode(&pcm_i16, frame_size as i32, &mut packet)
+        .expect("encode i16 failed");
     assert!(len_i16 > 0);
 
     let mut out_i16 = vec![0i16; frame_size * 2];
-    let dec_i16 = dec.decode(
-        &packet[..len_i16 as usize],
-        &mut out_i16,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(dec_i16, frame_size as i32);
+    let dec_i16 = dec
+        .decode(&packet[..len_i16], &mut out_i16, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(dec_i16, frame_size);
 
-    let len_f32 = enc.encode_float(&pcm_f32, frame_size as i32, &mut packet);
+    let len_f32 = enc
+        .encode_float(&pcm_f32, frame_size as i32, &mut packet)
+        .expect("encode float failed");
     assert!(len_f32 > 0);
 
     let mut out_f32 = vec![0f32; frame_size * 2];
-    let dec_f32 = dec.decode_float(
-        &packet[..len_f32 as usize],
-        &mut out_f32,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(dec_f32, frame_size as i32);
+    let dec_f32 = dec
+        .decode_float(&packet[..len_f32], &mut out_f32, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(dec_f32, frame_size);
 }
 
 #[test]
@@ -674,12 +678,16 @@ fn multistream_24bit_wrapper_entrypoints_smoke() {
     }
 
     let mut packet = vec![0u8; 4000];
-    let len = enc.encode24(&pcm_i24, frame_size as i32, &mut packet);
+    let len = enc
+        .encode24(&pcm_i24, frame_size as i32, &mut packet)
+        .expect("encode24 failed");
     assert!(len > 0);
 
     let mut out = vec![0i32; frame_size * 2];
-    let decoded = dec.decode24(&packet[..len as usize], &mut out, frame_size as i32, false);
-    assert_eq!(decoded, frame_size as i32);
+    let decoded = dec
+        .decode24(&packet[..len], &mut out, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(decoded, frame_size);
     assert!(out.iter().any(|&x| x != 0));
 }
 
@@ -719,8 +727,10 @@ fn multistream_24bit_encode_decode_parity_with_c() {
     }
 
     let mut rust_packet = vec![0u8; 4000];
-    let rust_len = rust_enc.encode24(&pcm, frame_size as i32, &mut rust_packet);
-    assert!(rust_len > 0, "rust encode24 failed: {rust_len}");
+    let rust_len = rust_enc
+        .encode24(&pcm, frame_size as i32, &mut rust_packet)
+        .expect("rust encode24 failed");
+    assert!(rust_len > 0, "rust encode24 returned zero");
 
     let mut c_packet = vec![0u8; 4000];
     let c_len = unsafe {
@@ -735,13 +745,15 @@ fn multistream_24bit_encode_decode_parity_with_c() {
     assert!(c_len > 0, "c encode24 failed: {c_len}");
 
     let mut rust_out_from_c = vec![0i32; frame_size * 2];
-    let rust_decoded_from_c = rust_dec.decode24(
-        &c_packet[..c_len as usize],
-        &mut rust_out_from_c,
-        frame_size as i32,
-        false,
-    );
-    assert_eq!(rust_decoded_from_c, frame_size as i32);
+    let rust_decoded_from_c = rust_dec
+        .decode24(
+            &c_packet[..c_len as usize],
+            &mut rust_out_from_c,
+            frame_size as i32,
+            false,
+        )
+        .unwrap();
+    assert_eq!(rust_decoded_from_c, frame_size);
 
     let mut c_out_from_c = vec![0i32; frame_size * 2];
     let c_decoded_from_c = unsafe {
@@ -796,7 +808,7 @@ fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
 
     let pcm = vec![0i32; 100];
     let mut packet = vec![0u8; 1000];
-    let rust_bad_arg = rust_enc.encode24(&pcm, 60, &mut packet);
+    let rust_bad_arg = res_to_i32(rust_enc.encode24(&pcm, 60, &mut packet));
     let c_bad_arg = unsafe {
         opus_multistream_encode24(
             c_enc,
@@ -810,7 +822,7 @@ fn multistream_24bit_bad_arg_and_invalid_packet_parity_with_c() {
 
     let bad_packet = [0xffu8];
     let mut rust_out = vec![0i32; 960 * 2];
-    let rust_invalid = rust_dec.decode24(&bad_packet, &mut rust_out, 960, false);
+    let rust_invalid = res_to_i32(rust_dec.decode24(&bad_packet, &mut rust_out, 960, false));
 
     let mut c_out = vec![0i32; 960 * 2];
     let c_invalid = unsafe {
@@ -845,12 +857,16 @@ fn multistream_decoder_mapping_255_outputs_silence() {
         *s = (i as i16).wrapping_mul(13);
     }
     let mut packet = vec![0u8; 2000];
-    let len = enc.encode(&pcm, frame_size as i32, &mut packet);
+    let len = enc
+        .encode(&pcm, frame_size as i32, &mut packet)
+        .expect("encode failed");
     assert!(len > 0);
 
     let mut out = vec![1i16; frame_size * 2];
-    let decoded = dec.decode(&packet[..len as usize], &mut out, frame_size as i32, false);
-    assert_eq!(decoded, frame_size as i32);
+    let decoded = dec
+        .decode(&packet[..len], &mut out, frame_size as i32, false)
+        .unwrap();
+    assert_eq!(decoded, frame_size);
     for i in 0..frame_size {
         assert_eq!(out[i * 2 + 1], 0, "channel mapped to 255 must be silent");
     }
@@ -1021,7 +1037,7 @@ fn multistream_wrapper_encode_rejects_frame_size_mismatch() {
     let pcm = vec![0i16; 100];
     let mut packet = vec![0u8; 1000];
     let ret = enc.encode(&pcm, 60, &mut packet);
-    assert_eq!(ret, OPUS_BAD_ARG);
+    assert!(ret.is_err(), "encode should have returned BAD_ARG");
 }
 
 #[test]
@@ -1050,7 +1066,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_i16 = vec![0i16; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_i16 = rust_enc.encode(&pcm_i16, frame_size, &mut rust_packet);
+        let rust_i16 = res_to_i32(rust_enc.encode(&pcm_i16, frame_size, &mut rust_packet));
         let mut c_packet = vec![0u8; 4000];
         let c_i16 = unsafe {
             opus_multistream_encode(
@@ -1068,7 +1084,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_f32 = vec![0f32; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_f32 = rust_enc.encode_float(&pcm_f32, frame_size, &mut rust_packet);
+        let rust_f32 = res_to_i32(rust_enc.encode_float(&pcm_f32, frame_size, &mut rust_packet));
         let mut c_packet = vec![0u8; 4000];
         let c_f32 = unsafe {
             opus_multistream_encode_float(
@@ -1086,7 +1102,7 @@ fn multistream_frame_size_validation_parity_with_c() {
 
         let pcm_i24 = vec![0i32; samples];
         let mut rust_packet = vec![0u8; 4000];
-        let rust_i24 = rust_enc.encode24(&pcm_i24, frame_size, &mut rust_packet);
+        let rust_i24 = res_to_i32(rust_enc.encode24(&pcm_i24, frame_size, &mut rust_packet));
         let mut c_packet = vec![0u8; 4000];
         let c_i24 = unsafe {
             opus_multistream_encode24(
@@ -1132,12 +1148,12 @@ fn multistream_frame_size_validation_parity_with_c() {
         assert!(!c_dec.is_null(), "c decoder create failed: {c_error}");
 
         let mut out_i16 = vec![0i16; 960 * 2];
-        let rust_i16 = rust_dec.decode(
+        let rust_i16 = res_to_i32(rust_dec.decode(
             &packet[..packet_len as usize],
             &mut out_i16,
             frame_size,
             false,
-        );
+        ));
         let mut c_i16 = vec![0i16; 960 * 2];
         let c_i16 = unsafe {
             opus_multistream_decode(
@@ -1155,12 +1171,12 @@ fn multistream_frame_size_validation_parity_with_c() {
         );
 
         let mut out_f32 = vec![0f32; 960 * 2];
-        let rust_f32 = rust_dec.decode_float(
+        let rust_f32 = res_to_i32(rust_dec.decode_float(
             &packet[..packet_len as usize],
             &mut out_f32,
             frame_size,
             false,
-        );
+        ));
         let mut c_f32 = vec![0f32; 960 * 2];
         let c_f32 = unsafe {
             opus_multistream_decode_float(
@@ -1178,12 +1194,12 @@ fn multistream_frame_size_validation_parity_with_c() {
         );
 
         let mut out_i24 = vec![0i32; 960 * 2];
-        let rust_i24 = rust_dec.decode24(
+        let rust_i24 = res_to_i32(rust_dec.decode24(
             &packet[..packet_len as usize],
             &mut out_i24,
             frame_size,
             false,
-        );
+        ));
         let mut c_i24 = vec![0i32; 960 * 2];
         let c_i24 = unsafe {
             opus_multistream_decode24(
@@ -1440,30 +1456,34 @@ fn multistream_decoder_ctl_value_parity_with_c() {
         .map(|i| ((i as i32 * 257) % 32768 - 16384) as i16)
         .collect();
     let mut packet = vec![0u8; 4000];
-    let packet_len = enc.encode(&pcm, frame_size as i32, &mut packet);
-    assert!(packet_len > 0, "encode failed: {packet_len}");
+    let packet_len = enc
+        .encode(&pcm, frame_size as i32, &mut packet)
+        .expect("encode failed");
+    assert!(packet_len > 0, "encode returned zero");
 
     let mut rust_out = vec![0i16; frame_size * 2];
-    let rust_decoded = rust.decode(
-        &packet[..packet_len as usize],
-        &mut rust_out,
-        frame_size as i32,
-        false,
-    );
-    assert!(rust_decoded > 0, "rust decode failed: {rust_decoded}");
+    let rust_decoded = rust
+        .decode(
+            &packet[..packet_len],
+            &mut rust_out,
+            frame_size as i32,
+            false,
+        )
+        .unwrap();
+    assert!(rust_decoded > 0, "rust decode failed");
 
     let mut c_out = vec![0i16; frame_size * 2];
     let c_decoded = unsafe {
         opus_multistream_decode(
             c_ptr,
             packet.as_ptr(),
-            packet_len,
+            packet_len as i32,
             c_out.as_mut_ptr(),
             frame_size as i32,
             0,
         )
     };
-    assert_eq!(rust_decoded, c_decoded);
+    assert_eq!(rust_decoded as i32, c_decoded);
 
     let mut c_complexity = 0i32;
     let mut c_gain = 0i32;

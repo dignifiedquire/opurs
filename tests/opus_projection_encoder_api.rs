@@ -202,8 +202,10 @@ fn projection_encoder_foa_encode_smoke_against_c() {
     }
 
     let mut rust_packet = vec![0u8; 4000];
-    let rust_len = rust_enc.encode(&pcm, frame_size as i32, &mut rust_packet);
-    assert!(rust_len > 0, "rust projection encode failed: {rust_len}");
+    let rust_len = rust_enc
+        .encode(&pcm, frame_size as i32, &mut rust_packet)
+        .expect("rust projection encode failed");
+    assert!(rust_len > 0, "rust projection encode returned zero");
 
     let mut c_packet = vec![0u8; 4000];
     let c_len = unsafe {
@@ -378,7 +380,9 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_enc.encode(&pcm_i16, frame_size as i32, &mut rust_packet);
+            let rust_len = rust_enc
+                .encode(&pcm_i16, frame_size as i32, &mut rust_packet)
+                .expect("rust i16 encode failed");
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode(
@@ -389,7 +393,10 @@ fn projection_encoder_format_encode_smoke_against_c() {
                     c_packet.len() as i32,
                 )
             };
-            assert!(rust_len > 0, "rust i16 encode failed (channels={channels})");
+            assert!(
+                rust_len > 0,
+                "rust i16 encode returned zero (channels={channels})"
+            );
             assert!(c_len > 0, "c i16 encode failed (channels={channels})");
 
             unsafe { opus_projection_encoder_destroy(c_enc) };
@@ -427,7 +434,9 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_enc.encode_float(&pcm_f32, frame_size as i32, &mut rust_packet);
+            let rust_len = rust_enc
+                .encode_float(&pcm_f32, frame_size as i32, &mut rust_packet)
+                .expect("rust float encode failed");
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode_float(
@@ -440,7 +449,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
             };
             assert!(
                 rust_len > 0,
-                "rust float encode failed (channels={channels})"
+                "rust float encode returned zero (channels={channels})"
             );
             assert!(c_len > 0, "c float encode failed (channels={channels})");
 
@@ -479,7 +488,9 @@ fn projection_encoder_format_encode_smoke_against_c() {
             assert_eq!(rust_coupled, c_coupled);
 
             let mut rust_packet = vec![0u8; 4000];
-            let rust_len = rust_enc.encode24(&pcm_i24, frame_size as i32, &mut rust_packet);
+            let rust_len = rust_enc
+                .encode24(&pcm_i24, frame_size as i32, &mut rust_packet)
+                .expect("rust 24bit encode failed");
             let mut c_packet = vec![0u8; 4000];
             let c_len = unsafe {
                 opus_projection_encode24(
@@ -492,7 +503,7 @@ fn projection_encoder_format_encode_smoke_against_c() {
             };
             assert!(
                 rust_len > 0,
-                "rust 24bit encode failed (channels={channels})"
+                "rust 24bit encode returned zero (channels={channels})"
             );
             assert!(c_len > 0, "c 24bit encode failed (channels={channels})");
 
@@ -550,7 +561,10 @@ fn projection_encoder_error_code_parity_with_c() {
 
     for bad_frame in [-1i32, 0i32] {
         let mut rust_packet = vec![0u8; 4000];
-        let rust_ret = rust_enc.encode(&pcm_i16, bad_frame, &mut rust_packet);
+        let rust_ret = match rust_enc.encode(&pcm_i16, bad_frame, &mut rust_packet) {
+            Ok(v) => v as i32,
+            Err(e) => i32::from(e),
+        };
         let mut c_packet = vec![0u8; 4000];
         let c_ret = unsafe {
             opus_projection_encode(
@@ -569,7 +583,10 @@ fn projection_encoder_error_code_parity_with_c() {
     }
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret = rust_enc.encode(&pcm_i16, frame_size as i32, &mut tiny);
+    let rust_ret = match rust_enc.encode(&pcm_i16, frame_size as i32, &mut tiny) {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    };
     let c_ret = unsafe {
         opus_projection_encode(
             c_enc,
@@ -583,7 +600,10 @@ fn projection_encoder_error_code_parity_with_c() {
     assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret = rust_enc.encode_float(&pcm_f32, frame_size as i32, &mut tiny);
+    let rust_ret = match rust_enc.encode_float(&pcm_f32, frame_size as i32, &mut tiny) {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    };
     let c_ret = unsafe {
         opus_projection_encode_float(
             c_enc,
@@ -597,7 +617,10 @@ fn projection_encoder_error_code_parity_with_c() {
     assert_eq!(rust_ret, OPUS_BUFFER_TOO_SMALL);
 
     let mut tiny = vec![0u8; 1];
-    let rust_ret = rust_enc.encode24(&pcm_i24, frame_size as i32, &mut tiny);
+    let rust_ret = match rust_enc.encode24(&pcm_i24, frame_size as i32, &mut tiny) {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    };
     let c_ret = unsafe {
         opus_projection_encode24(
             c_enc,

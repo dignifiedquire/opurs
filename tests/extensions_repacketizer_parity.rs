@@ -4,9 +4,7 @@ use opurs::internals::{
     opus_packet_extensions_parse_ext, opus_packet_pad_impl, opus_packet_parse_impl,
     OpusExtensionData,
 };
-use opurs::{
-    Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG, OPUS_OK,
-};
+use opurs::{Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG};
 
 #[cfg(feature = "tools")]
 #[repr(C)]
@@ -53,9 +51,9 @@ fn encode_mono_packet(seed: i16) -> Vec<u8> {
         .expect("encoder create");
     let pcm: Vec<i16> = (0..960).map(|i| i as i16 ^ seed).collect();
     let mut out = vec![0u8; 1500];
-    let len = enc.encode(&pcm, &mut out);
+    let len = enc.encode(&pcm, &mut out).expect("encode failed");
     assert!(len > 0);
-    out.truncate(len as usize);
+    out.truncate(len);
     out
 }
 
@@ -161,11 +159,11 @@ fn repacketizer_preserves_extensions_across_concatenation() {
     assert!(p1_len > 0);
 
     let mut rp = OpusRepacketizer::default();
-    assert_eq!(rp.cat(&p0_ext[..p0_len as usize]), OPUS_OK);
-    assert_eq!(rp.cat(&p1_ext[..p1_len as usize]), OPUS_OK);
+    rp.cat(&p0_ext[..p0_len as usize]).unwrap();
+    rp.cat(&p1_ext[..p1_len as usize]).unwrap();
 
     let mut out = vec![0u8; (p0_len + p1_len + 128) as usize];
-    let out_len = rp.out(&mut out);
+    let out_len = rp.out(&mut out).unwrap();
     assert!(out_len > 0);
 
     let mut toc = 0u8;
@@ -173,7 +171,7 @@ fn repacketizer_preserves_extensions_across_concatenation() {
     let mut packet_offset = 0i32;
     let mut padding_len = 0i32;
     let nb_frames = opus_packet_parse_impl(
-        &out[..out_len as usize],
+        &out[..out_len],
         false,
         Some(&mut toc),
         None,

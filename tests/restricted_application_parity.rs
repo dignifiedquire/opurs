@@ -87,12 +87,13 @@ fn restricted_silk_sub_10ms_encode_matches_c() {
 
     let rust_ret = rust_enc.encode(&pcm_5ms, &mut rust_packet);
     let c_ret = c_enc.encode(&pcm_5ms, &mut c_packet);
+    let rust_ret_i32 = match rust_ret {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
+    };
 
-    assert_eq!(rust_ret, c_ret, "restricted SILK 5ms encode mismatch");
-    assert_eq!(
-        rust_ret, OPUS_BAD_ARG,
-        "restricted SILK 5ms should be rejected"
-    );
+    assert_eq!(rust_ret_i32, c_ret, "restricted SILK 5ms encode mismatch");
+    assert!(rust_ret.is_err(), "restricted SILK 5ms should be rejected");
 }
 
 #[test]
@@ -210,11 +211,13 @@ fn lfe_ctl_semantics_match_c() {
     rust_enc.set_lfe(true);
     assert_eq!(c_enc.set_lfe(true), 0, "C OPUS_SET_LFE(1) failed");
 
-    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let rust_len = rust_enc
+        .encode(&pcm, &mut rust_packet)
+        .expect("LFE encode failed");
     let c_len = c_enc.encode(&pcm, &mut c_packet);
-    assert_eq!(rust_len, c_len, "LFE encode length mismatch");
+    assert_eq!(rust_len as i32, c_len, "LFE encode length mismatch");
     assert_eq!(
-        &rust_packet[..rust_len as usize],
+        &rust_packet[..rust_len],
         &c_packet[..c_len as usize],
         "LFE encode payload mismatch"
     );
@@ -222,11 +225,13 @@ fn lfe_ctl_semantics_match_c() {
     rust_enc.set_lfe(false);
     assert_eq!(c_enc.set_lfe(false), 0, "C OPUS_SET_LFE(0) failed");
 
-    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let rust_len = rust_enc
+        .encode(&pcm, &mut rust_packet)
+        .expect("LFE-clear encode failed");
     let c_len = c_enc.encode(&pcm, &mut c_packet);
-    assert_eq!(rust_len, c_len, "LFE-clear encode length mismatch");
+    assert_eq!(rust_len as i32, c_len, "LFE-clear encode length mismatch");
     assert_eq!(
-        &rust_packet[..rust_len as usize],
+        &rust_packet[..rust_len],
         &c_packet[..c_len as usize],
         "LFE-clear encode payload mismatch"
     );
@@ -259,11 +264,13 @@ fn energy_mask_ctl_semantics_match_c() {
         "C OPUS_SET_ENERGY_MASK failed"
     );
 
-    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let rust_len = rust_enc
+        .encode(&pcm, &mut rust_packet)
+        .expect("energy-mask encode failed");
     let c_len = c_enc.encode(&pcm, &mut c_packet);
-    assert_eq!(rust_len, c_len, "energy-mask encode length mismatch");
+    assert_eq!(rust_len as i32, c_len, "energy-mask encode length mismatch");
     assert_eq!(
-        &rust_packet[..rust_len as usize],
+        &rust_packet[..rust_len],
         &c_packet[..c_len as usize],
         "energy-mask encode payload mismatch"
     );
@@ -277,11 +284,16 @@ fn energy_mask_ctl_semantics_match_c() {
         "C OPUS_SET_ENERGY_MASK(NULL) failed"
     );
 
-    let rust_len = rust_enc.encode(&pcm, &mut rust_packet);
+    let rust_len = rust_enc
+        .encode(&pcm, &mut rust_packet)
+        .expect("energy-mask-clear encode failed");
     let c_len = c_enc.encode(&pcm, &mut c_packet);
-    assert_eq!(rust_len, c_len, "energy-mask-clear encode length mismatch");
     assert_eq!(
-        &rust_packet[..rust_len as usize],
+        rust_len as i32, c_len,
+        "energy-mask-clear encode length mismatch"
+    );
+    assert_eq!(
+        &rust_packet[..rust_len],
         &c_packet[..c_len as usize],
         "energy-mask-clear encode payload mismatch"
     );

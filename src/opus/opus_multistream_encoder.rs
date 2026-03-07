@@ -629,12 +629,22 @@ impl OpusMSEncoder {
     /// `pcm` must contain `frame_size * channels` samples.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encode
-    pub fn encode(&mut self, pcm: &[i16], frame_size: i32, output: &mut [u8]) -> i32 {
+    pub fn encode(
+        &mut self,
+        pcm: &[i16],
+        frame_size: i32,
+        output: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
-        self.encode_impl_i16(pcm, output)
+        let ret = self.encode_impl_i16(pcm, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode one interleaved `f32` frame across all streams.
@@ -642,12 +652,22 @@ impl OpusMSEncoder {
     /// `pcm` must contain `frame_size * channels` samples.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encode_float
-    pub fn encode_float(&mut self, pcm: &[f32], frame_size: i32, output: &mut [u8]) -> i32 {
+    pub fn encode_float(
+        &mut self,
+        pcm: &[f32],
+        frame_size: i32,
+        output: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
-        self.encode_impl_f32(pcm, output)
+        let ret = self.encode_impl_f32(pcm, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Encode one interleaved 24-bit frame (`i32`) across all streams.
@@ -655,12 +675,22 @@ impl OpusMSEncoder {
     /// `pcm` must contain `frame_size * channels` samples.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encode24
-    pub fn encode24(&mut self, pcm: &[i32], frame_size: i32, output: &mut [u8]) -> i32 {
+    pub fn encode24(
+        &mut self,
+        pcm: &[i32],
+        frame_size: i32,
+        output: &mut [u8],
+    ) -> Result<usize, ErrorCode> {
         let channels = self.layout().channels() as usize;
         if frame_size <= 0 || pcm.len() != frame_size as usize * channels {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
-        self.encode_impl_i24(pcm, output)
+        let ret = self.encode_impl_i24(pcm, output);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     fn stream_payload_budget(
@@ -1099,7 +1129,7 @@ impl OpusMSEncoder {
 
 fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
     let mut rp = OpusRepacketizer::default();
-    let ret = rp.cat(packet);
+    let ret = rp.cat_impl(packet, false);
     if ret < 0 {
         return Err(ret);
     }

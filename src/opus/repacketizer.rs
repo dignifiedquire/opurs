@@ -2,6 +2,7 @@
 //!
 //! Upstream C: `src/repacketizer.c`
 
+use crate::error::ErrorCode;
 use crate::opus::extensions::OpusExtensionData;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
@@ -114,14 +115,19 @@ impl OpusRepacketizer {
     /// audio stored in the repacketizer state to more than 120 ms.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_cat
-    pub fn cat(&mut self, data: &[u8]) -> i32 {
-        self.cat_impl(data, false)
+    pub fn cat(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+        let ret = self.cat_impl(data, false);
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(())
+        }
     }
 
     /// Internal packet enqueue path with optional self-delimited parsing.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_cat_impl
-    fn cat_impl(&mut self, data: &[u8], self_delimited: bool) -> i32 {
+    pub(crate) fn cat_impl(&mut self, data: &[u8], self_delimited: bool) -> i32 {
         // Validate TOC compatibility with previously queued frames.
         if data.is_empty() {
             return OPUS_INVALID_PACKET;
@@ -222,15 +228,20 @@ impl OpusRepacketizer {
     /// - `OPUS_BUFFER_TOO_SMALL`: `maxlen` was insufficient to contain the complete output packet.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_out_range
-    pub fn out_range(&mut self, begin: i32, end: i32, data: &mut [u8]) -> i32 {
-        self.out_range_impl(
+    pub fn out_range(&mut self, begin: i32, end: i32, data: &mut [u8]) -> Result<usize, ErrorCode> {
+        let ret = self.out_range_impl(
             begin,
             end,
             data,
             false,
             false,
             FrameSource::Data { offset: 0 },
-        )
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Construct a new packet from data previously submitted to the repacketizer
@@ -251,15 +262,20 @@ impl OpusRepacketizer {
     /// - `OPUS_BUFFER_TOO_SMALL`: `maxlen` was insufficient to contain the complete output packet.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_out
-    pub fn out(&mut self, data: &mut [u8]) -> i32 {
-        self.out_range_impl(
+    pub fn out(&mut self, data: &mut [u8]) -> Result<usize, ErrorCode> {
+        let ret = self.out_range_impl(
             0,
             self.nb_frames,
             data,
             false,
             false,
             FrameSource::Data { offset: 0 },
-        )
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     /// Internal wrapper for `out_range_impl_ext` when no extensions are supplied.
@@ -567,7 +583,7 @@ pub fn opus_packet_pad_impl(
     let copy = data[..len as usize].to_vec();
 
     let mut rp = OpusRepacketizer::default();
-    let ret = rp.cat(&copy);
+    let ret = rp.cat_impl(&copy, false);
     if ret != OPUS_OK {
         return ret;
     }
@@ -622,7 +638,7 @@ pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
         return OPUS_BAD_ARG;
     }
     let mut rp = OpusRepacketizer::default();
-    let ret = rp.cat(data);
+    let ret = rp.cat_impl(data, false);
     if ret < 0 {
         return ret;
     }

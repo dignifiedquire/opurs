@@ -61,9 +61,9 @@ fn regression_mscbr_encode_fail10() {
 
     let pcm = vec![0i16; 20 * 255];
     let mut data = vec![0u8; 627_300];
-    let data_len = enc.encode(&pcm, 20, &mut data);
+    let data_len = enc.encode(&pcm, 20, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -99,9 +99,9 @@ fn regression_mscbr_encode_fail() {
 
     let pcm = vec![0i16; 20 * 192];
     let mut data = vec![0u8; 472_320];
-    let data_len = enc.encode(&pcm, 20, &mut data);
+    let data_len = enc.encode(&pcm, 20, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -115,9 +115,11 @@ fn regression_analysis_overflow() {
 
     let pcm = vec![1e9f32; 320 * 2];
     let mut data = [0u8; 200];
-    let data_len = enc.encode_float(&pcm, &mut data);
+    let data_len = enc
+        .encode_float(&pcm, &mut data)
+        .expect("encode_float failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -142,9 +144,11 @@ fn regression_projection_overflow2() {
     pcm[n - 2] = 0.0;
     pcm[n - 1] = -8e9;
     let mut data = [0u8; 480];
-    let data_len = enc.encode_float(&pcm, 30, &mut data);
+    let data_len = enc
+        .encode_float(&pcm, 30, &mut data)
+        .expect("encode_float failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -166,17 +170,21 @@ fn regression_projection_overflow3() {
 
     let mut pcm = vec![-1e38f32; 60 * 4];
     let mut data = [0u8; 500];
-    let data_len = enc.encode_float(&pcm, 60, &mut data);
+    let data_len = enc
+        .encode_float(&pcm, 60, &mut data)
+        .expect("encode_float failed");
     assert!(
-        data_len >= 5 && data_len <= data.len() as i32,
+        data_len >= 5 && data_len <= data.len(),
         "expected packet length in [5, {}], got {data_len}",
         data.len()
     );
 
     pcm.fill(1e38f32);
-    let data_len = enc.encode_float(&pcm, 60, &mut data);
+    let data_len = enc
+        .encode_float(&pcm, 60, &mut data)
+        .expect("encode_float failed");
     assert!(
-        data_len >= 5 && data_len <= data.len() as i32,
+        data_len >= 5 && data_len <= data.len(),
         "expected packet length in [5, {}], got {data_len}",
         data.len()
     );
@@ -191,9 +199,9 @@ fn regression_qext_stereo_overflow() {
 
     let pcm = vec![32767i16; 11_520 * 2];
     let mut data = [0u8; 2000];
-    let data_len = enc.encode(&pcm, &mut data);
+    let data_len = enc.encode(&pcm, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -216,9 +224,9 @@ fn regression_qext_repacketize_fail() {
     pcm[4] = -1_809;
 
     let mut data = [0u8; 9000];
-    let data_len = enc.encode(&pcm, &mut data);
+    let data_len = enc.encode(&pcm, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected positive packet length in range, got {data_len}"
     );
 }
@@ -256,9 +264,11 @@ fn regression_celt_ec_internal_error() {
 
     let mut data = vec![0u8; 2460];
     let pcm0 = patterned_pcm_i16(320, 0x1234_5678);
-    let data_len = enc.encode(&pcm0, 320, &mut data);
+    let data_len = enc
+        .encode(&pcm0, 320, &mut data)
+        .expect("first encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "first encode expected packet length in range, got {data_len}"
     );
 
@@ -282,9 +292,11 @@ fn regression_celt_ec_internal_error() {
             let mid = pcm.len() / 2;
             pcm[mid] = 25_600;
         }
-        let data_len = enc.encode(&pcm, 160, &mut data);
+        let data_len = enc
+            .encode(&pcm, 160, &mut data)
+            .expect("iteration encode failed");
         assert!(
-            data_len > 0 && data_len <= data.len() as i32,
+            data_len > 0 && data_len <= data.len(),
             "iteration {idx} encode expected packet length in range, got {data_len}"
         );
     }
@@ -303,9 +315,11 @@ fn regression_celt_ec_internal_error() {
     let _ = enc.set_packet_loss_perc(41);
     enc.set_bitrate(Bitrate::Bits(21_425));
     let pcm_last = patterned_pcm_i16(40, 0xCAFE_BABE);
-    let data_len = enc.encode(&pcm_last, 40, &mut data);
+    let data_len = enc
+        .encode(&pcm_last, 40, &mut data)
+        .expect("final encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "final encode expected packet length in range, got {data_len}"
     );
 }
@@ -343,9 +357,11 @@ fn regression_surround_analysis_uninit() {
 
     let mut data = vec![0u8; 7380];
     let pcm0 = patterned_pcm_i16(960 * 3, 0x00C0_FFEE);
-    let data_len = enc.encode(&pcm0, 960, &mut data);
+    let data_len = enc
+        .encode(&pcm0, 960, &mut data)
+        .expect("first encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "first encode expected packet length in range, got {data_len}"
     );
 
@@ -365,9 +381,11 @@ fn regression_surround_analysis_uninit() {
     enc.set_bitrate(Bitrate::Bits(775_410));
 
     let pcm1 = mostly_constant_pcm_i16(1440 * 3, -13365, 0x0BAD_F00D);
-    let data_len = enc.encode(&pcm1, 1440, &mut data);
+    let data_len = enc
+        .encode(&pcm1, 1440, &mut data)
+        .expect("second encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "second encode expected packet length in range, got {data_len}"
     );
 }
@@ -402,9 +420,9 @@ fn regression_projection_overflow() {
 
     let pcm = patterned_pcm_i16(1920 * 36, 0xDEAD_BEEF);
     let mut data = vec![0u8; 10_000];
-    let data_len = enc.encode(&pcm, 1920, &mut data);
+    let data_len = enc.encode(&pcm, 1920, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected packet length in range, got {data_len}"
     );
 }
@@ -429,9 +447,9 @@ fn regression_projection_overflow4() {
 
     let pcm = mostly_constant_pcm_i16(480 * 36, -32640, 0xBADC_0FFE);
     let mut data = vec![0u8; 1000];
-    let data_len = enc.encode(&pcm, 480, &mut data);
+    let data_len = enc.encode(&pcm, 480, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected packet length in range, got {data_len}"
     );
 }
@@ -472,9 +490,9 @@ fn regression_qext_dred_combination() {
         pcm[24] = -2057;
     }
     let mut data = vec![0u8; 2560];
-    let data_len = enc.encode(&pcm, 320, &mut data);
+    let data_len = enc.encode(&pcm, 320, &mut data).expect("encode failed");
     assert!(
-        data_len > 0 && data_len <= data.len() as i32,
+        data_len > 0 && data_len <= data.len(),
         "expected packet length in range, got {data_len}"
     );
 }

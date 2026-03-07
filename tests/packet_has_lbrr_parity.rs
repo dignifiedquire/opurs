@@ -21,7 +21,11 @@ fn packet_has_lbrr_matches_c_for_fixed_packets() {
 
     for packet in packets {
         let c = c_has_lbrr(packet);
-        let rust = OpusDecoder::packet_has_lbrr(packet);
+        // Convert Result<bool, ErrorCode> to i32 to compare with C
+        let rust = match OpusDecoder::packet_has_lbrr(packet) {
+            Ok(v) => v as i32,
+            Err(e) => i32::from(e),
+        };
         assert_eq!(rust, c, "packet={packet:?}");
     }
 }
@@ -46,12 +50,14 @@ fn packet_has_lbrr_matches_c_on_real_encoded_packets_and_finds_lbrr() {
             *sample = (t * 0.013).sin().mul_add(12_000.0, 0.0) as i16;
         }
 
-        let bytes = enc.encode(&pcm, &mut out);
-        assert!(bytes > 0, "encode failed at frame {frame_idx}: {bytes}");
-        let packet = &out[..bytes as usize];
+        let bytes = enc.encode(&pcm, &mut out).expect("encode failed");
+        let packet = &out[..bytes];
 
         let c = c_has_lbrr(packet);
-        let rust = OpusDecoder::packet_has_lbrr(packet);
+        let rust = match OpusDecoder::packet_has_lbrr(packet) {
+            Ok(v) => v as i32,
+            Err(e) => i32::from(e),
+        };
         assert_eq!(rust, c, "frame={frame_idx}, packet_len={bytes}");
         if rust == 1 {
             saw_lbrr = true;

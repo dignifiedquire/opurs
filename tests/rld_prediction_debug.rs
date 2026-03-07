@@ -60,7 +60,7 @@ fn first_diff_frame(prediction_disabled: bool) -> Option<(usize, usize, usize)> 
     let mut c_out = vec![0u8; 4000];
     let frame_samples = frame_size as usize * channels as usize;
     for (frame_idx, frame) in pcm.chunks_exact(frame_samples).enumerate() {
-        let rust_len = rust_enc.encode(frame, &mut rust_out) as usize;
+        let rust_len = rust_enc.encode(frame, &mut rust_out).unwrap();
         let c_len = unsafe {
             opus_encode(
                 c_enc,

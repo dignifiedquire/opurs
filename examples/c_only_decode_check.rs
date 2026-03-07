@@ -102,11 +102,15 @@ fn main() {
         let mut pcm1 = vec![0.0f32; MAX_FRAME_SIZE * 2];
         let mut pcm2 = vec![0.0f32; MAX_FRAME_SIZE * 2];
 
-        let ret1 = rust_dec1.decode_float(pkt, &mut pcm1, MAX_FRAME_SIZE as i32, false);
-        let ret2 = rust_dec2.decode_float(pkt, &mut pcm2, MAX_FRAME_SIZE as i32, false);
+        let ret1 = rust_dec1
+            .decode_float(pkt, &mut pcm1, MAX_FRAME_SIZE as i32, false)
+            .unwrap();
+        let ret2 = rust_dec2
+            .decode_float(pkt, &mut pcm2, MAX_FRAME_SIZE as i32, false)
+            .unwrap();
         assert_eq!(ret1, ret2);
 
-        let n = ret1 as usize * 2;
+        let n = ret1 * 2;
         for i in 0..n {
             if pcm1[i] != pcm2[i] {
                 rust_diffs += 1;
