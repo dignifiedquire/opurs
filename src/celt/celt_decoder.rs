@@ -26,6 +26,7 @@ use crate::celt::rate::clt_compute_allocation;
 use crate::celt::vq::renormalise_vector;
 
 use crate::arch::{opus_select_arch, Arch};
+use crate::error::ErrorCode;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET,
 };
@@ -343,19 +344,121 @@ impl OpusCustomDecoder {
         self.qext_old_band_e.fill(0.0);
     }
 
+    /// Decode compressed CELT into interleaved `i16` PCM.
+    ///
+    /// Returns number of decoded samples per channel on success.
+    ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode
-    pub fn decode(&mut self, data: &[u8], pcm: &mut [i16], frame_size: i32) -> i32 {
-        opus_custom_decode(self, data, pcm, frame_size)
+    pub fn decode(&mut self, data: &[u8], pcm: &mut [i16], frame_size: i32) -> Result<usize, ErrorCode> {
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let channels = self.channels;
+        let required = match (frame_size as usize).checked_mul(channels) {
+            Some(v) => v,
+            None => return Err(ErrorCode::BadArg),
+        };
+        if pcm.len() < required {
+            return Err(ErrorCode::BadArg);
+        }
+        let mut out = vec![0.0f32; required];
+        let packet = if data.is_empty() { None } else { Some(data) };
+        let ret = celt_decode_with_ec(
+            self,
+            packet,
+            &mut out[..required],
+            frame_size,
+            None,
+            0,
+            #[cfg(feature = "deep-plc")]
+            None,
+            #[cfg(feature = "qext")]
+            None,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            celt_float2int16(&out, pcm, ret as usize * channels);
+            Ok(ret as usize)
+        }
     }
 
+    /// Decode compressed CELT into interleaved `f32` PCM.
+    ///
+    /// Returns number of decoded samples per channel on success.
+    ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode_float
-    pub fn decode_float(&mut self, data: &[u8], pcm: &mut [f32], frame_size: i32) -> i32 {
-        opus_custom_decode_float(self, data, pcm, frame_size)
+    pub fn decode_float(&mut self, data: &[u8], pcm: &mut [f32], frame_size: i32) -> Result<usize, ErrorCode> {
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let channels = self.channels;
+        let required = match (frame_size as usize).checked_mul(channels) {
+            Some(v) => v,
+            None => return Err(ErrorCode::BadArg),
+        };
+        if pcm.len() < required {
+            return Err(ErrorCode::BadArg);
+        }
+        let packet = if data.is_empty() { None } else { Some(data) };
+        let ret = celt_decode_with_ec(
+            self,
+            packet,
+            &mut pcm[..required],
+            frame_size,
+            None,
+            0,
+            #[cfg(feature = "deep-plc")]
+            None,
+            #[cfg(feature = "qext")]
+            None,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
+    /// Decode compressed CELT into interleaved 24-bit `i32` PCM.
+    ///
+    /// Returns number of decoded samples per channel on success.
+    ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode24
-    pub fn decode24(&mut self, data: &[u8], pcm: &mut [i32], frame_size: i32) -> i32 {
-        opus_custom_decode24(self, data, pcm, frame_size)
+    pub fn decode24(&mut self, data: &[u8], pcm: &mut [i32], frame_size: i32) -> Result<usize, ErrorCode> {
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let channels = self.channels;
+        let required = match (frame_size as usize).checked_mul(channels) {
+            Some(v) => v,
+            None => return Err(ErrorCode::BadArg),
+        };
+        if pcm.len() < required {
+            return Err(ErrorCode::BadArg);
+        }
+        let mut out = vec![0.0f32; required];
+        let packet = if data.is_empty() { None } else { Some(data) };
+        let ret = celt_decode_with_ec(
+            self,
+            packet,
+            &mut out[..required],
+            frame_size,
+            None,
+            0,
+            #[cfg(feature = "deep-plc")]
+            None,
+            #[cfg(feature = "qext")]
+            None,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            for i in 0..(ret as usize * channels) {
+                pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+            }
+            Ok(ret as usize)
+        }
     }
 
     pub fn set_signalling(&mut self, signalling: i32) {
@@ -363,92 +466,6 @@ impl OpusCustomDecoder {
     }
 }
 
-/// Upstream C: celt/celt_decoder.c:opus_custom_decode
-pub fn opus_custom_decode(
-    st: &mut OpusCustomDecoder,
-    data: &[u8],
-    pcm: &mut [i16],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let channels = st.channels;
-    let required = match (frame_size as usize).checked_mul(channels) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    let mut out = vec![0.0f32; required];
-    let ret = opus_custom_decode_float(st, data, &mut out, frame_size);
-    if ret > 0 {
-        celt_float2int16(&out, pcm, ret as usize * channels);
-    }
-    ret
-}
-
-/// Upstream C: celt/celt_decoder.c:opus_custom_decode_float
-pub fn opus_custom_decode_float(
-    st: &mut OpusCustomDecoder,
-    data: &[u8],
-    pcm: &mut [f32],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let channels = st.channels;
-    let required = match (frame_size as usize).checked_mul(channels) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    let packet = if data.is_empty() { None } else { Some(data) };
-    celt_decode_with_ec(
-        st,
-        packet,
-        &mut pcm[..required],
-        frame_size,
-        None,
-        0,
-        #[cfg(feature = "deep-plc")]
-        None,
-        #[cfg(feature = "qext")]
-        None,
-    )
-}
-
-/// Upstream C: celt/celt_decoder.c:opus_custom_decode24
-pub fn opus_custom_decode24(
-    st: &mut OpusCustomDecoder,
-    data: &[u8],
-    pcm: &mut [i32],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let channels = st.channels;
-    let required = match (frame_size as usize).checked_mul(channels) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    let mut out = vec![0.0f32; required];
-    let ret = opus_custom_decode_float(st, data, &mut out, frame_size);
-    if ret > 0 {
-        for i in 0..(ret as usize * channels) {
-            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
-        }
-    }
-    ret
-}
 
 /// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
 #[inline]

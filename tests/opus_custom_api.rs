@@ -138,7 +138,8 @@ fn custom_decode24_matches_upstream_c() {
     let mut rust_out = vec![0i32; frame_size as usize * channels as usize];
     let mut c_out = vec![0i32; frame_size as usize * channels as usize];
 
-    let rust_ret = rust_dec.decode24(&packet[..packet_len as usize], &mut rust_out, frame_size);
+    let rust_ret = rust_dec.decode24(&packet[..packet_len as usize], &mut rust_out, frame_size)
+        .expect("custom decode24 failed");
     let c_ret = unsafe {
         opus_custom_decode24(
             c_dec,
@@ -149,10 +150,10 @@ fn custom_decode24_matches_upstream_c() {
         )
     };
 
-    assert_eq!(rust_ret, c_ret, "custom decode24 sample-count mismatch");
-    assert!(rust_ret > 0, "custom decode24 failed: {rust_ret}");
+    assert_eq!(rust_ret as i32, c_ret, "custom decode24 sample-count mismatch");
+    assert!(rust_ret > 0, "custom decode24 failed");
     assert_eq!(
-        &rust_out[..rust_ret as usize * channels as usize],
+        &rust_out[..rust_ret * channels as usize],
         &c_out[..c_ret as usize * channels as usize],
         "custom decode24 PCM mismatch"
     );

@@ -196,7 +196,7 @@ fn decode_frame(
     frame_size: i32,
     channels: usize,
 ) -> i32 {
-    match (dec, format) {
+    let result = match (dec, format) {
         (RustDecoder::Custom(st), SampleFormat::I16) => {
             let mut out = vec![0i16; frame_size as usize * channels];
             st.decode(packet, &mut out, frame_size)
@@ -211,25 +211,20 @@ fn decode_frame(
         }
         (RustDecoder::Opus(st), SampleFormat::I16) => {
             let mut out = vec![0i16; frame_size as usize * channels];
-            match st.decode(packet, &mut out, frame_size, false) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.decode(packet, &mut out, frame_size, false)
         }
         (RustDecoder::Opus(st), SampleFormat::I24) => {
             let mut out = vec![0i32; frame_size as usize * channels];
-            match st.decode24(packet, &mut out, frame_size, false) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.decode24(packet, &mut out, frame_size, false)
         }
         (RustDecoder::Opus(st), SampleFormat::Float) => {
             let mut out = vec![0f32; frame_size as usize * channels];
-            match st.decode_float(packet, &mut out, frame_size, false) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.decode_float(packet, &mut out, frame_size, false)
         }
+    };
+    match result {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
     }
 }
 
@@ -239,18 +234,19 @@ fn decode_corrupt_i16(
     frame_size: i32,
     channels: usize,
 ) -> i32 {
-    match dec {
+    let result = match dec {
         RustDecoder::Custom(st) => {
             let mut out = vec![0i16; frame_size as usize * channels];
             st.decode(packet, &mut out, frame_size)
         }
         RustDecoder::Opus(st) => {
             let mut out = vec![0i16; frame_size as usize * channels];
-            match st.decode(packet, &mut out, frame_size, false) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.decode(packet, &mut out, frame_size, false)
         }
+    };
+    match result {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
     }
 }
 
