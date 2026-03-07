@@ -69,8 +69,7 @@ impl OpusProjectionDecoder {
         }
 
         let demixing_matrix =
-            MappingMatrix::from_bytes_le(channels, input_channels, 0, demixing_matrix)
-                .map_err(ErrorCode::from)?;
+            MappingMatrix::from_bytes_le(channels, input_channels, 0, demixing_matrix)?;
 
         // Decode to "input streams" channels first, then project to output channels.
         let mapping = (0..input_channels).map(|idx| idx as u8).collect::<Vec<_>>();
@@ -161,16 +160,14 @@ impl OpusProjectionDecoder {
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);
         for input_row in 0..input_channels {
-            self.demixing_matrix
-                .multiply_channel_out_short(
-                    &input_pcm[input_row..],
-                    input_row,
-                    input_channels,
-                    output,
-                    output_channels,
-                    decoded,
-                )
-                .map_err(ErrorCode::from)?;
+            self.demixing_matrix.multiply_channel_out_short(
+                &input_pcm[input_row..],
+                input_row,
+                input_channels,
+                output,
+                output_channels,
+                decoded,
+            )?;
         }
 
         Ok(decoded)
@@ -204,16 +201,14 @@ impl OpusProjectionDecoder {
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0.0);
         for input_row in 0..input_channels {
-            self.demixing_matrix
-                .multiply_channel_out_float(
-                    &input_pcm[input_row..],
-                    input_row,
-                    input_channels,
-                    output,
-                    output_channels,
-                    decoded,
-                )
-                .map_err(ErrorCode::from)?;
+            self.demixing_matrix.multiply_channel_out_float(
+                &input_pcm[input_row..],
+                input_row,
+                input_channels,
+                output,
+                output_channels,
+                decoded,
+            )?;
         }
 
         Ok(decoded)
@@ -247,16 +242,14 @@ impl OpusProjectionDecoder {
         let output = &mut pcm[..decoded * output_channels];
         output.fill(0);
         for input_row in 0..input_channels {
-            self.demixing_matrix
-                .multiply_channel_out_int24(
-                    &input_pcm[input_row..],
-                    input_row,
-                    input_channels,
-                    output,
-                    output_channels,
-                    decoded,
-                )
-                .map_err(ErrorCode::from)?;
+            self.demixing_matrix.multiply_channel_out_int24(
+                &input_pcm[input_row..],
+                input_row,
+                input_channels,
+                output,
+                output_channels,
+                decoded,
+            )?;
         }
 
         Ok(decoded)
@@ -265,14 +258,14 @@ impl OpusProjectionDecoder {
     /// Set decode gain.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_ctl
-    pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
+    pub fn set_gain(&mut self, gain: i32) -> Result<(), ErrorCode> {
         self.decoder.set_gain(gain)
     }
 
     /// Set decoder complexity.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_ctl
-    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), ErrorCode> {
         self.decoder.set_complexity(complexity)
     }
 
@@ -372,14 +365,14 @@ impl OpusProjectionDecoder {
     /// Borrow a child stream decoder by stream index.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_ctl
-    pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, i32> {
+    pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, ErrorCode> {
         self.decoder.decoder_state(stream_id)
     }
 
     /// Mutably borrow a child stream decoder by stream index.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_ctl
-    pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, i32> {
+    pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, ErrorCode> {
         self.decoder.decoder_state_mut(stream_id)
     }
 }

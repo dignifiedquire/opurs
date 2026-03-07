@@ -368,19 +368,19 @@ impl OpusEncoder {
     // -- Type-safe CTL getters and setters --
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_application(&mut self, app: Application) -> Result<(), i32> {
+    pub fn set_application(&mut self, app: Application) -> Result<(), ErrorCode> {
         let value = i32::from(app);
         if self.application == OPUS_APPLICATION_RESTRICTED_SILK
             || self.application == OPUS_APPLICATION_RESTRICTED_CELT
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         if (value != OPUS_APPLICATION_VOIP
             && value != OPUS_APPLICATION_AUDIO
             && value != OPUS_APPLICATION_RESTRICTED_LOWDELAY)
             || (self.first == 0 && self.application != value)
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.application = value;
         self.analysis.application = value;
@@ -414,9 +414,9 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), ErrorCode> {
         if !(0..=10).contains(&complexity) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.silk_mode.complexity = complexity;
         self.celt_enc.complexity = complexity;
@@ -475,11 +475,11 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:OPUS_SET_ENERGY_MASK_REQUEST
-    pub fn set_energy_mask(&mut self, mask: Option<&[f32]>) -> Result<(), i32> {
+    pub fn set_energy_mask(&mut self, mask: Option<&[f32]>) -> Result<(), ErrorCode> {
         if let Some(mask) = mask {
             let expected = (self.channels * 21) as usize;
             if mask.len() != expected {
-                return Err(OPUS_BAD_ARG);
+                return Err(ErrorCode::BadArg);
             }
             self.energy_masking.fill(0.0);
             self.energy_masking[..expected].copy_from_slice(mask);
@@ -543,12 +543,12 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), ErrorCode> {
         let raw = match channels {
             Some(c) => {
                 let v: i32 = c.into();
                 if v > self.channels {
-                    return Err(OPUS_BAD_ARG);
+                    return Err(ErrorCode::BadArg);
                 }
                 v
             }
@@ -568,9 +568,9 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
+    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), ErrorCode> {
         if !(0..=2).contains(&value) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.fec_config = value;
         self.silk_mode.use_in_band_fec = (value != 0) as i32;
@@ -583,9 +583,9 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
+    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), ErrorCode> {
         if !(0..=100).contains(&pct) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.silk_mode.packet_loss_percentage = pct;
         self.celt_enc.loss_rate = pct;
@@ -608,9 +608,9 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), ErrorCode> {
         if !(8..=24).contains(&depth) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.lsb_depth = depth;
         Ok(())
@@ -672,9 +672,9 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn set_force_mode(&mut self, mode: i32) -> Result<(), i32> {
+    pub fn set_force_mode(&mut self, mode: i32) -> Result<(), ErrorCode> {
         if !(MODE_SILK_ONLY..=MODE_CELT_ONLY).contains(&mode) && mode != OPUS_AUTO {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.user_forced_mode = mode;
         Ok(())
@@ -733,9 +733,9 @@ impl OpusEncoder {
     ///
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "dred")]
-    pub fn set_dred_duration(&mut self, value: i32) -> Result<(), i32> {
+    pub fn set_dred_duration(&mut self, value: i32) -> Result<(), ErrorCode> {
         if value < 0 || value > DRED_MAX_FRAMES as i32 {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.dred_duration = value;
         self.silk_mode.use_dred = if value != 0 { 1 } else { 0 };
@@ -759,7 +759,7 @@ impl OpusEncoder {
     ///
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(all(feature = "dred", feature = "builtin-weights"))]
-    pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
+    pub fn load_dnn_weights(&mut self) -> Result<(), ErrorCode> {
         let arrays = crate::dnn::weights::compiled_weights();
         self.load_dnn_from_arrays(&arrays)
     }
@@ -770,8 +770,8 @@ impl OpusEncoder {
     ///
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     #[cfg(feature = "dred")]
-    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
-        let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
+    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+        let arrays = crate::dnn::weights::load_weights(data).ok_or(ErrorCode::BadArg)?;
         self.load_dnn_from_arrays(&arrays)
     }
 
@@ -779,9 +779,9 @@ impl OpusEncoder {
     fn load_dnn_from_arrays(
         &mut self,
         arrays: &[crate::dnn::nnet::WeightArray],
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if !self.dred_encoder.load_model(arrays) {
-            return Err(OPUS_INTERNAL_ERROR);
+            return Err(ErrorCode::InternalError);
         }
         Ok(())
     }
@@ -3676,11 +3676,11 @@ mod tests {
             OpusEncoder::new(SampleRate::Hz48000, Channels::Stereo, Application::Audio).unwrap();
         assert_eq!(
             enc.set_application(Application::RestrictedSilk),
-            Err(OPUS_BAD_ARG)
+            Err(ErrorCode::BadArg)
         );
         assert_eq!(
             enc.set_application(Application::RestrictedCelt),
-            Err(OPUS_BAD_ARG)
+            Err(ErrorCode::BadArg)
         );
 
         let mut enc_restricted = OpusEncoder::new(
@@ -3691,7 +3691,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             enc_restricted.set_application(Application::Audio),
-            Err(OPUS_BAD_ARG)
+            Err(ErrorCode::BadArg)
         );
     }
 

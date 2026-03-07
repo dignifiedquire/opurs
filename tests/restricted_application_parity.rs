@@ -109,7 +109,7 @@ fn set_application_restricted_modes_match_c() {
         let rust_app = Application::try_from(restricted).expect("restricted app convert");
         let rust_ret = match rust_enc.set_application(rust_app) {
             Ok(()) => 0,
-            Err(e) => e,
+            Err(e) => i32::from(e),
         };
         let c_ret = c_enc.set_application(restricted);
         assert_eq!(
@@ -129,7 +129,7 @@ fn set_application_restricted_modes_match_c() {
 
     let rust_ret = match rust_restricted.set_application(Application::Audio) {
         Ok(()) => 0,
-        Err(e) => e,
+        Err(e) => i32::from(e),
     };
     let c_ret = c_restricted.set_application(OPUS_APPLICATION_AUDIO);
     assert_eq!(

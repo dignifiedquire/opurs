@@ -301,9 +301,9 @@ impl OpusDecoder {
     // -- Type-safe CTL getters and setters --
 
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
-    pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
+    pub fn set_gain(&mut self, gain: i32) -> Result<(), ErrorCode> {
         if !(-32768..=32767).contains(&gain) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.decode_gain = gain;
         Ok(())
@@ -354,9 +354,9 @@ impl OpusDecoder {
     }
 
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
-    pub fn set_complexity(&mut self, value: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, value: i32) -> Result<(), ErrorCode> {
         if !(0..=10).contains(&value) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.complexity = value;
         self.celt_dec.complexity = value;
@@ -406,7 +406,7 @@ impl OpusDecoder {
     ///
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
-    pub fn load_dnn_weights(&mut self) -> Result<(), i32> {
+    pub fn load_dnn_weights(&mut self) -> Result<(), ErrorCode> {
         let arrays = crate::dnn::weights::compiled_weights();
         self.load_dnn_from_arrays(&arrays)
     }
@@ -417,8 +417,8 @@ impl OpusDecoder {
     ///
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
     #[cfg(feature = "deep-plc")]
-    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), i32> {
-        let arrays = crate::dnn::weights::load_weights(data).ok_or(OPUS_BAD_ARG)?;
+    pub fn set_dnn_blob(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+        let arrays = crate::dnn::weights::load_weights(data).ok_or(ErrorCode::BadArg)?;
         self.load_dnn_from_arrays(&arrays)
     }
 
@@ -426,9 +426,9 @@ impl OpusDecoder {
     fn load_dnn_from_arrays(
         &mut self,
         arrays: &[crate::dnn::nnet::WeightArray],
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if !self.lpcnet.load_model(arrays) {
-            return Err(OPUS_INTERNAL_ERROR);
+            return Err(ErrorCode::InternalError);
         }
         #[cfg(feature = "osce")]
         {
@@ -436,7 +436,7 @@ impl OpusDecoder {
                 &mut self.silk_dec.osce_model,
                 arrays,
             ) {
-                return Err(OPUS_INTERNAL_ERROR);
+                return Err(ErrorCode::InternalError);
             }
         }
         Ok(())
@@ -1595,11 +1595,11 @@ pub fn opus_dred_decoder_init(dec: &mut OpusDREDDecoder) -> i32 {
 
 /// Upstream C: src/opus_decoder.c:opus_dred_decoder_create
 #[cfg(feature = "dred")]
-pub fn opus_dred_decoder_create() -> Result<OpusDREDDecoder, i32> {
+pub fn opus_dred_decoder_create() -> Result<OpusDREDDecoder, ErrorCode> {
     let mut dec = OpusDREDDecoder::new();
     let ret = opus_dred_decoder_init(&mut dec);
     if ret != OPUS_OK {
-        return Err(ret);
+        return Err(ErrorCode::from(ret));
     }
     Ok(dec)
 }

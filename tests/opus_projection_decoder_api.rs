@@ -573,8 +573,8 @@ fn projection_decoder_state_access_parity_with_c() {
         "c projection decoder create failed: {c_error}"
     );
 
-    assert_eq!(rust.decoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
-    assert_eq!(rust.decoder_state_mut(streams).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.decoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(rust.decoder_state_mut(streams).err(), Some(opurs::ErrorCode::BadArg));
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {

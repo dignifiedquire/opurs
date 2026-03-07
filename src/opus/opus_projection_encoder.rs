@@ -115,15 +115,13 @@ impl OpusProjectionEncoder {
             mixing_matrix_def.cols,
             mixing_matrix_def.gain,
             mixing_matrix_def.data,
-        )
-        .map_err(ErrorCode::from)?;
+        )?;
         let demixing_matrix = MappingMatrix::new(
             demixing_matrix_def.rows,
             demixing_matrix_def.cols,
             demixing_matrix_def.gain,
             demixing_matrix_def.data,
-        )
-        .map_err(ErrorCode::from)?;
+        )?;
 
         let input_channels = s + c;
         if input_channels > mixing_matrix.rows() as i32
@@ -196,16 +194,14 @@ impl OpusProjectionEncoder {
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            self.mixing_matrix
-                .multiply_channel_in_short(
-                    pcm,
-                    channels,
-                    &mut mixed[row..],
-                    row,
-                    input_channels,
-                    frame_size,
-                )
-                .map_err(ErrorCode::from)?;
+            self.mixing_matrix.multiply_channel_in_short(
+                pcm,
+                channels,
+                &mut mixed[row..],
+                row,
+                input_channels,
+                frame_size,
+            )?;
         }
         let analysis_input = DownmixInput::Int(pcm);
         let ret = self.encoder.encode_float_with_analysis(
@@ -244,16 +240,14 @@ impl OpusProjectionEncoder {
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            self.mixing_matrix
-                .multiply_channel_in_float(
-                    pcm,
-                    channels,
-                    &mut mixed[row..],
-                    row,
-                    input_channels,
-                    frame_size,
-                )
-                .map_err(ErrorCode::from)?;
+            self.mixing_matrix.multiply_channel_in_float(
+                pcm,
+                channels,
+                &mut mixed[row..],
+                row,
+                input_channels,
+                frame_size,
+            )?;
         }
         let analysis_input = DownmixInput::Float(pcm);
         let ret = self.encoder.encode_float_with_analysis(
@@ -292,16 +286,14 @@ impl OpusProjectionEncoder {
         let input_channels = (self.streams + self.coupled_streams) as usize;
         let mut mixed = vec![0f32; frame_size * input_channels];
         for row in 0..input_channels {
-            self.mixing_matrix
-                .multiply_channel_in_int24(
-                    pcm,
-                    channels,
-                    &mut mixed[row..],
-                    row,
-                    input_channels,
-                    frame_size,
-                )
-                .map_err(ErrorCode::from)?;
+            self.mixing_matrix.multiply_channel_in_int24(
+                pcm,
+                channels,
+                &mut mixed[row..],
+                row,
+                input_channels,
+                frame_size,
+            )?;
         }
         let analysis_input = DownmixInput::Int24(pcm);
         let ret = self.encoder.encode_float_with_analysis(
@@ -338,10 +330,10 @@ impl OpusProjectionEncoder {
     /// `dst.len()` must equal [`Self::demixing_matrix_size`].
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn copy_demixing_matrix(&self, dst: &mut [u8]) -> Result<(), i32> {
+    pub fn copy_demixing_matrix(&self, dst: &mut [u8]) -> Result<(), ErrorCode> {
         let expected = self.demixing_matrix_size() as usize;
         if dst.len() != expected {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         let rows = self.demixing_matrix.rows();
@@ -364,7 +356,7 @@ impl OpusProjectionEncoder {
     /// Set encoder application mode.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
+    pub fn set_application(&mut self, application: i32) -> Result<(), ErrorCode> {
         self.encoder.set_application(application)
     }
 
@@ -378,7 +370,7 @@ impl OpusProjectionEncoder {
     /// Set encoder complexity.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), ErrorCode> {
         self.encoder.set_complexity(complexity)
     }
 
@@ -420,14 +412,14 @@ impl OpusProjectionEncoder {
     /// Enable or disable in-band FEC.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
+    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), ErrorCode> {
         self.encoder.set_inband_fec(value)
     }
 
     /// Set expected packet loss percentage.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
+    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), ErrorCode> {
         self.encoder.set_packet_loss_perc(pct)
     }
 
@@ -441,14 +433,14 @@ impl OpusProjectionEncoder {
     /// Set forced mono/stereo behavior.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), ErrorCode> {
         self.encoder.set_force_channels(channels)
     }
 
     /// Set input PCM bit depth hint.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), ErrorCode> {
         self.encoder.set_lsb_depth(depth)
     }
 
@@ -491,14 +483,14 @@ impl OpusProjectionEncoder {
     /// Borrow a child stream encoder by stream index.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, i32> {
+    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, ErrorCode> {
         self.encoder.encoder_state(stream_id)
     }
 
     /// Mutably borrow a child stream encoder by stream index.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_encoder_ctl
-    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, i32> {
+    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, ErrorCode> {
         self.encoder.encoder_state_mut(stream_id)
     }
 

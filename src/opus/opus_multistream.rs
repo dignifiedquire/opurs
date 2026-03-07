@@ -6,7 +6,6 @@
 use crate::error::ErrorCode;
 use crate::opus::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_APPLICATION_VOIP,
-    OPUS_BAD_ARG,
 };
 
 /// Typed multistream channel layout.
@@ -172,12 +171,12 @@ impl OpusMultistreamConfig {
         self.application
     }
 
-    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
+    pub fn set_application(&mut self, application: i32) -> Result<(), ErrorCode> {
         let valid_application = application == OPUS_APPLICATION_VOIP
             || application == OPUS_APPLICATION_AUDIO
             || application == OPUS_APPLICATION_RESTRICTED_LOWDELAY;
         if !valid_application {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.application = application;
         Ok(())

@@ -8,10 +8,7 @@ use opurs::internals::{
     opus_packet_extensions_parse_ext, opus_packet_pad_impl, opus_packet_parse_impl,
     OpusExtensionData,
 };
-use opurs::{
-    Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG,
-    OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
-};
+use opurs::{Application, Channels, ErrorCode, OpusEncoder, OpusRepacketizer, SampleRate};
 
 fn ext(id: i32, frame: i32, data: &[u8]) -> OpusExtensionData {
     OpusExtensionData {
@@ -141,7 +138,11 @@ fn extensions_generate_fail() {
     for len in 0..23usize {
         let mut packet = [0xFEu8; 100];
         let res = opus_packet_extensions_generate(&mut packet[..len], &exts, 11, true);
-        assert_eq!(res, Err(OPUS_BUFFER_TOO_SMALL), "expected buffer-too-small");
+        assert_eq!(
+            res,
+            Err(ErrorCode::BufferTooSmall),
+            "expected buffer-too-small"
+        );
         assert!(
             packet[len..].iter().all(|&x| x == 0xFE),
             "tail bytes should remain undisturbed"
@@ -151,27 +152,27 @@ fn extensions_generate_fail() {
     let mut packet = [0u8; 100];
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(256, 0, b"a")], 11, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(2, 0, b"a")], 11, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(33, 11, b"a")], 49, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(33, -1, b"a")], 11, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(33, 11, b"a")], 11, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
     assert_eq!(
         opus_packet_extensions_generate(&mut packet, &[ext(3, 0, b"abcd")], 1, true),
-        Err(OPUS_BAD_ARG)
+        Err(ErrorCode::BadArg)
     );
 }
 
@@ -217,7 +218,7 @@ fn extensions_parse_zero() {
 
     let parsed = opus_packet_extensions_parse(&packet[..len], 0, 2);
     assert!(
-        matches!(parsed, Err(OPUS_BUFFER_TOO_SMALL)),
+        matches!(parsed, Err(ErrorCode::BufferTooSmall)),
         "expected OPUS_BUFFER_TOO_SMALL, got {parsed:?}"
     );
 }
@@ -242,25 +243,25 @@ fn extensions_parse_fail() {
     packet[4] = 255;
     assert!(matches!(
         opus_packet_extensions_parse(&packet[..len], 10, 11),
-        Err(OPUS_INVALID_PACKET)
+        Err(ErrorCode::InvalidPacket)
     ));
 
     len = opus_packet_extensions_generate(&mut packet, &exts[..4], 11, false).expect("generate");
     assert!(matches!(
         opus_packet_extensions_parse(&packet[..len], 10, 5),
-        Err(OPUS_INVALID_PACKET)
+        Err(ErrorCode::InvalidPacket)
     ));
 
     packet[14] = 255;
     assert!(matches!(
         opus_packet_extensions_parse(&packet[..len], 10, 11),
-        Err(OPUS_INVALID_PACKET)
+        Err(ErrorCode::InvalidPacket)
     ));
 
     len = opus_packet_extensions_generate(&mut packet, &exts[..4], 11, false).expect("generate");
     assert!(matches!(
         opus_packet_extensions_parse(&packet[..len], 1, 11),
-        Err(OPUS_BUFFER_TOO_SMALL)
+        Err(ErrorCode::BufferTooSmall)
     ));
 
     len = opus_packet_extensions_generate(&mut packet, &exts, 11, false).expect("generate");
@@ -269,7 +270,7 @@ fn extensions_parse_fail() {
     assert!(
         matches!(
             tail_err,
-            Err(OPUS_INVALID_PACKET) | Err(OPUS_BUFFER_TOO_SMALL) | Err(OPUS_BAD_ARG)
+            Err(ErrorCode::InvalidPacket) | Err(ErrorCode::BufferTooSmall) | Err(ErrorCode::BadArg)
         ),
         "expected invalid-packet or buffer-too-small, got {tail_err:?}"
     );
@@ -411,9 +412,9 @@ fn random_extensions_parse() {
             }
             Err(err) => {
                 assert!(
-                    err == OPUS_BUFFER_TOO_SMALL
-                        || err == OPUS_INVALID_PACKET
-                        || err == OPUS_BAD_ARG,
+                    err == ErrorCode::BufferTooSmall
+                        || err == ErrorCode::InvalidPacket
+                        || err == ErrorCode::BadArg,
                     "unexpected parse error {err}"
                 );
             }

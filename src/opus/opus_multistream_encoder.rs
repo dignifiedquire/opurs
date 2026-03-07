@@ -266,23 +266,25 @@ impl OpusMSEncoder {
     /// Borrow a specific child stream encoder by stream index.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, i32> {
+    pub fn encoder_state(&self, stream_id: i32) -> Result<&OpusEncoder, ErrorCode> {
         if stream_id < 0 || stream_id >= self.layout().streams() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
-        self.encoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
+        self.encoders
+            .get(stream_id as usize)
+            .ok_or(ErrorCode::BadArg)
     }
 
     /// Mutably borrow a specific child stream encoder by stream index.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, i32> {
+    pub fn encoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusEncoder, ErrorCode> {
         if stream_id < 0 || stream_id >= self.layout().streams() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.encoders
             .get_mut(stream_id as usize)
-            .ok_or(OPUS_BAD_ARG)
+            .ok_or(ErrorCode::BadArg)
     }
 
     /// Apply bitrate to all stream encoders.
@@ -307,8 +309,8 @@ impl OpusMSEncoder {
     /// Set encoder application mode for all child encoders.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_application(&mut self, application: i32) -> Result<(), i32> {
-        let app = Application::try_from(application).map_err(|_| OPUS_BAD_ARG)?;
+    pub fn set_application(&mut self, application: i32) -> Result<(), ErrorCode> {
+        let app = Application::try_from(application).map_err(|_| ErrorCode::BadArg)?;
         for encoder in &mut self.encoders {
             encoder.set_application(app)?;
         }
@@ -319,7 +321,7 @@ impl OpusMSEncoder {
     /// Set encoder complexity for all child encoders.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), ErrorCode> {
         for encoder in &mut self.encoders {
             encoder.set_complexity(complexity)?;
         }
@@ -374,7 +376,7 @@ impl OpusMSEncoder {
     /// Enable or disable in-band FEC.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), i32> {
+    pub fn set_inband_fec(&mut self, value: i32) -> Result<(), ErrorCode> {
         for encoder in &mut self.encoders {
             encoder.set_inband_fec(value)?;
         }
@@ -384,7 +386,7 @@ impl OpusMSEncoder {
     /// Set expected packet loss percentage.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), i32> {
+    pub fn set_packet_loss_perc(&mut self, pct: i32) -> Result<(), ErrorCode> {
         for encoder in &mut self.encoders {
             encoder.set_packet_loss_perc(pct)?;
         }
@@ -403,7 +405,7 @@ impl OpusMSEncoder {
     /// Set forced mono/stereo behavior.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), i32> {
+    pub fn set_force_channels(&mut self, channels: Option<Channels>) -> Result<(), ErrorCode> {
         for encoder in &mut self.encoders {
             encoder.set_force_channels(channels)?;
         }
@@ -413,7 +415,7 @@ impl OpusMSEncoder {
     /// Set input PCM bit depth hint.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_ctl
-    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), i32> {
+    pub fn set_lsb_depth(&mut self, depth: i32) -> Result<(), ErrorCode> {
         for encoder in &mut self.encoders {
             encoder.set_lsb_depth(depth)?;
         }

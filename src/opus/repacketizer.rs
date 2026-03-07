@@ -427,7 +427,7 @@ impl OpusRepacketizer {
                 // Figure out how much space we need for the extensions
                 match opus_packet_extensions_generate_size(&all_extensions, count) {
                     Ok(size) => ext_len = size as i32,
-                    Err(e) => return e,
+                    Err(e) => return e.into(),
                 }
                 if !pad {
                     pad_amount = ext_len

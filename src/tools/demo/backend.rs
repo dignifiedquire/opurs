@@ -238,7 +238,7 @@ mod rust_backend {
 
         fn enc_load_dnn_weights(st: &mut Box<OpusEncoder>) -> Result<(), i32> {
             #[cfg(all(feature = "dred", feature = "builtin-weights"))]
-            return st.load_dnn_weights();
+            return st.load_dnn_weights().map_err(i32::from);
             #[cfg(not(all(feature = "dred", feature = "builtin-weights")))]
             {
                 let _ = st;
@@ -248,7 +248,7 @@ mod rust_backend {
 
         fn enc_set_dnn_blob(st: &mut Box<OpusEncoder>, data: &[u8]) -> Result<(), i32> {
             #[cfg(feature = "dred")]
-            return st.set_dnn_blob(data);
+            return st.set_dnn_blob(data).map_err(i32::from);
             #[cfg(not(feature = "dred"))]
             {
                 let _ = (st, data);
@@ -305,7 +305,7 @@ mod rust_backend {
 
         fn dec_load_dnn_weights(st: &mut Box<OpusDecoder>) -> Result<(), i32> {
             #[cfg(all(feature = "deep-plc", feature = "builtin-weights"))]
-            return st.load_dnn_weights();
+            return st.load_dnn_weights().map_err(i32::from);
             #[cfg(not(all(feature = "deep-plc", feature = "builtin-weights")))]
             {
                 let _ = st;
@@ -315,7 +315,7 @@ mod rust_backend {
 
         fn dec_set_dnn_blob(st: &mut Box<OpusDecoder>, data: &[u8]) -> Result<(), i32> {
             #[cfg(feature = "deep-plc")]
-            return st.set_dnn_blob(data);
+            return st.set_dnn_blob(data).map_err(i32::from);
             #[cfg(not(feature = "deep-plc"))]
             {
                 let _ = (st, data);
@@ -327,7 +327,7 @@ mod rust_backend {
 
         #[cfg(feature = "dred")]
         fn dred_decoder_create() -> Result<Self::DredDecoder, i32> {
-            crate::opus_dred_decoder_create()
+            crate::opus_dred_decoder_create().map_err(i32::from)
         }
 
         #[cfg(feature = "dred")]

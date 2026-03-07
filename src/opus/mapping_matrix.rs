@@ -3,7 +3,7 @@
 //! Upstream C: `src/mapping_matrix.c`
 
 use crate::celt::float_cast::{float2int, float2int16};
-use crate::opus::opus_defines::OPUS_BAD_ARG;
+use crate::error::ErrorCode;
 use crate::opus::opus_private::align;
 
 #[inline]
@@ -36,14 +36,14 @@ impl MappingMatrix {
     }
 
     /// Upstream C: src/mapping_matrix.c:mapping_matrix_init
-    pub fn new(rows: i32, cols: i32, gain: i32, data: &[i16]) -> Result<Self, i32> {
+    pub fn new(rows: i32, cols: i32, gain: i32, data: &[i16]) -> Result<Self, ErrorCode> {
         if Self::get_size(rows, cols) == 0 {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         let rows = rows as usize;
         let cols = cols as usize;
         if data.len() != rows * cols {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         Ok(Self {
             rows,
@@ -53,9 +53,9 @@ impl MappingMatrix {
         })
     }
 
-    pub fn from_bytes_le(rows: i32, cols: i32, gain: i32, data: &[u8]) -> Result<Self, i32> {
+    pub fn from_bytes_le(rows: i32, cols: i32, gain: i32, data: &[u8]) -> Result<Self, ErrorCode> {
         if !data.len().is_multiple_of(2) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         let mut values = Vec::with_capacity(data.len() / 2);
         for chunk in data.chunks_exact(2) {
@@ -94,12 +94,12 @@ impl MappingMatrix {
         output_rows: usize,
         frame_size: usize,
         output_row: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if input_rows == 0 || output_rows == 0 || frame_size == 0 {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         if input_rows > self.cols || output_rows > self.rows || output_row >= self.rows {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         Ok(())
     }
@@ -113,12 +113,12 @@ impl MappingMatrix {
         output_row: usize,
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         self.validate_multiply_dims(input_rows, output_rows, frame_size, output_row)?;
         if input.len() < input_rows * frame_size
             || output.len() <= output_rows.saturating_mul(frame_size.saturating_sub(1))
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -141,15 +141,15 @@ impl MappingMatrix {
         output: &mut [f32],
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if input_row >= self.cols {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.validate_multiply_dims(input_rows, output_rows, frame_size, 0)?;
         if input.len() <= input_rows.saturating_mul(frame_size.saturating_sub(1))
             || output.len() < output_rows * frame_size
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -171,12 +171,12 @@ impl MappingMatrix {
         output_row: usize,
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         self.validate_multiply_dims(input_rows, output_rows, frame_size, output_row)?;
         if input.len() < input_rows * frame_size
             || output.len() <= output_rows.saturating_mul(frame_size.saturating_sub(1))
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -200,15 +200,15 @@ impl MappingMatrix {
         output: &mut [i16],
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if input_row >= self.cols {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.validate_multiply_dims(input_rows, output_rows, frame_size, 0)?;
         if input.len() <= input_rows.saturating_mul(frame_size.saturating_sub(1))
             || output.len() < output_rows * frame_size
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -234,15 +234,15 @@ impl MappingMatrix {
         output: &mut [i16],
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if input_row >= self.cols {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.validate_multiply_dims(input_rows, output_rows, frame_size, 0)?;
         if input.len() <= input_rows.saturating_mul(frame_size.saturating_sub(1))
             || output.len() < output_rows * frame_size
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -267,12 +267,12 @@ impl MappingMatrix {
         output_row: usize,
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         self.validate_multiply_dims(input_rows, output_rows, frame_size, output_row)?;
         if input.len() < input_rows * frame_size
             || output.len() <= output_rows.saturating_mul(frame_size.saturating_sub(1))
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {
@@ -296,15 +296,15 @@ impl MappingMatrix {
         output: &mut [i32],
         output_rows: usize,
         frame_size: usize,
-    ) -> Result<(), i32> {
+    ) -> Result<(), ErrorCode> {
         if input_row >= self.cols {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.validate_multiply_dims(input_rows, output_rows, frame_size, 0)?;
         if input.len() <= input_rows.saturating_mul(frame_size.saturating_sub(1))
             || output.len() < output_rows * frame_size
         {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
 
         for i in 0..frame_size {

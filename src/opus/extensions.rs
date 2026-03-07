@@ -7,7 +7,7 @@
 //!
 //! Upstream C: `src/extensions.c`
 
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
+use crate::error::ErrorCode;
 
 /// Extension ID 2: "Repeat These Extensions" indicator.
 pub const EXTENSION_ID_REPEAT: i32 = 2;
@@ -29,7 +29,7 @@ pub struct OpusExtensionData {
 /// repeat indicators, but including repeated extensions).
 ///
 /// Upstream C: src/extensions.c:opus_packet_extensions_count
-pub fn opus_packet_extensions_count(data: &[u8], nb_frames: i32) -> Result<i32, i32> {
+pub fn opus_packet_extensions_count(data: &[u8], nb_frames: i32) -> Result<i32, ErrorCode> {
     let mut iter = OpusExtensionIterator::new(data, nb_frames);
     iter.set_frame_max(nb_frames);
     iter.reset();
@@ -52,9 +52,9 @@ pub fn opus_packet_extensions_count_ext(
     data: &[u8],
     nb_frame_exts: &mut [i32],
     nb_frames: i32,
-) -> Result<i32, i32> {
+) -> Result<i32, ErrorCode> {
     if nb_frames < 0 || nb_frames as usize > nb_frame_exts.len() {
-        return Err(OPUS_BAD_ARG);
+        return Err(ErrorCode::BadArg);
     }
     for item in nb_frame_exts.iter_mut().take(nb_frames as usize) {
         *item = 0;
@@ -79,12 +79,12 @@ pub fn opus_packet_extensions_parse(
     data: &[u8],
     max_extensions: i32,
     nb_frames: i32,
-) -> Result<Vec<OpusExtensionData>, i32> {
+) -> Result<Vec<OpusExtensionData>, ErrorCode> {
     let mut iter = OpusExtensionIterator::new(data, nb_frames);
     let mut extensions = Vec::new();
     while let Some(ext) = iter.next()? {
         if extensions.len() as i32 == max_extensions {
-            return Err(OPUS_BUFFER_TOO_SMALL);
+            return Err(ErrorCode::BufferTooSmall);
         }
         let start = ext.data_offset;
         let end = start + ext.len;
@@ -109,9 +109,9 @@ pub fn opus_packet_extensions_parse_ext(
     max_extensions: i32,
     nb_frame_exts: &[i32],
     nb_frames: i32,
-) -> Result<Vec<OpusExtensionData>, i32> {
+) -> Result<Vec<OpusExtensionData>, ErrorCode> {
     if !(0..=48).contains(&nb_frames) || nb_frame_exts.len() < nb_frames as usize {
-        return Err(OPUS_BAD_ARG);
+        return Err(ErrorCode::BadArg);
     }
 
     let mut frame_offsets = [0i32; 49];
@@ -136,7 +136,7 @@ pub fn opus_packet_extensions_parse_ext(
     while let Some(ext) = iter.next()? {
         let idx = frame_offsets[ext.frame as usize];
         if idx >= max_extensions {
-            return Err(OPUS_BUFFER_TOO_SMALL);
+            return Err(ErrorCode::BufferTooSmall);
         }
         frame_offsets[ext.frame as usize] += 1;
         let start = ext.data_offset;
@@ -163,7 +163,7 @@ pub fn opus_packet_extensions_generate(
     extensions: &[OpusExtensionData],
     nb_frames: i32,
     pad: bool,
-) -> Result<usize, i32> {
+) -> Result<usize, ErrorCode> {
     generate_extensions_internal(Some(output), extensions, nb_frames, pad)
 }
 
@@ -192,9 +192,9 @@ impl<'a> ExtWriter<'a> {
     /// Write a single byte and advance the output cursor.
     ///
     /// Upstream C: src/extensions.c:opus_packet_extensions_generate
-    fn put(&mut self, byte: u8) -> Result<(), i32> {
+    fn put(&mut self, byte: u8) -> Result<(), ErrorCode> {
         if self.out.is_some() && self.pos >= self.len {
-            return Err(OPUS_BUFFER_TOO_SMALL);
+            return Err(ErrorCode::BufferTooSmall);
         }
         if let Some(buf) = self.out.as_deref_mut() {
             buf[self.pos] = byte;
@@ -206,9 +206,9 @@ impl<'a> ExtWriter<'a> {
     /// Write a byte slice and advance the output cursor.
     ///
     /// Upstream C: src/extensions.c:opus_packet_extensions_generate
-    fn put_slice(&mut self, data: &[u8]) -> Result<(), i32> {
+    fn put_slice(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         if self.out.is_some() && self.len.saturating_sub(self.pos) < data.len() {
-            return Err(OPUS_BUFFER_TOO_SMALL);
+            return Err(ErrorCode::BufferTooSmall);
         }
         if let Some(buf) = self.out.as_deref_mut() {
             buf[self.pos..self.pos + data.len()].copy_from_slice(data);
@@ -225,11 +225,11 @@ fn write_extension_payload(
     writer: &mut ExtWriter<'_>,
     ext: &OpusExtensionData,
     last: bool,
-) -> Result<(), i32> {
+) -> Result<(), ErrorCode> {
     debug_assert!((EXTENSION_ID_MIN..=127).contains(&ext.id));
     if ext.id < 32 {
         if ext.data.len() > 1 {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         if let Some(first) = ext.data.first() {
             writer.put(*first)?;
@@ -260,7 +260,7 @@ fn write_extension(
     writer: &mut ExtWriter<'_>,
     ext: &OpusExtensionData,
     last: bool,
-) -> Result<(), i32> {
+) -> Result<(), ErrorCode> {
     debug_assert!((EXTENSION_ID_MIN..=127).contains(&ext.id));
     let header = ((ext.id << 1)
         + if ext.id < 32 {
@@ -280,9 +280,9 @@ fn generate_extensions_internal(
     extensions: &[OpusExtensionData],
     nb_frames: i32,
     pad: bool,
-) -> Result<usize, i32> {
+) -> Result<usize, ErrorCode> {
     if !(0..=48).contains(&nb_frames) {
-        return Err(OPUS_BAD_ARG);
+        return Err(ErrorCode::BadArg);
     }
 
     let nb_extensions = extensions.len();
@@ -298,10 +298,10 @@ fn generate_extensions_internal(
     for (idx, ext) in extensions.iter().enumerate() {
         let frame = ext.frame;
         if !(0..nb_frames).contains(&frame) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         if !(EXTENSION_ID_MIN..=127).contains(&ext.id) {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         frame_min_idx[frame as usize] = frame_min_idx[frame as usize].min(idx as i32);
         frame_max_idx[frame as usize] = frame_max_idx[frame as usize].max(idx as i32 + 1);
@@ -451,16 +451,16 @@ fn skip_extension_payload(
     mut len: i32,
     id_byte: u8,
     trailing_short_len: i32,
-) -> Result<(usize, i32, i32), i32> {
+) -> Result<(usize, i32, i32), ErrorCode> {
     let id = id_byte >> 1;
     let l = id_byte & 1;
     let mut header_size: i32 = 0;
 
     if (id == 0 && l == 1) || id == EXTENSION_ID_REPEAT as u8 {
-        // Padding byte or RTE indicator — nothing to skip
+        // Padding byte or RTE indicator -- nothing to skip
     } else if id > 0 && id < 32 {
         if len < l as i32 {
-            return Err(-1);
+            return Err(ErrorCode::InvalidPacket);
         }
         pos += l as usize;
         len -= l as i32;
@@ -468,7 +468,7 @@ fn skip_extension_payload(
         // Long extension (id >= 32)
         if l == 0 {
             if len < trailing_short_len {
-                return Err(-1);
+                return Err(ErrorCode::InvalidPacket);
             }
             pos += (len - trailing_short_len) as usize;
             len = trailing_short_len;
@@ -476,7 +476,7 @@ fn skip_extension_payload(
             let mut bytes: i32 = 0;
             loop {
                 if len < 1 {
-                    return Err(-1);
+                    return Err(ErrorCode::InvalidPacket);
                 }
                 let lacing = data[pos] as i32;
                 pos += 1;
@@ -488,7 +488,7 @@ fn skip_extension_payload(
                 }
             }
             if len < 0 {
-                return Err(-1);
+                return Err(ErrorCode::InvalidPacket);
             }
             pos += bytes as usize;
         }
@@ -502,12 +502,12 @@ fn skip_extension_payload(
 /// Matches C `skip_extension` (the outer one that includes the ID byte).
 ///
 /// Upstream C: src/extensions.c:skip_extension
-fn skip_extension_full(data: &[u8], pos: usize, len: i32) -> Result<(usize, i32, i32), i32> {
+fn skip_extension_full(data: &[u8], pos: usize, len: i32) -> Result<(usize, i32, i32), ErrorCode> {
     if len == 0 {
         return Ok((pos, 0, 0));
     }
     if len < 1 {
-        return Err(-1);
+        return Err(ErrorCode::InvalidPacket);
     }
     let id_byte = data[pos];
     let new_pos = pos + 1;
@@ -605,7 +605,7 @@ impl<'a> OpusExtensionIterator<'a> {
     /// or negative on error.
     ///
     /// Upstream C: src/extensions.c:opus_extension_iterator_next_repeat
-    fn next_repeat(&mut self) -> Result<Option<ExtensionRef>, i32> {
+    fn next_repeat(&mut self) -> Result<Option<ExtensionRef>, ErrorCode> {
         debug_assert!(self.repeat_frame > 0);
         while self.repeat_frame < self.nb_frames {
             while self.src_len > 0 {
@@ -683,12 +683,12 @@ impl<'a> OpusExtensionIterator<'a> {
     /// Returns `Ok(Some(ext))` for each extension found (excluding real padding,
     /// frame separators, and repeat indicators),
     /// `Ok(None)` when iteration is complete,
-    /// or `Err(OPUS_INVALID_PACKET)` on parse error.
+    /// or `Err(ErrorCode::InvalidPacket)` on parse error.
     ///
     /// Upstream C: src/extensions.c:opus_extension_iterator_next
-    pub fn next(&mut self) -> Result<Option<ExtensionRef>, i32> {
+    pub fn next(&mut self) -> Result<Option<ExtensionRef>, ErrorCode> {
         if self.curr_len < 0 {
-            return Err(OPUS_INVALID_PACKET);
+            return Err(ErrorCode::InvalidPacket);
         }
         // If we're in the middle of repeating extensions
         if self.repeat_frame > 0 {
@@ -710,7 +710,7 @@ impl<'a> OpusExtensionIterator<'a> {
 
             let (new_pos, new_len, header_size) =
                 skip_extension_full(self.data, self.curr_pos, self.curr_len)
-                    .map_err(|_| OPUS_INVALID_PACKET)?;
+                    .map_err(|_| ErrorCode::InvalidPacket)?;
             self.curr_pos = new_pos;
             self.curr_len = new_len;
 
@@ -727,7 +727,7 @@ impl<'a> OpusExtensionIterator<'a> {
                 }
                 if self.curr_frame >= self.nb_frames {
                     self.curr_len = -1;
-                    return Err(OPUS_INVALID_PACKET);
+                    return Err(ErrorCode::InvalidPacket);
                 }
                 if self.curr_frame >= self.frame_max {
                     self.curr_len = 0;
@@ -772,7 +772,7 @@ impl<'a> OpusExtensionIterator<'a> {
     ///
     /// Upstream C: src/extensions.c:opus_extension_iterator_find
     #[cfg(any(feature = "qext", feature = "dred"))]
-    pub fn find(&mut self, target_id: i32) -> Result<Option<ExtensionRef>, i32> {
+    pub fn find(&mut self, target_id: i32) -> Result<Option<ExtensionRef>, ErrorCode> {
         loop {
             match self.next()? {
                 None => return Ok(None),
@@ -791,6 +791,6 @@ impl<'a> OpusExtensionIterator<'a> {
 pub fn opus_packet_extensions_generate_size(
     extensions: &[OpusExtensionData],
     nb_frames: i32,
-) -> Result<usize, i32> {
+) -> Result<usize, ErrorCode> {
     generate_extensions_internal(None, extensions, nb_frames, false)
 }

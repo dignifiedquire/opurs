@@ -1553,8 +1553,8 @@ fn multistream_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.encoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
-    assert_eq!(rust.encoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.encoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(rust.encoder_state_mut(2).err(), Some(opurs::ErrorCode::BadArg));
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1639,8 +1639,8 @@ fn multistream_decoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.decoder_state_mut(-1).err(), Some(OPUS_BAD_ARG));
-    assert_eq!(rust.decoder_state_mut(2).err(), Some(OPUS_BAD_ARG));
+    assert_eq!(rust.decoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(rust.decoder_state_mut(2).err(), Some(opurs::ErrorCode::BadArg));
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {

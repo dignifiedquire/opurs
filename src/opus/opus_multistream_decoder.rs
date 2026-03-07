@@ -307,7 +307,7 @@ impl OpusMSDecoder {
     /// Set decode gain for all child decoders.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
-    pub fn set_gain(&mut self, gain: i32) -> Result<(), i32> {
+    pub fn set_gain(&mut self, gain: i32) -> Result<(), ErrorCode> {
         for decoder in &mut self.decoders {
             decoder.set_gain(gain)?;
         }
@@ -317,7 +317,7 @@ impl OpusMSDecoder {
     /// Set complexity for all child decoders.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
-    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), i32> {
+    pub fn set_complexity(&mut self, complexity: i32) -> Result<(), ErrorCode> {
         for decoder in &mut self.decoders {
             decoder.set_complexity(complexity)?;
         }
@@ -355,23 +355,25 @@ impl OpusMSDecoder {
     /// Borrow a child decoder by stream index.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
-    pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, i32> {
+    pub fn decoder_state(&self, stream_id: i32) -> Result<&OpusDecoder, ErrorCode> {
         if stream_id < 0 || stream_id >= self.layout.streams() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
-        self.decoders.get(stream_id as usize).ok_or(OPUS_BAD_ARG)
+        self.decoders
+            .get(stream_id as usize)
+            .ok_or(ErrorCode::BadArg)
     }
 
     /// Mutably borrow a child decoder by stream index.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_ctl
-    pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, i32> {
+    pub fn decoder_state_mut(&mut self, stream_id: i32) -> Result<&mut OpusDecoder, ErrorCode> {
         if stream_id < 0 || stream_id >= self.layout.streams() {
-            return Err(OPUS_BAD_ARG);
+            return Err(ErrorCode::BadArg);
         }
         self.decoders
             .get_mut(stream_id as usize)
-            .ok_or(OPUS_BAD_ARG)
+            .ok_or(ErrorCode::BadArg)
     }
 
     /// Return current decode gain.
