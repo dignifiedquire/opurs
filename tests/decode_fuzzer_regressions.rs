@@ -1,6 +1,5 @@
-use opurs::internals::OPUS_BANDWIDTH_NARROWBAND;
 use opurs::{
-    opus_packet_get_bandwidth, opus_packet_get_nb_channels, Channels, OpusDecoder, SampleRate,
+    opus_packet_get_bandwidth, opus_packet_get_nb_channels, Bandwidth, OpusDecoder, SampleRate,
 };
 
 const MAX_FRAME_SAMP: i32 = 5760;
@@ -27,22 +26,19 @@ fn decode_fuzzer_crash_162fefed_does_not_panic() {
 
         let toc = data[SETUP_BYTE_COUNT];
         let bandwidth = opus_packet_get_bandwidth(toc);
-        let bw_idx = bandwidth - OPUS_BANDWIDTH_NARROWBAND;
-        if !(0..SAMP_FREQS.len() as i32).contains(&bw_idx) {
-            return;
-        }
-        let fs = SAMP_FREQS[bw_idx as usize];
-        let channels = opus_packet_get_nb_channels(toc);
-        if !(1..=2).contains(&channels) {
-            return;
-        }
+        let bw_idx = match bandwidth {
+            Bandwidth::Narrowband => 0,
+            Bandwidth::Mediumband => 1,
+            Bandwidth::Wideband => 2,
+            Bandwidth::Superwideband => 3,
+            Bandwidth::Fullband => 4,
+        };
+        let fs = SAMP_FREQS[bw_idx];
+        let ch = opus_packet_get_nb_channels(toc);
+        let channels = i32::from(ch);
 
         let sample_rate = match SampleRate::try_from(fs) {
             Ok(sr) => sr,
-            Err(_) => return,
-        };
-        let ch = match Channels::try_from(channels) {
-            Ok(ch) => ch,
             Err(_) => return,
         };
         let mut dec = match OpusDecoder::new(sample_rate, ch) {

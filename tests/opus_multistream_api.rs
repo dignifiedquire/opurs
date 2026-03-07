@@ -322,8 +322,8 @@ fn multistream_get_size_zero_nonzero_parity() {
     let _guard = test_guard();
     let cases = [(1, 0), (2, 1), (0, 0), (1, 2), (300, 0)];
     for (streams, coupled) in cases {
-        let rust_enc = OpusMSEncoder::get_size(streams, coupled);
-        let rust_dec = OpusMSDecoder::get_size(streams, coupled);
+        let rust_enc = OpusMSEncoder::size(streams, coupled);
+        let rust_dec = OpusMSDecoder::size(streams, coupled);
         let c_enc = unsafe { opus_multistream_encoder_get_size(streams, coupled) };
         let c_dec = unsafe { opus_multistream_decoder_get_size(streams, coupled) };
         assert_eq!(rust_enc == 0, c_enc == 0, "encoder size validity mismatch");
@@ -346,7 +346,7 @@ fn multistream_surround_get_size_zero_nonzero_parity() {
         (5, 2),
     ];
     for (channels, mapping_family) in cases {
-        let rust = OpusMSEncoder::surround_get_size(channels, mapping_family);
+        let rust = OpusMSEncoder::surround_size(channels, mapping_family);
         let c = unsafe { opus_multistream_surround_encoder_get_size(channels, mapping_family) };
         assert_eq!(
             rust == 0,

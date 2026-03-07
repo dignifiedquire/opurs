@@ -4,7 +4,7 @@ use opurs::internals::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET}
 use opurs::{
     opus_packet_get_bandwidth, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
     opus_packet_get_samples_per_frame, opus_packet_pad, opus_packet_parse, opus_packet_unpad,
-    Application, Bandwidth, Bitrate, Channels, FrameSize, OpusDecoder, OpusEncoder,
+    Application, Bandwidth, Bitrate, Channels, ErrorCode, FrameSize, OpusDecoder, OpusEncoder,
     OpusRepacketizer, SampleRate, Signal,
 };
 
@@ -149,29 +149,33 @@ fn test_dec_api() {
 
     packet[0] = 0;
     assert_eq!(dec.nb_samples(&packet[..1]).unwrap(), 480);
-    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 48000), 480);
-    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 96000), 960);
-    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 32000), 320);
-    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 8000), 80);
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 48000), Ok(480));
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 96000), Ok(960));
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 32000), Ok(320));
+    assert_eq!(opus_packet_get_nb_samples(&packet[..1], 8000), Ok(80));
     packet[0] = 3;
     assert_eq!(
         opus_packet_get_nb_samples(&packet[..1], 24000),
-        OPUS_INVALID_PACKET
+        Err(ErrorCode::InvalidPacket)
     );
     packet[0] = ((63) << 2 | 3) as u8;
     packet[1] = 63;
-    assert_eq!(opus_packet_get_nb_samples(&[], 24000), OPUS_BAD_ARG);
+    assert_eq!(
+        opus_packet_get_nb_samples(&[], 24000),
+        Err(ErrorCode::BadArg)
+    );
     assert_eq!(
         opus_packet_get_nb_samples(&packet[..2], 48000),
-        OPUS_INVALID_PACKET
+        Err(ErrorCode::InvalidPacket)
     );
     assert!(dec.nb_samples(&packet[..2]).is_err());
     println!("    opus_{{packet,decoder}}_get_nb_samples() ....... OK.");
     cfgs += 9;
-    assert_eq!(opus_packet_get_nb_frames(&[]), OPUS_BAD_ARG);
+    assert_eq!(opus_packet_get_nb_frames(&[]), Err(ErrorCode::BadArg));
 
     for i in 0..256 {
-        let l1res: [i32; 4] = [1, 2, 2, OPUS_INVALID_PACKET];
+        let l1res: [Result<usize, ErrorCode>; 4] =
+            [Ok(1), Ok(2), Ok(2), Err(ErrorCode::InvalidPacket)];
         packet[0] = i as u8;
         assert_eq!(
             l1res[(packet[0] as i32 & 3) as usize],
@@ -184,7 +188,7 @@ fn test_dec_api() {
             let expected = if packet[0] as i32 & 3 != 3 {
                 l1res[(packet[0] as i32 & 3) as usize]
             } else {
-                packet[1] as i32 & 63
+                Ok((packet[1] as usize) & 63)
             };
             assert_eq!(
                 expected,
@@ -202,7 +206,7 @@ fn test_dec_api() {
         bw = 1101 + (((((bw & 7) * 9) & (63 - (bw & 8))) + 2 + 12 * (bw & 8 != 0) as i32) >> 4);
         assert_eq!(
             bw,
-            opus_packet_get_bandwidth(packet[0]),
+            i32::from(opus_packet_get_bandwidth(packet[0])),
             "get_bandwidth mismatch for toc={i}"
         );
         cfgs += 1;

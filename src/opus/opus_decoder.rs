@@ -141,7 +141,7 @@ impl OpusDecoder {
             nb_frames = packet_frame_size / 960;
         }
 
-        let packet_stream_channels = opus_packet_get_nb_channels(packet[0]);
+        let packet_stream_channels = opus_packet_get_nb_channels_raw(packet[0]);
         let mut frames = [0usize; 48];
         let mut size = [0i16; 48];
         let ret = opus_packet_parse(packet, None, Some(&mut frames), &mut size, None);
@@ -290,12 +290,7 @@ impl OpusDecoder {
     ///
     /// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
     pub fn nb_samples(&self, packet: &[u8]) -> Result<usize, ErrorCode> {
-        let ret = opus_packet_get_nb_samples(packet, self.fs);
-        if ret < 0 {
-            Err(ErrorCode::from(ret))
-        } else {
-            Ok(ret as usize)
-        }
+        opus_packet_get_nb_samples(packet, self.fs)
     }
 
     // -- Type-safe CTL getters and setters --
@@ -1213,9 +1208,9 @@ pub fn opus_decode_native(
     }
 
     let packet_mode = opus_packet_get_mode(data);
-    let packet_bandwidth = opus_packet_get_bandwidth(data[0]);
+    let packet_bandwidth = opus_packet_get_bandwidth_raw(data[0]);
     let packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.fs);
-    let packet_stream_channels = opus_packet_get_nb_channels(data[0]);
+    let packet_stream_channels = opus_packet_get_nb_channels_raw(data[0]);
     let mut padding_len: i32 = 0;
     let mut parsed_packet_offset: i32 = 0;
     let count = opus_packet_parse_impl(
@@ -1411,7 +1406,7 @@ pub fn opus_decode(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_packet_get_nb_samples(data, st.fs);
+        let nb_samples = opus_packet_get_nb_samples_raw(data, st.fs);
         if nb_samples > 0 {
             frame_size = if frame_size < nb_samples {
                 frame_size
@@ -1461,7 +1456,7 @@ pub fn opus_decode24(
         return OPUS_BAD_ARG;
     }
     if !data.is_empty() && decode_fec == 0 {
-        let nb_samples = opus_packet_get_nb_samples(data, st.fs);
+        let nb_samples = opus_packet_get_nb_samples_raw(data, st.fs);
         if nb_samples > 0 {
             frame_size = frame_size.min(nb_samples);
         } else {
@@ -1574,81 +1569,6 @@ pub fn opus_decoder_dred_decode_float(
     )
 }
 
-/// Upstream C: src/opus_decoder.c:opus_dred_decoder_get_size
-#[cfg(feature = "dred")]
-pub fn opus_dred_decoder_get_size() -> i32 {
-    std::mem::size_of::<OpusDREDDecoder>() as i32
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_decoder_init
-#[cfg(feature = "dred")]
-pub fn opus_dred_decoder_init(dec: &mut OpusDREDDecoder) -> i32 {
-    *dec = OpusDREDDecoder::new();
-    #[cfg(feature = "builtin-weights")]
-    {
-        if !dec.load_dnn_weights() {
-            return OPUS_INTERNAL_ERROR;
-        }
-    }
-    OPUS_OK
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_decoder_create
-#[cfg(feature = "dred")]
-pub fn opus_dred_decoder_create() -> Result<OpusDREDDecoder, ErrorCode> {
-    let mut dec = OpusDREDDecoder::new();
-    let ret = opus_dred_decoder_init(&mut dec);
-    if ret != OPUS_OK {
-        return Err(ErrorCode::from(ret));
-    }
-    Ok(dec)
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_decoder_destroy
-#[cfg(feature = "dred")]
-pub fn opus_dred_decoder_destroy(_dec: OpusDREDDecoder) {}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_decoder_ctl
-#[cfg(feature = "dred")]
-pub fn opus_dred_decoder_ctl(
-    dred_dec: &mut OpusDREDDecoder,
-    request: i32,
-    dnn_blob: Option<&[u8]>,
-) -> i32 {
-    match request {
-        crate::opus::opus_defines::OPUS_SET_DNN_BLOB_REQUEST => {
-            let Some(blob) = dnn_blob else {
-                return OPUS_BAD_ARG;
-            };
-            if blob.is_empty() {
-                return OPUS_BAD_ARG;
-            }
-            if dred_dec.set_dnn_blob(blob) {
-                OPUS_OK
-            } else {
-                OPUS_INTERNAL_ERROR
-            }
-        }
-        _ => OPUS_UNIMPLEMENTED,
-    }
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_get_size
-#[cfg(feature = "dred")]
-pub fn opus_dred_get_size() -> i32 {
-    std::mem::size_of::<OpusDRED>() as i32
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_alloc
-#[cfg(feature = "dred")]
-pub fn opus_dred_alloc() -> OpusDRED {
-    OpusDRED::new()
-}
-
-/// Upstream C: src/opus_decoder.c:opus_dred_free
-#[cfg(feature = "dred")]
-pub fn opus_dred_free(_dred: OpusDRED) {}
-
 #[cfg(feature = "dred")]
 fn dred_find_payload(data: &[u8]) -> Result<Option<(usize, usize, i32)>, i32> {
     if data.is_empty() {
@@ -1711,85 +1631,90 @@ fn dred_find_payload(data: &[u8]) -> Result<Option<(usize, usize, i32)>, i32> {
     }
 }
 
-/// Upstream C: src/opus_decoder.c:opus_dred_parse
 #[cfg(feature = "dred")]
-pub fn opus_dred_parse(
-    dred_dec: &mut OpusDREDDecoder,
-    dred: &mut OpusDRED,
-    data: &[u8],
-    max_dred_samples: i32,
-    sampling_rate: i32,
-    dred_end: Option<&mut i32>,
-    defer_processing: bool,
-) -> i32 {
-    if sampling_rate <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    if !dred_dec.loaded {
-        return OPUS_UNIMPLEMENTED;
-    }
-
-    dred.process_stage = -1;
-    let payload = match dred_find_payload(data) {
-        Ok(payload) => payload,
-        Err(err) => return err,
-    };
-
-    let Some((start, payload_len, dred_frame_offset)) = payload else {
-        if let Some(end) = dred_end {
-            *end = 0;
-        }
-        return 0;
-    };
-
-    let offset = 100 * max_dred_samples / sampling_rate;
-    let min_feature_frames = (2 + offset)
-        .min((2 * DRED_NUM_REDUNDANCY_FRAMES) as i32)
-        .max(0) as usize;
-    dred_ec_decode(
-        dred,
-        &data[start..start + payload_len],
-        payload_len,
-        min_feature_frames,
-        dred_frame_offset,
-    );
-    if !defer_processing {
-        if dred.process_stage == 1 {
-            dred_process_impl(dred_dec, dred);
-        } else if dred.process_stage != 2 {
+impl OpusDREDDecoder {
+    /// Parse DRED data from a packet.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_dred_parse
+    pub fn parse(
+        &mut self,
+        dred: &mut OpusDRED,
+        data: &[u8],
+        max_dred_samples: i32,
+        sampling_rate: i32,
+        dred_end: Option<&mut i32>,
+        defer_processing: bool,
+    ) -> i32 {
+        if sampling_rate <= 0 {
             return OPUS_BAD_ARG;
         }
+        if !self.loaded {
+            return OPUS_UNIMPLEMENTED;
+        }
+
+        dred.process_stage = -1;
+        let payload = match dred_find_payload(data) {
+            Ok(payload) => payload,
+            Err(err) => return err,
+        };
+
+        let Some((start, payload_len, dred_frame_offset)) = payload else {
+            if let Some(end) = dred_end {
+                *end = 0;
+            }
+            return 0;
+        };
+
+        let offset = 100 * max_dred_samples / sampling_rate;
+        let min_feature_frames = (2 + offset)
+            .min((2 * DRED_NUM_REDUNDANCY_FRAMES) as i32)
+            .max(0) as usize;
+        dred_ec_decode(
+            dred,
+            &data[start..start + payload_len],
+            payload_len,
+            min_feature_frames,
+            dred_frame_offset,
+        );
+        if !defer_processing {
+            if dred.process_stage == 1 {
+                dred_process_impl(self, dred);
+            } else if dred.process_stage != 2 {
+                return OPUS_BAD_ARG;
+            }
+        }
+        if let Some(end) = dred_end {
+            *end = 0.max(-dred.dred_offset * sampling_rate / 400);
+        }
+        0.max(dred.nb_latents * sampling_rate / 25 - dred.dred_offset * sampling_rate / 400)
     }
-    if let Some(end) = dred_end {
-        *end = 0.max(-dred.dred_offset * sampling_rate / 400);
+
+    /// Process parsed DRED data: run RDOVAE decoder to reconstruct features.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_dred_process
+    pub fn process(&self, src: &OpusDRED, dst: &mut OpusDRED) -> i32 {
+        if src.process_stage != 1 && src.process_stage != 2 {
+            return OPUS_BAD_ARG;
+        }
+        if !self.loaded {
+            return OPUS_UNIMPLEMENTED;
+        }
+
+        if !std::ptr::eq(src as *const OpusDRED, dst as *const OpusDRED) {
+            *dst = src.clone();
+        }
+        if dst.process_stage == 2 {
+            return OPUS_OK;
+        }
+        dred_process_impl(self, dst);
+        OPUS_OK
     }
-    0.max(dred.nb_latents * sampling_rate / 25 - dred.dred_offset * sampling_rate / 400)
 }
 
-/// Upstream C: src/opus_decoder.c:opus_dred_process
-#[cfg(feature = "dred")]
-pub fn opus_dred_process(dred_dec: &OpusDREDDecoder, src: &OpusDRED, dst: &mut OpusDRED) -> i32 {
-    if src.process_stage != 1 && src.process_stage != 2 {
-        return OPUS_BAD_ARG;
-    }
-    if !dred_dec.loaded {
-        return OPUS_UNIMPLEMENTED;
-    }
-
-    if !std::ptr::eq(src as *const OpusDRED, dst as *const OpusDRED) {
-        *dst = src.clone();
-    }
-    if dst.process_stage == 2 {
-        return OPUS_OK;
-    }
-    dred_process_impl(dred_dec, dst);
-    OPUS_OK
-}
-
-/// Return packet bandwidth from the TOC byte.
+/// Return packet bandwidth from the TOC byte (raw `i32` for internal use).
 ///
 /// Upstream C: src/opus_decoder.c:opus_packet_get_bandwidth
-pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
+pub(crate) fn opus_packet_get_bandwidth_raw(toc: u8) -> i32 {
     let mut bandwidth: i32;
     if toc as i32 & 0x80 != 0 {
         bandwidth = OPUS_BANDWIDTH_MEDIUMBAND + (toc as i32 >> 5 & 0x3);
@@ -1807,22 +1732,43 @@ pub fn opus_packet_get_bandwidth(toc: u8) -> i32 {
     }
     bandwidth
 }
-/// Return the stream channel count encoded in the TOC byte (`1` or `2`).
+
+/// Return packet bandwidth from the TOC byte.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_bandwidth
+pub fn opus_packet_get_bandwidth(toc: u8) -> crate::enums::Bandwidth {
+    // All branches produce valid OPUS_BANDWIDTH_* constants
+    crate::enums::Bandwidth::try_from(opus_packet_get_bandwidth_raw(toc)).unwrap()
+}
+
+/// Return the stream channel count from the TOC byte (raw `i32` for internal use).
 ///
 /// Upstream C: src/opus_decoder.c:opus_packet_get_nb_channels
-pub fn opus_packet_get_nb_channels(toc: u8) -> i32 {
+pub(crate) fn opus_packet_get_nb_channels_raw(toc: u8) -> i32 {
     if toc as i32 & 0x4 != 0 {
         2
     } else {
         1
     }
 }
-/// Return the number of frames in an Opus packet.
+
+/// Return the stream channel count encoded in the TOC byte.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_channels
+pub fn opus_packet_get_nb_channels(toc: u8) -> crate::enums::Channels {
+    if toc as i32 & 0x4 != 0 {
+        crate::enums::Channels::Stereo
+    } else {
+        crate::enums::Channels::Mono
+    }
+}
+
+/// Return the number of frames in an Opus packet (raw `i32` for internal use).
 ///
 /// Returns a negative `OPUS_*` code on malformed/truncated headers.
 ///
 /// Upstream C: src/opus_decoder.c:opus_packet_get_nb_frames
-pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
+pub(crate) fn opus_packet_get_nb_frames_raw(packet: &[u8]) -> i32 {
     if packet.is_empty() {
         return OPUS_BAD_ARG;
     }
@@ -1838,13 +1784,25 @@ pub fn opus_packet_get_nb_frames(packet: &[u8]) -> i32 {
     }
 }
 
-/// Return decoded sample count for a packet at the given sample rate.
+/// Return the number of frames in an Opus packet.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_frames
+pub fn opus_packet_get_nb_frames(packet: &[u8]) -> Result<usize, crate::error::ErrorCode> {
+    let ret = opus_packet_get_nb_frames_raw(packet);
+    if ret < 0 {
+        Err(crate::error::ErrorCode::from(ret))
+    } else {
+        Ok(ret as usize)
+    }
+}
+
+/// Return decoded sample count for a packet at the given sample rate (raw `i32` for internal use).
 ///
 /// Enforces the Opus 120 ms maximum packet duration.
 ///
 /// Upstream C: src/opus_decoder.c:opus_packet_get_nb_samples
-pub fn opus_packet_get_nb_samples(packet: &[u8], fs: i32) -> i32 {
-    let count: i32 = opus_packet_get_nb_frames(packet);
+pub(crate) fn opus_packet_get_nb_samples_raw(packet: &[u8], fs: i32) -> i32 {
+    let count: i32 = opus_packet_get_nb_frames_raw(packet);
     if count < 0 {
         return count;
     }
@@ -1856,11 +1814,26 @@ pub fn opus_packet_get_nb_samples(packet: &[u8], fs: i32) -> i32 {
     }
 }
 
+/// Return decoded sample count for a packet at the given sample rate.
+///
+/// Enforces the Opus 120 ms maximum packet duration.
+///
+/// Upstream C: src/opus_decoder.c:opus_packet_get_nb_samples
+pub fn opus_packet_get_nb_samples(
+    packet: &[u8],
+    fs: i32,
+) -> Result<usize, crate::error::ErrorCode> {
+    let ret = opus_packet_get_nb_samples_raw(packet, fs);
+    if ret < 0 {
+        Err(crate::error::ErrorCode::from(ret))
+    } else {
+        Ok(ret as usize)
+    }
+}
+
 #[cfg(all(test, feature = "dred"))]
 mod tests {
     use super::*;
-    use crate::opus::opus_defines::OPUS_SET_DNN_BLOB_REQUEST;
-
     #[test]
     fn stage_dred_features_blend_zero_queues_expected_frames() {
         let mut dec = OpusDecoder::new(SampleRate::Hz48000, Channels::Mono).expect("decoder");
@@ -1897,26 +1870,12 @@ mod tests {
     }
 
     #[test]
-    fn dred_decoder_ctl_rejects_missing_blob() {
-        let mut dred_dec = OpusDREDDecoder::new();
-        let ret = opus_dred_decoder_ctl(&mut dred_dec, OPUS_SET_DNN_BLOB_REQUEST, None);
-        assert_eq!(ret, OPUS_BAD_ARG);
-    }
-
-    #[test]
-    fn dred_decoder_ctl_unknown_request_unimplemented() {
-        let mut dred_dec = OpusDREDDecoder::new();
-        let ret = opus_dred_decoder_ctl(&mut dred_dec, 0x7fff, None);
-        assert_eq!(ret, OPUS_UNIMPLEMENTED);
-    }
-
-    #[test]
     fn dred_process_rejects_invalid_stage() {
         let dred_dec = OpusDREDDecoder::new();
         let mut src = OpusDRED::new();
         src.process_stage = 0;
         let mut dst = OpusDRED::new();
-        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        let ret = dred_dec.process(&src, &mut dst);
         assert_eq!(ret, OPUS_BAD_ARG);
     }
 
@@ -1926,25 +1885,17 @@ mod tests {
         let mut src = OpusDRED::new();
         src.process_stage = 2;
         let mut dst = OpusDRED::new();
-        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        let ret = dred_dec.process(&src, &mut dst);
         assert_eq!(ret, OPUS_UNIMPLEMENTED);
     }
 
     #[cfg(feature = "builtin-weights")]
     #[test]
     fn dred_parse_empty_packet_returns_zero() {
-        let mut dred_dec = opus_dred_decoder_create().expect("dred decoder");
-        let mut dred = opus_dred_alloc();
+        let mut dred_dec = OpusDREDDecoder::create().expect("dred decoder");
+        let mut dred = OpusDRED::new();
         let mut dred_end = -1;
-        let ret = opus_dred_parse(
-            &mut dred_dec,
-            &mut dred,
-            &[],
-            960,
-            48_000,
-            Some(&mut dred_end),
-            false,
-        );
+        let ret = dred_dec.parse(&mut dred, &[], 960, 48_000, Some(&mut dred_end), false);
         assert_eq!(ret, 0);
         assert_eq!(dred_end, 0);
     }
@@ -1952,7 +1903,7 @@ mod tests {
     #[cfg(feature = "builtin-weights")]
     #[test]
     fn dred_process_copies_src_when_dst_is_distinct() {
-        let dred_dec = opus_dred_decoder_create().expect("dred decoder");
+        let dred_dec = OpusDREDDecoder::create().expect("dred decoder");
         let mut src = OpusDRED::new();
         src.process_stage = 2;
         src.nb_latents = 3;
@@ -1961,7 +1912,7 @@ mod tests {
         src.state[0] = -2.0;
 
         let mut dst = OpusDRED::new();
-        let ret = opus_dred_process(&dred_dec, &src, &mut dst);
+        let ret = dred_dec.process(&src, &mut dst);
         assert_eq!(ret, OPUS_OK);
         assert_eq!(dst.process_stage, 2);
         assert_eq!(dst.nb_latents, 3);

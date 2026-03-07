@@ -22,7 +22,7 @@ pub struct MappingMatrix {
 
 impl MappingMatrix {
     /// Upstream C: src/mapping_matrix.c:mapping_matrix_get_size
-    pub fn get_size(rows: i32, cols: i32) -> i32 {
+    pub fn size(rows: i32, cols: i32) -> i32 {
         if rows < 0 || cols < 0 || rows > 255 || cols > 255 {
             return 0;
         }
@@ -37,7 +37,7 @@ impl MappingMatrix {
 
     /// Upstream C: src/mapping_matrix.c:mapping_matrix_init
     pub fn new(rows: i32, cols: i32, gain: i32, data: &[i16]) -> Result<Self, ErrorCode> {
-        if Self::get_size(rows, cols) == 0 {
+        if Self::size(rows, cols) == 0 {
             return Err(ErrorCode::BadArg);
         }
         let rows = rows as usize;
@@ -342,15 +342,15 @@ mod tests {
 
     #[test]
     fn mapping_matrix_get_size_limits() {
-        assert!(MappingMatrix::get_size(4, 3) > 0);
-        assert!(MappingMatrix::get_size(0, 3) > 0);
-        assert!(MappingMatrix::get_size(3, 0) > 0);
-        assert_eq!(MappingMatrix::get_size(-1, 3), 0);
-        assert_eq!(MappingMatrix::get_size(3, -1), 0);
-        assert_eq!(MappingMatrix::get_size(256, 3), 0);
-        assert_eq!(MappingMatrix::get_size(3, 256), 0);
+        assert!(MappingMatrix::size(4, 3) > 0);
+        assert!(MappingMatrix::size(0, 3) > 0);
+        assert!(MappingMatrix::size(3, 0) > 0);
+        assert_eq!(MappingMatrix::size(-1, 3), 0);
+        assert_eq!(MappingMatrix::size(3, -1), 0);
+        assert_eq!(MappingMatrix::size(256, 3), 0);
+        assert_eq!(MappingMatrix::size(3, 256), 0);
         // 181*181*2 > 65004
-        assert_eq!(MappingMatrix::get_size(181, 181), 0);
+        assert_eq!(MappingMatrix::size(181, 181), 0);
     }
 
     #[test]

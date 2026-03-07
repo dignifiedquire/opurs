@@ -7,7 +7,7 @@
 mod test_common;
 
 use opurs::internals::OPUS_OK;
-use opurs::{opus_dred_alloc, opus_dred_decoder_create, opus_dred_parse, opus_dred_process};
+use opurs::{OpusDRED, OpusDREDDecoder};
 use test_common::TestRng;
 
 const DEFAULT_ITERS: usize = 20_000;
@@ -27,8 +27,8 @@ fn dred_random_parse_process() {
     let mut rng = TestRng::from_iseed(0x1357_9BDF);
     let iters = iterations_from_env();
 
-    let mut dred_dec = opus_dred_decoder_create().expect("opus_dred_decoder_create failed");
-    let mut dred = opus_dred_alloc();
+    let mut dred_dec = OpusDREDDecoder::create().expect("OpusDREDDecoder::create failed");
+    let mut dred = OpusDRED::new();
 
     for _ in 0..iters {
         let len = (rng.next_u32() as usize) % (MAX_EXTENSION_SIZE + 1);
@@ -39,8 +39,7 @@ fn dred_random_parse_process() {
 
         let mut dred_end = 0i32;
         let defer = (rng.next_u32() & 1) != 0;
-        let res1 = opus_dred_parse(
-            &mut dred_dec,
+        let res1 = dred_dec.parse(
             &mut dred,
             &payload,
             48_000,
@@ -51,7 +50,7 @@ fn dred_random_parse_process() {
 
         if res1 > 0 {
             let src = dred.clone();
-            let res2 = opus_dred_process(&dred_dec, &src, &mut dred);
+            let res2 = dred_dec.process(&src, &mut dred);
             assert_eq!(res2, OPUS_OK, "process should succeed if parse succeeds");
             assert!(res1 >= dred_end, "end before beginning");
         }

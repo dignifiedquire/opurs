@@ -4,11 +4,12 @@
 
 use crate::error::ErrorCode;
 use crate::opus::extensions::OpusExtensionData;
+use crate::opus::opus_decoder::opus_packet_get_nb_frames_raw;
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
 };
 use crate::opus::packet::{encode_size, opus_packet_parse_impl};
-use crate::{opus_packet_get_nb_frames, opus_packet_get_samples_per_frame};
+use crate::opus_packet_get_samples_per_frame;
 
 /// The repacketizer can be used to merge multiple Opus packets into a single
 /// packet or alternatively to split Opus packets that have previously been
@@ -138,7 +139,7 @@ impl OpusRepacketizer {
         } else if self.toc & 0xfc != data[0] & 0xfc {
             return OPUS_INVALID_PACKET;
         }
-        let curr_nb_frames = opus_packet_get_nb_frames(data);
+        let curr_nb_frames = opus_packet_get_nb_frames_raw(data);
         if curr_nb_frames < 1 {
             return OPUS_INVALID_PACKET;
         }

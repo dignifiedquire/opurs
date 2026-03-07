@@ -18,12 +18,12 @@ use super::stats::*;
 /// Upstream C: dnn/dred_decoder.h:OpusDRED
 #[derive(Clone)]
 pub struct OpusDRED {
-    pub fec_features: Vec<f32>,
-    pub state: Vec<f32>,
-    pub latents: Vec<f32>,
-    pub nb_latents: i32,
-    pub process_stage: i32, // 0=empty, 1=parsed, 2=processed
-    pub dred_offset: i32,
+    pub(crate) fec_features: Vec<f32>,
+    pub(crate) state: Vec<f32>,
+    pub(crate) latents: Vec<f32>,
+    pub(crate) nb_latents: i32,
+    pub(crate) process_stage: i32, // 0=empty, 1=parsed, 2=processed
+    pub(crate) dred_offset: i32,
 }
 
 impl Default for OpusDRED {
@@ -49,8 +49,8 @@ impl OpusDRED {
 ///
 /// Upstream C: uses OpusDREDDecoder in opus API
 pub struct OpusDREDDecoder {
-    pub model: RDOVAEDec,
-    pub loaded: bool,
+    pub(crate) model: RDOVAEDec,
+    pub(crate) loaded: bool,
 }
 
 impl Default for OpusDREDDecoder {
@@ -94,6 +94,25 @@ impl OpusDREDDecoder {
             Some(arrays) => self.load_model(&arrays),
             None => false,
         }
+    }
+
+    /// Create a new DRED decoder, loading builtin weights if available.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_dred_decoder_create
+    #[cfg(feature = "builtin-weights")]
+    pub fn create() -> Result<Self, crate::ErrorCode> {
+        let mut dec = Self::new();
+        if !dec.load_dnn_weights() {
+            return Err(crate::ErrorCode::from(
+                crate::opus::opus_defines::OPUS_INTERNAL_ERROR,
+            ));
+        }
+        Ok(dec)
+    }
+
+    /// Returns whether the DRED decoder model is loaded.
+    pub fn is_loaded(&self) -> bool {
+        self.loaded
     }
 }
 

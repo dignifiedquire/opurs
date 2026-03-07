@@ -80,7 +80,7 @@ impl OpusMSEncoder {
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_encoder_get_size
-    pub fn get_size(streams: i32, coupled_streams: i32) -> i32 {
+    pub fn size(streams: i32, coupled_streams: i32) -> i32 {
         if streams < 1 || coupled_streams < 0 || coupled_streams > streams {
             0
         } else {
@@ -94,7 +94,7 @@ impl OpusMSEncoder {
     /// Returns zero for invalid `(channels, mapping_family)` combinations.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_surround_encoder_get_size
-    pub fn surround_get_size(channels: i32, mapping_family: i32) -> i32 {
+    pub fn surround_size(channels: i32, mapping_family: i32) -> i32 {
         let mut streams = 0i32;
         let mut coupled_streams = 0i32;
         let mut mapping = vec![0u8; channels.max(0) as usize];
@@ -109,7 +109,7 @@ impl OpusMSEncoder {
         {
             return 0;
         }
-        Self::get_size(streams, coupled_streams)
+        Self::size(streams, coupled_streams)
     }
 
     /// Create and initialize a multistream encoder.

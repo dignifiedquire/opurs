@@ -61,7 +61,7 @@ impl OpusProjectionEncoder {
     /// Returns zero for invalid `(channels, mapping_family)` combinations.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_ambisonics_encoder_get_size
-    pub fn get_size(channels: i32, mapping_family: i32) -> i32 {
+    pub fn size(channels: i32, mapping_family: i32) -> i32 {
         let Ok((streams, coupled_streams, order_plus_one)) =
             get_streams_from_channels(channels, mapping_family)
         else {
@@ -80,7 +80,7 @@ impl OpusProjectionEncoder {
         {
             return 0;
         }
-        if OpusMSEncoder::get_size(streams, coupled_streams) == 0 {
+        if OpusMSEncoder::size(streams, coupled_streams) == 0 {
             return 0;
         }
         core::mem::size_of::<Self>() as i32

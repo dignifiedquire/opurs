@@ -13,9 +13,7 @@ use libopus_sys::{
     opus_decode as c_opus_decode, opus_decoder_create as c_opus_decoder_create,
     opus_decoder_destroy as c_opus_decoder_destroy, OpusDecoder as COpusDecoder, OPUS_OK,
 };
-use opurs::{
-    opus_packet_get_bandwidth, opus_packet_get_nb_channels, OpusDecoder, OPUS_BANDWIDTH_NARROWBAND,
-};
+use opurs::{opus_packet_get_bandwidth, opus_packet_get_nb_channels, Bandwidth, OpusDecoder};
 
 const MAX_FRAME_SAMP: i32 = 5760;
 const MAX_PACKET: usize = 1500;
@@ -70,16 +68,19 @@ fuzz_target!(|data: &[u8]| {
     // Parse ToC from the first packet to determine sample rate and channels
     let toc = data[SETUP_BYTE_COUNT];
     let bandwidth = opus_packet_get_bandwidth(toc);
-    let bw_idx = bandwidth - OPUS_BANDWIDTH_NARROWBAND;
-    let fs = SAMP_FREQS[bw_idx as usize];
-    let channels = opus_packet_get_nb_channels(toc);
+    let bw_idx = match bandwidth {
+        Bandwidth::Narrowband => 0,
+        Bandwidth::Mediumband => 1,
+        Bandwidth::Wideband => 2,
+        Bandwidth::Superwideband => 3,
+        Bandwidth::Fullband => 4,
+    };
+    let fs = SAMP_FREQS[bw_idx];
+    let ch = opus_packet_get_nb_channels(toc);
+    let channels = i32::from(ch);
 
     let sample_rate = match opurs::SampleRate::try_from(fs) {
         Ok(sr) => sr,
-        Err(_) => return,
-    };
-    let ch = match opurs::Channels::try_from(channels) {
-        Ok(c) => c,
         Err(_) => return,
     };
     let mut dec = match OpusDecoder::new(sample_rate, ch) {

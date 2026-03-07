@@ -328,22 +328,22 @@ mod rust_backend {
 
         #[cfg(feature = "dred")]
         fn dred_decoder_create() -> Result<Self::DredDecoder, i32> {
-            crate::opus_dred_decoder_create().map_err(i32::from)
+            crate::OpusDREDDecoder::create().map_err(i32::from)
         }
 
         #[cfg(feature = "dred")]
         fn dred_decoder_destroy(st: Self::DredDecoder) {
-            crate::opus_dred_decoder_destroy(st);
+            drop(st);
         }
 
         #[cfg(feature = "dred")]
         fn dred_alloc() -> Result<Self::DredState, i32> {
-            Ok(crate::opus_dred_alloc())
+            Ok(crate::OpusDRED::new())
         }
 
         #[cfg(feature = "dred")]
         fn dred_free(st: Self::DredState) {
-            crate::opus_dred_free(st);
+            drop(st);
         }
 
         #[cfg(feature = "dred")]
@@ -381,8 +381,7 @@ mod rust_backend {
             sampling_rate: i32,
             dred_end: &mut i32,
         ) -> i32 {
-            crate::opus_dred_parse(
-                dred_dec,
+            dred_dec.parse(
                 dred,
                 data,
                 max_dred_samples,

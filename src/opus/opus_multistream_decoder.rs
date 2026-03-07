@@ -5,7 +5,7 @@
 use crate::celt::float_cast::{float2int, float2int16};
 use crate::enums::{Channels, SampleRate};
 use crate::error::ErrorCode;
-use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples, OpusDecoder};
+use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples_raw, OpusDecoder};
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
 };
@@ -36,7 +36,7 @@ impl OpusMSDecoder {
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
     ///
     /// Upstream C: include/opus_multistream.h:opus_multistream_decoder_get_size
-    pub fn get_size(streams: i32, coupled_streams: i32) -> i32 {
+    pub fn size(streams: i32, coupled_streams: i32) -> i32 {
         if streams < 1 || coupled_streams < 0 || coupled_streams > streams {
             0
         } else {
@@ -475,7 +475,7 @@ fn multistream_packet_validate(data: &[u8], nb_streams: i32, fs: i32) -> Result<
             return Err(OPUS_INVALID_PACKET);
         }
 
-        let tmp_samples = opus_packet_get_nb_samples(&payload[..packet_offset as usize], fs);
+        let tmp_samples = opus_packet_get_nb_samples_raw(&payload[..packet_offset as usize], fs);
         if stream_idx != 0 && samples != tmp_samples {
             return Err(OPUS_INVALID_PACKET);
         }

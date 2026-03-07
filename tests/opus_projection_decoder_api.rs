@@ -99,7 +99,7 @@ fn projection_decoder_get_size_zero_nonzero_parity() {
     let _guard = test_guard();
     let cases = [(2, 1, 1), (2, 1, 0), (0, 1, 1), (2, 0, 0), (256, 1, 1)];
     for (channels, streams, coupled) in cases {
-        let rust = OpusProjectionDecoder::get_size(channels, streams, coupled);
+        let rust = OpusProjectionDecoder::size(channels, streams, coupled);
         let c = unsafe { opus_projection_decoder_get_size(channels, streams, coupled) };
         assert_eq!(
             rust == 0,

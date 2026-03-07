@@ -42,9 +42,6 @@ pub use crate::dnn::dred::decoder::{OpusDRED, OpusDREDDecoder};
 #[cfg(feature = "dred")]
 pub use crate::opus::opus_decoder::{
     opus_decoder_dred_decode, opus_decoder_dred_decode24, opus_decoder_dred_decode_float,
-    opus_dred_alloc, opus_dred_decoder_create, opus_dred_decoder_ctl, opus_dred_decoder_destroy,
-    opus_dred_decoder_get_size, opus_dred_decoder_init, opus_dred_free, opus_dred_get_size,
-    opus_dred_parse, opus_dred_process,
 };
 
 // opus_libinfo

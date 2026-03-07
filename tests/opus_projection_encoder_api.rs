@@ -76,7 +76,7 @@ fn projection_encoder_get_size_zero_nonzero_parity() {
     let _guard = test_guard();
     let cases = [(4, 3), (9, 3), (36, 3), (49, 3), (4, 1)];
     for (channels, mapping_family) in cases {
-        let rust = OpusProjectionEncoder::get_size(channels, mapping_family);
+        let rust = OpusProjectionEncoder::size(channels, mapping_family);
         let c = unsafe { opus_projection_ambisonics_encoder_get_size(channels, mapping_family) };
         assert_eq!(
             rust == 0,

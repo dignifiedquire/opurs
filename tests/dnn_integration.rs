@@ -222,7 +222,7 @@ mod dred_tests {
         let arrays = get_weights();
         let mut dec = opurs::dnn::dred::decoder::OpusDREDDecoder::new();
         assert!(dec.load_model(&arrays), "OpusDREDDecoder full load failed");
-        assert!(dec.loaded, "OpusDREDDecoder.loaded should be true");
+        assert!(dec.is_loaded(), "OpusDREDDecoder.loaded should be true");
     }
 }
 

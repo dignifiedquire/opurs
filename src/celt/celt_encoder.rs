@@ -363,6 +363,10 @@ impl OpusCustomEncoder {
         let frame_size = (pcm.len() / channels) as i32;
         opus_custom_encode24(self, pcm, frame_size, compressed)
     }
+
+    pub fn set_signalling(&mut self, signalling: i32) {
+        self.signalling = signalling;
+    }
 }
 
 /// Upstream C: celt/celt_encoder.c:opus_custom_encode

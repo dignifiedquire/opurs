@@ -357,6 +357,10 @@ impl OpusCustomDecoder {
     pub fn decode24(&mut self, data: &[u8], pcm: &mut [i32], frame_size: i32) -> i32 {
         opus_custom_decode24(self, data, pcm, frame_size)
     }
+
+    pub fn set_signalling(&mut self, signalling: i32) {
+        self.signalling = signalling;
+    }
 }
 
 /// Upstream C: celt/celt_decoder.c:opus_custom_decode

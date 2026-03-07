@@ -35,10 +35,10 @@ impl OpusProjectionDecoder {
     /// Returns zero for invalid stream shapes, non-zero for valid shapes.
     ///
     /// Upstream C: include/opus_projection.h:opus_projection_decoder_get_size
-    pub fn get_size(channels: i32, streams: i32, coupled_streams: i32) -> i32 {
+    pub fn size(channels: i32, streams: i32, coupled_streams: i32) -> i32 {
         let input_channels = streams + coupled_streams;
-        if MappingMatrix::get_size(input_channels, channels) == 0
-            || OpusMSDecoder::get_size(streams, coupled_streams) == 0
+        if MappingMatrix::size(input_channels, channels) == 0
+            || OpusMSDecoder::size(streams, coupled_streams) == 0
         {
             0
         } else {
