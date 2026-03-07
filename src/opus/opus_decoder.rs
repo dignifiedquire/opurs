@@ -194,8 +194,7 @@ impl OpusDecoder {
         debug_assert!(self.channels == 1 || self.channels == 2);
         let vla = (frame_size * self.channels) as usize;
         let mut out: Vec<f32> = vec![0.0; vla];
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             data,
             &mut out,
             frame_size,
@@ -233,8 +232,7 @@ impl OpusDecoder {
         if frame_size <= 0 {
             return Err(ErrorCode::BadArg);
         }
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             data,
             pcm,
             frame_size,
@@ -277,8 +275,7 @@ impl OpusDecoder {
         debug_assert!(self.channels == 1 || self.channels == 2);
         let vla = (frame_size * self.channels) as usize;
         let mut out: Vec<f32> = vec![0.0; vla];
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             data,
             &mut out,
             frame_size,
@@ -315,8 +312,7 @@ impl OpusDecoder {
         }
         debug_assert!(self.channels == 1 || self.channels == 2);
         let mut out = vec![0.0f32; (frame_size * self.channels) as usize];
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             &[],
             &mut out,
             frame_size,
@@ -351,8 +347,7 @@ impl OpusDecoder {
         }
         debug_assert!(self.channels == 1 || self.channels == 2);
         let mut out = vec![0.0f32; (frame_size * self.channels) as usize];
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             &[],
             &mut out,
             frame_size,
@@ -387,8 +382,7 @@ impl OpusDecoder {
         if frame_size <= 0 {
             return Err(ErrorCode::BadArg);
         }
-        let ret = opus_decode_native(
-            self,
+        let ret = self.decode_native(
             &[],
             pcm,
             frame_size,
@@ -1267,251 +1261,252 @@ fn stage_dred_features_for_decode(
     }
 }
 
-/// Core decode path shared by the typed decode entry points.
-///
-/// Upstream C: src/opus_decoder.c:opus_decode_native
-pub fn opus_decode_native(
-    st: &mut OpusDecoder,
-    data: &[u8],
-    pcm: &mut [f32],
-    frame_size: i32,
-    decode_fec: i32,
-    self_delimited: bool,
-    packet_offset: Option<&mut i32>,
-    soft_clip: i32,
-    #[cfg(feature = "dred")] dred: Option<&OpusDRED>,
-    #[cfg(not(feature = "dred"))] _dred: Option<&()>,
-    dred_offset: i32,
-) -> i32 {
-    let mut i: i32;
-    let mut nb_samples: usize = 0;
-    let mut offset: i32 = 0;
-    let mut toc: u8 = 0;
-    let mut size: [i16; 48] = [0; 48];
-    validate_opus_decoder(&*st);
-    if !(0..=1).contains(&decode_fec) {
-        return OPUS_BAD_ARG;
-    }
-    if (decode_fec != 0 || data.is_empty()) && frame_size % (st.fs / 400) != 0 {
-        return OPUS_BAD_ARG;
-    }
-    #[cfg(feature = "dred")]
-    if let Some(dred) = dred {
-        stage_dred_features_for_decode(st, frame_size, dred, dred_offset);
-    }
-    #[cfg(not(feature = "dred"))]
-    let _ = dred_offset;
+impl OpusDecoder {
+    /// Core decode path shared by the typed decode entry points.
+    ///
+    /// Upstream C: src/opus_decoder.c:opus_decode_native
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn decode_native(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [f32],
+        frame_size: i32,
+        decode_fec: i32,
+        self_delimited: bool,
+        packet_offset: Option<&mut i32>,
+        soft_clip: i32,
+        #[cfg(feature = "dred")] dred: Option<&OpusDRED>,
+        #[cfg(not(feature = "dred"))] _dred: Option<&()>,
+        dred_offset: i32,
+    ) -> i32 {
+        let mut i: i32;
+        let mut nb_samples: usize = 0;
+        let mut offset: i32 = 0;
+        let mut toc: u8 = 0;
+        let mut size: [i16; 48] = [0; 48];
+        validate_opus_decoder(&*self);
+        if !(0..=1).contains(&decode_fec) {
+            return OPUS_BAD_ARG;
+        }
+        if (decode_fec != 0 || data.is_empty()) && frame_size % (self.fs / 400) != 0 {
+            return OPUS_BAD_ARG;
+        }
+        #[cfg(feature = "dred")]
+        if let Some(dred) = dred {
+            stage_dred_features_for_decode(self, frame_size, dred, dred_offset);
+        }
+        #[cfg(not(feature = "dred"))]
+        let _ = dred_offset;
 
-    if data.is_empty() {
-        let mut pcm_count: i32 = 0;
-        loop {
-            let ret = opus_decode_frame(
-                st,
-                None,
-                &mut pcm[(pcm_count * st.channels) as usize..],
-                frame_size - pcm_count,
-                0,
+        if data.is_empty() {
+            let mut pcm_count: i32 = 0;
+            loop {
+                let ret = opus_decode_frame(
+                    self,
+                    None,
+                    &mut pcm[(pcm_count * self.channels) as usize..],
+                    frame_size - pcm_count,
+                    0,
+                    #[cfg(feature = "qext")]
+                    None,
+                );
+                if ret < 0 {
+                    return ret;
+                }
+                pcm_count += ret;
+                if pcm_count >= frame_size {
+                    break;
+                }
+            }
+            debug_assert_eq!(pcm_count, frame_size);
+            self.last_packet_duration = pcm_count;
+            return pcm_count;
+        }
+
+        let packet_mode = opus_packet_get_mode(data);
+        let packet_bandwidth = opus_packet_get_bandwidth_raw(data[0]);
+        let packet_frame_size = opus_packet_get_samples_per_frame(data[0], self.fs);
+        let packet_stream_channels = opus_packet_get_nb_channels_raw(data[0]);
+        let mut padding_len: i32 = 0;
+        let mut parsed_packet_offset: i32 = 0;
+        let count = opus_packet_parse_impl(
+            data,
+            self_delimited,
+            Some(&mut toc),
+            None,
+            &mut size,
+            Some(&mut offset),
+            Some(&mut parsed_packet_offset),
+            Some(&mut padding_len),
+        );
+        if let Some(out_offset) = packet_offset {
+            *out_offset = parsed_packet_offset;
+        }
+        if count < 0 {
+            return count;
+        }
+        // For self-delimited multistream packets, extensions belong to the current
+        // sub-packet, not the whole remaining payload.
+        #[cfg(feature = "qext")]
+        let padding_data = if padding_len > 0 && !self.ignore_extensions {
+            let packet_len = if self_delimited && parsed_packet_offset > 0 {
+                parsed_packet_offset as usize
+            } else {
+                data.len()
+            };
+            if packet_len >= padding_len as usize && packet_len <= data.len() {
+                &data[packet_len - padding_len as usize..packet_len]
+            } else {
+                &[] as &[u8]
+            }
+        } else {
+            &[] as &[u8]
+        };
+        let mut data = &data[offset as usize..];
+        if decode_fec != 0 {
+            let duration_copy: i32 = self.last_packet_duration;
+            let mut ret_0: i32;
+            if frame_size < packet_frame_size
+                || packet_mode == MODE_CELT_ONLY
+                || self.mode == MODE_CELT_ONLY
+            {
+                return self.decode_native(
+                    &[][..],
+                    pcm,
+                    frame_size,
+                    0,
+                    false,
+                    None,
+                    soft_clip,
+                    None,
+                    0,
+                );
+            }
+            if frame_size - packet_frame_size != 0 {
+                ret_0 = self.decode_native(
+                    &[][..],
+                    pcm,
+                    frame_size - packet_frame_size,
+                    0,
+                    false,
+                    None,
+                    soft_clip,
+                    None,
+                    0,
+                );
+                if ret_0 < 0 {
+                    self.last_packet_duration = duration_copy;
+                    return ret_0;
+                }
+                debug_assert_eq!(ret_0, frame_size - packet_frame_size);
+            }
+            self.mode = packet_mode;
+            self.bandwidth = packet_bandwidth;
+            self.frame_size = packet_frame_size;
+            self.stream_channels = packet_stream_channels;
+            ret_0 = opus_decode_frame(
+                self,
+                Some(&data[..size[0] as usize]),
+                &mut pcm[(self.channels * (frame_size - packet_frame_size)) as usize..],
+                packet_frame_size,
+                1,
                 #[cfg(feature = "qext")]
                 None,
             );
-            if ret < 0 {
-                return ret;
-            }
-            pcm_count += ret;
-            if pcm_count >= frame_size {
-                break;
-            }
-        }
-        debug_assert_eq!(pcm_count, frame_size);
-        st.last_packet_duration = pcm_count;
-        return pcm_count;
-    }
-
-    let packet_mode = opus_packet_get_mode(data);
-    let packet_bandwidth = opus_packet_get_bandwidth_raw(data[0]);
-    let packet_frame_size = opus_packet_get_samples_per_frame(data[0], st.fs);
-    let packet_stream_channels = opus_packet_get_nb_channels_raw(data[0]);
-    let mut padding_len: i32 = 0;
-    let mut parsed_packet_offset: i32 = 0;
-    let count = opus_packet_parse_impl(
-        data,
-        self_delimited,
-        Some(&mut toc),
-        None,
-        &mut size,
-        Some(&mut offset),
-        Some(&mut parsed_packet_offset),
-        Some(&mut padding_len),
-    );
-    if let Some(out_offset) = packet_offset {
-        *out_offset = parsed_packet_offset;
-    }
-    if count < 0 {
-        return count;
-    }
-    // For self-delimited multistream packets, extensions belong to the current
-    // sub-packet, not the whole remaining payload.
-    #[cfg(feature = "qext")]
-    let padding_data = if padding_len > 0 && !st.ignore_extensions {
-        let packet_len = if self_delimited && parsed_packet_offset > 0 {
-            parsed_packet_offset as usize
-        } else {
-            data.len()
-        };
-        if packet_len >= padding_len as usize && packet_len <= data.len() {
-            &data[packet_len - padding_len as usize..packet_len]
-        } else {
-            &[] as &[u8]
-        }
-    } else {
-        &[] as &[u8]
-    };
-    let mut data = &data[offset as usize..];
-    if decode_fec != 0 {
-        let duration_copy: i32 = st.last_packet_duration;
-        let mut ret_0: i32;
-        if frame_size < packet_frame_size
-            || packet_mode == MODE_CELT_ONLY
-            || st.mode == MODE_CELT_ONLY
-        {
-            return opus_decode_native(
-                st,
-                &[][..],
-                pcm,
-                frame_size,
-                0,
-                false,
-                None,
-                soft_clip,
-                None,
-                0,
-            );
-        }
-        if frame_size - packet_frame_size != 0 {
-            ret_0 = opus_decode_native(
-                st,
-                &[][..],
-                pcm,
-                frame_size - packet_frame_size,
-                0,
-                false,
-                None,
-                soft_clip,
-                None,
-                0,
-            );
             if ret_0 < 0 {
-                st.last_packet_duration = duration_copy;
                 return ret_0;
+            } else {
+                self.last_packet_duration = frame_size;
+                return frame_size;
             }
-            debug_assert_eq!(ret_0, frame_size - packet_frame_size);
         }
-        st.mode = packet_mode;
-        st.bandwidth = packet_bandwidth;
-        st.frame_size = packet_frame_size;
-        st.stream_channels = packet_stream_channels;
-        ret_0 = opus_decode_frame(
-            st,
-            Some(&data[..size[0] as usize]),
-            &mut pcm[(st.channels * (frame_size - packet_frame_size)) as usize..],
-            packet_frame_size,
-            1,
-            #[cfg(feature = "qext")]
-            None,
-        );
-        if ret_0 < 0 {
-            return ret_0;
+        if count * packet_frame_size > frame_size {
+            return OPUS_BUFFER_TOO_SMALL;
+        }
+        self.mode = packet_mode;
+        self.bandwidth = packet_bandwidth;
+        self.frame_size = packet_frame_size;
+        self.stream_channels = packet_stream_channels;
+        #[cfg(feature = "qext")]
+        let mut iter = if !padding_data.is_empty() && !self.ignore_extensions {
+            Some(crate::opus::extensions::OpusExtensionIterator::new(
+                padding_data,
+                count,
+            ))
         } else {
-            st.last_packet_duration = frame_size;
-            return frame_size;
-        }
-    }
-    if count * packet_frame_size > frame_size {
-        return OPUS_BUFFER_TOO_SMALL;
-    }
-    st.mode = packet_mode;
-    st.bandwidth = packet_bandwidth;
-    st.frame_size = packet_frame_size;
-    st.stream_channels = packet_stream_channels;
-    #[cfg(feature = "qext")]
-    let mut iter = if !padding_data.is_empty() && !st.ignore_extensions {
-        Some(crate::opus::extensions::OpusExtensionIterator::new(
-            padding_data,
-            count,
-        ))
-    } else {
-        None
-    };
-    i = 0;
-    while i < count {
-        // Per-frame QEXT extension lookup
-        #[cfg(feature = "qext")]
-        let qext_payload_vec: Option<Vec<u8>>;
-        #[cfg(feature = "qext")]
-        {
-            let mut ext_data: Option<crate::opus::extensions::ExtensionRef> = None;
-            if let Some(ref mut it) = iter {
-                // Search forward until we find an extension for frame >= i,
-                // matching the C pattern of saving/restoring iterator state.
-                loop {
-                    let frame_of_ext = ext_data.as_ref().map_or(-1, |e| e.frame);
-                    if frame_of_ext >= i {
-                        break;
-                    }
-                    let it_copy = it.clone();
-                    match it.find(crate::celt::modes::data_96000::QEXT_EXTENSION_ID) {
-                        Ok(Some(ext)) => {
-                            if ext.frame > i {
-                                // Went past our frame — restore iterator
-                                *it = it_copy;
-                                ext_data = Some(ext);
-                                break;
-                            }
-                            ext_data = Some(ext);
-                        }
-                        _ => break,
-                    }
-                }
-            }
-            qext_payload_vec = ext_data.and_then(|ext| {
-                if ext.frame == i {
-                    Some(padding_data[ext.data_offset..ext.data_offset + ext.len].to_vec())
-                } else {
-                    None
-                }
-            });
-        }
-        let ret_1 = opus_decode_frame(
-            st,
-            Some(&data[..size[i as usize] as usize]),
-            &mut pcm[(nb_samples * st.channels as usize)..],
-            frame_size - nb_samples as i32,
-            0,
+            None
+        };
+        i = 0;
+        while i < count {
+            // Per-frame QEXT extension lookup
             #[cfg(feature = "qext")]
-            qext_payload_vec.as_deref(),
-        );
-        if ret_1 < 0 {
-            return ret_1;
+            let qext_payload_vec: Option<Vec<u8>>;
+            #[cfg(feature = "qext")]
+            {
+                let mut ext_data: Option<crate::opus::extensions::ExtensionRef> = None;
+                if let Some(ref mut it) = iter {
+                    // Search forward until we find an extension for frame >= i,
+                    // matching the C pattern of saving/restoring iterator state.
+                    loop {
+                        let frame_of_ext = ext_data.as_ref().map_or(-1, |e| e.frame);
+                        if frame_of_ext >= i {
+                            break;
+                        }
+                        let it_copy = it.clone();
+                        match it.find(crate::celt::modes::data_96000::QEXT_EXTENSION_ID) {
+                            Ok(Some(ext)) => {
+                                if ext.frame > i {
+                                    // Went past our frame — restore iterator
+                                    *it = it_copy;
+                                    ext_data = Some(ext);
+                                    break;
+                                }
+                                ext_data = Some(ext);
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+                qext_payload_vec = ext_data.and_then(|ext| {
+                    if ext.frame == i {
+                        Some(padding_data[ext.data_offset..ext.data_offset + ext.len].to_vec())
+                    } else {
+                        None
+                    }
+                });
+            }
+            let ret_1 = opus_decode_frame(
+                self,
+                Some(&data[..size[i as usize] as usize]),
+                &mut pcm[(nb_samples * self.channels as usize)..],
+                frame_size - nb_samples as i32,
+                0,
+                #[cfg(feature = "qext")]
+                qext_payload_vec.as_deref(),
+            );
+            if ret_1 < 0 {
+                return ret_1;
+            }
+            debug_assert_eq!(ret_1, packet_frame_size);
+            data = &data[size[i as usize] as usize..];
+            nb_samples += ret_1 as usize;
+            i += 1;
         }
-        debug_assert_eq!(ret_1, packet_frame_size);
-        data = &data[size[i as usize] as usize..];
-        nb_samples += ret_1 as usize;
-        i += 1;
+        self.last_packet_duration = nb_samples as i32;
+        if soft_clip != 0 {
+            opus_pcm_soft_clip_impl(
+                pcm,
+                nb_samples,
+                self.channels as usize,
+                &mut self.softclip_mem,
+                self.celt_dec.arch,
+            );
+        } else {
+            self.softclip_mem[1_usize] = 0 as f32;
+            self.softclip_mem[0_usize] = self.softclip_mem[1_usize];
+        }
+        nb_samples as i32
     }
-    st.last_packet_duration = nb_samples as i32;
-    if soft_clip != 0 {
-        opus_pcm_soft_clip_impl(
-            pcm,
-            nb_samples,
-            st.channels as usize,
-            &mut st.softclip_mem,
-            st.celt_dec.arch,
-        );
-    } else {
-        st.softclip_mem[1_usize] = 0 as f32;
-        st.softclip_mem[0_usize] = st.softclip_mem[1_usize];
-    }
-    nb_samples as i32
 }
 
 #[cfg(feature = "dred")]

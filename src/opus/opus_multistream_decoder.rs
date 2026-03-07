@@ -5,7 +5,7 @@
 use crate::celt::float_cast::{float2int, float2int16};
 use crate::enums::{Channels, SampleRate};
 use crate::error::ErrorCode;
-use crate::opus::opus_decoder::{opus_decode_native, opus_packet_get_nb_samples_raw, OpusDecoder};
+use crate::opus::opus_decoder::{opus_packet_get_nb_samples_raw, OpusDecoder};
 use crate::opus::opus_defines::{
     OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INTERNAL_ERROR, OPUS_INVALID_PACKET, OPUS_OK,
 };
@@ -269,8 +269,7 @@ impl OpusMSDecoder {
             let mut tmp = vec![0f32; frame_size as usize * stream_channels];
             let self_delimited = stream_id + 1 != self.layout.streams() as usize;
             let mut packet_offset = 0i32;
-            let ret = opus_decode_native(
-                &mut self.decoders[stream_id],
+            let ret = self.decoders[stream_id].decode_native(
                 payload,
                 &mut tmp,
                 frame_size,
