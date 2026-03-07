@@ -689,257 +689,262 @@ fn downmix_and_resample(
     ret *= 1.0f32 / 32768.0 / 32768.0;
     ret
 }
-pub fn tonality_analysis_init(tonal: &mut TonalityAnalysisState, fs: i32) {
-    tonal.arch = opus_select_arch();
-    tonal.fs = fs;
-    tonality_analysis_reset(tonal);
-}
-pub fn tonality_analysis_reset(tonal: &mut TonalityAnalysisState) {
-    // Zero everything from `angle` onwards, preserving arch, application, fs
-    tonal.angle = [0.0; 240];
-    tonal.d_angle = [0.0; 240];
-    tonal.d2_angle = [0.0; 240];
-    tonal.inmem = [0.0; 720];
-    tonal.mem_fill = 0;
-    tonal.prev_band_tonality = [0.0; 18];
-    tonal.prev_tonality = 0.0;
-    tonal.prev_bandwidth = 0;
-    tonal.e = [[0.0; 18]; 8];
-    tonal.log_e = [[0.0; 18]; 8];
-    tonal.low_e = [0.0; 18];
-    tonal.high_e = [0.0; 18];
-    tonal.mean_e = [0.0; 19];
-    tonal.mem = [0.0; 32];
-    tonal.cmean = [0.0; 8];
-    tonal.std = [0.0; 9];
-    tonal.e_tracker = 0.0;
-    tonal.low_e_count = 0.0;
-    tonal.e_count = 0;
-    tonal.count = 0;
-    tonal.analysis_offset = 0;
-    tonal.write_pos = 0;
-    tonal.read_pos = 0;
-    tonal.read_subframe = 0;
-    tonal.hp_ener_accum = 0.0;
-    tonal.initialized = 0;
-    tonal.rnn_state = [0.0; 24];
-    tonal.downmix_state = [0.0; 3];
-    tonal.info = [AnalysisInfo {
-        valid: 0,
-        tonality: 0.0,
-        tonality_slope: 0.0,
-        noisiness: 0.0,
-        activity: 0.0,
-        music_prob: 0.0,
-        music_prob_min: 0.0,
-        music_prob_max: 0.0,
-        bandwidth: 0,
-        activity_probability: 0.0,
-        max_pitch_ratio: 0.0,
-        leak_boost: [0; 19],
-    }; 100];
-}
-pub fn tonality_get_info(tonal: &mut TonalityAnalysisState, info_out: &mut AnalysisInfo, len: i32) {
-    let mut pos: i32;
-    let mut curr_lookahead: i32;
-    let mut tonality_max: f32;
-    let mut tonality_avg: f32;
-    let mut tonality_count: i32;
-    let mut i: i32;
+impl TonalityAnalysisState {
+    pub fn init(&mut self, fs: i32) {
+        self.arch = opus_select_arch();
+        self.fs = fs;
+        self.reset();
+    }
 
-    let mut prob_avg: f32;
-    let mut prob_count: f32;
-    let mut prob_min: f32;
-    let mut prob_max: f32;
+    pub fn reset(&mut self) {
+        // Zero everything from `angle` onwards, preserving arch, application, fs
+        self.angle = [0.0; 240];
+        self.d_angle = [0.0; 240];
+        self.d2_angle = [0.0; 240];
+        self.inmem = [0.0; 720];
+        self.mem_fill = 0;
+        self.prev_band_tonality = [0.0; 18];
+        self.prev_tonality = 0.0;
+        self.prev_bandwidth = 0;
+        self.e = [[0.0; 18]; 8];
+        self.log_e = [[0.0; 18]; 8];
+        self.low_e = [0.0; 18];
+        self.high_e = [0.0; 18];
+        self.mean_e = [0.0; 19];
+        self.mem = [0.0; 32];
+        self.cmean = [0.0; 8];
+        self.std = [0.0; 9];
+        self.e_tracker = 0.0;
+        self.low_e_count = 0.0;
+        self.e_count = 0;
+        self.count = 0;
+        self.analysis_offset = 0;
+        self.write_pos = 0;
+        self.read_pos = 0;
+        self.read_subframe = 0;
+        self.hp_ener_accum = 0.0;
+        self.initialized = 0;
+        self.rnn_state = [0.0; 24];
+        self.downmix_state = [0.0; 3];
+        self.info = [AnalysisInfo {
+            valid: 0,
+            tonality: 0.0,
+            tonality_slope: 0.0,
+            noisiness: 0.0,
+            activity: 0.0,
+            music_prob: 0.0,
+            music_prob_min: 0.0,
+            music_prob_max: 0.0,
+            bandwidth: 0,
+            activity_probability: 0.0,
+            max_pitch_ratio: 0.0,
+            leak_boost: [0; 19],
+        }; 100];
+    }
 
-    let mut mpos: i32;
-    let mut vpos: i32;
-    let mut bandwidth_span: i32;
-    pos = tonal.read_pos;
-    curr_lookahead = tonal.write_pos - tonal.read_pos;
-    if curr_lookahead < 0 {
-        curr_lookahead += DETECT_SIZE;
-    }
-    tonal.read_subframe += len / (tonal.fs / 400);
-    while tonal.read_subframe >= 8 {
-        tonal.read_subframe -= 8;
-        tonal.read_pos += 1;
-    }
-    if tonal.read_pos >= DETECT_SIZE {
-        tonal.read_pos -= DETECT_SIZE;
-    }
-    if len > tonal.fs / 50 && pos != tonal.write_pos {
-        pos += 1;
-        if pos == DETECT_SIZE {
-            pos = 0;
+    pub fn get_info(&mut self, info_out: &mut AnalysisInfo, len: i32) {
+        let mut pos: i32;
+        let mut curr_lookahead: i32;
+        let mut tonality_max: f32;
+        let mut tonality_avg: f32;
+        let mut tonality_count: i32;
+        let mut i: i32;
+
+        let mut prob_avg: f32;
+        let mut prob_count: f32;
+        let mut prob_min: f32;
+        let mut prob_max: f32;
+
+        let mut mpos: i32;
+        let mut vpos: i32;
+        let mut bandwidth_span: i32;
+        pos = self.read_pos;
+        curr_lookahead = self.write_pos - self.read_pos;
+        if curr_lookahead < 0 {
+            curr_lookahead += DETECT_SIZE;
         }
-    }
-    if pos == tonal.write_pos {
-        pos -= 1;
-    }
-    if pos < 0 {
-        pos = DETECT_SIZE - 1;
-    }
-    let pos0: i32 = pos;
-    *info_out = tonal.info[pos as usize];
-    if info_out.valid == 0 {
-        return;
-    }
-    tonality_avg = info_out.tonality;
-    tonality_max = tonality_avg;
-    tonality_count = 1;
-    bandwidth_span = 6;
-    i = 0;
-    while i < 3 {
-        pos += 1;
-        if pos == DETECT_SIZE {
-            pos = 0;
+        self.read_subframe += len / (self.fs / 400);
+        while self.read_subframe >= 8 {
+            self.read_subframe -= 8;
+            self.read_pos += 1;
         }
-        if pos == tonal.write_pos {
-            break;
+        if self.read_pos >= DETECT_SIZE {
+            self.read_pos -= DETECT_SIZE;
         }
-        tonality_max = if tonality_max > tonal.info[pos as usize].tonality {
-            tonality_max
-        } else {
-            tonal.info[pos as usize].tonality
-        };
-        tonality_avg += tonal.info[pos as usize].tonality;
-        tonality_count += 1;
-        info_out.bandwidth = if info_out.bandwidth > tonal.info[pos as usize].bandwidth {
-            info_out.bandwidth
-        } else {
-            tonal.info[pos as usize].bandwidth
-        };
-        bandwidth_span -= 1;
-        i += 1;
-    }
-    pos = pos0;
-    i = 0;
-    while i < bandwidth_span {
-        pos -= 1;
+        if len > self.fs / 50 && pos != self.write_pos {
+            pos += 1;
+            if pos == DETECT_SIZE {
+                pos = 0;
+            }
+        }
+        if pos == self.write_pos {
+            pos -= 1;
+        }
         if pos < 0 {
             pos = DETECT_SIZE - 1;
         }
-        if pos == tonal.write_pos {
-            break;
+        let pos0: i32 = pos;
+        *info_out = self.info[pos as usize];
+        if info_out.valid == 0 {
+            return;
         }
-        info_out.bandwidth = if info_out.bandwidth > tonal.info[pos as usize].bandwidth {
-            info_out.bandwidth
-        } else {
-            tonal.info[pos as usize].bandwidth
-        };
-        i += 1;
-    }
-    info_out.tonality = if tonality_avg / tonality_count as f32 > tonality_max - 0.2f32 {
-        tonality_avg / tonality_count as f32
-    } else {
-        tonality_max - 0.2f32
-    };
-    vpos = pos0;
-    mpos = vpos;
-    if curr_lookahead > 15 {
-        mpos += 5;
-        if mpos >= DETECT_SIZE {
-            mpos -= DETECT_SIZE;
+        tonality_avg = info_out.tonality;
+        tonality_max = tonality_avg;
+        tonality_count = 1;
+        bandwidth_span = 6;
+        i = 0;
+        while i < 3 {
+            pos += 1;
+            if pos == DETECT_SIZE {
+                pos = 0;
+            }
+            if pos == self.write_pos {
+                break;
+            }
+            tonality_max = if tonality_max > self.info[pos as usize].tonality {
+                tonality_max
+            } else {
+                self.info[pos as usize].tonality
+            };
+            tonality_avg += self.info[pos as usize].tonality;
+            tonality_count += 1;
+            info_out.bandwidth = if info_out.bandwidth > self.info[pos as usize].bandwidth {
+                info_out.bandwidth
+            } else {
+                self.info[pos as usize].bandwidth
+            };
+            bandwidth_span -= 1;
+            i += 1;
         }
-        vpos += 1;
-        if vpos >= DETECT_SIZE {
-            vpos -= DETECT_SIZE;
-        }
-    }
-    prob_min = 1.0f32;
-    prob_max = 0.0f32;
-    let vad_prob: f32 = tonal.info[vpos as usize].activity_probability;
-    prob_count = if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob };
-    prob_avg =
-        (if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob }) * tonal.info[mpos as usize].music_prob;
-    loop {
-        mpos += 1;
-        if mpos == DETECT_SIZE {
-            mpos = 0;
-        }
-        if mpos == tonal.write_pos {
-            break;
-        }
-        vpos += 1;
-        if vpos == DETECT_SIZE {
-            vpos = 0;
-        }
-        if vpos == tonal.write_pos {
-            break;
-        }
-        let pos_vad = tonal.info[vpos as usize].activity_probability;
-        prob_min = if (prob_avg - 10_f32 * (vad_prob - pos_vad)) / prob_count < prob_min {
-            (prob_avg - 10_f32 * (vad_prob - pos_vad)) / prob_count
-        } else {
-            prob_min
-        };
-        prob_max = if (prob_avg + 10_f32 * (vad_prob - pos_vad)) / prob_count > prob_max {
-            (prob_avg + 10_f32 * (vad_prob - pos_vad)) / prob_count
-        } else {
-            prob_max
-        };
-        prob_count += if 0.1f32 > pos_vad { 0.1f32 } else { pos_vad };
-        prob_avg += (if 0.1f32 > pos_vad { 0.1f32 } else { pos_vad })
-            * tonal.info[mpos as usize].music_prob;
-    }
-    info_out.music_prob = prob_avg / prob_count;
-    prob_min = if prob_avg / prob_count < prob_min {
-        prob_avg / prob_count
-    } else {
-        prob_min
-    };
-    prob_max = if prob_avg / prob_count > prob_max {
-        prob_avg / prob_count
-    } else {
-        prob_max
-    };
-    prob_min = if prob_min > 0.0f32 { prob_min } else { 0.0f32 };
-    prob_max = if prob_max < 1.0f32 { prob_max } else { 1.0f32 };
-    if curr_lookahead < 10 {
-        let mut pmin: f32 = prob_min;
-        let mut pmax: f32 = prob_max;
         pos = pos0;
         i = 0;
-        while i
-            < (if (tonal.count - 1) < 15 {
-                tonal.count - 1
-            } else {
-                15
-            })
-        {
+        while i < bandwidth_span {
             pos -= 1;
             if pos < 0 {
                 pos = DETECT_SIZE - 1;
             }
-            pmin = if pmin < tonal.info[pos as usize].music_prob {
-                pmin
+            if pos == self.write_pos {
+                break;
+            }
+            info_out.bandwidth = if info_out.bandwidth > self.info[pos as usize].bandwidth {
+                info_out.bandwidth
             } else {
-                tonal.info[pos as usize].music_prob
-            };
-            pmax = if pmax > tonal.info[pos as usize].music_prob {
-                pmax
-            } else {
-                tonal.info[pos as usize].music_prob
+                self.info[pos as usize].bandwidth
             };
             i += 1;
         }
-        pmin = if 0.0f32 > pmin - 0.1f32 * vad_prob {
-            0.0f32
+        info_out.tonality = if tonality_avg / tonality_count as f32 > tonality_max - 0.2f32 {
+            tonality_avg / tonality_count as f32
         } else {
-            pmin - 0.1f32 * vad_prob
+            tonality_max - 0.2f32
         };
-        pmax = if 1.0f32 < pmax + 0.1f32 * vad_prob {
-            1.0f32
+        vpos = pos0;
+        mpos = vpos;
+        if curr_lookahead > 15 {
+            mpos += 5;
+            if mpos >= DETECT_SIZE {
+                mpos -= DETECT_SIZE;
+            }
+            vpos += 1;
+            if vpos >= DETECT_SIZE {
+                vpos -= DETECT_SIZE;
+            }
+        }
+        prob_min = 1.0f32;
+        prob_max = 0.0f32;
+        let vad_prob: f32 = self.info[vpos as usize].activity_probability;
+        prob_count = if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob };
+        prob_avg = (if 0.1f32 > vad_prob { 0.1f32 } else { vad_prob })
+            * self.info[mpos as usize].music_prob;
+        loop {
+            mpos += 1;
+            if mpos == DETECT_SIZE {
+                mpos = 0;
+            }
+            if mpos == self.write_pos {
+                break;
+            }
+            vpos += 1;
+            if vpos == DETECT_SIZE {
+                vpos = 0;
+            }
+            if vpos == self.write_pos {
+                break;
+            }
+            let pos_vad = self.info[vpos as usize].activity_probability;
+            prob_min = if (prob_avg - 10_f32 * (vad_prob - pos_vad)) / prob_count < prob_min {
+                (prob_avg - 10_f32 * (vad_prob - pos_vad)) / prob_count
+            } else {
+                prob_min
+            };
+            prob_max = if (prob_avg + 10_f32 * (vad_prob - pos_vad)) / prob_count > prob_max {
+                (prob_avg + 10_f32 * (vad_prob - pos_vad)) / prob_count
+            } else {
+                prob_max
+            };
+            prob_count += if 0.1f32 > pos_vad { 0.1f32 } else { pos_vad };
+            prob_avg += (if 0.1f32 > pos_vad { 0.1f32 } else { pos_vad })
+                * self.info[mpos as usize].music_prob;
+        }
+        info_out.music_prob = prob_avg / prob_count;
+        prob_min = if prob_avg / prob_count < prob_min {
+            prob_avg / prob_count
         } else {
-            pmax + 0.1f32 * vad_prob
+            prob_min
         };
-        prob_min += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmin - prob_min);
-        prob_max += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmax - prob_max);
+        prob_max = if prob_avg / prob_count > prob_max {
+            prob_avg / prob_count
+        } else {
+            prob_max
+        };
+        prob_min = if prob_min > 0.0f32 { prob_min } else { 0.0f32 };
+        prob_max = if prob_max < 1.0f32 { prob_max } else { 1.0f32 };
+        if curr_lookahead < 10 {
+            let mut pmin: f32 = prob_min;
+            let mut pmax: f32 = prob_max;
+            pos = pos0;
+            i = 0;
+            while i
+                < (if (self.count - 1) < 15 {
+                    self.count - 1
+                } else {
+                    15
+                })
+            {
+                pos -= 1;
+                if pos < 0 {
+                    pos = DETECT_SIZE - 1;
+                }
+                pmin = if pmin < self.info[pos as usize].music_prob {
+                    pmin
+                } else {
+                    self.info[pos as usize].music_prob
+                };
+                pmax = if pmax > self.info[pos as usize].music_prob {
+                    pmax
+                } else {
+                    self.info[pos as usize].music_prob
+                };
+                i += 1;
+            }
+            pmin = if 0.0f32 > pmin - 0.1f32 * vad_prob {
+                0.0f32
+            } else {
+                pmin - 0.1f32 * vad_prob
+            };
+            pmax = if 1.0f32 < pmax + 0.1f32 * vad_prob {
+                1.0f32
+            } else {
+                pmax + 0.1f32 * vad_prob
+            };
+            prob_min += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmin - prob_min);
+            prob_max += (1.0f32 - 0.1f32 * curr_lookahead as f32) * (pmax - prob_max);
+        }
+        info_out.music_prob_min = prob_min;
+        info_out.music_prob_max = prob_max;
     }
-    info_out.music_prob_min = prob_min;
-    info_out.music_prob_max = prob_max;
 }
+
 const STD_FEATURE_BIAS: [f32; 9] = [
     5.684947f32,
     3.475288f32,
@@ -953,6 +958,7 @@ const STD_FEATURE_BIAS: [f32; 9] = [
 ];
 pub const LEAKAGE_OFFSET: f32 = 2.5f32;
 pub const LEAKAGE_SLOPE: f32 = 2.0f32;
+
 fn tonality_analysis(
     tonal: &mut TonalityAnalysisState,
     celt_mode: &OpusCustomMode,
@@ -1627,54 +1633,56 @@ fn tonality_analysis(
         tonal.info[info_idx].max_pitch_ratio.to_bits()
     );
 }
-#[allow(clippy::too_many_arguments)]
-pub fn run_analysis(
-    analysis: &mut TonalityAnalysisState,
-    celt_mode: &OpusCustomMode,
-    input: Option<&DownmixInput>,
-    mut analysis_frame_size: i32,
-    frame_size: i32,
-    c1: i32,
-    c2: i32,
-    c: i32,
-    fs: i32,
-    lsb_depth: i32,
-    analysis_info: &mut AnalysisInfo,
-) {
-    analysis_frame_size -= analysis_frame_size & 1;
-    if let Some(input) = input {
-        let mut offset: i32;
-        let mut pcm_len: i32;
-        analysis_frame_size = if ((100 - 5) * fs / 50) < analysis_frame_size {
-            (100 - 5) * fs / 50
-        } else {
-            analysis_frame_size
-        };
-        pcm_len = analysis_frame_size - analysis.analysis_offset;
-        offset = analysis.analysis_offset;
-        while pcm_len > 0 {
-            tonality_analysis(
-                analysis,
-                celt_mode,
-                input,
-                if (fs / 50) < pcm_len {
-                    fs / 50
-                } else {
-                    pcm_len
-                },
-                offset,
-                c1,
-                c2,
-                c,
-                lsb_depth,
-            );
-            offset += fs / 50;
-            pcm_len -= fs / 50;
+impl TonalityAnalysisState {
+    #[allow(clippy::too_many_arguments)]
+    pub fn run_analysis(
+        &mut self,
+        celt_mode: &OpusCustomMode,
+        input: Option<&DownmixInput>,
+        mut analysis_frame_size: i32,
+        frame_size: i32,
+        c1: i32,
+        c2: i32,
+        c: i32,
+        fs: i32,
+        lsb_depth: i32,
+        analysis_info: &mut AnalysisInfo,
+    ) {
+        analysis_frame_size -= analysis_frame_size & 1;
+        if let Some(input) = input {
+            let mut offset: i32;
+            let mut pcm_len: i32;
+            analysis_frame_size = if ((100 - 5) * fs / 50) < analysis_frame_size {
+                (100 - 5) * fs / 50
+            } else {
+                analysis_frame_size
+            };
+            pcm_len = analysis_frame_size - self.analysis_offset;
+            offset = self.analysis_offset;
+            while pcm_len > 0 {
+                tonality_analysis(
+                    self,
+                    celt_mode,
+                    input,
+                    if (fs / 50) < pcm_len {
+                        fs / 50
+                    } else {
+                        pcm_len
+                    },
+                    offset,
+                    c1,
+                    c2,
+                    c,
+                    lsb_depth,
+                );
+                offset += fs / 50;
+                pcm_len -= fs / 50;
+            }
+            self.analysis_offset = analysis_frame_size;
+            self.analysis_offset -= frame_size;
         }
-        analysis.analysis_offset = analysis_frame_size;
-        analysis.analysis_offset -= frame_size;
+        self.get_info(analysis_info, frame_size);
     }
-    tonality_get_info(analysis, analysis_info, frame_size);
 }
 
 #[cfg(test)]

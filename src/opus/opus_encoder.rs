@@ -19,10 +19,7 @@ use crate::celt::pitch::celt_inner_prod;
 
 #[cfg(feature = "dred")]
 use crate::dnn::dred::config::DRED_MAX_FRAMES;
-use crate::opus::analysis::{
-    run_analysis, tonality_analysis_init, tonality_analysis_reset, tonality_get_info, AnalysisInfo,
-    DownmixInput, TonalityAnalysisState,
-};
+use crate::opus::analysis::{AnalysisInfo, DownmixInput, TonalityAnalysisState};
 use crate::opus::opus_defines::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_CELT, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
     OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
@@ -210,7 +207,7 @@ impl OpusEncoder {
 
         // Build analysis state
         let mut analysis = TonalityAnalysisState::default();
-        tonality_analysis_init(&mut analysis, fs);
+        analysis.init(fs);
         analysis.application = application;
 
         let st = OpusEncoder {
@@ -789,7 +786,7 @@ impl OpusEncoder {
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
     pub fn reset(&mut self) {
         let mut dummy = silk_EncControlStruct::default();
-        tonality_analysis_reset(&mut self.analysis);
+        self.analysis.reset();
         // Zero from stream_channels to end of struct (matches C OPUS_RESET_STATE)
         self.stream_channels = 0;
         self.hybrid_stereo_width_q14 = 0;
@@ -1564,7 +1561,7 @@ fn encode_multiframe_packet(
         let pcm_offset = (i * (st.channels * frame_size)) as usize;
         let mut frame_analysis_info = AnalysisInfo::default();
         if analysis_available {
-            tonality_get_info(&mut st.analysis, &mut frame_analysis_info, frame_size);
+            st.analysis.get_info(&mut frame_analysis_info, frame_size);
         }
 
         // When switching from SILK/Hybrid to CELT, only ask for a switch at the last frame
@@ -2184,8 +2181,7 @@ pub fn opus_encode_native(
     {
         analysis_read_pos_bak = st.analysis.read_pos;
         analysis_read_subframe_bak = st.analysis.read_subframe;
-        run_analysis(
-            &mut st.analysis,
+        st.analysis.run_analysis(
             celt_mode,
             analysis_pcm,
             analysis_size,
@@ -2198,7 +2194,7 @@ pub fn opus_encode_native(
             &mut analysis_info,
         );
     } else if !multiframe_fixed && st.analysis.initialized != 0 {
-        tonality_analysis_reset(&mut st.analysis);
+        st.analysis.reset();
     }
     // Reset voice_ratio if this frame is not silent or if analysis is disabled.
     // Otherwise, preserve voice_ratio from the last non-silent frame.
