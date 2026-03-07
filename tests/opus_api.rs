@@ -276,26 +276,24 @@ fn test_parse_header_code_0() {
 
 fn test_parse_code_0_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = (i << 2) as u8;
-        frames[0] = 0;
-        frames[1] = 0;
 
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
-        let ret = opus_packet_parse(
-            &packet[..4],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
+        let parsed = opus_packet_parse(&packet[..4]).expect("code 0: parse failed");
+        assert_eq!(
+            parsed.frames.len(),
+            1,
+            "code 0: expected 1 frame for toc={i}"
         );
-        assert_eq!(ret, 1, "code 0: expected 1 frame for toc={i}");
-        assert_eq!(size[0], 3, "code 0: expected size 3 for toc={i}");
-        assert_eq!(frames[0], 1, "code 0: expected frame offset 1 for toc={i}");
+        assert_eq!(
+            parsed.frames[0].size, 3,
+            "code 0: expected size 3 for toc={i}"
+        );
+        assert_eq!(
+            parsed.frames[0].offset, 1,
+            "code 0: expected frame offset 1 for toc={i}"
+        );
     }
 }
 
@@ -306,50 +304,40 @@ fn test_parse_header_code_1() {
 
 fn test_parse_code_1_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     // code 1, two frames of the same size
     for i in 0..64 {
         packet[0] = ((i << 2) + 1) as u8;
 
         for jj in 0..=1275 * 2 + 3 {
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             // this makes no sense anymore
             if jj as usize > packet.len() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..jj as _],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
+            let result = opus_packet_parse(&packet[..jj as _]);
             if jj & 1 == 1 && jj <= 2551 {
                 // Must pass if payload length even (packet length odd) and
                 // size<=2551, must fail otherwise.
-                if ret != 2 {
+                let parsed = result.expect("assertion failed at upstream test_opus_api.c:749");
+                if parsed.frames.len() != 2 {
                     panic!("assertion failed at upstream test_opus_api.c:749");
                 }
-                if size[0] != size[1] || size[0] as i32 != (jj - 1) >> 1 {
+                if parsed.frames[0].size != parsed.frames[1].size
+                    || parsed.frames[0].size as i32 != (jj - 1) >> 1
+                {
                     panic!("assertion failed at upstream test_opus_api.c:750");
                 }
-                if frames[0] != 1 {
+                if parsed.frames[0].offset != 1 {
                     panic!("assertion failed at upstream test_opus_api.c:751");
                 }
-                if frames[1] != frames[0] + size[0] as usize {
+                if parsed.frames[1].offset != parsed.frames[0].offset + parsed.frames[0].size {
                     panic!("assertion failed at upstream test_opus_api.c:752");
                 }
-                if toc as i32 >> 2 != i {
+                if parsed.toc as i32 >> 2 != i {
                     panic!("assertion failed at upstream test_opus_api.c:753");
                 }
-            } else if ret != OPUS_INVALID_PACKET {
+            } else if result.is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:754");
             }
         }
@@ -363,43 +351,17 @@ fn test_parse_header_code_2() {
 
 fn test_parse_code_2_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         // code 2, length code overflow
         packet[0] = ((i << 2) + 2) as u8;
-        frames[0] = 0;
-        frames[1] = 0;
 
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
-
-        let ret = opus_packet_parse(
-            &packet[..1],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
-        );
-        if ret != OPUS_INVALID_PACKET {
+        if opus_packet_parse(&packet[..1]).is_ok() {
             panic!("assertion failed at upstream test_opus_api.c:767");
         }
         packet[1] = 252;
-        frames[0] = 0;
-        frames[1] = 0;
 
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
-
-        let ret = opus_packet_parse(
-            &packet[..2],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
-        );
-        if ret != OPUS_INVALID_PACKET {
+        if opus_packet_parse(&packet[..2]).is_ok() {
             panic!("assertion failed at upstream test_opus_api.c:772");
         }
         for j in 0..1275 {
@@ -411,83 +373,44 @@ fn test_parse_code_2_inner() {
             }
 
             // Code 2, one too short
-            frames[0] = 0;
-            frames[1] = 0;
-
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..(j + (if j < 252 { 2 } else { 3 }) - 1_usize)],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..(j + (if j < 252 { 2 } else { 3 }) - 1_usize)]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:781");
             }
 
             // Code 2, one too long
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             let packet_len = j + (if j < 252 { 2 } else { 3 }) + 1276;
             // this makes no sense anymore
             if packet_len > packet.len() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..packet_len as _],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..packet_len as _]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:786");
             }
 
             // Code 2, second zero
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             let packet_len = j + (if j < 252 { 2 } else { 3 });
             // this makes no sense anymore
             if packet_len > packet.len() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..packet_len as _],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != 2 {
+            let parsed = opus_packet_parse(&packet[..packet_len as _])
+                .expect("assertion failed at upstream test_opus_api.c:791");
+            if parsed.frames.len() != 2 {
                 panic!("assertion failed at upstream test_opus_api.c:791");
             }
-            if size[0] as usize != j || size[1] as i32 != 0 {
+            if parsed.frames[0].size != j || parsed.frames[1].size != 0 {
                 panic!("assertion failed at upstream test_opus_api.c:792");
             }
-            if frames[1] != frames[0] + size[0] as usize {
+            if parsed.frames[1].offset != parsed.frames[0].offset + parsed.frames[0].size {
                 panic!("assertion failed at upstream test_opus_api.c:793");
             }
-            if toc as i32 >> 2 != i {
+            if parsed.toc as i32 >> 2 != i {
                 panic!("assertion failed at upstream test_opus_api.c:794");
             }
 
             // Code 2, normal
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             let packet_len = (j << 1) + 4;
 
             // this makes no sense anymore
@@ -495,25 +418,20 @@ fn test_parse_code_2_inner() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..packet_len],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != 2 {
+            let parsed = opus_packet_parse(&packet[..packet_len])
+                .expect("assertion failed at upstream test_opus_api.c:799");
+            if parsed.frames.len() != 2 {
                 panic!("assertion failed at upstream test_opus_api.c:799");
             }
-            if size[0] as usize != j
-                || size[1] as usize != (j << 1) + 3 - j - (if j < 252 { 1 } else { 2 })
+            if parsed.frames[0].size != j
+                || parsed.frames[1].size != (j << 1) + 3 - j - (if j < 252 { 1 } else { 2 })
             {
                 panic!("assertion failed at upstream test_opus_api.c:800");
             }
-            if frames[1] != frames[0] + size[0] as usize {
+            if parsed.frames[1].offset != parsed.frames[0].offset + parsed.frames[0].size {
                 panic!("assertion failed at upstream test_opus_api.c:801");
             }
-            if toc as i32 >> 2 != i {
+            if parsed.toc as i32 >> 2 != i {
                 panic!("assertion failed at upstream test_opus_api.c:802");
             }
         }
@@ -527,24 +445,11 @@ fn test_parse_header_code_3_m_truncation() {
 
 fn test_parse_code_3_m_truncation_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
-        frames[0] = 0;
-        frames[1] = 0;
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
-        let ret = opus_packet_parse(
-            &packet[..1],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
-        );
 
-        if ret != OPUS_INVALID_PACKET {
+        if opus_packet_parse(&packet[..1]).is_ok() {
             panic!("assertion failed at upstream test_opus_api.c:815");
         }
     }
@@ -557,71 +462,24 @@ fn test_parse_header_code_3_m_0_49_64() {
 
 fn test_parse_code_3_m_0_49_64_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
         for jj in 49..=64 {
             packet[1] = (jj & 63) as u8;
-            frames[0] = 0;
-            frames[1] = 0;
-
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..1275],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..1275]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:830");
             }
             packet[1] = (128 + (jj & 63)) as u8;
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..1275],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..1275]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:835");
             }
             packet[1] = (64 + (jj & 63)) as u8;
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..1275],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..1275]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:840");
             }
             packet[1] = (128 + 64 + (jj & 63)) as u8;
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..1275],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..1275]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:845");
             }
         }
@@ -635,38 +493,26 @@ fn test_parse_header_code_3_m_1_cbr() {
 
 fn test_parse_code_3_m_1_cbr_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
         packet[1] = 1;
         for j in 0..1276 {
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             let packet_len = j + 2;
             // this makes no sense anymore
             if packet_len as usize > packet.len() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..packet_len as usize],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != 1 {
+            let parsed = opus_packet_parse(&packet[..packet_len as usize])
+                .expect("assertion failed at upstream test_opus_api.c:861");
+            if parsed.frames.len() != 1 {
                 panic!("assertion failed at upstream test_opus_api.c:861");
             }
-            if size[0] as i32 != j {
+            if parsed.frames[0].size as i32 != j {
                 panic!("assertion failed at upstream test_opus_api.c:862");
             }
-            if toc as i32 >> 2 != i {
+            if parsed.toc as i32 >> 2 != i {
                 panic!("assertion failed at upstream test_opus_api.c:863");
             }
         }
@@ -680,58 +526,41 @@ fn test_parse_header_code_3_m_1_48_cbr() {
 
 fn test_parse_code_3_m_1_48_cbr_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
-        let mut frame_samp: i32 = 0;
         packet[0] = (i << 2) + 3;
-        frame_samp = opus_packet_get_samples_per_frame(packet[0], 48000);
+        let frame_samp = opus_packet_get_samples_per_frame(packet[0], 48000);
         for j in 2..49 {
             packet[1] = j as u8;
             for sz in 2..(j + 2) * 1275 {
-                frames[0] = 0;
-                frames[1] = 0;
-                let mut toc = u8::MAX;
-                let mut payload_offset = -1;
-
                 // this makes no sense anymore
                 if sz > packet.len() {
                     continue;
                 }
 
-                let ret = opus_packet_parse(
-                    &packet[..sz],
-                    Some(&mut toc),
-                    Some(&mut frames),
-                    &mut size,
-                    Some(&mut payload_offset),
-                );
+                let result = opus_packet_parse(&packet[..sz]);
                 if frame_samp * j as i32 <= 5760 && (sz - 2) % j == 0 && (sz - 2) / j < 1276 {
-                    if ret != j as i32 {
+                    let parsed = result.expect("assertion failed at upstream test_opus_api.c:890");
+                    if parsed.frames.len() != j {
                         panic!("assertion failed at upstream test_opus_api.c:890");
                     }
-                    for jj in 1..ret {
-                        if frames[jj as usize]
-                            != (frames[(jj - 1) as usize] + size[(jj - 1) as usize] as usize)
+                    for jj in 1..parsed.frames.len() {
+                        if parsed.frames[jj].offset
+                            != (parsed.frames[jj - 1].offset + parsed.frames[jj - 1].size)
                         {
                             panic!("assertion failed at upstream test_opus_api.c:891");
                         }
                     }
-                    if toc >> 2 != i {
+                    if parsed.toc >> 2 != i {
                         panic!("assertion failed at upstream test_opus_api.c:892");
                     }
-                } else if ret != OPUS_INVALID_PACKET {
+                } else if result.is_ok() {
                     panic!("assertion failed at upstream test_opus_api.c:893");
                 }
             }
         }
 
         packet[1] = (5760 / frame_samp) as u8;
-        frames[0] = 0;
-        frames[1] = 0;
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
         let p1 = packet[1];
 
         let packet_len = 1275 * p1 as i32 + 2;
@@ -740,18 +569,13 @@ fn test_parse_code_3_m_1_48_cbr_inner() {
             continue;
         }
 
-        let ret = opus_packet_parse(
-            &packet[..packet_len as usize],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
-        );
-        if ret != packet[1] as i32 {
+        let parsed = opus_packet_parse(&packet[..packet_len as usize])
+            .expect("assertion failed at upstream test_opus_api.c:901");
+        if parsed.frames.len() != packet[1] as usize {
             panic!("assertion failed at upstream test_opus_api.c:901");
         }
-        for jj in 0..ret {
-            if size[jj as usize] != 1275 {
+        for jj in 0..parsed.frames.len() {
+            if parsed.frames[jj].size != 1275 {
                 panic!("assertion failed at upstream test_opus_api.c:902");
             }
         }
@@ -765,8 +589,6 @@ fn test_parse_header_code_3_m_1_48_vbr() {
 
 fn test_parse_code_3_m_1_48_vbr_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
@@ -774,126 +596,62 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
         let frame_samp_0 = opus_packet_get_samples_per_frame(packet[0], 48000);
 
         for jj in 0..1276 {
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-
             let packet_len = 2 + jj;
             // this makes no sense anymore
             if packet_len as usize > packet.len() {
                 continue;
             }
 
-            let ret = opus_packet_parse(
-                &packet[..packet_len as usize],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-
-            if ret != 1 {
+            let parsed = opus_packet_parse(&packet[..packet_len as usize])
+                .expect("assertion failed at upstream test_opus_api.c:919");
+            if parsed.frames.len() != 1 {
                 panic!("assertion failed at upstream test_opus_api.c:919");
             }
-            if size[0] as i32 != jj {
+            if parsed.frames[0].size as i32 != jj {
                 panic!("assertion failed at upstream test_opus_api.c:920");
             }
-            if toc as i32 >> 2 != i {
+            if parsed.toc as i32 >> 2 != i {
                 panic!("assertion failed at upstream test_opus_api.c:921");
             }
         }
 
         for j in 2..49 {
             packet[1] = (128 + j) as u8;
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..2 + j - 2],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..2 + j - 2]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:934");
             }
             packet[2] = 252;
             packet[3] = 0;
             packet[4..2 + j].fill(0);
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..2 + j],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..2 + j]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:941");
             }
             packet[2..2 + j].fill(0);
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..2 + j - 2],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..2 + j - 2]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:947");
             }
             packet[2] = 252;
             packet[3] = 0;
             packet[4..2 + j].fill(0);
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..2 + j + 252 - 1],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
-
-            if ret != OPUS_INVALID_PACKET {
+            if opus_packet_parse(&packet[..2 + j + 252 - 1]).is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:955");
             }
             packet[2..2 + j].fill(0);
-            frames[0] = 0;
-            frames[1] = 0;
-            let mut toc = u8::MAX;
-            let mut payload_offset = -1;
-            let ret = opus_packet_parse(
-                &packet[..2 + j - 1],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            );
+
+            let result = opus_packet_parse(&packet[..2 + j - 1]);
 
             if frame_samp_0 * j as i32 <= 5760 {
-                if ret != j as i32 {
+                let parsed = result.expect("assertion failed at upstream test_opus_api.c:962");
+                if parsed.frames.len() != j {
                     panic!("assertion failed at upstream test_opus_api.c:962");
                 }
-                if size[..j].iter().any(|s| *s as i32 != 0) {
+                if parsed.frames[..j].iter().any(|f| f.size != 0) {
                     panic!("assertion failed at upstream test_opus_api.c:963");
                 }
-                if toc >> 2 != i as u8 {
+                if parsed.toc >> 2 != i as u8 {
                     panic!("assertion failed at upstream test_opus_api.c:964");
                 }
-            } else if ret != OPUS_INVALID_PACKET {
+            } else if result.is_ok() {
                 panic!("assertion failed at upstream test_opus_api.c:965");
             }
             for sz in 0..8 {
@@ -910,10 +668,6 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
                         pos += 2;
                     }
                 }
-                frames[0] = 0;
-                frames[1] = 0;
-                let mut toc = u8::MAX;
-                let mut payload_offset = -1;
 
                 let packet_len = tsz[sz as usize] + i;
                 // this makes no sense anymore
@@ -921,32 +675,28 @@ fn test_parse_code_3_m_1_48_vbr_inner() {
                     continue;
                 }
 
-                let ret = opus_packet_parse(
-                    &packet[..packet_len as usize],
-                    Some(&mut toc),
-                    Some(&mut frames),
-                    &mut size,
-                    Some(&mut payload_offset),
-                );
+                let result = opus_packet_parse(&packet[..packet_len as usize]);
 
                 if frame_samp_0 * j as i32 <= 5760
                     && as_0 < 1276
                     && tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1) < 1276
                 {
-                    if ret != j as i32 {
+                    let parsed = result.expect("assertion failed at upstream test_opus_api.c:981");
+                    if parsed.frames.len() != j {
                         panic!("assertion failed at upstream test_opus_api.c:981");
                     }
-                    if size[..j - 1].iter().any(|s| *s as i32 != as_0) {
+                    if parsed.frames[..j - 1].iter().any(|f| f.size as i32 != as_0) {
                         panic!("assertion failed at upstream test_opus_api.c:982");
                     }
-                    if size[j - 1] as i32 != tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1)
+                    if parsed.frames[j - 1].size as i32
+                        != tsz[sz as usize] + i - 2 - pos - as_0 * (j as i32 - 1)
                     {
                         panic!("assertion failed at upstream test_opus_api.c:983");
                     }
-                    if toc as i32 >> 2 != i {
+                    if parsed.toc as i32 >> 2 != i {
                         panic!("assertion failed at upstream test_opus_api.c:984");
                     }
-                } else if ret != OPUS_INVALID_PACKET {
+                } else if result.is_ok() {
                     panic!("assertion failed at upstream test_opus_api.c:985");
                 }
             }
@@ -961,8 +711,6 @@ fn test_parse_header_code_3_padding() {
 
 fn test_parse_code_3_padding_inner() {
     let mut packet = vec![0u8; 1276];
-    let mut frames = [0; 48];
-    let mut size: [i16; 48] = [0; 48];
 
     for i in 0..64 {
         packet[0] = ((i << 2) + 3) as u8;
@@ -971,19 +719,7 @@ fn test_parse_code_3_padding_inner() {
             packet[jj as usize] = 255;
         }
 
-        frames[0] = 0;
-        frames[1] = 0;
-        let mut toc = u8::MAX;
-        let mut payload_offset = -1;
-        let ret = opus_packet_parse(
-            &packet[..127],
-            Some(&mut toc),
-            Some(&mut frames),
-            &mut size,
-            Some(&mut payload_offset),
-        );
-
-        if ret != OPUS_INVALID_PACKET {
+        if opus_packet_parse(&packet[..127]).is_ok() {
             panic!("assertion failed at upstream test_opus_api.c:1002");
         }
         for sz in 0..4 {
@@ -998,33 +734,16 @@ fn test_parse_code_3_padding_inner() {
                 packet[(2 + pos_0) as usize] = (jj % 254) as u8;
                 pos_0 += 1;
                 if sz == 0 && i == 63 {
-                    frames[0] = 0;
-                    frames[1] = 0;
-                    let mut payload_offset = -1;
-                    let mut toc = u8::MAX;
-
                     let packet_len = 2 + jj + pos_0 - 1;
                     // this makes no sense anymore
                     if packet_len as usize > packet.len() {
                         continue;
                     }
 
-                    let ret = opus_packet_parse(
-                        &packet[..packet_len as usize],
-                        Some(&mut toc),
-                        Some(&mut frames),
-                        &mut size,
-                        Some(&mut payload_offset),
-                    );
-
-                    if ret != OPUS_INVALID_PACKET {
+                    if opus_packet_parse(&packet[..packet_len as usize]).is_ok() {
                         panic!("assertion failed at upstream test_opus_api.c:1019");
                     }
                 }
-                frames[0] = 0;
-                frames[1] = 0;
-                let mut toc = u8::MAX;
-                let mut payload_offset = -1;
 
                 let packet_len = 2 + jj + tsz_0[sz as usize] + i + pos_0;
                 // this makes no sense anymore
@@ -1032,25 +751,20 @@ fn test_parse_code_3_padding_inner() {
                     continue;
                 }
 
-                let ret = opus_packet_parse(
-                    &packet[..packet_len as usize],
-                    Some(&mut toc),
-                    Some(&mut frames),
-                    &mut size,
-                    Some(&mut payload_offset),
-                );
+                let result = opus_packet_parse(&packet[..packet_len as usize]);
 
                 if tsz_0[sz as usize] + i < 1276 {
-                    if ret != 1 {
+                    let parsed = result.expect("assertion failed at upstream test_opus_api.c:1026");
+                    if parsed.frames.len() != 1 {
                         panic!("assertion failed at upstream test_opus_api.c:1026");
                     }
-                    if size[0] as i32 != tsz_0[sz as usize] + i {
+                    if parsed.frames[0].size as i32 != tsz_0[sz as usize] + i {
                         panic!("assertion failed at upstream test_opus_api.c:1027");
                     }
-                    if toc as i32 >> 2 != i {
+                    if parsed.toc as i32 >> 2 != i {
                         panic!("assertion failed at upstream test_opus_api.c:1028");
                     }
-                } else if ret != OPUS_INVALID_PACKET {
+                } else if result.is_ok() {
                     panic!("assertion failed at upstream test_opus_api.c:1029");
                 }
             }

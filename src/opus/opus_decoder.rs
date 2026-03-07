@@ -142,23 +142,15 @@ impl OpusDecoder {
         }
 
         let packet_stream_channels = opus_packet_get_nb_channels_raw(packet[0]);
-        let mut frames = [0usize; 48];
-        let mut size = [0i16; 48];
-        let ret = opus_packet_parse(packet, None, Some(&mut frames), &mut size, None);
-        if ret <= 0 {
-            return if ret < 0 {
-                Err(ErrorCode::from(ret))
-            } else {
-                Ok(false)
-            };
-        }
-        if size[0] == 0 {
+        let parsed = opus_packet_parse(packet)?;
+        if parsed.frames.is_empty() || parsed.frames[0].size == 0 {
             return Ok(false);
         }
 
-        let mut lbrr = ((packet[frames[0]] >> (7 - nb_frames)) & 0x1) as i32;
+        let frame0_offset = parsed.frames[0].offset;
+        let mut lbrr = ((packet[frame0_offset] >> (7 - nb_frames)) & 0x1) as i32;
         if packet_stream_channels == 2 {
-            lbrr |= ((packet[frames[0]] >> (6 - 2 * nb_frames)) & 0x1) as i32;
+            lbrr |= ((packet[frame0_offset] >> (6 - 2 * nb_frames)) & 0x1) as i32;
         }
         Ok(lbrr != 0)
     }

@@ -554,10 +554,6 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
     let mut i: i32 = 0;
     let mut count: i32 = 0;
     loop {
-        let mut toc: u8 = 0;
-        let mut frames = [0usize; 48];
-        let mut size = [0i16; 48];
-        let mut payload_offset: i32 = 0;
         let frame_size_1 = fsizes[db62[fsize as usize] as usize];
         let offset = i % (48000 * 30 - 5760);
 
@@ -583,21 +579,14 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
         dec_final_range = dec.final_range();
         assert_eq!(dec_final_range, enc_final_range);
 
-        assert!(
-            opus_packet_parse(
-                &packet[..len as usize],
-                Some(&mut toc),
-                Some(&mut frames),
-                &mut size,
-                Some(&mut payload_offset),
-            ) > 0
-        );
+        let parsed = opus_packet_parse(&packet[..len as usize]).expect("packet parse failed");
+        assert!(!parsed.frames.is_empty());
 
         if rng.next_u32() & 1023 == 0 {
             len = 0;
         }
 
-        let mut j = frames[0] as i32; // frame offset within packet
+        let mut j = parsed.frames[0].offset as i32; // frame offset within packet
         while j < len {
             for jj in 0..8 {
                 packet[j as usize] = (packet[j as usize] as i32

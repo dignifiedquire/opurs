@@ -30,7 +30,8 @@ pub use crate::opus::opus_decoder::{
     opus_packet_get_nb_samples, OpusDecoder,
 };
 pub use crate::opus::packet::{
-    opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip,
+    opus_packet_get_samples_per_frame, opus_packet_parse, opus_pcm_soft_clip, PacketFrame,
+    ParsedPacket,
 };
 pub use crate::opus::repacketizer::{
     opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad,

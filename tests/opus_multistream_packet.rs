@@ -7,7 +7,7 @@ use libopus_sys::opus_multistream_packet_pad as c_multistream_packet_pad;
 use libopus_sys::opus_multistream_packet_unpad as c_multistream_packet_unpad;
 use opurs::{
     opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_parse, Application,
-    Channels, ErrorCode, OpusEncoder, SampleRate,
+    Channels, ErrorCode, OpusEncoder, ParsedPacket, SampleRate,
 };
 
 fn encode_size(size: i32, out: &mut [u8]) -> usize {
@@ -33,20 +33,14 @@ fn encode_mono_packet(seed: i16) -> Vec<u8> {
 }
 
 fn to_self_delimited_single_frame(packet: &[u8]) -> Vec<u8> {
-    let mut toc = 0u8;
-    let mut frames = [0usize; 48];
-    let mut sizes = [0i16; 48];
-    let mut payload_offset = 0i32;
-    let count = opus_packet_parse(
-        packet,
-        Some(&mut toc),
-        Some(&mut frames),
-        &mut sizes,
-        Some(&mut payload_offset),
-    );
-    assert_eq!(count, 1, "expected a single-frame packet");
-    let frame_len = sizes[0] as usize;
-    let frame_off = frames[0];
+    let ParsedPacket {
+        toc,
+        frames,
+        payload_offset: _,
+    } = opus_packet_parse(packet).expect("opus_packet_parse failed");
+    assert_eq!(frames.len(), 1, "expected a single-frame packet");
+    let frame_len = frames[0].size;
+    let frame_off = frames[0].offset;
     let mut out = vec![0u8; 2 + frame_len];
     out[0] = toc;
     let sz = encode_size(frame_len as i32, &mut out[1..]);

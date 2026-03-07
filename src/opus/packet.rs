@@ -3,6 +3,7 @@
 //! Upstream C: `src/opus.c`
 
 use crate::arch::Arch;
+use crate::error::ErrorCode;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_INVALID_PACKET};
 
 /// Applies soft-clipping to bring a float signal within `[-1, 1]`.
@@ -428,37 +429,63 @@ pub fn opus_packet_parse_impl(
     count
 }
 
+/// A single frame within a parsed Opus packet.
+#[derive(Debug, Clone)]
+pub struct PacketFrame {
+    /// Byte offset of this frame within the original packet data.
+    pub offset: usize,
+    /// Size of this frame in bytes.
+    pub size: usize,
+}
+
+/// Result of parsing an Opus packet with [`opus_packet_parse`].
+#[derive(Debug, Clone)]
+pub struct ParsedPacket {
+    /// Table-of-contents byte from the packet header.
+    pub toc: u8,
+    /// Per-frame offset and size information.
+    pub frames: Vec<PacketFrame>,
+    /// Byte offset of the payload (first frame data) within the packet.
+    pub payload_offset: usize,
+}
+
 /// Parse an opus packet into one or more frames.
+///
 /// Opus_decode will perform this operation internally so most applications do
 /// not need to use this function.
-/// This function does not copy the frames, the returned pointers are pointers into
-/// the input packet.
 ///
-/// - `data`: Opus packet to be parsed
-/// - `len`: size of data
-/// - `out_toc`: TOC pointer
-/// - `frames`: encapsulated frames
-/// - `size`: sizes of the encapsulated frames
-/// - `payload_offset`: returns the position of the payload within the packet (in bytes)
-///
-/// Returns number of frames
+/// Returns a [`ParsedPacket`] with the TOC byte, per-frame offsets/sizes,
+/// and the payload offset within the packet.
 ///
 /// Upstream C: include/opus.h:opus_packet_parse
-pub fn opus_packet_parse(
-    data: &[u8],
-    out_toc: Option<&mut u8>,
-    frames: Option<&mut [usize; 48]>,
-    size: &mut [i16; 48],
-    payload_offset: Option<&mut i32>,
-) -> i32 {
-    opus_packet_parse_impl(
+pub fn opus_packet_parse(data: &[u8]) -> Result<ParsedPacket, ErrorCode> {
+    let mut toc: u8 = 0;
+    let mut frame_offsets = [0usize; 48];
+    let mut size = [0i16; 48];
+    let mut payload_offset: i32 = 0;
+
+    let count = opus_packet_parse_impl(
         data,
         false,
-        out_toc,
-        frames.map(|s| s.as_mut_slice()),
-        size.as_mut_slice(),
-        payload_offset,
+        Some(&mut toc),
+        Some(&mut frame_offsets[..]),
+        &mut size,
+        Some(&mut payload_offset),
         None,
         None,
-    )
+    );
+    if count < 0 {
+        return Err(ErrorCode::from(count));
+    }
+    let frames = (0..count as usize)
+        .map(|i| PacketFrame {
+            offset: frame_offsets[i],
+            size: size[i] as usize,
+        })
+        .collect();
+    Ok(ParsedPacket {
+        toc,
+        frames,
+        payload_offset: payload_offset as usize,
+    })
 }
