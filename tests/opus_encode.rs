@@ -459,22 +459,22 @@ fn run_test1(no_fuzz: bool, rng: &mut TestRng) {
 
                 if rng.next_u32() & 3 == 0 {
                     let pad = 1;
-                    assert_eq!(
-                        opus_packet_pad(&mut packet[..(len + pad) as usize], len, len + pad),
-                        0
+                    assert!(
+                        opus_packet_pad(&mut packet[..(len + pad) as usize], len, len + pad)
+                            .is_ok()
                     );
                     len += pad;
                 }
                 if rng.next_u32() & 7 == 0 {
-                    assert_eq!(
-                        opus_packet_pad(&mut packet[..(len + 256) as usize], len, len + 256),
-                        0
+                    assert!(
+                        opus_packet_pad(&mut packet[..(len + 256) as usize], len, len + 256)
+                            .is_ok()
                     );
                     len += 256;
                 }
                 if rng.next_u32() & 3 == 0 {
-                    len = opus_packet_unpad(&mut packet[..len as usize]);
-                    assert!(len >= 1, "opus_packet_unpad failed: {len}");
+                    len = opus_packet_unpad(&mut packet[..len as usize])
+                        .expect("opus_packet_unpad failed") as i32;
                 }
 
                 let out_samples = dec

@@ -5,10 +5,9 @@
 
 use libopus_sys::opus_multistream_packet_pad as c_multistream_packet_pad;
 use libopus_sys::opus_multistream_packet_unpad as c_multistream_packet_unpad;
-use opurs::internals::{OPUS_BAD_ARG, OPUS_OK};
 use opurs::{
     opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_parse, Application,
-    Channels, OpusEncoder, SampleRate,
+    Channels, ErrorCode, OpusEncoder, SampleRate,
 };
 
 fn encode_size(size: i32, out: &mut [u8]) -> usize {
@@ -74,11 +73,10 @@ fn multistream_packet_pad_matches_upstream_c() {
     rust_buf[..base.len()].copy_from_slice(&base);
     let mut c_buf = rust_buf.clone();
 
-    let rust_ret = opus_multistream_packet_pad(&mut rust_buf, len, new_len, 2);
+    opus_multistream_packet_pad(&mut rust_buf, len, new_len, 2).expect("rust pad failed");
     let c_ret = unsafe { c_multistream_packet_pad(c_buf.as_mut_ptr(), len, new_len, 2) };
 
-    assert_eq!(rust_ret, c_ret, "return code mismatch");
-    assert_eq!(rust_ret, OPUS_OK, "expected successful pad");
+    assert_eq!(c_ret, 0, "c pad failed");
     assert_eq!(
         &rust_buf[..new_len as usize],
         &c_buf[..new_len as usize],
@@ -94,19 +92,19 @@ fn multistream_packet_unpad_matches_upstream_c() {
 
     let mut src = vec![0u8; new_len as usize];
     src[..base.len()].copy_from_slice(&base);
-    let ret = opus_multistream_packet_pad(&mut src, len, new_len, 2);
-    assert_eq!(ret, OPUS_OK, "failed to build padded packet");
+    opus_multistream_packet_pad(&mut src, len, new_len, 2).expect("failed to build padded packet");
 
     let mut rust_buf = src.clone();
     let mut c_buf = src.clone();
 
-    let rust_ret = opus_multistream_packet_unpad(&mut rust_buf, new_len, 2);
+    let rust_ret =
+        opus_multistream_packet_unpad(&mut rust_buf, new_len, 2).expect("rust unpad failed");
     let c_ret = unsafe { c_multistream_packet_unpad(c_buf.as_mut_ptr(), new_len, 2) };
 
-    assert_eq!(rust_ret, c_ret, "return code mismatch");
-    assert!(rust_ret > 0, "expected successful unpad");
+    assert_eq!(rust_ret as i32, c_ret, "return code mismatch");
+    assert!(c_ret > 0, "expected successful unpad");
     assert_eq!(
-        &rust_buf[..rust_ret as usize],
+        &rust_buf[..rust_ret],
         &c_buf[..c_ret as usize],
         "unpadded payload mismatch"
     );
@@ -120,6 +118,6 @@ fn multistream_packet_pad_bad_arg_parity() {
     let rust_ret = opus_multistream_packet_pad(&mut rust_buf, 0, 8, 2);
     let c_ret = unsafe { c_multistream_packet_pad(c_buf.as_mut_ptr(), 0, 8, 2) };
 
-    assert_eq!(rust_ret, OPUS_BAD_ARG);
-    assert_eq!(rust_ret, c_ret);
+    assert_eq!(rust_ret, Err(ErrorCode::BadArg));
+    assert_eq!(c_ret, i32::from(ErrorCode::BadArg));
 }

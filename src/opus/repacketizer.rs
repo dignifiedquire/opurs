@@ -614,12 +614,12 @@ pub fn opus_packet_pad_impl(
 /// - `OPUS_INVALID_PACKET`:  data did not contain a valid Opus packet.
 ///
 /// Upstream C: src/repacketizer.c:opus_packet_pad
-pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> i32 {
+pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> Result<(), ErrorCode> {
     let ret = opus_packet_pad_impl(data, len, new_len, true, &[]);
-    if ret > 0 {
-        OPUS_OK
+    if ret >= 0 {
+        Ok(())
     } else {
-        ret
+        Err(ErrorCode::from(ret))
     }
 }
 
@@ -634,14 +634,14 @@ pub fn opus_packet_pad(data: &mut [u8], len: i32, new_len: i32) -> i32 {
 /// - `OPUS_INVALID_PACKET`: data did not contain a valid Opus packet.
 ///
 /// Upstream C: src/repacketizer.c:opus_packet_unpad
-pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
+pub fn opus_packet_unpad(data: &mut [u8]) -> Result<usize, ErrorCode> {
     if data.is_empty() {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
     let mut rp = OpusRepacketizer::default();
     let ret = rp.cat_impl(data, false);
     if ret < 0 {
-        return ret;
+        return Err(ErrorCode::from(ret));
     }
     for i in 0..rp.nb_frames as usize {
         rp.paddings[i] = None;
@@ -655,7 +655,7 @@ pub fn opus_packet_unpad(data: &mut [u8]) -> i32 {
         FrameSource::Data { offset: 0 },
     );
     debug_assert!(ret > 0 && ret <= data.len() as _);
-    ret
+    Ok(ret as usize)
 }
 
 /// Pads only the last stream inside a self-delimited multistream packet.
@@ -666,17 +666,17 @@ pub fn opus_multistream_packet_pad(
     len: i32,
     new_len: i32,
     nb_streams: i32,
-) -> i32 {
+) -> Result<(), ErrorCode> {
     if len < 1 {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
     if len == new_len {
-        return OPUS_OK;
+        return Ok(());
     } else if len > new_len {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
     if len as usize > data.len() || new_len as usize > data.len() {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
 
     let amount = new_len - len;
@@ -686,7 +686,7 @@ pub fn opus_multistream_packet_pad(
     // Seek to the final stream packet (self-delimited for all preceding streams).
     for _ in 0..nb_streams - 1 {
         if remaining <= 0 {
-            return OPUS_INVALID_PACKET;
+            return Err(ErrorCode::InvalidPacket);
         }
         let mut toc = 0u8;
         let mut size = [0i16; 48];
@@ -702,7 +702,7 @@ pub fn opus_multistream_packet_pad(
             None,
         );
         if count < 0 {
-            return count;
+            return Err(ErrorCode::from(count));
         }
         offset += packet_offset as usize;
         remaining -= packet_offset;
@@ -718,12 +718,16 @@ pub fn opus_multistream_packet_pad(
 /// Removes padding from each stream in a self-delimited multistream packet.
 ///
 /// Upstream C: `src/repacketizer.c:opus_multistream_packet_unpad`
-pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32) -> i32 {
+pub fn opus_multistream_packet_unpad(
+    data: &mut [u8],
+    len: i32,
+    nb_streams: i32,
+) -> Result<usize, ErrorCode> {
     if len < 1 {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
     if len as usize > data.len() {
-        return OPUS_BAD_ARG;
+        return Err(ErrorCode::BadArg);
     }
 
     let mut src_offset = 0usize;
@@ -733,7 +737,7 @@ pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32)
     for stream in 0..nb_streams {
         let self_delimited = stream != nb_streams - 1;
         if remaining <= 0 {
-            return OPUS_INVALID_PACKET;
+            return Err(ErrorCode::InvalidPacket);
         }
 
         let mut toc = 0u8;
@@ -750,14 +754,14 @@ pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32)
             None,
         );
         if ret < 0 {
-            return ret;
+            return Err(ErrorCode::from(ret));
         }
 
         let packet = data[src_offset..src_offset + packet_offset as usize].to_vec();
         let mut rp = OpusRepacketizer::default();
         let ret = rp.cat_impl(&packet, self_delimited);
         if ret < 0 {
-            return ret;
+            return Err(ErrorCode::from(ret));
         }
         for i in 0..rp.nb_frames as usize {
             rp.paddings[i] = None;
@@ -774,7 +778,7 @@ pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32)
             },
         );
         if ret < 0 {
-            return ret;
+            return Err(ErrorCode::from(ret));
         }
 
         dst_offset += ret as usize;
@@ -782,5 +786,5 @@ pub fn opus_multistream_packet_unpad(data: &mut [u8], len: i32, nb_streams: i32)
         remaining -= packet_offset;
     }
 
-    dst_offset as i32
+    Ok(dst_offset)
 }

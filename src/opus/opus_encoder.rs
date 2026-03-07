@@ -29,7 +29,7 @@ use crate::opus::opus_defines::{
     OPUS_BANDWIDTH_FULLBAND, OPUS_BANDWIDTH_MEDIUMBAND, OPUS_BANDWIDTH_NARROWBAND,
     OPUS_BANDWIDTH_SUPERWIDEBAND, OPUS_BANDWIDTH_WIDEBAND, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL,
     OPUS_FRAMESIZE_120_MS, OPUS_FRAMESIZE_2_5_MS, OPUS_FRAMESIZE_40_MS, OPUS_FRAMESIZE_ARG,
-    OPUS_INTERNAL_ERROR, OPUS_OK, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE,
+    OPUS_INTERNAL_ERROR, OPUS_SIGNAL_MUSIC, OPUS_SIGNAL_VOICE,
 };
 use crate::opus::opus_private::{MODE_CELT_ONLY, MODE_HYBRID, MODE_SILK_ONLY};
 use crate::silk::define::{
@@ -1885,8 +1885,7 @@ fn encode_low_bitrate_frame(
         data[1] = num_multiframes as u8;
     }
     if st.use_vbr == 0 {
-        ret = opus_packet_pad(&mut data[..max_data_bytes as usize], ret, max_data_bytes);
-        if ret == OPUS_OK {
+        if opus_packet_pad(&mut data[..max_data_bytes as usize], ret, max_data_bytes).is_ok() {
             ret = max_data_bytes;
         } else {
             ret = OPUS_INTERNAL_ERROR;
@@ -3489,7 +3488,8 @@ pub fn opus_encode_native(
             &mut data[..orig_max_data_bytes as usize],
             ret,
             orig_max_data_bytes,
-        ) != OPUS_OK
+        )
+        .is_err()
         {
             return OPUS_INTERNAL_ERROR;
         }

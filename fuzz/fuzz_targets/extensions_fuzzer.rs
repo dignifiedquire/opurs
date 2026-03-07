@@ -51,9 +51,8 @@ fuzz_target!(|data: &[u8]| {
 
     let packet = payload.to_vec();
     let mut unpadded = packet.clone();
-    let unpadded_len = opus_packet_unpad(&mut unpadded);
-    if unpadded_len > 0 {
-        unpadded.truncate(unpadded_len as usize);
+    if let Ok(unpadded_len) = opus_packet_unpad(&mut unpadded) {
+        unpadded.truncate(unpadded_len);
     }
 
     for candidate in [&packet[..], &unpadded[..]] {

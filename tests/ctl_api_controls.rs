@@ -698,12 +698,13 @@ fn build_projection_packet_with_forced_qext(
     let new_last_len = old_last_len + 64;
     let mut padded = vec![0u8; packet.len() + 64];
     padded[..packet.len()].copy_from_slice(&packet);
-    let pad_ret = opus_packet_pad(
+    if opus_packet_pad(
         &mut padded[last_off..last_off + new_last_len],
         old_last_len as i32,
         new_last_len as i32,
-    );
-    if pad_ret < 0 {
+    )
+    .is_err()
+    {
         return None;
     }
     padded.truncate(last_off + new_last_len);
@@ -832,9 +833,8 @@ fn decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() {
         }
 
         let mut unpadded = packet.clone();
-        let unpadded_len = opus_packet_unpad(&mut unpadded);
-        assert!(unpadded_len > 0, "packet unpad failed");
-        unpadded.truncate(unpadded_len as usize);
+        let unpadded_len = opus_packet_unpad(&mut unpadded).expect("packet unpad failed");
+        unpadded.truncate(unpadded_len);
 
         let (pcm_with_ext, rng_with_ext) = decode_single(&packet, false);
         let (pcm_ignored, rng_ignored) = decode_single(&packet, true);
@@ -945,9 +945,9 @@ fn ms_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_packets() 
 
         let mut unpadded = packet.clone();
         let unpadded_cap = unpadded.len() as i32;
-        let unpadded_len = opus_multistream_packet_unpad(&mut unpadded, unpadded_cap, 1);
-        assert!(unpadded_len > 0, "multistream packet unpad failed");
-        unpadded.truncate(unpadded_len as usize);
+        let unpadded_len = opus_multistream_packet_unpad(&mut unpadded, unpadded_cap, 1)
+            .expect("multistream packet unpad failed");
+        unpadded.truncate(unpadded_len);
 
         let (pcm_with_ext, rng_with_ext) = decode_ms(&packet, false);
         let (pcm_ignored, rng_ignored) = decode_ms(&packet, true);
@@ -1003,11 +1003,12 @@ fn projection_decoder_ignore_extensions_matches_unpadded_decode_for_real_qext_pa
 
         let mut unpadded = packet.clone();
         let unpadded_cap = unpadded.len() as i32;
-        let unpadded_len = opus_multistream_packet_unpad(&mut unpadded, unpadded_cap, streams);
-        if unpadded_len <= 0 || unpadded_len as usize >= packet.len() {
-            continue;
-        }
-        unpadded.truncate(unpadded_len as usize);
+        let unpadded_len = match opus_multistream_packet_unpad(&mut unpadded, unpadded_cap, streams)
+        {
+            Ok(len) if len < packet.len() => len,
+            _ => continue,
+        };
+        unpadded.truncate(unpadded_len);
 
         let (pcm_with_ext, rng_with_ext) =
             decode_projection(&packet, streams, coupled_streams, &demixing, false);
@@ -1288,12 +1289,9 @@ rust_rng_with_ext={}, c_rng_with_ext={}",
             let mut malformed_unpadded = malformed.clone();
             let malformed_unpadded_cap = malformed_unpadded.len() as i32;
             let malformed_unpadded_len =
-                opus_multistream_packet_unpad(&mut malformed_unpadded, malformed_unpadded_cap, 1);
-            assert!(
-                malformed_unpadded_len > 0,
-                "multistream malformed packet unpad failed"
-            );
-            malformed_unpadded.truncate(malformed_unpadded_len as usize);
+                opus_multistream_packet_unpad(&mut malformed_unpadded, malformed_unpadded_cap, 1)
+                    .expect("multistream malformed packet unpad failed");
+            malformed_unpadded.truncate(malformed_unpadded_len);
 
             let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) =
                 decode_ms_c(&malformed_unpadded, false);
@@ -1413,12 +1411,9 @@ fn malformed_qext_extensions_projection_decode_path_is_deterministic() {
                 &mut malformed_unpadded,
                 malformed_unpadded_cap,
                 streams,
-            );
-            assert!(
-                malformed_unpadded_len > 0,
-                "projection malformed packet unpad failed"
-            );
-            malformed_unpadded.truncate(malformed_unpadded_len as usize);
+            )
+            .expect("projection malformed packet unpad failed");
+            malformed_unpadded.truncate(malformed_unpadded_len);
 
             let (c_ret_ignore, c_pcm_ignore, c_rng_ignore) = decode_projection_c(
                 &malformed_unpadded,

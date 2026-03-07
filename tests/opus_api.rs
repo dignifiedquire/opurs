@@ -1585,16 +1585,17 @@ fn test_repacketizer_api_0() {
                             if out_ret != len {
                                 panic!("assertion failed at upstream test_opus_api.c:1558");
                             }
-                            if opus_packet_unpad(&mut po[..len as _]) != len {
+                            if opus_packet_unpad(&mut po[..len as _]) != Ok(len as usize) {
                                 panic!("assertion failed at upstream test_opus_api.c:1560");
                             }
-                            if opus_packet_pad(&mut po[..len as usize + 1], len, len + 1) != 0 {
+                            if opus_packet_pad(&mut po[..len as usize + 1], len, len + 1).is_err() {
                                 panic!("assertion failed at upstream test_opus_api.c:1562");
                             }
-                            if opus_packet_pad(&mut po, len + 1, len + 256) != 0 {
+                            if opus_packet_pad(&mut po, len + 1, len + 256).is_err() {
                                 panic!("assertion failed at upstream test_opus_api.c:1564");
                             }
-                            if opus_packet_unpad(&mut po[..len as usize + 256]) != len {
+                            if opus_packet_unpad(&mut po[..len as usize + 256]) != Ok(len as usize)
+                            {
                                 panic!("assertion failed at upstream test_opus_api.c:1566");
                             }
 
@@ -1762,21 +1763,21 @@ fn test_repacketizer_api_1() {
             if out_val != len_0 {
                 panic!("assertion failed at upstream test_opus_api.c:1673");
             }
-            if opus_packet_unpad(&mut po[..len_0 as _]) != len_0 {
+            if opus_packet_unpad(&mut po[..len_0 as _]) != Ok(len_0 as usize) {
                 panic!("assertion failed at upstream test_opus_api.c:1675");
             }
 
             let before = po[..len_0 as usize].to_vec();
             println!("---pad 1");
-            if opus_packet_pad(&mut po[..len_0 as usize + 1], len_0, len_0 + 1) != 0 {
+            if opus_packet_pad(&mut po[..len_0 as usize + 1], len_0, len_0 + 1).is_err() {
                 panic!("assertion failed at upstream test_opus_api.c:1677");
             }
             println!("---pad 256");
-            if opus_packet_pad(&mut po[..len_0 as usize + 256], len_0 + 1, len_0 + 256) != 0 {
+            if opus_packet_pad(&mut po[..len_0 as usize + 256], len_0 + 1, len_0 + 256).is_err() {
                 panic!("assertion failed at upstream test_opus_api.c:1679");
             }
             println!("---unpad ({len_0})");
-            if opus_packet_unpad(&mut po[..len_0 as usize + 256]) != len_0 {
+            if opus_packet_unpad(&mut po[..len_0 as usize + 256]) != Ok(len_0 as usize) {
                 panic!("assertion failed at upstream test_opus_api.c:1681");
             }
             assert_eq!(before, &po[..len_0 as usize], "unpadding failed");
@@ -1796,26 +1797,26 @@ fn test_repacketizer_api_1() {
     po[0] = b'O';
     po[1] = b'p';
 
-    if opus_packet_pad(&mut po[..4], 4, 4) != 0 {
+    if opus_packet_pad(&mut po[..4], 4, 4).is_err() {
         panic!("assertion failed at upstream test_opus_api.c:1705");
     }
-    if opus_packet_pad(&mut po[..5], 4, 5) != OPUS_INVALID_PACKET {
+    if opus_packet_pad(&mut po[..5], 4, 5) != Err(ErrorCode::InvalidPacket) {
         panic!("assertion failed at upstream test_opus_api.c:1709");
     }
-    if opus_packet_pad(&mut po[..5], 0, 5) != OPUS_BAD_ARG {
+    if opus_packet_pad(&mut po[..5], 0, 5) != Err(ErrorCode::BadArg) {
         panic!("assertion failed at upstream test_opus_api.c:1713");
     }
-    if opus_packet_unpad(&mut po[..0]) != OPUS_BAD_ARG {
+    if opus_packet_unpad(&mut po[..0]) != Err(ErrorCode::BadArg) {
         panic!("assertion failed at upstream test_opus_api.c:1717");
     }
-    if opus_packet_unpad(&mut po[..4]) != OPUS_INVALID_PACKET {
+    if opus_packet_unpad(&mut po[..4]) != Err(ErrorCode::InvalidPacket) {
         panic!("assertion failed at upstream test_opus_api.c:1721");
     }
     po[0] = 0;
     po[1] = 0;
     po[2] = 0;
 
-    if opus_packet_pad(&mut po, 5, 4) != OPUS_BAD_ARG {
+    if opus_packet_pad(&mut po, 5, 4) != Err(ErrorCode::BadArg) {
         panic!("assertion failed at upstream test_opus_api.c:1728");
     }
 }
