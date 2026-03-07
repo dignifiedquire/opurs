@@ -40,45 +40,45 @@ const CELT_SIG_SCALE: f32 = 32768.0;
 pub struct OpusCustomDecoder {
     // TODO: a lot of the stuff from the mode should become constants
     // we only have one "opus custom mode" after all
-    pub mode: &'static OpusCustomMode,
-    pub overlap: usize,
-    pub channels: usize,
-    pub stream_channels: usize,
-    pub downsample: i32,
-    pub start: i32,
-    pub end: i32,
-    pub signalling: i32,
-    pub disable_inv: i32,
-    pub complexity: i32,
-    pub arch: Arch,
-    pub rng: u32,
-    pub error: i32,
-    pub last_pitch_index: i32,
-    pub loss_duration: i32,
-    pub plc_duration: i32,
-    pub last_frame_type: i32,
-    pub skip_plc: i32,
-    pub postfilter_period: i32,
-    pub postfilter_period_old: i32,
-    pub postfilter_gain: f32,
-    pub postfilter_gain_old: f32,
-    pub postfilter_tapset: i32,
-    pub postfilter_tapset_old: i32,
-    pub prefilter_and_fold: i32,
-    pub preemph_mem_d: [f32; 2],
+    pub(crate) mode: &'static OpusCustomMode,
+    pub(crate) overlap: usize,
+    pub(crate) channels: usize,
+    pub(crate) stream_channels: usize,
+    pub(crate) downsample: i32,
+    pub(crate) start: i32,
+    pub(crate) end: i32,
+    pub(crate) signalling: i32,
+    pub(crate) disable_inv: i32,
+    pub(crate) complexity: i32,
+    pub(crate) arch: Arch,
+    pub(crate) rng: u32,
+    pub(crate) error: i32,
+    pub(crate) last_pitch_index: i32,
+    pub(crate) loss_duration: i32,
+    pub(crate) plc_duration: i32,
+    pub(crate) last_frame_type: i32,
+    pub(crate) skip_plc: i32,
+    pub(crate) postfilter_period: i32,
+    pub(crate) postfilter_period_old: i32,
+    pub(crate) postfilter_gain: f32,
+    pub(crate) postfilter_gain_old: f32,
+    pub(crate) postfilter_tapset: i32,
+    pub(crate) postfilter_tapset_old: i32,
+    pub(crate) prefilter_and_fold: i32,
+    pub(crate) preemph_mem_d: [f32; 2],
 
-    pub decode_mem: [f32; 2 * (2 * DECODE_BUFFER_SIZE + 240)], /* Size = channels*(QEXT_SCALE(DECODE_BUFFER_SIZE)+mode->overlap), max qext_scale=2, overlap=240 */
-    pub lpc: [f32; 2 * LPC_ORDER],                             /* Size = channels*LPC_ORDER */
-    pub old_ebands: [f32; 2 * 21],                             /* Size = 2*mode->nb_ebands */
-    pub old_log_e: [f32; 2 * 21],                              /* Size = 2*mode->nb_ebands */
-    pub old_log_e2: [f32; 2 * 21],                             /* Size = 2*mode->nb_ebands */
-    pub background_log_e: [f32; 2 * 21],                       /* Size = 2*mode->nb_ebands */
+    pub(crate) decode_mem: [f32; 2 * (2 * DECODE_BUFFER_SIZE + 240)], /* Size = channels*(QEXT_SCALE(DECODE_BUFFER_SIZE)+mode->overlap), max qext_scale=2, overlap=240 */
+    pub(crate) lpc: [f32; 2 * LPC_ORDER], /* Size = channels*LPC_ORDER */
+    pub(crate) old_ebands: [f32; 2 * 21], /* Size = 2*mode->nb_ebands */
+    pub(crate) old_log_e: [f32; 2 * 21],  /* Size = 2*mode->nb_ebands */
+    pub(crate) old_log_e2: [f32; 2 * 21], /* Size = 2*mode->nb_ebands */
+    pub(crate) background_log_e: [f32; 2 * 21], /* Size = 2*mode->nb_ebands */
     /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
     #[cfg(feature = "qext")]
-    pub qext_scale: i32,
+    pub(crate) qext_scale: i32,
     /// QEXT: old band energies for extension bands
     #[cfg(feature = "qext")]
-    pub qext_old_band_e: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
+    pub(crate) qext_old_band_e: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
 #[cfg(feature = "qext")]

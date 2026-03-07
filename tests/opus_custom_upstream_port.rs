@@ -127,15 +127,15 @@ fn to_i24(input: &[f32]) -> Vec<i32> {
 fn apply_encoder_settings(enc: &mut RustEncoder, settings: CaseSettings) {
     match enc {
         RustEncoder::Custom(st) => {
-            st.bitrate = settings.bitrate;
-            st.vbr = settings.vbr as i32;
-            st.constrained_vbr = settings.vbr_constraint as i32;
-            st.complexity = settings.complexity;
-            st.loss_rate = settings.packet_loss_perc;
-            st.lsb_depth = settings.lsb_depth;
+            st.set_bitrate(settings.bitrate);
+            st.set_vbr(settings.vbr as i32);
+            st.set_constrained_vbr(settings.vbr_constraint as i32);
+            st.set_complexity(settings.complexity);
+            st.set_loss_rate(settings.packet_loss_perc);
+            st.set_lsb_depth(settings.lsb_depth);
             #[cfg(feature = "qext")]
             {
-                st.enable_qext = settings.qext as i32;
+                st.set_enable_qext(settings.qext as i32);
             }
         }
         RustEncoder::Opus(st) => {

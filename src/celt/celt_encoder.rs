@@ -53,73 +53,73 @@ use crate::silk::macros::EC_CLZ0;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct OpusCustomEncoder {
-    pub mode: &'static OpusCustomMode,
-    pub channels: i32,
-    pub stream_channels: i32,
-    pub force_intra: i32,
-    pub clip: i32,
-    pub disable_pf: i32,
-    pub complexity: i32,
-    pub upsample: i32,
-    pub start: i32,
-    pub end: i32,
-    pub bitrate: i32,
-    pub vbr: i32,
-    pub signalling: i32,
-    pub constrained_vbr: i32,
-    pub loss_rate: i32,
-    pub lsb_depth: i32,
-    pub lfe: i32,
-    pub disable_inv: i32,
-    pub arch: Arch,
-    pub rng: u32,
-    pub spread_decision: i32,
-    pub delayed_intra: f32,
-    pub tonal_average: i32,
-    pub last_coded_bands: i32,
-    pub hf_average: i32,
-    pub tapset_decision: i32,
-    pub prefilter_period: i32,
-    pub prefilter_gain: f32,
-    pub prefilter_tapset: i32,
-    pub consec_transient: i32,
-    pub analysis: AnalysisInfo,
-    pub silk_info: SILKInfo,
-    pub preemph_mem_e: [f32; 2],
-    pub preemph_mem_d: [f32; 2],
-    pub vbr_reservoir: i32,
-    pub vbr_drift: i32,
-    pub vbr_offset: i32,
-    pub vbr_count: i32,
-    pub overlap_max: f32,
-    pub stereo_saving: f32,
-    pub intensity: i32,
+    pub(crate) mode: &'static OpusCustomMode,
+    pub(crate) channels: i32,
+    pub(crate) stream_channels: i32,
+    pub(crate) force_intra: i32,
+    pub(crate) clip: i32,
+    pub(crate) disable_pf: i32,
+    pub(crate) complexity: i32,
+    pub(crate) upsample: i32,
+    pub(crate) start: i32,
+    pub(crate) end: i32,
+    pub(crate) bitrate: i32,
+    pub(crate) vbr: i32,
+    pub(crate) signalling: i32,
+    pub(crate) constrained_vbr: i32,
+    pub(crate) loss_rate: i32,
+    pub(crate) lsb_depth: i32,
+    pub(crate) lfe: i32,
+    pub(crate) disable_inv: i32,
+    pub(crate) arch: Arch,
+    pub(crate) rng: u32,
+    pub(crate) spread_decision: i32,
+    pub(crate) delayed_intra: f32,
+    pub(crate) tonal_average: i32,
+    pub(crate) last_coded_bands: i32,
+    pub(crate) hf_average: i32,
+    pub(crate) tapset_decision: i32,
+    pub(crate) prefilter_period: i32,
+    pub(crate) prefilter_gain: f32,
+    pub(crate) prefilter_tapset: i32,
+    pub(crate) consec_transient: i32,
+    pub(crate) analysis: AnalysisInfo,
+    pub(crate) silk_info: SILKInfo,
+    pub(crate) preemph_mem_e: [f32; 2],
+    pub(crate) preemph_mem_d: [f32; 2],
+    pub(crate) vbr_reservoir: i32,
+    pub(crate) vbr_drift: i32,
+    pub(crate) vbr_offset: i32,
+    pub(crate) vbr_count: i32,
+    pub(crate) overlap_max: f32,
+    pub(crate) stereo_saving: f32,
+    pub(crate) intensity: i32,
     /// Energy mask for surround encoding (set by multistream encoder).
     /// `energy_mask_len == 0` means no mask is active.
-    pub energy_mask: [f32; 2 * 21],
-    pub energy_mask_len: usize,
-    pub spec_avg: f32,
+    pub(crate) energy_mask: [f32; 2 * 21],
+    pub(crate) energy_mask_len: usize,
+    pub(crate) spec_avg: f32,
     /// Overlap memory, size = channels * overlap (max 2*240 = 480)
-    pub in_mem: [f32; 2 * 240],
+    pub(crate) in_mem: [f32; 2 * 240],
     /// Prefilter memory, size = channels * QEXT_SCALE(COMBFILTER_MAXPERIOD) (max 2*2048 = 4096)
-    pub prefilter_mem: [f32; 2 * PREFILTER_MEM_CHAN_CAP],
+    pub(crate) prefilter_mem: [f32; 2 * PREFILTER_MEM_CHAN_CAP],
     /// Old band energies, size = channels * nb_ebands (max 2*21 = 42)
-    pub old_band_e: [f32; 2 * 21],
+    pub(crate) old_band_e: [f32; 2 * 21],
     /// Old log energies, size = channels * nb_ebands (max 2*21 = 42)
-    pub old_log_e: [f32; 2 * 21],
+    pub(crate) old_log_e: [f32; 2 * 21],
     /// Old log energies (2 frames ago), size = channels * nb_ebands (max 2*21 = 42)
-    pub old_log_e2: [f32; 2 * 21],
+    pub(crate) old_log_e2: [f32; 2 * 21],
     /// Energy quantization error, size = channels * nb_ebands (max 2*21 = 42)
-    pub energy_error: [f32; 2 * 21],
+    pub(crate) energy_error: [f32; 2 * 21],
     /// QEXT: enable quality extension encoding
     #[cfg(feature = "qext")]
-    pub enable_qext: i32,
+    pub(crate) enable_qext: i32,
     /// QEXT: scaling factor (1 for 48 kHz, 2 for 96 kHz)
     #[cfg(feature = "qext")]
-    pub qext_scale: i32,
+    pub(crate) qext_scale: i32,
     /// QEXT: old band energies for extension bands
     #[cfg(feature = "qext")]
-    pub qext_old_band_e: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
+    pub(crate) qext_old_band_e: [f32; 2 * crate::celt::modes::data_96000::NB_QEXT_BANDS],
 }
 
 #[cfg(feature = "qext")]
@@ -438,6 +438,35 @@ impl OpusCustomEncoder {
 
     pub fn set_signalling(&mut self, signalling: i32) {
         self.signalling = signalling;
+    }
+
+    pub fn set_bitrate(&mut self, bitrate: i32) {
+        self.bitrate = bitrate;
+    }
+
+    pub fn set_vbr(&mut self, vbr: i32) {
+        self.vbr = vbr;
+    }
+
+    pub fn set_constrained_vbr(&mut self, constrained_vbr: i32) {
+        self.constrained_vbr = constrained_vbr;
+    }
+
+    pub fn set_complexity(&mut self, complexity: i32) {
+        self.complexity = complexity;
+    }
+
+    pub fn set_loss_rate(&mut self, loss_rate: i32) {
+        self.loss_rate = loss_rate;
+    }
+
+    pub fn set_lsb_depth(&mut self, lsb_depth: i32) {
+        self.lsb_depth = lsb_depth;
+    }
+
+    #[cfg(feature = "qext")]
+    pub fn set_enable_qext(&mut self, enable_qext: i32) {
+        self.enable_qext = enable_qext;
     }
 }
 
