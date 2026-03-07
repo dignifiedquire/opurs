@@ -40,6 +40,7 @@ use crate::celt::rate::clt_compute_allocation;
 use crate::celt::rate::clt_compute_extra_allocation;
 
 use crate::opus::analysis::AnalysisInfo;
+use crate::error::ErrorCode;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 use crate::silk::macros::EC_CLZ0;
 
@@ -334,34 +335,105 @@ impl OpusCustomEncoder {
         self.qext_old_band_e.fill(0.0);
     }
 
+    /// Encode interleaved `i16` PCM into compressed CELT.
+    ///
+    /// Returns number of bytes written to `compressed` on success.
+    ///
     /// Upstream C: celt/celt_encoder.c:opus_custom_encode
-    pub fn encode(&mut self, pcm: &[i16], compressed: &mut [u8]) -> i32 {
+    pub fn encode(&mut self, pcm: &[i16], compressed: &mut [u8]) -> Result<usize, ErrorCode> {
         let channels = self.channels as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = (pcm.len() / channels) as i32;
-        opus_custom_encode(self, pcm, frame_size, compressed)
+        let required = pcm.len();
+        let mut input = vec![0.0f32; required];
+        for i in 0..required {
+            input[i] = (1.0f32 / 32768.0f32) * pcm[i] as f32;
+        }
+        let ret = celt_encode_with_ec(
+            self,
+            &input,
+            frame_size,
+            compressed,
+            compressed.len() as i32,
+            None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
+    /// Encode interleaved `f32` PCM into compressed CELT.
+    ///
+    /// Returns number of bytes written to `compressed` on success.
+    ///
     /// Upstream C: celt/celt_encoder.c:opus_custom_encode_float
-    pub fn encode_float(&mut self, pcm: &[f32], compressed: &mut [u8]) -> i32 {
+    pub fn encode_float(&mut self, pcm: &[f32], compressed: &mut [u8]) -> Result<usize, ErrorCode> {
         let channels = self.channels as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = (pcm.len() / channels) as i32;
-        opus_custom_encode_float(self, pcm, frame_size, compressed)
+        let required = pcm.len();
+        let ret = celt_encode_with_ec(
+            self,
+            &pcm[..required],
+            frame_size,
+            compressed,
+            compressed.len() as i32,
+            None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
+    /// Encode interleaved 24-bit `i32` PCM into compressed CELT.
+    ///
+    /// Returns number of bytes written to `compressed` on success.
+    ///
     /// Upstream C: celt/celt_encoder.c:opus_custom_encode24
-    pub fn encode24(&mut self, pcm: &[i32], compressed: &mut [u8]) -> i32 {
+    pub fn encode24(&mut self, pcm: &[i32], compressed: &mut [u8]) -> Result<usize, ErrorCode> {
         let channels = self.channels as usize;
         if channels == 0 || pcm.is_empty() || !pcm.len().is_multiple_of(channels) {
-            return OPUS_BAD_ARG;
+            return Err(ErrorCode::BadArg);
         }
         let frame_size = (pcm.len() / channels) as i32;
-        opus_custom_encode24(self, pcm, frame_size, compressed)
+        let required = pcm.len();
+        let mut input = vec![0.0f32; required];
+        for i in 0..required {
+            input[i] = (1.0f32 / 32768.0f32 / 256.0f32) * pcm[i] as f32;
+        }
+        let ret = celt_encode_with_ec(
+            self,
+            &input,
+            frame_size,
+            compressed,
+            compressed.len() as i32,
+            None,
+            #[cfg(feature = "qext")]
+            None,
+            #[cfg(feature = "qext")]
+            0,
+        );
+        if ret < 0 {
+            Err(ErrorCode::from(ret))
+        } else {
+            Ok(ret as usize)
+        }
     }
 
     pub fn set_signalling(&mut self, signalling: i32) {
@@ -369,106 +441,6 @@ impl OpusCustomEncoder {
     }
 }
 
-/// Upstream C: celt/celt_encoder.c:opus_custom_encode
-pub fn opus_custom_encode(
-    st: &mut OpusCustomEncoder,
-    pcm: &[i16],
-    frame_size: i32,
-    compressed: &mut [u8],
-) -> i32 {
-    if frame_size <= 0 || st.channels <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    let mut input = vec![0.0f32; required];
-    for i in 0..required {
-        input[i] = (1.0f32 / 32768.0f32) * pcm[i] as f32;
-    }
-    celt_encode_with_ec(
-        st,
-        &input,
-        frame_size,
-        compressed,
-        compressed.len() as i32,
-        None,
-        #[cfg(feature = "qext")]
-        None,
-        #[cfg(feature = "qext")]
-        0,
-    )
-}
-
-/// Upstream C: celt/celt_encoder.c:opus_custom_encode_float
-pub fn opus_custom_encode_float(
-    st: &mut OpusCustomEncoder,
-    pcm: &[f32],
-    frame_size: i32,
-    compressed: &mut [u8],
-) -> i32 {
-    if frame_size <= 0 || st.channels <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    celt_encode_with_ec(
-        st,
-        &pcm[..required],
-        frame_size,
-        compressed,
-        compressed.len() as i32,
-        None,
-        #[cfg(feature = "qext")]
-        None,
-        #[cfg(feature = "qext")]
-        0,
-    )
-}
-
-/// Upstream C: celt/celt_encoder.c:opus_custom_encode24
-pub fn opus_custom_encode24(
-    st: &mut OpusCustomEncoder,
-    pcm: &[i32],
-    frame_size: i32,
-    compressed: &mut [u8],
-) -> i32 {
-    if frame_size <= 0 || st.channels <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    let required = match (frame_size as usize).checked_mul(st.channels as usize) {
-        Some(v) => v,
-        None => return OPUS_BAD_ARG,
-    };
-    if pcm.len() < required {
-        return OPUS_BAD_ARG;
-    }
-    let mut input = vec![0.0f32; required];
-    for i in 0..required {
-        input[i] = (1.0f32 / 32768.0f32 / 256.0f32) * pcm[i] as f32;
-    }
-    celt_encode_with_ec(
-        st,
-        &input,
-        frame_size,
-        compressed,
-        compressed.len() as i32,
-        None,
-        #[cfg(feature = "qext")]
-        None,
-        #[cfg(feature = "qext")]
-        0,
-    )
-}
 
 #[cfg(all(test, feature = "qext"))]
 mod tests {

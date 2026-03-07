@@ -163,7 +163,7 @@ fn encode_frame(
 ) -> i32 {
     let lo = frame_idx * input.frame_size * input.channels;
     let hi = lo + input.frame_size * input.channels;
-    match (enc, format) {
+    let result = match (enc, format) {
         (RustEncoder::Custom(st), SampleFormat::I16) => {
             st.encode(&input.i16_samples[lo..hi], packet)
         }
@@ -174,23 +174,18 @@ fn encode_frame(
             st.encode_float(&input.f32_samples[lo..hi], packet)
         }
         (RustEncoder::Opus(st), SampleFormat::I16) => {
-            match st.encode(&input.i16_samples[lo..hi], packet) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.encode(&input.i16_samples[lo..hi], packet)
         }
         (RustEncoder::Opus(st), SampleFormat::I24) => {
-            match st.encode24(&input.i24_samples[lo..hi], packet) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.encode24(&input.i24_samples[lo..hi], packet)
         }
         (RustEncoder::Opus(st), SampleFormat::Float) => {
-            match st.encode_float(&input.f32_samples[lo..hi], packet) {
-                Ok(v) => v as i32,
-                Err(e) => i32::from(e),
-            }
+            st.encode_float(&input.f32_samples[lo..hi], packet)
         }
+    };
+    match result {
+        Ok(v) => v as i32,
+        Err(e) => i32::from(e),
     }
 }
 

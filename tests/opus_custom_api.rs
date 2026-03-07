@@ -63,7 +63,7 @@ fn custom_encode24_matches_upstream_c() {
     let mut rust_packet = vec![0u8; 4000];
     let mut c_packet = vec![0u8; 4000];
 
-    let rust_len = rust_enc.encode24(&pcm, &mut rust_packet);
+    let rust_len = rust_enc.encode24(&pcm, &mut rust_packet).expect("custom encode24 failed");
     let c_len = unsafe {
         opus_custom_encode24(
             c_enc,
@@ -74,10 +74,10 @@ fn custom_encode24_matches_upstream_c() {
         )
     };
 
-    assert_eq!(rust_len, c_len, "custom encode24 length mismatch");
-    assert!(rust_len > 0, "custom encode24 failed: {rust_len}");
+    assert_eq!(rust_len as i32, c_len, "custom encode24 length mismatch");
+    assert!(rust_len > 0, "custom encode24 failed");
     assert_eq!(
-        &rust_packet[..rust_len as usize],
+        &rust_packet[..rust_len],
         &c_packet[..c_len as usize],
         "custom encode24 payload mismatch"
     );
