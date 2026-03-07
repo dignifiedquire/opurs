@@ -6,7 +6,7 @@ use crate::enums::{Application, Bandwidth, Bitrate, Channels, FrameSize, SampleR
 use crate::error::ErrorCode;
 use crate::opus::analysis::DownmixInput;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_OK, OPUS_UNIMPLEMENTED};
-use crate::opus::opus_encoder::{frame_size_select, opus_encode_native, OpusEncoder};
+use crate::opus::opus_encoder::{frame_size_select, OpusEncoder};
 use crate::opus::opus_multistream::{OpusMultistreamConfig, OpusMultistreamLayout};
 use crate::opus::repacketizer::{FrameSource, OpusRepacketizer};
 
@@ -857,8 +857,7 @@ impl OpusMSEncoder {
                 *dst = src as f32 * (1.0 / 32768.0);
             }
             let analysis_input = DownmixInput::Int(pcm);
-            let len = opus_encode_native(
-                encoder,
+            let len = encoder.encode_native(
                 &in_f32,
                 frame_size_i32,
                 &mut stream_packet,
@@ -986,8 +985,7 @@ impl OpusMSEncoder {
                 )));
             }
             let mut stream_packet = vec![0u8; curr_max];
-            let len = opus_encode_native(
-                encoder,
+            let len = encoder.encode_native(
                 &stream_pcm,
                 frame_size_i32,
                 &mut stream_packet,
@@ -1091,8 +1089,7 @@ impl OpusMSEncoder {
                 *dst = src as f32 * (1.0 / (32768.0 * 256.0));
             }
             let analysis_input = DownmixInput::Int24(pcm);
-            let len = opus_encode_native(
-                encoder,
+            let len = encoder.encode_native(
                 &in_f32,
                 frame_size_i32,
                 &mut stream_packet,
