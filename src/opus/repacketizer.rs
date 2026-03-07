@@ -375,7 +375,7 @@ impl OpusRepacketizer {
                 }
                 data[ptr] = self.toc & 0xfc | 0x2;
                 ptr += 1;
-                ptr += encode_size(len[0] as i32, &mut data[ptr..]) as usize;
+                ptr += encode_size(len[0] as i32, &mut data[ptr..]);
             }
         }
         if count > 2 || (pad && tot_size < maxlen) || ext_count > 0 {
@@ -459,14 +459,13 @@ impl OpusRepacketizer {
             }
             if vbr != 0 {
                 for i in 0..count - 1 {
-                    ptr += encode_size(len[i as usize] as i32, &mut data[ptr..]) as usize;
+                    ptr += encode_size(len[i as usize] as i32, &mut data[ptr..]);
                 }
             }
 
             // Copy payload frames.
             if self_delimited {
-                let sdlen =
-                    encode_size(len[(count - 1) as usize] as i32, &mut data[ptr..]) as usize;
+                let sdlen = encode_size(len[(count - 1) as usize] as i32, &mut data[ptr..]);
                 ptr += sdlen;
             }
             for (i, (len, frame)) in len.iter().zip(frames).enumerate().take(count as _) {
@@ -509,7 +508,7 @@ impl OpusRepacketizer {
             return tot_size;
         }
         if self_delimited {
-            let sdlen = encode_size(len[(count - 1) as usize] as i32, &mut data[ptr..]) as usize;
+            let sdlen = encode_size(len[(count - 1) as usize] as i32, &mut data[ptr..]);
             ptr += sdlen;
         }
 

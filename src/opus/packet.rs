@@ -146,7 +146,7 @@ pub fn opus_pcm_soft_clip(
 /// Uses the same 1-byte / 2-byte encoding rules as upstream packet parsing.
 ///
 /// Upstream C: src/opus.c:encode_size
-pub fn encode_size(size: i32, data: &mut [u8]) -> i32 {
+pub fn encode_size(size: i32, data: &mut [u8]) -> usize {
     if size < 252 {
         data[0] = size as u8;
         1
