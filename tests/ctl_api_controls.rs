@@ -8,7 +8,7 @@ use opurs::internals::{
     opus_packet_extensions_generate, opus_packet_extensions_parse, opus_packet_parse_impl,
     OpusExtensionData,
 };
-#[cfg(feature = "qext")]
+#[cfg(all(feature = "tools", feature = "qext"))]
 use opurs::OPUS_APPLICATION_AUDIO;
 #[cfg(feature = "qext")]
 use opurs::{opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad};
@@ -116,7 +116,7 @@ unsafe extern "C" {
     fn opus_projection_decoder_destroy(st: *mut c_void);
 }
 
-#[cfg(feature = "qext")]
+#[cfg(all(feature = "tools", feature = "qext"))]
 const SAMPLE_RATE_96K: i32 = 96_000;
 #[cfg(feature = "qext")]
 const FRAME_SIZE_20MS_96K: i32 = 1920;
