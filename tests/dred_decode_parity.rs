@@ -4,9 +4,7 @@
 
 use std::ptr;
 
-use opurs::{
-    opus_decoder_dred_decode_float, Application, Channels, OpusDecoder, OpusEncoder, SampleRate,
-};
+use opurs::{Application, Channels, OpusDecoder, OpusEncoder, SampleRate};
 
 fn max_abs_diff(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
@@ -55,11 +53,16 @@ fn dred_decode_float_stage0_matches_c_null_dred_path() {
     let dred = opurs::dnn::dred::decoder::OpusDRED::new();
     let mut rust_out = vec![0.0f32; 960];
     let mut c_out = vec![0.0f32; 960];
-    let rust_ret = opus_decoder_dred_decode_float(&mut rust_dec, &dred, 0, &mut rust_out, 960);
+    let rust_ret = rust_dec.decode_dred_float(&dred, 0, &mut rust_out, 960);
     let c_ret = unsafe {
         libopus_sys::opus_decoder_dred_decode_float(c_dec, ptr::null(), 0, c_out.as_mut_ptr(), 960)
     };
-    assert_eq!(rust_ret, c_ret, "dred decode return mismatch");
+    // Method returns Result<usize, ErrorCode>; C returns i32. Compare raw values.
+    let rust_ret_raw = match rust_ret {
+        Ok(n) => n as i32,
+        Err(e) => i32::from(e),
+    };
+    assert_eq!(rust_ret_raw, c_ret, "dred decode return mismatch");
 
     let max_diff = max_abs_diff(&rust_out, &c_out);
     assert!(

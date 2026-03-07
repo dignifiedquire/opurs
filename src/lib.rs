@@ -39,10 +39,6 @@ pub use crate::opus::repacketizer::{
 
 #[cfg(feature = "dred")]
 pub use crate::dnn::dred::decoder::{OpusDRED, OpusDREDDecoder};
-#[cfg(feature = "dred")]
-pub use crate::opus::opus_decoder::{
-    opus_decoder_dred_decode, opus_decoder_dred_decode24, opus_decoder_dred_decode_float,
-};
 
 // opus_libinfo
 pub use crate::celt::common::{opus_get_version_string, opus_strerror};

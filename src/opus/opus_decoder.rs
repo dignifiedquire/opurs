@@ -283,10 +283,18 @@ impl OpusDecoder {
         pcm: &mut [i16],
         frame_size: i32,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decoder_dred_decode(self, dred, dred_offset, pcm, frame_size);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        debug_assert!(self.channels == 1 || self.channels == 2);
+        let mut out = vec![0.0f32; (frame_size * self.channels) as usize];
+        let ret = opus_decode_native(
+            self, &[], &mut out, frame_size, 0, false, None, 1, Some(dred), dred_offset,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
+            celt_float2int16(&out, pcm, (ret * self.channels) as usize);
             Ok(ret as usize)
         }
     }
@@ -302,10 +310,20 @@ impl OpusDecoder {
         pcm: &mut [i32],
         frame_size: i32,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decoder_dred_decode24(self, dred, dred_offset, pcm, frame_size);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        debug_assert!(self.channels == 1 || self.channels == 2);
+        let mut out = vec![0.0f32; (frame_size * self.channels) as usize];
+        let ret = opus_decode_native(
+            self, &[], &mut out, frame_size, 0, false, None, 1, Some(dred), dred_offset,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
+            for i in 0..(ret * self.channels) as usize {
+                pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
+            }
             Ok(ret as usize)
         }
     }
@@ -321,7 +339,12 @@ impl OpusDecoder {
         pcm: &mut [f32],
         frame_size: i32,
     ) -> Result<usize, ErrorCode> {
-        let ret = opus_decoder_dred_decode_float(self, dred, dred_offset, pcm, frame_size);
+        if frame_size <= 0 {
+            return Err(ErrorCode::BadArg);
+        }
+        let ret = opus_decode_native(
+            self, &[], pcm, frame_size, 0, false, None, 0, Some(dred), dred_offset,
+        );
         if ret < 0 {
             Err(ErrorCode::from(ret))
         } else {
@@ -1438,97 +1461,6 @@ pub fn opus_decode_native(
 }
 
 
-/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode
-#[cfg(feature = "dred")]
-pub fn opus_decoder_dred_decode(
-    st: &mut OpusDecoder,
-    dred: &OpusDRED,
-    dred_offset: i32,
-    pcm: &mut [i16],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    debug_assert!(st.channels == 1 || st.channels == 2);
-    let mut out = vec![0.0f32; (frame_size * st.channels) as usize];
-    let ret = opus_decode_native(
-        st,
-        &[],
-        &mut out,
-        frame_size,
-        0,
-        false,
-        None,
-        1,
-        Some(dred),
-        dred_offset,
-    );
-    if ret > 0 {
-        celt_float2int16(&out, pcm, (ret * st.channels) as usize);
-    }
-    ret
-}
-
-/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode24
-#[cfg(feature = "dred")]
-pub fn opus_decoder_dred_decode24(
-    st: &mut OpusDecoder,
-    dred: &OpusDRED,
-    dred_offset: i32,
-    pcm: &mut [i32],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    debug_assert!(st.channels == 1 || st.channels == 2);
-    let mut out = vec![0.0f32; (frame_size * st.channels) as usize];
-    let ret = opus_decode_native(
-        st,
-        &[],
-        &mut out,
-        frame_size,
-        0,
-        false,
-        None,
-        1,
-        Some(dred),
-        dred_offset,
-    );
-    if ret > 0 {
-        for i in 0..(ret * st.channels) as usize {
-            pcm[i] = float2int(32768.0f32 * 256.0f32 * out[i]);
-        }
-    }
-    ret
-}
-
-/// Upstream C: src/opus_decoder.c:opus_decoder_dred_decode_float
-#[cfg(feature = "dred")]
-pub fn opus_decoder_dred_decode_float(
-    st: &mut OpusDecoder,
-    dred: &OpusDRED,
-    dred_offset: i32,
-    pcm: &mut [f32],
-    frame_size: i32,
-) -> i32 {
-    if frame_size <= 0 {
-        return OPUS_BAD_ARG;
-    }
-    opus_decode_native(
-        st,
-        &[],
-        pcm,
-        frame_size,
-        0,
-        false,
-        None,
-        0,
-        Some(dred),
-        dred_offset,
-    )
-}
 
 #[cfg(feature = "dred")]
 fn dred_find_payload(data: &[u8]) -> Result<Option<(usize, usize, i32)>, i32> {

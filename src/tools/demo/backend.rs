@@ -399,7 +399,10 @@ mod rust_backend {
             pcm: &mut [i32],
             frame_size: i32,
         ) -> i32 {
-            crate::opus_decoder_dred_decode24(dec, dred, dred_offset, pcm, frame_size)
+            match dec.decode_dred24(dred, dred_offset, pcm, frame_size) {
+                Ok(n) => n as i32,
+                Err(e) => i32::from(e),
+            }
         }
 
         fn opus_multistream_encoder_create(
