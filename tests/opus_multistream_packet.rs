@@ -5,9 +5,10 @@
 
 use libopus_sys::opus_multistream_packet_pad as c_multistream_packet_pad;
 use libopus_sys::opus_multistream_packet_unpad as c_multistream_packet_unpad;
+use opurs::internals::{OPUS_BAD_ARG, OPUS_OK};
 use opurs::{
     opus_multistream_packet_pad, opus_multistream_packet_unpad, opus_packet_parse, Application,
-    Channels, OpusEncoder, SampleRate, OPUS_BAD_ARG, OPUS_OK,
+    Channels, OpusEncoder, SampleRate,
 };
 
 fn encode_size(size: i32, out: &mut [u8]) -> usize {

@@ -1,4 +1,6 @@
 #[cfg(all(feature = "tools", feature = "qext"))]
+use opurs::internals::OPUS_APPLICATION_AUDIO;
+#[cfg(all(feature = "tools", feature = "qext"))]
 use opurs::internals::{
     ec_dec_bit_logp as r_ec_dec_bit_logp, ec_dec_init as r_ec_dec_init,
     ec_dec_uint as r_ec_dec_uint, ec_tell_frac as r_ec_tell_frac,
@@ -9,7 +11,12 @@ use opurs::internals::{
     OpusExtensionData,
 };
 #[cfg(all(feature = "tools", feature = "qext"))]
-use opurs::OPUS_APPLICATION_AUDIO;
+use opurs::internals::{
+    OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_IGNORE_EXTENSIONS_REQUEST, OPUS_GET_QEXT_REQUEST,
+    OPUS_SET_IGNORE_EXTENSIONS_REQUEST, OPUS_SET_QEXT_REQUEST,
+};
+#[cfg(all(feature = "osce", feature = "tools-dnn"))]
+use opurs::internals::{OPUS_GET_OSCE_BWE_REQUEST, OPUS_SET_OSCE_BWE_REQUEST};
 #[cfg(feature = "qext")]
 use opurs::{opus_multistream_packet_unpad, opus_packet_pad, opus_packet_unpad};
 use opurs::{
@@ -18,13 +25,6 @@ use opurs::{
 };
 #[cfg(any(feature = "qext", feature = "osce"))]
 use opurs::{Bitrate, OpusEncoder, OpusMSEncoder};
-#[cfg(all(feature = "tools", feature = "qext"))]
-use opurs::{
-    OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_IGNORE_EXTENSIONS_REQUEST, OPUS_GET_QEXT_REQUEST,
-    OPUS_SET_IGNORE_EXTENSIONS_REQUEST, OPUS_SET_QEXT_REQUEST,
-};
-#[cfg(all(feature = "osce", feature = "tools-dnn"))]
-use opurs::{OPUS_GET_OSCE_BWE_REQUEST, OPUS_SET_OSCE_BWE_REQUEST};
 #[cfg(all(feature = "tools", feature = "qext"))]
 use std::ffi::c_void;
 

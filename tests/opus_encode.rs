@@ -10,9 +10,10 @@
 
 mod test_common;
 
+use opurs::internals::OPUS_AUTO;
 use opurs::{
     opus_packet_pad, opus_packet_parse, opus_packet_unpad, Application, Bandwidth, Bitrate,
-    Channels, FrameSize, OpusDecoder, OpusEncoder, SampleRate, Signal, OPUS_AUTO,
+    Channels, FrameSize, OpusDecoder, OpusEncoder, SampleRate, Signal,
 };
 use test_common::{debruijn2, TestRng};
 

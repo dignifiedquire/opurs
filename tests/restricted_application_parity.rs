@@ -5,12 +5,12 @@ use libopus_sys::{
     opus_encoder_ctl as c_opus_encoder_ctl, opus_encoder_destroy as c_opus_encoder_destroy,
     OpusEncoder as COpusEncoder,
 };
-use opurs::{
-    Application, Channels, OpusEncoder, SampleRate, OPUS_APPLICATION_AUDIO,
-    OPUS_APPLICATION_RESTRICTED_CELT, OPUS_APPLICATION_RESTRICTED_SILK, OPUS_APPLICATION_VOIP,
-    OPUS_BAD_ARG, OPUS_GET_BITRATE_REQUEST, OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BITRATE_REQUEST,
+use opurs::internals::{
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_RESTRICTED_CELT, OPUS_APPLICATION_RESTRICTED_SILK,
+    OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_GET_BITRATE_REQUEST,
+    OPUS_SET_APPLICATION_REQUEST, OPUS_SET_BITRATE_REQUEST,
 };
-use opurs::{Bitrate, OPUS_AUTO, OPUS_BITRATE_MAX};
+use opurs::{Application, Bitrate, Channels, OpusEncoder, SampleRate};
 
 const OPUS_SET_LFE_REQUEST: i32 = 10024;
 const OPUS_SET_ENERGY_MASK_REQUEST: i32 = 10026;

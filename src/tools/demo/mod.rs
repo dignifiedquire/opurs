@@ -27,7 +27,8 @@ pub use input::{
     MultistreamEncodeArgs, MultistreamLayout, SampleRate,
 };
 
-use crate::{opus_strerror, OPUS_AUTO, OPUS_FRAMESIZE_ARG};
+use crate::opus::opus_defines::{OPUS_AUTO, OPUS_FRAMESIZE_ARG};
+use crate::opus_strerror;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 

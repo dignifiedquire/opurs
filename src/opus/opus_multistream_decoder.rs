@@ -389,7 +389,7 @@ impl OpusMSDecoder {
     pub fn bandwidth(&self) -> i32 {
         self.decoders
             .first()
-            .map(OpusDecoder::get_bandwidth)
+            .map(OpusDecoder::bandwidth)
             .unwrap_or(0)
     }
 

@@ -1,10 +1,11 @@
+use opurs::internals::OPUS_BAD_ARG;
 use opurs::internals::{
     opus_packet_extensions_count, opus_packet_extensions_count_ext,
     opus_packet_extensions_generate, opus_packet_extensions_parse,
     opus_packet_extensions_parse_ext, opus_packet_pad_impl, opus_packet_parse_impl,
     OpusExtensionData,
 };
-use opurs::{Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate, OPUS_BAD_ARG};
+use opurs::{Application, Channels, OpusEncoder, OpusRepacketizer, SampleRate};
 
 #[cfg(feature = "tools")]
 #[repr(C)]

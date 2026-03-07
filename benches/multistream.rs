@@ -97,14 +97,14 @@ fn create_c_encoder(layout: LayoutCase, bitrate: i32) -> *mut libopus_sys::OpusM
             layout.streams,
             layout.coupled_streams,
             layout.mapping.as_ptr(),
-            opurs::OPUS_APPLICATION_AUDIO,
+            opurs::internals::OPUS_APPLICATION_AUDIO,
             &mut err as *mut _,
         )
     };
     assert!(!enc.is_null(), "c ms encoder create failed: {err}");
     unsafe {
-        c_opus_multistream_encoder_ctl(enc, opurs::OPUS_SET_BITRATE_REQUEST, bitrate);
-        c_opus_multistream_encoder_ctl(enc, opurs::OPUS_SET_COMPLEXITY_REQUEST, 10i32);
+        c_opus_multistream_encoder_ctl(enc, opurs::internals::OPUS_SET_BITRATE_REQUEST, bitrate);
+        c_opus_multistream_encoder_ctl(enc, opurs::internals::OPUS_SET_COMPLEXITY_REQUEST, 10i32);
     }
     enc
 }

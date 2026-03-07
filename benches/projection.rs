@@ -12,11 +12,13 @@ use libopus_sys::{
     opus_projection_encoder_ctl as c_opus_projection_encoder_ctl,
     opus_projection_encoder_destroy as c_opus_projection_encoder_destroy,
 };
-use opurs::{
-    Application, Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate,
+use opurs::internals::{
     OPUS_APPLICATION_AUDIO, OPUS_OK, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_SET_BITRATE_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST,
+};
+use opurs::{
+    Application, Bitrate, MappingMatrix, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate,
 };
 use std::ffi::c_void;
 

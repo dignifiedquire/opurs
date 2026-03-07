@@ -1,8 +1,7 @@
 #![cfg(feature = "tools")]
 
-use opurs::{
-    Application, Channels, OpusProjectionEncoder, SampleRate, Signal, OPUS_APPLICATION_AUDIO,
-    OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL,
+use opurs::internals::{
+    OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL,
     OPUS_GET_APPLICATION_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_DTX_REQUEST,
     OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_INBAND_FEC_REQUEST,
     OPUS_GET_PACKET_LOSS_PERC_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
@@ -15,6 +14,7 @@ use opurs::{
     OPUS_SET_PREDICTION_DISABLED_REQUEST, OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST,
     OPUS_SET_VBR_REQUEST,
 };
+use opurs::{Application, Channels, OpusProjectionEncoder, SampleRate, Signal};
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::ffi::c_void;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -689,7 +689,11 @@ fn projection_encoder_ctl_value_parity_with_c() {
         opus_projection_encoder_ctl(c_ptr, OPUS_SET_VBR_CONSTRAINT_REQUEST, 1i32);
         opus_projection_encoder_ctl(c_ptr, OPUS_SET_DTX_REQUEST, 1i32);
         opus_projection_encoder_ctl(c_ptr, OPUS_SET_FORCE_CHANNELS_REQUEST, 1i32);
-        opus_projection_encoder_ctl(c_ptr, OPUS_SET_SIGNAL_REQUEST, opurs::OPUS_SIGNAL_VOICE);
+        opus_projection_encoder_ctl(
+            c_ptr,
+            OPUS_SET_SIGNAL_REQUEST,
+            opurs::internals::OPUS_SIGNAL_VOICE,
+        );
         opus_projection_encoder_ctl(c_ptr, OPUS_SET_PREDICTION_DISABLED_REQUEST, 1i32);
         opus_projection_encoder_ctl(c_ptr, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, 1i32);
     }
@@ -797,8 +801,14 @@ fn projection_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.encoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
-    assert_eq!(rust.encoder_state_mut(2).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(
+        rust.encoder_state_mut(-1).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
+    assert_eq!(
+        rust.encoder_state_mut(2).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {

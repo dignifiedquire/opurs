@@ -9,6 +9,10 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::ThreadPoolBuilder;
 
 use indicatif::ParallelProgressIterator;
+use opurs::internals::{
+    OPUS_APPLICATION_AUDIO, OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST,
+    OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST, OPUS_SET_BITRATE_REQUEST,
+};
 use opurs::tools::demo::{
     opus_demo_decode, opus_demo_decode_multistream, opus_demo_encode, opus_demo_encode_multistream,
     Application, Bandwidth, Channels, CommonOptions, Complexity, DecodeArgs, DnnOptions,
@@ -18,9 +22,7 @@ use opurs::tools::demo::{
 use opurs::tools::{opus_compare, CompareParams};
 use opurs::{
     Application as OpusApplication, Bitrate as OpusBitrate, OpusProjectionDecoder,
-    OpusProjectionEncoder, SampleRate as OpusSampleRate, OPUS_APPLICATION_AUDIO,
-    OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
-    OPUS_SET_BITRATE_REQUEST,
+    OpusProjectionEncoder, SampleRate as OpusSampleRate,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::c_void;

@@ -10,7 +10,8 @@ use libopus_sys::{
     opus_custom_mode_destroy,
 };
 use opurs::arch::opus_select_arch;
-use opurs::{OpusCustomDecoder, OpusCustomEncoder, OPUS_OK};
+use opurs::internals::OPUS_OK;
+use opurs::{OpusCustomDecoder, OpusCustomEncoder};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 fn test_guard() -> MutexGuard<'static, ()> {

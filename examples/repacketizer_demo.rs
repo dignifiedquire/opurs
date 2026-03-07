@@ -107,7 +107,7 @@ fn main() {
                 }
             }
         } else {
-            let nb_frames = rp.get_nb_frames();
+            let nb_frames = rp.nb_frames();
             let mut i = 0;
             while i < nb_frames {
                 match rp.out_range(i, i + 1, &mut output_packet) {

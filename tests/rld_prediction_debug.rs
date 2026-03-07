@@ -4,10 +4,11 @@
 extern crate opurs;
 
 use libopus_sys::{opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy};
-use opurs::{
-    Application, Bitrate, Channels, SampleRate, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
-    OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
+use opurs::internals::{
+    OPUS_APPLICATION_RESTRICTED_LOWDELAY, OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST,
+    OPUS_SET_PREDICTION_DISABLED_REQUEST,
 };
+use opurs::{Application, Bitrate, Channels, SampleRate};
 
 fn first_diff_frame(prediction_disabled: bool) -> Option<(usize, usize, usize)> {
     let sample_rate: i32 = 48000;

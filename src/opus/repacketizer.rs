@@ -205,7 +205,7 @@ impl OpusRepacketizer {
     /// to the repacketizer state.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_get_nb_frames
-    pub fn get_nb_frames(&self) -> i32 {
+    pub fn nb_frames(&self) -> i32 {
         self.nb_frames
     }
 
@@ -224,7 +224,7 @@ impl OpusRepacketizer {
     ///
     /// Returns the total size of the output packet on success, or an error code on failure.
     /// - `OPUS_BAD_ARG`: `[begin,end)` was an invalid range of frames (begin < 0, begin >= end, or end >
-    ///   `OpusRepacketizer::get_nb_frames`).
+    ///   `OpusRepacketizer::nb_frames`).
     /// - `OPUS_BUFFER_TOO_SMALL`: `maxlen` was insufficient to contain the complete output packet.
     ///
     /// Upstream C: src/repacketizer.c:opus_repacketizer_out_range
@@ -249,13 +249,13 @@ impl OpusRepacketizer {
     /// This is a convenience routine that returns all the data submitted so far
     /// in a single packet.
     /// It is equivalent to calling
-    /// `rp.out_range(0, rp.get_nb_frames(), data)`.
+    /// `rp.out_range(0, rp.nb_frames(), data)`.
     ///
     /// - `data`: The buffer in which to store the output packet.
     ///
     /// The output budget is `data.len()`. To guarantee success, it should be at
     /// least `1276` for a single frame, or for multiple frames,
-    /// `1277 * rp.get_nb_frames()`.
+    /// `1277 * rp.nb_frames()`.
     ///
     /// Returns the total size of the output packet on success, or an error code
     ///          on failure.

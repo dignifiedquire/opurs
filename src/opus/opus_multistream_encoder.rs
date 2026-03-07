@@ -513,7 +513,7 @@ impl OpusMSEncoder {
     pub fn bandwidth(&self) -> i32 {
         self.encoders
             .first()
-            .map(OpusEncoder::get_bandwidth)
+            .map(OpusEncoder::bandwidth)
             .unwrap_or(0)
     }
 
@@ -1139,12 +1139,12 @@ fn make_self_delimited(packet: &[u8]) -> Result<Vec<u8>, i32> {
     buffer.resize(packet.len() + 2, 0);
     let ret = rp.out_range_impl(
         0,
-        rp.get_nb_frames(),
+        rp.nb_frames(),
         &mut buffer,
         true,
         false,
         FrameSource::Slice {
-            data: vec![packet; rp.get_nb_frames() as usize],
+            data: vec![packet; rp.nb_frames() as usize],
         },
     );
     if ret < 0 {

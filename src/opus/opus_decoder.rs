@@ -289,7 +289,7 @@ impl OpusDecoder {
     /// Return decoded sample count for a packet using the decoder sample rate.
     ///
     /// Upstream C: src/opus_decoder.c:opus_decoder_get_nb_samples
-    pub fn get_nb_samples(&self, packet: &[u8]) -> Result<usize, ErrorCode> {
+    pub fn nb_samples(&self, packet: &[u8]) -> Result<usize, ErrorCode> {
         let ret = opus_packet_get_nb_samples(packet, self.fs);
         if ret < 0 {
             Err(ErrorCode::from(ret))
@@ -315,7 +315,7 @@ impl OpusDecoder {
     }
 
     /// Upstream C: src/opus_decoder.c:opus_decoder_ctl
-    pub fn get_bandwidth(&self) -> i32 {
+    pub fn bandwidth(&self) -> i32 {
         self.bandwidth
     }
 

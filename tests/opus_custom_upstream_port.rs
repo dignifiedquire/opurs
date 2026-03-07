@@ -7,9 +7,12 @@
 mod test_common;
 
 use opurs::arch::opus_select_arch;
+use opurs::internals::{
+    OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
+};
 use opurs::{
     Application, Bitrate, Channels, OpusCustomDecoder, OpusCustomEncoder, OpusDecoder, OpusEncoder,
-    SampleRate, OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
+    SampleRate,
 };
 use std::f64::consts::PI;
 use std::sync::{Mutex, MutexGuard, OnceLock};

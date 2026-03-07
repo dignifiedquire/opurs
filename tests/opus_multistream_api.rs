@@ -12,8 +12,7 @@ use libopus_sys::{
     opus_multistream_surround_encoder_create, opus_multistream_surround_encoder_get_size,
     opus_multistream_surround_encoder_init,
 };
-use opurs::{
-    Application, Bitrate, Channels, ErrorCode, OpusMSDecoder, OpusMSEncoder, SampleRate, Signal,
+use opurs::internals::{
     OPUS_APPLICATION_AUDIO, OPUS_APPLICATION_VOIP, OPUS_AUTO, OPUS_BAD_ARG,
     OPUS_GET_APPLICATION_REQUEST, OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST,
     OPUS_GET_DTX_REQUEST, OPUS_GET_FORCE_CHANNELS_REQUEST, OPUS_GET_GAIN_REQUEST,
@@ -28,6 +27,9 @@ use opurs::{
     OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST, OPUS_SET_PREDICTION_DISABLED_REQUEST,
     OPUS_SET_SIGNAL_REQUEST, OPUS_SET_VBR_CONSTRAINT_REQUEST, OPUS_SET_VBR_REQUEST,
     OPUS_SIGNAL_VOICE, OPUS_UNIMPLEMENTED,
+};
+use opurs::{
+    Application, Bitrate, Channels, ErrorCode, OpusMSDecoder, OpusMSEncoder, SampleRate, Signal,
 };
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -1553,8 +1555,14 @@ fn multistream_encoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.encoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
-    assert_eq!(rust.encoder_state_mut(2).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(
+        rust.encoder_state_mut(-1).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
+    assert_eq!(
+        rust.encoder_state_mut(2).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
 
     let mut c_state: *mut libopus_sys::OpusEncoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {
@@ -1639,8 +1647,14 @@ fn multistream_decoder_state_access_parity_with_c() {
     };
     assert!(!c_ptr.is_null(), "c create failed: {c_error}");
 
-    assert_eq!(rust.decoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
-    assert_eq!(rust.decoder_state_mut(2).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(
+        rust.decoder_state_mut(-1).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
+    assert_eq!(
+        rust.decoder_state_mut(2).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {

@@ -1,7 +1,7 @@
 #![cfg(feature = "tools")]
 
 use opurs::internals::opus_packet_parse_impl;
-use opurs::OPUS_INVALID_PACKET;
+use opurs::internals::OPUS_INVALID_PACKET;
 
 unsafe extern "C" {
     #[link_name = "opus_packet_parse_impl"]

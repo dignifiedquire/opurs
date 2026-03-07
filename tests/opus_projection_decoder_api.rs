@@ -4,15 +4,15 @@ use libopus_sys::{
     opus_multistream_encode, opus_multistream_encoder_create, opus_multistream_encoder_destroy,
     OPUS_APPLICATION_AUDIO,
 };
-use opurs::{
-    Application, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate, OPUS_BAD_ARG,
-    OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_GAIN_REQUEST,
+use opurs::internals::{
+    OPUS_BAD_ARG, OPUS_GET_BANDWIDTH_REQUEST, OPUS_GET_COMPLEXITY_REQUEST, OPUS_GET_GAIN_REQUEST,
     OPUS_GET_LAST_PACKET_DURATION_REQUEST, OPUS_GET_PHASE_INVERSION_DISABLED_REQUEST,
     OPUS_GET_SAMPLE_RATE_REQUEST, OPUS_MULTISTREAM_GET_DECODER_STATE_REQUEST, OPUS_OK,
     OPUS_PROJECTION_GET_DEMIXING_MATRIX_REQUEST, OPUS_PROJECTION_GET_DEMIXING_MATRIX_SIZE_REQUEST,
     OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_GAIN_REQUEST, OPUS_SET_INBAND_FEC_REQUEST,
     OPUS_SET_PACKET_LOSS_PERC_REQUEST, OPUS_SET_PHASE_INVERSION_DISABLED_REQUEST,
 };
+use opurs::{Application, OpusProjectionDecoder, OpusProjectionEncoder, SampleRate};
 use std::ffi::c_void;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -573,8 +573,14 @@ fn projection_decoder_state_access_parity_with_c() {
         "c projection decoder create failed: {c_error}"
     );
 
-    assert_eq!(rust.decoder_state_mut(-1).err(), Some(opurs::ErrorCode::BadArg));
-    assert_eq!(rust.decoder_state_mut(streams).err(), Some(opurs::ErrorCode::BadArg));
+    assert_eq!(
+        rust.decoder_state_mut(-1).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
+    assert_eq!(
+        rust.decoder_state_mut(streams).err(),
+        Some(opurs::ErrorCode::BadArg)
+    );
 
     let mut c_state: *mut libopus_sys::OpusDecoder = core::ptr::null_mut();
     let c_bad_neg = unsafe {

@@ -1,10 +1,11 @@
 #![allow(unused_assignments)]
 
+use opurs::internals::{OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET};
 use opurs::{
     opus_packet_get_bandwidth, opus_packet_get_nb_frames, opus_packet_get_nb_samples,
     opus_packet_get_samples_per_frame, opus_packet_pad, opus_packet_parse, opus_packet_unpad,
     Application, Bandwidth, Bitrate, Channels, FrameSize, OpusDecoder, OpusEncoder,
-    OpusRepacketizer, SampleRate, Signal, OPUS_BAD_ARG, OPUS_BUFFER_TOO_SMALL, OPUS_INVALID_PACKET,
+    OpusRepacketizer, SampleRate, Signal,
 };
 
 const OPUS_RATES: [i32; 5] = [48000, 24000, 16000, 12000, 8000];
@@ -60,7 +61,7 @@ fn test_dec_api() {
     // OPUS_UNIMPLEMENTED test removed: the old CTL dispatch for unknown
     // request codes is not exposed in the safe API.
 
-    let i = dec.get_bandwidth();
+    let i = dec.bandwidth();
     assert_eq!(i, 0, "OPUS_GET_BANDWIDTH initial value should be 0");
     println!("    OPUS_GET_BANDWIDTH ........................... OK.");
     cfgs += 1;
@@ -147,7 +148,7 @@ fn test_dec_api() {
     cfgs += 1;
 
     packet[0] = 0;
-    assert_eq!(dec.get_nb_samples(&packet[..1]).unwrap(), 480);
+    assert_eq!(dec.nb_samples(&packet[..1]).unwrap(), 480);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 48000), 480);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 96000), 960);
     assert_eq!(opus_packet_get_nb_samples(&packet[..1], 32000), 320);
@@ -164,7 +165,7 @@ fn test_dec_api() {
         opus_packet_get_nb_samples(&packet[..2], 48000),
         OPUS_INVALID_PACKET
     );
-    assert!(dec.get_nb_samples(&packet[..2]).is_err());
+    assert!(dec.nb_samples(&packet[..2]).is_err());
     println!("    opus_{{packet,decoder}}_get_nb_samples() ....... OK.");
     cfgs += 9;
     assert_eq!(opus_packet_get_nb_frames(&[]), OPUS_BAD_ARG);
@@ -1224,7 +1225,7 @@ fn test_enc_api_inner() {
     enc.set_bandwidth(Some(Bandwidth::Mediumband));
     cfgs += 1;
     println!("    OPUS_SET_BANDWIDTH ........................... OK.");
-    let i = enc.get_bandwidth();
+    let i = enc.bandwidth();
     assert!(
         i == 1101 || i == 1102 || i == 1103 || i == 1105 || i == -1000,
         "get_bandwidth returned unexpected {i}"
@@ -1460,7 +1461,7 @@ fn test_repacketizer_api_0() {
     println!("\n  Repacketizer tests");
     println!("  ---------------------------------------------------");
 
-    if rp.get_nb_frames() != 0 {
+    if rp.nb_frames() != 0 {
         panic!("assertion failed at upstream test_opus_api.c:1477");
     }
     println!("    opus_repacketizer_get_nb_frames .............. OK.");
@@ -1550,7 +1551,7 @@ fn test_repacketizer_api_0() {
                         } else {
                             0
                         };
-                        if rp.get_nb_frames() != rcnt * i {
+                        if rp.nb_frames() != rcnt * i {
                             panic!("assertion failed at upstream test_opus_api.c:1546");
                         }
                         let ret = match rp.out_range(0, rcnt * i, &mut po[..1276 * 48 + 48 * 2 + 2])

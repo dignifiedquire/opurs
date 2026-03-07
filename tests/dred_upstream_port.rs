@@ -6,9 +6,8 @@
 
 mod test_common;
 
-use opurs::{
-    opus_dred_alloc, opus_dred_decoder_create, opus_dred_parse, opus_dred_process, OPUS_OK,
-};
+use opurs::internals::OPUS_OK;
+use opurs::{opus_dred_alloc, opus_dred_decoder_create, opus_dred_parse, opus_dred_process};
 use test_common::TestRng;
 
 const DEFAULT_ITERS: usize = 20_000;

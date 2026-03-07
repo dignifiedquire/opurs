@@ -1,6 +1,6 @@
+use opurs::internals::OPUS_BANDWIDTH_NARROWBAND;
 use opurs::{
     opus_packet_get_bandwidth, opus_packet_get_nb_channels, Channels, OpusDecoder, SampleRate,
-    OPUS_BANDWIDTH_NARROWBAND,
 };
 
 const MAX_FRAME_SAMP: i32 = 5760;

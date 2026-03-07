@@ -191,7 +191,7 @@ fn test_decoder_all_2byte_prefixes() {
 
         // Get expected sample counts
         for t in 0..NUM_DECODERS {
-            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..1]));
+            expected[t] = res_to_i32(decoders[t].nb_samples(&packet[..1]));
             assert!(
                 expected[t] <= 2880,
                 "dec[{t}] mode {i}: nb_samples {} > 2880",
@@ -369,7 +369,7 @@ fn test_decoder_fuzz() {
         packet[0] = (i << 2) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..1]));
+            expected[t] = res_to_i32(decoders[t].nb_samples(&packet[..1]));
         }
 
         let mut j = 2 + skip;
@@ -420,7 +420,7 @@ fn test_decoder_fuzz() {
         packet[0] = (modes[i] as i32 * 4) as u8;
 
         for t in 0..NUM_DECODERS {
-            expected[t] = res_to_i32(decoders[t].get_nb_samples(&packet[..plen as usize]));
+            expected[t] = res_to_i32(decoders[t].nb_samples(&packet[..plen as usize]));
         }
 
         for j in 0..plen {
@@ -482,7 +482,7 @@ fn test_decoder_fuzz() {
 
     for i in 0..4096 {
         packet[0] = (modes[i] as i32 * 4) as u8;
-        let expected = res_to_i32(decoders[t].get_nb_samples(&packet[..plen as usize]));
+        let expected = res_to_i32(decoders[t].nb_samples(&packet[..plen as usize]));
 
         for _ in 0..10 {
             for j in 0..plen {

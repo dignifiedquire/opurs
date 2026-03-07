@@ -125,6 +125,7 @@ pub(crate) trait OpusBackendTrait {
 }
 
 mod rust_backend {
+    use crate::opus::opus_defines::{OPUS_AUTO, OPUS_UNIMPLEMENTED};
     use crate::{
         Application, Bitrate, Channels, OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder,
         SampleRate,
@@ -161,7 +162,7 @@ mod rust_backend {
             st.set_bitrate(Bitrate::from(val));
         }
         fn enc_set_bandwidth(st: &mut Box<OpusEncoder>, val: i32) {
-            let bw = if val == crate::OPUS_AUTO {
+            let bw = if val == OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -178,7 +179,7 @@ mod rust_backend {
             st.set_complexity(val).unwrap();
         }
         fn enc_set_force_channels(st: &mut Box<OpusEncoder>, val: i32) {
-            let ch = if val == crate::OPUS_AUTO {
+            let ch = if val == OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -252,7 +253,7 @@ mod rust_backend {
             #[cfg(not(feature = "dred"))]
             {
                 let _ = (st, data);
-                Err(crate::OPUS_UNIMPLEMENTED)
+                Err(OPUS_UNIMPLEMENTED)
             }
         }
 
@@ -319,7 +320,7 @@ mod rust_backend {
             #[cfg(not(feature = "deep-plc"))]
             {
                 let _ = (st, data);
-                Err(crate::OPUS_UNIMPLEMENTED)
+                Err(OPUS_UNIMPLEMENTED)
             }
         }
 
@@ -352,13 +353,13 @@ mod rust_backend {
                 if st.load_dnn_weights() {
                     Ok(())
                 } else {
-                    Err(crate::OPUS_UNIMPLEMENTED)
+                    Err(OPUS_UNIMPLEMENTED)
                 }
             }
             #[cfg(not(feature = "builtin-weights"))]
             {
                 let _ = st;
-                Err(crate::OPUS_UNIMPLEMENTED)
+                Err(OPUS_UNIMPLEMENTED)
             }
         }
 
@@ -367,7 +368,7 @@ mod rust_backend {
             if st.set_dnn_blob(data) {
                 Ok(())
             } else {
-                Err(crate::OPUS_UNIMPLEMENTED)
+                Err(OPUS_UNIMPLEMENTED)
             }
         }
 
@@ -429,7 +430,7 @@ mod rust_backend {
         }
 
         fn ms_enc_set_bandwidth(st: &mut Self::MSEncoder, val: i32) {
-            let bw = if val == crate::OPUS_AUTO {
+            let bw = if val == OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -458,7 +459,7 @@ mod rust_backend {
         }
 
         fn ms_enc_set_force_channels(st: &mut Self::MSEncoder, val: i32) {
-            let ch = if val == crate::OPUS_AUTO {
+            let ch = if val == OPUS_AUTO {
                 None
             } else {
                 Some(val.try_into().unwrap())
@@ -560,7 +561,7 @@ mod libopus {
     };
     use libopus_sys::{OpusDecoder, OpusEncoder, OpusMSDecoder, OpusMSEncoder};
 
-    use crate::{
+    use crate::opus::opus_defines::{
         OPUS_GET_FINAL_RANGE_REQUEST, OPUS_GET_LAST_PACKET_DURATION_REQUEST,
         OPUS_GET_LOOKAHEAD_REQUEST, OPUS_SET_BANDWIDTH_REQUEST, OPUS_SET_BITRATE_REQUEST,
         OPUS_SET_COMPLEXITY_REQUEST, OPUS_SET_DNN_BLOB_REQUEST, OPUS_SET_DRED_DURATION_REQUEST,

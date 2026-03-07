@@ -502,7 +502,7 @@ impl OpusEncoder {
     }
 
     /// Upstream C: src/opus_encoder.c:opus_encoder_ctl
-    pub fn get_bandwidth(&self) -> i32 {
+    pub fn bandwidth(&self) -> i32 {
         self.bandwidth
     }
 

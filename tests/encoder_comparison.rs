@@ -9,10 +9,10 @@
 extern crate opurs;
 
 use libopus_sys::{opus_encode, opus_encoder_create, opus_encoder_ctl, opus_encoder_destroy};
-use opurs::{
-    Application, Channels, SampleRate, OPUS_APPLICATION_AUDIO, OPUS_SET_BITRATE_REQUEST,
-    OPUS_SET_COMPLEXITY_REQUEST,
+use opurs::internals::{
+    OPUS_APPLICATION_AUDIO, OPUS_SET_BITRATE_REQUEST, OPUS_SET_COMPLEXITY_REQUEST,
 };
+use opurs::{Application, Channels, SampleRate};
 
 /// Simple deterministic PRNG for audio generation
 struct Rng(u64);
