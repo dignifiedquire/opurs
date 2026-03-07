@@ -68,7 +68,7 @@ fn opus_ifft_c(st: &opurs::internals::KissFftState, fin: &[Complex32], fout: &mu
 
 fn test_fft(nfft: usize, isinverse: bool) {
     // Get FFT state from mode
-    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960).expect("Failed to create mode");
 
     let shift = match nfft {
         480 => 0,

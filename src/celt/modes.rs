@@ -45,7 +45,7 @@ pub const STATIC_MODE_LIST: [&OpusCustomMode; 2] = [
     &data_96000::MODE96000_1920_240,
 ];
 use crate::celt::mdct::MdctLookup;
-use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_OK};
+use crate::error::ErrorCode;
 
 #[cfg(feature = "qext")]
 use self::data_96000::{
@@ -73,23 +73,15 @@ const BAND_ALLOCATION: [u8; 231] = [
 pub fn opus_custom_mode_create(
     fs: i32,
     frame_size: i32,
-    error: Option<&mut i32>,
-) -> Option<&'static OpusCustomMode> {
-    // TODO: maybe return Result instead of error code?
+) -> Result<&'static OpusCustomMode, ErrorCode> {
     for mode in STATIC_MODE_LIST {
         for j in 0..4 {
             if fs == mode.fs && frame_size << j == mode.short_mdct_size * mode.nb_short_mdcts {
-                if let Some(error) = error {
-                    *error = OPUS_OK;
-                }
-                return Some(mode);
+                return Ok(mode);
             }
         }
     }
-    if let Some(error) = error {
-        *error = OPUS_BAD_ARG;
-    }
-    None
+    Err(ErrorCode::BadArg)
 }
 
 /// Build a temporary QEXT mode from the base mode.

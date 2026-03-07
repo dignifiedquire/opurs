@@ -217,16 +217,16 @@ pub fn validate_celt_decoder(st: &OpusCustomDecoder) {
 pub fn celt_decoder_init(sampling_rate: i32, channels: usize) -> Result<OpusCustomDecoder, i32> {
     #[cfg(feature = "qext")]
     let (mode, downsample) = if sampling_rate == 96000 {
-        (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
+        (opus_custom_mode_create(96000, 1920).unwrap(), 1)
     } else {
         (
-            opus_custom_mode_create(48000, 960, None).unwrap(),
+            opus_custom_mode_create(48000, 960).unwrap(),
             resampling_factor(sampling_rate),
         )
     };
     #[cfg(not(feature = "qext"))]
     let (mode, downsample) = (
-        opus_custom_mode_create(48000, 960, None).unwrap(),
+        opus_custom_mode_create(48000, 960).unwrap(),
         resampling_factor(sampling_rate),
     );
     let mut st = opus_custom_decoder_init(mode, channels)?;
@@ -2697,18 +2697,18 @@ mod tests {
 
     #[test]
     fn decoder_sets_qext_scale_from_mode() {
-        let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
+        let mode_96k = opus_custom_mode_create(96000, 1920).unwrap();
         let dec_96k = opus_custom_decoder_init(mode_96k, 2).unwrap();
         assert_eq!(dec_96k.qext_scale, 2);
 
-        let mode_48k = opus_custom_mode_create(48000, 960, None).unwrap();
+        let mode_48k = opus_custom_mode_create(48000, 960).unwrap();
         let dec_48k = opus_custom_decoder_init(mode_48k, 2).unwrap();
         assert_eq!(dec_48k.qext_scale, 1);
     }
 
     #[test]
     fn decoder_reset_clears_qext_history() {
-        let mode_96k = opus_custom_mode_create(96000, 1920, None).unwrap();
+        let mode_96k = opus_custom_mode_create(96000, 1920).unwrap();
         let mut dec = opus_custom_decoder_init(mode_96k, 2).unwrap();
         dec.qext_old_band_e.fill(1.0);
         dec.reset();

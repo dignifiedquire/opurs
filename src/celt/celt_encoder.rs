@@ -177,16 +177,16 @@ impl OpusCustomEncoder {
         }
         #[cfg(feature = "qext")]
         let (mode, upsample) = if sampling_rate == 96000 {
-            (opus_custom_mode_create(96000, 1920, None).unwrap(), 1)
+            (opus_custom_mode_create(96000, 1920).unwrap(), 1)
         } else {
             (
-                opus_custom_mode_create(48000, 960, None).unwrap(),
+                opus_custom_mode_create(48000, 960).unwrap(),
                 resampling_factor(sampling_rate),
             )
         };
         #[cfg(not(feature = "qext"))]
         let (mode, upsample) = (
-            opus_custom_mode_create(48000, 960, None).unwrap(),
+            opus_custom_mode_create(48000, 960).unwrap(),
             resampling_factor(sampling_rate),
         );
         #[cfg(feature = "qext")]

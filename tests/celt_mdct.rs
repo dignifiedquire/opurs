@@ -63,7 +63,7 @@ fn check_inverse(input: &[f32], output: &[f32], nfft: usize) -> f64 {
 }
 
 fn test_mdct_forward(nfft: usize) {
-    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960).expect("Failed to create mode");
 
     let shift = match nfft {
         1920 => 0,
@@ -97,7 +97,7 @@ fn test_mdct_forward(nfft: usize) {
 }
 
 fn test_mdct_inverse(nfft: usize) {
-    let mode = opurs::opus_custom_mode_create(48000, 960, None).expect("Failed to create mode");
+    let mode = opurs::opus_custom_mode_create(48000, 960).expect("Failed to create mode");
 
     let shift = match nfft {
         1920 => 0,
