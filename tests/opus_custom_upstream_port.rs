@@ -173,9 +173,7 @@ fn encode_frame(
         (RustEncoder::Custom(st), SampleFormat::Float) => {
             st.encode_float(&input.f32_samples[lo..hi], packet)
         }
-        (RustEncoder::Opus(st), SampleFormat::I16) => {
-            st.encode(&input.i16_samples[lo..hi], packet)
-        }
+        (RustEncoder::Opus(st), SampleFormat::I16) => st.encode(&input.i16_samples[lo..hi], packet),
         (RustEncoder::Opus(st), SampleFormat::I24) => {
             st.encode24(&input.i24_samples[lo..hi], packet)
         }

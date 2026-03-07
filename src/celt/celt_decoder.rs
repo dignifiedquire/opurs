@@ -349,7 +349,12 @@ impl OpusCustomDecoder {
     /// Returns number of decoded samples per channel on success.
     ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode
-    pub fn decode(&mut self, data: &[u8], pcm: &mut [i16], frame_size: i32) -> Result<usize, ErrorCode> {
+    pub fn decode(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [i16],
+        frame_size: i32,
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
             return Err(ErrorCode::BadArg);
         }
@@ -388,7 +393,12 @@ impl OpusCustomDecoder {
     /// Returns number of decoded samples per channel on success.
     ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode_float
-    pub fn decode_float(&mut self, data: &[u8], pcm: &mut [f32], frame_size: i32) -> Result<usize, ErrorCode> {
+    pub fn decode_float(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [f32],
+        frame_size: i32,
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
             return Err(ErrorCode::BadArg);
         }
@@ -425,7 +435,12 @@ impl OpusCustomDecoder {
     /// Returns number of decoded samples per channel on success.
     ///
     /// Upstream C: celt/celt_decoder.c:opus_custom_decode24
-    pub fn decode24(&mut self, data: &[u8], pcm: &mut [i32], frame_size: i32) -> Result<usize, ErrorCode> {
+    pub fn decode24(
+        &mut self,
+        data: &[u8],
+        pcm: &mut [i32],
+        frame_size: i32,
+    ) -> Result<usize, ErrorCode> {
         if frame_size <= 0 {
             return Err(ErrorCode::BadArg);
         }
@@ -465,7 +480,6 @@ impl OpusCustomDecoder {
         self.signalling = signalling;
     }
 }
-
 
 /// Upstream C: celt/celt_decoder.c:deemphasis_stereo_simple
 #[inline]

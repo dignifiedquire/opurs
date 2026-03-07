@@ -39,8 +39,8 @@ use crate::celt::rate::clt_compute_allocation;
 #[cfg(feature = "qext")]
 use crate::celt::rate::clt_compute_extra_allocation;
 
-use crate::opus::analysis::AnalysisInfo;
 use crate::error::ErrorCode;
+use crate::opus::analysis::AnalysisInfo;
 use crate::opus::opus_defines::{OPUS_BAD_ARG, OPUS_BITRATE_MAX, OPUS_INTERNAL_ERROR};
 use crate::silk::macros::EC_CLZ0;
 
@@ -440,7 +440,6 @@ impl OpusCustomEncoder {
         self.signalling = signalling;
     }
 }
-
 
 #[cfg(all(test, feature = "qext"))]
 mod tests {
