@@ -784,7 +784,7 @@ impl OpusMSEncoder {
 
     fn apply_stream_target_bitrates(&mut self, frame_size: usize) {
         let rates = self.stream_target_bitrates(frame_size);
-        for (encoder, rate) in self.encoders.iter_mut().zip(rates.into_iter()) {
+        for (encoder, rate) in self.encoders.iter_mut().zip(rates) {
             encoder.set_bitrate(Bitrate::Bits(rate));
         }
     }
